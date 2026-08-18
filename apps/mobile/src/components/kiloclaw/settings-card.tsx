@@ -7,7 +7,7 @@ import {
   EyeOff,
   KeyRound,
   Trash2,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';

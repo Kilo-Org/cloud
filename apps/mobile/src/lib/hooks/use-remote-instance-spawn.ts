@@ -16,11 +16,12 @@ import {
   type CreateRemoteSessionInput,
   type CreateSessionOutcome,
   createSessionSpawner,
+  type CreateSessionSpawnOptions,
   mergeSpawnOrganizationId,
   resolveSpawnOrganizationId,
 } from './remote-instance-spawn-classifier';
 
-export type { CreateRemoteSessionInput, CreateSessionOutcome };
+export type { CreateRemoteSessionInput, CreateSessionOutcome, CreateSessionSpawnOptions };
 export { buildCreateRemoteSessionInput };
 
 export type RemoteInstanceSpawnStatus =
@@ -39,6 +40,11 @@ export type RemoteInstanceSpawnStatus =
  * underlying SDK call is one-shot per `spawn()` call — no in-hook retry
  * loop, no toast, no debouncing; the caller drives those.
  *
+ * The caller may pass a stable per-intent `operationKey` in the third
+ * `spawn()` argument; the spawner forwards it to the SDK as `mutationId`
+ * so a retry of the same intent dedupes against the relay instead of
+ * spawning a second session.
+ *
  * `organizationId` tri-state:
  *   - omitted (`undefined`) — inherit live `useOrganization()` (share-gate
  *     and other zero-arg callers that intentionally follow global context)
@@ -50,7 +56,11 @@ export type RemoteInstanceSpawnStatus =
  */
 export function useRemoteInstanceSpawn(organizationId?: string | null): {
   status: RemoteInstanceSpawnStatus;
-  spawn: (connectionId: string, opts?: CreateRemoteSessionInput) => Promise<CreateSessionOutcome>;
+  spawn: (
+    connectionId: string,
+    opts?: CreateRemoteSessionInput,
+    options?: CreateSessionSpawnOptions
+  ) => Promise<CreateSessionOutcome>;
 } {
   const connection = useUserWebConnection();
   const { organizationId: contextOrganizationId } = useOrganization();
@@ -63,11 +73,12 @@ export function useRemoteInstanceSpawn(organizationId?: string | null): {
 
   const spawn = async (
     connectionId: string,
-    opts?: CreateRemoteSessionInput
+    opts?: CreateRemoteSessionInput,
+    options?: CreateSessionSpawnOptions
   ): Promise<CreateSessionOutcome> => {
     setStatus({ status: 'inFlight' });
     const merged = mergeSpawnOrganizationId(opts, resolvedOrganizationId);
-    const outcome = await spawner.spawn(connectionId, merged);
+    const outcome = await spawner.spawn(connectionId, merged, options);
     setStatus({ ...outcome, creationKey: spawner.creationKey });
     return outcome;
   };

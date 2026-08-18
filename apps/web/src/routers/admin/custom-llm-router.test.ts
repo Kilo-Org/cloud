@@ -17,7 +17,8 @@ const validDefinition: CustomLlmDefinition = {
   context_length: 128000,
   max_completion_tokens: 4096,
   base_url: 'https://api.openai.com/v1',
-  organization_ids: ['org_test_123'],
+  organization_ids: ['00000000-0000-4000-8000-000000000100'],
+  group_ids: ['00000000-0000-4000-8000-000000000123'],
 };
 
 beforeEach(async () => {
@@ -52,6 +53,7 @@ describe('adminCustomLlmRouter', () => {
 
       expect(result.public_id).toBe(publicId);
       expect(result.definition.display_name).toBe('Custom GPT-4');
+      expect(result.definition.group_ids).toEqual(validDefinition.group_ids);
       expect((result.definition as Record<string, unknown>).api_key).toBeUndefined();
       expect((result as Record<string, unknown>).encrypted_api_key).toBeUndefined();
 

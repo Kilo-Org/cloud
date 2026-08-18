@@ -23,6 +23,10 @@ export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(
   'ai-gateway:sync-providers:last-completed-at'
 );
 
+export const SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY = redisKey(
+  'ai-gateway:sync-providers:stale-alert-last-posted-at'
+);
+
 export const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: redisKey('ai-gateway.metadata:all-providers'),
   // Lightweight lists of language model ids used for existence checks without
@@ -40,15 +44,6 @@ export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProv
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
-/**
- * Per-user list of BYOK provider ids a user has used, written daily by the
- * `sync-byok-provider-notifications` cron and read when notifications are polled.
- * Storing one entry per user keeps the read tiny instead of fetching the whole
- * dataset on every poll.
- */
-export const byokProvidersNotificationRedisKey = (userId: string) =>
-  redisKey(`notification:byok-providers:${userId}`);
-
 export const codingPlanUsageRedisKey = (input: {
   userId: string;
   subscriptionId: string;
@@ -59,12 +54,6 @@ export const codingPlanUsageRedisKey = (input: {
   redisKey(
     `coding-plan-usage:v1:${input.userId}:${input.subscriptionId}:${input.planId}:${input.providerId}:${input.inventoryId}`
   );
-
-export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
-  'public-api:leaderboard-model-provider-usage'
-);
-export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
-export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
 export const REQUEST_LOGGING_OPT_INS_REDIS_KEY = redisKey('ai-gateway:request-logging-opt-ins');
 

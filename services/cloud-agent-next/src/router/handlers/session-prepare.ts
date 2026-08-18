@@ -36,7 +36,11 @@ import {
   UpdateSessionOutput,
   isBuiltinMode,
 } from '../schemas.js';
-import { registerNewSession, startNewSession } from '../../session/session-registration.js';
+import {
+  registerNewSession,
+  startNewSession,
+  createSessionWithLedger,
+} from '../../session/session-registration.js';
 import { getPgDb } from '../../db/pg.js';
 import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
@@ -289,6 +293,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       kilocodeOrganizationId: input.kilocodeOrganizationId,
       createdOnPlatform: input.createdOnPlatform,
       shallow: input.shallow,
+      operationKey: input.operationKey,
     },
   };
 }
@@ -362,33 +367,36 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
       }
 
+      const operationKey = requestWithProfile.options?.operationKey;
+      const registrationContext = {
+        env: ctx.env,
+        userId: ctx.userId,
+        authToken: ctx.authToken,
+        botId: ctx.botId,
+      };
+      const billingOrigin = { billingOrigin: input.createdOnPlatform };
+      // Admit into the operation ledger only when the client supplied an
+      // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
+      // key is ignored and the legacy split-flow behavior is preserved.
       const result =
-        input.autoInitiate === true
-          ? await startNewSession(
-              requestWithProfile,
-              {
-                env: ctx.env,
-                userId: ctx.userId,
-                authToken: ctx.authToken,
-                botId: ctx.botId,
-              },
-              { billingOrigin: input.createdOnPlatform }
-            )
-          : await registerNewSession(
-              requestWithProfile,
-              {
-                env: ctx.env,
-                userId: ctx.userId,
-                authToken: ctx.authToken,
-                botId: ctx.botId,
-              },
-              { billingOrigin: input.createdOnPlatform }
-            );
+        input.autoInitiate === true && operationKey
+          ? await createSessionWithLedger(requestWithProfile, registrationContext, {
+              ...billingOrigin,
+              operationKey,
+              startedAt: Date.now(),
+            })
+          : input.autoInitiate === true
+            ? await startNewSession(requestWithProfile, registrationContext, billingOrigin)
+            : await registerNewSession(requestWithProfile, registrationContext, billingOrigin);
 
-      return {
+      const response = {
         cloudAgentSessionId: result.cloudAgentSessionId,
         kiloSessionId: result.kiloSessionId,
       };
+      if ('replayed' in result && result.replayed === true) {
+        return { ...response, replayed: true };
+      }
+      return response;
     });
   });
 

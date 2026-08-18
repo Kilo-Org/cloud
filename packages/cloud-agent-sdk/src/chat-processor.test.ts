@@ -149,6 +149,68 @@ describe('createChatProcessor', () => {
       expect(storedFile.source?.text.value).toBe('');
     });
 
+    // --- onFilePart callback gates ---
+
+    it('calls onFilePart for a top-level FilePart with a non-blank url', () => {
+      const storage = createMemoryStorage();
+      const onFilePart = jest.fn();
+      const processor = createChatProcessor(storage, { onFilePart });
+      const part = makeFilePart('part-file', 'msg-1');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      expect(onFilePart).toHaveBeenCalledTimes(1);
+      expect(onFilePart).toHaveBeenCalledWith('part-file', {
+        mime: 'text/plain',
+        filename: 'readme.txt',
+        url: 'data:text/plain;base64,aGVsbG8=',
+      });
+    });
+
+    it('does not call onFilePart when the file url is blank', () => {
+      const storage = createMemoryStorage();
+      const onFilePart = jest.fn();
+      const processor = createChatProcessor(storage, { onFilePart });
+      const part = makeFilePart('part-file', 'msg-1');
+      part.url = '';
+
+      processor.process({ type: 'message.part.updated', part });
+
+      expect(onFilePart).not.toHaveBeenCalled();
+    });
+
+    it('still strips the stored url and source text when onFilePart is supplied', () => {
+      const storage = createMemoryStorage();
+      const onFilePart = jest.fn();
+      const processor = createChatProcessor(storage, { onFilePart });
+      const part = makeFilePart('part-file', 'msg-1');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      const storedFile = stored[0] satisfies Part as FilePart;
+      expect(storedFile.url).toBe('');
+      expect(storedFile.source?.text.value).toBe('');
+      expect(onFilePart).toHaveBeenCalled();
+    });
+
+    it('continues processing when onFilePart throws', () => {
+      const storage = createMemoryStorage();
+      const onFilePart = jest.fn(() => {
+        throw new Error('sink failed');
+      });
+      const processor = createChatProcessor(storage, { onFilePart });
+      const part = makeFilePart('part-file', 'msg-1');
+
+      expect(() => processor.process({ type: 'message.part.updated', part })).not.toThrow();
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      const storedFile = stored[0] satisfies Part as FilePart;
+      expect(storedFile.url).toBe('');
+    });
+
     // --- onToolAttachment callback gates ---
 
     it('calls onToolAttachment for image attachments from any tool', () => {

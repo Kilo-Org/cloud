@@ -288,6 +288,7 @@ function sendHeartbeat(
     status: string;
     title: string;
     platform?: string;
+    prLink?: { platform: string; prUrl: string; prNumber: number };
   }>,
   options: {
     protocolVersion?: string;
@@ -765,6 +766,39 @@ describe('UserConnectionDO', () => {
 
       const msgs = allSent(cliWs);
       expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
+    });
+
+    it('broadcasts a heartbeat session prLink to web sockets', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'busy',
+          title: 'PR session',
+          prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/42', prNumber: 42 },
+        },
+      ]);
+
+      expect(parseSent(webWs)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: {
+          connectionId: 'cli-1',
+          sessions: [
+            {
+              id: 's1',
+              prLink: {
+                platform: 'github',
+                prUrl: 'https://github.com/o/r/pull/42',
+                prNumber: 42,
+              },
+            },
+          ],
+        },
+      });
     });
 
     // -----------------------------------------------------------------------

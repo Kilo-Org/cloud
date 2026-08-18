@@ -1,6 +1,6 @@
 // Shared status helpers for PR file rows.
 
-import { File, FileMinus, FilePlus } from 'lucide-react-native';
+import { File, FileMinus, FilePlus } from '@/components/ui/icons';
 
 export function fileStatusLabel(status: string): string {
   switch (status) {

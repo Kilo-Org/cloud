@@ -1,6 +1,17 @@
 import { SHARE_PAYLOAD_MAX_ENTRIES, type ShareId } from '@/lib/share-payload';
 
-export type PendingShareNavigation = { href: string; shareId: ShareId };
+export type PendingShareNavigation = { href: string; shareId: ShareId | null };
+
+/**
+ * Narrow a pending navigation to the delivery case: `shareId` is a string.
+ * A null `shareId` means the gate dismissed to a non-share destination (e.g.
+ * Review PR) that must push `href` without delivering a payload.
+ */
+export function shareDeliveryShareId(
+  pending: PendingShareNavigation
+): pending is PendingShareNavigation & { shareId: ShareId } {
+  return pending.shareId !== null;
+}
 
 /** FIFO of committed share destinations waiting for gate dismiss + delivery. */
 const pendingQueue: PendingShareNavigation[] = [];
@@ -18,15 +29,23 @@ export function takePendingShareNavigation(): PendingShareNavigation | null {
   return pendingQueue.shift() ?? null;
 }
 
-/** Append the share delivery params to a route path. */
+/**
+ * Append the share delivery params to a route path.
+ *
+ * `mode` carries the agent mode the spawn was started with. A freshly spawned
+ * session has no stored config yet, so without it the destination composer
+ * falls back to `code` and the auto-sent first message switches the session
+ * off the chosen mode.
+ */
 export function appendShareParams(
   base: string,
   shareId: ShareId,
-  options: { autoSend?: boolean } = {}
+  options: { autoSend?: boolean; mode?: string } = {}
 ): string {
   const separator = base.includes('?') ? '&' : '?';
   const autoSend = options.autoSend === true ? '&autoSend=1' : '';
-  return `${base}${separator}shareId=${encodeURIComponent(shareId)}${autoSend}`;
+  const mode = options.mode ? `&mode=${encodeURIComponent(options.mode)}` : '';
+  return `${base}${separator}shareId=${encodeURIComponent(shareId)}${autoSend}${mode}`;
 }
 
 /** Parse the destination params a focused delivery must set from a pending href. */

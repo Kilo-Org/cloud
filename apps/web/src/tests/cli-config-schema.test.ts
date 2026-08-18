@@ -39,6 +39,44 @@ const upstream: Schema = {
   },
 };
 
+const referencedUpstream: Schema = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $ref: '#/$defs/Config',
+  $defs: {
+    Config: {
+      type: 'object',
+      properties: {
+        existing: { type: 'boolean' },
+        agent: {
+          type: 'object',
+          properties: {
+            build: { ref: 'AgentConfig', type: 'object', properties: {} },
+          },
+        },
+        experimental: {
+          type: 'object',
+          properties: {
+            batch_tool: { type: 'boolean' },
+          },
+        },
+      },
+      additionalProperties: false,
+    },
+    PermissionConfig: {
+      anyOf: [
+        { $ref: '#/$defs/PermissionActionConfig' },
+        {
+          type: 'object',
+          properties: {
+            read: { $ref: '#/$defs/PermissionRuleConfig' },
+          },
+          additionalProperties: { $ref: '#/$defs/PermissionRuleConfig' },
+        },
+      ],
+    },
+  },
+};
+
 describe('kilo config.json schema merge', () => {
   const out = merge(upstream);
   const props = out.properties as Record<string, unknown>;
@@ -134,5 +172,41 @@ describe('kilo config.json schema merge', () => {
     expect(out.$schema).toBe(upstream.$schema);
     expect(out.ref).toBe('Config');
     expect(out.type).toBe('object');
+  });
+
+  test('adds Kilo keys to a referenced Config definition', () => {
+    const out = merge(referencedUpstream);
+    const defs = out.$defs as Record<string, unknown>;
+    const config = defs.Config as {
+      properties: Record<string, unknown>;
+      additionalProperties: boolean;
+    };
+    const props = config.properties;
+
+    expect(props.commit_message).toBeDefined();
+    expect(props.remote_control).toBeDefined();
+    expect(props.web_search).toBeDefined();
+    expect(props.privacy_mode).toBeDefined();
+    expect(props.existing).toEqual({ type: 'boolean' });
+
+    const agent = props.agent as { properties: Record<string, unknown> };
+    expect(agent.properties.ask).toBeDefined();
+    expect(agent.properties.debug).toBeDefined();
+    expect(agent.properties.orchestrator).toBeDefined();
+    expect(agent.properties.build).toBeDefined();
+
+    const experimental = props.experimental as { properties: Record<string, unknown> };
+    expect(experimental.properties.codebase_search).toBeDefined();
+    expect(experimental.properties.batch_tool).toBeDefined();
+    expect(config.additionalProperties).toBe(false);
+    expect(out.properties).toBeUndefined();
+  });
+
+  test('does not mutate the upstream referenced schema', () => {
+    const before = structuredClone(referencedUpstream);
+
+    merge(referencedUpstream);
+
+    expect(referencedUpstream).toEqual(before);
   });
 });

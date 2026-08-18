@@ -128,6 +128,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
   return tokenResponse.data;
 }
 
+/**
+ * The stable per-device Expo push token, or null when the permission is not
+ * granted (denied or undetermined), so the device never obtained a token this
+ * install. Rejects when either expo call throws — the caller decides how to
+ * treat a failed lookup.
+ */
 export async function getDevicePushToken(): Promise<string | null> {
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== Notifications.PermissionStatus.GRANTED) {
@@ -138,6 +144,27 @@ export async function getDevicePushToken(): Promise<string | null> {
     projectId: getProjectId(),
   });
   return tokenResponse.data;
+}
+
+export type DevicePushTokenOutcome =
+  | { kind: 'none' }
+  | { kind: 'token'; token: string }
+  | { kind: 'lookup-failed' };
+
+/**
+ * Three-outcome device push token read for sign-out cleanup. `'none'` means
+ * the permission is not granted (denied or undetermined), so the device never
+ * obtained a token this install and there is nothing to unregister. `'token'`
+ * is the stable per-device Expo push token. `'lookup-failed'` means either
+ * expo call threw, so a server row may exist and reconciliation must re-read.
+ */
+export async function getDevicePushTokenOutcome(): Promise<DevicePushTokenOutcome> {
+  try {
+    const token = await getDevicePushToken();
+    return token === null ? { kind: 'none' } : { kind: 'token', token };
+  } catch {
+    return { kind: 'lookup-failed' };
+  }
 }
 
 export async function getNotificationPermissionStatus(): Promise<

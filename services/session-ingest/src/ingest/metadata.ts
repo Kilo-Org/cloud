@@ -23,6 +23,9 @@ type SessionMetadataUpdates = Partial<
     | 'git_branch'
     | 'status'
     | 'status_updated_at'
+    | 'platform'
+    | 'pr_url'
+    | 'pr_number'
   >
 >;
 
@@ -46,6 +49,14 @@ export function computeSessionMetadataUpdates(
   if (mergedChanges.has('status')) {
     updates.status = mergedChanges.get('status') ?? null;
     updates.status_updated_at = now();
+  }
+  // PR-link triple. `platform` here is the PR host (not created_on_platform); the
+  // change-map string for prNumber is converted back to an integer, or null on clear.
+  if (mergedChanges.has('prPlatform')) updates.platform = mergedChanges.get('prPlatform') ?? null;
+  if (mergedChanges.has('prUrl')) updates.pr_url = mergedChanges.get('prUrl') ?? null;
+  if (mergedChanges.has('prNumber')) {
+    const raw = mergedChanges.get('prNumber');
+    updates.pr_number = raw === null ? null : Number(raw);
   }
 
   return updates;
@@ -311,6 +322,9 @@ export async function applyMetadataChanges(
       organizationIdWriteApplied ||
       mergedChanges.has('gitUrl') ||
       mergedChanges.has('gitBranch') ||
+      mergedChanges.has('prPlatform') ||
+      mergedChanges.has('prUrl') ||
+      mergedChanges.has('prNumber') ||
       parentSessionIdWriteApplied;
 
     if (!changedNonStatus && !statusChange.changed) return null;

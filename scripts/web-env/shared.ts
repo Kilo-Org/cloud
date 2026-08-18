@@ -15,7 +15,6 @@ const ONE_PASSWORD_CLI_DOCS = 'https://www.1password.dev/cli/get-started';
 
 export type Project = (typeof PROJECTS)[number];
 export type Environment = (typeof ENVIRONMENTS)[number];
-export type Values = Record<Environment, string>;
 export type VercelContext = {
   project: Project;
   orgId: string;
@@ -25,6 +24,7 @@ export type OnePasswordContext = {
   accountId: string;
   vaultId: string;
 };
+export type VaultEnvironment = Extract<Environment, 'staging' | 'production'>;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -156,6 +156,77 @@ function vercel(
   );
 }
 
+function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const commandArgs = [
+      'dlx',
+      VERCEL_PACKAGE,
+      ...args,
+      '--scope',
+      'kilocode',
+      '--non-interactive',
+      '--no-color',
+      '--cwd',
+      context.cwd,
+    ];
+    const child = spawn('pnpm', commandArgs, {
+      cwd: context.cwd,
+      env: {
+        ...process.env,
+        VERCEL_ORG_ID: context.orgId,
+        VERCEL_PROJECT_ID: context.project,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stdout: Buffer[] = [];
+    let outputBytes = 0;
+    let settled = false;
+
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const capture = (chunk: Buffer, keep: boolean) => {
+      outputBytes += chunk.length;
+      if (outputBytes > 10 * 1024 * 1024) {
+        child.kill();
+        fail(
+          new Error(
+            `pnpm ${commandArgs.slice(0, 3).join(' ')} failed; provider output exceeded 10 MiB.`
+          )
+        );
+        return;
+      }
+      if (keep) stdout.push(chunk);
+    };
+
+    child.stdout.on('data', chunk => capture(Buffer.from(chunk), true));
+    child.stderr.on('data', chunk => capture(Buffer.from(chunk), false));
+    child.once('error', error => {
+      if (errorCode(error) === 'ENOENT') {
+        const message = missingCommandMessage('pnpm', commandArgs);
+        if (message) {
+          fail(new MissingCommandError(message));
+          return;
+        }
+      }
+      fail(error);
+    });
+    child.once('close', status => {
+      if (settled) return;
+      if (status === 0) {
+        settled = true;
+        resolve(Buffer.concat(stdout).toString('utf8'));
+        return;
+      }
+      fail(
+        new Error(`pnpm ${commandArgs.slice(0, 3).join(' ')} failed; provider output was redacted.`)
+      );
+    });
+  });
+}
+
 function vercelAccessError(error: unknown): Error {
   const details = error instanceof Error ? error.message.trim() : '';
   return new Error(
@@ -228,6 +299,31 @@ export function setVariable(
     ],
     value
   );
+}
+
+export async function redeployLatest(
+  context: VercelContext,
+  environment: Exclude<Environment, 'development'>
+): Promise<string> {
+  const response = parseJson(
+    await vercelAsync(context, [
+      'list',
+      context.project,
+      '--environment',
+      environment,
+      '--status',
+      'READY',
+      '--format=json',
+    ]),
+    `List ${context.project}/${environment} deployments`
+  );
+  const deployment = records(response.deployments)[0];
+  const url = deployment ? stringValue(deployment, 'url') : undefined;
+  if (!url) {
+    throw new Error(`No ready deployment found for ${context.project}/${environment}.`);
+  }
+
+  return (await vercelAsync(context, ['redeploy', url, '--target', environment])).trim();
 }
 
 // setVaultValue streams the secret template to `op` over /dev/fd/3 (see
@@ -383,10 +479,42 @@ function setAuditNote(item: JsonRecord, note: string): void {
   notes.value = preserved ? `${preserved}\n${note}` : note;
 }
 
+function vaultPasswordField(environment: VaultEnvironment, value: string): JsonRecord {
+  if (environment === 'production') {
+    return {
+      id: 'password',
+      label: 'password',
+      type: 'CONCEALED',
+      purpose: 'PASSWORD',
+      value,
+    };
+  }
+  return {
+    id: 'password-staging',
+    label: 'password (staging)',
+    type: 'CONCEALED',
+    value,
+  };
+}
+
+function findVaultPasswordField(
+  fields: JsonRecord[],
+  environment: VaultEnvironment
+): JsonRecord | undefined {
+  const matches = fields.filter(field =>
+    environment === 'production' ? field.id === 'password' : field.label === 'password (staging)'
+  );
+  if (matches.length > 1) {
+    throw new Error(`1Password item has more than one ${environment} password field.`);
+  }
+  return matches[0];
+}
+
 export async function setVaultValue(
   context: OnePasswordContext,
   name: string,
-  value: string
+  value: string,
+  environment: VaultEnvironment
 ): Promise<void> {
   const note = auditNote();
   const existing = findVaultItem(context, name);
@@ -395,13 +523,7 @@ export async function setVaultValue(
       title: name,
       category: 'PASSWORD',
       fields: [
-        {
-          id: 'password',
-          label: 'password',
-          type: 'CONCEALED',
-          purpose: 'PASSWORD',
-          value,
-        },
+        vaultPasswordField(environment, value),
         {
           id: 'notesPlain',
           label: 'notesPlain',
@@ -428,10 +550,12 @@ export async function setVaultValue(
       ),
       `Create ${name}`
     );
-    const createdPassword = records(created.fields).find(field => field.id === 'password');
+    const createdPassword = findVaultPasswordField(records(created.fields), environment);
     const createdNotes = records(created.fields).find(field => field.id === 'notesPlain');
     if (createdPassword?.value !== value || createdNotes?.value !== note) {
-      throw new Error(`1Password did not persist the new ${name} value and audit note.`);
+      throw new Error(
+        `1Password did not persist the new ${name} ${environment} value and audit note.`
+      );
     }
     return;
   }
@@ -451,11 +575,19 @@ export async function setVaultValue(
     ]),
     `Read ${name}`
   );
-  const password = records(item.fields).find(field => field.id === 'password');
-  if (!password || password.type !== 'CONCEALED') {
-    throw new Error(`1Password item ${name} does not have a concealed password field.`);
+  const fields = records(item.fields);
+  const password = findVaultPasswordField(fields, environment);
+  if (password && password.type !== 'CONCEALED') {
+    throw new Error(`1Password item ${name} does not have a concealed ${environment} field.`);
   }
-  password.value = value;
+  if (password) password.value = value;
+  else {
+    const itemFields = item.fields;
+    if (!Array.isArray(itemFields)) {
+      throw new Error('1Password item does not have editable fields.');
+    }
+    itemFields.push(vaultPasswordField(environment, value));
+  }
   setAuditNote(item, note);
   const expectedNotes = stringValue(
     records(item.fields).find(field => field.id === 'notesPlain') ?? {},
@@ -478,10 +610,12 @@ export async function setVaultValue(
     ),
     `Update ${name}`
   );
-  const updatedPassword = records(updated.fields).find(field => field.id === 'password');
+  const updatedPassword = findVaultPasswordField(records(updated.fields), environment);
   const updatedNotes = records(updated.fields).find(field => field.id === 'notesPlain');
   if (updatedPassword?.value !== value || updatedNotes?.value !== expectedNotes) {
-    throw new Error(`1Password did not persist the updated ${name} value and audit note.`);
+    throw new Error(
+      `1Password did not persist the updated ${name} ${environment} value and audit note.`
+    );
   }
 }
 
@@ -512,6 +646,21 @@ export function trackedEnvFiles(repoRoot: string): string[] {
         (!basename.includes('.local') || basename.includes('.example'))
       );
     });
+}
+
+/**
+ * Strip one matching pair of surrounding quotes. Users often paste dotenv-style
+ * values (`"secret"`) into the prompt; those quotes must not be stored in Vercel
+ * or `vercel env pull` writes broken / double-quoted assignments.
+ */
+export function stripSurroundingQuotes(value: string): string {
+  if (value.length < 2) return value;
+  const first = value[0];
+  const last = value[value.length - 1];
+  if ((first === '"' || first === "'") && first === last) {
+    return value.slice(1, -1);
+  }
+  return value;
 }
 
 export function setEnvDefault(file: string, name: string, value: string): void {

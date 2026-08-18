@@ -1,4 +1,4 @@
-import { Share, X } from 'lucide-react-native';
+import { Share, X } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';

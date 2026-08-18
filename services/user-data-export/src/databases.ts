@@ -1,5 +1,7 @@
 import { getWorkerDb, pg } from '@kilocode/db/client';
+import { organizationExportAccess } from '@kilocode/db/organization-export-access';
 import { sql } from 'drizzle-orm';
+import { logExportEvent, safeError, setSpanFields, withSpan } from './observability';
 import type { ReplicaQuery } from './source-adapters';
 
 export type HyperdriveBinding = { connectionString: string };
@@ -7,7 +9,11 @@ export type StateDb = ReturnType<typeof createStateDb>;
 
 export type ExportJob = {
   id: string;
+  /** The requester, for both subject types. Not necessarily whose data this contains. */
   kilo_user_id: string;
+  subject_type: 'user' | 'organization';
+  /** Set exactly when subject_type is 'organization'; a CHECK constraint enforces it. */
+  organization_id: string | null;
   status: 'queued' | 'processing' | 'finalizing' | 'ready' | 'failed' | 'expired';
   snapshot_at: string;
   requested_at: string;
@@ -26,6 +32,33 @@ type MultipartUpload = { id: string; multipart_upload_id: string };
 export type ExportCompletionResult = 'completed' | 'already_completed' | 'fenced';
 type ReadyExportObject = { r2_object_key: string; expires_at: string };
 type ObjectDeletion = { object_key: string; multipart_upload_id: string | null };
+
+/**
+ * Whether `kiloUserId` may reach an export row, for either subject type.
+ *
+ * A personal export is reachable only by the person it belongs to. An organization's
+ * goes through the predicate shared with the web router, so this Worker and the request
+ * path cannot disagree — which they once did, producing an export that generated,
+ * showed as ready, and refused every download.
+ *
+ * Still evaluated here rather than trusted from the caller: this runs on the download
+ * path, and a Worker that took the router's word for it would have no check at all. It
+ * is also evaluated in the same statement as the row lookup, so a revoked admin loses
+ * access immediately rather than at the next lease or cache expiry.
+ */
+function callerMayAccess(kiloUserId: string) {
+  return sql`(
+    (subject_type = 'user' AND kilo_user_id = ${kiloUserId})
+    OR (
+      subject_type = 'organization'
+      AND organization_id IS NOT NULL
+      AND ${organizationExportAccess({
+        kiloUserId,
+        organizationId: sql`user_data_exports.organization_id`,
+      })}
+    )
+  )`;
+}
 
 export function createStateDb(binding: HyperdriveBinding) {
   const db = getWorkerDb(binding.connectionString, { statement_timeout: 30_000 });
@@ -46,7 +79,8 @@ export function createStateDb(binding: HyperdriveBinding) {
         WHERE id = ${exportId} AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
           AND (lease_expires_at IS NULL OR lease_expires_at < now())
-        RETURNING id, kilo_user_id, status, snapshot_at, requested_at, current_source, source_cursor, multipart_upload_id,
+        RETURNING id, kilo_user_id, subject_type, organization_id, status, snapshot_at, requested_at,
+          current_source, source_cursor, multipart_upload_id,
           next_part_number, dispatch_generation, lease_token, r2_object_key
       `);
       return rows.rows[0] ?? null;
@@ -114,7 +148,7 @@ export function createStateDb(binding: HyperdriveBinding) {
           UPDATE user_data_exports
           SET status = 'ready', r2_object_key = ${input.objectKey}, r2_etag = ${input.etag}, size_bytes = ${input.sizeBytes},
             row_count = ${input.rowCount}, current_source = NULL, source_cursor = NULL,
-            completed_at = now(), expires_at = now() + interval '7 days', multipart_upload_id = NULL,
+            completed_at = now(), expires_at = now() + interval '24 hours', multipart_upload_id = NULL,
             lease_token = NULL, lease_expires_at = NULL, updated_at = now()
           WHERE id = ${input.exportId} AND status = 'processing' AND lease_token = ${input.leaseToken}
           RETURNING id
@@ -233,7 +267,8 @@ export function createStateDb(binding: HyperdriveBinding) {
     ): Promise<boolean> {
       const rows = await db.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
-        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        WHERE id = ${exportId}
+          AND ${callerMayAccess(kiloUserId)}
           AND dispatch_generation = ${generation}
           AND status IN ('queued', 'processing', 'finalizing')
         LIMIT 1
@@ -244,7 +279,8 @@ export function createStateDb(binding: HyperdriveBinding) {
       const rows = await db.execute<ReadyExportObject>(sql`
         SELECT r2_object_key, expires_at
         FROM user_data_exports
-        WHERE id = ${exportId} AND kilo_user_id = ${kiloUserId}
+        WHERE id = ${exportId}
+          AND ${callerMayAccess(kiloUserId)}
           AND status = 'ready' AND expires_at > now() AND r2_object_key IS NOT NULL
         LIMIT 1
       `);
@@ -361,23 +397,76 @@ export function createStateDb(binding: HyperdriveBinding) {
 
 type ExportQueueRow = { id: string; export_id: string; generation: number };
 
-export function createReplicaQuery(binding: HyperdriveBinding): ReplicaQuery {
-  return async (text: string, values: unknown[]): Promise<Record<string, unknown>[]> => {
-    const client = new pg.Client({
-      connectionString: binding.connectionString,
-      statement_timeout: 30_000,
+export type ReplicaDatabase = {
+  query: ReplicaQuery;
+  close: () => Promise<void>;
+};
+
+type ReplicaPool = {
+  query: (text: string, values: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+  end: () => Promise<void>;
+};
+
+/**
+ * Build one invocation-scoped warehouse connection pool.
+ *
+ * `database` only labels spans, so pass the logical binding name rather than anything
+ * derived from the connection string, which carries credentials.
+ *
+ * Every source page an export reads passes through here, and Hyperdrive is not
+ * auto-instrumented, so this is the one place that can make read cost visible. The pool
+ * has one client because pages are read sequentially. Keeping it for the invocation avoids
+ * reconnecting for every page while still preventing I/O state from crossing invocations.
+ * Callers must await each query before starting the next; max: 1 is a guard, not a source
+ * of query parallelism.
+ *
+ * The query text is intentionally not recorded. The enclosing per-source span already
+ * identifies which of the six queries ran, so the text would add bytes to every span
+ * without adding information, and keeping it out avoids growing the exported surface.
+ */
+export function createReplicaDatabase(
+  binding: HyperdriveBinding,
+  database: string,
+  createPool: (config: pg.PoolConfig) => ReplicaPool = config => {
+    const pool = new pg.Pool(config);
+    // node-postgres emits idle-client failures through EventEmitter rather than through
+    // query(). Without a listener they become uncaught errors for the invocation.
+    pool.on('error', error => {
+      logExportEvent('warn', 'postgres_pool_error', {
+        database,
+        ...safeError(error),
+      });
     });
-    try {
-      await client.connect();
-      await client.query('BEGIN READ ONLY');
-      const result = await client.query<Record<string, unknown>>(text, values);
-      await client.query('COMMIT');
-      return result.rows;
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      await client.end();
-    }
+    return {
+      query: (text, values) => pool.query<Record<string, unknown>>(text, values),
+      end: () => pool.end(),
+    };
+  }
+): ReplicaDatabase {
+  const pool = createPool({
+    connectionString: binding.connectionString,
+    max: 1,
+    statement_timeout: 30_000,
+  });
+  return {
+    query: (text, values) =>
+      withSpan(
+        'postgres_read_page',
+        { 'db.system.name': 'postgresql', 'db.name': database },
+        async span => {
+          try {
+            const result = await pool.query(text, values);
+            span.setAttribute('db.response.returned_rows', result.rows.length);
+            return result.rows;
+          } catch (error) {
+            span.setAttribute('db.read.failed', true);
+            setSpanFields(span, safeError(error));
+            throw error;
+          }
+        }
+      ),
+    close: () => pool.end(),
   };
 }
+
+export const __test__ = { callerMayAccess };

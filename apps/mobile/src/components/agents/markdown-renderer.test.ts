@@ -308,7 +308,6 @@ describe('MarkdownRenderer key stability', () => {
       renderer.text(' after'),
     ];
     for (const result of [
-      renderer.heading(children),
       renderer.strong(children),
       renderer.em(children),
       renderer.del(children),
@@ -326,16 +325,53 @@ describe('MarkdownRenderer key stability', () => {
     expect(typeof linkResult.props.onPress).toBe('function');
     // Ancestors must not wrap the Pressable in native Text.
     expect(Array.isArray(renderer.text([linkResult]))).toBe(true);
-    expect(Array.isArray(renderer.heading([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.strong([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.em([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.del([linkResult]))).toBe(true);
+    // The linked heading carries real text, so it keeps header semantics too.
+    const linkedHeading = renderer.heading([linkResult]) as ReactElement<Record<string, unknown>>;
+    expect(linkedHeading.props.accessibilityRole).toBe('header');
     // html() with non-string input delegates to textOrChildren
     expect(renderer.html(children)).toMatchObject([
       { type: 'Text' },
       { type: 'MarkdownImage' },
       { type: 'Text' },
     ]);
+  });
+});
+
+describe('MarkdownRenderer heading semantics', () => {
+  it('heading() renders text with the header accessibility role', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.heading('Section title') as ReactElement<Record<string, unknown>>;
+    expect(element.props.accessibilityRole).toBe('header');
+    expect(element.props.children).toBe('Section title');
+  });
+
+  it('heading() gives a mixed image-and-text heading the header role', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [
+      renderer.text('before '),
+      renderer.html('<img alt="a" src="https://x/a.png">'),
+    ];
+    const result = renderer.heading(children) as ReactElement<Record<string, unknown>>;
+    expect(result.props.accessibilityRole).toBe('header');
+  });
+
+  it('heading() keeps an image-only heading pass-through', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [renderer.html('<img alt="a" src="https://x/a.png">')];
+    const result = renderer.heading(children);
+    expect(Array.isArray(result)).toBe(true);
+    expect((result as ReactNode[])[0]).toMatchObject({ type: 'MarkdownImage' });
+  });
+
+  it('plain text and inline formatting keep no header role', async () => {
+    const renderer = await createRenderer();
+    const textElement = renderer.text('plain') as ReactElement<Record<string, unknown>>;
+    const strongElement = renderer.strong('bold') as ReactElement<Record<string, unknown>>;
+    expect(textElement.props.accessibilityRole).toBeUndefined();
+    expect(strongElement.props.accessibilityRole).toBeUndefined();
   });
 });
 

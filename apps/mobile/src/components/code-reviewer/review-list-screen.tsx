@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { GitPullRequest } from 'lucide-react-native';
+import { GitPullRequest } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -133,6 +133,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 return (
                   <Pressable
                     key={review.id}
+                    accessibilityRole="button"
                     className={cn(
                       'py-3 active:opacity-70',
                       index < data.reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'

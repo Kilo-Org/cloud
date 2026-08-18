@@ -13,13 +13,15 @@ vi.mock('@/components/ui/text', () => ({
 const REASON = 'Reference does not exist';
 
 describe('PrMergePartialSuccessBanner', () => {
-  it('renders the merge-success headline and the branch-delete failure reason', () => {
+  it('renders the merge-success headline and the branch-delete failure reason without a live region', () => {
     const element = banner({ reason: REASON });
     const serialized = JSON.stringify(element);
 
     expect(serialized).toContain('Merged');
     expect(serialized).toContain(`Couldn't delete the branch: ${REASON}`);
-    expect(serialized).toContain('polite');
+    // The banner has no live region: the merge hook owns the partial
+    // announcement, so a second announcement channel would double-speak.
+    expect(serialized).not.toContain('polite');
   });
 
   it('contains NO Button or Pressable (no destructive CTA — there is nothing to retry or undo)', () => {

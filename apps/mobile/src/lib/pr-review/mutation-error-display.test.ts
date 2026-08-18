@@ -1,10 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   mutationErrorDisplay,
   mutationErrorDisplayFromError,
 } from '@/lib/pr-review/mutation-error-display';
+import {
+  PR_OPERATION_AMBIGUOUS_MESSAGE,
+  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
+
+// `mutation-error-display` imports the ambiguous-marker constant from the PR
+// operation-ledger helpers, which import `expo-crypto` (and transitively
+// react-native). Mock it so this pure suite stays node-only, same as the
+// other ledger pure tests.
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => 'not-used-in-pure-tests',
+}));
 
 function makeError(code: string, message: string): Error {
   const error = new Error(message);
@@ -24,6 +36,49 @@ describe('mutationErrorDisplay', () => {
     expect(mutationErrorDisplay('submit', classification)).toEqual({
       kind: 'forbidden',
       message: serverMessage,
+    });
+  });
+
+  it('shows the verify-before-retry copy inline (no generic retryable message) for an ambiguous submit-review', () => {
+    // The ledger's ambiguous outcome means the effect may have committed: the
+    // inline error must pass the marker through verbatim — NOT the generic
+    // "check your connection" retryable copy — on both surfaces.
+    const ambiguous = new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);
+    const classification = classifyPrReviewMutationError(ambiguous);
+    expect(classification).toEqual({ kind: 'retryable' });
+    expect(mutationErrorDisplay('submit', classification, ambiguous)).toEqual({
+      kind: 'retryable',
+      message: PR_OPERATION_AMBIGUOUS_MESSAGE,
+    });
+    expect(mutationErrorDisplay('composer', classification, ambiguous)).toEqual({
+      kind: 'retryable',
+      message: PR_OPERATION_AMBIGUOUS_MESSAGE,
+    });
+    // The convenience wrapper classifies then selects the same inline copy.
+    expect(mutationErrorDisplayFromError('submit', ambiguous)).toEqual({
+      kind: 'retryable',
+      message: PR_OPERATION_AMBIGUOUS_MESSAGE,
+    });
+  });
+
+  it('maps the persistence-failure marker to the retry-blocking kind with the honest server copy', () => {
+    // The reconcile-pending persistence failure must never offer a retry CTA:
+    // it maps to the retry-blocking bad-request kind with the server's own
+    // copy (NOT the surface-specific validation copy), on both surfaces.
+    const persistenceFailed = new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+    const classification = classifyPrReviewMutationError(persistenceFailed);
+    expect(classification).toEqual({ kind: 'retryable' });
+    expect(mutationErrorDisplay('composer', classification, persistenceFailed)).toEqual({
+      kind: 'bad-request',
+      message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+    });
+    expect(mutationErrorDisplay('submit', classification, persistenceFailed)).toEqual({
+      kind: 'bad-request',
+      message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+    });
+    expect(mutationErrorDisplayFromError('submit', persistenceFailed)).toEqual({
+      kind: 'bad-request',
+      message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
     });
   });
 

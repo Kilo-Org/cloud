@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import * as Haptics from 'expo-haptics';
 import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
-import { BookOpenCheck, Brain, Check, ChevronDown, Star } from 'lucide-react-native';
+import { BookOpenCheck, Brain, Check, ChevronDown, Star } from '@/components/ui/icons';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -33,6 +33,8 @@ type ModelSelectorProps = {
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
   isLoading?: boolean;
+  /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
+  lockLabel?: string;
 };
 
 type ModelPickerSelectionScopeContextValue = {
@@ -127,6 +129,7 @@ export function ModelSelector({
   onSelect,
   disabled = false,
   isLoading = false,
+  lockLabel,
 }: Readonly<ModelSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -150,7 +153,11 @@ export function ModelSelector({
   const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
   const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
   const accessibilityLabel =
-    hasVariants && variantLabel ? `${modelLabel}, ${variantLabel} thinking effort` : modelLabel;
+    (hasVariants && variantLabel ? `${modelLabel}, ${variantLabel} thinking effort` : modelLabel) +
+    (lockLabel && disabled ? `, Locked by agent "${lockLabel}"` : '');
+  // A pinned variant is meaningful even when the locked option carries a single
+  // variant, so surface the badge whenever a lock label is present.
+  const showVariantBadge = compactVariantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
     if (effectivelyDisabled) {
@@ -192,7 +199,7 @@ export function ModelSelector({
           </View>
         ) : null}
         {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
-        {hasVariants && compactVariantLabel ? (
+        {showVariantBadge ? (
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
             <Brain size={12} color={colors.mutedForeground} />
             <Text className="text-xs font-medium text-muted-foreground" numberOfLines={1}>
@@ -240,63 +247,67 @@ export function ModelPickerOptionRow({
     .filter(Boolean)
     .join(', ');
 
+  // The row is a NON-accessible container with two sibling controls: the
+  // main select (row content) and the favorite star. A pressable nested
+  // inside a pressable would shadow the favorite for assistive technology,
+  // so the two must never nest. The selected check stays a static sibling
+  // to preserve the exact visual order (content, star, check).
   return (
     <View className="border-b border-border">
-      <Pressable
-        className={cn(
-          'flex-row items-center gap-3 px-4 py-3 active:bg-secondary',
-          option.unavailable && 'opacity-50'
-        )}
-        onPress={() => {
-          onSelectModel(option);
-        }}
-        disabled={option.unavailable}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled: option.unavailable, selected }}
-      >
-        <View className="flex-1">
-          <Text className="text-base text-foreground">{option.name}</Text>
-          {option.modelRef ? (
-            <Text selectable className="font-mono text-xs text-muted-foreground">
-              Provider {option.modelRef.providerID}
-            </Text>
-          ) : null}
-          {option.displayId ? (
-            <Text selectable className="font-mono text-xs text-muted-foreground">
-              {option.modelRef ? `Model ${option.displayId}` : option.displayId}
-            </Text>
-          ) : null}
-          {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
-          {option.unavailable ? (
-            <Text className="mt-1 text-xs text-muted-foreground">Unavailable</Text>
-          ) : null}
-          {free || byok || collectsData ? (
-            <View className="mt-1 flex-row items-center gap-1 self-start">
-              {free && !byok ? (
-                <View className="rounded-full bg-good px-2 py-0.5">
-                  <Text className="text-[11px] font-medium text-good-foreground">
-                    {FREE_MODEL_FREE_LABEL}
-                  </Text>
-                </View>
-              ) : null}
-              {byok ? (
-                <View className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-700">
-                  <Text className="text-[11px] font-medium text-foreground">
-                    {BYOK_MODEL_LABEL}
-                  </Text>
-                </View>
-              ) : null}
-              {collectsData ? (
-                <BookOpenCheck
-                  accessibilityLabel={FREE_MODEL_DATA_LABEL}
-                  size={13}
-                  color={colors.warn}
-                />
-              ) : null}
-            </View>
-          ) : null}
-        </View>
+      <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
+        <Pressable
+          className="min-h-9 flex-1 flex-row items-center py-3 pl-4 active:bg-secondary"
+          onPress={() => {
+            onSelectModel(option);
+          }}
+          disabled={option.unavailable}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          accessibilityState={{ disabled: option.unavailable, selected }}
+        >
+          <View className="flex-1">
+            <Text className="text-base text-foreground">{option.name}</Text>
+            {option.modelRef ? (
+              <Text selectable className="font-mono text-xs text-muted-foreground">
+                Provider {option.modelRef.providerID}
+              </Text>
+            ) : null}
+            {option.displayId ? (
+              <Text selectable className="font-mono text-xs text-muted-foreground">
+                {option.modelRef ? `Model ${option.displayId}` : option.displayId}
+              </Text>
+            ) : null}
+            {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
+            {option.unavailable ? (
+              <Text className="mt-1 text-xs text-muted-foreground">Unavailable</Text>
+            ) : null}
+            {free || byok || collectsData ? (
+              <View className="mt-1 flex-row items-center gap-1 self-start">
+                {free && !byok ? (
+                  <View className="rounded-full bg-good px-2 py-0.5">
+                    <Text className="text-[11px] font-medium text-good-foreground">
+                      {FREE_MODEL_FREE_LABEL}
+                    </Text>
+                  </View>
+                ) : null}
+                {byok ? (
+                  <View className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-700">
+                    <Text className="text-[11px] font-medium text-foreground">
+                      {BYOK_MODEL_LABEL}
+                    </Text>
+                  </View>
+                ) : null}
+                {collectsData ? (
+                  <BookOpenCheck
+                    accessibilityLabel={FREE_MODEL_DATA_LABEL}
+                    size={13}
+                    color={colors.warn}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
         <Pressable
           onPress={() => {
             void Haptics.selectionAsync();
@@ -317,7 +328,7 @@ export function ModelPickerOptionRow({
           />
         </Pressable>
         {selected ? <Check size={18} color={colors.primary} /> : null}
-      </Pressable>
+      </View>
       {selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

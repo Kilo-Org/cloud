@@ -4,9 +4,9 @@ import {
   type KiloSessionId,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { type Href, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue } from 'jotai';
-import { MessageSquare } from 'lucide-react-native';
+import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
@@ -16,6 +16,14 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
+import {
+  type AgentMode,
+  customModeOptionsFromRuntimeAgents,
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+  lockedModelOption,
+  resolvePinnedAgentModel,
+} from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
@@ -30,9 +38,11 @@ import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
+import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import {
@@ -93,8 +103,11 @@ import {
 } from '@/lib/analytics/posthog';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
@@ -109,6 +122,7 @@ import {
   type ModelPickerSelection,
   type ModelPickerSelectionScope,
 } from '@/lib/picker-bridge';
+import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 type SessionDetailContentProps = {
@@ -118,6 +132,8 @@ type SessionDetailContentProps = {
   shareId?: string;
   /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
   autoSend?: boolean;
+  /** Mode picked at spawn; seeds the mode until the session reports its own. */
+  spawnedMode?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -132,6 +148,7 @@ export function SessionDetailContent({
   openedVia = 'app',
   shareId,
   autoSend,
+  spawnedMode,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -190,6 +207,39 @@ export function SessionDetailContent({
   const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
   const { bottom } = useSafeAreaInsets();
+
+  // Durable composer draft. The composer renders immediately — typing must
+  // never wait on the `user.getMe` query — and the draft load settles behind
+  // it: `initialDraft` stays undefined until then, and the composer applies a
+  // restored draft only into an untouched input. Identity still gates the data
+  // itself: drafts neither save nor restore while the user id is unknown, the
+  // shared fence resets on identity or session changes, and only the newest
+  // generation's load publishes, so an old account's draft can never restore
+  // into the current composer.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const sessionComposerDraftKey = agentComposerDraftKey(sessionId);
+  const composerDraft = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: sessionComposerDraftKey,
+  });
+
+  // Composer remount identity. An account CHANGE must remount the composer, so
+  // one account's typed text never surfaces under another. Identity RESOLVING
+  // must not: the composer already renders while `userId` is undefined, so a
+  // key flipping from anonymous to the real id would remount and destroy what
+  // the user typed on a cold start. The epoch therefore bumps only between two
+  // known ids.
+  const [composerAccount, setComposerAccount] = useState<{ id?: string; epoch: number }>({
+    id: userId,
+    epoch: 0,
+  });
+  if (userId !== undefined && composerAccount.id !== userId) {
+    setComposerAccount(current => ({
+      id: userId,
+      epoch: current.id === undefined ? current.epoch : current.epoch + 1,
+    }));
+  }
 
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
@@ -308,7 +358,72 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    spawnedMode,
   });
+
+  // Custom modes come from the session's `runtimeAgents` (slug + name). The
+  // selected slug is appended once when it is neither a built-in nor already
+  // listed, so an inherited custom slug stays visible in the picker.
+  const runtimeAgents = sessionConfig?.runtimeAgents;
+  const customOptions = useMemo(
+    () =>
+      ensureSelectedCustomOption(
+        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
+        currentMode
+      ),
+    [runtimeAgents, currentMode]
+  );
+  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
+  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
+  const pinned = useMemo(
+    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
+    [currentMode, runtimeAgents]
+  );
+  const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
+  const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
+  const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;
+  // When locked to a model that is not already in the catalog, append a
+  // fallback option so the chip can still show the pinned model id.
+  const modelOptionsForToolbar = useMemo(() => {
+    if (!modelLocked || !pinned.model) {
+      return modelOptions;
+    }
+    return modelOptions.some(option => option.id === pinned.model)
+      ? modelOptions
+      : [...modelOptions, lockedModelOption(pinned)];
+  }, [modelLocked, pinned, modelOptions]);
+  const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+
+  // Sync the cloud-agent override to the selected agent's pin (or clear it)
+  // so the SDK's `cloudAgentModelOverride` preference cannot beat the pin.
+  const applyCloudAgentModelOverride = useCallback(
+    (mode: AgentMode) => {
+      if (activeSessionType !== 'cloud-agent') {
+        return;
+      }
+      const agentPin = resolvePinnedAgentModel({ slug: mode, runtimeAgents });
+      if (agentPin.model) {
+        manager.setCloudAgentModelOverride({
+          model: agentPin.model,
+          ...(agentPin.variant ? { variant: agentPin.variant } : {}),
+        });
+      } else {
+        manager.setCloudAgentModelOverride(null);
+      }
+    },
+    [activeSessionType, manager, runtimeAgents]
+  );
+
+  const handleModeChange = useCallback(
+    (mode: AgentMode) => {
+      setCurrentMode(mode);
+      if (sessionConfig) {
+        setSessionConfig({ ...sessionConfig, mode });
+      }
+      applyCloudAgentModelOverride(mode);
+    },
+    [setCurrentMode, sessionConfig, setSessionConfig, applyCloudAgentModelOverride]
+  );
 
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -329,6 +444,46 @@ export function SessionDetailContent({
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  // Refetch the linked PR on every focus so a link, unlink, or mid-session
+  // decision change surfaces without reopening the session. A pending review
+  // decision gets one 4s follow-up refetch — no polling loop.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const refetch = async (scheduleFollowUp: boolean) => {
+        try {
+          const result = await trpcClient.cliSessionsV2.getWithRuntimeState.query({
+            session_id: sessionId,
+          });
+          if (cancelled) {
+            return;
+          }
+          manager.updateFetchedAssociatedPr(result.associatedPr);
+          if (scheduleFollowUp && result.associatedPr?.reviewDecisionPending) {
+            pendingTimeout = setTimeout(() => {
+              pendingTimeout = null;
+              void refetch(false);
+            }, 4000);
+          }
+        } catch {
+          // Ignore a failed refetch: the badge keeps its current state and a
+          // later focus refetches again.
+        }
+      };
+
+      void refetch(true);
+
+      return () => {
+        cancelled = true;
+        if (pendingTimeout !== null) {
+          clearTimeout(pendingTimeout);
+        }
+      };
+    }, [manager, sessionId])
+  );
 
   useEffect(() => {
     setOpenContextSheetIdentity(openIdentity => {
@@ -563,23 +718,26 @@ export function SessionDetailContent({
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <SessionContextMetrics
-      info={contextInfo}
-      totalCostMicrodollars={totalMicrodollars}
-      hasMessages={messages.length > 0}
-      loading={shouldShowLoading}
-      onPress={
-        contextInfo
-          ? () => {
-              setOpenContextSheetIdentity({
-                sessionId,
-                providerID: contextInfo.providerID,
-                modelID: contextInfo.modelID,
-              });
-            }
-          : undefined
-      }
-    />
+    <View className="flex-row items-center gap-2">
+      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+      <SessionContextMetrics
+        info={contextInfo}
+        totalCostMicrodollars={totalMicrodollars}
+        hasMessages={messages.length > 0}
+        loading={shouldShowLoading}
+        onPress={
+          contextInfo
+            ? () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo.providerID,
+                  modelID: contextInfo.modelID,
+                });
+              }
+            : undefined
+        }
+      />
+    </View>
   );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -612,15 +770,21 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
+  // One condition for the composer and for the bottom BlurBar that reserves
+  // its space: if the bar claimed the space on a condition the composer does
+  // not share, the composer pops in and the layout jumps on every open.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
-  const isComposerDisabled =
-    isReadOnly ||
-    !canSend ||
-    shouldShowLoading ||
-    Boolean(error) ||
-    hasBlockingInteraction ||
-    (requiresModel && !currentModel);
+  const isComposerDisabled = resolveSessionComposerDisabled({
+    isReadOnly,
+    canSend,
+    shouldShowLoading,
+    hasBlockingInteraction,
+    requiresModel,
+    // A pinned agent model satisfies the model requirement even before the
+    // catalog selection resolves.
+    hasModel: Boolean(pinned.model ?? currentModel),
+  });
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
@@ -631,7 +795,7 @@ export function SessionDetailContent({
       attachments?: AgentAttachmentWire,
       submission?: AgentAttachmentSubmissionPayload
     ) => {
-      if (requiresModel && !currentModel) {
+      if (requiresModel && !(pinned.model ?? currentModel)) {
         toast.error('Select a model before sending');
         return;
       }
@@ -668,6 +832,22 @@ export function SessionDetailContent({
         }
         attachmentParts = result.parts;
       }
+      const sendModel =
+        activeSessionType === 'cloud-agent' && pinned.model ? pinned.model : currentModel;
+      const sendVariant =
+        activeSessionType === 'cloud-agent' && pinned.model
+          ? (pinned.variant ?? '')
+          : currentVariant;
+      // Sync the override to the exact model/variant being sent so the SDK's
+      // `cloudAgentModelOverride` preference cannot beat the pin on send, and
+      // a leftover pin cannot beat a user pick. `sendModel` is always truthy
+      // here (the guard above returns early when no model resolves), so this
+      // never clears to null on an unpinned send.
+      if (activeSessionType === 'cloud-agent') {
+        manager.setCloudAgentModelOverride(
+          sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
+        );
+      }
       // manager.send() reports failures via its own return value (and toasts
       // through the manager's onSendFailed hook) rather than rejecting — it
       // is the single toast owner for send failures. Throw here, without a
@@ -678,8 +858,8 @@ export function SessionDetailContent({
           type: 'prompt',
           prompt: text,
           mode: currentMode,
-          model: currentModel,
-          variant: currentVariant || undefined,
+          model: sendModel,
+          variant: sendVariant || undefined,
         },
         ...(kind === 'cloud' && attachments ? { attachments } : {}),
         ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
@@ -694,6 +874,8 @@ export function SessionDetailContent({
       currentMode,
       currentModel,
       currentVariant,
+      pinned.model,
+      pinned.variant,
       requiresModel,
       activeSessionType,
       supportsAttachments,
@@ -979,6 +1161,7 @@ export function SessionDetailContent({
               isSelectionCurrent={isModelPickerSelectionCurrent}
             >
               <ChatComposer
+                key={`${composerAccount.epoch}:${sessionId}`}
                 onSend={handleSend}
                 onSendCommand={handleSendCommand}
                 onCreateSession={handleCreateSession}
@@ -989,10 +1172,13 @@ export function SessionDetailContent({
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 mode={currentMode}
-                onModeChange={setCurrentMode}
-                model={currentModel}
-                variant={currentVariant}
-                modelOptions={modelOptions}
+                onModeChange={handleModeChange}
+                model={displayModel}
+                variant={displayVariant}
+                modelOptions={modelOptionsForToolbar}
+                customOptions={customOptions}
+                modelLocked={modelLocked}
+                modelLockLabel={pinned.agentName}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}
@@ -1001,6 +1187,8 @@ export function SessionDetailContent({
                 commandState={remoteCommandState}
                 shareId={shareId}
                 autoSend={autoSend}
+                draftKey={userId ? sessionComposerDraftKey : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

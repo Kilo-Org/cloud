@@ -2,6 +2,10 @@ import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { orderOpenCodeSettings } from './order-opencode-variants';
+import { hasCustomLlmAccess } from './access';
+
+const CUSTOM_LLM_DESCRIPTION =
+  'Access to this model was granted by a Kilo admin. This model has no availability or data retention guarantees. Do not use for mission critical workloads. Existence of the model may be confidential.';
 
 function convert(publicId: string, model: CustomLlmDefinition) {
   return {
@@ -10,7 +14,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     hugging_face_id: '',
     name: model.display_name,
     created: 1756238927,
-    description: model.display_name,
+    description: CUSTOM_LLM_DESCRIPTION,
     context_length: model.context_length,
     architecture: {
       modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
@@ -37,11 +41,12 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
+    mayTrainOnYourPrompts: true,
     opencode: orderOpenCodeSettings(model.opencode_settings),
   };
 }
 
-export async function listAvailableCustomLlms(organizationId: string) {
+export async function listAvailableCustomLlms(organizationId: string, groupIds: readonly string[]) {
   const rows = await readDb.select().from(custom_llm2);
   return rows
     .map(row => {
@@ -52,6 +57,6 @@ export async function listAvailableCustomLlms(organizationId: string) {
       return parsed.success ? { public_id: row.public_id, definition: parsed.data } : null;
     })
     .filter(row => row !== null)
-    .filter(row => row.definition.organization_ids.includes(organizationId))
+    .filter(row => hasCustomLlmAccess(row.definition, organizationId, groupIds))
     .map(row => convert(row.public_id, row.definition));
 }

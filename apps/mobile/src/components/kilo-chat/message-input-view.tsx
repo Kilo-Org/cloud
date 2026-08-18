@@ -1,4 +1,4 @@
-import { Paperclip, Send, X } from 'lucide-react-native';
+import { Paperclip, Send, X } from '@/components/ui/icons';
 import { type ReactNode, type RefObject } from 'react';
 import { type LayoutChangeEvent, Pressable, TextInput, View } from 'react-native';
 import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';

@@ -1,8 +1,9 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- cohesive mounted suite: mono-control presence and streaming auto-follow share one sheet harness */
 import { type Part, type ReasoningPart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 
 // Real block, imported before the sheet: the hoisted body-mock factory runs
 // while the sheet module loads, so its binding must already be initialized.
@@ -140,19 +141,23 @@ function makeGenericPart(
   };
 }
 
-function makeReasoningPart(id: string, text: string): ReasoningPart {
+function makeReasoningPart(
+  id: string,
+  text: string,
+  { streaming = false }: { streaming?: boolean } = {}
+): ReasoningPart {
   return {
     id,
     sessionID: 's1',
     messageID: 'm1',
     type: 'reasoning',
     text,
-    time: { start: 1, end: 2 },
+    time: { start: 1, end: streaming ? undefined : 2 },
   };
 }
 
-function sheetElement(part: Part | null): ReactElement {
-  return createElement(PartDetailSheet, { visible: true, part, onClose: vi.fn<() => void>() });
+function sheetElement(part: Part | null, visible = true): ReactElement {
+  return createElement(PartDetailSheet, { visible, part, onClose: vi.fn<() => void>() });
 }
 
 function findByType(
@@ -191,11 +196,13 @@ function radio(
   );
 }
 
+// A React Native radio reports its current choice through `checked`, not
+// `selected` — see `radioItemA11y` in @/components/ui/radio-group.
 function radioSelected(root: TestRenderer.ReactTestInstance, label: string): boolean {
   const state = propOf(radio(root, label), 'accessibilityState') as
-    | { selected: boolean }
+    | { checked: boolean }
     | undefined;
-  return state?.selected === true;
+  return state?.checked === true;
 }
 
 function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {
@@ -221,6 +228,80 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
     await Promise.resolve();
     renderer.unmount();
   });
+}
+
+/**
+ * Mounts the sheet with a per-case `createNodeMock` so the sheet ScrollView's
+ * ref resolves to a fresh `scrollToEnd` mock. Never reuse the returned mock
+ * across cases.
+ */
+async function mountSheetWithScroll(element: ReactElement): Promise<{
+  renderer: TestRenderer.ReactTestRenderer;
+  scrollToEnd: Mock<(params?: { animated?: boolean }) => void>;
+}> {
+  const scrollToEnd = vi.fn<(params?: { animated?: boolean }) => void>();
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    await Promise.resolve();
+    ref.current = TestRenderer.create(element, {
+      createNodeMock: node => (node.type === 'ScrollView' ? { scrollToEnd } : null),
+    });
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return { renderer, scrollToEnd };
+}
+
+/** The sheet's own vertical ScrollView (string element in the RN mock). */
+function sheetScrollView(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const scrollView = findByType(root, 'ScrollView')[0];
+  if (!scrollView) {
+    throw new Error('sheet ScrollView not found');
+  }
+  return scrollView;
+}
+
+function scrollEvent({
+  offsetY,
+  contentHeight,
+  viewportHeight,
+}: {
+  offsetY: number;
+  contentHeight: number;
+  viewportHeight: number;
+}): {
+  nativeEvent: {
+    contentOffset: { y: number };
+    contentSize: { height: number; width: number };
+    layoutMeasurement: { height: number; width: number };
+  };
+} {
+  return {
+    nativeEvent: {
+      contentOffset: { y: offsetY },
+      contentSize: { height: contentHeight, width: 0 },
+      layoutMeasurement: { height: viewportHeight, width: 0 },
+    },
+  };
+}
+
+type ScrollHandler = (event: unknown) => void;
+type ContentSizeHandler = (width: number, height: number) => void;
+
+/** Fires the drag-away sequence on the sheet ScrollView, settling user-scrolling state via momentum. */
+function dragAwayFromBottom(scrollView: TestRenderer.ReactTestInstance): void {
+  const away = scrollEvent({ offsetY: 0, contentHeight: 1000, viewportHeight: 400 });
+  (propOf(scrollView, 'onScrollBeginDrag') as () => void)();
+  (propOf(scrollView, 'onScroll') as ScrollHandler)(away);
+  (propOf(scrollView, 'onScrollEndDrag') as ScrollHandler)(away);
+  (propOf(scrollView, 'onMomentumScrollBegin') as () => void)();
+  (propOf(scrollView, 'onMomentumScrollEnd') as ScrollHandler)(away);
+}
+
+function contentSizeChange(scrollView: TestRenderer.ReactTestInstance, height: number): void {
+  (propOf(scrollView, 'onContentSizeChange') as ContentSizeHandler)(0, height);
 }
 
 describe('PartDetailSheet mounted', () => {
@@ -364,5 +445,153 @@ describe('PartDetailSheet mounted', () => {
     );
     expect(unavailable).toHaveLength(1);
     await unmount(nullPart);
+  });
+});
+
+describe('PartDetailSheet auto-follow', () => {
+  it('renders streaming reasoning as Text and completed reasoning as SelectableText', async () => {
+    const streaming = await mountSheet(makeReasoningPart('r1', 'thinking...', { streaming: true }));
+    expect(findByType(streaming.root, 'SelectableText')).toHaveLength(0);
+    const textNodes = findByType(streaming.root, 'Text').filter(
+      node => propOf(node, 'children') === 'thinking...'
+    );
+    expect(textNodes).toHaveLength(1);
+    await unmount(streaming);
+
+    const completed = await mountSheet(makeReasoningPart('r2', 'thought'));
+    expect(findByType(completed.root, 'SelectableText')).toHaveLength(1);
+    await unmount(completed);
+  });
+
+  it('follows growth while at the bottom', async () => {
+    const { renderer, scrollToEnd } = await mountSheetWithScroll(
+      sheetElement(makeReasoningPart('r1', 'thinking...', { streaming: true }))
+    );
+    await act(async () => {
+      await Promise.resolve();
+      contentSizeChange(sheetScrollView(renderer.root), 400);
+    });
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: false });
+    await unmount(renderer);
+  });
+
+  it('pins the first layout to the bottom', async () => {
+    const { renderer, scrollToEnd } = await mountSheetWithScroll(
+      sheetElement(makeReasoningPart('r1', 'thinking...', { streaming: true }))
+    );
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(sheetScrollView(renderer.root), 'onLayout') as () => void)();
+    });
+    expect(scrollToEnd).toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
+  it('never yanks during drag or momentum and stays off away from the bottom', async () => {
+    const { renderer, scrollToEnd } = await mountSheetWithScroll(
+      sheetElement(makeReasoningPart('r1', 'thinking...', { streaming: true }))
+    );
+    const scrollView = sheetScrollView(renderer.root);
+    const onScrollBeginDrag = propOf(scrollView, 'onScrollBeginDrag') as () => void;
+    const onScroll = propOf(scrollView, 'onScroll') as ScrollHandler;
+    const onScrollEndDrag = propOf(scrollView, 'onScrollEndDrag') as ScrollHandler;
+    const onMomentumScrollBegin = propOf(scrollView, 'onMomentumScrollBegin') as () => void;
+    const onMomentumScrollEnd = propOf(scrollView, 'onMomentumScrollEnd') as ScrollHandler;
+    const away = scrollEvent({ offsetY: 0, contentHeight: 1000, viewportHeight: 400 });
+
+    await act(async () => {
+      await Promise.resolve();
+      onScrollBeginDrag();
+      contentSizeChange(scrollView, 1200);
+    });
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+      onScroll(away);
+      onScrollEndDrag(away);
+      onMomentumScrollBegin();
+      contentSizeChange(scrollView, 1300);
+    });
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+      onMomentumScrollEnd(away);
+      contentSizeChange(scrollView, 1400);
+    });
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('resumes following when the user returns to the bottom', async () => {
+    const { renderer, scrollToEnd } = await mountSheetWithScroll(
+      sheetElement(makeReasoningPart('r1', 'thinking...', { streaming: true }))
+    );
+    const scrollView = sheetScrollView(renderer.root);
+
+    await act(async () => {
+      await Promise.resolve();
+      dragAwayFromBottom(scrollView);
+      contentSizeChange(scrollView, 1200);
+    });
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(scrollView, 'onScroll') as ScrollHandler)(
+        scrollEvent({ offsetY: 850, contentHeight: 1200, viewportHeight: 400 })
+      );
+      contentSizeChange(scrollView, 1400);
+    });
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: false });
+
+    await unmount(renderer);
+  });
+
+  it('never follows a non-streaming part', async () => {
+    const { renderer, scrollToEnd } = await mountSheetWithScroll(
+      sheetElement(makeReasoningPart('r1', 'thought'))
+    );
+    const scrollView = sheetScrollView(renderer.root);
+    await act(async () => {
+      await Promise.resolve();
+      contentSizeChange(scrollView, 400);
+      (propOf(scrollView, 'onLayout') as () => void)();
+    });
+    expect(scrollToEnd).not.toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
+  it('resets follow state on close and reopen', async () => {
+    const { renderer, scrollToEnd } = await mountSheetWithScroll(
+      sheetElement(makeReasoningPart('r1', 'thinking...', { streaming: true }))
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      dragAwayFromBottom(sheetScrollView(renderer.root));
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(sheetElement(null, false));
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        sheetElement(makeReasoningPart('r2', 'fresh thinking', { streaming: true }), true)
+      );
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      contentSizeChange(sheetScrollView(renderer.root), 500);
+    });
+    expect(scrollToEnd).toHaveBeenCalled();
+
+    await unmount(renderer);
   });
 });

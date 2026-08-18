@@ -26,6 +26,7 @@ import {
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { getTierName } from './utils';
 import {
+  computeCurrentPeriodBonusModel,
   computeNextBillingDateRowDateLabel,
   computeRenewInfoRowModel,
   computeUsageProgressModel,
@@ -114,15 +115,15 @@ function RenewInfoRow() {
         <div className="flex items-start gap-2">
           <Calendar className="mt-0.5 h-4 w-4 text-white/40" />
           <div className="text-muted-foreground">
-            {row.labelPrefix}: adds{' '}
+            {row.labelPrefix}:{' '}
             <span className="font-mono font-semibold text-amber-300">
               {formatDollars(row.baseUsd)}
             </span>{' '}
-            paid +{' '}
+            paid + up to{' '}
             <span className="font-mono font-semibold text-emerald-300">
               {formatDollars(row.bonusUsd)}
             </span>{' '}
-            free bonus credits
+            bonus credits
           </div>
         </div>
         <span className="text-muted-foreground">{dateLabel}</span>
@@ -217,13 +218,15 @@ function UsageProgressOrBonusUnlocked() {
 
   const baseUsd = subscription.currentPeriodBaseCreditsUsd;
   const usageUsd = subscription.currentPeriodUsageUsd;
-  // This is the bonus for the *current* period (unlocked after consuming the base credits).
-  const bonusUsd = subscription.currentPeriodBonusCreditsUsd;
+  // Bonus for the *current* period: the actual granted amount once issued (a
+  // referral bonus replaces the normal bonus), the projection while available.
+  const bonus = computeCurrentPeriodBonusModel(subscription.currentPeriodBonus);
+  if (!bonus) return null;
 
   const model = computeUsageProgressModel({
     baseUsd,
     usageUsd,
-    bonusUsd,
+    bonusUsd: bonus.amountUsd,
     isBonusUnlocked: subscription.isBonusUnlocked,
     isBonusAvailableToUnlock: subscription.isBonusAvailableToUnlock,
   });
@@ -291,7 +294,7 @@ function UsageProgressOrBonusUnlocked() {
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-sm bg-emerald-400/80" />
-            Free bonus
+            {bonus.label}
           </div>
         </div>
       </div>

@@ -1,4 +1,8 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
+import {
+  type ReasoningDetailText,
+  ReasoningDetailType,
+} from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
@@ -17,6 +21,7 @@ import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
+import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
 
 /**
  * Handle passed to the response pipeline so the upstream response body can be
@@ -81,6 +86,28 @@ async function isLoggingEnabledForUser(
   });
 }
 
+export function sanitizeApiRequestLogRequest(request: GatewayRequest): unknown {
+  const gateway = request.body.providerOptions?.gateway;
+  if (!gateway?.byok) {
+    return sanitizeJsonbValue(request.body);
+  }
+
+  const redactedByok = Object.fromEntries(
+    Object.entries(gateway.byok).map(([provider, credentials]) => [
+      provider,
+      credentials.map(() => ({ apiKey: '[redacted]' })),
+    ])
+  );
+
+  return sanitizeJsonbValue({
+    ...request.body,
+    providerOptions: {
+      ...request.body.providerOptions,
+      gateway: { ...gateway, byok: redactedByok },
+    },
+  });
+}
+
 async function createRequestLogCapture(
   response: Response,
   model: string,
@@ -88,7 +115,7 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  if (!(await isLoggingEnabledForUser(user, organization_id))) {
+  if (provider !== 'custom' && !(await isLoggingEnabledForUser(user, organization_id))) {
     return null;
   }
   const status = response.status;
@@ -137,7 +164,7 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: sanitizeJsonbValue(request.body),
+          request: sanitizeApiRequestLogRequest(request),
           response: responseText,
           error: sanitizeJsonbValue(error),
         })
@@ -382,28 +409,48 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getPropertyPath(target: unknown, path: string): unknown {
-  let current = target;
-  for (const segment of path.split('.')) {
-    if (!isRecord(current)) {
-      return undefined;
-    }
-    current = current[segment];
+function isGeminiThoughtDelta(delta: Record<string, unknown>) {
+  const extraContent = delta.extra_content;
+  if (!isRecord(extraContent)) {
+    return false;
   }
-  return current;
+  const google = extraContent.google;
+  return isRecord(google) && google.thought === true;
 }
 
-function rewriteThoughtContent(delta: unknown, path: string) {
-  if (
-    !isRecord(delta) ||
-    typeof delta.content !== 'string' ||
-    getPropertyPath(delta, path) !== true
-  ) {
+function rewriteGeminiThoughtContent(delta: unknown) {
+  if (!isRecord(delta) || typeof delta.content !== 'string' || !isGeminiThoughtDelta(delta)) {
     return;
   }
 
   delta.reasoning_content = delta.content;
   delete delta.content;
+}
+
+/**
+ * Converts the DeepSeek-style `reasoning_content` string into OpenRouter-style
+ * `reasoning_details`, matching the shape produced by OpenRouter and consumed
+ * by clients such as `@openrouter/ai-sdk-provider`. The flat string carries no
+ * format or signature, so every chunk becomes a `reasoning.text` detail at
+ * index 0; clients merge consecutive same-type deltas into a single block.
+ */
+function rewriteReasoningContentToReasoningDetails(delta: unknown) {
+  if (
+    !isRecord(delta) ||
+    typeof delta.reasoning_content !== 'string' ||
+    typeof delta.reasoning_details !== 'undefined'
+  ) {
+    return;
+  }
+
+  const detail = {
+    type: ReasoningDetailType.Text,
+    text: delta.reasoning_content,
+    index: 0,
+    format: ReasoningFormat.Unknown,
+  } satisfies ReasoningDetailText;
+  delta.reasoning_details = [detail];
+  delete delta.reasoning_content;
 }
 
 export async function rewriteModelResponse_ChatCompletions({
@@ -439,6 +486,11 @@ export async function rewriteModelResponse_ChatCompletions({
     const usage = json.usage as OpenRouterUsage;
     if (usage) {
       rewriteUsage(usage, removeCost);
+    }
+    if (responseTransforms?.mapReasoningContentToDetails) {
+      for (const choice of json.choices ?? []) {
+        rewriteReasoningContentToReasoningDetails(choice.message);
+      }
     }
 
     return NextResponse.json(json, {
@@ -495,8 +547,11 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.role === null) {
               delete delta.role;
             }
-            if (responseTransforms?.thoughtContentMapping) {
-              rewriteThoughtContent(delta, responseTransforms.thoughtContentMapping);
+            if (responseTransforms?.mapGeminiThoughtContent) {
+              rewriteGeminiThoughtContent(delta);
+            }
+            if (responseTransforms?.mapReasoningContentToDetails) {
+              rewriteReasoningContentToReasoningDetails(delta);
             }
           }
 
@@ -902,9 +957,11 @@ export async function rewriteModelResponse({
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
+  const customPricing = getCustomPricing(model);
   const requiresCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') &&
-    (isKiloExclusiveFreeModel(model) || getCustomPricing(model) !== undefined);
+    (isKiloExclusiveFreeModel(model) ||
+      (customPricing !== undefined && !customPricing.fallbackOnly));
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;

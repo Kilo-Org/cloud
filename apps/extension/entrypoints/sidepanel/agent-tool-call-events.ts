@@ -28,13 +28,26 @@ const getStringArgument = (args: Record<string, unknown>, name: string): string 
   return parsed.success ? parsed.data : undefined;
 };
 
+// Models pass numeric arguments as numbers or numeric strings; accept both.
+const numberArgumentSchema = z.coerce.number();
+
+const getNumberArgument = (args: Record<string, unknown>, name: string): number | undefined => {
+  if (args[name] === undefined || args[name] === null) {
+    return undefined;
+  }
+  const parsed = numberArgumentSchema.safeParse(args[name]);
+
+  return parsed.success && Number.isFinite(parsed.data) ? parsed.data : undefined;
+};
+
 const isSafeToolName = (name: string): name is SafeToolName =>
   name === 'find_in_page' ||
   name === 'get_element_details' ||
   name === 'get_memory' ||
   name === 'get_page_snapshot' ||
   name === 'get_viewport_screenshot' ||
-  name === 'search_memories';
+  name === 'search_memories' ||
+  name === 'web_search';
 
 export const isWorkflowToolName = (name: string): name is WorkflowToolName =>
   name === 'delete_workflow' ||
@@ -56,6 +69,7 @@ const toSafeToolCallEvent = (
   const memoryId = getStringArgument(toolCall.arguments, 'memoryId');
   const query = getStringArgument(toolCall.arguments, 'query');
   const snapshotId = getStringArgument(toolCall.arguments, 'snapshotId');
+  const textStart = getNumberArgument(toolCall.arguments, 'textStart');
 
   return createSafeToolCall({
     name: toolCall.name,
@@ -65,6 +79,7 @@ const toSafeToolCallEvent = (
     ...(query === undefined ? {} : { query }),
     ...(snapshotId === undefined ? {} : { snapshotId }),
     tabId: selectedTabId,
+    ...(textStart === undefined ? {} : { textStart }),
   });
 };
 

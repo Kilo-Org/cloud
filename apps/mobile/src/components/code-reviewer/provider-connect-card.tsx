@@ -1,5 +1,5 @@
 import * as WebBrowser from 'expo-web-browser';
-import { GitBranch, GitMerge } from 'lucide-react-native';
+import { GitBranch, GitMerge } from '@/components/ui/icons';
 import { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { toast } from 'sonner-native';

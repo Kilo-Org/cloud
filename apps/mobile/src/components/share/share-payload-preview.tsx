@@ -1,5 +1,5 @@
 import { formatFileSize } from '@kilocode/kilo-chat';
-import { File as FileIcon } from 'lucide-react-native';
+import { File as FileIcon } from '@/components/ui/icons';
 import { ScrollView, View } from 'react-native';
 
 import { Image } from '@/components/ui/image';

@@ -59,6 +59,14 @@ export type CreateRemoteSessionRawResult = unknown;
  * `sessionId` on the wire — the CLI is expected to provision a fresh
  * `KiloSessionId` for the new cloud-agent session.
  *
+ * When `input.mutationId` is supplied it is forwarded on the wire as a durable
+ * dedupe identity: the extended attempt uses `${key}:ext` and the old-CLI bare
+ * retry uses `${key}:bare`. The two MUST NOT share an identity, because the
+ * relay dedupes by mutationId and would replay the extended attempt's stored
+ * `invalid create_session command` error to the bare retry. When omitted, the
+ * wire carries no mutationId and the relay falls back to a per-wire random
+ * correlation id.
+ *
  * The returned promise resolves with the raw reply; the caller is responsible
  * for parsing the response shape. A delivered error response (string or
  * structured `UserWebCommandError`) rejects the promise; transport failures
@@ -79,11 +87,15 @@ export async function createRemoteSessionOnConnection(
   };
   const hasExtendedFields =
     data.agent !== undefined || data.model !== undefined || data.orgId !== undefined;
+  const logicalKey = input?.mutationId;
+  const extendedMutationId = logicalKey === undefined ? undefined : `${logicalKey}:ext`;
+  const bareMutationId = logicalKey === undefined ? undefined : `${logicalKey}:bare`;
   try {
     return await connection.sendCommandToConnection({
       command: 'create_session',
       data,
       expectedConnectionId: connectionId,
+      ...(extendedMutationId !== undefined ? { mutationId: extendedMutationId } : {}),
     });
   } catch (error) {
     // Only bare-retry when extended fields made the original wire differ from
@@ -97,8 +109,18 @@ export async function createRemoteSessionOnConnection(
         command: 'create_session',
         data: { protocolVersion: 1 },
         expectedConnectionId: connectionId,
+        ...(bareMutationId !== undefined ? { mutationId: bareMutationId } : {}),
       });
     }
     throw error;
   }
 }
+
+/**
+ * Relay-emitted structured code for a same-key duplicate whose command is
+ * already in flight or whose durable entry is still pending. The intent is NOT
+ * terminal: the retry must keep the caller's operation key so it rides the same
+ * durable identity and the relay replays the stored terminal result instead of
+ * dispatching a second command. Callers classify it as retryable.
+ */
+export const COMMAND_ALREADY_PENDING_CODE = 'COMMAND_ALREADY_PENDING';

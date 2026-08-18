@@ -307,4 +307,19 @@ describe('sessionRowAccessibilityLabel', () => {
       ).toBe('X, GASTOWN, 1 hour ago');
     });
   });
+
+  describe('ui SessionRow onPress-branch call shape (title, needs input, badge)', () => {
+    it('composes a plain row button label from title and badge', () => {
+      // Shape wired in `components/ui/session-row.tsx` for the onPress
+      // branch: the presentational row has no spoken meta (its `meta` prop
+      // is the visible uppercase form), so the label omits it.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          badge: 'CLI',
+        })
+      ).toBe('Fix login bug, CLI');
+    });
+  });
 });

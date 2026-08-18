@@ -5,6 +5,7 @@ import { Alert, Linking, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { captureEvent, FEEDBACK_SUBMITTED_EVENT } from '@/lib/analytics/posthog';
+import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
 
 const SUPPORT_EMAIL = 'hi@kilo.ai';
@@ -29,13 +30,31 @@ async function openSupportEmail(userId: string | undefined) {
   }
 }
 
+// Serialized claim of the one-time native review request. The marker
+// absent-check and the marker write run inside one per-key chain (the shared
+// metadata helper), so concurrent `rateApp` calls observe the marker
+// atomically: exactly one call sees it absent, writes it, and returns true;
+// later calls see it and fall back to the store page.
+async function claimOneTimeReview(): Promise<boolean> {
+  let claimed = false;
+  await writeAccountMetadata(REVIEW_REQUESTED_AT_KEY, async () => {
+    const alreadyRequested = await SecureStore.getItemAsync(REVIEW_REQUESTED_AT_KEY);
+    if (alreadyRequested != null) {
+      return;
+    }
+    if (await StoreReview.isAvailableAsync()) {
+      claimed = true;
+      await SecureStore.setItemAsync(REVIEW_REQUESTED_AT_KEY, new Date().toISOString());
+    }
+  });
+  return claimed;
+}
+
 async function rateApp() {
   // The native review popup silently no-ops when the OS rate limit is hit, so
   // only use it the first time; afterwards deep-link to the store review page.
   try {
-    const alreadyRequested = await SecureStore.getItemAsync(REVIEW_REQUESTED_AT_KEY);
-    if (alreadyRequested == null && (await StoreReview.isAvailableAsync())) {
-      await SecureStore.setItemAsync(REVIEW_REQUESTED_AT_KEY, new Date().toISOString());
+    if (await claimOneTimeReview()) {
       await StoreReview.requestReview();
       return;
     }

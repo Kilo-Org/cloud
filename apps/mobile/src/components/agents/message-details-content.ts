@@ -5,6 +5,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { collectCopyableText } from './collect-copyable-text';
 import { formatCost } from './context-usage-display';
 import { resolveMessageDisplayModel } from './message-model-label';
+import { isPartStreaming } from './part-types';
 import { friendlyModelName } from './session-model-display';
 
 type MessageDetailsTokenRow = {
@@ -19,6 +20,7 @@ type MessageDetailsContent = {
   costLabel: string | null;
   tokenRows: MessageDetailsTokenRow[] | null;
   copyableText: string | null;
+  canSelectText: boolean;
 };
 
 const SENT_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -39,6 +41,9 @@ export function getMessageDetailsContent(
   const sentTimeLabel = formatMessageSentTime(message.info.time.created);
   const copyable = collectCopyableText(message);
   const copyableText = copyable.length > 0 ? copyable : null;
+  const canSelectText =
+    copyableText !== null &&
+    !message.parts.some(part => isPartInFlightForSelect(part, message.info.role));
 
   if (message.info.role !== 'assistant') {
     return {
@@ -48,6 +53,7 @@ export function getMessageDetailsContent(
       costLabel: null,
       tokenRows: null,
       copyableText,
+      canSelectText,
     };
   }
 
@@ -75,7 +81,23 @@ export function getMessageDetailsContent(
         ]
       : null,
     copyableText,
+    canSelectText,
   };
+}
+
+/**
+ * A part blocks range selection while it is in flight. A user text part never
+ * streams, so only an assistant text part with a `time` that lacks `end` is
+ * in flight; reasoning and tool parts reuse the shared streaming check.
+ */
+function isPartInFlightForSelect(
+  part: StoredMessage['parts'][number],
+  role: StoredMessage['info']['role']
+): boolean {
+  if (part.type === 'text') {
+    return role === 'assistant' && part.time !== undefined && part.time.end === undefined;
+  }
+  return isPartStreaming(part);
 }
 
 type AssistantUsage = {

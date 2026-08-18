@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import { addDays } from 'date-fns';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
 import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
@@ -14,7 +14,7 @@ import {
   type CodingPlanCredentialValidationResult,
   validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
-import { getCodingPlanPrice, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
@@ -35,6 +35,17 @@ export class CodingPlanInventoryUploadError extends Error {
     super(message);
     this.name = 'CodingPlanInventoryUploadError';
   }
+}
+
+export class CodingPlanInventoryReplacementError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodingPlanInventoryReplacementError';
+  }
+}
+
+function inventoryReplacementError(message: string): CodingPlanInventoryReplacementError {
+  return new CodingPlanInventoryReplacementError(message);
 }
 
 function databaseConstraint(error: unknown): string | null {
@@ -643,4 +654,281 @@ export async function getKeyInventoryCounts(
     status: row.status,
     count: Number.parseInt(row.count, 10),
   }));
+}
+
+export async function adminCancelCodingPlanSubscription(subscriptionId: string): Promise<void> {
+  const result = await db
+    .update(coding_plan_subscriptions)
+    .set({ cancel_at_period_end: true })
+    .where(
+      and(
+        eq(coding_plan_subscriptions.id, subscriptionId),
+        eq(coding_plan_subscriptions.status, 'active')
+      )
+    );
+  if ((result.rowCount ?? 0) === 0) {
+    throw new Error('No active subscription found.');
+  }
+  logInfo('Coding plan admin cancellation scheduled', { subscriptionId });
+}
+
+export async function extendCodingPlanSubscriptionPeriod(
+  subscriptionId: string,
+  days: number,
+  adminUserId: string
+): Promise<{ currentPeriodEnd: string; creditRenewalAt: string }> {
+  const result = await db.transaction(async tx => {
+    const { rows: lockedRows } = await tx.execute<{
+      id: string;
+      user_id: string;
+      plan_id: string;
+      current_period_end: string;
+    }>(sql`
+      SELECT id, user_id, plan_id, current_period_end
+      FROM coding_plan_subscriptions
+      WHERE id = ${subscriptionId}
+        AND status = 'active'
+      FOR UPDATE
+    `);
+    const locked = lockedRows[0];
+    if (!locked) {
+      throw new Error('No active subscription found.');
+    }
+
+    const [updated] = await tx
+      .update(coding_plan_subscriptions)
+      .set({
+        current_period_end: sql`${coding_plan_subscriptions.current_period_end} + make_interval(days => ${days})`,
+        credit_renewal_at: sql`${coding_plan_subscriptions.credit_renewal_at} + make_interval(days => ${days})`,
+      })
+      .where(
+        and(
+          eq(coding_plan_subscriptions.id, subscriptionId),
+          eq(coding_plan_subscriptions.status, 'active')
+        )
+      )
+      .returning({
+        currentPeriodEnd: coding_plan_subscriptions.current_period_end,
+        creditRenewalAt: coding_plan_subscriptions.credit_renewal_at,
+      });
+    if (!updated) {
+      throw new Error('No active subscription found.');
+    }
+
+    const transactionId = crypto.randomUUID();
+    const occurredAt = new Date().toISOString();
+    const description = `Coding plan extension: ${days} additional day${days === 1 ? '' : 's'}`;
+    await tx.insert(credit_transactions).values({
+      id: transactionId,
+      kilo_user_id: locked.user_id,
+      amount_microdollars: 0,
+      is_free: true,
+      description,
+      credit_category: `coding-plan:extension:${subscriptionId}:${transactionId}`,
+      created_by_kilo_user_id: adminUserId,
+      created_at: occurredAt,
+    });
+    await tx.insert(coding_plan_terms).values({
+      subscription_id: subscriptionId,
+      user_id: locked.user_id,
+      plan_id: locked.plan_id,
+      kind: 'extension',
+      idempotency_key: `extension:${subscriptionId}:${transactionId}`,
+      period_start: locked.current_period_end,
+      period_end: updated.currentPeriodEnd,
+      cost_microdollars: 0,
+      credit_transaction_id: transactionId,
+      created_at: occurredAt,
+    });
+
+    return {
+      currentPeriodEnd: new Date(updated.currentPeriodEnd).toISOString(),
+      creditRenewalAt: new Date(updated.creditRenewalAt).toISOString(),
+    };
+  });
+
+  logInfo('Coding plan subscription period extended', { subscriptionId, days, adminUserId });
+  return result;
+}
+
+type InventoryReplacementOptions = {
+  validateCredential?: InventoryCredentialValidator;
+};
+
+export async function replaceInventoryCredential(
+  inventoryKeyId: string,
+  apiKey: string,
+  options: InventoryReplacementOptions = {}
+): Promise<void> {
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw inventoryReplacementError('BYOK encryption is not configured');
+  }
+
+  const [credential] = await db
+    .select({
+      planId: coding_plan_key_inventory.plan_id,
+      providerId: coding_plan_key_inventory.provider_id,
+      upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
+      upstreamUsageId: coding_plan_key_inventory.upstream_usage_id,
+      credentialFingerprint: coding_plan_key_inventory.credential_fingerprint,
+      status: coding_plan_key_inventory.status,
+    })
+    .from(coding_plan_key_inventory)
+    .where(
+      and(
+        eq(coding_plan_key_inventory.id, inventoryKeyId),
+        inArray(coding_plan_key_inventory.status, ['available', 'assigned'])
+      )
+    )
+    .limit(1);
+  if (!credential) {
+    throw inventoryReplacementError('Credential is not eligible for replacement.');
+  }
+  if (!isCodingPlanId(credential.planId)) {
+    throw inventoryReplacementError('Credential has an unsupported Coding Plan ID.');
+  }
+  const plan = getCodingPlanPrice(credential.planId);
+  if (!plan || plan.providerId !== credential.providerId) {
+    throw inventoryReplacementError('Credential has an unsupported Coding Plan provider.');
+  }
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    throw inventoryReplacementError(`A replacement ${plan.providerName} API key is required.`);
+  }
+  const replacementFingerprint = codingPlanCredentialFingerprint(normalizedApiKey);
+  if (replacementFingerprint === credential.credentialFingerprint) {
+    throw inventoryReplacementError(
+      `Replacement ${plan.providerName} credential must be different from the current credential.`
+    );
+  }
+
+  const [duplicateCredential] = await db
+    .select({ id: coding_plan_key_inventory.id })
+    .from(coding_plan_key_inventory)
+    .where(
+      and(
+        eq(coding_plan_key_inventory.credential_fingerprint, replacementFingerprint),
+        ne(coding_plan_key_inventory.id, inventoryKeyId)
+      )
+    )
+    .limit(1);
+  if (duplicateCredential) {
+    throw inventoryReplacementError(
+      `Replacement ${plan.providerName} credential is already present in inventory.`
+    );
+  }
+
+  const validateCredential = options.validateCredential ?? validateCodingPlanCredential;
+  const validationResult = getCodingPlanValidationResult(
+    await validateCredential({
+      apiKey: normalizedApiKey,
+      planId: credential.planId,
+      providerId: plan.providerId,
+      upstreamPlanId: credential.upstreamPlanId,
+    })
+  );
+  if (
+    !validationResult.valid ||
+    (plan.providerId === 'byteplus-coding' && !validationResult.upstreamUsageId)
+  ) {
+    throw inventoryReplacementError(
+      `Replacement ${plan.providerName} credential failed validation. Confirm plan access and supported model behavior, then try again.`
+    );
+  }
+
+  const encryptedApiKey = encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY);
+  const nextUpstreamUsageId =
+    plan.providerId === 'byteplus-coding'
+      ? validationResult.upstreamUsageId
+      : credential.upstreamUsageId;
+
+  try {
+    await db.transaction(async tx => {
+      const { rows: lockedRows } = await tx.execute<{
+        plan_id: string;
+        provider_id: string;
+        upstream_plan_id: string;
+        credential_fingerprint: string;
+        status: string;
+      }>(sql`
+        SELECT plan_id, provider_id, upstream_plan_id, credential_fingerprint, status
+        FROM coding_plan_key_inventory
+        WHERE id = ${inventoryKeyId}
+        FOR UPDATE
+      `);
+      const locked = lockedRows[0];
+      if (!locked || (locked.status !== 'available' && locked.status !== 'assigned')) {
+        throw inventoryReplacementError('Credential is not eligible for replacement.');
+      }
+      if (
+        locked.plan_id !== credential.planId ||
+        locked.provider_id !== credential.providerId ||
+        locked.upstream_plan_id !== credential.upstreamPlanId ||
+        locked.credential_fingerprint !== credential.credentialFingerprint
+      ) {
+        throw inventoryReplacementError(
+          'Credential changed during replacement. Refresh and try again.'
+        );
+      }
+
+      const result = await tx
+        .update(coding_plan_key_inventory)
+        .set({
+          encrypted_api_key: encryptedApiKey,
+          credential_fingerprint: replacementFingerprint,
+          upstream_usage_id: nextUpstreamUsageId,
+        })
+        .where(
+          and(
+            eq(coding_plan_key_inventory.id, inventoryKeyId),
+            eq(coding_plan_key_inventory.plan_id, credential.planId),
+            eq(coding_plan_key_inventory.provider_id, credential.providerId),
+            eq(coding_plan_key_inventory.upstream_plan_id, credential.upstreamPlanId),
+            eq(coding_plan_key_inventory.credential_fingerprint, credential.credentialFingerprint),
+            inArray(coding_plan_key_inventory.status, ['available', 'assigned'])
+          )
+        );
+      if ((result.rowCount ?? 0) === 0) {
+        throw inventoryReplacementError('Credential is not eligible for replacement.');
+      }
+
+      if (locked.status === 'assigned') {
+        const liveInstalledKeys = await tx
+          .select({ id: coding_plan_subscriptions.installed_byok_key_id })
+          .from(coding_plan_subscriptions)
+          .where(
+            and(
+              eq(coding_plan_subscriptions.key_inventory_id, inventoryKeyId),
+              isNotNull(coding_plan_subscriptions.installed_byok_key_id),
+              inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
+            )
+          );
+        const installedKeyIds = liveInstalledKeys.flatMap(row => (row.id ? [row.id] : []));
+        if (installedKeyIds.length > 0) {
+          await tx
+            .update(byok_api_keys)
+            .set({ encrypted_api_key: encryptedApiKey })
+            .where(
+              and(
+                eq(byok_api_keys.management_source, 'coding_plan'),
+                inArray(byok_api_keys.id, installedKeyIds)
+              )
+            );
+        }
+      }
+    });
+  } catch (error) {
+    if (error instanceof CodingPlanInventoryReplacementError) throw error;
+    if (databaseConstraint(error) === 'UQ_coding_plan_key_inv_provider_usage_id') {
+      throw inventoryReplacementError(
+        'The resolved BytePlus seat is already attached to inventory.'
+      );
+    }
+    throw inventoryReplacementError('Unable to replace the credential due to a database error.');
+  }
+
+  logInfo('Coding plan inventory credential replaced', {
+    inventoryKeyId,
+    planId: credential.planId,
+  });
 }

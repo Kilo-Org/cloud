@@ -169,6 +169,11 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
 
+/** Whether the reasoning expander has content worth showing. */
+export function shouldRenderReasoningPart(part: Part): boolean {
+  return isReasoningPart(part) && part.text.trim() !== '';
+}
+
 /** Check if a part is a StepStartPart */
 export function isStepStartPart(part: Part): part is StepStartPart {
   return part.type === 'step-start';
@@ -229,12 +234,8 @@ export function isPartStreaming(part: Part): boolean {
  * Check if any parts in a message are still streaming.
  */
 export function isMessageStreaming(message: StoredMessage): boolean {
-  // Assistant messages without completed time are still streaming,
-  // unless they have an error (failed before producing output)
-  if (isAssistantMessage(message.info) && !message.info.time.completed && !message.info.error) {
-    return true;
-  }
-  // Check if any parts are still streaming
+  if (isAssistantMessage(message.info) && message.info.error) return false;
+  if (isAssistantMessage(message.info) && !message.info.time.completed) return true;
   return message.parts.some(isPartStreaming);
 }
 

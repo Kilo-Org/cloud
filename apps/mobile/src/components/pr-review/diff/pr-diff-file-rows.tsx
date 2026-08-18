@@ -1,7 +1,7 @@
 // File-level row components for the PR diff FlashList.
 
 import * as Haptics from 'expo-haptics';
-import { ChevronDown, ChevronRight, Eye, EyeOff, File, Link2 } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';

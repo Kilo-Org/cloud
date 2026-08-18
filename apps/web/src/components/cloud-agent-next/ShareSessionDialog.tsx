@@ -40,7 +40,7 @@ export function ShareSessionDialog({ open, onOpenChange, kiloSessionId }: ShareS
         session_id: kiloSessionId,
       });
 
-      const url = `${window.location.origin}/s/${result.public_id}`;
+      const url = `${window.location.origin}/s/${result.share_token}`;
       setShareUrl(url);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to share session';
@@ -84,7 +84,7 @@ export function ShareSessionDialog({ open, onOpenChange, kiloSessionId }: ShareS
         </DialogHeader>
 
         {shareUrl && (
-          <div className="flex items-center gap-2 overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
+          <div className="ph-no-capture flex items-center gap-2 overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
             <a
               href={shareUrl}
               target="_blank"

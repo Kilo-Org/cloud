@@ -7,11 +7,12 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { CRON_SECRET } from '@/lib/config.server';
+import { alertIfSyncProvidersStale } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 
-// The cron job runs every 10 minutes, so if increasing the timeout beyond 8 minutes
+// The cron job runs every 5 minutes, so if increasing the timeout beyond 4 minutes
 // becomes necessary, the cron schedule in vercel.json should probably be adjusted as well.
-export const maxDuration = 480;
+export const maxDuration = 240;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -23,6 +24,12 @@ export async function GET(request: NextRequest) {
     jobName: 'web.sync_providers',
     environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
   });
+
+  try {
+    await alertIfSyncProvidersStale();
+  } catch (error) {
+    console.error('[sync-providers] stale full-sync alert escaped', error);
+  }
 
   try {
     const summary = await syncAndStoreProviders();

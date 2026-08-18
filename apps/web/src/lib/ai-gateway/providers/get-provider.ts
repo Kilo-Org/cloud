@@ -23,6 +23,7 @@ import {
   type AllocationSubject,
 } from '@/lib/ai-gateway/experiments/pick-variant';
 import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/google-service-account';
+import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 
@@ -80,6 +81,7 @@ async function checkDirectBYOK(
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
+      apiUrlOverrides: directByok.base_url_overrides,
       apiKey: userByok[0].decryptedAPIKey,
       supportedChatApis: directByok.supported_chat_apis,
       responseTransforms: null,
@@ -95,7 +97,8 @@ async function checkDirectBYOK(
 
 async function checkCustomLlm(
   requestedModel: string,
-  organizationId: string
+  organizationId: string,
+  kiloUserId: string
 ): Promise<GetProviderProviderResult | null> {
   const [row] = await readDb
     .select()
@@ -106,7 +109,7 @@ async function checkCustomLlm(
     console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
   }
   const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
+  if (!customLlm || !(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
     return null;
   }
 
@@ -251,8 +254,8 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     // this id. Fall through to non-experiment routing.
   }
 
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
+  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
+    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
     if (customLlmResult) {
       return customLlmResult;
     }

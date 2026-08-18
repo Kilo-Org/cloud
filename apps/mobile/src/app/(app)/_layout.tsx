@@ -1,13 +1,49 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
+import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { StoreKiloPassPurchaseProvider } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+
+/**
+ * Attempts failed logout cleanup on every "next authenticated opportunity":
+ * once `user.getMe` has resolved on the authenticated mount, and on each
+ * AppState return to `active` while authenticated. The attempt itself is
+ * single-flight with 60 s spacing, so foreground flaps do not hammer the
+ * server and a transient failure retries on the next foreground.
+ */
+function LogoutReconciliationMount() {
+  const { userId, isLoading, isError } = useCurrentUserId();
+
+  useEffect(() => {
+    if (!userId || isLoading || isError) {
+      return undefined;
+    }
+
+    void attemptLogoutReconciliation(userId);
+
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        void attemptLogoutReconciliation(userId);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [userId, isLoading, isError]);
+
+  return null;
+}
 
 export default function AppLayout() {
   const colors = useThemeColors();
@@ -16,6 +52,8 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <CachePersistenceMount />
+      <LogoutReconciliationMount />
       <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>

@@ -20,7 +20,7 @@ vi.mock('@/src/shared/agent-llm-turn-runner-core', () => ({
 
 // eslint-disable-next-line vitest/prefer-import-in-mock
 vi.mock('./agent-safe-tool-runtime', () => ({
-  executeSafeToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'safe' }),
+  createSafeToolExecutor: vi.fn(() => vi.fn().mockResolvedValue({ ok: true, value: 'safe' })),
 }));
 
 // eslint-disable-next-line vitest/prefer-import-in-mock

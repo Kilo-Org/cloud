@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { parseOptions, type Options } from './options.js';
 import {
   ENVIRONMENTS,
   PROJECTS,
@@ -8,57 +9,17 @@ import {
   findRepoRoot,
   question,
   readSecret,
+  redeployLatest,
   resolveVault,
   resolveVercelContexts,
   setEnvDefault,
   setVariable,
   setVaultValue,
+  stripSurroundingQuotes,
   trackedEnvFiles,
   type Environment,
-  type Values,
+  type VaultEnvironment,
 } from './shared.js';
-
-type Options = {
-  name: string;
-  dryRun: boolean;
-  valueFiles: Partial<Record<Environment, string>>;
-};
-
-function usage(): never {
-  throw new Error(
-    [
-      'Usage: pnpm web:env set VARIABLE [--dry-run]',
-      '       [--development-file PATH] [--staging-file PATH] [--production-file PATH]',
-    ].join('\n')
-  );
-}
-
-function parseOptions(args: string[]): Options {
-  if (args[0] !== 'set' || !args[1]) usage();
-  const name = args[1];
-  const valueFiles: Partial<Record<Environment, string>> = {};
-  let dryRun = false;
-
-  for (let index = 2; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === '--dry-run') dryRun = true;
-    else {
-      const match = argument?.match(/^--(development|staging|production)-file(?:=(.*))?$/);
-      if (!match) usage();
-      const environment = match[1] as Environment;
-      const nextArgument = args[index + 1];
-      const file = match[2] || nextArgument;
-      if (!file) usage();
-      if (!match[2]) index += 1;
-      valueFiles[environment] = file;
-    }
-  }
-
-  if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) {
-    throw new Error('Variable names must contain only uppercase letters, digits, and underscores.');
-  }
-  return { name, dryRun, valueFiles };
-}
 
 async function askSensitivity(name: string): Promise<boolean> {
   while (true) {
@@ -83,31 +44,36 @@ function normalizeFileValue(value: string): string {
   return /[\r\n]/.test(valueWithoutTrailingNewline) ? value : valueWithoutTrailingNewline;
 }
 
-async function collectValues(options: Options): Promise<Values> {
-  const values: Partial<Values> = {};
-  for (const environment of ENVIRONMENTS) {
+async function collectValues(
+  options: Options,
+  environments: readonly Environment[]
+): Promise<Partial<Record<Environment, string>>> {
+  const values: Partial<Record<Environment, string>> = {};
+  for (const environment of environments) {
     const file = options.valueFiles[environment];
     if (file) {
-      const value = normalizeFileValue(readFileSync(path.resolve(file), 'utf8'));
+      const value = stripSurroundingQuotes(
+        normalizeFileValue(readFileSync(path.resolve(file), 'utf8'))
+      );
       if (!value) throw new Error(`${environment} value file cannot be empty.`);
       values[environment] = value;
       continue;
     }
 
     while (!values[environment]) {
-      const value = await readSecret(`${environment} value: `);
+      const value = stripSurroundingQuotes(await readSecret(`${environment} value: `));
       if (value) values[environment] = value;
       else console.warn(`${environment} value cannot be empty. Please try again.`);
     }
   }
-  return values as Values;
+  return values;
 }
 
 async function collectDefaults(repoRoot: string, name: string): Promise<Map<string, string>> {
   const defaults = new Map<string, string>();
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
-    const value = await question(
-      `${relativeFile}: default value for ${name} (press Return to skip): `
+    const value = stripSurroundingQuotes(
+      await question(`${relativeFile}: default value for ${name} (press Return to skip): `)
     );
     if (!value) continue;
     defaults.set(relativeFile, value);
@@ -143,7 +109,7 @@ function assignmentValue(content: string, name: string): string | undefined {
 function rejectMatchingTrackedValues(
   repoRoot: string,
   name: string,
-  values: Values,
+  values: Partial<Record<Environment, string>>,
   defaults: Map<string, string>
 ): void {
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
@@ -160,28 +126,49 @@ function rejectMatchingTrackedValues(
 
 async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
+  const environments: readonly Environment[] = options.only ? [options.only] : ENVIRONMENTS;
   const sensitive = await askSensitivity(options.name);
   const repoRoot = findRepoRoot();
   const tempDirectory = mkdtempSync(path.join(os.tmpdir(), 'kilo-web-env-'));
 
   try {
-    console.log('Checking Vercel and 1Password access...');
+    const vaultEnvironments = sensitive
+      ? environments.filter(
+          (environment): environment is VaultEnvironment => environment !== 'development'
+        )
+      : [];
+    console.log(`Checking Vercel${vaultEnvironments.length > 0 ? ' and 1Password' : ''} access...`);
     const contexts = resolveVercelContexts(tempDirectory);
-    const vault = sensitive ? resolveVault() : undefined;
-    const values = await collectValues(options);
-    const defaults = await collectDefaults(repoRoot, options.name);
-    if (defaults.size === 0) warnAboutMissingTrackedDefault(options.name);
+    const vault = vaultEnvironments.length > 0 ? resolveVault() : undefined;
+    const values = await collectValues(options, environments);
+    const defaults = options.only
+      ? new Map<string, string>()
+      : await collectDefaults(repoRoot, options.name);
+    if (!options.only && defaults.size === 0) warnAboutMissingTrackedDefault(options.name);
     rejectMatchingTrackedValues(repoRoot, options.name, values, defaults);
 
+    const deployableEnvironments = environments.filter(
+      (environment): environment is Exclude<Environment, 'development'> =>
+        environment !== 'development'
+    );
+
     console.log('\nPlan');
-    for (const environment of ENVIRONMENTS) {
+    for (const environment of environments) {
       const type = sensitive && environment !== 'development' ? 'sensitive' : 'encrypted';
       for (const project of PROJECTS) console.log(`- ${project}/${environment}: ${type}`);
     }
     for (const [file, value] of defaults)
       console.log(`- ${file}: ${options.name}=${JSON.stringify(value)}`);
-    console.log(`- 1Password: ${sensitive ? 'update Production copy' : 'skip'}`);
-    console.log('- Deployments: not triggered');
+    console.log(
+      `- 1Password: ${vaultEnvironments.length > 0 ? `update ${vaultEnvironments.join(' and ')} fields` : 'skip'}`
+    );
+    console.log(
+      `- Deployments: ${
+        deployableEnvironments.length > 0
+          ? 'ask after environment updates'
+          : 'not applicable for development'
+      }`
+    );
 
     if (options.dryRun) {
       console.log('\nDry run complete; nothing changed.');
@@ -196,19 +183,46 @@ async function main(): Promise<void> {
       setEnvDefault(path.join(repoRoot, relativeFile), options.name, value);
     }
 
-    for (const environment of ENVIRONMENTS) {
+    for (const environment of environments) {
+      const value = values[environment];
+      if (!value) throw new Error(`Missing ${environment} value.`);
       for (const context of contexts) {
         console.log(`Setting ${context.project}/${environment}...`);
-        setVariable(context, environment, options.name, values[environment], sensitive);
+        setVariable(context, environment, options.name, value, sensitive);
       }
     }
     if (vault) {
-      console.log('Updating 1Password Production copy...');
-      await setVaultValue(vault, options.name, values.production);
+      for (const environment of vaultEnvironments) {
+        const value = values[environment];
+        if (!value) throw new Error(`Missing ${environment} value.`);
+        console.log(`Updating 1Password ${environment} copy...`);
+        await setVaultValue(vault, options.name, value, environment);
+      }
+    }
+
+    if (
+      deployableEnvironments.length > 0 &&
+      (await confirm(
+        `\nEnvironment changes only take effect in new deployments. Redeploy ${deployableEnvironments.join(' and ')} now?`
+      ))
+    ) {
+      for (const environment of deployableEnvironments) {
+        console.log(`Redeploying ${environment} in both Vercel projects...`);
+        const deployments = await Promise.all(
+          contexts.map(async context => ({
+            project: context.project,
+            url: await redeployLatest(context, environment),
+          }))
+        );
+        for (const deployment of deployments) {
+          console.log(`- ${deployment.project}: ${deployment.url}`);
+        }
+      }
+    } else if (deployableEnvironments.length > 0) {
+      console.log('Deployments skipped; the previous deployments still use the old value.');
     }
 
     console.log('\nDone. Rerun the same command if a provider failed partway through.');
-    console.log('Deploy Staging or Production separately when the new value should take effect.');
   } finally {
     rmSync(tempDirectory, { recursive: true, force: true });
   }

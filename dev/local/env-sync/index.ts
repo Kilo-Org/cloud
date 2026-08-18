@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { resolveTargets } from '../services';
-import { computePlan, findDevVarsExamples } from './plan';
+import { computePlanAsync, findDevVarsExamples } from './plan';
 import { planHasChanges, displayPlan, applyEnvLocalAutoCreates, applyPlan } from './output';
 import type { SyncResult, CheckResult } from './types';
 
@@ -39,12 +39,14 @@ function resolveServiceFilter(targets?: string[]): Set<string> | undefined {
 async function syncEnvVars(options: {
   repoRoot: string;
   check?: boolean;
+  missingSecretsOnly?: boolean;
   yes?: boolean;
   targets?: string[];
 }): Promise<SyncResult> {
-  const { repoRoot, check = false, yes = false, targets } = options;
+  const { repoRoot, check = false, missingSecretsOnly = false, yes = false, targets } = options;
   const serviceFilter = resolveServiceFilter(targets);
-  const plan = computePlan(repoRoot, serviceFilter, !check);
+  const refreshSourceBackedSecrets = !check && !missingSecretsOnly;
+  const plan = await computePlanAsync(repoRoot, serviceFilter, refreshSourceBackedSecrets);
 
   if (plan.missingEnvLocal) {
     displayPlan(plan);
@@ -74,8 +76,10 @@ async function syncEnvVars(options: {
     if (shouldApply) {
       applyEnvLocalAutoCreates(plan.envLocalAutoCreates, repoRoot);
       const applyReadyPlan =
-        plan.envLocalAutoCreates.length > 0 ? computePlan(repoRoot, serviceFilter, true) : plan;
-      applyPlan(applyReadyPlan, repoRoot);
+        plan.envLocalAutoCreates.length > 0
+          ? await computePlanAsync(repoRoot, serviceFilter, refreshSourceBackedSecrets)
+          : plan;
+      await applyPlan(applyReadyPlan, repoRoot);
       console.log(`\n${GREEN}✓ Applied${RESET}`);
     } else {
       console.log('Skipped.');
@@ -99,7 +103,7 @@ async function checkEnvVars(repoRoot: string, targets?: string[]): Promise<Check
   }
 
   const serviceFilter = resolveServiceFilter(targets);
-  const plan = computePlan(repoRoot, serviceFilter, false);
+  const plan = await computePlanAsync(repoRoot, serviceFilter, false);
   const totalMissing =
     plan.devVarsChanges.reduce((sum, c) => sum + c.missingValues.length, 0) +
     plan.secretStoreWarnings.reduce((sum, c) => sum + c.bindings.length, 0);
@@ -144,6 +148,7 @@ function findRepoRoot(): string {
 async function main() {
   const args = process.argv.slice(2);
   const checkMode = args.includes('--check');
+  const missingSecretsOnly = args.includes('--missing-secrets-only');
   const yesMode = args.includes('--yes') || args.includes('-y');
   const targets = args.filter(a => !a.startsWith('-'));
 
@@ -165,6 +170,7 @@ async function main() {
 
   const result = await syncEnvVars({
     repoRoot,
+    missingSecretsOnly,
     yes: yesMode,
     targets: targets.length > 0 ? targets : undefined,
   });

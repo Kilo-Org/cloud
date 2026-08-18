@@ -37,6 +37,12 @@ export type PricingTier = {
 
 export type PricingTiers = readonly [PricingTier, ...PricingTier[]];
 
+export type KiloExclusivePricing = {
+  tiers: PricingTiers;
+  /** Only use these tiers when the upstream response does not report a positive market cost. */
+  fallbackOnly?: boolean;
+};
+
 export function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
   if (pricingTiers[0].start_context_length !== 0) {
     throw new Error('The first pricing tier must start at context length 0');
@@ -75,7 +81,7 @@ export type KiloExclusiveModel = {
   flags: KiloExclusiveModelFlag[];
   gateway: ProviderId;
   internal_id: string;
-  pricing: PricingTiers | null;
+  pricing: KiloExclusivePricing | null;
   /**
    * Upstream inference providers this model may be routed to; empty means no
    * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.
@@ -188,14 +194,19 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   if (model.flags.includes('stealth')) {
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
   }
-  if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
-    return null;
-  }
-  const slug = OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+
+  const slug: OpenRouterInferenceProviderId | null =
+    model.inference_provider_restriction.length === 1
+      ? model.inference_provider_restriction[0]
+      : model.gateway === 'openrouter' || model.gateway === 'vercel'
+        ? null
+        : OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+  if (!slug) return null;
+
   return {
     slug,
     name: slug.toUpperCase(),
-    training: false,
+    training: model.flags.includes('requires-data-collection'),
     retainsPrompts: true,
   };
 }
@@ -207,7 +218,7 @@ function formatPricePerMillionAsPerToken(price: number | null | undefined): stri
 }
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
-  const cheapestPricing = model.pricing?.[0].pricing;
+  const cheapestPricing = model.pricing?.tiers[0].pricing;
   const isFree = !model.pricing;
   return {
     id: model.public_id,

@@ -116,12 +116,14 @@ import {
   mcp_gateway_oauth_clients,
   mcp_gateway_oauth_grants,
   deployments_ephemeral,
+  operation_ledgers,
+  analytics_event_outbox,
   user_data_exports,
   user_data_export_parts,
   user_data_export_outbox,
 } from '@kilocode/db/schema';
 
-import { eq, count, sql } from 'drizzle-orm';
+import { eq, count, inArray, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   assertUserCanBeSoftDeleted,
@@ -172,6 +174,8 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(deployments_ephemeral);
+    await db.delete(operation_ledgers);
+    await db.delete(analytics_event_outbox);
     await db.delete(user_data_export_parts);
     await db.delete(user_data_export_outbox);
     await db.delete(user_data_exports);
@@ -828,6 +832,84 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
+      const user = await insertTestUser({ google_user_email: 'ledger-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const now = new Date();
+      const leaseExpiresAt = new Date(now.getTime() + 60_000).toISOString();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const [userLedger, otherLedger] = await db
+        .insert(operation_ledgers)
+        .values([
+          {
+            operation_key: 'op-1',
+            domain: 'session',
+            intent: 'create',
+            kilo_user_id: user.id,
+            taxonomy: 'safe-retry',
+            lease_expires_at: leaseExpiresAt,
+            expires_at: expiresAt,
+          },
+          {
+            operation_key: 'op-2',
+            domain: 'session',
+            intent: 'create',
+            kilo_user_id: otherUser.id,
+            taxonomy: 'safe-retry',
+            lease_expires_at: leaseExpiresAt,
+            expires_at: expiresAt,
+          },
+        ])
+        .returning();
+
+      // Outbox writers fall back to the user id as distinct_id when the email
+      // lookup fails, so both identities must be deleted.
+      const [userOutbox, fallbackOutbox, otherOutbox] = await db
+        .insert(analytics_event_outbox)
+        .values([
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'session_create_settled',
+            distinct_id: user.google_user_email,
+            properties: { source: 'server' },
+          },
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'pr_operation_settled',
+            distinct_id: user.id,
+            properties: { source: 'web' },
+          },
+          {
+            event_uuid: crypto.randomUUID(),
+            event_name: 'session_create_settled',
+            distinct_id: otherUser.google_user_email,
+            properties: { source: 'server' },
+          },
+        ])
+        .returning();
+      if (!userLedger || !otherLedger || !userOutbox || !fallbackOutbox || !otherOutbox) {
+        throw new Error('Failed to seed ledger or outbox rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db.select().from(operation_ledgers).where(eq(operation_ledgers.id, userLedger.id))
+      ).toHaveLength(0);
+      expect(
+        await db.select().from(operation_ledgers).where(eq(operation_ledgers.id, otherLedger.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(
+            inArray(analytics_event_outbox.id, [userOutbox.id, fallbackOutbox.id, otherOutbox.id])
+          )
+      ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
+    });
+
     it('deletes user data export state and dependent multipart and outbox rows', async () => {
       const user = await insertTestUser();
       const [exportJob] = await db

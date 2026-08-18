@@ -61,10 +61,18 @@ import {
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
+import {
+  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  useClipboardPaste,
+} from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { type ModeOption } from '@/components/agents/mode-normalize';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
+import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import {
@@ -118,8 +126,14 @@ type ChatComposerProps = {
   onModeChange: (mode: AgentMode) => void;
   model: string;
   variant: string;
-  modelOptions: ModelOption[];
+  modelOptions: (ModelOption | SessionModelOption)[];
   onModelSelect: (modelId: string, variant: string) => void;
+  /** Custom mode options shown under the built-ins in the mode picker. */
+  customOptions?: ModeOption[];
+  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
+  modelLocked?: boolean;
+  /** Agent name shown in the locked model chip's accessibility label. */
+  modelLockLabel?: string;
   organizationId?: string;
   /** Only Cloud Agent sessions can receive attachments. */
   attachmentsEnabled?: boolean;
@@ -133,6 +147,21 @@ type ChatComposerProps = {
   shareId?: string;
   /** Remote-spawn auto-send flag; fires one submit after share delivery completes. */
   autoSend?: boolean;
+  /**
+   * Durable draft persistence key. When set (with a resolved identity), text
+   * changes are saved debounced, flushed on background/unmount, and cleared
+   * on successful send — the draft survives process kill, never navigation.
+   */
+  draftKey?: string;
+  /**
+   * Restored draft text, applied once into the input through the same restore
+   * path the Stop remount uses. The host mounts the composer immediately, so
+   * this arrives after mount on a cold start: `undefined` means the draft load
+   * has not settled yet, `''` means it settled with nothing stored. A draft is
+   * applied only while the input is still untouched, so it can never overwrite
+   * text the user typed while identity and the draft were still loading.
+   */
+  initialDraft?: string;
 };
 
 export function ChatComposer({
@@ -151,6 +180,9 @@ export function ChatComposer({
   variant,
   modelOptions,
   onModelSelect,
+  customOptions = [],
+  modelLocked = false,
+  modelLockLabel,
   organizationId,
   attachmentsEnabled = true,
   activeSessionType = null,
@@ -158,9 +190,14 @@ export function ChatComposer({
   commandState = null,
   shareId,
   autoSend,
+  draftKey,
+  initialDraft,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
+  // Draft persistence is fenced on identity: while the user id is unknown,
+  // drafts neither save nor flush (the drafts module no-ops on an empty id).
+  const { userId } = useCurrentUserId();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   // Last caret the input reported. Paste inserts here so the button behaves
@@ -240,6 +277,30 @@ export function ChatComposer({
   const measureRef = useRef(measure);
   measureRef.current = measure;
 
+  // Flush the debounced draft write when the app leaves `active` and on
+  // unmount, so a backgrounded-then-killed app (or a navigation away) does
+  // not lose the last keystrokes inside the 500 ms window.
+  useDraftFlushOnBackground(userId, draftKey, true);
+
+  // The one place text is written into the live input from outside a keystroke:
+  // the Stop remount and the host-loaded draft both go through it, so both set
+  // text, selection, hasText, slash-command state, and the measure node the
+  // same way.
+  const restoreTextIntoInput = useCallback((draft: string) => {
+    // Sync the live submit-time ref with the restored text: `handleSend`
+    // reads `textRef.current`, so an immediate send (before any keystroke)
+    // must see the restored draft, not the mount-time empty string.
+    textRef.current = draft;
+    inputRef.current?.setNativeProps({
+      text: draft,
+      selection: { start: draft.length, end: draft.length },
+    });
+    selectionRef.current = { start: draft.length, end: draft.length };
+    setHasText(draft.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(draft));
+    measureRef.current.setText(draft);
+  }, []);
+
   useEffect(() => {
     const draft = pendingDraftRestoreRef.current;
     if (draft === null) {
@@ -249,15 +310,26 @@ export function ChatComposer({
     if (!draft) {
       return;
     }
-    inputRef.current?.setNativeProps({
-      text: draft,
-      selection: { start: draft.length, end: draft.length },
-    });
-    selectionRef.current = { start: draft.length, end: draft.length };
-    setHasText(draft.trim().length > 0);
-    setSlashCommandInput(getSlashCommandCandidate(draft));
-    measureRef.current.setText(draft);
-  }, [inputEpoch]);
+    restoreTextIntoInput(draft);
+  }, [inputEpoch, restoreTextIntoInput]);
+
+  // Apply the host-loaded draft once, whenever it arrives. The host renders
+  // the composer before identity and the draft load settle (typing must never
+  // wait on a network query), so `initialDraft` is `undefined` until the load
+  // settles. Nothing is applied once the input holds text: whatever the user
+  // typed while the draft was loading wins, and the stale stored draft is
+  // dropped rather than pasted over the typing.
+  const initialDraftAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialDraftAppliedRef.current || initialDraft === undefined) {
+      return;
+    }
+    initialDraftAppliedRef.current = true;
+    if (initialDraft === '' || textRef.current !== '') {
+      return;
+    }
+    restoreTextIntoInput(initialDraft);
+  }, [initialDraft, restoreTextIntoInput]);
 
   // After Stop, remount the input row once the SDK has restored the composer
   // (Item 14 E2E gate).  The state machine is armed in handleStop and
@@ -291,6 +363,12 @@ export function ChatComposer({
     // auto-send the user's modified draft.
     if (shareDeliveredRef.current) {
       setAutoSendArmed(false);
+    }
+    // Save boundary for the durable draft: every text change (typing, share
+    // prefill, voice transcript) goes through here. Debounced 500 ms; a
+    // background/unmount flush forces the pending write.
+    if (draftKey && userId) {
+      saveDraft(userId, draftKey, value);
     }
   }
 
@@ -329,6 +407,8 @@ export function ChatComposer({
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
+    readyAttachmentsCount: upload.attachments.filter(attachment => attachment.status === 'uploaded')
+      .length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
     hasText,
@@ -358,8 +438,12 @@ export function ChatComposer({
         onChangeText: handleChangeText,
       });
     },
-    onUnreadable: () => {
-      toast.error(describeClassificationFailure('unreadable'));
+    onFailure: reason => {
+      toast.error(
+        reason === 'empty'
+          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          : describeClassificationFailure('unreadable')
+      );
     },
   });
 
@@ -516,11 +600,16 @@ export function ChatComposer({
     setSlashCommandInput(null);
     measure.reset();
     inputRef.current?.clear();
+    // Clear the persisted draft only on successful send / explicit clear,
+    // never on navigation-away, process kill, or sign-out.
+    if (draftKey && userId) {
+      void clearStoredDraft(userId, draftKey);
+    }
   }
 
   async function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!trimmed || !control.canSend) {
+    if (!control.canSend) {
       return;
     }
     if (upload.isUploading) {
@@ -720,6 +809,9 @@ export function ChatComposer({
             disabled={control.toolbarDisabled}
             onPaste={attachmentsEnabled ? pasteClipboard : undefined}
             pasteDisabled={!control.inputEditable}
+            customOptions={customOptions}
+            modelLocked={modelLocked}
+            modelLockLabel={modelLockLabel}
           />
         </Animated.View>
       ) : null}

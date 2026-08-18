@@ -88,6 +88,15 @@ export type AssistantFailureClassification = {
   terminalCode?: 'payment_required' | 'model_missing';
 };
 
+export function isAssistantInterrupt(source: unknown): boolean {
+  if (typeof source === 'object' && source !== null && 'name' in source) {
+    if (source.name === 'MessageAbortedError') return true;
+  }
+  return /messageabortederror|user[_ -]?interrupt|interrupted by the user/.test(
+    extractErrorMessage(source).toLocaleLowerCase()
+  );
+}
+
 export function classifyAssistantFailure(
   source: unknown,
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
@@ -155,6 +164,7 @@ export function classifyAssistantFailure(
 }
 
 export function classifyAssistantFailureMessage(source: unknown): string {
+  if (isAssistantInterrupt(source)) return GENERIC_FAILURE_MESSAGES.user_interrupt;
   return classifyAssistantFailure(source).safeMessage;
 }
 

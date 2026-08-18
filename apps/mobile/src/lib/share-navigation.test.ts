@@ -8,6 +8,7 @@ import {
   navigationContainsShareGate,
   parseShareHrefParams,
   setPendingShareNavigation,
+  shareDeliveryShareId,
   takePendingShareNavigation,
 } from './share-navigation';
 
@@ -60,7 +61,9 @@ describe('share-navigation', () => {
     const taken: string[] = [];
     let next = takePendingShareNavigation();
     while (next) {
-      taken.push(next.shareId);
+      if (shareDeliveryShareId(next)) {
+        taken.push(next.shareId);
+      }
       next = takePendingShareNavigation();
     }
     expect(taken).toHaveLength(SHARE_PAYLOAD_MAX_ENTRIES);
@@ -77,6 +80,31 @@ describe('share-navigation', () => {
     setPendingShareNavigation({ href: '/b', shareId: 'b' });
     __resetPendingShareNavigationForTests();
     expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('enqueues and returns a null-shareId navigation unchanged', () => {
+    setPendingShareNavigation({
+      href: '/(app)/pr-review/octocat/hello-world/42',
+      shareId: null,
+    });
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/pr-review/octocat/hello-world/42',
+      shareId: null,
+    });
+  });
+});
+
+describe('shareDeliveryShareId', () => {
+  it('is false when shareId is null', () => {
+    expect(
+      shareDeliveryShareId({ href: '/(app)/pr-review/octocat/hello-world/42', shareId: null })
+    ).toBe(false);
+  });
+
+  it('is true when shareId is a string', () => {
+    expect(shareDeliveryShareId({ href: '/(app)/agent-chat/new?shareId=a', shareId: 'a' })).toBe(
+      true
+    );
   });
 });
 
@@ -192,6 +220,27 @@ describe('appendShareParams', () => {
   it('does not append autoSend when autoSend is false', () => {
     expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { autoSend: false })).toBe(
       '/(app)/agent-chat/ses_1?shareId=abc123'
+    );
+  });
+
+  it('appends the spawn mode so the destination seeds it', () => {
+    expect(
+      appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { autoSend: true, mode: 'reviewer' })
+    ).toBe('/(app)/agent-chat/ses_1?shareId=abc123&autoSend=1&mode=reviewer');
+  });
+
+  it('does not append mode when it is empty or omitted', () => {
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { mode: '' })).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123'
+    );
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123')).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123'
+    );
+  });
+
+  it('URL-encodes the mode', () => {
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { mode: 'my agent' })).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123&mode=my%20agent'
     );
   });
 

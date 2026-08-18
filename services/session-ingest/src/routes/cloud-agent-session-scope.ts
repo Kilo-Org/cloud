@@ -15,6 +15,7 @@ import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import type { ApiContext } from './api';
 
 const createScopedSessionSchema = z.object({
@@ -68,6 +69,10 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
   const kiloUserId = c.get('user_id');
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const result = await db.transaction(async tx => {
+    if (!(await canCreateCliSessionForUser(tx, kiloUserId))) {
+      return { status: 'user_not_admitted' } as const;
+    }
+
     const [root] = await tx
       .select({
         sessionId: cli_sessions_v2.session_id,
@@ -163,6 +168,9 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
     return { status: 'existing', row: existing } as const;
   });
 
+  if (result.status === 'user_not_admitted') {
+    return c.json({ success: false, error: 'User account not found' }, 403);
+  }
   if (result.status === 'root_not_found') {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }

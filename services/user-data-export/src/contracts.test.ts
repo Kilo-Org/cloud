@@ -1,5 +1,65 @@
 import { describe, expect, it } from 'vitest';
-import { DownloadRequestSchema, ExportQueueMessageSchema, parseCursor } from './contracts';
+import { ORGANIZATION_EXPORT_ROLES } from '@kilocode/db/organization-export-access';
+import {
+  DownloadRequestSchema,
+  EXPORT_FILE_SCHEMA_VERSION,
+  EXPORT_SCHEMA_VERSION,
+  ExportQueueMessageSchema,
+  parseCursor,
+} from './contracts';
+import { __test__ } from './databases';
+
+// The Worker re-authorises an organization download against live membership rather than
+// trusting the request path, so it must reach the same verdict as the router. Both now
+// build from one shared predicate; this pins the values so a change is a visible
+// decision here, and catches a hand-written copy reappearing on this side.
+describe('organization export roles', () => {
+  it('admits owners and admins only', () => {
+    expect([...ORGANIZATION_EXPORT_ROLES]).toEqual(['owner', 'admin']);
+  });
+
+  it('builds the membership predicate from the shared list', () => {
+    const predicate = __test__.callerMayAccess('user-1');
+    // Every role in the shared list reaches the SQL, and nothing else does. A stale
+    // literal would leave 'member' or 'billing_manager' able to download.
+    for (const role of ORGANIZATION_EXPORT_ROLES) {
+      expect(predicate.queryChunks.some(chunk => JSON.stringify(chunk).includes(role))).toBe(true);
+    }
+    const rendered = JSON.stringify(predicate.queryChunks);
+    expect(rendered).not.toContain('billing_manager');
+    expect(rendered).not.toContain('"member"');
+  });
+
+  // The inheritance branch is what the Worker's own copy was missing, which is how an
+  // export came to generate, show as ready, and refuse every download.
+  it('carries the parent-organization branch', () => {
+    const rendered = JSON.stringify(__test__.callerMayAccess('user-1').queryChunks);
+    expect(rendered).toContain('parent_organization_id');
+    expect(rendered).toContain('deleted_at IS NULL');
+  });
+});
+
+// The two versions govern different things and once happened to agree at 1, which read
+// as one constant doing both jobs. Raising the message contract dead-letters every
+// in-flight message; raising the file version does not, and must not be avoided out of
+// fear of the other.
+describe('schema versions', () => {
+  it('versions the file separately from the message contract', () => {
+    expect(EXPORT_FILE_SCHEMA_VERSION).not.toBe(EXPORT_SCHEMA_VERSION);
+  });
+
+  it('keeps the message contract at the version in-flight messages carry', () => {
+    expect(EXPORT_SCHEMA_VERSION).toBe(1);
+    expect(
+      ExportQueueMessageSchema.safeParse({
+        version: 1,
+        operation: 'generate',
+        exportId: '1e6c4a2b-6a1a-4a3f-9b3d-2f8f0a1b7c55',
+        generation: 0,
+      }).success
+    ).toBe(true);
+  });
+});
 
 describe('ExportQueueMessageSchema', () => {
   it('accepts only a versioned durable generation reference', () => {

@@ -98,9 +98,13 @@ export async function createOrganizationKiloPassCheckout(input: {
         eq(organization_seats_purchases.subscription_status, 'active')
       )
     )
+    .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
   if (!purchase) throw new Error('An active organization seat subscription is required');
   const subscription = await stripe.subscriptions.retrieve(purchase.subscriptionId);
+  if (subscription.status !== 'active' || subscription.ended_at) {
+    throw new Error('An active organization seat subscription is required');
+  }
   const existingPassItem = subscription.items.data.find(item => !isSeatLineItem(item));
   if (existingPassItem) throw new Error('KILO_PASS_ORG_ALREADY_EXISTS');
   const seatItem = paidSeatItem(subscription);
@@ -302,7 +306,10 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
 /** Repairs a pending agreement when Stripe has already finalized its add-on invoice. */
 export async function reconcileOrganizationKiloPassPayment(organizationId: string) {
   const [agreement] = await db
-    .select({ providerSubscriptionId: kilo_pass_org_agreements.provider_subscription_id })
+    .select({
+      id: kilo_pass_org_agreements.id,
+      providerSubscriptionId: kilo_pass_org_agreements.provider_subscription_id,
+    })
     .from(kilo_pass_org_agreements)
     .where(
       and(
@@ -318,8 +325,22 @@ export async function reconcileOrganizationKiloPassPayment(organizationId: strin
     expand: ['latest_invoice'],
   });
   const invoice = subscription.latest_invoice;
-  if (!invoice || typeof invoice === 'string' || invoice.status !== 'paid') return false;
-  return handleOrganizationKiloPassInvoicePaid({ invoice });
+  if (invoice && typeof invoice !== 'string' && invoice.status === 'paid') {
+    const activated = await handleOrganizationKiloPassInvoicePaid({ invoice });
+    if (activated) return true;
+  }
+  if (subscription.status !== 'canceled' && !subscription.ended_at) return false;
+
+  await db
+    .update(kilo_pass_org_agreements)
+    .set({ state: KiloPassOrgAgreementState.Ended })
+    .where(
+      and(
+        eq(kilo_pass_org_agreements.id, agreement.id),
+        eq(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.PendingPayment)
+      )
+    );
+  return true;
 }
 
 /** Keep the paid seat subscription alive while removing only its Kilo Pass add-on at renewal. */

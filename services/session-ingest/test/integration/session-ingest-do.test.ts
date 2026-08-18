@@ -56,6 +56,7 @@ describe('SessionIngestDO integration', () => {
         await expect(stub.ingest(items, envelopeUserId, sessionId, 1, 1)).resolves.toEqual({
           accepted: true,
           changes: [],
+          attentionSignals: [],
         });
         await runInDurableObject(stub, async (_instance, state) => {
           const rows = [

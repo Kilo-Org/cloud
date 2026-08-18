@@ -3,14 +3,9 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Bell, ChartLine, Mail } from 'lucide-react';
+import { Bell, Mail } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { toast } from 'sonner';
-import {
-  useOrganizationWithMembers,
-  useUpdateRecommendationsDigest,
-} from '@/app/api/organizations/hooks';
+import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 
 type Props = {
@@ -61,45 +56,17 @@ function PreferenceRow({
 export function OrganizationEmailPreferencesCard({ organizationId }: Props) {
   const { data } = useOrganizationWithMembers(organizationId);
   const [isSpendingAlertsOpen, setIsSpendingAlertsOpen] = useState(false);
-  const updateRecommendationsDigest = useUpdateRecommendationsDigest();
-
   if (!data) {
     return null;
   }
 
   const settings = data.settings;
-  const isEnterprise = data.plan === 'enterprise';
-
   // Low-balance alerts are "on" only when both a threshold and at least one
   // recipient are configured (matches SpendingAlertsModal's enabled check).
   const spendingRecipientCount =
     settings?.minimum_balance !== undefined
       ? (settings?.minimum_balance_alert_email?.length ?? 0)
       : 0;
-  const digestEnabled = settings?.recommendations_digest_enabled === true;
-
-  const handleDigestToggle = (next: boolean) => {
-    updateRecommendationsDigest.mutate(
-      { organizationId, enabled: next },
-      {
-        onSuccess: () => {
-          toast.success(
-            next
-              ? 'Weekly recommendations email enabled. Organization owners will receive it.'
-              : 'Weekly recommendations email disabled.'
-          );
-        },
-        onError: (error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : 'Failed to update the recommendations digest setting'
-          );
-        },
-      }
-    );
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -128,21 +95,6 @@ export function OrganizationEmailPreferencesCard({ organizationId }: Props) {
               </Button>
             }
           />
-          {isEnterprise && (
-            <PreferenceRow
-              icon={ChartLine}
-              title="Weekly recommendations email"
-              description="Email the organization's owners a weekly summary of open recommendations and feature setup."
-              control={
-                <Switch
-                  checked={digestEnabled}
-                  disabled={updateRecommendationsDigest.isPending}
-                  onCheckedChange={handleDigestToggle}
-                  aria-label="Weekly recommendations email"
-                />
-              }
-            />
-          )}
         </div>
       </CardContent>
 

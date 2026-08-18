@@ -205,7 +205,9 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
 
   // Mirror attribution events into PostHog so the onboarding funnel is
   // visible in product analytics too. Both SDKs sit behind the same consent
-  // gate; captureEvent no-ops until PostHog is initialized.
+  // gate; `captureEvent` no-ops until PostHog is initialized and drops any
+  // payload key that names a prohibited data class. These names are dynamic,
+  // so they resolve to `captureEvent`'s uncataloged overload.
   captureEvent(name, eventValues);
 
   if (!initialized) {

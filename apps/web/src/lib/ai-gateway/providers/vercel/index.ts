@@ -12,46 +12,15 @@ import type {
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { redisClient } from '@/lib/redis';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import {
-  GatewayPercentageSchema,
-  DEFAULT_VERCEL_PERCENTAGE,
-  DEFAULT_VERCEL_PERCENTAGE_FREE,
-} from '@/lib/ai-gateway/gateway-config';
-import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-
-type VercelRoutingPercentages = {
-  paid: number;
-  free: number;
-};
-
-const DEFAULT_VERCEL_ROUTING_PERCENTAGES: VercelRoutingPercentages = {
-  paid: DEFAULT_VERCEL_PERCENTAGE,
-  free: DEFAULT_VERCEL_PERCENTAGE_FREE,
-};
-
-const getVercelRoutingPercentages = createCachedFetch<VercelRoutingPercentages>(
-  async () => {
-    const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
-    if (!raw) return DEFAULT_VERCEL_ROUTING_PERCENTAGES;
-    const { vercel_routing_percentage, vercel_routing_percentage_free } =
-      GatewayPercentageSchema.parse(JSON.parse(raw));
-    return {
-      paid: vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE,
-      free: vercel_routing_percentage_free ?? DEFAULT_VERCEL_PERCENTAGE_FREE,
-    };
-  },
-  600_000,
-  DEFAULT_VERCEL_ROUTING_PERCENTAGES
-);
+import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
+import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
+import { getEnvVariable } from '@/lib/dotenvx';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -82,11 +51,11 @@ export function getVercelInferenceProvidersExcludingIgnored(
 }
 
 export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
-  const routingSeed = 'vercel_routing_' + randomSeed;
-  const wholePercentageBucket = getRandomNumber(routingSeed, 100);
-  const fractionalPercentageBucket = getRandomNumber(routingSeed + '_fractional', 1_000);
+  return passesRoutingPercentage('vercel', randomSeed, routingPercentage);
+}
 
-  return wholePercentageBucket + fractionalPercentageBucket / 1_000 < routingPercentage;
+export function isVercelRoutingOptOut(requestedModel: string, optOutModels: ReadonlySet<string>) {
+  return optOutModels.has(requestedModel);
 }
 
 export async function shouldRouteToVercel(
@@ -94,16 +63,16 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  // BYOK in the Vercel AI Gateway was not working for Laguna models.
-  if (requestedModel.includes('laguna')) {
+  const routingConfig = await getRuntimeGatewayRoutingConfig();
+  if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
+    console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
     return false;
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const percentages = await getVercelRoutingPercentages();
   const routingPercentage = (await isFreeModel(requestedModel))
-    ? percentages.free
-    : percentages.paid;
+    ? routingConfig.vercelFree
+    : routingConfig.vercelPaid;
 
   const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
 
@@ -288,13 +257,26 @@ export async function applyVercelSettings(
       },
     };
   } else {
-    const vercelInferenceProviders = requestToMutate.body.provider?.ignore?.length
-      ? await getCachedVercelInferenceProviderIdsForModel(vercelModelId)
-      : null;
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
     requestToMutate.body.providerOptions = convertProviderOptions(
       requestToMutate,
       vercelInferenceProviders
     );
+
+    const gatewayOptions = requestToMutate.body.providerOptions.gateway;
+    const openAiApiKey = getEnvVariable('OPENAI_API_KEY');
+    if (
+      gatewayOptions &&
+      openAiApiKey &&
+      vercelInferenceProviders?.includes('openai') &&
+      (!gatewayOptions.only || gatewayOptions.only.includes('openai'))
+    ) {
+      gatewayOptions.byok = {
+        ...gatewayOptions.byok,
+        openai: [{ apiKey: openAiApiKey }],
+      };
+    }
   }
 
   if (requestToMutate.body.providerOptions) {

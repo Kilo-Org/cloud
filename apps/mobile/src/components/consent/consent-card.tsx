@@ -7,7 +7,7 @@ import {
   Shield,
   Smartphone,
   User,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
 import { WEB_BASE_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
@@ -265,11 +266,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           .
         </Text>
 
-        {error ? (
-          <Text accessibilityLiveRegion="polite" className="mt-6 text-sm text-destructive">
-            {error}
-          </Text>
-        ) : null}
+        <AccessibleStatus message={error} className="mt-6 text-sm" />
 
         <View className="mt-8 gap-3">
           <Button

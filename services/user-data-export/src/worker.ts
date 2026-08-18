@@ -1,31 +1,65 @@
-import { ExportQueueMessageSchema, type ExportQueueMessage } from './contracts';
 import {
-  createReplicaQuery,
+  EXPORT_FILE_SCHEMA_VERSION,
+  ExportQueueMessageSchema,
+  type ExportCursor,
+  type ExportQueueMessage,
+} from './contracts';
+import {
+  createReplicaDatabase,
   createStateDb,
   type ExportCompletionResult,
   type ExportJob,
   type HyperdriveBinding,
+  type ReplicaDatabase,
 } from './databases';
-import { createSourceAdapters, type ExportRecord } from './source-adapters';
+import { SourceReadError, TerminalExportError } from './errors';
+import {
+  createSourceAdapters,
+  findPresentWarehouseTables,
+  warehouseRequirements,
+  USER_ONLY_SOURCES,
+  type ExportRecord,
+  type ExportSubject,
+  type SourcePage,
+} from './source-adapters';
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
-import { classifyFetchFailure, logExportEvent, safeError } from './observability';
+import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
 
+/**
+ * The wall-clock deadlines, and the reason tuning past this point does not help.
+ *
+ * These are not the only ceiling a large export runs into. `limits.cpu_ms` in
+ * `wrangler.jsonc` is 300,000, which is Cloudflare's MAXIMUM rather than a number we
+ * chose, so it cannot be raised. Measured on the organization export of 2026-08-15: 202 s
+ * of CPU to write 5.34 M records, or roughly 38 microseconds per record. That puts a hard
+ * ceiling near 7.5 M records on any single invocation, whatever the read path costs.
+ *
+ * So making reads faster moves the binding constraint from this deadline to that cap
+ * rather than removing it. The same export had already been sped up 3.2x — 1.65 M records
+ * to 5.34 M in the identical 12 minutes — and still died, on the last of its fourteen
+ * sources. An organization whose export does not fit needs the work SPLIT across
+ * invocations, not made faster inside one.
+ *
+ * The state columns for that still exist: `current_source`, `source_cursor` and
+ * `next_part_number` on `user_data_exports`, which `hasRetiredGeneratorState` below
+ * rejects because this generator is one-shot.
+ */
 const MAX_PROCESSING_MS = 13 * 60 * 1000;
 const SOURCE_PROCESSING_MS = 12 * 60 * 1000;
 const PART_BYTES = 5 * 1024 * 1024;
-const PAGE_SIZE = 1_000;
-
-export class TerminalExportError extends Error {
-  constructor(
-    readonly failureCode: string,
-    readonly redactedMessage: string,
-    message: string
-  ) {
-    super(message);
-    this.name = 'TerminalExportError';
-  }
-}
+/**
+ * The page size for every source that does not override it, which is every NARROW source:
+ * measured row widths there leave a page of this size inside the byte budget. The sources
+ * whose rows are large enough for that to matter set `pageSize` themselves, and the budget
+ * all of those are derived from is documented beside them in `source-adapters.ts`.
+ *
+ * Raised from 1,000 on 2026-08-15. A page costs a few hundred milliseconds of fixed round
+ * trip before returning a row, so an export's wall clock tracks page COUNT far more than
+ * page size, and an organization export was exhausting the 13-minute deadline on round
+ * trips alone.
+ */
+const PAGE_SIZE = 4_000;
 
 function exportDeadlineError(): TerminalExportError {
   return new TerminalExportError(
@@ -39,6 +73,25 @@ export function hasRetiredGeneratorState(
   job: Pick<ExportJob, 'current_source' | 'source_cursor' | 'next_part_number'>
 ): boolean {
   return job.current_source !== null || job.source_cursor !== null || job.next_part_number !== 1;
+}
+
+export async function closeReplicaDatabase(input: {
+  database: ReplicaDatabase | undefined;
+  exportId: string;
+  generation: number;
+}): Promise<void> {
+  if (!input.database) return;
+  try {
+    await input.database.close();
+  } catch (error) {
+    // Cleanup must be awaited, but it must not replace the generation outcome. In
+    // particular, a close failure after state completion must not retry a ready export.
+    logExportEvent('warn', 'export_warehouse_close_failed', {
+      exportId: input.exportId,
+      generation: input.generation,
+      ...safeError(error),
+    });
+  }
 }
 
 export async function handleGenerationFailure(input: {
@@ -90,7 +143,8 @@ export async function handleGenerationFailure(input: {
 
 export type ExportEnv = {
   PRIMARY_STATE_DB: HyperdriveBinding;
-  EXPORT_REPLICA_DB: HyperdriveBinding;
+  /** Export warehouse. Read only, frozen at its load cutoff. */
+  EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
   INTERNAL_API_SECRET: string;
@@ -141,6 +195,18 @@ export function isAllowedWebCallbackUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The source after this one, or null at the end. One rule, because the failure path and
+ * the completion path both advance and must agree on what comes next; when they were
+ * written out separately a change to either was a change to only half the loop.
+ */
+export function nextReadableAdapter(
+  adapters: SourceAdapter[],
+  from: SourceAdapter
+): SourceAdapter | null {
+  return adapters.slice(adapters.indexOf(from) + 1).find(item => item.readPage) ?? null;
 }
 
 export function resolveSourceAdapter(
@@ -220,20 +286,109 @@ function strictIsoTimestamp(value: string): string {
   return new Date(value).toISOString();
 }
 
-export function exportHeader(job: ExportJob): string {
+/**
+ * The subject a job reads for, derived from persisted state rather than passed in.
+ *
+ * A row that says 'organization' without an id cannot be scoped to anything, and
+ * falling back to the requester would silently hand them a personal export they did
+ * not ask for. The database CHECK makes this unreachable; this raises terminally if it
+ * ever is, because no retry can add the missing id.
+ */
+export function exportSubject(job: ExportJob): ExportSubject {
+  if (job.subject_type === 'organization') {
+    if (!job.organization_id) {
+      throw new TerminalExportError(
+        'export_subject_incomplete',
+        'This export could not be prepared. Please request it again.',
+        'Organization export job has no organization_id'
+      );
+    }
+    return { type: 'organization', organizationId: job.organization_id };
+  }
+  return { type: 'user', kiloUserId: job.kilo_user_id };
+}
+
+/**
+ * Sources that produce records for a subject, split by whether their table exists.
+ *
+ * An organization export has no identity section — the warehouse holds no organization
+ * record — so `kilocode_users` is dropped from it entirely rather than reported missing.
+ * That is a property of the subject, not of the warehouse's load state, and conflating
+ * the two would tell an org admin their identity data was unavailable when no such
+ * section was ever going to exist. `enrichment_data` is dropped on the same basis: its
+ * table carries no organization column at all, so there is no organization reading of it
+ * to report as anything.
+ *
+ * Both are named in `USER_ONLY_SOURCES` rather than checked by name here, so a source
+ * that has no organization form says so once, beside the query that lacks one.
+ *
+ * Everything else is classified by the probe. The warehouse loads table by table and the
+ * export ships ahead of it, so a source whose table has not landed is expected.
+ */
+export function partitionSources(
+  adapters: SourceAdapter[],
+  subjectType: ExportJob['subject_type'],
+  presentTables: Set<string>
+): { available: SourceAdapter[]; unavailable: string[] } {
+  const applicable = adapters.filter(
+    adapter => !(subjectType === 'organization' && USER_ONLY_SOURCES.has(adapter.name))
+  );
+  const available: SourceAdapter[] = [];
+  const unavailable: string[] = [];
+  for (const adapter of applicable) {
+    if (!adapter.warehouseTable || presentTables.has(adapter.warehouseTable)) {
+      available.push(adapter);
+    } else {
+      unavailable.push(adapter.name);
+    }
+  }
+  return { available, unavailable };
+}
+
+export function exportHeader(
+  job: ExportJob,
+  sources: { available: SourceAdapter[]; unavailable: string[] }
+): string {
   return `${JSON.stringify({
     type: 'header',
-    schemaVersion: 1,
+    schemaVersion: EXPORT_FILE_SCHEMA_VERSION,
     exportId: job.id,
     requestedAt: strictIsoTimestamp(job.requested_at),
     generatedAt: new Date().toISOString(),
-    includedSources: [
-      'kilocode_users',
-      'app_builder_projects',
-      'microdollar_usage_metadata',
-      'system_prompt_prefix',
-    ],
+    // Names the subject explicitly rather than leaving a consumer to infer it from
+    // which sections are present. An organization export and a personal one are
+    // otherwise the same shape.
+    subjectType: job.subject_type,
+    organizationId: job.organization_id,
+    includedSources: sources.available.map(adapter => adapter.name),
+    // Named rather than silently absent, so "we hold nothing for you here" is
+    // distinguishable from "this has not been exported yet". Empty on a complete run.
+    unavailableSources: sources.unavailable,
     snapshotAt: strictIsoTimestamp(job.snapshot_at),
+  })}\n`;
+}
+
+/**
+ * The last line of every file, naming any source that failed while being read.
+ *
+ * A trailer rather than a header field, because the header is written before the first
+ * source is read and cannot be amended once a part has been uploaded. A read failure is
+ * only knowable afterwards, so the only honest place to record it is at the end.
+ *
+ * It is written unconditionally, empty list and all. That gives a consumer something the
+ * file did not previously have: proof it is complete. A file that ends without a trailer
+ * was truncated — the generator died, the deadline fired, R2 rejected a part — and until
+ * now that was indistinguishable from a file that simply had no more to say.
+ *
+ * `failedSources` names the source and nothing else. The underlying error is logged, not
+ * exported: a driver message can carry a table name, a column, or a fragment of a query,
+ * and none of that belongs in a file handed to the person the export is about.
+ */
+export function exportTrailer(failedSources: string[]): string {
+  return `${JSON.stringify({
+    type: 'trailer',
+    complete: failedSources.length === 0,
+    failedSources,
   })}\n`;
 }
 
@@ -243,7 +398,11 @@ export async function processGenerateMessage(
 ): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
   const leaseToken = crypto.randomUUID();
-  const job = await state.claim(message.exportId, message.generation, leaseToken);
+  const job = await withSpan('export_claim', {}, async span => {
+    const claimed = await state.claim(message.exportId, message.generation, leaseToken);
+    span.setAttribute('export.claimed', claimed !== null);
+    return claimed;
+  });
   if (!job) {
     logExportEvent('info', 'export_generation_skipped', {
       exportId: message.exportId,
@@ -262,6 +421,7 @@ export async function processGenerateMessage(
   let objectCompletionAttempted = false;
   let phase = 'claim';
   let activeSource = job.current_source;
+  let warehouse: ReplicaDatabase | undefined;
 
   try {
     if (hasRetiredGeneratorState(job)) {
@@ -275,15 +435,19 @@ export async function processGenerateMessage(
     if (job.multipart_upload_id) {
       const multipartUploadId = job.multipart_upload_id;
       phase = 'orphan_cleanup';
-      const recovered = await recoverInterruptedMultipartUpload({
-        upload: env.EXPORT_BUCKET.resumeMultipartUpload(objectKey(job.id), multipartUploadId),
-        clear: () =>
-          state.clearClaimedMultipartUpload({
-            exportId: job.id,
-            generation: job.dispatch_generation,
-            leaseToken,
-            multipartUploadId,
-          }),
+      const recovered = await withSpan('export_orphan_cleanup', {}, async span => {
+        const cleared = await recoverInterruptedMultipartUpload({
+          upload: env.EXPORT_BUCKET.resumeMultipartUpload(objectKey(job.id), multipartUploadId),
+          clear: () =>
+            state.clearClaimedMultipartUpload({
+              exportId: job.id,
+              generation: job.dispatch_generation,
+              leaseToken,
+              multipartUploadId,
+            }),
+        });
+        span.setAttribute('export.lease_retained', cleared);
+        return cleared;
       });
       if (!recovered) {
         logExportEvent('info', 'export_generation_skipped', {
@@ -297,7 +461,45 @@ export async function processGenerateMessage(
       phase = 'claim';
     }
 
-    const adapters = createSourceAdapters(createReplicaQuery(env.EXPORT_REPLICA_DB));
+    // Resolved once, from persisted state, and reused for every page. Deriving it per
+    // page would let a single mis-set field change scope midway through a file.
+    const subject = exportSubject(job);
+    warehouse = createReplicaDatabase(env.EXPORT_WAREHOUSE_DB, 'warehouse');
+    const activeWarehouse = warehouse;
+    const allAdapters = createSourceAdapters({ warehouseQuery: activeWarehouse.query });
+
+    // Before anything is written, because the header names what is missing and cannot
+    // be amended once the first part has been uploaded. One query, not one per source.
+    phase = 'source_probe';
+    const sources = await withSpan('export_source_probe', {}, async span => {
+      const present = await findPresentWarehouseTables(
+        activeWarehouse.query,
+        warehouseRequirements(allAdapters, job.subject_type)
+      );
+      const partitioned = partitionSources(allAdapters, job.subject_type, present);
+      span.setAttribute('export.sources.available', partitioned.available.length);
+      span.setAttribute('export.sources.unavailable', partitioned.unavailable.length);
+      return partitioned;
+    });
+    if (sources.unavailable.length > 0) {
+      // Expected while the warehouse is still loading, so info rather than warn — but
+      // recorded, because it is also how a table silently disappearing would show up.
+      logExportEvent('info', 'export_sources_unavailable', {
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        sources: sources.unavailable.join(','),
+        sourceCount: sources.unavailable.length,
+      });
+    }
+    const adapters = sources.available;
+    if (adapters.length === 0) {
+      throw new TerminalExportError(
+        'export_no_sources_available',
+        'Your data could not be exported right now. Please try again later.',
+        'No export source tables are present in the warehouse'
+      );
+    }
+
     let adapter = resolveSourceAdapter(adapters, job.current_source);
     if (!adapter || !adapter.readPage) {
       throw new Error('Export job has an invalid current source');
@@ -312,18 +514,29 @@ export async function processGenerateMessage(
         contentDisposition: exportArtifact.contentDisposition,
       },
     });
-    const attachResult = await attachNewMultipartUpload({
-      upload,
-      exportId: job.id,
-      generation: job.dispatch_generation,
-      leaseToken,
-      attach: input => state.attachMultipartUpload(input),
+    // Bound to a const so the closure below keeps the non-undefined narrowing, matching
+    // how activeUpload is captured for the part uploader further down.
+    const attachingUpload = upload;
+    // R2's createMultipartUpload above is auto-instrumented; the state write that binds
+    // the upload id to the job is not, and it is what decides whether this attempt owns
+    // the export or has been fenced.
+    const attachResult = await withSpan('export_multipart_attach', {}, async span => {
+      const result = await attachNewMultipartUpload({
+        upload: attachingUpload,
+        exportId: job.id,
+        generation: job.dispatch_generation,
+        leaseToken,
+        attach: input => state.attachMultipartUpload(input),
+      });
+      span.setAttribute('export.attach_result', result);
+      return result;
     });
     if (attachResult !== 'attached') return;
     logExportEvent('info', 'export_generation_attempt_started', {
       exportId: job.id,
       generation: job.dispatch_generation,
       source: adapter.name,
+      subjectType: job.subject_type,
       uploadMode: 'single_invocation_multipart',
     });
     const encoder = new TextEncoder();
@@ -336,17 +549,29 @@ export async function processGenerateMessage(
       uploadPart: (partNumber, value) => activeUpload.uploadPart(partNumber, value),
     });
     writer = compressor.writable.getWriter();
+    // Same reason as activeUpload: the spans below are closures, where the non-undefined
+    // narrowing on the outer `writer` and `uploadParts` bindings does not survive.
+    const activeWriter = writer;
+    const activeUploadParts = uploadParts;
     deadline = setTimeout(() => {
       deadlineError = exportDeadlineError();
       void writer?.abort(deadlineError).catch(() => undefined);
     }, MAX_PROCESSING_MS);
     let uncompressedSize = 0;
     let pageCount = 0;
-    const header = encoder.encode(exportHeader(job));
+    const header = encoder.encode(exportHeader(job, sources));
     await writer.write(header);
     uncompressedSize += header.byteLength;
-    let cursor = null;
+    // Annotated because the page span reads this inside a closure, which stops the
+    // implicit widening TypeScript would otherwise infer from the assignments below.
+    let cursor: ExportCursor | null = null;
     let recordCount = 0;
+    // Sources that failed to read. Named in the trailer, so a file says what is missing
+    // from it rather than leaving a consumer to infer absence from silence.
+    const failedSources: string[] = [];
+    // What could be read at all, which is what "everything failed" has to be measured
+    // against. See the guard after the loop.
+    const readableAdapters = adapters.filter(item => item.readPage);
     let nextSource: string | null = adapter.name;
 
     while (nextSource) {
@@ -357,16 +582,86 @@ export async function processGenerateMessage(
       if (!readPage) throw new Error('Export job has an invalid current source');
       phase = 'source_read';
       activeSource = adapter.name;
-      const page = await readPage({
-        kiloUserId: job.kilo_user_id,
-        snapshotAt: job.snapshot_at,
-        cursor,
-        limit: PAGE_SIZE,
-      });
-      for (const record of page.records) {
-        const recordBytes = encoder.encode(jsonLine(record));
-        await writer.write(recordBytes);
-        uncompressedSize += recordBytes.byteLength;
+      // One span per page rather than per source: the loop advances cursors and adapters
+      // with continue/break, so a per-source span cannot wrap it without restructuring
+      // the control flow. Group by export.source to get per-source totals. The nested
+      // postgres_read_page span splits read time from compress-and-write time.
+      //
+      // Every key below stays a leaf under the export.page object. Setting a scalar at
+      // export.page alongside export.page.* silently loses the nested keys, because
+      // dotted attribute names are expanded into nested objects on export and a scalar
+      // cannot also be an object.
+      const pageNumber = pageCount + 1;
+      const pageLimit = adapter.pageSize ?? PAGE_SIZE;
+      // Captured because the loop reassigns `adapter`, which costs the narrowing inside
+      // the closure below.
+      const sourceName = adapter.name;
+      let page: SourcePage;
+      try {
+        page = await withSpan(
+          'export_source_page',
+          { 'export.source': adapter.name, 'export.page.number': pageNumber },
+          async span => {
+            // Only the read is wrapped: a failure here is one source's problem and the
+            // export moves on without it. Everything below writes to the stream, and a
+            // stream that cannot be written to is the export's problem, so those throw
+            // bare and stay fatal. See `SourceReadError`.
+            let result: SourcePage;
+            try {
+              result = await readPage({
+                subject,
+                snapshotAt: job.snapshot_at,
+                cursor,
+                limit: pageLimit,
+              });
+            } catch (error) {
+              // A terminal error is a decision the adapter has already made about the
+              // whole export — `kilocode_users` raises one when the subject is absent
+              // from the snapshot, carrying the message the requester is meant to see.
+              // Wrapping it would demote that to a skipped source and hand back a file
+              // missing its identity section with nothing saying why.
+              if (error instanceof TerminalExportError) throw error;
+              throw new SourceReadError(sourceName, error);
+            }
+            let pageBytes = 0;
+            for (const record of result.records) {
+              const recordBytes = encoder.encode(jsonLine(record));
+              await activeWriter.write(recordBytes);
+              pageBytes += recordBytes.byteLength;
+            }
+            uncompressedSize += pageBytes;
+            // Records, not database rows: an adapter can fan one row out to several
+            // records, so this deliberately differs from db.response.returned_rows on the
+            // nested read span.
+            span.setAttribute('export.page.records', result.records.length);
+            span.setAttribute('export.page.uncompressed_bytes', pageBytes);
+            span.setAttribute('export.page.has_more', result.nextCursor !== null);
+            return result;
+          }
+        );
+      } catch (error) {
+        // A deadline is the export's, not a source's, and must not be absorbed here: the
+        // loop would carry on past it, one source at a time, until the outer timer fired.
+        if (deadlineError) throw deadlineError;
+        if (!(error instanceof SourceReadError)) throw error;
+        failedSources.push(adapter.name);
+        logExportEvent('warn', 'export_source_failed', {
+          exportId: job.id,
+          generation: job.dispatch_generation,
+          source: adapter.name,
+          // The error itself never reaches the file; it is recorded here instead.
+          ...safeError(error.cause),
+        });
+        const afterFailed = nextReadableAdapter(adapters, adapter);
+        if (!afterFailed) {
+          nextSource = null;
+          cursor = null;
+          break;
+        }
+        adapter = afterFailed;
+        cursor = null;
+        nextSource = adapter.name;
+        continue;
       }
       pageCount += 1;
       recordCount += page.records.length;
@@ -375,8 +670,7 @@ export async function processGenerateMessage(
         nextSource = adapter.name;
         continue;
       }
-      const currentIndex = adapters.indexOf(adapter);
-      const nextAdapter = adapters.slice(currentIndex + 1).find(item => item.readPage);
+      const nextAdapter = nextReadableAdapter(adapters, adapter);
       if (!nextAdapter) {
         nextSource = null;
         cursor = null;
@@ -386,9 +680,29 @@ export async function processGenerateMessage(
       cursor = null;
       nextSource = adapter.name;
     }
+    // Every source failing is not a partial export, it is a broken one. Completing here
+    // would hand someone an empty file that claims to be their data, which is a worse
+    // outcome than the failure the retry path exists for.
+    //
+    // Counted against the READABLE adapters rather than all of them. `readPage` is
+    // optional on the type and every other advance here filters on it, so comparing
+    // against the full list would let a single reader-less adapter make this condition
+    // unreachable and turn a total failure into a silently empty file.
+    if (failedSources.length > 0 && failedSources.length === readableAdapters.length) {
+      throw new Error('Every export source failed to read');
+    }
+    const trailer = encoder.encode(exportTrailer(failedSources));
+    await writer.write(trailer);
+    uncompressedSize += trailer.byteLength;
     phase = 'compression_finalize';
-    await writer.close();
-    const parts = await uploadParts;
+    // Draining the compressor is where any part uploads still in flight are awaited, so
+    // this span is the wait-on-R2 tail of the export rather than compression cost alone.
+    const parts = await withSpan('export_compression_finalize', {}, async span => {
+      await activeWriter.close();
+      const uploaded = await activeUploadParts;
+      span.setAttribute('export.parts', uploaded.length);
+      return uploaded;
+    });
     if (parts.length === 0) throw new Error('Compressed export produced no multipart data');
     if (deadlineError) throw deadlineError;
     if (deadline) {
@@ -401,19 +715,27 @@ export async function processGenerateMessage(
       parts.map(part => ({ partNumber: part.partNumber, etag: part.etag }))
     );
     phase = 'state_update';
-    const completion = await persistCompletedExport({
-      complete: () =>
-        state.complete({
-          exportId: job.id,
-          leaseToken,
-          rowCount: recordCount,
-          objectKey: key,
-          etag: object.etag,
-          sizeBytes: object.size,
-        }),
-      completedObjectMatches: () =>
-        state.completedObjectMatches({ exportId: job.id, objectKey: key, etag: object.etag }),
-    });
+    const completion = await withSpan(
+      'export_state_update',
+      { 'export.rows': recordCount, 'export.size_bytes': object.size },
+      async span => {
+        const result = await persistCompletedExport({
+          complete: () =>
+            state.complete({
+              exportId: job.id,
+              leaseToken,
+              rowCount: recordCount,
+              objectKey: key,
+              etag: object.etag,
+              sizeBytes: object.size,
+            }),
+          completedObjectMatches: () =>
+            state.completedObjectMatches({ exportId: job.id, objectKey: key, etag: object.etag }),
+        });
+        span.setAttribute('export.completion', result);
+        return result;
+      }
+    );
     if (completion === 'fenced') {
       await handleFencedCompletion({
         exportId: job.id,
@@ -463,6 +785,11 @@ export async function processGenerateMessage(
     if (outcome === 'retry') throw failure;
   } finally {
     if (deadline) clearTimeout(deadline);
+    await closeReplicaDatabase({
+      database: warehouse,
+      exportId: job.id,
+      generation: job.dispatch_generation,
+    });
   }
 }
 
@@ -484,7 +811,18 @@ export async function consumeExportBatch(
       continue;
     }
     try {
-      await processMessage(env, parsed.data);
+      // Wrapped here rather than inside processGenerateMessage so the span covers the
+      // whole attempt, including the retry decision below, and so every span the
+      // generator opens inherits the export id and attempt number as ancestors.
+      await withSpan(
+        'export_generate',
+        {
+          'export.id': parsed.data.exportId,
+          'export.generation': parsed.data.generation,
+          'export.attempt': message.attempts,
+        },
+        () => processMessage(env, parsed.data)
+      );
       message.ack();
     } catch (error) {
       logExportEvent('warn', 'export_queue_retry_requested', {
@@ -520,12 +858,18 @@ export async function consumeDeadLetterBatch(
   }
 }
 
+/**
+ * The cron runs every five minutes and its four stages are sequential, so without spans
+ * per stage a slow sweep is indistinguishable from a slow lease expiry query.
+ */
 export async function reconcile(env: ExportEnv): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
-  await state.reconcile();
-  await deletePendingObjects(env.EXPORT_BUCKET, state);
-  await processScheduledExportWork(env, state);
-  await dispatchReadyNotifications(env, state);
+  await withSpan('reconcile_leases', {}, () => state.reconcile());
+  await withSpan('reconcile_object_deletions', {}, () =>
+    deletePendingObjects(env.EXPORT_BUCKET, state)
+  );
+  await withSpan('reconcile_scheduled_work', {}, () => processScheduledExportWork(env, state));
+  await withSpan('reconcile_notifications', {}, () => dispatchReadyNotifications(env, state));
 }
 
 export async function processScheduledExportWork(

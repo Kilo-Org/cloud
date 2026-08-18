@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Plus, X } from 'lucide-react-native';
+import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -13,12 +13,16 @@ import {
 } from '@/components/agents/session-detail-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
+import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { useHoistedOperationKey } from '@/lib/operation-key';
+import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
@@ -40,6 +44,7 @@ import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
+import { selectShareReviewPr } from './share-review-pr';
 
 type ShareGateSheetProps = {
   shareId: string | undefined;
@@ -64,6 +69,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const { spawn } = useRemoteInstanceSpawn();
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
+  // P1-A-08b: one `operationKey` per share-spawn intent (share + instance), so
+  // a retryable failure keeps the key and the relay dedupes the retry.
+  const { getKey, rotateKey } = useHoistedOperationKey();
   // Per-attempt token so a stale spawn's finally cannot clear a newer lock
   // (share replace mid-flight, or same-connection re-tap after replace).
   const spawnAttemptRef = useRef(0);
@@ -164,6 +172,17 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     ]
   );
 
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  const reviewPr = useMemo(
+    () =>
+      selectShareReviewPr({
+        text: payload?.text ?? '',
+        prReviewEnabled,
+        showNewSession: state.showNewSession,
+      }),
+    [payload?.text, prReviewEnabled, state.showNewSession]
+  );
+
   const instanceRows = useMemo(
     () =>
       selectShareCliSpawnRows({
@@ -189,6 +208,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     abandon();
     router.back();
   }, [abandon, router]);
+
+  const handleReviewPr = useCallback(() => {
+    if (!reviewPr) {
+      return;
+    }
+    void Haptics.selectionAsync();
+    setPendingShareNavigation({
+      href: getPrReviewPath(reviewPr.owner, reviewPr.repo, reviewPr.number) as string,
+      shareId: null,
+    });
+    dismiss();
+  }, [dismiss, reviewPr]);
 
   useEffect(
     () => () => {
@@ -271,8 +302,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         spawnAttemptRef.current += 1;
         const attempt = spawnAttemptRef.current;
         setSpawningConnectionId(instance.connectionId);
+        const operationKey = getKey(
+          JSON.stringify({ connectionId: instance.connectionId, shareId })
+        );
         try {
-          const outcome = await spawn(instance.connectionId);
+          const outcome = await spawn(instance.connectionId, undefined, { operationKey });
           // Gate has no "Run on" selection; ignore selection-reset flags.
           const action = resolveRemoteSubmitOutcome({
             outcome,
@@ -281,6 +315,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           });
 
           if (action.kind === 'navigate') {
+            // Rotate before the suppressed-navigation early return, so a later
+            // eligible spawn cannot reuse the settled key.
+            rotateKey();
             if (
               !shouldCommitShareSpawnReady({
                 committedShareId: committedShareIdRef.current,
@@ -305,6 +342,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
             return;
           }
 
+          // A typed non-retryable rejection ends the intent.
+          rotateKey();
           toast.error(action.toast);
         } finally {
           // Only the attempt that still owns the lock may clear it.
@@ -314,7 +353,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         }
       })();
     },
-    [commit, commitEnabled, isSpawning, payload, refetchInstances, shareId, spawn, validation]
+    [
+      commit,
+      commitEnabled,
+      getKey,
+      isSpawning,
+      payload,
+      refetchInstances,
+      rotateKey,
+      shareId,
+      spawn,
+      validation,
+    ]
   );
 
   const handleRetry = useCallback(() => {
@@ -353,6 +403,16 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <View className="items-center px-6 pb-6 pt-4">
           <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
         </View>
+      ) : null}
+
+      {reviewPr ? (
+        <DestinationOptionRow
+          icon={GitPullRequest}
+          title="Review PR"
+          subtitle={`${reviewPr.owner}/${reviewPr.repo} #${reviewPr.number}`}
+          accessibilityLabel="Review PR"
+          onPress={handleReviewPr}
+        />
       ) : null}
 
       {showNewSession ? (

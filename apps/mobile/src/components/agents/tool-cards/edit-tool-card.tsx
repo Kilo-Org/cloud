@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
-import { Pencil } from 'lucide-react-native';
+import { Pencil } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { SelectableText } from '@/components/ui/selectable-text';

@@ -67,11 +67,15 @@ export type CloudAgentPrepareSessionInput = {
   // Inline per-session agents. For council runs, one subagent per specialist, each pinned
   // to its own model/effort; cloud-agent-next materializes these into KILO_CONFIG agents.
   runtimeAgents?: RuntimeAgentInput[];
+  /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
+  operationKey?: string;
 };
 
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  /** `true` when the response replays an already-settled create for the same `operationKey`. */
+  replayed?: boolean;
 };
 
 export type CloudAgentInitiateInput = {
@@ -234,6 +238,13 @@ export const CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS = [
   'insufficient funds',
   'payment required',
 ] as const;
+
+/**
+ * User-facing message for auto-fix billing failures.
+ * Shared by the web app and auto-fix-infra so the copy stays in sync.
+ */
+export const AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE =
+  'Insufficient credits. Auto-fix requires at least $1 in available credits. Add credits, then retry.';
 
 export function isCloudAgentNextBillingErrorBody(body: string): boolean {
   const normalizedBody = body.toLowerCase();

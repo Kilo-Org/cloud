@@ -1,4 +1,4 @@
-import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
+import { ArrowUp, Paperclip, Square } from '@/components/ui/icons';
 import { type RefObject } from 'react';
 import {
   ActivityIndicator,
@@ -123,6 +123,8 @@ export function ChatComposerInputRow({
           style={textInputStyle}
           scrollEnabled={inputScrollable}
           editable={inputEditable}
+          contextMenuHidden={!inputEditable}
+          pointerEvents={inputEditable ? 'auto' : 'none'}
           accessibilityState={{ disabled: inputAccessibilityDisabled }}
           returnKeyType="default"
           submitBehavior="newline"

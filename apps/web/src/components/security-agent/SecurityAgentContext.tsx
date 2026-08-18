@@ -561,7 +561,9 @@ function useSecurityAgentProviderValue(
   const toggleEnabledInFlightRef = useRef(false);
   const commandSuccessCallbacksRef = useRef<Map<string, () => void> | null>(null);
 
-  const trackCommand = useCallback((commandId: string, onSuccess?: () => void) => {
+  // A replayed command admission has no command id: there is nothing to track.
+  const trackCommand = useCallback((commandId: string | undefined, onSuccess?: () => void) => {
+    if (!commandId) return;
     if (onSuccess) {
       if (commandSuccessCallbacksRef.current === null) {
         commandSuccessCallbacksRef.current = new Map();

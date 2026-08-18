@@ -20,6 +20,7 @@ export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
 export type TRPCContext = {
   user: User;
+  deviceSessionId?: string;
   // Admin audit signals threaded from the auth layer so `adminProcedure` can
   // emit IP-independent, identity-attributed access telemetry. Optional so the
   // many existing `{ user }` context constructors (tests, scripts) keep working;
@@ -40,7 +41,7 @@ export type TRPCContext = {
  */
 export const createTRPCContext = async (): Promise<TRPCContext> => {
   const headersList = await headers();
-  const { user, tokenSource } = await getUserFromAuth({ adminOnly: false });
+  const { user, deviceSessionId, tokenSource } = await getUserFromAuth({ adminOnly: false });
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -54,6 +55,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
   setTag('userId', user.id);
   return {
     user,
+    deviceSessionId,
     authViaToken: authViaTokenFromHeaders(headersList),
     tokenSource: tokenSource ?? null,
     ip: clientIpFromHeaders(headersList),

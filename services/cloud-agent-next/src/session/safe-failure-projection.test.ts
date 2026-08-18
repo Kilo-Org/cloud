@@ -11,6 +11,7 @@ import {
   classifyAssistantFailureMessage,
   classifyAssistantFailure,
   genericFailureMessage,
+  isAssistantInterrupt,
   projectSafeFailure,
 } from './safe-failure-projection.js';
 
@@ -211,5 +212,25 @@ describe('classifyAssistantFailure', () => {
       reason: 'provider_unavailable',
       providerOwnership: 'unknown',
     });
+  });
+});
+
+describe('isAssistantInterrupt', () => {
+  it('recognizes MessageAbortedError and user-interrupt text', () => {
+    expect(
+      isAssistantInterrupt({ name: 'MessageAbortedError', data: { message: 'aborted' } })
+    ).toBe(true);
+    expect(isAssistantInterrupt('user-interrupt')).toBe(true);
+    expect(isAssistantInterrupt('The message was interrupted by the user')).toBe(true);
+    expect(isAssistantInterrupt('provider exploded')).toBe(false);
+  });
+
+  it('maps abort errors to the user-interrupt safe message', () => {
+    expect(
+      classifyAssistantFailureMessage({
+        name: 'MessageAbortedError',
+        data: { message: 'aborted mid-tool' },
+      })
+    ).toBe('The message was interrupted by the user');
   });
 });

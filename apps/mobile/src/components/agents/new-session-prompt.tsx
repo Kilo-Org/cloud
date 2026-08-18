@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   Platform,
@@ -9,7 +9,7 @@ import {
   type TextStyle,
   View,
 } from 'react-native';
-import { Paperclip } from 'lucide-react-native';
+import { Paperclip } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
@@ -18,26 +18,22 @@ import {
   type ComposerSelection,
   pasteTextIntoComposer,
 } from '@/components/agents/composer-paste-text';
-import { type AgentMode } from '@/components/agents/mode-selector';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
-import { type ModelOption } from '@/lib/hooks/use-available-models';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type ModelPickerSelection } from '@/lib/picker-bridge';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
-import {
-  type AgentAttachment,
-  type AgentAttachmentCandidate,
-} from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
+import {
+  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  useClipboardPaste,
+} from '@/lib/agent-attachments/use-clipboard-paste';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -58,30 +54,6 @@ const promptInputStyle = {
   lineHeight: PROMPT_INPUT_LINE_HEIGHT,
   textAlignVertical: 'top',
 } satisfies TextStyle;
-
-type NewSessionPromptProps = {
-  attachments: AgentAttachment[];
-  attachmentMax: number;
-  isCreating: boolean;
-  isModelsError: boolean;
-  isLoadingModels: boolean;
-  mode: AgentMode;
-  model: string;
-  variant: string;
-  modelOptions: (ModelOption | SessionModelOption)[];
-  onChangeText: (text: string) => void;
-  onModeChange: (mode: AgentMode) => void;
-  onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
-  onAddAttachment: () => void;
-  onRemoveAttachment: (id: string) => void;
-  onRetryAttachment: (id: string) => void;
-  onRefetchModels: () => void;
-  onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
-  shareId?: string;
-  voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
-  /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
-  initialPrompt?: string;
-};
 
 /**
  * New-session prompt surface: attachment strip, full-width multiline text
@@ -106,6 +78,9 @@ export function NewSessionPrompt({
   onChangeText,
   onModeChange,
   onModelSelect,
+  customOptions = [],
+  modelLocked = false,
+  modelLockLabel,
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
@@ -204,8 +179,12 @@ export function NewSessionPrompt({
         onChangeText: handlePromptChange,
       });
     },
-    onUnreadable: () => {
-      toast.error(describeClassificationFailure('unreadable'));
+    onFailure: reason => {
+      toast.error(
+        reason === 'empty'
+          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          : describeClassificationFailure('unreadable')
+      );
     },
   });
 
@@ -319,6 +298,9 @@ export function NewSessionPrompt({
           onModelSelect={onModelSelect}
           disabled={isCreating}
           isLoadingModels={isLoadingModels}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
           className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}

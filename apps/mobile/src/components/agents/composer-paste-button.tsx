@@ -1,4 +1,4 @@
-import { ClipboardPaste } from 'lucide-react-native';
+import { ClipboardPaste } from '@/components/ui/icons';
 import { Pressable } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

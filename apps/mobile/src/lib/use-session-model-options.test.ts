@@ -7,7 +7,7 @@ import {
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
 } from './hooks/use-session-model-options';
-import { buildModelPickerRows, modelPickerFavoriteId } from './model-picker-rows';
+import { buildModelPickerRows, canonicalFavoriteId } from './model-picker-rows';
 import { resolveSessionContextInfo } from './session-context-info';
 
 const gatewayModels = [
@@ -514,7 +514,7 @@ describe('buildSessionModelOptions capacity projection', () => {
     }
     expect(gatewayOption.provider).toBeUndefined();
     expect(gatewayOption.modelRef).toBeUndefined();
-    expect(modelPickerFavoriteId(gatewayOption)).toBe('gateway/recommended');
+    expect(canonicalFavoriteId(gatewayOption)).toBe('gateway/recommended');
     expect(
       buildModelPickerRows({ models: result.options, search: '', favoriteIds: new Set() })
         .filter(row => row.type === 'header')

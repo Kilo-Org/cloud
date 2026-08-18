@@ -1,6 +1,6 @@
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
 import { type AttachmentBlock, formatFileSize, type KiloChatClient } from '@kilocode/kilo-chat';
-import { AlertCircle, File as FileIcon } from 'lucide-react-native';
+import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';

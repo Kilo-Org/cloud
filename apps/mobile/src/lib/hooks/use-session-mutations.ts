@@ -103,13 +103,21 @@ export function useSessionMutations() {
   // rolls back the list cache, and lets the caller keep its modal open for
   // retry.
   return {
-    deleteSession: (sessionId: string) => {
+    // `onDeleted` runs only after the server confirms the delete (the
+    // optimistic removal already happened in onMutate). It lets the list
+    // move assistive-technology focus to a stable anchor; it is NOT invoked
+    // on failure, so a failed delete never moves focus. The success toast
+    // lives here (the hook owns outcome toasts) and announces the deletion
+    // through the shared announcingToast owner.
+    deleteSession: (sessionId: string, onDeleted?: () => void) => {
       void (async () => {
         try {
           // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
           await chainSave(sessionId, () =>
             deleteSessionMutation.mutateAsync({ session_id: sessionId })
           );
+          announcingToast.success('Session deleted');
+          onDeleted?.();
         } catch {
           // Already surfaced via the mutation's own onError (toast + rollback).
         }

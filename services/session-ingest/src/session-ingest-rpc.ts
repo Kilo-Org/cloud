@@ -33,6 +33,10 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
 import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
+import {
+  canCreateCliSessionForUser,
+  USER_SESSION_ADMISSION_ERROR,
+} from './services/user-session-admission';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 
@@ -75,6 +79,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     const { existingRow, persistedRow } = await db.transaction(async tx => {
+      if (!(await canCreateCliSessionForUser(tx, parsed.kiloUserId))) {
+        throw new Error(USER_SESSION_ADMISSION_ERROR);
+      }
+
       const [created] = await tx
         .insert(cli_sessions_v2)
         .values({

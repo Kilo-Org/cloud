@@ -4,7 +4,7 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
-import { ExternalLink, ScanSearch } from 'lucide-react-native';
+import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 
 import { MarkdownText } from '@/components/agents/markdown-text';

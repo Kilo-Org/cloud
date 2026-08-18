@@ -3,6 +3,33 @@
  * router. The explicit status union keeps UI behavior easy to review.
  */
 
+/**
+ * Digits in an emailed download code.
+ *
+ * The per-code attempt budget resets whenever a new code is issued, so it caps
+ * the guess *rate*, not the total. The search space is therefore what bounds a
+ * held session's odds over time, which is why this is wider than the 6 digits a
+ * sign-in code uses: those are spent in one sitting, this one is not.
+ */
+export const DOWNLOAD_CODE_LENGTH = 8;
+const DOWNLOAD_CODE_REUSE_MARGIN_MS = 30_000;
+
+export type DownloadCodeChallenge = {
+  exportId: string;
+  challengeId: string;
+  expiresAt: number;
+};
+
+export function canReuseDownloadCodeChallenge(
+  challenge: DownloadCodeChallenge | null,
+  exportId: string,
+  now = Date.now()
+): challenge is DownloadCodeChallenge {
+  return (
+    challenge?.exportId === exportId && challenge.expiresAt > now + DOWNLOAD_CODE_REUSE_MARGIN_MS
+  );
+}
+
 export const USER_EXPORT_STATUSES = [
   'queued',
   'processing',
@@ -14,9 +41,16 @@ export const USER_EXPORT_STATUSES = [
 
 export type UserExportStatus = (typeof USER_EXPORT_STATUSES)[number];
 
+/** Whose data an export holds, which is not necessarily who requested it. */
+export type UserExportSubjectType = 'user' | 'organization';
+
 /** User-safe fields returned by `userExports.list`. */
 export type UserExport = {
   id: string;
+  subjectType: UserExportSubjectType;
+  /** Both null for a personal export. */
+  organizationId: string | null;
+  organizationName: string | null;
   status: UserExportStatus;
   /** Strict UTC ISO timestamps, normalized by the API. */
   requestedAt: string;
@@ -33,6 +67,44 @@ export type UserExportsList = {
   exports: UserExport[];
   nextCursor: string | null;
 };
+
+/** An organization the signed in person may export, from `exportableOrganizations`. */
+export type ExportableOrganization = { id: string; name: string };
+
+/**
+ * The export in flight for one subject, or undefined.
+ *
+ * Each button is governed by its own subject: a personal export generating must not
+ * disable an organization's button, and vice versa, because the server tracks the two
+ * separately and would accept the request.
+ */
+export function findActiveExport(
+  records: readonly UserExport[] | null | undefined,
+  organizationId: string | null
+): UserExport | undefined {
+  return records?.find(
+    record =>
+      isActiveUserExportStatus(record.status) &&
+      (organizationId === null
+        ? record.subjectType === 'user'
+        : record.organizationId === organizationId)
+  );
+}
+
+/** The most recent downloadable export for one subject, on the same basis. */
+export function findReadyExport(
+  records: readonly UserExport[] | null | undefined,
+  organizationId: string | null,
+  now: Date = new Date()
+): UserExport | undefined {
+  return records?.find(
+    record =>
+      getDisplayStatus(record, now) === 'ready' &&
+      (organizationId === null
+        ? record.subjectType === 'user'
+        : record.organizationId === organizationId)
+  );
+}
 
 /** Poll only while at least one visible export is still active. */
 export const USER_EXPORTS_POLL_INTERVAL_MS = 5000;

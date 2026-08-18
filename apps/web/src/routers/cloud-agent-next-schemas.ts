@@ -320,6 +320,18 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/**
+ * Send-only execution payload for follow-up messages. Mirrors
+ * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
+ * follow-up send may carry attachments or images with no text. Used only by
+ * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
+ * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
+ */
+export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
+  sendMessageNextPayloadSchema.options[0].extend({ prompt: z.string() }),
+  sendMessageNextPayloadSchema.options[1],
+]);
+
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .object({
@@ -377,6 +389,8 @@ export const basePrepareSessionNextSchema = z
     attachments: cloudAgentAttachmentsSchema.optional(),
     images: cloudAgentImagesSchema,
     devcontainer: z.boolean().optional(),
+    /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
+    operationKey: z.string().uuid().optional(),
   })
   .refine(
     data =>
@@ -405,6 +419,8 @@ export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema.ref
 export const basePrepareSessionNextOutputSchema = z.object({
   kiloSessionId: z.string().startsWith('ses_').length(30),
   cloudAgentSessionId: z.string(),
+  /** `true` when the response replays an already-settled create for the same `operationKey`. */
+  replayed: z.boolean().optional(),
 });
 
 // Schema for initiating from a prepared session
@@ -418,7 +434,7 @@ export const baseInitiateFromPreparedSessionNextSchema = z
 export const baseSendMessageNextSchema = z
   .object({
     cloudAgentSessionId: z.string(),
-    payload: sendMessageNextPayloadSchema,
+    payload: sendMessageNextSendPayloadSchema,
     autoCommit: z.boolean().optional(),
     messageId: messageIdNextSchema.nullish(),
     attachments: cloudAgentAttachmentsSchema.optional(),
@@ -427,7 +443,20 @@ export const baseSendMessageNextSchema = z
   .refine(hasOnlyOneAttachmentField, {
     message: 'Must not provide both attachments and images',
     path: ['attachments'],
-  });
+  })
+  .refine(
+    data => {
+      if (data.payload.type === 'command') return true;
+      if (data.payload.prompt.trim().length > 0) return true;
+      const hasFiles =
+        (data.attachments?.files.length ?? 0) > 0 || (data.images?.files.length ?? 0) > 0;
+      return hasFiles;
+    },
+    {
+      message: 'Prompt is required',
+      path: ['payload', 'prompt'],
+    }
+  );
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({

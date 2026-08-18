@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react-native';
+import { Download } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Linking, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

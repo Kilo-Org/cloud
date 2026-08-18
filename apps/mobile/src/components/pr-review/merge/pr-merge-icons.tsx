@@ -9,7 +9,7 @@ import {
   type LucideIcon,
   ShieldAlert,
   XCircle,
-} from 'lucide-react-native';
+} from '@/components/ui/icons';
 
 import {
   type AllowedMergeMethod,

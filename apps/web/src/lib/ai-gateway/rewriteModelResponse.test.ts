@@ -1,9 +1,12 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
+import { after } from 'next/server';
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
   rewriteModelResponse,
+  logUnrewrittenResponse,
+  sanitizeApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -27,10 +30,12 @@ jest.mock('@/lib/utils.server', () => ({
 
 const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
 const mockedLog = jest.mocked(logExceptInTest);
+const mockedAfter = jest.mocked(after);
 
 beforeEach(() => {
   mockedOptIn.mockClear();
   mockedLog.mockClear();
+  mockedAfter.mockClear();
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -273,6 +278,100 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(result.status).toBe(502);
       expect(await result.text()).toBe('not-json{');
     });
+
+    test('maps message reasoning_content to reasoning_details', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning_content: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'answer',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'full thought', index: 0, format: 'unknown' },
+        ],
+      });
+    });
+
+    test('leaves reasoning_content alone when reasoning_details are already present', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'answer',
+              reasoning_content: 'full thought',
+              reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        { type: 'reasoning.text', text: 'full thought', index: 0 },
+      ]);
+    });
+
+    test('leaves reasoning_content alone when the transform is disabled', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning_content: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning_content).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toBeUndefined();
+    });
   });
 
   describe('streaming responses', () => {
@@ -370,7 +469,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
     test('moves marked delta content to reasoning content', async () => {
       const upstream = sseResponse(
-        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"flags":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"flags":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
           'data: [DONE]\n\n'
       );
 
@@ -380,7 +479,8 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         capture: null,
         vercelRequestId: null,
         responseTransforms: {
-          thoughtContentMapping: 'extra_content.flags.thought',
+          mapGeminiThoughtContent: true,
+          mapReasoningContentToDetails: false,
         },
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -389,10 +489,43 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       expect(chunk.choices[0].delta).toEqual({
         reasoning_content: 'first thought',
-        extra_content: { flags: { thought: true } },
+        extra_content: { google: { thought: true } },
       });
       expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
       expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });
+    });
+
+    test('maps delta reasoning_content to reasoning_details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"reasoning_content":"first "}},{"index":0,"delta":{"reasoning_content":"thought"}},{"index":0,"delta":{"content":"answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: {
+          mapGeminiThoughtContent: false,
+          mapReasoningContentToDetails: true,
+        },
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'first ', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[1].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'thought', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
     });
 
     test('does not treat a null error field as terminal', async () => {
@@ -906,6 +1039,56 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
   };
 }
 
+describe('sanitizeApiRequestLogRequest', () => {
+  test('replaces gateway BYOK credentials without mutating the upstream request', () => {
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'zai/glm-5.2',
+        messages: [{ role: 'user', content: 'hello' }],
+        providerOptions: {
+          gateway: {
+            order: ['friendli', 'novita'],
+            byok: {
+              friendli: [{ apiKey: 'friendli-managed-key', baseURL: 'https://api.friendli.ai' }],
+              bedrock: [
+                {
+                  accessKeyId: 'AKIAEXAMPLE',
+                  secretAccessKey: 'bedrock-secret',
+                  region: 'us-east-1',
+                },
+              ],
+            },
+          },
+          anthropic: { effort: 'high' },
+        },
+      },
+    } satisfies RequestLoggingParams['request'];
+
+    expect(sanitizeApiRequestLogRequest(request)).toEqual({
+      model: 'zai/glm-5.2',
+      messages: [{ role: 'user', content: 'hello' }],
+      providerOptions: {
+        gateway: {
+          order: ['friendli', 'novita'],
+          byok: {
+            friendli: [{ apiKey: '[redacted]' }],
+            bedrock: [{ apiKey: '[redacted]' }],
+          },
+        },
+        anthropic: { effort: 'high' },
+      },
+    });
+    expect(request.body.providerOptions.gateway.byok.friendli[0].apiKey).toBe(
+      'friendli-managed-key'
+    );
+    expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'bedrock-secret',
+    });
+  });
+});
+
 describe('rewriteModelResponse', () => {
   test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {
     const result = await rewriteModelResponse({
@@ -1001,6 +1184,25 @@ describe('rewriteModelResponse', () => {
     });
   });
 
+  test('preserves cost for models with fallback-only custom pricing', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: 'moonshotai/kimi-k3',
+        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+      }),
+      model: 'moonshotai/kimi-k3',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({
+      model: 'moonshotai/kimi-k3',
+      usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+    });
+  });
+
   test('processes paid-model responses when request logging is enabled', async () => {
     mockedOptIn.mockResolvedValueOnce(true);
     const result = await rewriteModelResponse({
@@ -1013,6 +1215,46 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(result).not.toBeNull();
+  });
+
+  test('does not schedule a log insert for non-custom models without opt-in', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'openai/gpt-5' }),
+      model: 'openai/gpt-5',
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedOptIn).toHaveBeenCalled();
+  });
+
+  test('always schedules a log insert for custom models', async () => {
+    await rewriteModelResponse({
+      response: jsonResponse({ model: 'kilo-internal/my-model' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    expect(mockedOptIn).not.toHaveBeenCalled();
+  });
+
+  test('always logs unrewritten custom model responses', async () => {
+    await logUnrewrittenResponse({
+      response: jsonResponse({ error: 'upstream error' }, 400),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    expect(mockedOptIn).not.toHaveBeenCalled();
   });
 });
 

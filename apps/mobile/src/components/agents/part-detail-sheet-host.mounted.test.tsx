@@ -250,10 +250,18 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
 
-    // Opens wrapped by default.
-    expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({ selected: true });
+    // Opens wrapped by default. A React Native radio reports its current
+    // choice through `checked`, not `selected` — see `radioItemA11y` in
+    // @/components/ui/radio-group.
+    expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
+      checked: true,
+      disabled: false,
+      busy: false,
+    });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      selected: false,
+      checked: false,
+      disabled: false,
+      busy: false,
     });
 
     await act(async () => {
@@ -261,7 +269,9 @@ describe('PartDetailSheetHost mounted', () => {
       pressRadio(renderer.root, 'Scroll');
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      selected: true,
+      checked: true,
+      disabled: false,
+      busy: false,
     });
 
     // Close through the real host boundary: the SheetHeader Done button's
@@ -277,6 +287,10 @@ describe('PartDetailSheetHost mounted', () => {
       await Promise.resolve();
       capturedOpener?.('bash-1');
     });
-    expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({ selected: true });
+    expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
+      checked: true,
+      disabled: false,
+      busy: false,
+    });
   });
 });

@@ -127,6 +127,15 @@
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /*
   Tailwind CSS v4 defaults border color to `currentcolor`. Keep implicit
   borders on Kilo's semantic border token so legacy bare `border` utilities
@@ -437,6 +446,33 @@
     animation: pulse-glow 0.6s ease-out;
   }
 
+  @keyframes liquidRipple {
+    0% {
+      transform: scale(0.65);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.06);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .card-link-footer-ripple {
+    visibility: hidden;
+    opacity: 0;
+    transform: scale(0.65);
+    transform-origin: center;
+  }
+
+  .card-link-footer-ripple-active {
+    visibility: visible;
+    animation: liquidRipple 0.6s ease-out forwards;
+  }
+
   @keyframes usage-pending-bar {
     0%,
     12% {
@@ -503,6 +539,17 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-once {
+      animation: none;
+      transform: scale(1);
+      box-shadow: none;
+    }
+
+    .card-link-footer-ripple-active {
+      visibility: hidden;
+      animation: none;
+    }
+
     .animate-usage-pending-bar {
       animation: none;
       transform: scaleY(1);

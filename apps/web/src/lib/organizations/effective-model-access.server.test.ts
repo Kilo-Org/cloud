@@ -33,6 +33,7 @@ function context(
       company_domain: null,
     },
     defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
+    groupIds: [],
     groupPolicies: [],
     policyRevision: 1,
     ...overrides,
@@ -93,7 +94,7 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: true });
   });
 
-  it('excludes latest aliases from model restrictions while enforcing provider routes', async () => {
+  it('applies organization model restrictions to latest aliases', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -109,22 +110,19 @@ describe('effective organization model access', () => {
 
     await expect(
       getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => {
-        throw new Error('latest aliases must not use snapshot provider metadata');
+        throw new Error('denied models must not use snapshot provider metadata');
       })
-    ).resolves.toEqual({
-      allowed: true,
-      eligibleProviderRoutes: new Set(['anthropic']),
-    });
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it('denies latest aliases when the organization allows no providers', async () => {
+  it('requires latest aliases to exist in the current snapshot', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
           ...context().organization,
           settings: {
-            model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
-            provider_allow_list: [],
+            model_deny_list: [],
+            provider_allow_list: ['anthropic'],
           },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
@@ -132,8 +130,8 @@ describe('effective organization model access', () => {
     );
 
     await expect(
-      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS)
-    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+      getEffectiveModelDecision(policy, CLAUDE_SONNET_LATEST_MODEL_ALIAS, async () => new Set())
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
   it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(

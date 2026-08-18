@@ -3,23 +3,23 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { Env } from './env';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
 
-import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
+import { kiloJwtAuthMiddleware, USER_AUTH_CACHE_KEY_PREFIX } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
 import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getSessionExport } from './services/session-export';
+import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
-const publicSessionAccessEnabled: boolean = false;
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),
+});
+const invalidateUserAuthSchema = z.object({
+  kiloUserId: z.string().min(1),
 });
 
 async function hasValidInternalSecret(c: {
@@ -47,7 +47,18 @@ const requireValidInternalSecret = createMiddleware<{
   Bindings: Env;
   Variables: { user_id: string };
 }>(async (c, next) => {
-  if (!(await hasValidInternalSecret(c))) {
+  let isValid: boolean;
+  try {
+    isValid = await hasValidInternalSecret(c);
+  } catch (error) {
+    console.error('Auth infrastructure failure', {
+      operation: 'internal-api-secret-get',
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
+  if (!isValid) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   return next();
@@ -70,42 +81,21 @@ app.use('/internal/cloud-agent/v1/*', kiloJwtAuthMiddleware);
 app.use('/internal/cloud-agent/v1/*', requireValidInternalSecret);
 app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 
-// Public session endpoint: look up a session by public_id and return all ingested DO events.
-app.get('/session/:sessionId', async c => {
-  const sessionId = c.req.param('sessionId');
-  const parsedSessionId = z.uuid().safeParse(sessionId);
-  if (!parsedSessionId.success) {
-    return c.json(
-      { success: false, error: 'Invalid sessionId', issues: parsedSessionId.error.issues },
-      400
-    );
-  }
-
-  if (!publicSessionAccessEnabled) {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-
-  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
-  const rows = await db
-    .select({
-      session_id: cli_sessions_v2.session_id,
-      kilo_user_id: cli_sessions_v2.kilo_user_id,
-    })
-    .from(cli_sessions_v2)
-    .where(eq(cli_sessions_v2.public_id, parsedSessionId.data))
-    .limit(1);
-
-  const row = rows[0];
-
-  if (!row) {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
+// Public session endpoint: resolve the purpose-bound share token, then return
+// all ingested DO events for the current session generation.
+app.get('/session/:shareToken', async c => {
+  const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
+  if (!sharedSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404, {
+      'cache-control': 'no-store',
+    });
   }
 
   const stream = await withDORetry(
     () =>
       getSessionIngestDO(c.env, {
-        kiloUserId: row.kilo_user_id,
-        sessionId: row.session_id,
+        kiloUserId: sharedSession.kiloUserId,
+        sessionId: sharedSession.sessionId,
       }),
     s => s.getAllStream(),
     'SessionIngestDO.getAllStream'
@@ -113,14 +103,30 @@ app.get('/session/:sessionId', async c => {
 
   return c.body(stream, 200, {
     'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
   });
 });
 
-app.post('/internal/session-access/invalidate', async c => {
-  if (!(await hasValidInternalSecret(c))) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
+app.get('/session/:shareToken/metadata', async c => {
+  const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
+  if (!sharedSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404, {
+      'cache-control': 'no-store',
+    });
   }
 
+  return c.json(
+    {
+      success: true,
+      title: sharedSession.title,
+      owner_name: sharedSession.ownerName,
+    },
+    200,
+    { 'cache-control': 'no-store' }
+  );
+});
+
+app.post('/internal/session-access/invalidate', requireValidInternalSecret, async c => {
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
@@ -135,12 +141,18 @@ app.post('/internal/session-access/invalidate', async c => {
   return c.body(null, 204);
 });
 
-// Internal route for service-binding HTTP fetch (secret-protected)
-app.get('/internal/session/:sessionId/export', async c => {
-  if (!(await hasValidInternalSecret(c))) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
+app.post('/internal/user-auth/invalidate', requireValidInternalSecret, async c => {
+  const parsed = invalidateUserAuthSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
   }
 
+  await c.env.USER_EXISTS_CACHE.delete(`${USER_AUTH_CACHE_KEY_PREFIX}${parsed.data.kiloUserId}`);
+  return c.body(null, 204);
+});
+
+// Internal route for service-binding HTTP fetch (secret-protected)
+app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async c => {
   const kiloUserId = c.req.header('X-Kilo-User-Id');
   if (!kiloUserId) return c.json({ success: false, error: 'Missing X-Kilo-User-Id' }, 400);
 

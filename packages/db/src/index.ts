@@ -39,6 +39,7 @@ export {
 } from './kiloclaw-orphan-volume';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export {
+  createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,
   deleteRetainedSecurityAgentCommands,
   getSecurityAgentCommandForOwner,

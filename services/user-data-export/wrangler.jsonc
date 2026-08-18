@@ -21,6 +21,19 @@
       "enabled": true,
       "head_sampling_rate": 1,
     },
+    // observability.enabled alone does not turn on tracing while Workers tracing is
+    // in beta, and a destination only receives spans from Workers that name it, so
+    // both keys below are required. "axiom-traces" must match the destination
+    // configured under Workers Observability in the Cloudflare dashboard; without it
+    // Axiom receives only the one-off pre-flight span emitted when the destination
+    // is saved. Sampling stays at 1: this Worker runs a 5-minute cron plus one queue
+    // message per export, so full-fidelity tracing is far below the free tier.
+    "traces": {
+      "enabled": true,
+      "persist": true,
+      "head_sampling_rate": 1,
+      "destinations": ["axiom-traces"],
+    },
   },
   "logpush": true,
   "routes": [
@@ -74,10 +87,16 @@
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
+    // Export warehouse: read-only, frozen at its load cutoff. Every source an
+    // export reads comes from here, including the identity section, so the whole
+    // file reads as of one moment. PRIMARY_STATE_DB above is the job's own state
+    // and is never a source.
+    // kilo-supabase-snowflake-export, us-east-2. Caching is disabled on the config:
+    // every query returns one user's personal data and each row is read once.
     {
-      "binding": "EXPORT_REPLICA_DB",
-      "id": "bcc8d2f3a24f4929b5ee91cf77b1c5fa",
-      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+      "binding": "EXPORT_WAREHOUSE_DB",
+      "id": "c57c7ffa100a424398162dd502bdddce",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/data_export",
     },
   ],
 }

@@ -12,6 +12,7 @@ import {
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -98,7 +99,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         <>
           <FormField
             label="Alert below (USD)"
-            accessibilityLabel="Alert threshold"
+            required
             placeholder="10.00"
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
@@ -112,7 +113,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           <View className="gap-1.5">
             <FormField
               label="Notify emails"
-              accessibilityLabel="Notify emails"
+              required
               placeholder="name@company.com"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -131,11 +132,17 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         </>
       )}
 
-      {mutations.updateMinimumBalanceAlert.isError && (
-        <Text className="text-sm text-destructive">
-          {mutations.updateMinimumBalanceAlert.error.message}
-        </Text>
-      )}
+      {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
+          P2), so AccessibleStatus is the single announcement owner here: one
+          announcement per platform, visuals preserved (tone error). */}
+      <AccessibleStatus
+        message={
+          mutations.updateMinimumBalanceAlert.isError
+            ? mutations.updateMinimumBalanceAlert.error.message
+            : null
+        }
+        className="text-sm"
+      />
 
       <Button
         disabled={!canSave}

@@ -1,7 +1,33 @@
 import { describe, expect, test } from '@jest/globals';
-import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  addCacheBreakpoints,
+  removeChatCompletionsToolNames,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import type {
+  GatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
+
+describe('removeChatCompletionsToolNames', () => {
+  test('removes names from tool messages only', () => {
+    const toolMessage: OpenAI.ChatCompletionToolMessageParam & { name?: string } = {
+      role: 'tool',
+      content: 'Tool result',
+      tool_call_id: 'call_123',
+      name: 'read_file',
+    };
+    const request: OpenRouterChatCompletionRequest = {
+      model: 'test-model',
+      messages: [{ role: 'user', content: 'Run the tool', name: 'user-name' }, toolMessage],
+    };
+
+    removeChatCompletionsToolNames(request);
+
+    expect(toolMessage.name).toBeUndefined();
+    expect(request.messages[0]).toHaveProperty('name', 'user-name');
+  });
+});
 
 describe('addCacheBreakpoints', () => {
   test('adds a cache breakpoint to the system message and the last eligible chat completions message when none exist', () => {
@@ -94,6 +120,31 @@ describe('addCacheBreakpoints', () => {
 
     expect(request.body.messages.at(-2)?.content).toEqual([
       { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: '<environment_details>dynamic context' },
+    ]);
+  });
+
+  test('adds a cache breakpoint before environment details in a single chat completions user message', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Build snake in plain JS' },
+              { type: 'text', text: '<environment_details>dynamic context' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(0)?.content).toEqual([
+      { type: 'text', text: 'Build snake in plain JS', cache_control: { type: 'ephemeral' } },
       { type: 'text', text: '<environment_details>dynamic context' },
     ]);
   });
@@ -194,6 +245,40 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
+  test('adds a cache breakpoint to the last responses instructions message', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          { type: 'message', role: 'system', content: 'You are helpful.' },
+          { type: 'message', role: 'developer', content: 'Be concise.' },
+          { type: 'message', role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    expect(request.body.input.at(0)).toMatchObject({
+      type: 'message',
+      role: 'system',
+      content: 'You are helpful.',
+    });
+    expect(request.body.input.at(1)).toMatchObject({
+      type: 'message',
+      role: 'developer',
+      content: [
+        {
+          type: 'input_text',
+          text: 'Be concise.',
+          prompt_cache_breakpoint: { mode: 'explicit' },
+        },
+      ],
+    });
+  });
+
   test('does nothing for responses requests when any prompt_cache_breakpoint is already present', () => {
     const request: GatewayRequest = {
       kind: 'responses',
@@ -278,12 +363,48 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
-  test('adds cache_control to the last content block of a messages request', () => {
+  test('adds a cache breakpoint before environment details in a single responses user message', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          {
+            type: 'message',
+            role: 'user',
+            content: [
+              { type: 'input_text', text: 'Build snake in plain JS' },
+              { type: 'input_text', text: '<environment_details>dynamic context' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    expect(request.body.input.at(0)).toMatchObject({
+      type: 'message',
+      role: 'user',
+      content: [
+        {
+          type: 'input_text',
+          text: 'Build snake in plain JS',
+          prompt_cache_breakpoint: { mode: 'explicit' },
+        },
+        { type: 'input_text', text: '<environment_details>dynamic context' },
+      ],
+    });
+  });
+
+  test('adds cache_control to the system prompt and last content block of a messages request', () => {
     const request: GatewayRequest = {
       kind: 'messages',
       body: {
         model: 'anthropic/claude-sonnet-4-5',
         max_tokens: 1024,
+        system: 'You are helpful.',
         messages: [
           { role: 'user', content: 'First prompt' },
           { role: 'assistant', content: 'First response' },
@@ -295,8 +416,33 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     expect(request.body.cache_control).toBeUndefined();
+    expect(request.body.system).toEqual([
+      { type: 'text', text: 'You are helpful.', cache_control: { type: 'ephemeral' } },
+    ]);
     expect(request.body.messages.at(-1)?.content).toEqual([
       { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+    ]);
+  });
+
+  test('adds cache_control to the last block of a messages system prompt', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: [
+          { type: 'text', text: 'You are helpful.' },
+          { type: 'text', text: 'Be concise.' },
+        ],
+        messages: [{ role: 'user', content: 'Latest prompt' }],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.system).toEqual([
+      { type: 'text', text: 'You are helpful.' },
+      { type: 'text', text: 'Be concise.', cache_control: { type: 'ephemeral' } },
     ]);
   });
 
@@ -363,6 +509,32 @@ describe('addCacheBreakpoints', () => {
     ]);
   });
 
+  test('adds cache_control before environment details in a single messages user message', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Build snake in plain JS' },
+              { type: 'text', text: '<environment_details>dynamic context' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(0)?.content).toEqual([
+      { type: 'text', text: 'Build snake in plain JS', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: '<environment_details>dynamic context' },
+    ]);
+  });
+
   test('adds cache_control to the last cacheable content block', () => {
     const request: GatewayRequest = {
       kind: 'messages',
@@ -416,5 +588,27 @@ describe('addCacheBreakpoints', () => {
     addCacheBreakpoints(request);
 
     expect(request.body.cache_control).toBeUndefined();
+  });
+
+  test('does nothing for messages requests when the system prompt has cache_control', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: [
+          {
+            type: 'text',
+            text: 'You are helpful.',
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages: [{ role: 'user', content: 'Latest prompt' }],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(-1)?.content).toBe('Latest prompt');
   });
 });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- spawn-input, navigation, and admission suites share the hook harness. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
@@ -9,6 +10,7 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
+import { REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST } from '@/lib/remote-spawn-admission';
 
 import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
 
@@ -30,13 +32,14 @@ const useRemoteInstanceSpawnMock = vi.hoisted(() =>
 );
 
 const routerReplace = vi.hoisted(() => vi.fn());
+const toastErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: routerReplace }),
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: toastErrorMock },
 }));
 
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'share-id-fixed' }));
@@ -78,6 +81,18 @@ const INSTANCE: InstancePickerInstance = {
 
 /** Stub payload for the ready-path-with-payload case. */
 const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
+const filesPayload: SharePayload = {
+  text: '',
+  files: [
+    {
+      name: 'report.pdf',
+      uri: 'file:///tmp/report.pdf',
+      mimeType: 'application/pdf',
+      size: 1024,
+    },
+  ],
+  failedFiles: [],
+};
 
 /**
  * Runs `onStart` and returns the arguments the spawn mock was called with.
@@ -109,6 +124,8 @@ function runHook(args: {
   mode?: string;
   selection?: ModelSelection;
   getSubmitPayload?: () => SharePayload | null;
+  onSpawnAdmitted?: () => void;
+  runOnInstance?: InstancePickerInstance | null;
 }) {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
@@ -164,13 +181,14 @@ function runHook(args: {
       organizationId: args.organizationId,
       mode: args.mode,
       selection: args.selection,
-      runOnInstance: INSTANCE,
+      runOnInstance: args.runOnInstance === undefined ? INSTANCE : args.runOnInstance,
       // eslint-disable-next-line no-empty-function -- no-op setter for harness
       setRunOnInstance: (_next: InstancePickerInstance | null) => {},
       // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
       refetchInstances: () => Promise.resolve({ data: { instances: [INSTANCE] } }),
       instanceList: [INSTANCE],
       getSubmitPayload: args.getSubmitPayload,
+      onSpawnAdmitted: args.onSpawnAdmitted,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -183,6 +201,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     spawnMock.mockClear();
     useRemoteInstanceSpawnMock.mockClear();
     routerReplace.mockClear();
+    toastErrorMock.mockClear();
     __resetSharePayloadStoreForTests();
   });
 
@@ -200,6 +219,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         model: { providerID: 'anthropic', modelID: 'claude-x', variant: 'high' },
         orgId: 'org-xyz',
       },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -208,7 +228,11 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       organizationId: 'org-xyz',
     });
 
-    expect(await captureSpawnCall(onStart)).toEqual(['conn-abc', { orgId: 'org-xyz' }]);
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
+    ]);
   });
 
   it('explicit mode and selection reach the spawn input', async () => {
@@ -221,6 +245,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       { agent: 'code', model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -247,6 +272,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         agent: 'code',
         model: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
       },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -264,6 +290,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         model: { providerID: 'opencode', modelID: 'opencode-model', variant: 'xhigh' },
         orgId: 'org-xyz',
       },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -276,6 +303,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(await captureSpawnCall(onStart)).toEqual([
       'conn-abc',
       { agent: 'code', orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
     ]);
   });
 
@@ -297,6 +325,32 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     const stored = peekSharePayload('share-id-fixed');
     expect(stored).not.toBeNull();
     expect(stored?.text).toBe('hello');
+  });
+
+  it('ready path carries the chosen custom mode so the auto-send keeps it', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'reviewer',
+      getSubmitPayload: () => samplePayload,
+    });
+
+    await runStartAndWaitForReplace(onStart);
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(calledWith).toContain('autoSend=1');
+    expect(calledWith).toContain('mode=reviewer');
+  });
+
+  it('ready path omits mode when the spawn had none', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => samplePayload,
+    });
+
+    await runStartAndWaitForReplace(onStart);
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(calledWith).not.toContain('mode=');
   });
 
   it('ready path navigates without share params when press-time payload is null', async () => {
@@ -327,5 +381,50 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(calledWith).toContain('spawned=1');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
+  });
+
+  it('calls the admitted callback after admission allows the payload', async () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => samplePayload,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    await captureSpawnCall(onStart);
+    expect(onSpawnAdmitted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call the admitted callback when admission denies files', () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => filesPayload,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith(REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST);
+  });
+
+  it('does not call the admitted callback without a target instance', () => {
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      runOnInstance: null,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 });

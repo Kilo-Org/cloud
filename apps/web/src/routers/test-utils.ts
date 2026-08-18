@@ -1,24 +1,14 @@
-import type { TRPCContext } from '@/lib/trpc/init';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { findUserById } from '@/lib/user';
 import { rootRouter } from '@/routers/root-router';
 
-/**
- * Test-only context factory that allows creating context with mock users
- */
-const createTestTRPCContext = async (userId: string): Promise<TRPCContext> => {
+const createCaller = createCallerFactory(rootRouter);
+
+/** Test-only caller bound to a real user row and an optional device session. */
+export async function createCallerForUser(userId: string, opts?: { deviceSessionId?: string }) {
   const user = await findUserById(userId);
   if (!user) {
     throw new Error(`Test user not found: ${userId}`);
   }
-  return {
-    user,
-  };
-};
-
-const createCaller = createCallerFactory(rootRouter);
-
-export async function createCallerForUser(userId: string) {
-  const ctx = await createTestTRPCContext(userId);
-  return createCaller(ctx);
+  return createCaller({ user, deviceSessionId: opts?.deviceSessionId });
 }

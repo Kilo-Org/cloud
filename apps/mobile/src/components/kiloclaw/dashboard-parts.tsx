@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, RefreshCw, Trash2 } from 'lucide-react-native';
+import { AlertTriangle, Bot, RefreshCw, Trash2 } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { statusLabel, statusTone } from '@/components/kiloclaw/status-badge';

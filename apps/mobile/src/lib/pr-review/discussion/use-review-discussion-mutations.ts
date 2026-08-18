@@ -36,7 +36,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
-import { useTRPC } from '@/lib/trpc';
+import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+
+import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useHoistedOperationKey } from '@/lib/operation-key';
+import {
+  isPrMutationRetryable,
+  mapPrOperationError,
+  prOperationToastMessage,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 
 import {
   applyReactionToggle,
@@ -61,21 +69,42 @@ async function invalidateDiscussionCaches(
 
 // ── Reply (not optimistic) ────────────────────────────────────────────
 
+export type ReplyToCommentInput = {
+  owner: string;
+  repo: string;
+  number: number;
+  commentId: number;
+  body: string;
+};
+
 export function useReplyToCommentMutation() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
-  return useMutation(
-    trpc.githubPrReview.replyToComment.mutationOptions({
-      onError: (error: { message: string }) => {
-        toast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidateDiscussionCaches(queryClient, keys);
-      },
-    })
-  );
+  return useMutation({
+    mutationFn: async (input: ReplyToCommentInput) => {
+      try {
+        const result = await trpcClient.githubPrReview.replyToComment.mutate({
+          ...input,
+          operationKey: getKey(prIntentFingerprint('reply_comment', input)),
+        });
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isPrMutationRetryable(error)) {
+          rotateKey();
+        }
+        throw mapPrOperationError(error, 'reply');
+      }
+    },
+    onError: (error: { message: string }) => {
+      toast.error(prOperationToastMessage(error, 'reply'));
+    },
+    onSettled: async () => {
+      await invalidateDiscussionCaches(queryClient, keys);
+    },
+  });
 }
 
 // ── Resolve / unresolve (optimistic) ──────────────────────────────────

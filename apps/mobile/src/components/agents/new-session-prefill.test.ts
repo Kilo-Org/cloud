@@ -10,7 +10,7 @@ import {
   resolvePrefillRepo,
 } from './new-session-prefill';
 
-vi.mock('lucide-react-native', () => ({
+vi.mock('@/components/ui/icons', () => ({
   Bug: 'Bug',
   Code: 'Code',
   HelpCircle: 'HelpCircle',
@@ -150,7 +150,7 @@ describe('readNewSessionPrefill', () => {
   });
 
   it.each([
-    ['unknown', 'code'],
+    ['unknown', 'unknown'],
     ['architect', 'plan'],
     ['build', 'code'],
   ])('normalizes mode "%s" to "%s"', (input, expected) => {

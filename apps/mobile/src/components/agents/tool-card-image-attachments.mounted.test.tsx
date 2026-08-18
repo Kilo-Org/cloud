@@ -55,7 +55,7 @@ vi.mock('@/lib/share-remote-file', () => ({
 }));
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
-vi.mock('lucide-react-native', () => ({ AlertCircle: 'AlertCircle', ImageOff: 'ImageOff' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', ImageOff: 'ImageOff' }));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

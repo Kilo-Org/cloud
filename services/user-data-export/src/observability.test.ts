@@ -1,5 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { classifyFetchFailure, logExportEvent, safeError } from './observability';
+import {
+  classifyFetchFailure,
+  logExportEvent,
+  safeError,
+  setSpanFields,
+  withSpan,
+  type ExportSpan,
+} from './observability';
+
+function recordingSpan(): ExportSpan & { attributes: [string, unknown][] } {
+  const attributes: [string, unknown][] = [];
+  return {
+    attributes,
+    isTraced: true,
+    setAttribute: (key, value) => void attributes.push([key, value]),
+  };
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -45,6 +61,50 @@ describe('export observability', () => {
     });
 
     expect(safeError(error)).toEqual({ errorName: 'Error' });
+  });
+});
+
+describe('span fields', () => {
+  it('copies booleans, numbers, and strings onto the span', () => {
+    const span = recordingSpan();
+
+    setSpanFields(span, { source: 'cli_sessions', 'export.page': 3, 'export.done': false });
+
+    expect(span.attributes).toEqual([
+      ['source', 'cli_sessions'],
+      ['export.page', 3],
+      ['export.done', false],
+    ]);
+  });
+
+  /**
+   * setAttribute rejects null, and our field records use null freely for values that are
+   * not resolved yet, so dropping both null and undefined keeps call sites from having to
+   * pre-filter.
+   */
+  it('drops null and undefined instead of forwarding them', () => {
+    const span = recordingSpan();
+
+    setSpanFields(span, { source: null, generation: undefined, exportId: 'export-id' });
+
+    expect(span.attributes).toEqual([['exportId', 'export-id']]);
+  });
+});
+
+describe('withSpan', () => {
+  it('returns the callback result so instrumentation stays transparent', async () => {
+    await expect(withSpan('probe', { source: 'test' }, async () => 'value')).resolves.toBe('value');
+    expect(withSpan('probe', {}, () => 42)).toBe(42);
+  });
+
+  it('propagates failures rather than swallowing them', async () => {
+    const failure = new Error('read failed');
+
+    await expect(
+      withSpan('probe', {}, async () => {
+        throw failure;
+      })
+    ).rejects.toBe(failure);
   });
 });
 

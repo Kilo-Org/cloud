@@ -312,7 +312,7 @@ function sendHeartbeat(
     ...(options.capabilities ? { capabilities: options.capabilities } : {}),
     ...(options.instance ? { instance: options.instance } : {}),
   });
-  doInstance.webSocketMessage(cliWs as never, msg);
+  void doInstance.webSocketMessage(cliWs as never, msg);
 }
 
 /** Send a subscribe from a web ws */
@@ -325,13 +325,13 @@ async function sendSubscribe(doInstance: UserConnectionDO, webWs: MockWS, sessio
 /** Send an unsubscribe from a web ws */
 function sendUnsubscribe(doInstance: UserConnectionDO, webWs: MockWS, sessionId: string) {
   const msg = JSON.stringify({ type: 'unsubscribe', sessionId });
-  doInstance.webSocketMessage(webWs as never, msg);
+  void doInstance.webSocketMessage(webWs as never, msg);
 }
 
 /** Send a viewer ping from a web ws */
 function sendPing(doInstance: UserConnectionDO, webWs: MockWS, nonce: string) {
   const msg = JSON.stringify({ type: 'ping', nonce });
-  doInstance.webSocketMessage(webWs as never, msg);
+  void doInstance.webSocketMessage(webWs as never, msg);
 }
 
 /** Send a command from a web ws. Auto-flushes so durable-before-send
@@ -362,7 +362,7 @@ async function sendCliResponse(
   opts: { id: string; result?: unknown; error?: unknown }
 ): Promise<void> {
   const msg = JSON.stringify({ type: 'response', ...opts });
-  doInstance.webSocketMessage(cliWs as never, msg);
+  void doInstance.webSocketMessage(cliWs as never, msg);
   await flushAsync();
 }
 
@@ -1832,7 +1832,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: {},
       });
-      doInstance.webSocketMessage(cliWs as never, cliEventMsg);
+      void doInstance.webSocketMessage(cliWs as never, cliEventMsg);
       // No web sockets to receive the event — no crash = success
     });
 
@@ -3530,7 +3530,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(subWeb.send).toHaveBeenCalledTimes(1);
       expect(parseSent(subWeb)).toEqual({
@@ -3561,7 +3561,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(parentWeb.send).toHaveBeenCalledTimes(1);
       expect(childWeb.send).toHaveBeenCalledTimes(1);
@@ -3593,7 +3593,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       // Should only receive once despite subscribing to both
       expect(webWs.send).toHaveBeenCalledTimes(1);
@@ -3616,7 +3616,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-child-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(webWs.send).toHaveBeenCalledTimes(1);
       expect(parseSent(webWs)).toEqual({
@@ -3645,7 +3645,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-child-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(webWs.send).not.toHaveBeenCalled();
     });
@@ -3665,7 +3665,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(webWs.send).toHaveBeenCalledTimes(1);
       expect(parseSent(webWs)).toEqual({
@@ -3691,7 +3691,7 @@ describe('UserConnectionDO', () => {
         event: 'session.status',
         data: {},
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       const sent = parseSent(webWs);
       expect(sent).not.toHaveProperty('parentSessionId');
@@ -3778,7 +3778,7 @@ describe('UserConnectionDO', () => {
         event: 'test',
         data: {},
       });
-      doInstance.webSocketMessage(cliWs as never, triggerMsg);
+      void doInstance.webSocketMessage(cliWs as never, triggerMsg);
 
       // webWs should have received the event because it was subscribed via attachment
       expect(webWs.send).toHaveBeenCalledTimes(1);
@@ -3799,7 +3799,7 @@ describe('UserConnectionDO', () => {
         replaced: true,
       });
 
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({
           type: 'event',
@@ -4216,7 +4216,7 @@ describe('UserConnectionDO', () => {
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
       // Should not throw
-      doInstance.webSocketMessage(cliWs as never, 'not-json');
+      void doInstance.webSocketMessage(cliWs as never, 'not-json');
     });
 
     it('logs invalid CLI JSON metadata without raw payload content', async () => {
@@ -4225,7 +4225,7 @@ describe('UserConnectionDO', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const malformed = '{"secret":"raw-secret-must-not-be-logged"';
 
-      doInstance.webSocketMessage(cliWs as never, malformed);
+      void doInstance.webSocketMessage(cliWs as never, malformed);
 
       expect(warn).toHaveBeenCalledWith('Failed to parse WebSocket message as JSON', {
         role: 'cli',
@@ -4241,7 +4241,10 @@ describe('UserConnectionDO', () => {
       mockCtx.addSocket(ws);
 
       // Trigger ensureState first
-      doInstance.webSocketMessage(ws as never, JSON.stringify({ type: 'heartbeat', sessions: [] }));
+      void doInstance.webSocketMessage(
+        ws as never,
+        JSON.stringify({ type: 'heartbeat', sessions: [] })
+      );
       // Should not throw
     });
 
@@ -4252,12 +4255,12 @@ describe('UserConnectionDO', () => {
 
       // Invalid CLI message
       const badMsg = JSON.stringify({ type: 'invalid_type' });
-      doInstance.webSocketMessage(cliWs as never, badMsg);
+      void doInstance.webSocketMessage(cliWs as never, badMsg);
       // Should not throw
 
       // Invalid web message
       const webWs = addWebSocket(mockCtx, 'web-1');
-      doInstance.webSocketMessage(webWs as never, badMsg);
+      void doInstance.webSocketMessage(webWs as never, badMsg);
       // Should not throw
     });
 
@@ -4272,7 +4275,7 @@ describe('UserConnectionDO', () => {
         result: { secret },
       });
 
-      doInstance.webSocketMessage(cliWs as never, malformed);
+      void doInstance.webSocketMessage(cliWs as never, malformed);
 
       expect(warn).toHaveBeenCalledWith('CLI message parse failed', {
         role: 'cli',
@@ -5963,7 +5966,7 @@ describe('UserConnectionDO', () => {
       });
 
       // Send raw — schema validation must reject it.
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
 
       // No response forwarded to CLI.
       const cliCommands = allSent(mockCtx.sockets.find(s => s._tags.includes('cli'))!).filter(
@@ -6095,7 +6098,7 @@ describe('UserConnectionDO', () => {
       // Start the first CLI reply — the handler rehydrates the durable
       // entry, builds the in-memory entry, then blocks on the deferred
       // storage.put before sending the live response.
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { first: true } })
       );
@@ -6104,7 +6107,7 @@ describe('UserConnectionDO', () => {
       // Start the second CLI reply while the first is held on storage.put.
       // The completedCorrelationIds reservation is still set, so the
       // second reply returns early without delivering.
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { second: true } })
       );
@@ -6652,7 +6655,7 @@ describe('UserConnectionDO', () => {
       await Promise.resolve();
       const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
       expect(markers.has(correlationId!)).toBe(true);
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { wrong: true } })
       );
@@ -6717,7 +6720,7 @@ describe('UserConnectionDO', () => {
       await Promise.resolve();
       const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
       expect(markers.has(correlationId!)).toBe(true);
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         firstOwner as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { wrong: true } })
       );
@@ -7448,7 +7451,7 @@ describe('UserConnectionDO', () => {
         command: 'send_message',
         sessionId: 's1',
       });
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
 
       // Flush enough for the initial write to fail and the .catch + .finally
       // to execute. The command was never forwarded to the CLI.
@@ -7496,7 +7499,7 @@ describe('UserConnectionDO', () => {
         command: 'send_message',
         sessionId: 's1',
       });
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
 
       // Drain microtasks so the waitUntil launches and the initial write
       // promise is awaited (but not yet resolved).
@@ -7563,7 +7566,7 @@ describe('UserConnectionDO', () => {
         command: 'send_message',
         sessionId: 's1',
       });
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
       await flushAsync();
 
       // Get the correlationId that was assigned.

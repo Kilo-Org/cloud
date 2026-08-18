@@ -8,7 +8,7 @@ import { UserWebConnectionProvider } from './user-web-connection-provider';
 type AuthConfig = { getAuthToken: () => Promise<string> };
 
 const mocks = vi.hoisted(() => ({
-  mutate: vi.fn(async () => ({ token: 'ticket-1', expiresAt: 1_700_000_060 })),
+  mutate: vi.fn(() => ({ token: 'ticket-1', expiresAt: 1_700_000_060 })),
   query: vi.fn(),
   createUserWebConnection: vi.fn(),
   capturedConfig: null as AuthConfig | null,
@@ -19,19 +19,19 @@ vi.mock('@kilocode/cloud-agent-sdk/user-web-connection', () => ({
     mocks.capturedConfig = config;
     mocks.createUserWebConnection(config);
     return {
-      retain: () => () => {},
-      connect: () => {},
-      disconnect: () => {},
-      destroy: () => {},
-      isConnected: () => false,
-      onConnectionChange: () => () => {},
-      subscribeToCliSession: () => () => {},
-      sendCommand: async () => ({}),
-      sendCommandToConnection: async () => ({}),
-      onCliEvent: () => () => {},
-      onSystemEvent: () => () => {},
-      onReconnect: () => () => {},
-      onSessionEvent: () => () => {},
+      retain: vi.fn(() => vi.fn()),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      destroy: vi.fn(),
+      isConnected: vi.fn(() => false),
+      onConnectionChange: vi.fn(() => vi.fn()),
+      subscribeToCliSession: vi.fn(() => vi.fn()),
+      sendCommand: vi.fn(),
+      sendCommandToConnection: vi.fn(),
+      onCliEvent: vi.fn(() => vi.fn()),
+      onSystemEvent: vi.fn(() => vi.fn()),
+      onReconnect: vi.fn(() => vi.fn()),
+      onSessionEvent: vi.fn(() => vi.fn()),
     };
   },
 }));
@@ -64,22 +64,25 @@ describe('UserWebConnectionProvider', () => {
   });
 
   it('mints the ingest ticket via the getToken mutation', async () => {
-    let renderer: TestRenderer.ReactTestRenderer | undefined;
-    await act(async () => {
-      renderer = TestRenderer.create(createElement(UserWebConnectionProvider, { children: null }));
+    const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
+    await act(() => {
+      holder.renderer = TestRenderer.create(createElement(UserWebConnectionProvider, null));
     });
 
     expect(mocks.createUserWebConnection).toHaveBeenCalledTimes(1);
-    expect(mocks.capturedConfig).not.toBeNull();
+    const config = mocks.capturedConfig;
+    if (!config) {
+      throw new Error('user web connection config not captured');
+    }
 
-    const token = await mocks.capturedConfig!.getAuthToken();
+    const token = await config.getAuthToken();
 
     expect(token).toBe('ticket-1');
     expect(mocks.mutate).toHaveBeenCalledTimes(1);
     expect(mocks.query).not.toHaveBeenCalled();
 
-    await act(async () => {
-      renderer!.unmount();
+    await act(() => {
+      holder.renderer?.unmount();
     });
   });
 });

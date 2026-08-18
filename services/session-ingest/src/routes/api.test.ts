@@ -1892,7 +1892,7 @@ describe('api routes', () => {
     now.mockRestore();
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { ticket: string; expiresAt: number };
     expect(body).toEqual({
       ticket: expect.any(String),
       expiresAt: 1_700_000_060,

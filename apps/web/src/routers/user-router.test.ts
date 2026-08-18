@@ -1090,15 +1090,14 @@ describe('user router - account deletion', () => {
   it('challenge omits devCode in production', async () => {
     mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
     const caller = await createCallerForUser(deletionUser.id);
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    const restoreNodeEnv = jest.replaceProperty(process.env, 'NODE_ENV', 'production');
     try {
       const result = await caller.user.requestAccountDeletionChallenge();
 
       expect(result.challengeId).toEqual(expect.any(String));
       expect(result.devCode).toBeUndefined();
     } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+      restoreNodeEnv.restore();
     }
   });
 

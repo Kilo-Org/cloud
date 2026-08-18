@@ -58,7 +58,9 @@ beforeEach(() => {
 
 // Load the real `closeCloudAgentOrgStreams` (the module mock above does not
 // expose it) so the test exercises the actual fetch call, not a stub.
-const { closeCloudAgentOrgStreams } = jest.requireActual('./cloud-agent-client');
+const { closeCloudAgentOrgStreams } = jest.requireActual('./cloud-agent-client') as {
+  closeCloudAgentOrgStreams: (userId: string, organizationId: string) => Promise<void>;
+};
 
 describe('createCloudAgentNextClientForModel', () => {
   it('returns the default client when the model is paid and has no BYOK', () => {
@@ -100,7 +102,9 @@ describe('closeCloudAgentOrgStreams', () => {
   });
 
   it('POSTs to the close endpoint with the internal key header and body', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await closeCloudAgentOrgStreams('usr_1', 'org_1');
@@ -120,7 +124,7 @@ describe('closeCloudAgentOrgStreams', () => {
 
   it('throws when the close endpoint returns a non-OK response', async () => {
     const fetchMock = jest
-      .fn()
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
       .mockResolvedValue(
         new Response('boom', { status: 500, statusText: 'Internal Server Error' })
       );

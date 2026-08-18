@@ -174,15 +174,20 @@ async function mountAndSignOut(): Promise<void> {
   vi.resetModules();
   const mod = await import('./auth-context');
 
-  let captured: { signOut: (ended?: boolean) => Promise<void> } | undefined = undefined;
+  const holder: {
+    captured?: { signOut: (ended?: boolean) => Promise<void> };
+    renderer?: TestRenderer.ReactTestRenderer;
+  } = {};
+
   function Consumer(): null {
-    captured = mod.useAuth();
+    holder.captured = mod.useAuth();
     return null;
   }
 
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   await act(async () => {
-    renderer = TestRenderer.create(createElement(mod.AuthProvider, null, createElement(Consumer)));
+    holder.renderer = TestRenderer.create(
+      createElement(mod.AuthProvider, null, createElement(Consumer))
+    );
     await Promise.resolve();
   });
   await act(async () => {
@@ -192,13 +197,14 @@ async function mountAndSignOut(): Promise<void> {
   });
 
   // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- safety net for test failures
-  if (!captured) {
+  if (!holder.captured) {
     throw new Error('auth context not captured');
   }
+  const signOut = holder.captured.signOut;
 
   await act(async () => {
-    await captured.signOut();
+    await signOut();
   });
 
-  renderer?.unmount();
+  holder.renderer?.unmount();
 }

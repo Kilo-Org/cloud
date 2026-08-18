@@ -39,6 +39,25 @@ export const BLOB_TYPES = [
   'git_state',
 ] as const satisfies readonly FileName[];
 
+<<<<<<< ours
+=======
+/** Known platform values that have dedicated filters. "Other" is everything else. */
+export const KNOWN_PLATFORMS = [
+  'cloud-agent',
+  'cloud-agent-web',
+  'cli',
+  'vscode',
+  'agent-manager',
+  'app-builder',
+  'slack',
+  'github',
+  'linear',
+  'gastown',
+  'webhook',
+  'scheduled',
+] as const;
+
+>>>>>>> theirs
 const PAGE_SIZE = 10;
 
 const commonSessionFields = {

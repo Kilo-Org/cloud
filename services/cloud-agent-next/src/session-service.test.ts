@@ -30,7 +30,6 @@ const workspaceMocks = vi.hoisted(() => ({
     sessionHome: '/home/agent_test',
   }),
   updateGitAuthor: vi.fn().mockResolvedValue(undefined),
-  updateGitRemoteToken: vi.fn().mockResolvedValue(undefined),
   updateGitRemoteUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -689,7 +688,6 @@ describe('SessionService.prepareWorkspace', () => {
       sessionHome: '/home/agent_test',
     });
     workspaceMocks.updateGitAuthor.mockResolvedValue(undefined);
-    workspaceMocks.updateGitRemoteToken.mockResolvedValue(undefined);
     workspaceMocks.updateGitRemoteUrl.mockResolvedValue(undefined);
     tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValue({
       success: true,
@@ -769,7 +767,6 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'resolved-gitlab-token',
       undefined,
       { platform: 'gitlab' }
     );
@@ -994,7 +991,6 @@ describe('SessionService.prepareWorkspace', () => {
       workspacePath,
       'https://bitbucket.org/acme-team/widgets.git'
     );
-    expect(workspaceMocks.updateGitRemoteToken).not.toHaveBeenCalled();
     const branchCallIndex = session.exec.mock.calls.findIndex(
       ([command]) => typeof command === 'string' && command.includes('git checkout -b')
     );
@@ -1011,7 +1007,7 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
-  it('preserves the capability origin (no strip) for a contained cold Bitbucket review', async () => {
+  it('strips the capability origin for a contained cold Bitbucket review', async () => {
     const session = createSession(false);
     const sandbox = createSandbox(session);
     const metadata = createBitbucketMetadata(true, '123e4567-e89b-12d3-a456-426614174030', {
@@ -1041,9 +1037,11 @@ describe('SessionService.prepareWorkspace', () => {
 
     expect(tokenMocks.issueCloudAgentBitbucketSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveManagedBitbucketToken).not.toHaveBeenCalled();
-    // A kbb1. capability origin stays authenticated through the outbound
-    // interceptor, so it must NOT be stripped (unlike a raw-token session).
-    expect(workspaceMocks.updateGitRemoteUrl).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://bitbucket.org/acme-team/widgets.git'
+    );
   });
 
   it('writes the opaque Kilo capability to the sandbox auth file, never the raw token', async () => {
@@ -1425,7 +1423,6 @@ describe('SessionService.prepareWorkspace', () => {
     });
 
     expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).not.toHaveBeenCalled();
     expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
@@ -1433,7 +1430,7 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
-  it('preserves the capability origin (no strip, no refresh) for a contained warm Bitbucket review', async () => {
+  it('strips the capability origin for a contained warm Bitbucket review', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
     const metadata = createBitbucketMetadata(true, '123e4567-e89b-12d3-a456-426614174030', {
@@ -1462,10 +1459,12 @@ describe('SessionService.prepareWorkspace', () => {
     });
 
     expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
-    // A capability origin is preserved: no strip, and the warm-resume token
-    // refresh is skipped because sanitize reports the remote as handled.
-    expect(workspaceMocks.updateGitRemoteUrl).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://bitbucket.org/acme-team/widgets.git'
+    );
+    expect(workspaceMocks.updateGitAuthor).not.toHaveBeenCalled();
   });
 
   it('refreshes prepared GitHub workspace metadata with a managed capability', async () => {
@@ -1507,11 +1506,15 @@ describe('SessionService.prepareWorkspace', () => {
       }
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
-      'https://github.com/acme/repo.git',
-      'kgh2.default'
+      'https://github.com/acme/repo.git'
+    );
+    expect(workspaceMocks.updateGitAuthor).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      { name: 'kiloconnect[bot]', email: 'bot@example.com' }
     );
   });
 
@@ -1539,12 +1542,54 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://git.example.com/acme/repo.git',
-      'generic-git-token',
       undefined,
-      { platform: undefined }
+      { platform: undefined, token: 'generic-git-token' }
     );
+    expect(workspaceMocks.updateGitRemoteUrl).not.toHaveBeenCalled();
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+  });
+
+  it('clones type:git + platform:github without embedding the leftover PAT and writes GH_TOKEN', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = createMetadata({
+      gitUrl: 'https://github.com/Kilo-Org/cloud.git',
+      gitToken: 'leftover-github-pat',
+      platform: 'github',
+      gitlabTokenManaged: undefined,
+    });
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(metadata.repository).toMatchObject({
+      type: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      platform: 'github',
+    });
+    expect(workspaceMocks.cloneGitRepo).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://github.com/Kilo-Org/cloud.git',
+      undefined,
+      { platform: 'github' }
+    );
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://github.com/Kilo-Org/cloud.git'
+    );
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+    expect(result.ready.gitToken).toBe('leftover-github-pat');
+    expect(result.runtimeEnv.GH_TOKEN).toBe('leftover-github-pat');
   });
 
   it('restores persisted devcontainer runtime metadata on the warm fast path', async () => {
@@ -1689,11 +1734,15 @@ describe('SessionService.prepareWorkspace', () => {
     expect(getTokenMock).not.toHaveBeenCalled();
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
-      'https://github.com/acme/repo.git',
-      'kgh2.default'
+      'https://github.com/acme/repo.git'
+    );
+    expect(workspaceMocks.updateGitAuthor).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      { name: 'kiloconnect[bot]', email: 'bot@example.com' }
     );
   });
 
@@ -1724,13 +1773,12 @@ describe('SessionService.prepareWorkspace', () => {
     expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
     expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
-      'https://gitlab.com/acme/repo.git',
-      'resolved-gitlab-token',
-      'gitlab'
+      'https://gitlab.com/acme/repo.git'
     );
+    expect(workspaceMocks.updateGitAuthor).not.toHaveBeenCalled();
   });
 
   it('refreshes a warm GitLab code-review remote with a contained project capability', async () => {
@@ -1772,13 +1820,12 @@ describe('SessionService.prepareWorkspace', () => {
       }
     );
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
-      'https://gitlab.com/acme/repo.git',
-      'kgl2.project',
-      'gitlab'
+      'https://gitlab.com/acme/repo.git'
     );
+    expect(workspaceMocks.updateGitAuthor).not.toHaveBeenCalled();
   });
 
   it('refreshes a prepared warm GitHub remote through managed capability authentication', async () => {
@@ -1809,11 +1856,15 @@ describe('SessionService.prepareWorkspace', () => {
 
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
-    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
-      'https://github.com/acme/repo.git',
-      'kgh2.default'
+      'https://github.com/acme/repo.git'
+    );
+    expect(workspaceMocks.updateGitAuthor).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      { name: 'kiloconnect[bot]', email: 'bot@example.com' }
     );
   });
 
@@ -1860,7 +1911,6 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'acme/repo',
-      'resolved-gh-token',
       { name: 'kiloconnect[bot]', email: 'bot@example.com' },
       undefined
     );
@@ -3404,6 +3454,25 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       ].sort()
     );
     expect(materialized.PATH).toBe('/user/bin');
+  });
+
+  it('writes GH_TOKEN for type:git + platform:github leftover PATs', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://github.com/Kilo-Org/cloud.git',
+        gitToken: 'leftover-github-pat',
+        platform: 'github',
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      token: 'leftover-github-pat',
+      platform: 'github',
+    });
+    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('leftover-github-pat');
   });
 
   it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {

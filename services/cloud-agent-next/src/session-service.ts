@@ -35,7 +35,6 @@ import {
   manageBranch,
   setupWorkspace,
   updateGitAuthor,
-  updateGitRemoteToken,
   updateGitRemoteUrl,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
@@ -1555,8 +1554,12 @@ export class SessionService {
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
     // Set GH_TOKEN for GitHub repos only, respecting user overrides
-    if (githubToken && githubRepo && !baseEnvVars.GH_TOKEN) {
-      envVars.GH_TOKEN = githubToken;
+    if (!baseEnvVars.GH_TOKEN) {
+      if (githubToken && githubRepo) {
+        envVars.GH_TOKEN = githubToken;
+      } else if (platform === 'github' && gitToken) {
+        envVars.GH_TOKEN = gitToken;
+      }
     }
 
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
@@ -1819,9 +1822,8 @@ export class SessionService {
 
       if (credentialContainment.bitbucket) {
         // Contained sessions get an opaque capability instead of the raw
-        // workspace token; the outbound interceptor redeems it per request, so
-        // bitbucket.org is `git.url` (the canonical clone URL) with the
-        // capability supplied as the git password by the wrapper.
+        // workspace token. The helper emits BITBUCKET_TOKEN as Basic auth and
+        // the outbound interceptor redeems it per request.
         if (!env.GIT_TOKEN_SERVICE) {
           throw ExecutionError.invalidRequest('Git token service is not configured');
         }
@@ -2379,11 +2381,8 @@ export class SessionService {
         kiloProviderBaseUrl,
         kiloSessionIngestBaseUrl
       );
-      if (
-        !(await this.sanitizeBitbucketCodeReviewRemote(session, context.workspacePath, metadata))
-      ) {
-        await this.refreshGitRemoteToken(session, context, metadata, resolvedTokens);
-      }
+      await this.sanitizeGitRemote(session, context.workspacePath, metadata, resolvedTokens);
+      await this.refreshGitAuthor(session, context, metadata, resolvedTokens);
 
       const detectedDevcontainer =
         metadata.workspace?.devcontainerRequested && !metadata.devcontainer
@@ -2460,7 +2459,7 @@ export class SessionService {
 
       onProgress?.('branch', 'Setting up branch…');
       await this.prepareBranch(session, workspacePath, branchName, metadata);
-      await this.sanitizeBitbucketCodeReviewRemote(session, workspacePath, metadata);
+      await this.sanitizeGitRemote(session, workspacePath, metadata, resolvedTokens);
 
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
       await writeGlobalRules(sandbox, sessionHome, sessionId);
@@ -2621,15 +2620,16 @@ export class SessionService {
     const cloneOptions = repositoryShallow(metadata) ? { shallow: true } : undefined;
     const git = gitRepository(metadata);
     if (git) {
+      const platform = repositoryPlatform(metadata);
       await cloneGitRepo(
         session,
         workspacePath,
         tokens.gitlabCapabilityGitUrl ?? tokens.bitbucketCapabilityGitUrl ?? git.url,
-        tokens.gitToken,
         undefined,
         {
           ...cloneOptions,
-          platform: repositoryPlatform(metadata),
+          platform,
+          ...(platform === undefined && tokens.gitToken ? { token: tokens.gitToken } : {}),
         }
       );
       return;
@@ -2640,7 +2640,6 @@ export class SessionService {
         session,
         workspacePath,
         github.repo,
-        tokens.githubToken,
         tokens.githubGitAuthor,
         cloneOptions
       );
@@ -2687,77 +2686,43 @@ export class SessionService {
     }
   }
 
-  private async sanitizeBitbucketCodeReviewRemote(
+  private async sanitizeGitRemote(
     session: ExecutionSession,
     workspacePath: string,
-    metadata: CloudAgentSessionState
-  ): Promise<boolean> {
-    const git = gitRepository(metadata);
-    if (metadata.identity.createdOnPlatform !== 'code-review' || git?.type !== 'bitbucket') {
-      return false;
-    }
-    // A contained session's origin carries a kbb1. capability that stays
-    // authenticated through the outbound interceptor, so it must stay in place for
-    // a blobless clone's later lazy blob fetches (mirrors the wrapper's
-    // sanitizeBitbucketCodeReviewRemote). Only a raw workspace token is stripped.
-    if (getEffectiveCredentialContainment(metadata).bitbucket) {
-      return true;
-    }
-    await updateGitRemoteUrl(session, workspacePath, git.url);
-    return true;
-  }
-
-  /**
-   * Refresh the embedded credentials in the workspace's git remote URL on the
-   * warm fast path.
-   *
-   * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
-   * credentials can rotate independently of a warm workspace. The URL-embedded
-   * credentials from the original clone go stale quickly.
-   *
-   * The pinned `credential.helper` (`SYSTEM_GIT_CONFIG_ENV`) does serve `git`
-   * itself from `GH_TOKEN` / `GITLAB_TOKEN`, but it only rescues a remote whose
-   * URL lacks a password: when the URL carries both a username and a password,
-   * git sends that pair and never issues a `get` to the helper (verified against
-   * git 2.50 — on the 401 it only calls `erase`). A stale embedded pair
-   * therefore fails the fetch outright, so we still rewrite `origin` whenever
-   * the token is resolved by us.
-   */
-  private async refreshGitRemoteToken(
-    session: ExecutionSession,
-    context: SessionContext,
     metadata: CloudAgentSessionState,
     tokens: ResolvedWorkspaceTokens
   ): Promise<void> {
     const github = githubRepository(metadata);
     if (github) {
-      if (tokens.githubToken !== undefined && tokens.githubInstallationId !== undefined) {
-        await updateGitRemoteToken(
-          session,
-          context.workspacePath,
-          `https://github.com/${github.repo}.git`,
-          tokens.githubToken
-        );
-        if (tokens.githubGitAuthor) {
-          await updateGitAuthor(session, context.workspacePath, tokens.githubGitAuthor);
-        }
-      }
+      await updateGitRemoteUrl(session, workspacePath, `https://github.com/${github.repo}.git`);
+      return;
     }
-
     const git = gitRepository(metadata);
-    if (git) {
-      if (
-        tokens.gitToken !== undefined &&
-        (tokens.gitlabTokenManaged === true || tokens.bitbucketTokenManaged === true)
-      ) {
-        await updateGitRemoteToken(
-          session,
-          context.workspacePath,
-          tokens.gitlabCapabilityGitUrl ?? tokens.bitbucketCapabilityGitUrl ?? git.url,
-          tokens.gitToken,
-          repositoryPlatform(metadata)
-        );
-      }
+    if (!git) return;
+    const platform = repositoryPlatform(metadata);
+    if (platform !== 'github' && platform !== 'gitlab' && platform !== 'bitbucket') {
+      return;
+    }
+    await updateGitRemoteUrl(
+      session,
+      workspacePath,
+      tokens.gitlabCapabilityGitUrl ?? tokens.bitbucketCapabilityGitUrl ?? git.url
+    );
+  }
+
+  /**
+   * Refresh GitHub author identity on the warm fast path. Origin is kept
+   * credential-free by `sanitizeGitRemote`; git auth comes from the helper
+   * via GH_TOKEN / GITLAB_TOKEN / BITBUCKET_TOKEN.
+   */
+  private async refreshGitAuthor(
+    session: ExecutionSession,
+    context: SessionContext,
+    metadata: CloudAgentSessionState,
+    tokens: ResolvedWorkspaceTokens
+  ): Promise<void> {
+    if (githubRepository(metadata) && tokens.githubGitAuthor) {
+      await updateGitAuthor(session, context.workspacePath, tokens.githubGitAuthor);
     }
   }
 

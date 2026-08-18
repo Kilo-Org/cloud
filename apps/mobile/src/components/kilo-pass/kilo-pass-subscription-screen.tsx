@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The Kilo Pass screen composes the presentation gate, loading, error, unavailable, and native-IAP surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -172,7 +172,15 @@ function KiloPassNativeIapContent() {
   }
   const preflightBlocked = preflightFailure?.kind === 'nonRetryable';
   const isRetryDisabled = isPending || productsIsRefetching;
+  const tilesDisabled = isPending || preflightBlocked || preflightPurchase.isPending;
   const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   useEffect(
     () => () => {
       clearError();
@@ -208,6 +216,10 @@ function KiloPassNativeIapContent() {
             ? 'You already have a Kilo Pass subscription.'
             : 'Kilo Pass purchase is not available right now.',
       });
+      return;
+    }
+
+    if (!mountedRef.current) {
       return;
     }
 
@@ -296,12 +308,15 @@ function KiloPassNativeIapContent() {
                 key={product.appleProductId}
                 accessibilityLabel={`${formatTier(product)}, ${formatStorePrice(product)}`}
                 accessibilityRole="button"
-                accessibilityState={{ busy: isPending, disabled: isPending || preflightBlocked }}
+                accessibilityState={{
+                  busy: isPending || preflightPurchase.isPending,
+                  disabled: tilesDisabled,
+                }}
                 className={cn(
                   'rounded-xl border border-border bg-card p-5 active:opacity-80',
-                  (isPending || preflightBlocked) && 'opacity-50'
+                  tilesDisabled && 'opacity-50'
                 )}
-                disabled={isPending || preflightBlocked}
+                disabled={tilesDisabled}
                 onPress={() => {
                   handleProductPress(product);
                 }}

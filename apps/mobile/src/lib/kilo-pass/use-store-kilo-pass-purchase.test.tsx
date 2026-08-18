@@ -43,6 +43,7 @@ const mockedReactQuery = vi.hoisted(() => ({
   fetchQuery: vi.fn(),
   invalidateQueries: vi.fn(),
   lastQueryKey: null as unknown[] | null,
+  mobileStoreProductsData: undefined as { products: { appleProductId: string }[] } | undefined,
   removeQueries: vi.fn(),
   useMutation: vi.fn(),
   useQuery: vi.fn(),
@@ -90,8 +91,9 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { queryKey: unknown[] }) => {
     mockedReactQuery.useQuery();
     mockedReactQuery.lastQueryKey = options.queryKey;
+    const isMobileStoreProducts = options.queryKey[0] === 'mobile-products';
     return {
-      data: undefined,
+      data: isMobileStoreProducts ? mockedReactQuery.mobileStoreProductsData : undefined,
       error: null,
       isError: false,
       isLoading: false,
@@ -137,6 +139,7 @@ vi.mock('@/lib/trpc', () => ({
         completeAppStorePurchase: { mutationOptions: () => ({}) },
         getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
         getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
+        getPurchasePresentation: { pathFilter: () => ({ queryKey: ['purchase-presentation'] }) },
         getState: { pathFilter: () => ({ queryKey: ['state'] }) },
       },
       user: {
@@ -367,6 +370,7 @@ beforeEach(() => {
   });
   mockedReactQuery.invalidateQueries.mockResolvedValue(undefined);
   mockedReactQuery.lastQueryKey = null;
+  mockedReactQuery.mobileStoreProductsData = undefined;
   mockedReactQuery.removeQueries.mockReturnValue(undefined);
 });
 
@@ -931,5 +935,39 @@ describe('KiloPassNativeIapOwner', () => {
     expect(updatedValue.errorMessage).toBe('Inline banner check failed');
 
     inlineOwner.unmount();
+  });
+
+  it('recovers purchases using server-backed product IDs when the store fetch is empty', async () => {
+    mockedIap.availablePurchases = [createPurchase()];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [{ appleProductId: product.appleProductId }],
+    };
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {
+    mockedIap.availablePurchases = [createPurchase()];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [{ appleProductId: product.appleProductId }],
+    };
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['state'] });
+    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['balance'] });
+    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['credits'] });
+    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['credit-history'],
+    });
+    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['purchase-presentation'],
+    });
   });
 });

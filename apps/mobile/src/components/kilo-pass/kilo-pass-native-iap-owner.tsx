@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchProducts as fetchIapProducts,
   getAvailablePurchases as getAvailableIapPurchases,
@@ -170,14 +170,20 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     restorePurchases: restoreStorePurchases,
   } = actionsRef;
 
+  // Server-backed fallback for the recovery SKU list: when the StoreKit fetch
+  // fails or returns no products, recovery still needs the enabled product IDs
+  // so charged-but-uncompleted transactions are completed instead of released.
+  const serverProductsQuery = useQuery(trpc.kiloPass.getMobileStoreProducts.queryOptions());
   const productsQuery = useStoreKiloPassProducts({
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
   });
-  const enabledAppleProductIds = useMemo(
-    () => productsQuery.products.map(product => product.appleProductId),
-    [productsQuery.products]
-  );
+  const enabledAppleProductIds = useMemo(() => {
+    if (productsQuery.products.length > 0) {
+      return productsQuery.products.map(product => product.appleProductId);
+    }
+    return serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [];
+  }, [productsQuery.products, serverProductsQuery.data]);
 
   const invalidateAfterCompletion = useCallback(async () => {
     await Promise.all([
@@ -185,6 +191,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
       queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
       queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
+      queryClient.invalidateQueries(trpc.kiloPass.getPurchasePresentation.pathFilter()),
     ]);
   }, [queryClient, trpc]);
 

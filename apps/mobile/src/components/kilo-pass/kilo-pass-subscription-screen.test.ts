@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   preflightMutateAsync: vi.fn(),
+  preflightIsPending: false,
   ownerMount: vi.fn(),
   nativeIap: {
     clearError: vi.fn(),
@@ -55,7 +56,10 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({ mutateAsync: mocks.preflightMutateAsync, isPending: false }),
+  useMutation: () => ({
+    mutateAsync: mocks.preflightMutateAsync,
+    isPending: mocks.preflightIsPending,
+  }),
   useQuery: () => mocks.presentation,
 }));
 
@@ -174,6 +178,18 @@ function first<T>(items: readonly T[]): T {
   return item;
 }
 
+function ignoreDeferredResolution(_value: unknown): void {
+  return undefined;
+}
+
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolvePromise: (value: T) => void = ignoreDeferredResolution;
+  const promise = new Promise<T>(resolve => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
 async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
@@ -235,6 +251,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.presentation.isError = false;
     mocks.presentation.data = null;
     mocks.preflightMutateAsync.mockReset();
+    mocks.preflightIsPending = false;
     mocks.ownerMount.mockReset();
     mocks.nativeIap.clearError.mockReset();
     mocks.nativeIap.errorMessage = null;
@@ -416,5 +433,50 @@ describe('KiloPassSubscriptionScreen', () => {
     expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
+  });
+
+  it('disables the product tiles while preflight is pending', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.preflightIsPending = true;
+
+    const renderer = await renderScreen();
+    const tiles = productTiles(renderer);
+
+    expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
+    expect(
+      (first(tiles).props as { accessibilityState?: { busy?: boolean; disabled?: boolean } })
+        .accessibilityState?.busy
+    ).toBe(true);
+    expect(
+      (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
+        ?.disabled
+    ).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('does not start the purchase when the screen unmounts during preflight', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    const deferred = createDeferred<unknown>();
+    mocks.preflightMutateAsync.mockReturnValue(deferred.promise);
+
+    const renderer = await renderScreen();
+    const tiles = productTiles(renderer);
+    act(() => {
+      (first(tiles).props as { onPress?: () => void }).onPress?.();
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+
+    await act(async () => {
+      deferred.resolve({ allowed: true, statusClass: 'healthy', reason: null });
+      await flush();
+    });
+
+    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
   });
 });

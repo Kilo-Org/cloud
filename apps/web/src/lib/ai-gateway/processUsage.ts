@@ -78,6 +78,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.c
 import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,

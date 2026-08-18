@@ -8,12 +8,12 @@ import { logger, withLogTags } from './logger.js';
 import {
   resolveSecret,
   validateStreamTicket,
-  validateKiloToken,
   validateWrapperDispatchTicket,
   STREAM_TICKET_AUDIENCE,
   TERMINAL_TICKET_AUDIENCE,
   type WrapperAuthClaims,
 } from './auth.js';
+import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';

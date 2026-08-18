@@ -1,7 +1,8 @@
 import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
 import type { HonoContext } from '../hono-context.js';
-import { resolveSecret, validateKiloToken } from '../auth.js';
+import { resolveSecret } from '../auth.js';
+import { validateKiloToken } from '../validate-kilo-token.js';
 import { logger } from '../logger.js';
 import { buildTrpcErrorResponse } from '../trpc-error.js';
 import { extractProcedureName } from '../balance-validation.js';

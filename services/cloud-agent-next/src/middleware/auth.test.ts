@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as AuthModule from '../auth.js';
+import type * as ValidateKiloTokenModule from '../validate-kilo-token.js';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
 
-vi.mock('../auth.js', async () => {
-  const actual = await vi.importActual<typeof AuthModule>('../auth.js');
+vi.mock('../validate-kilo-token.js', async () => {
+  const actual = await vi.importActual<typeof ValidateKiloTokenModule>('../validate-kilo-token.js');
   return {
     ...actual,
     validateKiloToken: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('../logger.js', () => {
 });
 
 const { authMiddleware } = await import('./auth.js');
-const { validateKiloToken } = await import('../auth.js');
+const { validateKiloToken } = await import('../validate-kilo-token.js');
 
 describe('authMiddleware', () => {
   beforeEach(() => {

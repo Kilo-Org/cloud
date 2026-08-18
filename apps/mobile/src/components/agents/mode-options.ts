@@ -15,7 +15,6 @@ import {
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 
-export { normalizeAgentMode };
 export type { ModeOption };
 
 export const MODE_OPTIONS: ModeOption[] = [

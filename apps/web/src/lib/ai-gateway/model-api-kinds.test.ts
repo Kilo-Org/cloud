@@ -5,7 +5,7 @@ import type * as ModelsModule from '@/lib/ai-gateway/models';
 
 // Stub the catalog so the rejection test doesn't depend on any specific provider file.
 // 'test-exclusive/alibaba-only' resolves to a KiloExclusiveModel on the alibaba gateway,
-// which only supports chat_completions, exercising the rejection branch.
+// which does not support Messages, exercising the rejection branch.
 // 'test-exclusive/disabled' is filtered out by findKiloExclusiveModel, mirroring how
 // disabled catalog models fall back to OpenRouter.
 jest.mock('@/lib/ai-gateway/models', () => {
@@ -51,9 +51,12 @@ describe('modelServesAllGatewayChatApis', () => {
     expect(modelServesAllGatewayChatApis('openai/gpt-5-mini')).toBe(true);
   });
 
-  it('rejects a Kilo-exclusive model served by a chat-completions-only provider', () => {
+  it('rejects a Kilo-exclusive model served by a provider without Messages support', () => {
     expect(modelServesAllGatewayChatApis('test-exclusive/alibaba-only')).toBe(false);
-    expect(gatewayChatApisForModel('test-exclusive/alibaba-only')).toEqual(['chat_completions']);
+    expect(gatewayChatApisForModel('test-exclusive/alibaba-only')).toEqual([
+      'chat_completions',
+      'responses',
+    ]);
   });
 
   it('treats disabled Kilo-exclusive models like plain OpenRouter models, matching get-provider', () => {

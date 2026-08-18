@@ -23,7 +23,7 @@ jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
 }));
 
 // Stub the catalog so tests don't depend on any specific provider file.
-// 'test-exclusive/alibaba-only' maps to the alibaba gateway (chat_completions only).
+// 'test-exclusive/alibaba-only' maps to the alibaba gateway, which lacks Messages support.
 jest.mock('@/lib/ai-gateway/models', () => {
   const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
   const stubModel: KiloExclusiveModel = {
@@ -121,6 +121,7 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
     const body = (await response.json()) as { error: string };
     expect(body.error).toContain('test-exclusive/alibaba-only');
     expect(body.error).toContain('chat_completions');
+    expect(body.error).toContain('responses');
     expect(body.error).not.toContain('openai/gpt-5-mini (');
     expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
   });

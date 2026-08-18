@@ -48,7 +48,16 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 9,
+          weight: 8,
+          reasoning: { enabled: true, effort: 'high' },
+        } satisfies AutoFreeModel,
+      ]
+    : []),
+  ...(tencent_hy3_free_model.status === 'public'
+    ? [
+        {
+          model: tencent_hy3_free_model.public_id,
+          weight: 1,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]

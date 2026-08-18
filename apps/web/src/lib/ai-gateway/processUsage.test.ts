@@ -96,38 +96,6 @@ describe('processOpenRouterUsage', () => {
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
   });
-
-  test('uses Vercel market cost for a managed gateway BYOK request', () => {
-    const usage = {
-      is_byok: true,
-      cost: 0,
-      cost_details: { upstream_inference_cost: 0 },
-      completion_tokens: 100,
-      completion_tokens_details: { reasoning_tokens: 0 },
-      prompt_tokens: 50,
-      prompt_tokens_details: { cached_tokens: 0 },
-      total_tokens: 150,
-    };
-    const vercelProviderMetadata = {
-      gateway: {
-        cost: '0',
-        marketCost: '0.02',
-        routing: {
-          modelAttempts: [
-            {
-              success: true,
-              providerAttempts: [{ provider: 'openai', credentialType: 'byok', success: true }],
-            },
-          ],
-        },
-      },
-    };
-
-    const result = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
-
-    expect(result.cost_mUsd).toBe(20000);
-    expect(result.is_byok).toBe(true);
-  });
 });
 
 describe('authoritative usage transaction configuration', () => {

@@ -78,7 +78,6 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.c
 import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
-  computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,
@@ -1001,16 +1000,11 @@ export function processOpenRouterUsage(
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
-  const { cost_mUsd: openRouterCost_mUsd, is_byok } = computeOpenRouterCostFields(
+  const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
     'sse_processing'
   );
-  const vercelGateway = vercelProviderMetadata?.gateway;
-  const cost_mUsd =
-    vercelGateway?.marketCost != null || vercelGateway?.cost != null
-      ? computeVercelCostMicrodollars(vercelGateway)
-      : openRouterCost_mUsd;
 
   return {
     inputTokens: usage?.prompt_tokens ?? 0,
@@ -1021,7 +1015,7 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
-    is_byok: is_byok ?? extractVercelIsByok(vercelGateway),
+    is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
 

@@ -5,7 +5,7 @@ import { DataExportsClient } from './DataExportsClient';
 import { RequestDataDeletionCard } from './RequestDataDeletionCard';
 
 export default async function DataExportsPage() {
-  const { user } = await getUserFromAuth({ adminOnly: true });
+  const { user } = await getUserFromAuth({ adminOnly: false });
   if (!user) notFound();
 
   return (

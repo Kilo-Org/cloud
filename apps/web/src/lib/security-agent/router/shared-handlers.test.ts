@@ -419,6 +419,34 @@ describe('setEnabled', () => {
       initialSyncAdmissionFailed: true,
     });
   });
+
+  it('refuses enabling with an empty selected repo set', async () => {
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+
+  it('refuses enabling with all mode and zero integration repos', async () => {
+    await expect(
+      createPersonalHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
 });
 
 describe('saveConfig', () => {

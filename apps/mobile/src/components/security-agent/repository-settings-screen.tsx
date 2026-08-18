@@ -75,7 +75,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     setSelectedIds(config.data.selectedRepositoryIds);
   }, [config.data]);
 
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
+  // The repositories screen stays reachable while the agent is disabled so a
+  // user with integration repos but no effective selection can pick repos and
+  // then enable (the overview's "Select repositories" CTA lands here). Opt out
+  // of the disabled-state redirect; every other sub-screen keeps it.
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, true);
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
@@ -102,9 +106,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }
   if (config.isLoading || !config.data) {
     return <RepositorySettingsSkeleton />;
-  }
-  if (!config.data.isEnabled) {
-    return null;
   }
 
   const setModeOption = (option: RepositorySelectionMode) => {

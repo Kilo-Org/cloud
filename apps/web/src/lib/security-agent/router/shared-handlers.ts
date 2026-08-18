@@ -1066,6 +1066,21 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const selectedIds =
           input.selectedRepositoryIds ?? existingConfig?.config.selected_repository_ids ?? [];
 
+        // Refuse enabling with an empty effective repo set: no repository would
+        // be synced or analyzed, so an enabled state would be misleading.
+        if (input.isEnabled) {
+          const effectiveRepos = getRepoFullNamesInScope(integration, {
+            repository_selection_mode: selectionMode,
+            selected_repository_ids: selectedIds,
+          });
+          if (effectiveRepos.length === 0) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Select at least one repository before enabling Security Agent.',
+            });
+          }
+        }
+
         // Always upsert the config when enabling to ensure it exists with the correct selection
         if (input.isEnabled) {
           await upsertSecurityAgentConfig(

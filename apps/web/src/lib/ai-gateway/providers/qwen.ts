@@ -59,29 +59,31 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   gateway: 'martian',
   internal_id: 'qwen/qwen3.6-plus',
-  pricing: makeTieredPricing(
-    [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 0.5,
-          completion_per_million: 3,
-          input_cache_read_per_million: 0.05,
-          input_cache_write_per_million: 0.625,
+  pricing: {
+    tiers: makeTieredPricing(
+      [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 0.5,
+            completion_per_million: 3,
+            input_cache_read_per_million: 0.05,
+            input_cache_write_per_million: 0.625,
+          },
         },
-      },
-      {
-        start_context_length: TOKENS_256K,
-        pricing: {
-          prompt_per_million: 2,
-          completion_per_million: 6,
-          input_cache_read_per_million: 0.2,
-          input_cache_write_per_million: 2.5,
+        {
+          start_context_length: TOKENS_256K,
+          pricing: {
+            prompt_per_million: 2,
+            completion_per_million: 6,
+            input_cache_read_per_million: 0.2,
+            input_cache_write_per_million: 2.5,
+          },
         },
-      },
-    ],
-    KILO_STEALTH_DISCOUNT_FACTOR
-  ),
+      ],
+      KILO_STEALTH_DISCOUNT_FACTOR
+    ),
+  },
   inference_provider_restriction: [],
 };
 

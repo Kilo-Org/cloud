@@ -131,6 +131,8 @@ type SessionDetailContentProps = {
   shareId?: string;
   /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
   autoSend?: boolean;
+  /** Mode picked at spawn; seeds the mode until the session reports its own. */
+  spawnedMode?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -145,6 +147,7 @@ export function SessionDetailContent({
   openedVia = 'app',
   shareId,
   autoSend,
+  spawnedMode,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -354,6 +357,7 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    spawnedMode,
   });
 
   // Custom modes come from the session's `runtimeAgents` (slug + name). The

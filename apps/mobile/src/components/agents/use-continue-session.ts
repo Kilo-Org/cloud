@@ -115,7 +115,7 @@ export function useContinueSession(args: {
             appendShareParams(
               getSpawnedAgentSessionPath(outcome.sessionID, args.organizationId) as string,
               shareId,
-              { autoSend: true }
+              { autoSend: true, mode: fields.mode }
             ) as Href
           );
           return;

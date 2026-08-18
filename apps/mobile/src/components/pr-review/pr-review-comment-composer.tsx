@@ -25,7 +25,10 @@ import {
 } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { ensureTermsAccepted } from '@/components/pr-review/discussion/reply-input';
+import {
+  ensureTermsAcceptedOutcome,
+  TERMS_OUTDATED_COPY,
+} from '@/components/pr-review/discussion/reply-input';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
@@ -152,8 +155,14 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setInlineError(null);
     setInlineErrorKind(null);
     setInlineErrorIsLocal(false);
-    const accepted = await ensureTermsAccepted();
-    if (!accepted) {
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      setInlineErrorIsLocal(false);
+      return;
+    }
+    if (outcome.kind !== 'accepted') {
       return;
     }
     try {

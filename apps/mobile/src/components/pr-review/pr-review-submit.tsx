@@ -32,7 +32,10 @@ import {
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { ensureTermsAccepted } from '@/components/pr-review/discussion/reply-input';
+import {
+  ensureTermsAcceptedOutcome,
+  TERMS_OUTDATED_COPY,
+} from '@/components/pr-review/discussion/reply-input';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
@@ -81,13 +84,17 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       const classification = classifyPrReviewMutationError(submitReview.error);
       if (classification.kind === 'terms-required') {
         void (async () => {
-          const accepted = await ensureTermsAccepted();
-          if (accepted) {
+          const outcome = await ensureTermsAcceptedOutcome();
+          if (outcome.kind === 'accepted') {
             setInlineError(null);
+            setInlineErrorKind(null);
+          } else if (outcome.kind === 'outdated') {
+            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineErrorKind('bad-request');
           } else {
             setInlineError('You must accept the Terms of Service to post.');
+            setInlineErrorKind(null);
           }
-          setInlineErrorKind(null);
         })();
         return;
       }
@@ -119,8 +126,13 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   async function handleSubmit() {
     setInlineError(null);
     setInlineErrorKind(null);
-    const accepted = await ensureTermsAccepted();
-    if (!accepted) {
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      return;
+    }
+    if (outcome.kind !== 'accepted') {
       return;
     }
     try {

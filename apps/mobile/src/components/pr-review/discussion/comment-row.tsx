@@ -33,7 +33,7 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 type CommentRowProps = {
   readonly comment: ReviewComment;
@@ -46,8 +46,28 @@ type CommentRowProps = {
 
 const REPORT_PLATFORM = 'mobile';
 
+type ModerationAction = 'report-content' | 'report-user' | 'mute' | 'block';
+
+type ModerationFailure =
+  | { kind: 'terminal'; message: string }
+  | { kind: 'retryable'; message: string };
+
+const TERMINAL_MESSAGES: Record<ModerationAction, string> = {
+  'report-content': "This comment can't be reported.",
+  'report-user': "This user can't be reported.",
+  mute: "This user can't be muted.",
+  block: "This user can't be blocked.",
+};
+
+const RETRYABLE_MESSAGES: Record<ModerationAction, string> = {
+  'report-content': "Couldn't report this comment. Check your connection and try again.",
+  'report-user': "Couldn't report this user. Check your connection and try again.",
+  mute: "Couldn't mute this user. Check your connection and try again.",
+  block: "Couldn't block this user. Check your connection and try again.",
+};
+
 /** Terminal moderation failures must not be retried; everything else is retryable. */
-function moderationFailureMessage(error: unknown): string {
+export function moderationFailure(action: ModerationAction, error: unknown): ModerationFailure {
   const code = (error as { data?: { code?: string } } | null)?.data?.code;
   if (
     code === 'BAD_REQUEST' ||
@@ -56,9 +76,22 @@ function moderationFailureMessage(error: unknown): string {
     code === 'NOT_FOUND' ||
     code === 'UNPROCESSABLE_CONTENT'
   ) {
-    return "This action can't be completed.";
+    return { kind: 'terminal', message: TERMINAL_MESSAGES[action] };
   }
-  return "Couldn't complete this action. Try again.";
+  return { kind: 'retryable', message: RETRYABLE_MESSAGES[action] };
+}
+
+/** Terminal failures toast once; retryable failures offer a Retry CTA. */
+function showModerationFailure(action: ModerationAction, error: unknown, retry: () => void): void {
+  const failure = moderationFailure(action, error);
+  if (failure.kind === 'terminal') {
+    announcingToast.error(failure.message);
+    return;
+  }
+  Alert.alert('Something went wrong', failure.message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Retry', onPress: retry },
+  ]);
 }
 
 export function CommentRow({
@@ -84,13 +117,21 @@ export function CommentRow({
   const reportContent = useMutation(
     trpc.moderation.reportContent.mutationOptions({
       onSuccess: result => announcingToast.success(`Report submitted. Receipt ${result.receiptId}`),
-      onError: error => announcingToast.error(moderationFailureMessage(error)),
+      onError: (error, variables) => {
+        showModerationFailure('report-content', error, () => {
+          reportContent.mutate(variables);
+        });
+      },
     })
   );
   const reportUser = useMutation(
     trpc.moderation.reportUser.mutationOptions({
       onSuccess: result => announcingToast.success(`Report submitted. Receipt ${result.receiptId}`),
-      onError: error => announcingToast.error(moderationFailureMessage(error)),
+      onError: (error, variables) => {
+        showModerationFailure('report-user', error, () => {
+          reportUser.mutate(variables);
+        });
+      },
     })
   );
   const blockUser = useMutation(
@@ -99,7 +140,11 @@ export function CommentRow({
         invalidateHiddenUsers();
         announcingToast.success(`Blocked ${input.githubLogin}`);
       },
-      onError: error => announcingToast.error(moderationFailureMessage(error)),
+      onError: (error, variables) => {
+        showModerationFailure('block', error, () => {
+          blockUser.mutate(variables);
+        });
+      },
     })
   );
   const muteUser = useMutation(
@@ -108,7 +153,11 @@ export function CommentRow({
         invalidateHiddenUsers();
         announcingToast.success(`Muted ${input.githubLogin}`);
       },
-      onError: error => announcingToast.error(moderationFailureMessage(error)),
+      onError: (error, variables) => {
+        showModerationFailure('mute', error, () => {
+          muteUser.mutate(variables);
+        });
+      },
     })
   );
 

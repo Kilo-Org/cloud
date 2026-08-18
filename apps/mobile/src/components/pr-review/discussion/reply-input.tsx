@@ -24,34 +24,91 @@ import { trpcClient } from '@/lib/trpc';
 const REPLY_PLACEHOLDER = 'Reply…';
 
 const TERMS_COPY = 'You must be 13 or older to post.';
+const TERMS_ACCEPT_RETRY_COPY = "Couldn't accept the Terms. Check your connection and try again.";
+export const TERMS_OUTDATED_COPY =
+  'The Terms of Service changed. Reopen this screen to accept the latest version.';
 
 /**
- * Best-effort UGC Terms gate. Returns true when the current version is
- * already accepted, or when the user accepts now. Returns false when the
- * user dismisses the gate. A `getTermsStatus` failure passes through (the
+ * Outcome of the UGC Terms gate. `accepted` means the current version is
+ * already accepted or the user accepted now (the caller may post).
+ * `dismissed` means the user cancelled the gate. `outdated` means the accept
+ * was rejected because the version is stale — terminal, the caller must not
+ * post.
+ */
+export type TermsGateOutcome = { kind: 'accepted' } | { kind: 'dismissed' } | { kind: 'outdated' };
+
+/**
+ * Best-effort UGC Terms gate. Returns `accepted` when the current version is
+ * already accepted, or when the user accepts now. A transient accept failure
+ * re-prompts with a Retry CTA; an outdated-version reject returns `outdated`
+ * (terminal). A `getTermsStatus` failure passes through as `accepted` (the
  * server enforces Terms on the write and the reactive path re-prompts).
  */
-export async function ensureTermsAccepted(): Promise<boolean> {
+export async function ensureTermsAcceptedOutcome(): Promise<TermsGateOutcome> {
   try {
     const status = await trpcClient.moderation.getTermsStatus.query();
     if (status.accepted) {
-      return true;
+      return { kind: 'accepted' };
     }
     return await promptTermsAcceptance(status.currentVersion);
   } catch {
-    return true;
+    return { kind: 'accepted' };
   }
 }
 
-async function promptTermsAcceptance(version: string): Promise<boolean> {
-  const accepted = await new Promise<boolean>(resolve => {
+/**
+ * Backward-compatible boolean form of the gate: `true` only when the current
+ * version is accepted. Kept for callers outside this slice that predate the
+ * richer outcome.
+ */
+export async function ensureTermsAccepted(): Promise<boolean> {
+  const outcome = await ensureTermsAcceptedOutcome();
+  return outcome.kind === 'accepted';
+}
+
+async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome> {
+  const outcome = await new Promise<TermsGateOutcome>(resolve => {
+    async function accept() {
+      try {
+        await trpcClient.moderation.acceptTerms.mutate({
+          version,
+          agePosture: UGC_AGE_POSTURE,
+        });
+        resolve({ kind: 'accepted' });
+      } catch (error) {
+        // A BAD_REQUEST reject is the server's stale-version marker: terminal.
+        // Anything else (network, 5xx) is transient and re-prompts with Retry.
+        if (classifyPrReviewMutationError(error).kind === 'bad-request') {
+          resolve({ kind: 'outdated' });
+        } else {
+          showRetry();
+        }
+      }
+    }
+    function showRetry() {
+      Alert.alert('Terms of Service', TERMS_ACCEPT_RETRY_COPY, [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            resolve({ kind: 'dismissed' });
+          },
+        },
+        {
+          text: 'Retry',
+          onPress: () => {
+            void accept();
+          },
+        },
+      ]);
+    }
     const show = () => {
       Alert.alert('Terms of Service', TERMS_COPY, [
         {
           text: 'Cancel',
           style: 'cancel',
           onPress: () => {
-            resolve(false);
+            resolve({ kind: 'dismissed' });
           },
         },
         {
@@ -64,24 +121,14 @@ async function promptTermsAcceptance(version: string): Promise<boolean> {
         {
           text: 'Accept',
           onPress: () => {
-            void (async () => {
-              try {
-                await trpcClient.moderation.acceptTerms.mutate({
-                  version,
-                  agePosture: UGC_AGE_POSTURE,
-                });
-                resolve(true);
-              } catch {
-                resolve(false);
-              }
-            })();
+            void accept();
           },
         },
       ]);
     };
     show();
   });
-  return accepted;
+  return outcome;
 }
 
 type ReplyInputProps = {
@@ -117,13 +164,17 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       const classification = classifyPrReviewMutationError(reply.error);
       if (classification.kind === 'terms-required') {
         void (async () => {
-          const accepted = await ensureTermsAccepted();
-          if (accepted) {
+          const outcome = await ensureTermsAcceptedOutcome();
+          if (outcome.kind === 'accepted') {
             setInlineError(null);
+            setInlineErrorKind(null);
+          } else if (outcome.kind === 'outdated') {
+            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineErrorKind('bad-request');
           } else {
             setInlineError(TERMS_COPY);
+            setInlineErrorKind(null);
           }
-          setInlineErrorKind(null);
         })();
       } else if (classification.kind === 'bad-request') {
         setInlineError("This reply can't be posted. The thread may have changed.");
@@ -149,8 +200,13 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
     }
     setInlineError(null);
     setInlineErrorKind(null);
-    const accepted = await ensureTermsAccepted();
-    if (!accepted) {
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      return;
+    }
+    if (outcome.kind !== 'accepted') {
       return;
     }
     reply.mutate(

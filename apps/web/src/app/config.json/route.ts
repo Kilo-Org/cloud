@@ -20,17 +20,39 @@ function isObject(value: unknown): value is Schema {
 }
 
 export function merge(schema: Schema): Schema {
-  const properties = isObject(schema.properties) ? { ...schema.properties } : {};
-  Object.assign(properties, kiloExtras.top);
-
-  const agent = isObject(properties.agent) ? { ...properties.agent } : {};
-  agent.properties = {
-    ...(isObject(agent.properties) ? agent.properties : {}),
-    ...kiloExtras.agents,
-  };
-  properties.agent = agent;
-
   const defs = isObject(schema.$defs) ? { ...schema.$defs } : undefined;
+
+  const mergeProperties = (source: unknown): Schema => {
+    const properties = isObject(source) ? { ...source } : {};
+
+    Object.assign(properties, kiloExtras.top);
+
+    const agent = isObject(properties.agent) ? { ...properties.agent } : {};
+    agent.properties = {
+      ...(isObject(agent.properties) ? agent.properties : {}),
+      ...kiloExtras.agents,
+    };
+    properties.agent = agent;
+
+    const experimental = isObject(properties.experimental) ? { ...properties.experimental } : {};
+    experimental.properties = {
+      ...(isObject(experimental.properties) ? experimental.properties : {}),
+      ...kiloExtras.experimental,
+    };
+    properties.experimental = experimental;
+
+    return properties;
+  };
+
+  const config =
+    schema.$ref === '#/$defs/Config' && defs && isObject(defs.Config)
+      ? { ...defs.Config, properties: mergeProperties(defs.Config.properties) }
+      : undefined;
+
+  if (config && defs) {
+    defs.Config = config;
+  }
+
   if (defs && isObject(defs.PermissionConfig)) {
     const permissionConfig = { ...defs.PermissionConfig };
     if (Array.isArray(permissionConfig.anyOf)) {
@@ -45,14 +67,11 @@ export function merge(schema: Schema): Schema {
     }
   }
 
-  const experimental = isObject(properties.experimental) ? { ...properties.experimental } : {};
-  experimental.properties = {
-    ...(isObject(experimental.properties) ? experimental.properties : {}),
-    ...kiloExtras.experimental,
+  return {
+    ...schema,
+    ...(defs ? { $defs: defs } : {}),
+    ...(config ? {} : { properties: mergeProperties(schema.properties) }),
   };
-  properties.experimental = experimental;
-
-  return { ...schema, ...(defs ? { $defs: defs } : {}), properties };
 }
 
 export async function GET() {

@@ -523,6 +523,23 @@ async function extractDiffsWithBun(
   return Array.from(dedup.values());
 }
 
+async function runGitApply(
+  workspacePath: string,
+  patchFile: string,
+  extraArgs: string[],
+  signal?: AbortSignal
+): Promise<{ exitCode: number; stderr: string }> {
+  const proc = Bun.spawn(['git', 'apply', ...extraArgs, '--whitespace=nowarn', patchFile], {
+    cwd: workspacePath,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    signal,
+  });
+  const stderr = await new Response(proc.stderr).text();
+  const exitCode = await proc.exited;
+  return { exitCode, stderr: stderr.trim() };
+}
+
 async function applyPatch(
   workspacePath: string,
   diff: SnapshotDiff,
@@ -534,16 +551,72 @@ async function applyPatch(
   try {
     signal?.throwIfAborted();
     fs.writeFileSync(file, diff.patch);
-    const proc = Bun.spawn(['git', 'apply', '--3way', '--whitespace=nowarn', file], {
+    const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal);
+    signal?.throwIfAborted();
+    if (threeWay.exitCode === 0) return true;
+    log(
+      `git apply --3way failed file=${diff.file} exitCode=${threeWay.exitCode}${threeWay.stderr ? ` stderr=${threeWay.stderr}` : ''}`
+    );
+
+    // A failed three-way apply can leave unmerged index entries. Reset the
+    // index before trying fallbacks, while preserving restored working-tree files.
+    const reset = Bun.spawn(['git', 'reset', '--quiet'], {
       cwd: workspacePath,
       stdout: 'pipe',
       stderr: 'pipe',
       signal,
     });
-    const exitCode = await proc.exited;
+    const resetStderr = await new Response(reset.stderr).text();
+    const resetExitCode = await reset.exited;
     signal?.throwIfAborted();
-    if (exitCode === 0) return true;
-    log(`git apply failed file=${diff.file} exitCode=${exitCode}`);
+    if (resetExitCode !== 0) {
+      log(
+        `failed to clear three-way apply state file=${diff.file} exitCode=${resetExitCode}${resetStderr.trim() ? ` stderr=${resetStderr.trim()}` : ''}`
+      );
+      return false;
+    }
+
+    const plain = await runGitApply(workspacePath, file, [], signal);
+    signal?.throwIfAborted();
+    if (plain.exitCode === 0) {
+      log(`git apply fallback succeeded file=${diff.file}`);
+      return true;
+    }
+    log(
+      `git apply fallback failed file=${diff.file} exitCode=${plain.exitCode}${plain.stderr ? ` stderr=${plain.stderr}` : ''}`
+    );
+
+    if (diff.status === 'deleted') {
+      const resolvedWorkspace = path.resolve(workspacePath);
+      const fp = path.resolve(resolvedWorkspace, diff.file);
+      if (!fp.startsWith(resolvedWorkspace + '/')) {
+        log(`skipping deleted-file unlink outside workspace file=${fp}`);
+        return false;
+      }
+      try {
+        fs.unlinkSync(fp);
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          log(`failed to unlink deleted file=${diff.file}`);
+          return false;
+        }
+      }
+      log(`unlinked deleted file after failed patch file=${diff.file}`);
+      return true;
+    }
+
+    if (diff.after !== undefined) {
+      const resolvedWorkspace = path.resolve(workspacePath);
+      const fp = path.resolve(resolvedWorkspace, diff.file);
+      if (!fp.startsWith(resolvedWorkspace + '/')) {
+        log(`skipping after-content write outside workspace file=${fp}`);
+        return false;
+      }
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      fs.writeFileSync(fp, diff.after);
+      log(`wrote snapshot after-content file=${diff.file}`);
+      return true;
+    }
     return false;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -722,9 +795,15 @@ export async function restoreSession(
     for (const diff of uniqueDiffs) {
       options.signal?.throwIfAborted();
       if (diff.patch) {
-        if (await applyPatch(workspacePath, diff, options.signal)) {
-          applied++;
-        } else {
+        try {
+          if (await applyPatch(workspacePath, diff, options.signal)) {
+            applied++;
+          } else {
+            skipped++;
+          }
+        } catch (err) {
+          if (options.signal?.aborted) throw err;
+          log(`failed to apply patch file=${diff.file}`);
           skipped++;
         }
         continue;
@@ -746,7 +825,7 @@ export async function restoreSession(
             if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
           }
           applied++;
-        } else if (diff.after) {
+        } else if (diff.after !== undefined) {
           fs.mkdirSync(path.dirname(fp), { recursive: true });
           fs.writeFileSync(fp, diff.after);
           applied++;
@@ -760,7 +839,11 @@ export async function restoreSession(
     }
 
     log(`diffs applied=${applied} skipped=${skipped} total=${total}`);
-    log('completed successfully');
+    if (skipped > 0) {
+      log('restore incomplete; continuing with partially restored workspace');
+    } else {
+      log('completed successfully');
+    }
 
     return { ok: true, downloaded, imported: true, diffs: { applied, skipped, total } };
   } finally {

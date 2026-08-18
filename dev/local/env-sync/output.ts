@@ -273,7 +273,6 @@ type WranglerRunner = typeof runWrangler;
 
 type ApplyPlanOptions = {
   concurrency?: number;
-  missingSecretsOnly?: boolean;
   runWrangler?: WranglerRunner;
 };
 
@@ -331,26 +330,6 @@ function resolveWranglerPersistenceDir(repoRoot: string, workerDir: string): str
   }
 }
 
-async function secretExists(
-  create: SecretStoreAutoCreate,
-  repoRoot: string,
-  runner: WranglerRunner = runWrangler
-): Promise<boolean> {
-  const result = await runner(repoRoot, create.workerDir, [
-    'secrets-store',
-    'secret',
-    'list',
-    create.binding.store_id,
-  ]);
-  if (result.status !== 0) {
-    const errorOutput = result.stderr.trim();
-    throw new Error(
-      `Failed to list Secrets Store secrets for ${create.workerDir}${errorOutput ? `: ${errorOutput}` : ''}`
-    );
-  }
-  return result.stdout.includes(create.binding.secret_name);
-}
-
 async function applySecretsStoreAutoCreates(
   creates: SecretStoreAutoCreate[],
   repoRoot: string,
@@ -377,13 +356,7 @@ async function applySecretsStoreAutoCreates(
         `Secrets Store for ${group[0]?.workerDir ?? persistenceDir}`,
         async () => {
           for (const create of group) {
-            if (
-              options.missingSecretsOnly &&
-              (await secretExists(create, repoRoot, options.runWrangler))
-            ) {
-              console.log(`  ✓ ${create.binding.secret_name} already exists`);
-              continue;
-            }
+            // The plan already filtered out secrets that exist locally, so no re-listing here.
             await createSecretsStoreSecret(
               repoRoot,
               create.workerDir,

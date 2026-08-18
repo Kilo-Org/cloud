@@ -1031,6 +1031,54 @@ describe('createPromptHandler', () => {
     expect(deps.kiloClient.sendPromptAsync).not.toHaveBeenCalled();
   });
 
+  it('accepts an empty prompt with a signed attachment and materializes it', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createPromptHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        message: {
+          id: 'msg_empty_prompt_attachment',
+          prompt: '',
+          attachments: [
+            {
+              filename: 'brief.pdf',
+              mime: 'application/pdf',
+              signedUrl: 'https://r2.example.com/brief.pdf',
+              localPath: '/tmp/brief.pdf',
+            },
+          ],
+        },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.materializePromptAttachments).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an empty prompt with no attachments and no parts', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createPromptHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        message: { id: 'msg_empty_prompt', prompt: '' },
+        session: completeBinding,
+      })
+    );
+    const data = await readJson(response);
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({
+      error: 'INVALID_REQUEST',
+      message: 'Either message.prompt or message.parts is required',
+    });
+    expect(deps.materializePromptAttachments).not.toHaveBeenCalled();
+  });
+
   it('rejects prompt with incomplete session binding', async () => {
     const state = new WrapperState();
     const deps = createMockDeps(state);

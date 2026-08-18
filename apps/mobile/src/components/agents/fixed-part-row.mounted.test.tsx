@@ -185,4 +185,28 @@ describe('FixedPartRow mounted', () => {
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.props.className).toContain('shrink');
   });
+
+  it('matches the dashed outer box to the solid outer box', async () => {
+    const renderer = await renderRow({
+      label: 'Thought',
+      labelKind: 'eyebrow',
+      variant: 'dashed',
+      accessibilityLabel: 'Thought',
+    });
+
+    const outerView = findHost(renderer.root, 'View').find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('border-dashed')
+    );
+    expect(outerView).toBeDefined();
+    if (!outerView) {
+      throw new Error('dashed outer view not found');
+    }
+    const className = outerView.props.className as string;
+    expect(className).toContain('overflow-hidden');
+    expect(className).toContain('rounded-lg');
+    expect(className).toContain('border-dashed');
+    expect(className).not.toContain('rounded-xl');
+    expect(className).not.toContain('border-[1.5px]');
+  });
 });

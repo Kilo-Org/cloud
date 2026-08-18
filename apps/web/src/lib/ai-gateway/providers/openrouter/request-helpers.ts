@@ -286,6 +286,14 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
   }
 }
 
+export function removeChatCompletionsToolNames(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if (message.role === 'tool' && 'name' in message) {
+      delete message.name;
+    }
+  }
+}
+
 /**
  * Inverse of the `mapReasoningContentToDetails` response transform: folds
  * OpenRouter-style `reasoning_details` back into the DeepSeek-style

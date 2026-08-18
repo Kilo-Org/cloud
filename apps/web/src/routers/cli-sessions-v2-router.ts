@@ -31,6 +31,7 @@ import {
   fetchSessionMessagesPage,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
+  unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
@@ -512,6 +513,7 @@ const ListSessionsInputSchema = z.object({
   limit: z.number().min(1).max(RECENT_DAYS_LIMIT).optional().default(PAGE_SIZE),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   includeChildren: z.boolean().optional().default(false),
+  sharedOnly: z.boolean().optional().default(false),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
@@ -538,6 +540,7 @@ const SearchInputSchema = z.object({
     .optional(),
   organizationId: z.uuid().nullable().optional(),
   includeChildren: z.boolean().optional().default(false),
+  sharedOnly: z.boolean().optional().default(false),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
 });
 
@@ -728,6 +731,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       limit,
       orderBy,
       includeChildren,
+      sharedOnly,
       createdOnPlatform,
       organizationId,
       gitUrl,
@@ -751,6 +755,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     if (!includeChildren) {
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    if (sharedOnly) {
+      whereConditions.push(isNotNull(cli_sessions_v2.public_id));
     }
 
     if (updatedSince) {
@@ -814,6 +822,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       createdOnPlatform,
       organizationId,
       includeChildren,
+      sharedOnly,
       gitUrl,
     } = input;
 
@@ -831,6 +840,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     if (!includeChildren) {
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    if (sharedOnly) {
+      whereConditions.push(isNotNull(cli_sessions_v2.public_id));
     }
 
     // Use position() for a case-insensitive substring match. This avoids LIKE
@@ -1658,6 +1671,35 @@ export const cliSessionsV2Router = createTRPCRouter({
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to share session',
+        cause: error,
+      });
+    }
+  }),
+
+  /**
+   * Revoke a V2 session's public share link.
+   *
+   * Owner-only, matching the session-ingest worker. A missing or inaccessible
+   * session is NOT_FOUND. Worker 404 is mapped the same way.
+   */
+  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+    const { session_id } = input;
+    await getSessionWithAccessCheck(session_id, ctx);
+
+    try {
+      await unshareSessionIngest(session_id, ctx.user.id);
+      return { success: true as const };
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Session not found') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+      captureException(error, {
+        tags: { source: 'cli-sessions-v2-router', endpoint: 'unshare' },
+        extra: { session_id },
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to unshare session',
         cause: error,
       });
     }

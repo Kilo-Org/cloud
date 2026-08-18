@@ -32,6 +32,7 @@ import {
   selectCommentAuthorName,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { useTRPC } from '@/lib/trpc';
+import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 import { Alert, Pressable, View } from 'react-native';
 
@@ -68,14 +69,8 @@ const RETRYABLE_MESSAGES: Record<ModerationAction, string> = {
 
 /** Terminal moderation failures must not be retried; everything else is retryable. */
 export function moderationFailure(action: ModerationAction, error: unknown): ModerationFailure {
-  const code = (error as { data?: { code?: string } } | null)?.data?.code;
-  if (
-    code === 'BAD_REQUEST' ||
-    code === 'FORBIDDEN' ||
-    code === 'UNAUTHORIZED' ||
-    code === 'NOT_FOUND' ||
-    code === 'UNPROCESSABLE_CONTENT'
-  ) {
+  const code = readTrpcErrorField(error, 'code');
+  if (isTerminalTrpcCode(code)) {
     return { kind: 'terminal', message: TERMINAL_MESSAGES[action] };
   }
   return { kind: 'retryable', message: RETRYABLE_MESSAGES[action] };

@@ -198,26 +198,13 @@ function getStatusClassTitle(statusClass: PurchaseStatusClass, cancelAtPeriodEnd
   if (cancelAtPeriodEnd) {
     return 'Kilo Pass canceling';
   }
-  switch (statusClass) {
-    case 'healthy': {
-      return 'Kilo Pass active';
-    }
-    case 'pending': {
-      return 'Kilo Pass pending';
-    }
-    case 'retryable': {
-      return 'Kilo Pass past due';
-    }
-    case 'inactive': {
-      return 'Kilo Pass active';
-    }
-    case 'terminal': {
-      return 'Kilo Pass active';
-    }
-    default: {
-      return 'Kilo Pass active';
-    }
+  if (statusClass === 'pending') {
+    return 'Kilo Pass pending';
   }
+  if (statusClass === 'retryable') {
+    return 'Kilo Pass past due';
+  }
+  return 'Kilo Pass active';
 }
 
 function getActiveSubscriptionCardState(

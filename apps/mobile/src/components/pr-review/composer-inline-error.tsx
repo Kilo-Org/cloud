@@ -9,7 +9,7 @@ import { View } from 'react-native';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
-import { ensureTermsAccepted } from '@/components/pr-review/discussion/reply-input';
+import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 
@@ -68,8 +68,8 @@ export function useComposerInlineError(error: unknown, isEdit: boolean) {
     const classification = classifyPrReviewMutationError(error);
     if (classification.kind === 'terms-required') {
       void (async () => {
-        const accepted = await ensureTermsAccepted();
-        if (accepted) {
+        const outcome = await ensureTermsAcceptedOutcome();
+        if (outcome.kind === 'accepted') {
           setInlineError(null);
           setInlineErrorKind(null);
           setInlineErrorIsLocal(false);

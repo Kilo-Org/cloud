@@ -1,6 +1,7 @@
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { resolveMessageDisplayModel } from './message-model-label';
 
 /**
@@ -72,14 +73,8 @@ export function buildReportAiResponseErrorToast(
  * (forbidden / validation). Terminal codes must never be retried.
  */
 export function classifyReportAiResponseFailure(error: unknown): ReportAiResponseFailure {
-  const code = (error as { data?: { code?: string } } | null)?.data?.code;
-  if (
-    code === 'BAD_REQUEST' ||
-    code === 'FORBIDDEN' ||
-    code === 'UNAUTHORIZED' ||
-    code === 'NOT_FOUND' ||
-    code === 'UNPROCESSABLE_CONTENT'
-  ) {
+  const code = readTrpcErrorField(error, 'code');
+  if (isTerminalTrpcCode(code)) {
     return { retryable: false, message: TERMINAL_MESSAGE };
   }
   return { retryable: true, message: RETRYABLE_MESSAGE };

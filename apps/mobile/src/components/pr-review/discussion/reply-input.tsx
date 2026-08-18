@@ -56,16 +56,6 @@ export async function ensureTermsAcceptedOutcome(): Promise<TermsGateOutcome> {
   }
 }
 
-/**
- * Backward-compatible boolean form of the gate: `true` only when the current
- * version is accepted. Kept for callers outside this slice that predate the
- * richer outcome.
- */
-export async function ensureTermsAccepted(): Promise<boolean> {
-  const outcome = await ensureTermsAcceptedOutcome();
-  return outcome.kind === 'accepted';
-}
-
 async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome> {
   const outcome = await new Promise<TermsGateOutcome>(resolve => {
     async function accept() {

@@ -9,6 +9,8 @@
 // the same decision tree. No React, no react-query, no expo modules —
 // that keeps it testable in plain Node.
 
+import { readTrpcErrorField } from '@/lib/trpc-error';
+
 type PrReviewQueryState =
   | {
       /**
@@ -44,80 +46,8 @@ type PrReviewQueryState =
       kind: 'reconnect';
     };
 
-/**
- * Extracts the tRPC error code from an unknown thrown value. tRPC v11
- * client errors expose `data.code`; server-shaped errors expose
- * `shape.data.code`. Anything else is treated as an unknown transient
- * error (retryable).
- */
-function readTrpcErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
-  }
-  const record = error as Record<string, unknown>;
-  // Direct TRPCClientError — `data` is the shape's data.
-  const data = record.data;
-  if (data && typeof data === 'object') {
-    const code = (data as Record<string, unknown>).code;
-    if (typeof code === 'string') {
-      return code;
-    }
-  }
-  // Nested `shape` form (some tRPC versions wrap the shape).
-  const shape = record.shape;
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>).data;
-    if (shapeData && typeof shapeData === 'object') {
-      const code = (shapeData as Record<string, unknown>).code;
-      if (typeof code === 'string') {
-        return code;
-      }
-    }
-  }
-  // Some helpers expose the code at the top level.
-  const top = record.code;
-  if (typeof top === 'string') {
-    return top;
-  }
-  return undefined;
-}
-
-/**
- * Extracts the tRPC error message from an unknown thrown value, mirroring
- * `readTrpcErrorCode`. The server's `terms_required` rejection is a
- * `PRECONDITION_FAILED` whose message distinguishes it from a generic
- * reconnect, so the message must be readable without guessing the shape.
- */
-function readTrpcErrorMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
-  }
-  const record = error as Record<string, unknown>;
-  const data = record.data;
-  if (data && typeof data === 'object') {
-    const message = (data as Record<string, unknown>).message;
-    if (typeof message === 'string') {
-      return message;
-    }
-  }
-  const shape = record.shape;
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>).data;
-    if (shapeData && typeof shapeData === 'object') {
-      const message = (shapeData as Record<string, unknown>).message;
-      if (typeof message === 'string') {
-        return message;
-      }
-    }
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return undefined;
-}
-
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
-  const code = readTrpcErrorCode(error);
+  const code = readTrpcErrorField(error, 'code');
   if (code === 'PRECONDITION_FAILED') {
     return { kind: 'reconnect' };
   }
@@ -182,7 +112,7 @@ type PrReviewMutationErrorState =
     };
 
 export function classifyPrReviewMutationError(error: unknown): PrReviewMutationErrorState {
-  const code = readTrpcErrorCode(error);
+  const code = readTrpcErrorField(error, 'code');
   if (code === 'BAD_REQUEST') {
     return {
       kind: 'bad-request',
@@ -195,7 +125,7 @@ export function classifyPrReviewMutationError(error: unknown): PrReviewMutationE
       message: error instanceof Error ? error.message : 'Forbidden',
     };
   }
-  if (code === 'PRECONDITION_FAILED' && readTrpcErrorMessage(error) === 'terms_required') {
+  if (code === 'PRECONDITION_FAILED' && readTrpcErrorField(error, 'message') === 'terms_required') {
     return { kind: 'terms-required', message: 'terms_required' };
   }
   if (code === 'PRECONDITION_FAILED' || code === 'UNAUTHORIZED') {

@@ -4,7 +4,7 @@ import { createMiddleware } from 'hono/factory';
 import type { Env } from './env';
 import { z } from 'zod';
 
-import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
+import { kiloJwtAuthMiddleware, USER_AUTH_CACHE_KEY_PREFIX } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
 import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
@@ -18,13 +18,21 @@ const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),
 });
+const invalidateUserAuthSchema = z.object({
+  kiloUserId: z.string().min(1),
+});
 
 async function hasValidInternalSecret(c: {
   req: { header(name: string): string | undefined };
   env: Env;
 }): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
-  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
+  let expected: string | null;
+  try {
+    expected = await c.env.INTERNAL_API_SECRET_PROD.get();
+  } catch {
+    return false;
+  }
   if (!provided || !expected) return false;
 
   const encoder = new TextEncoder();
@@ -112,11 +120,7 @@ app.get('/session/:shareToken/metadata', async c => {
   );
 });
 
-app.post('/internal/session-access/invalidate', async c => {
-  if (!(await hasValidInternalSecret(c))) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
-  }
-
+app.post('/internal/session-access/invalidate', requireValidInternalSecret, async c => {
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
@@ -131,12 +135,18 @@ app.post('/internal/session-access/invalidate', async c => {
   return c.body(null, 204);
 });
 
-// Internal route for service-binding HTTP fetch (secret-protected)
-app.get('/internal/session/:sessionId/export', async c => {
-  if (!(await hasValidInternalSecret(c))) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
+app.post('/internal/user-auth/invalidate', requireValidInternalSecret, async c => {
+  const parsed = invalidateUserAuthSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
   }
 
+  await c.env.USER_EXISTS_CACHE.delete(`${USER_AUTH_CACHE_KEY_PREFIX}${parsed.data.kiloUserId}`);
+  return c.body(null, 204);
+});
+
+// Internal route for service-binding HTTP fetch (secret-protected)
+app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async c => {
   const kiloUserId = c.req.header('X-Kilo-User-Id');
   if (!kiloUserId) return c.json({ success: false, error: 'Missing X-Kilo-User-Id' }, 400);
 

@@ -1,46 +1,66 @@
 import { createMiddleware } from 'hono/factory';
 import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
-import { eq } from 'drizzle-orm';
-import { getWorkerDb } from '@kilocode/db/client';
-import { kilocode_users } from '@kilocode/db/schema';
+import { findKiloUserPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { z } from 'zod';
 
 import type { Env } from '../env';
 
-const USER_EXISTS_TTL_SECONDS = 24 * 60 * 60; // 24h
-const USER_NOT_FOUND_TTL_SECONDS = 5 * 60; // 5m
+export const USER_AUTH_CACHE_KEY_PREFIX = 'user-auth:v1:';
+const USER_AUTH_TTL_SECONDS = 60;
+const USER_MISSING_TTL_SECONDS = 5 * 60;
 
-/**
- * Check whether a user exists, using KV as a cache in front of Postgres.
- * Positive results are cached for 24h. Negative results are cached for 5m
- * to rate-limit DB hits from deleted/nonexistent users with valid tokens.
- */
-async function userExists(env: Env, userId: string): Promise<boolean> {
-  const cacheKey = `user-exists:${userId}`;
+type CachedUserAuthV1 =
+  | { v: 1; exists: false }
+  | { v: 1; exists: true; pepper: string | null; blockedReason: string | null };
 
-  const cached = await env.USER_EXISTS_CACHE.get(cacheKey);
-  if (cached === '1') {
-    return true;
+const cachedUserAuthV1Schema = z.union([
+  z.object({ v: z.literal(1), exists: z.literal(false) }).strict(),
+  z
+    .object({
+      v: z.literal(1),
+      exists: z.literal(true),
+      pepper: z.string().nullable(),
+      blockedReason: z.string().nullable(),
+    })
+    .strict(),
+]);
+
+const USER_AUTH_DENIED = 'User account not found';
+
+function parseCachedUserAuth(raw: string | null): CachedUserAuthV1 | null {
+  if (raw === null) return null;
+  try {
+    const parsed = cachedUserAuthV1Schema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
   }
-  if (cached === '0') {
-    return false;
+}
+
+async function loadUserAuth(env: Env, userId: string): Promise<CachedUserAuthV1> {
+  const cacheKey = `${USER_AUTH_CACHE_KEY_PREFIX}${userId}`;
+  const cached = parseCachedUserAuth(await env.USER_EXISTS_CACHE.get(cacheKey));
+  if (cached) return cached;
+
+  const row = await findKiloUserPepper(env.HYPERDRIVE.connectionString, userId);
+  const state: CachedUserAuthV1 =
+    row === undefined || row === null
+      ? { v: 1, exists: false }
+      : { v: 1, exists: true, pepper: row.pepper, blockedReason: row.blockedReason };
+
+  try {
+    await env.USER_EXISTS_CACHE.put(cacheKey, JSON.stringify(state), {
+      expirationTtl: state.exists ? USER_AUTH_TTL_SECONDS : USER_MISSING_TTL_SECONDS,
+    });
+  } catch (error) {
+    console.warn('Failed to cache user auth state', {
+      operation: 'user-auth-cache-put',
+      kiloUserId: userId,
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
   }
-
-  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  const rows = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, userId))
-    .limit(1);
-
-  const row = rows[0];
-
-  if (!row) {
-    void env.USER_EXISTS_CACHE.put(cacheKey, '0', { expirationTtl: USER_NOT_FOUND_TTL_SECONDS });
-    return false;
-  }
-
-  void env.USER_EXISTS_CACHE.put(cacheKey, '1', { expirationTtl: USER_EXISTS_TTL_SECONDS });
-  return true;
+  return state;
 }
 
 export const kiloJwtAuthMiddleware = createMiddleware<{
@@ -58,19 +78,48 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }
 
-  const secret = await c.env.NEXTAUTH_SECRET_PROD.get();
+  let secret: string;
+  try {
+    const configuredSecret = await c.env.NEXTAUTH_SECRET_PROD.get();
+    if (!configuredSecret) {
+      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+    }
+    secret = configuredSecret;
+  } catch {
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
 
   let kiloUserId: string;
+  let apiTokenPepper: string | null | undefined;
   try {
     const payload = await verifyKiloToken(token, secret);
     kiloUserId = payload.kiloUserId;
+    apiTokenPepper = payload.apiTokenPepper;
   } catch {
     return c.json({ success: false, error: 'Invalid or expired token' }, 401);
   }
 
-  const exists = await userExists(c.env, kiloUserId);
-  if (!exists) {
-    return c.json({ success: false, error: 'User account not found' }, 403);
+  let state: CachedUserAuthV1;
+  try {
+    state = await loadUserAuth(c.env, kiloUserId);
+  } catch {
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
+
+  if (!state.exists) {
+    return c.json({ success: false, error: USER_AUTH_DENIED }, 403);
+  }
+
+  // A missing apiTokenPepper is the legacy internal service-token class. It
+  // intentionally requires only an existing user; ordinary tokens carry a
+  // pepper (including null) and must pass the blocked/pepper checks below.
+  if (apiTokenPepper === undefined) {
+    c.set('user_id', kiloUserId);
+    return next();
+  }
+
+  if (state.blockedReason !== null || state.pepper !== apiTokenPepper) {
+    return c.json({ success: false, error: USER_AUTH_DENIED }, 403);
   }
 
   c.set('user_id', kiloUserId);

@@ -45,6 +45,7 @@ type TestBindings = {
   INTERNAL_API_SECRET_PROD: { get(): Promise<string> };
   SESSION_SHARE_JWT_SECRET_PROD: { get(): Promise<string> };
   SESSION_SHARE_TOKEN_MIN_IAT: string;
+  USER_EXISTS_CACHE?: { delete: ReturnType<typeof vi.fn<(key: string) => Promise<void>>> };
 };
 
 function makeDbFakes() {
@@ -164,6 +165,99 @@ describe('session access invalidation route', () => {
     expect(cache.invalidateOrganization).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111'
     );
+  });
+});
+
+describe('user auth invalidation route', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('rejects invalidation without the internal secret', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(401);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalidation with an incorrect internal secret', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'wrong-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(401);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalidation with a malformed body', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 123 }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(400);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the versioned user-auth cache key', async () => {
+    const cache = { delete: vi.fn(async () => undefined) };
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+    );
+
+    expect(res.status).toBe(204);
+    expect(cache.delete).toHaveBeenCalledWith('user-auth:v1:usr_blocked');
+  });
+
+  it('protects the session export route with the shared internal-secret middleware', async () => {
+    const res = await app.request(
+      '/internal/session/ses_12345678901234567890123456/export',
+      { method: 'GET' },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
   });
 });
 

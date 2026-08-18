@@ -7,7 +7,10 @@
  */
 
 import { getFixTicketById, updateFixTicketStatus } from '@/lib/auto-fix/db/fix-tickets';
-import { formatAutoFixErrorMessage } from '@/lib/auto-fix/core/format-error-message';
+import {
+  formatAutoFixErrorMessage,
+  isAutoFixBillingErrorMessage,
+} from '@/lib/auto-fix/core/format-error-message';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -80,13 +83,7 @@ type FriendlyFailure = {
 function getFriendlyFailure(rawError: string): FriendlyFailure {
   const normalized = rawError.toLowerCase();
 
-  if (
-    normalized.includes('insufficient credits') ||
-    normalized.includes('payment_required') ||
-    normalized.includes('payment required') ||
-    normalized.includes('credits required') ||
-    normalized.includes('add credits')
-  ) {
+  if (isAutoFixBillingErrorMessage(rawError)) {
     return {
       summary:
         'I could not start this fix because the account needs at least $1 in available credits.',

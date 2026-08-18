@@ -58,6 +58,7 @@ export async function POST(
       cliSessionId,
       status,
       hasError: !!errorMessage,
+      errorMessage,
     });
 
     // Get current ticket to check if update is needed

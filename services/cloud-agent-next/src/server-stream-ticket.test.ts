@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { Env } from './types.js';
+import { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 
 const {
   getRunningTerminalClientMock,
@@ -161,6 +162,51 @@ function installNonceStore(env: MockEnv): Set<string> {
 
 function fetchWorker(request: Request, env: MockEnv): Promise<Response> | Response {
   return worker.fetch(request, env as unknown as Env, {} as ExecutionContext);
+}
+
+/**
+ * Instantiates StreamTicketNonceDO against an in-memory storage mock so the
+ * alarm lifecycle can be asserted directly without a Workers runtime.
+ */
+function createNonceDO(): {
+  instance: StreamTicketNonceDO;
+  map: Map<string, unknown>;
+  alarms: number[];
+} {
+  const map = new Map<string, unknown>();
+  const alarms: number[] = [];
+  const storage = {
+    transaction: async (
+      fn: (txn: {
+        get: (key: string) => Promise<unknown>;
+        put: (key: string, value: unknown) => Promise<void>;
+        delete: (key: string) => Promise<void>;
+      }) => Promise<unknown>
+    ) =>
+      fn({
+        get: async (key: string) => map.get(key),
+        put: async (key: string, value: unknown) => {
+          map.set(key, value);
+        },
+        delete: async (key: string) => {
+          map.delete(key);
+        },
+      }),
+    get: async (key: string) => map.get(key),
+    put: async (key: string, value: unknown) => {
+      map.set(key, value);
+    },
+    delete: async (key: string) => {
+      map.delete(key);
+    },
+    setAlarm: async (at: number) => {
+      alarms.push(at);
+    },
+    deleteAlarm: async () => {},
+  };
+  const instance = new StreamTicketNonceDO({} as never, {} as never);
+  (instance as unknown as { ctx: { storage: typeof storage } }).ctx = { storage };
+  return { instance, map, alarms };
 }
 
 function signStreamTicket(overrides: Record<string, unknown> = {}): string {
@@ -327,5 +373,56 @@ describe('server /terminal ticket nonce consume', () => {
     expect(replay.status).toBe(401);
     await expect(replay.text()).resolves.toBe('Ticket nonce already used');
     expect(connectTerminal).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('server stream ticket nonce expiry pass-through', () => {
+  it('passes the ticket expiry to the nonce DO on consume', async () => {
+    const env = createEnv();
+    const consume = vi.fn().mockResolvedValue(true);
+    env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
+    env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({ consume });
+    const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    const ticket = signStreamTicket();
+
+    const response = await fetchWorker(streamRequest(ticket), env);
+
+    expect(response.status).toBe(200);
+    const decoded = jwt.decode(ticket) as { exp: number };
+    expect(consume).toHaveBeenCalledWith(decoded.exp * 1000);
+  });
+});
+
+describe('StreamTicketNonceDO alarm lifecycle', () => {
+  it('sets an alarm at the ticket expiry on first consume', async () => {
+    const { instance, alarms } = createNonceDO();
+
+    const consumed = await instance.consume(1_700_000_000_000);
+
+    expect(consumed).toBe(true);
+    expect(alarms).toEqual([1_700_000_000_000]);
+  });
+
+  it('does not set a second alarm on replay', async () => {
+    const { instance, alarms } = createNonceDO();
+
+    await instance.consume(1_700_000_000_000);
+    const replay = await instance.consume(1_700_000_000_000);
+
+    expect(replay).toBe(false);
+    expect(alarms).toHaveLength(1);
+  });
+
+  it('alarm() deletes the used flag', async () => {
+    const { instance, map } = createNonceDO();
+
+    await instance.consume(1_700_000_000_000);
+    expect(map.has('used')).toBe(true);
+
+    await instance.alarm();
+
+    expect(map.has('used')).toBe(false);
   });
 });

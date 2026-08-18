@@ -184,6 +184,29 @@ function streamRequest(ticket: string): Request {
   );
 }
 
+function signTerminalTicket(overrides: Record<string, unknown> = {}): string {
+  return jwt.sign(
+    {
+      type: 'stream_ticket',
+      purpose: 'terminal',
+      userId: 'user-1',
+      cloudAgentSessionId: 'session-1',
+      ptyId: 'pty-1',
+      nonce: 'nonce-1',
+      ...overrides,
+    },
+    secret,
+    { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
+  );
+}
+
+function terminalRequest(ticket: string): Request {
+  return new Request(
+    `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty-1&ticket=${encodeURIComponent(ticket)}`,
+    { headers: { Upgrade: 'websocket' } }
+  );
+}
+
 beforeEach(() => {
   getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
@@ -265,5 +288,44 @@ describe('server /stream ticket nonce consume', () => {
     await expect(response.text()).resolves.toBe('Missing ticket nonce');
     expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
     expect(doFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /terminal ticket nonce consume', () => {
+  it('rejects an immediate replay of the same nonce on the terminal path', async () => {
+    const env = createEnv();
+    installNonceStore(env);
+
+    const connectTerminal = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
+    getRunningTerminalClientMock.mockResolvedValue({
+      status: 'running',
+      client: { connectTerminal },
+    });
+
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getMetadata: vi.fn().mockResolvedValue({
+        metadataSchemaVersion: 2,
+        identity: {
+          sessionId: 'session-1',
+          userId: 'user-1',
+          createdOnPlatform: 'cloud-agent',
+        },
+        auth: {},
+        lifecycle: { version: 1, timestamp: Date.now(), preparedAt: Date.now() },
+        workspace: { workspacePath: '/workspace' },
+      }),
+    });
+
+    const ticket = signTerminalTicket();
+
+    const first = await fetchWorker(terminalRequest(ticket), env);
+    expect(first.status).toBe(200);
+    expect(connectTerminal).toHaveBeenCalledOnce();
+
+    const replay = await fetchWorker(terminalRequest(ticket), env);
+    expect(replay.status).toBe(401);
+    await expect(replay.text()).resolves.toBe('Ticket nonce already used');
+    expect(connectTerminal).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,11 +4,39 @@ import {
   credit_transactions,
   device_sessions,
   kilocode_users,
+  magic_link_tokens,
   user_notification_preferences,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
+import { sendSignInCodeEmail } from '@/lib/email';
+import { performGdprRemoval } from '@/lib/user/gdpr-removal';
+import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
+
+jest.mock('@/lib/email', () => {
+  const actual = jest.requireActual('@/lib/email');
+  return {
+    ...actual,
+    sendSignInCodeEmail: jest.fn(),
+  };
+});
+
+jest.mock('@/lib/user/gdpr-removal', () => ({
+  performGdprRemoval: jest.fn(),
+}));
+
+jest.mock('@/lib/user', () => {
+  const actual = jest.requireActual('@/lib/user');
+  return {
+    ...actual,
+    assertUserCanBeSoftDeleted: jest.fn(),
+  };
+});
+
+const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
+const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
+const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
 
 let testUser: User;
 let surveyTestUser: User;
@@ -994,5 +1022,130 @@ describe('user router - device sessions', () => {
       .from(device_sessions)
       .where(eq(device_sessions.id, currentSessionId));
     expect(row?.revoked_at).toBeNull();
+  });
+});
+
+describe('user router - account deletion', () => {
+  let deletionUser: User;
+
+  beforeEach(async () => {
+    deletionUser = await insertTestUser({
+      google_user_email: `deletion-${crypto.randomUUID()}@example.com`,
+      google_user_name: 'Deletion Test User',
+    });
+
+    mockSendSignInCodeEmail.mockReset();
+    mockPerformGdprRemoval.mockReset();
+    mockAssertUserCanBeSoftDeleted.mockReset();
+
+    mockAssertUserCanBeSoftDeleted.mockResolvedValue(undefined);
+    mockPerformGdprRemoval.mockResolvedValue({ warnings: [] });
+    mockSendSignInCodeEmail.mockResolvedValue({ sent: false, reason: 'provider_not_configured' });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, deletionUser.google_user_email));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, deletionUser.id));
+  });
+
+  it('challenge sends the sign-in code email to the authenticated email', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+
+    const result = await caller.user.requestAccountDeletionChallenge();
+
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith(
+      deletionUser.google_user_email,
+      expect.any(String)
+    );
+    expect(result.challengeId).toEqual(expect.any(String));
+    expect(result.devCode).toEqual(expect.any(String));
+  });
+
+  it('challenge does not accept a client-supplied email', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+
+    await caller.user.requestAccountDeletionChallenge();
+
+    // The mutation takes no input; the only email used is the authenticated
+    // user's own address, never a client-provided value.
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith(
+      deletionUser.google_user_email,
+      expect.any(String)
+    );
+  });
+
+  it('challenge returns devCode when the email sends in non-production', async () => {
+    mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
+    const caller = await createCallerForUser(deletionUser.id);
+
+    const result = await caller.user.requestAccountDeletionChallenge();
+
+    expect(result.challengeId).toEqual(expect.any(String));
+    expect(result.devCode).toEqual(expect.any(String));
+  });
+
+  it('challenge omits devCode in production', async () => {
+    mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
+    const caller = await createCallerForUser(deletionUser.id);
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const result = await caller.user.requestAccountDeletionChallenge();
+
+      expect(result.challengeId).toEqual(expect.any(String));
+      expect(result.devCode).toBeUndefined();
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
+  it('wrong code does not delete the account', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+    const wrongCode = devCode === '000000' ? '111111' : '000000';
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: wrongCode })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('valid code calls performGdprRemoval once', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    const result = await caller.user.requestAccountDeletion({
+      challengeId,
+      code: devCode as string,
+    });
+
+    expect(result).toEqual({ status: 'deleted' });
+    expect(mockPerformGdprRemoval).toHaveBeenCalledTimes(1);
+    expect(mockPerformGdprRemoval).toHaveBeenCalledWith(deletionUser.id, {
+      destroyReason: 'admin_request',
+      actor: {
+        id: deletionUser.id,
+        email: deletionUser.google_user_email,
+        name: deletionUser.google_user_name,
+      },
+    });
+  });
+
+  it('precondition error maps to PRECONDITION_FAILED without deleting', async () => {
+    mockAssertUserCanBeSoftDeleted.mockRejectedValue(
+      new SoftDeletePreconditionError('active subscription')
+    );
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
   });
 });

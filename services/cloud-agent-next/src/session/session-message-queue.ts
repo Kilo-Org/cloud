@@ -838,7 +838,11 @@ export function createSessionMessageQueue(
         return buildAdmissionError('BAD_REQUEST', MESSAGE_ID_FORMAT_DESCRIPTION);
       }
 
-      if (explicitTurn.type === 'prompt' && !explicitTurn.prompt) {
+      if (
+        explicitTurn.type === 'prompt' &&
+        !explicitTurn.prompt.trim() &&
+        !(explicitTurn.attachments?.files.length ?? 0)
+      ) {
         return buildAdmissionError('BAD_REQUEST', 'No prompt provided');
       }
       if (explicitTurn.type === 'command' && explicitTurn.attachments !== undefined) {

@@ -830,6 +830,18 @@ export function SessionDetailContent({
         activeSessionType === 'cloud-agent' && pinned.model
           ? (pinned.variant ?? '')
           : currentVariant;
+      // Sync the override to the exact model/variant being sent so the SDK's
+      // `cloudAgentModelOverride` preference cannot beat the pin on send, and
+      // a leftover pin cannot beat a user pick. `sendModel` is always truthy
+      // here (the guard above returns early when no model resolves), so this
+      // never clears to null on an unpinned send.
+      if (activeSessionType === 'cloud-agent') {
+        manager.setCloudAgentModelOverride(
+          sendModel
+            ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) }
+            : null
+        );
+      }
       // manager.send() reports failures via its own return value (and toasts
       // through the manager's onSendFailed hook) rather than rejecting — it
       // is the single toast owner for send failures. Throw here, without a

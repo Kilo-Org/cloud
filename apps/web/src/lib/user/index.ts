@@ -909,7 +909,7 @@ export class SoftDeletePreconditionError extends Error {
 
 type SoftDeleteExecutor = typeof db | DrizzleTransaction;
 
-async function assertNoLiveSubscriptionsForSoftDelete(
+export async function assertNoLiveSubscriptionsForSoftDelete(
   userId: string,
   executor: SoftDeleteExecutor
 ): Promise<void> {

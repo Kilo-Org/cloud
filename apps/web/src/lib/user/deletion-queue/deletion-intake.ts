@@ -95,8 +95,9 @@ export function classifyProtectedIdentity(params: {
   email: string;
   user?: ProtectedIdentityTarget | null;
   actor?: DeletionActorIdentity | null;
+  allowSelf?: boolean;
 }): DeletionRefusalCode | null {
-  if (isSelfDeletionTarget(params)) {
+  if (!params.allowSelf && isSelfDeletionTarget(params)) {
     return DeletionRefusalCode.ProtectedSelf;
   }
   if (params.user?.is_bot) {

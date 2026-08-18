@@ -42,6 +42,7 @@ export type EnqueueTarget = {
   email?: string;
   pylonTicket?: string;
   trustedUserId?: string;
+  allowSelf?: boolean;
 };
 
 export type EnqueueResult =
@@ -140,6 +141,7 @@ async function enqueueOneTarget(params: {
         email,
         user: currentUser,
         actor: { id: params.actor.kiloUserId, email: params.actor.email ?? null },
+        allowSelf: params.target.allowSelf,
       });
       if (refusal) {
         await writeRefusalAudit(tx, params, writeHmac, refusal);

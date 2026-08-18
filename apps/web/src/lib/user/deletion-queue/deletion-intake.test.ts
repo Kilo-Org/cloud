@@ -98,6 +98,21 @@ describe('deletion intake', () => {
         actor: { id: 'admin-1', email: 'admin@kilocode.ai' },
       })
     ).toBe(DeletionRefusalCode.ProtectedSelf);
+    expect(
+      classifyProtectedIdentity({
+        email: 'admin@kilocode.ai',
+        user: {
+          id: 'admin-1',
+          is_admin: true,
+          is_super_admin: false,
+          is_bot: false,
+          hosted_domain: 'kilocode.ai',
+          google_user_email: 'admin@kilocode.ai',
+        },
+        actor: { id: 'admin-1', email: 'admin@kilocode.ai' },
+        allowSelf: true,
+      })
+    ).toBeNull();
   });
 
   it('accepts a ticket-only entry for later Pylon resolution', () => {

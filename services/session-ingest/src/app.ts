@@ -27,12 +27,7 @@ async function hasValidInternalSecret(c: {
   env: Env;
 }): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
-  let expected: string | null;
-  try {
-    expected = await c.env.INTERNAL_API_SECRET_PROD.get();
-  } catch {
-    return false;
-  }
+  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
   if (!provided || !expected) return false;
 
   const encoder = new TextEncoder();
@@ -52,7 +47,18 @@ const requireValidInternalSecret = createMiddleware<{
   Bindings: Env;
   Variables: { user_id: string };
 }>(async (c, next) => {
-  if (!(await hasValidInternalSecret(c))) {
+  let isValid: boolean;
+  try {
+    isValid = await hasValidInternalSecret(c);
+  } catch (error) {
+    console.error('Auth infrastructure failure', {
+      operation: 'internal-api-secret-get',
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
+  if (!isValid) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   return next();

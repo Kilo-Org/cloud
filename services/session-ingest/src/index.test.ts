@@ -259,6 +259,49 @@ describe('user auth invalidation route', () => {
 
     expect(res.status).toBe(401);
   });
+
+  it('returns 503 when the Secrets Store cannot resolve the internal secret', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const cache = { delete: vi.fn(async () => undefined) };
+    const suppliedSecret = 'caller-supplied-secret';
+
+    const res = await app.request(
+      '/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': suppliedSecret,
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+      },
+      {
+        ...defaultEnv,
+        USER_EXISTS_CACHE: cache,
+        INTERNAL_API_SECRET_PROD: {
+          get: async () => {
+            throw new Error('secret store unavailable');
+          },
+        },
+      }
+    );
+
+    const body = await res.json();
+    expect(res.status).toBe(503);
+    expect(body).toEqual({ success: false, error: 'Service temporarily unavailable' });
+    expect(JSON.stringify(body)).not.toContain('secret store unavailable');
+    expect(JSON.stringify(body)).not.toContain(suppliedSecret);
+    expect(cache.delete).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'internal-api-secret-get',
+        errorClass: 'Error',
+      })
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(suppliedSecret);
+    error.mockRestore();
+  });
 });
 
 describe('public session route', () => {

@@ -320,6 +320,32 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/**
+ * Send-only execution payload for follow-up messages. Mirrors
+ * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
+ * follow-up send may carry attachments or images with no text. Used only by
+ * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
+ * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
+ */
+export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string(),
+    mode: agentModeSendMessageSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .object({
@@ -422,7 +448,7 @@ export const baseInitiateFromPreparedSessionNextSchema = z
 export const baseSendMessageNextSchema = z
   .object({
     cloudAgentSessionId: z.string(),
-    payload: sendMessageNextPayloadSchema,
+    payload: sendMessageNextSendPayloadSchema,
     autoCommit: z.boolean().optional(),
     messageId: messageIdNextSchema.nullish(),
     attachments: cloudAgentAttachmentsSchema.optional(),
@@ -431,7 +457,20 @@ export const baseSendMessageNextSchema = z
   .refine(hasOnlyOneAttachmentField, {
     message: 'Must not provide both attachments and images',
     path: ['attachments'],
-  });
+  })
+  .refine(
+    data => {
+      if (data.payload.type === 'command') return true;
+      if (data.payload.prompt.trim().length > 0) return true;
+      const hasFiles =
+        (data.attachments?.files.length ?? 0) > 0 || (data.images?.files.length ?? 0) > 0;
+      return hasFiles;
+    },
+    {
+      message: 'Prompt is required',
+      path: ['payload', 'prompt'],
+    }
+  );
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({

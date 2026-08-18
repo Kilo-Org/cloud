@@ -2178,8 +2178,8 @@ describe('source adapters', () => {
 
 describe('microdollar usage hourly', () => {
   // The coalesced key columns are SELECTed as well as ordered on, which SELECT DISTINCT
-  // requires, so a row carries both the raw values and the cursor values. `key_2` comes
-  // back as a number here and as text elsewhere, since a bigint arrives as either.
+  // requires, so a row carries both the raw values and the cursor values. Depending on the
+  // active pg type parser, bigint columns arrive as bigint, number, or text.
   const HOURLY_ROW = {
     cursor_owner: 'org-9',
     project_id: 'project-a',
@@ -2285,6 +2285,42 @@ describe('microdollar usage hourly', () => {
   // the WHERE clause cannot compare against a bigint.
   it('substitutes the numeric sentinel for an absent country id', async () => {
     const { adapters } = harness([{ ...HOURLY_ROW, vercel_ip_country_id: null, key_2: -1 }]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'project-a', '-1', 'NL'] });
+  });
+
+  it('normalizes bigint values returned by the shared pg type parser', async () => {
+    const { adapters } = harness([
+      {
+        ...HOURLY_ROW,
+        vercel_ip_country_id: 16n,
+        key_2: 16n,
+      },
+    ]);
+
+    const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
+      ...READ_PAGE_INPUT,
+      limit: 1,
+    });
+    const byField = new Map(page?.records.map(record => [record.field, record.value]));
+
+    expect(byField.get('vercel_ip_country_id')).toBe('16');
+    expect(page?.nextCursor).toEqual({ key: ['org-9', 'project-a', '16', 'NL'] });
+  });
+
+  it('normalizes the bigint null sentinel returned by the shared pg type parser', async () => {
+    const { adapters } = harness([
+      {
+        ...HOURLY_ROW,
+        vercel_ip_country_id: null,
+        key_2: -1n,
+      },
+    ]);
 
     const page = await requireAdapter(adapters, 'microdollar_usage_hourly').readPage?.({
       ...READ_PAGE_INPUT,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   type AssistantMessage,
@@ -9,6 +9,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 
 import {
+  buildReportAiResponseErrorToast,
   buildReportAiResponseInput,
   classifyReportAiResponseFailure,
   reportAiResponseSubmittedToast,
@@ -171,5 +172,36 @@ describe('reportAiResponseSubmittedToast — submitted (happy)', () => {
     const toast = reportAiResponseSubmittedToast('receipt-123');
     expect(toast).toBe('Report submitted. Receipt receipt-123');
     expect(toast).not.toContain('secret response body');
+  });
+});
+
+describe('buildReportAiResponseErrorToast — retryable unhappy', () => {
+  it('carries a Retry action that re-runs the supplied retry callback', () => {
+    const retry = vi.fn<() => void>();
+    const failure = classifyReportAiResponseFailure({ data: { code: 'INTERNAL_SERVER_ERROR' } });
+    const errorToast = buildReportAiResponseErrorToast(failure, retry);
+
+    expect(errorToast.message).toBe("Couldn't report this response.");
+    expect(errorToast.action).toEqual({ label: 'Retry', onClick: expect.any(Function) });
+    expect(retry).not.toHaveBeenCalled();
+
+    errorToast.action?.onClick();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries a Retry action for a network failure', () => {
+    const failure = classifyReportAiResponseFailure(new TypeError('Network request failed'));
+    const errorToast = buildReportAiResponseErrorToast(failure, vi.fn<() => void>());
+    expect(errorToast.action?.label).toBe('Retry');
+  });
+});
+
+describe('buildReportAiResponseErrorToast — terminal (non-retryable)', () => {
+  it('carries no Retry action', () => {
+    const failure = classifyReportAiResponseFailure({ data: { code: 'FORBIDDEN' } });
+    const errorToast = buildReportAiResponseErrorToast(failure, vi.fn<() => void>());
+
+    expect(errorToast.message).toBe("This response can't be reported.");
+    expect(errorToast.action).toBeUndefined();
   });
 });

@@ -44,6 +44,28 @@ export type ReportAiResponseFailure =
 
 const RETRYABLE_MESSAGE = "Couldn't report this response.";
 const TERMINAL_MESSAGE = "This response can't be reported.";
+const RETRY_LABEL = 'Retry';
+
+/** Error toast shape: the message plus an optional retry action. */
+export type ReportAiResponseErrorToast = {
+  message: string;
+  action?: { label: string; onClick: () => void };
+};
+
+/**
+ * Build the submit-failure toast. A retryable failure carries a Retry action
+ * that re-runs the supplied `retry` callback; a terminal failure carries no
+ * action so the user cannot trigger another attempt.
+ */
+export function buildReportAiResponseErrorToast(
+  failure: ReportAiResponseFailure,
+  retry: () => void
+): ReportAiResponseErrorToast {
+  if (failure.retryable) {
+    return { message: failure.message, action: { label: RETRY_LABEL, onClick: retry } };
+  }
+  return { message: failure.message };
+}
 
 /**
  * Classify a submit failure as retryable (network / 5xx) or terminal

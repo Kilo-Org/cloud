@@ -14,6 +14,7 @@ import { formatExactTokens } from './context-usage-display';
 import { handleMessageDetailsCopy } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import {
+  buildReportAiResponseErrorToast,
   buildReportAiResponseInput,
   classifyReportAiResponseFailure,
   reportAiResponseSubmittedToast,
@@ -47,9 +48,15 @@ export function MessageDetailsSheet({
         setReportedMessageId(input.targetId);
         announcingToast.success(reportAiResponseSubmittedToast(result.receiptId));
       },
-      onError: error => {
+      onError: (error, input) => {
         const failure = classifyReportAiResponseFailure(error);
-        announcingToast.error(failure.message);
+        const errorToast = buildReportAiResponseErrorToast(failure, () => {
+          reportMutation.mutate(input);
+        });
+        announcingToast.error(
+          errorToast.message,
+          errorToast.action ? { action: errorToast.action } : undefined
+        );
       },
     })
   );

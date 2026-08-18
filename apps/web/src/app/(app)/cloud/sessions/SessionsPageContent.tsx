@@ -58,7 +58,7 @@ export function SessionsPageContent() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
   const [sessionFilter, setSessionFilter] = useState<SessionFilterValue>('all');
-  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [pendingSessionIds, setPendingSessionIds] = useState(() => new Set<string>());
   type SessionWithSource = SessionsListItem & { source: 'v2' };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -121,8 +121,20 @@ export function SessionsPageContent() {
 
   const shareMutation = useMutation(trpc.cliSessionsV2.share.mutationOptions());
 
+  const setSessionPending = (sessionId: string, pending: boolean) => {
+    setPendingSessionIds(prev => {
+      const next = new Set(prev);
+      if (pending) {
+        next.add(sessionId);
+      } else {
+        next.delete(sessionId);
+      }
+      return next;
+    });
+  };
+
   const handleCopyLink = async (sessionId: string) => {
-    setPendingSessionId(sessionId);
+    setSessionPending(sessionId, true);
     try {
       const result = await shareMutation.mutateAsync({ session_id: sessionId });
       await navigator.clipboard.writeText(`${window.location.origin}/s/${result.share_token}`);
@@ -130,7 +142,7 @@ export function SessionsPageContent() {
     } catch {
       toast.error('Could not copy the share link');
     } finally {
-      setPendingSessionId(null);
+      setSessionPending(sessionId, false);
     }
   };
 
@@ -145,13 +157,13 @@ export function SessionsPageContent() {
       return;
     }
 
-    setPendingSessionId(sessionId);
+    setSessionPending(sessionId, true);
     try {
       await unshareMutation.mutateAsync({ session_id: sessionId });
     } catch {
       toast.error('Could not unshare the session');
     } finally {
-      setPendingSessionId(null);
+      setSessionPending(sessionId, false);
     }
   };
 
@@ -265,7 +277,7 @@ export function SessionsPageContent() {
           rowActions={
             sharedOnly
               ? session => {
-                  const isPending = pendingSessionId === session.sessionId;
+                  const isPending = pendingSessionIds.has(session.sessionId);
                   return (
                     <>
                       <Button

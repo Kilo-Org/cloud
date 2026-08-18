@@ -298,6 +298,12 @@ function assertAppStoreAccountTokenMatchesUser(params: {
 
 function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   if (error instanceof TRPCError) {
+    if (error.code === 'CONFLICT') {
+      return new TRPCError({
+        code: 'CONFLICT',
+        message: 'Purchase is still being processed — try again in a moment.',
+      });
+    }
     return error;
   }
 

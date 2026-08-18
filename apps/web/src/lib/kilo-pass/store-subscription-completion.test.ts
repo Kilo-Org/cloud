@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
@@ -1020,5 +1020,41 @@ describe('completeStoreKiloPassPurchase', () => {
         )
       );
     expect(ledgerRow?.status).toBe('reconcile_pending');
+  });
+
+  it('still returns the result when the completed settle fails', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const purchase = applePurchase();
+
+    const captureExceptionMock = jest.fn();
+    jest.doMock('@kilocode/db/operation-ledger', () => ({
+      ...jest.requireActual('@kilocode/db/operation-ledger'),
+      settleOperation: jest.fn().mockRejectedValue(new Error('settle failure')),
+    }));
+    jest.doMock('@sentry/nextjs', () => ({
+      ...jest.requireActual('@sentry/nextjs'),
+      captureException: captureExceptionMock,
+    }));
+    jest.resetModules();
+
+    const { completeStoreKiloPassPurchase: isolatedComplete } =
+      await import('./store-subscription-completion');
+    const freshDrizzle = await import('@/lib/drizzle');
+
+    try {
+      const result = await isolatedComplete({ user, purchase });
+
+      expect(result).toEqual({
+        subscriptionId: expect.any(String),
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: false,
+        purchaseKind: 'initial',
+      });
+
+      expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await freshDrizzle.closeAllDrizzleConnections();
+    }
   });
 });

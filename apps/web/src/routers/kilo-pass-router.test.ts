@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 
 import { db } from '@/lib/drizzle';
+import { TRPCError } from '@trpc/server';
 import {
   credit_transactions,
   kilo_pass_issuance_items,
@@ -900,6 +901,41 @@ describe('kiloPassRouter', () => {
         })
       ).rejects.not.toThrow(internalMessage);
       expect(sentryMock.captureException).toHaveBeenCalled();
+    });
+
+    it('maps a CONFLICT TRPCError to friendly copy without logging an internal failure', async () => {
+      const verifierMock = getAppStoreVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      const user = await insertTestUser();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
+        appStorePurchaseFixture({
+          appAccountToken: user.app_store_account_token,
+        })
+      );
+      completionMock.completeStoreKiloPassPurchase.mockRejectedValue(
+        new TRPCError({ code: 'CONFLICT', message: 'operation_in_progress' })
+      );
+
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+          platform: 'ios',
+          storefront: 'app_store',
+          product: 'kilo_pass',
+        })
+      ).rejects.toThrow('Purchase is still being processed — try again in a moment.');
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+          platform: 'ios',
+          storefront: 'app_store',
+          product: 'kilo_pass',
+        })
+      ).rejects.not.toThrow('operation_in_progress');
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
     });
 
     it.each([

@@ -9,6 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 
 import { PURCHASE_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import {
@@ -824,13 +825,19 @@ export async function completeStoreKiloPassPurchase(params: {
     throw error;
   }
 
-  await settleOperation(ledgerHandle, {
-    rowId: admission.row.id,
-    status: 'completed',
-    outcomeCode: 'ok',
-    canonicalResult: result as unknown as Record<string, unknown>,
-    outboxEvent: purchaseSettledOutboxEvent({ distinctId, outcome: 'completed', startedAt }),
-  });
+  try {
+    await settleOperation(ledgerHandle, {
+      rowId: admission.row.id,
+      status: 'completed',
+      outcomeCode: 'ok',
+      canonicalResult: result as unknown as Record<string, unknown>,
+      outboxEvent: purchaseSettledOutboxEvent({ distinctId, outcome: 'completed', startedAt }),
+    });
+  } catch (settleError) {
+    captureException(settleError, {
+      tags: { area: 'kilo-pass', operation: 'complete-store-purchase-settle' },
+    });
+  }
 
   return result;
 }

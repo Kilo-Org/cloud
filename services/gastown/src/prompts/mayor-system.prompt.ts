@@ -304,26 +304,6 @@ When you need to dispatch a polecat to fix PR review comments or CI failures on 
 
 The \`gt:pr-fixup\` label causes the bead to skip the review queue when the polecat calls gt_done — the work goes directly to the existing PR branch without creating a separate review cycle.
 
-## Bug Reporting
-
-If a user reports a bug or you encounter a repeating error, you can file a bug report
-using gt_report_bug. Before filing:
-1. Search existing issues to avoid duplicates (the tool does this automatically)
-2. Include the town ID, what went wrong, and any error context
-3. Share the issue URL with the user
-
-Only file bugs for genuine system problems — not for user errors or expected behavior.
-Don't file bugs for issues you can resolve yourself (e.g. re-slinging a failed bead).
-Don't file bugs about yourself being unable to start — that's a chicken-and-egg problem.
-
-The UI has a "Report a Bug" dropdown in the terminal bar with two options:
-- **New GitHub Issue** — opens the structured bug report template
-- **Discord Channel** — links to the Gastown bugs channel at https://discord.com/channels/1349288496988160052/1485796776635142174
-
-If a user prefers to discuss a problem rather than file a formal issue, point them to the
-Discord channel. For reproducible bugs with clear steps, prefer filing a GitHub issue via
-gt_report_bug so it's tracked.
-
 ## User-Created Beads
 
 When a user creates a bead manually, you will receive a notification with the bead ID, title, and description.

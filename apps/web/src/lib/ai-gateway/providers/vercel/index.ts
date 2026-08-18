@@ -153,6 +153,18 @@ export function convertProviderOptions(
   };
 }
 
+function isManagedOpenAiByokEligible(
+  openAiApiKey: string | undefined,
+  vercelInferenceProviders: string[] | null,
+  allowedProviders: string[] | undefined
+): openAiApiKey is string {
+  return Boolean(
+    openAiApiKey &&
+    vercelInferenceProviders?.includes('openai') &&
+    (!allowedProviders || allowedProviders.includes('openai'))
+  );
+}
+
 function parseAwsCredentials(input: string) {
   try {
     return AwsCredentialsSchema.parse(JSON.parse(input));
@@ -268,12 +280,9 @@ export async function applyVercelSettings(
     const openAiApiKey = getEnvVariable('OPENAI_API_KEY');
     if (
       gatewayOptions &&
-      openAiApiKey &&
-      vercelInferenceProviders?.includes('openai') &&
-      (!gatewayOptions.only || gatewayOptions.only.includes('openai'))
+      isManagedOpenAiByokEligible(openAiApiKey, vercelInferenceProviders, gatewayOptions.only)
     ) {
       gatewayOptions.byok = {
-        ...gatewayOptions.byok,
         openai: [{ apiKey: openAiApiKey }],
       };
     }

@@ -30,9 +30,14 @@ vi.mock('./dos/SessionAccessCacheDO', () => ({
   getSessionAccessCacheDO: vi.fn(),
 }));
 
+vi.mock('./dos/UserConnectionDO', () => ({
+  getUserConnectionDO: vi.fn(),
+}));
+
 import { app } from './index';
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 
 type TestBindings = {
   HYPERDRIVE: { connectionString: string };
@@ -94,6 +99,7 @@ describe('session access invalidation route', () => {
 
     expect(res.status).toBe(401);
     expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
   });
 
   it.each(['wrong-secretxxx', 'wrong'])(
@@ -123,6 +129,7 @@ describe('session access invalidation route', () => {
       expect(res.status).toBe(401);
       expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
       expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+      expect(getUserConnectionDO).not.toHaveBeenCalled();
     }
   );
 
@@ -131,6 +138,9 @@ describe('session access invalidation route', () => {
     vi.mocked(getSessionAccessCacheDO).mockReturnValue(
       cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
     );
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeViewerSockets: vi.fn(async () => 0),
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
 
     const res = await app.request(
       '/internal/session-access/invalidate',
@@ -152,6 +162,42 @@ describe('session access invalidation route', () => {
     expect(getSessionAccessCacheDO).toHaveBeenCalledWith(defaultEnv, {
       kiloUserId: 'usr_removed',
     });
+    expect(cache.invalidateOrganization).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111'
+    );
+  });
+
+  it('closes the removed member viewer sockets', async () => {
+    const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const closeViewerSockets = vi.fn(async () => 1);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeViewerSockets,
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
+
+    const res = await app.request(
+      '/internal/session-access/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(204);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: 'usr_removed',
+    });
+    expect(closeViewerSockets).toHaveBeenCalled();
     expect(cache.invalidateOrganization).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111'
     );

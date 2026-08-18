@@ -728,6 +728,9 @@ api.get('/user/web', async c => {
   const stub = getUserConnectionDO(c.env, { kiloUserId });
   const wsUrl = new URL(c.req.url);
   wsUrl.pathname = '/web';
+  // The DO can't recover the user from its idFromName-derived id; the web
+  // attachment needs it for command/subscribe access rechecks.
+  wsUrl.searchParams.set('kiloUserId', kiloUserId);
 
   return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
 });

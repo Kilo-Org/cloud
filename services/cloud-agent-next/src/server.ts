@@ -29,6 +29,10 @@ import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
 import { hasDuplicateQueryParameters } from './shared/http-query.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from './session-access.js';
+import { timingSafeEqual } from '@kilocode/encryption';
+import { and, eq, isNotNull } from 'drizzle-orm';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { getPgDb } from './db/pg.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -616,6 +620,52 @@ app.put(
     return c.body(null, 204);
   }
 );
+
+app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
+  const internalApiKey = c.req.header('x-internal-api-key');
+  if (!c.env.INTERNAL_API_SECRET) {
+    return c.text('Internal API secret not configured', 500);
+  }
+  if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
+    return c.text('Invalid or missing internal API key', 401);
+  }
+
+  const body = (await c.req.json().catch(() => null)) as {
+    userId?: unknown;
+    organizationId?: unknown;
+  } | null;
+  const userId = body?.userId;
+  const organizationId = body?.organizationId;
+  if (
+    typeof userId !== 'string' ||
+    userId.length === 0 ||
+    typeof organizationId !== 'string' ||
+    organizationId.length === 0
+  ) {
+    return c.text('Invalid request', 400);
+  }
+
+  const db = getPgDb(c.env);
+  const rows = await db
+    .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, userId),
+        eq(cli_sessions_v2.organization_id, organizationId),
+        isNotNull(cli_sessions_v2.cloud_agent_session_id)
+      )
+    );
+
+  for (const row of rows) {
+    if (!row.cloudAgentSessionId) continue;
+    const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${row.cloudAgentSessionId}`);
+    const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
+    await stub.closeOrgStreams(organizationId);
+  }
+
+  return c.body(null, 204);
+});
 
 app.use('/trpc/*', authMiddleware);
 app.use('/trpc/*', balanceMiddleware);

@@ -103,6 +103,7 @@ function createCtx() {
     id: { name: 'user-1:session-1' },
     storage,
     blockConcurrencyWhile: vi.fn().mockResolvedValue(undefined),
+    getWebSockets: vi.fn(),
   };
   return ctx;
 }
@@ -177,5 +178,69 @@ describe('CloudAgentSession /stream ticket audience', () => {
     expect(response.status).toBe(401);
     await expect(response.text()).resolves.toBe('Invalid ticket audience');
     expect(createStreamHandlerMock).not.toHaveBeenCalled();
+  });
+});
+
+function makeStreamSocket() {
+  return { close: vi.fn() };
+}
+
+function makeMetadata(orgId?: string) {
+  return {
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'session-1',
+      userId: 'user-1',
+      ...(orgId ? { orgId } : {}),
+    },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1700000000000 },
+  };
+}
+
+describe('closeOrgStreams', () => {
+  it('closes matching stream sockets and returns the count', async () => {
+    const ctx = createCtx();
+    const doInstance = new CloudAgentSession(ctx as never, createEnv() as never);
+
+    ctx.storage.get.mockResolvedValue(makeMetadata('org_1'));
+    const stream1 = makeStreamSocket();
+    const stream2 = makeStreamSocket();
+    const terminal1 = makeStreamSocket();
+    ctx.getWebSockets.mockImplementation((tag: string) =>
+      tag === 'stream' ? [stream1, stream2] : [terminal1]
+    );
+
+    const closed = await doInstance.closeOrgStreams('org_1');
+
+    expect(closed).toBe(2);
+    expect(ctx.getWebSockets).toHaveBeenCalledWith('stream');
+    expect(stream1.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(stream2.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(terminal1.close).not.toHaveBeenCalled();
+  });
+
+  it('closes nothing when identity.orgId is missing', async () => {
+    const ctx = createCtx();
+    const doInstance = new CloudAgentSession(ctx as never, createEnv() as never);
+
+    ctx.storage.get.mockResolvedValue(makeMetadata());
+
+    const closed = await doInstance.closeOrgStreams('org_1');
+
+    expect(closed).toBe(0);
+    expect(ctx.getWebSockets).not.toHaveBeenCalled();
+  });
+
+  it('closes nothing when identity.orgId does not match', async () => {
+    const ctx = createCtx();
+    const doInstance = new CloudAgentSession(ctx as never, createEnv() as never);
+
+    ctx.storage.get.mockResolvedValue(makeMetadata('org_other'));
+
+    const closed = await doInstance.closeOrgStreams('org_1');
+
+    expect(closed).toBe(0);
+    expect(ctx.getWebSockets).not.toHaveBeenCalled();
   });
 });

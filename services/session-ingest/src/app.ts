@@ -12,6 +12,7 @@ import { api } from './routes/api';
 import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
 import { withDORetry } from '@kilocode/worker-utils';
 
@@ -131,6 +132,8 @@ app.post('/internal/session-access/invalidate', async c => {
     sessionCache => sessionCache.invalidateOrganization(parsed.data.organizationId),
     'SessionAccessCacheDO.invalidateOrganization'
   );
+
+  await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
 
   return c.body(null, 204);
 });

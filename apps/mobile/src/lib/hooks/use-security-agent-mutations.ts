@@ -8,6 +8,7 @@ import {
   OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
   useHoistedOperationKey,
 } from '@/lib/operation-key';
+import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -35,6 +36,14 @@ export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not 
 /** Surface copy for the missing-configuration state (dismiss sheet). */
 export const SECURITY_CONFIGURATION_COPY =
   'Security service is not configured. Resubmitting cannot succeed until this is fixed.';
+
+/**
+ * Card copy for a reconcile-first sync row: a crash mid-sync left the outcome
+ * uncertain, so the card offers a same-key reconcile retry instead of a blind
+ * re-POST.
+ */
+export const SECURITY_SYNC_RECONCILE_COPY =
+  'A sync may not have completed. Retry to reconcile it, or discard.';
 
 /** True when the error is the server's missing-Worker-configuration rejection. */
 export function isSecurityConfigurationError(error: unknown): boolean {
@@ -244,12 +253,25 @@ export function useSetSecurityAgentEnabled(scope: string) {
 export function useTriggerSecuritySync(scope: string) {
   const queryClient = useQueryClient();
   const { getKey, rotateKey } = useHoistedOperationKey();
+  // P1-E-40c: Security sync is reconcile-first — persist the row so a crash
+  // mid-flight surfaces a card on relaunch instead of auto-replaying.
+  const { writeReconcileFirst, remove: removeOutboxRow } = useMutationOutbox();
 
   return useMutation({
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {
-      const operationKey = getKey(securitySyncIntentFingerprint(scope, vars.repoFullName));
+      const fingerprint = securitySyncIntentFingerprint(scope, vars.repoFullName);
+      // Persist the reconcile-first row BEFORE the POST and resolve the row's
+      // own operationKey: a stored row keeps its key, so the wire never POSTs
+      // a fresh in-memory key over a crash row. The row carries the scope so
+      // the dashboard shows only its own rows.
+      const operationKey = await writeReconcileFirst({
+        operationKey: vars.operationKey ?? getKey(fingerprint),
+        fingerprint,
+        scope,
+        input: vars,
+      });
       try {
         const result = isPersonalSecurityScope(scope)
           ? await trpcClient.securityAgent.triggerSync.mutate({ ...vars, operationKey })
@@ -259,11 +281,15 @@ export function useTriggerSecuritySync(scope: string) {
               operationKey,
             });
         rotateKey();
+        await removeOutboxRow(fingerprint);
         return result;
       } catch (error) {
         if (!isSecuritySyncRetryable(error)) {
           rotateKey();
+          await removeOutboxRow(fingerprint);
         }
+        // A retryable (ambiguous) failure keeps the row: the server may have
+        // accepted the command, so a relaunch must reconcile, not re-POST.
         throw mapSecuritySyncOperationError(error);
       }
     },

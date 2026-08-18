@@ -12,6 +12,7 @@ import { replaceWithAgentSession } from '@/components/agents/session-detail-rout
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { useHoistedOperationKey } from '@/lib/operation-key';
+import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import {
   type AgentAttachmentWire,
   type useAgentAttachmentUpload,
@@ -65,6 +66,14 @@ export function useNewSessionCreator({
   // P1-A-08b: one `operationKey` per submit intent, so a retry of the same
   // intent dedupes on the ledger instead of spawning a second session.
   const { getKey, rotateKey } = useHoistedOperationKey();
+  // P1-E-40c: persist the safe-retry row across relaunch so a crash mid-flight
+  // reuses the same key instead of minting a duplicate session.
+  const {
+    getStoredOperationKey,
+    writeSafeRetry,
+    remove: removeOutboxRow,
+    whenLoaded,
+  } = useMutationOutbox();
 
   const createSessionFromDraft = useCallback(async () => {
     // Read the live, post-settlement draft (see `settleVoiceInputBeforeSubmit`
@@ -99,7 +108,12 @@ export function useNewSessionCreator({
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
     });
-    const operationKey = getKey(intentFingerprint);
+    // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
+    // fresh key only when no stored row exists. A stored row must never be
+    // replaced by a new in-memory key. Gate on the outbox load first: a submit
+    // that races the launch load would read empty rows and mint a duplicate.
+    await whenLoaded();
+    const operationKey = getStoredOperationKey(intentFingerprint) ?? getKey(intentFingerprint);
 
     try {
       const initialMessageId = generateMessageId();
@@ -133,6 +147,14 @@ export function useNewSessionCreator({
         baseInput.attachments = attachmentWire;
       }
 
+      // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
+      // reuses the same key on relaunch instead of minting a duplicate.
+      await writeSafeRetry({
+        operationKey,
+        fingerprint: intentFingerprint,
+        input: baseInput,
+      });
+
       const result = organizationId
         ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
             ...baseInput,
@@ -143,6 +165,7 @@ export function useNewSessionCreator({
       // Rotate before the post-success work so a UI failure cannot keep the
       // successful key for a retry.
       rotateKey();
+      await removeOutboxRow(intentFingerprint);
 
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.
@@ -185,6 +208,7 @@ export function useNewSessionCreator({
       // A typed terminal rejection ends the intent; a retryable one keeps the key.
       if (!isCloudPrepareRetryableError(error)) {
         rotateKey();
+        await removeOutboxRow(intentFingerprint);
       }
     } finally {
       setIsCreating(false);
@@ -204,6 +228,10 @@ export function useNewSessionCreator({
     setIsCreating,
     getKey,
     rotateKey,
+    getStoredOperationKey,
+    writeSafeRetry,
+    removeOutboxRow,
+    whenLoaded,
     onCreated,
   ]);
 

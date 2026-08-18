@@ -116,6 +116,17 @@ vi.mock('expo-crypto', () => {
   };
 });
 
+const outboxMock = vi.hoisted(() => ({
+  getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
+  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
+  remove: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<void> => undefined),
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
+
 type CreatorInput = Parameters<typeof useNewSessionCreator>[0];
 type CreatorResult = ReturnType<typeof useNewSessionCreator>;
 
@@ -222,6 +233,10 @@ beforeEach(() => {
   hapticsMock.rejectWith = undefined;
   attachmentsWire = null;
   scheduledFrames.count = 0;
+  outboxMock.getStoredOperationKey.mockReturnValue(null);
+  outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+  outboxMock.remove.mockResolvedValue(undefined);
+  outboxMock.whenLoaded.mockResolvedValue(undefined);
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrameStub);
 });
 
@@ -648,6 +663,90 @@ describe('useNewSessionCreator autoCommit', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: true });
+  });
+});
+
+describe('useNewSessionCreator mutation outbox (P1-E-40c)', () => {
+  beforeEach(() => {
+    prepareSessionMutate.mockReset();
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    outboxMock.getStoredOperationKey.mockReturnValue(null);
+    outboxMock.writeSafeRetry.mockReset();
+    outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+    outboxMock.remove.mockReset();
+    outboxMock.remove.mockResolvedValue(undefined);
+  });
+
+  it('writes a safe-retry row before mutate and removes it on success', async () => {
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.writeSafeRetry).toHaveBeenCalledTimes(1);
+    expect(outboxMock.writeSafeRetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: expect.any(String),
+        fingerprint: expect.any(String),
+      })
+    );
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+    // The row is written before the mutate fires.
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0]).toBeLessThan(
+      prepareSessionMutate.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('reuses a stored operationKey instead of minting a new UUID', async () => {
+    outboxMock.getStoredOperationKey.mockReturnValue('stored-op-key');
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      operationKey: 'stored-op-key',
+    });
+  });
+
+  it('awaits the outbox load before reading the stored key (no key-reuse race)', async () => {
+    const order: string[] = [];
+    outboxMock.whenLoaded.mockImplementation(async () => {
+      order.push('whenLoaded');
+    });
+    outboxMock.getStoredOperationKey.mockImplementation(() => {
+      order.push('getStoredOperationKey');
+      return 'stored-op-key';
+    });
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(order).toEqual(['whenLoaded', 'getStoredOperationKey']);
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      operationKey: 'stored-op-key',
+    });
+  });
+
+  it('keeps the row on a retryable failure so a relaunch reuses the key', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(creationInProgressError());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes the row on a terminal failure', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(badRequestError());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
   });
 });
 

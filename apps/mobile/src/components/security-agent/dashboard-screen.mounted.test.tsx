@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
+/* eslint-disable max-lines -- the sync-control, dismiss-card, and reconcile-card suites share one mock harness in this file */
 
 // Dashboard sync-control terminal-state contract: a non-retryable sync outcome
 // (missing-configuration rejection, persistence failure) ends the intent — the
@@ -24,6 +25,9 @@ const IN_PROGRESS_COPY = vi.hoisted(
 const CONFIGURATION_ERROR_MESSAGE = vi.hoisted(() => 'Security service is not configured');
 const CONFIGURATION_COPY = vi.hoisted(
   () => 'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
+);
+const RECONCILE_COPY = vi.hoisted(
+  () => 'A sync may not have completed. Retry to reconcile it, or discard.'
 );
 
 const triggerSync = vi.hoisted(() => ({
@@ -60,6 +64,16 @@ const capability = vi.hoisted(() => ({
 const dismissFailures = vi.hoisted(() => ({
   failures: [] as { findingId: string; lastError: string; retryable: boolean | null }[],
   clear: vi.fn(),
+  refresh: vi.fn(),
+}));
+const outbox = vi.hoisted(() => ({
+  needsReconcile: [] as {
+    operationKey: string;
+    fingerprint: string;
+    scope: string;
+    input: unknown;
+  }[],
+  remove: vi.fn(),
   refresh: vi.fn(),
 }));
 
@@ -112,6 +126,9 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
 }));
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outbox,
+}));
 vi.mock('@/components/security-agent/security-command-retry-card', () => ({
   SecurityCommandRetryCard: (props: {
     lastError: string;
@@ -131,6 +148,7 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   isSecurityConfigurationError: (error: unknown) =>
     error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
   SECURITY_CONFIGURATION_COPY: CONFIGURATION_COPY,
+  SECURITY_SYNC_RECONCILE_COPY: RECONCILE_COPY,
   isSecuritySyncRetryable: (error: unknown) => {
     const message = error instanceof Error ? error.message : '';
     return !(
@@ -235,6 +253,9 @@ describe('DashboardScreen sync control terminal states', () => {
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
     dismissFailures.refresh.mockClear();
+    outbox.needsReconcile = [];
+    outbox.remove.mockClear();
+    outbox.refresh.mockClear();
     retryCards.cards = [];
     focusEffect.effect = undefined;
   });
@@ -302,6 +323,9 @@ describe('DashboardScreen dismiss failure card states', () => {
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
     dismissFailures.refresh.mockClear();
+    outbox.needsReconcile = [];
+    outbox.remove.mockClear();
+    outbox.refresh.mockClear();
     retryCards.cards = [];
     focusEffect.effect = undefined;
   });
@@ -353,5 +377,110 @@ describe('DashboardScreen dismiss failure card states', () => {
     });
 
     expect(dismissFailures.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DashboardScreen reconcile card states', () => {
+  beforeEach(() => {
+    dismissFailures.failures = [];
+    dismissFailures.clear.mockClear();
+    dismissFailures.refresh.mockClear();
+    outbox.needsReconcile = [];
+    outbox.remove.mockClear();
+    outbox.refresh.mockClear();
+    retryCards.cards = [];
+    focusEffect.effect = undefined;
+    triggerSync.mutate.mockClear();
+  });
+
+  it('renders no card when there are no reconcile rows (empty)', () => {
+    outbox.needsReconcile = [];
+    renderScreen();
+
+    expect(retryCards.cards).toHaveLength(0);
+  });
+
+  it('renders a retryable card for a reconcile-first row and does not auto-POST', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'op-1',
+        fingerprint: 'fp-1',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    renderScreen();
+
+    expect(retryCards.cards).toHaveLength(1);
+    expect(retryCards.cards[0]?.lastError).toBe(RECONCILE_COPY);
+    expect(retryCards.cards[0]?.retryable).toBe(true);
+    // A reconcile-first row is never auto-replayed: no POST on render.
+    expect(triggerSync.mutate).not.toHaveBeenCalled();
+  });
+
+  it('renders no card for a reconcile row from another scope', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'op-1',
+        fingerprint: 'fp-1',
+        scope: 'other-org',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    renderScreen();
+
+    expect(retryCards.cards).toHaveLength(0);
+  });
+
+  it('re-POSTs with the stored operationKey on retry', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'op-1',
+        fingerprint: 'fp-1',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    renderScreen();
+
+    act(() => {
+      retryCards.cards[0]?.onRetry?.();
+    });
+
+    expect(triggerSync.mutate).toHaveBeenCalledWith(
+      { repoFullName: 'kilo/repo', operationKey: 'op-1' },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onSettled: expect.any(Function),
+      })
+    );
+  });
+
+  it('removes the outbox row on discard', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'op-1',
+        fingerprint: 'fp-1',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    renderScreen();
+
+    act(() => {
+      retryCards.cards[0]?.onDiscard?.();
+    });
+
+    expect(outbox.remove).toHaveBeenCalledWith('fp-1');
+  });
+
+  it('re-reads the outbox on focus', () => {
+    renderScreen();
+
+    act(() => {
+      focusEffect.effect?.();
+    });
+
+    expect(outbox.refresh).toHaveBeenCalledTimes(1);
   });
 });

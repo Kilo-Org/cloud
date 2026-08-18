@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the dashboard composes the sync controls, dismiss-failure cards, reconcile cards, metrics, and sections; each is a small rendered surface that mirrors the shared retry-card pattern. Splitting would re-encode the same hooks. */
 import {
   buildSecurityDashboardMetrics,
   type DashboardMetricTone,
@@ -31,8 +32,10 @@ import {
   isSecurityConfigurationError,
   isSecuritySyncRetryable,
   SECURITY_CONFIGURATION_COPY,
+  SECURITY_SYNC_RECONCILE_COPY,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
+import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -59,6 +62,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const triggerSync = useTriggerSecuritySync(scope);
   const dismissFailures = useSecurityDismissFailures(scope);
   const { refresh: refreshDismissFailures } = dismissFailures;
+  // P1-E-40c: a crash mid-sync leaves a reconcile-first row; surface a card
+  // (never auto-POST) and keep the list current after a retry or discard.
+  const { needsReconcile, remove: removeOutboxRow, refresh: refreshOutbox } = useMutationOutbox();
+  // Only the current dashboard scope's rows render and retry here: a row from
+  // another scope must not show a card or POST this scope.
+  const reconcileRows = needsReconcile.filter(row => row.scope === scope);
 
   // The dashboard stays mounted while the dismiss sheet is open, so re-read
   // the failed dismiss drafts on focus: a fresh failure must show a card and
@@ -66,7 +75,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   useFocusEffect(
     useCallback(() => {
       refreshDismissFailures();
-    }, [refreshDismissFailures])
+      refreshOutbox();
+    }, [refreshDismissFailures, refreshOutbox])
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
@@ -185,6 +195,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                   onSuccess: () => {
                     toast.success('Sync queued');
                   },
+                  onSettled: () => {
+                    refreshOutbox();
+                  },
                 }
               );
             }}
@@ -228,6 +241,31 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             }}
             onDiscard={() => {
               dismissFailures.clear(failure.findingId);
+            }}
+          />
+        ))}
+
+        {reconcileRows.map(row => (
+          <SecurityCommandRetryCard
+            key={row.fingerprint}
+            lastError={SECURITY_SYNC_RECONCILE_COPY}
+            retryable
+            onRetry={() => {
+              const input = row.input as { repoFullName?: string };
+              triggerSync.mutate(
+                { repoFullName: input.repoFullName, operationKey: row.operationKey },
+                {
+                  onSuccess: () => {
+                    toast.success('Sync queued');
+                  },
+                  onSettled: () => {
+                    refreshOutbox();
+                  },
+                }
+              );
+            }}
+            onDiscard={() => {
+              void removeOutboxRow(row.fingerprint);
             }}
           />
         ))}

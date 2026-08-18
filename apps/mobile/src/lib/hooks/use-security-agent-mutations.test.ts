@@ -7,6 +7,8 @@
 // `isSecuritySyncRetryable` + `mapSecuritySyncOperationError`) runs inside
 // `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React ref
 // state that needs a mounted renderer).
+/* eslint-disable max-lines -- cohesive suite for sync wiring, retryability matrix, and the reconcile-first outbox path */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake outbox factories settle without await because they resolve immediately */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -35,6 +37,15 @@ vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
+
+const outboxMock = vi.hoisted(() => ({
+  writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => row.operationKey),
+  remove: vi.fn(async (): Promise<void> => undefined),
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
 
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
@@ -126,6 +137,10 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     trackCommandMock.mockClear();
     hoistedKeys.getKey.mockClear();
     hoistedKeys.rotateKey.mockClear();
+    outboxMock.writeReconcileFirst.mockReset();
+    outboxMock.writeReconcileFirst.mockImplementation(async (row: { operationKey: string }) => row.operationKey);
+    outboxMock.remove.mockReset();
+    outboxMock.remove.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -215,6 +230,65 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
       { repoFullName: 'kilo/repo' }
     );
     expect(trackCommandMock).toHaveBeenCalled();
+  });
+
+  it('persists a reconcile-first row before POSTing and removes it on success', async () => {
+    personalTriggerSyncMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useTriggerSecuritySync('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' });
+
+    expect(outboxMock.writeReconcileFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: 'hoisted-op-key',
+        fingerprint: expect.any(String),
+        scope: 'personal',
+      })
+    );
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+    // The row is written before the mutate fires.
+    expect(outboxMock.writeReconcileFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      personalTriggerSyncMutateMock.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('keeps the reconcile-first row on a retryable (ambiguous) failure', async () => {
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({
+      message: 'A security sync is already in progress. Please try again.',
+    });
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes the reconcile-first row on a terminal failure', async () => {
+    const replayFailed = new Error('This action did not complete. Please try again.');
+    Object.assign(replayFailed, { data: { code: 'BAD_REQUEST' } });
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(replayFailed);
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({ message: 'This action did not complete. Please try again.' });
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-POSTs with a supplied operationKey on a reconcile retry instead of minting a fresh key', async () => {
+    personalTriggerSyncMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useTriggerSecuritySync('personal');
+
+    await lastCapturedOptions?.mutationFn?.({
+      repoFullName: 'kilo/repo',
+      operationKey: 'stored-op-key',
+    });
+
+    expect(hoistedKeys.getKey).not.toHaveBeenCalled();
+    expect(personalTriggerSyncMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullName: 'kilo/repo', operationKey: 'stored-op-key' })
+    );
   });
 });
 

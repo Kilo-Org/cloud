@@ -225,7 +225,10 @@ export function useRemoteSpawnDispatch({
         }
         const shareId = putSharePayload(submitPayload);
         router.replace(
-          appendShareParams(spawnedPath as string, shareId, { autoSend: true }) as Href
+          appendShareParams(spawnedPath as string, shareId, {
+            autoSend: true,
+            mode: fields.mode,
+          }) as Href
         );
         return;
       }

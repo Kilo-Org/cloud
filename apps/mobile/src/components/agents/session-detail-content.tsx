@@ -5,7 +5,7 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -16,6 +16,14 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
+import {
+  type AgentMode,
+  customModeOptionsFromRuntimeAgents,
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+  lockedModelOption,
+  resolvePinnedAgentModel,
+} from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
@@ -124,6 +132,8 @@ type SessionDetailContentProps = {
   shareId?: string;
   /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
   autoSend?: boolean;
+  /** Mode picked at spawn; seeds the mode until the session reports its own. */
+  spawnedMode?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -138,6 +148,7 @@ export function SessionDetailContent({
   openedVia = 'app',
   shareId,
   autoSend,
+  spawnedMode,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -347,7 +358,72 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    spawnedMode,
   });
+
+  // Custom modes come from the session's `runtimeAgents` (slug + name). The
+  // selected slug is appended once when it is neither a built-in nor already
+  // listed, so an inherited custom slug stays visible in the picker.
+  const runtimeAgents = sessionConfig?.runtimeAgents;
+  const customOptions = useMemo(
+    () =>
+      ensureSelectedCustomOption(
+        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
+        currentMode
+      ),
+    [runtimeAgents, currentMode]
+  );
+  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
+  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
+  const pinned = useMemo(
+    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
+    [currentMode, runtimeAgents]
+  );
+  const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
+  const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
+  const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;
+  // When locked to a model that is not already in the catalog, append a
+  // fallback option so the chip can still show the pinned model id.
+  const modelOptionsForToolbar = useMemo(() => {
+    if (!modelLocked || !pinned.model) {
+      return modelOptions;
+    }
+    return modelOptions.some(option => option.id === pinned.model)
+      ? modelOptions
+      : [...modelOptions, lockedModelOption(pinned)];
+  }, [modelLocked, pinned, modelOptions]);
+  const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+
+  // Sync the cloud-agent override to the selected agent's pin (or clear it)
+  // so the SDK's `cloudAgentModelOverride` preference cannot beat the pin.
+  const applyCloudAgentModelOverride = useCallback(
+    (mode: AgentMode) => {
+      if (activeSessionType !== 'cloud-agent') {
+        return;
+      }
+      const agentPin = resolvePinnedAgentModel({ slug: mode, runtimeAgents });
+      if (agentPin.model) {
+        manager.setCloudAgentModelOverride({
+          model: agentPin.model,
+          ...(agentPin.variant ? { variant: agentPin.variant } : {}),
+        });
+      } else {
+        manager.setCloudAgentModelOverride(null);
+      }
+    },
+    [activeSessionType, manager, runtimeAgents]
+  );
+
+  const handleModeChange = useCallback(
+    (mode: AgentMode) => {
+      setCurrentMode(mode);
+      if (sessionConfig) {
+        setSessionConfig({ ...sessionConfig, mode });
+      }
+      applyCloudAgentModelOverride(mode);
+    },
+    [setCurrentMode, sessionConfig, setSessionConfig, applyCloudAgentModelOverride]
+  );
 
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -705,7 +781,9 @@ export function SessionDetailContent({
     shouldShowLoading,
     hasBlockingInteraction,
     requiresModel,
-    hasModel: Boolean(currentModel),
+    // A pinned agent model satisfies the model requirement even before the
+    // catalog selection resolves.
+    hasModel: Boolean(pinned.model ?? currentModel),
   });
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
@@ -717,7 +795,7 @@ export function SessionDetailContent({
       attachments?: AgentAttachmentWire,
       submission?: AgentAttachmentSubmissionPayload
     ) => {
-      if (requiresModel && !currentModel) {
+      if (requiresModel && !(pinned.model ?? currentModel)) {
         toast.error('Select a model before sending');
         return;
       }
@@ -754,6 +832,22 @@ export function SessionDetailContent({
         }
         attachmentParts = result.parts;
       }
+      const sendModel =
+        activeSessionType === 'cloud-agent' && pinned.model ? pinned.model : currentModel;
+      const sendVariant =
+        activeSessionType === 'cloud-agent' && pinned.model
+          ? (pinned.variant ?? '')
+          : currentVariant;
+      // Sync the override to the exact model/variant being sent so the SDK's
+      // `cloudAgentModelOverride` preference cannot beat the pin on send, and
+      // a leftover pin cannot beat a user pick. `sendModel` is always truthy
+      // here (the guard above returns early when no model resolves), so this
+      // never clears to null on an unpinned send.
+      if (activeSessionType === 'cloud-agent') {
+        manager.setCloudAgentModelOverride(
+          sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
+        );
+      }
       // manager.send() reports failures via its own return value (and toasts
       // through the manager's onSendFailed hook) rather than rejecting — it
       // is the single toast owner for send failures. Throw here, without a
@@ -764,8 +858,8 @@ export function SessionDetailContent({
           type: 'prompt',
           prompt: text,
           mode: currentMode,
-          model: currentModel,
-          variant: currentVariant || undefined,
+          model: sendModel,
+          variant: sendVariant || undefined,
         },
         ...(kind === 'cloud' && attachments ? { attachments } : {}),
         ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
@@ -780,6 +874,8 @@ export function SessionDetailContent({
       currentMode,
       currentModel,
       currentVariant,
+      pinned.model,
+      pinned.variant,
       requiresModel,
       activeSessionType,
       supportsAttachments,
@@ -1076,10 +1172,13 @@ export function SessionDetailContent({
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 mode={currentMode}
-                onModeChange={setCurrentMode}
-                model={currentModel}
-                variant={currentVariant}
-                modelOptions={modelOptions}
+                onModeChange={handleModeChange}
+                model={displayModel}
+                variant={displayVariant}
+                modelOptions={modelOptionsForToolbar}
+                customOptions={customOptions}
+                modelLocked={modelLocked}
+                modelLockLabel={pinned.agentName}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}

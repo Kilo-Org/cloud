@@ -534,6 +534,20 @@ describe('useNewSessionCreator operationKey', () => {
   });
 });
 
+describe('useNewSessionCreator mode passthrough', () => {
+  it('passes a custom mode slug through unchanged to prepareSession', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ mode: 'reviewer' });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      mode: 'reviewer',
+    });
+  });
+});
+
 describe('useNewSessionCreator onCreated', () => {
   it('fires onCreated once on success, before navigating', async () => {
     const onCreated = vi.fn(() => undefined);

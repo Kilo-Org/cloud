@@ -25,6 +25,7 @@ export default function SessionDetailScreen() {
     spawned,
     shareId: shareIdParam,
     autoSend: autoSendRaw,
+    mode: modeParam,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -42,10 +43,13 @@ export default function SessionDetailScreen() {
     spawned?: string;
     shareId?: string;
     autoSend?: string;
+    /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
+    mode?: string;
   }>();
   // Param can be string | string[] depending on how the route was opened.
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
+  const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const trpc = useTRPC();
   const router = useRouter();
   const sessionQuery = useQuery({
@@ -146,6 +150,7 @@ export default function SessionDetailScreen() {
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}
         autoSend={autoSendParam === '1'}
+        spawnedMode={spawnedMode}
       />
     </AgentSessionProvider>
   );

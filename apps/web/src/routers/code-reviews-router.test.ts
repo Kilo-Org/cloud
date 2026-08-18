@@ -1882,6 +1882,62 @@ describe('codeReviewRouter attempts', () => {
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
   });
 
+  it('parallel retriggers dispatch once and the second is a conflict', async () => {
+    await insertEnabledAgentConfig();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    // Pre-create the terminal attempt so both retriggers find an existing attempt and race
+    // only on the status CAS (avoiding a concurrent attempt-creation race).
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      session_id: 'agent-first',
+      cli_session_id: 'ses_first',
+      status: 'failed',
+      terminal_reason: 'sandbox_error',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+
+    const results = await Promise.allSettled([
+      caller.codeReviews.retrigger({ reviewId: review.id }),
+      caller.codeReviews.retrigger({ reviewId: review.id }),
+    ]);
+
+    // Exactly one call succeeds. The loser is either a CONFLICT (it reached the
+    // status CAS and lost) or a BAD_REQUEST (it read 'pending' before the CAS
+    // ran). Both are non-success outcomes; the test must not depend on which one.
+    const fulfilled = results.filter(
+      (r): r is PromiseFulfilledResult<{ success: boolean }> => r.status === 'fulfilled'
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(fulfilled[0].value.success).toBe(true);
+
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(rejected).toHaveLength(1);
+    expect(['CONFLICT', 'BAD_REQUEST']).toContain((rejected[0].reason as { code?: string }).code);
+
+    // Exactly one dispatch and one retry attempt, regardless of which call won.
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+
+    const attempts = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const retryAttempts = attempts.filter(attempt => attempt.retry_reason === 'manual_retrigger');
+    expect(retryAttempts).toHaveLength(1);
+  });
+
   it('retries Bitbucket with its platform preserved and a fresh session attempt', async () => {
     await insertEnabledBitbucketOrganizationConfig();
     const [review] = await db

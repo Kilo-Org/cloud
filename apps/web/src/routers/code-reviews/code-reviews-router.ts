@@ -591,8 +591,17 @@ export const codeReviewRouter = createTRPCRouter({
 
         const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
 
-        // Reset the review for retry
-        await resetCodeReviewForRetry(input.reviewId);
+        // Reset the review for retry. The reset is a status CAS: it only matches reviews
+        // still in a retriggable terminal state. A concurrent retrigger that already flipped
+        // the row to 'pending' yields zero rows, so we reject the duplicate without dispatching.
+        const resetCount = await resetCodeReviewForRetry(input.reviewId);
+        if (resetCount === 0) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This code review is already being retried.',
+          });
+        }
+
         await createCodeReviewAttempt({
           codeReviewId: input.reviewId,
           retryOfAttemptId: currentAttempt.id,

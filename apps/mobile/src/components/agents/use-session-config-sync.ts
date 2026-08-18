@@ -1,8 +1,7 @@
 import { type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import { useEffect, useState } from 'react';
 
-import { normalizeAgentMode } from '@/components/agents/mode-options';
-import { type AgentMode } from '@/components/agents/mode-selector';
+import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 type SessionConfigSnapshot = {

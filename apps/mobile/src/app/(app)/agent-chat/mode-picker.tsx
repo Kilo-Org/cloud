@@ -2,10 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, View } from 'react-native';
 
 import { getModeIcon, MODE_OPTIONS, type ModeOption } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import {
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+} from '@/components/agents/mode-normalize';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -46,6 +50,10 @@ export default function ModePickerScreen() {
   }
 
   const currentValue = bridge.currentValue;
+  const custom = ensureSelectedCustomOption(
+    dedupeCustomModeOptions(bridge.customOptions ?? []),
+    currentValue
+  );
 
   function renderItem({ item }: { item: ModeOption }) {
     const Icon = getModeIcon(item.value);
@@ -70,6 +78,8 @@ export default function ModePickerScreen() {
     );
   }
 
+  const separator = <View className="mx-4 border-b border-border" />;
+
   return (
     <PickerSheet
       title="Select mode"
@@ -78,13 +88,33 @@ export default function ModePickerScreen() {
       }}
       scrollable={false}
     >
-      <FlatList
-        className="flex-1 bg-background"
-        data={MODE_OPTIONS}
-        keyExtractor={item => item.value}
-        renderItem={renderItem}
-        ItemSeparatorComponent={() => <View className="mx-4 border-b border-border" />}
-      />
+      {custom.length === 0 ? (
+        <FlatList
+          className="flex-1 bg-background"
+          data={MODE_OPTIONS}
+          keyExtractor={item => item.value}
+          renderItem={renderItem}
+          ItemSeparatorComponent={() => separator}
+        />
+      ) : (
+        <ScrollView className="flex-1 bg-background">
+          {MODE_OPTIONS.map((item, index) => (
+            <View key={item.value}>
+              {index > 0 ? separator : null}
+              {renderItem({ item })}
+            </View>
+          ))}
+          <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Custom modes
+          </Text>
+          {custom.map((item, index) => (
+            <View key={item.value}>
+              {index > 0 ? separator : null}
+              {renderItem({ item })}
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </PickerSheet>
   );
 }

@@ -1,5 +1,4 @@
-import { type AgentMode } from '@/components/agents/mode-selector';
-import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 
 export type NewSessionPrefillParams = {

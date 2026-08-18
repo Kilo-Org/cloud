@@ -935,13 +935,12 @@ export function createConnectionManager(
   }
 
   function isAIProviderResponseError(errorText: string, error: unknown): boolean {
-    const normalized = errorText.toLowerCase();
+    const serializedError = error === undefined ? '' : JSON.stringify(error);
+    const normalized = `${errorText}\n${serializedError}`.toLowerCase();
     if (normalized.includes('ai_invalidresponsedataerror')) return true;
     if (normalized.includes('ai_jsonparseerror')) return true;
-    if (isRecord(error) && typeof error.name === 'string') {
-      const name = error.name.toLowerCase();
-      if (name === 'ai_invalidresponsedataerror' || name === 'ai_jsonparseerror') return true;
-    }
+    if (normalized.includes('invalid response data:')) return true;
+    if (normalized.includes('json parsing failed:')) return true;
     if (/^expected\s+['"].+['"]\s+to be\s+/i.test(errorText.trim())) return true;
     return false;
   }

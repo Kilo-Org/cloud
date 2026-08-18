@@ -1464,6 +1464,64 @@ describe('ingest WS reconnection', () => {
     });
   });
 
+  it('classifies UnknownError Invalid response data as a terminal provider error', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'UnknownError',
+                data: { message: "Invalid response data: Expected 'id' to be a string." },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'provider_error',
+      message: "Invalid response data: Expected 'id' to be a string.",
+      errorSource: 'assistant',
+    });
+  });
+
+  it('classifies UnknownError JSON parsing failed as a terminal provider error', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'UnknownError',
+                data: { message: 'JSON parsing failed: Unexpected end of JSON input' },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'provider_error',
+      message: 'JSON parsing failed: Unexpected end of JSON input',
+      errorSource: 'assistant',
+    });
+  });
+
   it('classifies an expected-field pattern error as a terminal provider error', async () => {
     const kiloClient = createMockKiloClient({
       subscribeEvents: vi.fn().mockResolvedValue({

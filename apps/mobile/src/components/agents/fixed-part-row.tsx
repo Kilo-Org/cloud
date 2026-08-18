@@ -44,7 +44,7 @@ export function FixedPartRow({
     <View
       className={
         variant === 'dashed'
-          ? 'rounded-xl border-[1.5px] border-dashed border-border'
+          ? 'overflow-hidden rounded-lg border border-dashed border-border'
           : 'overflow-hidden rounded-lg border border-border'
       }
     >

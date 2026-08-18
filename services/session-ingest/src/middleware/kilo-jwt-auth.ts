@@ -82,10 +82,16 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   try {
     const configuredSecret = await c.env.NEXTAUTH_SECRET_PROD.get();
     if (!configuredSecret) {
+      console.error('Auth infrastructure failure', { operation: 'nextauth-secret-missing' });
       return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
     }
     secret = configuredSecret;
-  } catch {
+  } catch (error) {
+    console.error('Auth infrastructure failure', {
+      operation: 'nextauth-secret-get',
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
   }
 
@@ -102,7 +108,13 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   let state: CachedUserAuthV1;
   try {
     state = await loadUserAuth(c.env, kiloUserId);
-  } catch {
+  } catch (error) {
+    console.error('Auth infrastructure failure', {
+      operation: 'user-auth-load',
+      kiloUserId,
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
   }
 

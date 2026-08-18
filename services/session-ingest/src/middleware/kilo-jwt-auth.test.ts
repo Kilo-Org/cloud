@@ -321,6 +321,7 @@ describe('kiloJwtAuthMiddleware', () => {
   });
 
   it('returns 503 when Postgres throws and does not authorize', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.mocked(findKiloUserPepper).mockRejectedValue(new Error('hyperdrive down'));
     const token = await userToken();
     const env = makeEnv();
@@ -329,9 +330,19 @@ describe('kiloJwtAuthMiddleware', () => {
 
     expect(res.status).toBe(503);
     expect(env.USER_EXISTS_CACHE.put).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'user-auth-load',
+        kiloUserId: USER_ID,
+        errorMessage: 'hyperdrive down',
+      })
+    );
+    error.mockRestore();
   });
 
   it('returns 503 when the cache read throws and does not authorize', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const token = await userToken();
     const env = makeEnv();
     env.USER_EXISTS_CACHE.get.mockRejectedValueOnce(new Error('kv unavailable'));
@@ -340,6 +351,15 @@ describe('kiloJwtAuthMiddleware', () => {
 
     expect(res.status).toBe(503);
     expect(findKiloUserPepper).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'user-auth-load',
+        kiloUserId: USER_ID,
+        errorMessage: 'kv unavailable',
+      })
+    );
+    error.mockRestore();
   });
 
   it('returns the authoritative result when caching the state fails', async () => {
@@ -363,6 +383,7 @@ describe('kiloJwtAuthMiddleware', () => {
   });
 
   it('returns 503 when the secret store cannot resolve the JWT secret', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const token = await userToken();
     const env = makeEnv();
     env.NEXTAUTH_SECRET_PROD.get = vi.fn(async () => {
@@ -373,6 +394,14 @@ describe('kiloJwtAuthMiddleware', () => {
 
     expect(res.status).toBe(503);
     expect(findKiloUserPepper).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'nextauth-secret-get',
+        errorMessage: 'secret store unavailable',
+      })
+    );
+    error.mockRestore();
   });
 
   it('authorizes an internal token when the user is unblocked', async () => {

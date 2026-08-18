@@ -207,8 +207,10 @@ export function createMobileAgentSessionManager({
         ...(activeSession.capabilities ? { capabilities: activeSession.capabilities } : {}),
       };
     },
-    getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
-      const ticket = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
+    getTicket: async (
+      sessionId: CloudAgentSessionId
+    ): Promise<{ ticket: string; expiresAt: number }> => {
+      const result = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
         const token = await getAuthTokenForRequest();
         const body: Record<string, string> = { cloudAgentSessionId: sessionId };
         if (organizationId) {
@@ -225,16 +227,23 @@ export function createMobileAgentSessionManager({
             body: JSON.stringify(body),
           }
         );
-        const data = (await response.json()) as { ticket?: string; error?: string };
+        const data = (await response.json()) as {
+          ticket?: string;
+          expiresAt?: number;
+          error?: string;
+        };
         if (!response.ok) {
           throw new Error(data.error ?? 'Failed to get stream ticket');
         }
         if (!data.ticket) {
           throw new Error('Missing ticket in stream-ticket response');
         }
-        return data.ticket;
+        if (data.expiresAt === undefined) {
+          throw new Error('Missing expiresAt in stream-ticket response');
+        }
+        return { ticket: data.ticket, expiresAt: data.expiresAt };
       });
-      return ticket;
+      return result;
     },
     fetchSnapshot: async (id: KiloSessionId) => {
       const [sessionData, messagesResult] = await Promise.all([

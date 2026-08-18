@@ -20,7 +20,7 @@
  * mutation: it returns the row to `pending` with a cleared attempt clock and
  * never inserts a second row, so the unique `invitation_id` constraint holds.
  */
-import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, exists, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
 import type { NodePgDatabase, NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
@@ -90,7 +90,10 @@ export async function enqueueInviteEmail(
  * Claims due `pending` rows in a bounded batch: transitions them to `sending`
  * with `claimed_at`, ordered oldest-first, `FOR UPDATE SKIP LOCKED` so
  * concurrent drainers never double-claim. A row is due when
- * `next_attempt_at` is null or in the past.
+ * `next_attempt_at` is null or in the past. The claim is fenced on the linked
+ * invitation still being valid (`accepted_at IS NULL AND expires_at > now()`),
+ * so an invitee who accepts before the next pass, or whose invite expires in
+ * retry backoff, is never emailed.
  */
 export async function claimDueInviteEmails(
   database: SideEffectOutboxDatabase,
@@ -107,6 +110,18 @@ export async function claimDueInviteEmails(
       FROM ${external_side_effect_outbox}
       WHERE ${external_side_effect_outbox.status} = 'pending'
         AND coalesce(${external_side_effect_outbox.next_attempt_at}, '-infinity'::timestamptz) <= now()
+        AND ${exists(
+          database
+            .select({ one: sql`1` })
+            .from(organization_invitations)
+            .where(
+              and(
+                eq(organization_invitations.id, external_side_effect_outbox.invitation_id),
+                isNull(organization_invitations.accepted_at),
+                gt(organization_invitations.expires_at, sql`now()`)
+              )
+            )
+        )}
       ORDER BY ${external_side_effect_outbox.created_at} ASC, ${external_side_effect_outbox.id} ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -254,6 +269,12 @@ export async function reclaimStaleInviteEmails(
  * `accepted_at IS NULL`. A concurrent `deleteInvite` that expires the invite
  * and marks the outbox row `failed` therefore wins: the reset affects zero rows
  * and returns null, so cron never re-arms a revoked/expired/accepted invite.
+ *
+ * The update is also fenced on outbox status: it only matches a row in
+ * `pending`, `delivered`, or `failed`. A `resendInvite` that lands while cron
+ * holds a `sending` claim matches zero rows and returns null, so the in-flight
+ * sender's claim token is never invalidated and the invitee is not emailed
+ * twice.
  */
 export async function resetInviteEmailForResend(
   database: SideEffectOutboxDatabase,
@@ -271,6 +292,7 @@ export async function resetInviteEmailForResend(
     .where(
       and(
         eq(external_side_effect_outbox.invitation_id, invitationId),
+        inArray(external_side_effect_outbox.status, ['pending', 'delivered', 'failed']),
         inArray(
           external_side_effect_outbox.invitation_id,
           database

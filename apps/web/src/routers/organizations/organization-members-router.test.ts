@@ -975,6 +975,37 @@ describe('organizations members trpc router', () => {
       expect(sendInviteEmail).toHaveBeenCalledWith(expect.objectContaining({ to: email }));
     });
 
+    it('does not send the invite email after the invitation is accepted', async () => {
+      const sendInviteEmail = jest.mocked(sendOrganizationInviteEmail);
+      sendInviteEmail.mockClear();
+
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@accepted-before-drain.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      // Accept the invitation before the cron pass: this sets `accepted_at`
+      // while the outbox row is still `pending`.
+      await db
+        .update(organization_invitations)
+        .set({ accepted_at: sql`NOW()` })
+        .where(eq(organization_invitations.id, result.invitationId));
+
+      await dispatchQueuedInviteEmails();
+
+      expect(sendInviteEmail).not.toHaveBeenCalled();
+
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRow.status).toBe('pending');
+    });
+
     it('resendInvite resets the same outbox row without inserting a second', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const email = `${crypto.randomUUID()}@resend-invite.example.com`;
@@ -1069,6 +1100,33 @@ describe('organizations members trpc router', () => {
         .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
       expect(outboxRow.status).toBe('failed');
       expect(outboxRow.last_error).toBe('revoked');
+    });
+
+    it('resetInviteEmailForResend returns null when the outbox row is sending', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@reset-fence-sending.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      // Simulate a drainer holding a `sending` claim.
+      await db
+        .update(external_side_effect_outbox)
+        .set({ status: 'sending', claimed_at: sql`NOW()` })
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+
+      const reset = await resetInviteEmailForResend(db, result.invitationId);
+
+      expect(reset).toBeNull();
+
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRow.status).toBe('sending');
     });
 
     it('resendInvite refuses an expired invitation and does not reset the outbox row', async () => {

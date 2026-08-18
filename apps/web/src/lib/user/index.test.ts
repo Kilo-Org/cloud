@@ -118,6 +118,7 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  external_side_effect_outbox,
   user_data_exports,
   user_data_export_parts,
   user_data_export_outbox,
@@ -2585,6 +2586,95 @@ describe('User', () => {
       const remaining = await db.select().from(organization_invitations);
       expect(remaining).toHaveLength(1);
       expect(remaining[0].email).toBe(user2.google_user_email);
+    });
+
+    it('deletes pending and sending invite-email outbox rows for the user', async () => {
+      const user1 = await insertTestUser({ google_user_email: 'outbox-invitee@example.com' });
+      const user2 = await insertTestUser();
+
+      const orgId = randomUUID();
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Test Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
+
+      const futureDate = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+
+      // Invitation sent BY user1
+      const [byUser1] = await db
+        .insert(organization_invitations)
+        .values({
+          organization_id: orgId,
+          email: 'someone@example.com',
+          role: 'member',
+          invited_by: user1.id,
+          token: 'outbox-token-from-user1',
+          expires_at: futureDate,
+        })
+        .returning();
+
+      // Invitation sent TO user1's email
+      const [toUser1] = await db
+        .insert(organization_invitations)
+        .values({
+          organization_id: orgId,
+          email: 'outbox-invitee@example.com',
+          role: 'member',
+          invited_by: user2.id,
+          token: 'outbox-token-to-user1',
+          expires_at: futureDate,
+        })
+        .returning();
+
+      // Invitation for user2 (unaffected)
+      const [forUser2] = await db
+        .insert(organization_invitations)
+        .values({
+          organization_id: orgId,
+          email: user2.google_user_email,
+          role: 'member',
+          invited_by: user2.id,
+          token: 'outbox-token-for-user2',
+          expires_at: futureDate,
+        })
+        .returning();
+
+      const payload = (invitationId: string, to: string) => ({
+        invitationId,
+        to,
+        organizationName: 'Test Org',
+        inviterName: 'Inviter',
+        acceptInviteUrl: 'https://example.com/accept',
+      });
+
+      // pending outbox row for the invitation sent BY user1
+      await db.insert(external_side_effect_outbox).values({
+        invitation_id: byUser1.id,
+        payload: payload(byUser1.id, 'someone@example.com'),
+        status: 'pending',
+      });
+
+      // sending outbox row for the invitation sent TO user1's email
+      await db.insert(external_side_effect_outbox).values({
+        invitation_id: toUser1.id,
+        payload: payload(toUser1.id, 'outbox-invitee@example.com'),
+        status: 'sending',
+      });
+
+      // pending outbox row for user2's invitation (unaffected)
+      await db.insert(external_side_effect_outbox).values({
+        invitation_id: forUser2.id,
+        payload: payload(forUser2.id, user2.google_user_email),
+        status: 'pending',
+      });
+
+      await softDeleteUser(user1.id);
+
+      const remainingOutbox = await db.select().from(external_side_effect_outbox);
+      expect(remainingOutbox).toHaveLength(1);
+      expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
     });
 
     it('should anonymize organization audit logs', async () => {

@@ -8,7 +8,7 @@ import {
   type InstanceModelCatalogResult,
   type RemoteModelCatalogV1,
 } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
-import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import {
   buildContinuePrefillParams,
   type NewSessionPrefill,

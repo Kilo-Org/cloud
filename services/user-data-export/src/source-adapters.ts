@@ -1328,6 +1328,19 @@ function warehouseText(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/** A PostgreSQL integer transported as text, number, or bigint by the active type parser. */
+function warehouseIntegerText(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value === 'bigint' || typeof value === 'string') return String(value);
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : null;
+}
+
+function requiredCursorValue(value: unknown): string {
+  if (typeof value === 'bigint' || typeof value === 'string') return String(value);
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  throw new Error('Replica row has invalid cursor');
+}
+
 /**
  * A `numeric` column, read as a number.
  *
@@ -1939,15 +1952,9 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
         ).then(result =>
           result.map(row => ({
             project_id: warehouseText(row.project_id),
-            vercel_ip_country_id:
-              typeof row.vercel_ip_country_id === 'number'
-                ? String(row.vercel_ip_country_id)
-                : warehouseText(row.vercel_ip_country_id),
+            vercel_ip_country_id: warehouseIntegerText(row.vercel_ip_country_id),
             vercel_ip_country: warehouseText(row.vercel_ip_country),
-            key: [0, 1, 2, 3].map(index => {
-              const value = row[`key_${index}`];
-              return typeof value === 'number' ? String(value) : requiredString(value, 'cursor');
-            }),
+            key: [0, 1, 2, 3].map(index => requiredCursorValue(row[`key_${index}`])),
           }))
         );
         return {

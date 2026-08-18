@@ -73,6 +73,13 @@ export function classifyProviderState(input: {
       variant,
     };
   }
+  // A paused query (offline/unknown connectivity) with an empty cache is
+  // pending but not fetching, so `isLoading` (isPending && isFetching) is
+  // false. "No data yet" must stay loading, not fall through to disconnected
+  // (which renders the Connect card on a cold launch before NetInfo settles).
+  if (!input.hasData) {
+    return { status: 'loading' };
+  }
   return input.connected ? { status: 'connected' } : { status: 'disconnected' };
 }
 

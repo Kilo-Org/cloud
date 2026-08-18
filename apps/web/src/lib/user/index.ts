@@ -104,6 +104,7 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
   user_data_exports,
@@ -1196,6 +1197,26 @@ export async function softDeleteUser(userId: string) {
       .update(organization_recommendation_dismissals)
       .set({ dismissed_by_user_id: null })
       .where(eq(organization_recommendation_dismissals.dismissed_by_user_id, userId));
+    // Delete pending/sending invite-email outbox rows for invitations sent BY
+    // this user or addressed TO this user's email. Runs before the invitation
+    // rows are deleted below so the subquery can still resolve them.
+    await tx.delete(external_side_effect_outbox).where(
+      and(
+        inArray(external_side_effect_outbox.status, ['pending', 'sending']),
+        inArray(
+          external_side_effect_outbox.invitation_id,
+          tx
+            .select({ id: organization_invitations.id })
+            .from(organization_invitations)
+            .where(
+              or(
+                eq(organization_invitations.invited_by, userId),
+                eq(organization_invitations.email, originalEmail)
+              )
+            )
+        )
+      )
+    );
     // Delete invitations sent BY this user and invitations sent TO this user's email
     await tx
       .delete(organization_invitations)

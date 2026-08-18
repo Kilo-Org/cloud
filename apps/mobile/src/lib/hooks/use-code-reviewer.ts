@@ -112,9 +112,9 @@ export function useReviewConfig(
     enabled: !isPersonal(scope),
   });
   // The org procedure's inferred type carries a few org/Bitbucket-only
-  // fields (manuallyAddedRepositories, reviewMemoryEnabled, actionRequired)
-  // beyond our shared ReviewConfigData contract — a strict structural
-  // superset, so this narrowing cast is safe (same reasoning as
+  // fields (manuallyAddedRepositories, reviewMemoryEnabled) beyond our
+  // shared ReviewConfigData contract — a strict structural superset, so
+  // this narrowing cast is safe (same reasoning as
   // useSaveReviewConfig's getQueryData<ReviewConfigData> below).
   return (isPersonal(scope) ? personal : org) as UseQueryResult<ReviewConfigData>;
 }

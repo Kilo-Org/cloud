@@ -41,6 +41,12 @@ export const TrackSecurityAgentUiInteractionInputSchema = z.object({
 });
 
 export const SaveSecurityConfigInputSchema = z.object({
+  /**
+   * Optimistic concurrency revision. `null` means the caller believes no config
+   * row exists yet (first insert). A non-null value must match the current
+   * `config_revision` or the save conflicts.
+   */
+  expectedRevision: z.number().int().positive().nullable(),
   slaCriticalDays: z.number().min(1).max(365).optional(),
   slaHighDays: z.number().min(1).max(365).optional(),
   slaMediumDays: z.number().min(1).max(365).optional(),

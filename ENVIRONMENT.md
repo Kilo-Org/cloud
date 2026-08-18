@@ -88,7 +88,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`
 - `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
 - `GITHUB_TOKEN` - Generic GitHub token for API calls used as fallback when `GIT_TOKEN` or `GITHUB_CLI_PAT` is absent; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
-- `GH_TOKEN` - Short alias for GitHub token; used in `services/gastown/container/plugin/mayor-tools.ts`. `[SECRET]`
+- `GH_TOKEN` - Short alias used by GitHub CLI processes. `[SECRET]`
 - `GIT_TOKEN` - Dynamic git credential token (often a GitHub App installation token) scoped for git clone/push; propagated from Town DO to containers in `services/gastown/src/dos/town/container-dispatch.ts` and `services/gastown/container/src/agent-runner.ts`. `[SECRET]`
 - `GOOGLE_WORKSPACE_OAUTH_CLIENT_ID` - Google Workspace OAuth client ID; used in tests and integration code. [PUBLIC]
 - `GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET` - Google Workspace OAuth client secret. `[SECRET]`
@@ -230,12 +230,14 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `ABUSE_SERVICE_CF_ACCESS_CLIENT_ID` - Cloudflare Access client ID for abuse service. [PUBLIC]
 - `ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET` - Cloudflare Access client secret for abuse service. `[SECRET]`
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
+- `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
 
 ### AI Providers
 
 - `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
+- `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
 - `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`

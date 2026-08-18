@@ -12,12 +12,6 @@ import { useConfirm } from '@/components/ui/confirm';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   useTerminalBar,
   COLLAPSED_SIZE,
   isHorizontal,
@@ -39,9 +33,6 @@ import {
   PanelTop,
   PanelLeft,
   PanelRight,
-  Bug,
-  Github,
-  MessageCircle,
   CircleDollarSign,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -782,13 +773,6 @@ function TabBar({
         </div>
       )}
 
-      {/* Bug report dropdown */}
-      {horizontal && (
-        <div className="shrink-0">
-          <BugReportMenu />
-        </div>
-      )}
-
       {/* Position picker */}
       <PositionPicker current={position} onSelect={setPosition} horizontal={horizontal} />
     </div>
@@ -852,45 +836,6 @@ export function PositionPicker({
         </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ── Bug Report Menu ──────────────────────────────────────────────────────
-
-const BUG_REPORT_OPTIONS = [
-  {
-    label: 'New GitHub Issue',
-    href: 'https://github.com/Kilo-Org/cloud/issues/new?template=gastown-bug.yml&labels=gastown,bug',
-    Icon: Github,
-  },
-  {
-    label: 'Discord Channel',
-    href: 'https://discord.com/channels/1349288496988160052/1485796776635142174',
-    Icon: MessageCircle,
-  },
-];
-
-export function BugReportMenu() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label="Report a bug"
-        className="mr-2 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
-      >
-        <Bug className="size-3" />
-        <span className="hidden sm:inline">Report a Bug</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={6} className="w-max">
-        {BUG_REPORT_OPTIONS.map(({ label, href, Icon }) => (
-          <DropdownMenuItem key={label} asChild>
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              <Icon className="size-3.5" />
-              {label}
-            </a>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

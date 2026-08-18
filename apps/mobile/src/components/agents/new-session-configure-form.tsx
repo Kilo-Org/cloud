@@ -6,7 +6,10 @@ import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { type ModeOption } from '@/components/agents/mode-normalize';
 import { Button } from '@/components/ui/button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
   type AgentAttachment,
@@ -17,6 +20,11 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
+
+const COMMIT_CHOICE_OPTIONS = [
+  { value: 'leave', label: 'Leave changes' },
+  { value: 'commit', label: 'Commit and push' },
+] as const;
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -32,6 +40,12 @@ type NewSessionConfigureFormProps = {
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
   onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Custom mode options shown under the built-ins in the mode picker. */
+  customOptions?: ModeOption[];
+  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
+  modelLocked?: boolean;
+  /** Agent name shown in the locked model chip's accessibility label. */
+  modelLockLabel?: string;
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
@@ -55,6 +69,14 @@ type NewSessionConfigureFormProps = {
   onRefreshRepos: () => void;
   repositories: { fullName: string; isPrivate: boolean }[];
   selectedRepo: string;
+  // Environment profile (Cloud Agent only).
+  profile: EffectiveAgentProfile | null;
+  isProfileLoading: boolean;
+  isProfileError: boolean;
+  onRetryProfile: () => void;
+  // Commit choice (Cloud Agent only).
+  autoCommit: boolean;
+  onAutoCommitChange: (next: boolean) => void;
   // Start.
   isSpawningRemote: boolean;
   isStartDisabled: boolean;
@@ -80,6 +102,9 @@ export function NewSessionConfigureForm({
   onChangeText,
   onModeChange,
   onModelSelect,
+  customOptions = [],
+  modelLocked = false,
+  modelLockLabel,
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
@@ -101,6 +126,12 @@ export function NewSessionConfigureForm({
   onRefreshRepos,
   repositories,
   selectedRepo,
+  profile,
+  isProfileLoading,
+  isProfileError,
+  onRetryProfile,
+  autoCommit,
+  onAutoCommitChange,
   isSpawningRemote,
   isStartDisabled,
   onStartSession,
@@ -131,6 +162,47 @@ export function NewSessionConfigureForm({
     );
   }
 
+  // Read-only effective-profile row. Hidden while the profile query loads so a
+  // resolved name never flashes a "Default environment" placeholder first.
+  function renderProfileRow(): ReactNode {
+    if (isProfileLoading) {
+      return null;
+    }
+    if (isProfileError) {
+      return (
+        <View className="mt-5">
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">Environment</Text>
+          <View className="flex-row items-center gap-2">
+            <Text className="text-sm text-destructive">Couldn't load your environment</Text>
+            <Button
+              variant="link"
+              size="sm"
+              onPress={onRetryProfile}
+              accessibilityLabel="Retry loading environment"
+            >
+              <Text>Retry</Text>
+            </Button>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View className="mt-5">
+        <Text className="mb-2 text-sm font-medium text-muted-foreground">Environment</Text>
+        {profile ? (
+          <View className="gap-1">
+            <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
+            <Text className="text-sm text-muted-foreground">
+              {`${profile.commandCount} commands · ${profile.mcpServerCount} MCP · ${profile.skillCount} skills · ${profile.agentCount} agents`}
+            </Text>
+          </View>
+        ) : (
+          <Text className="text-sm text-foreground">Default environment</Text>
+        )}
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       className="flex-1"
@@ -151,6 +223,9 @@ export function NewSessionConfigureForm({
         onChangeText={onChangeText}
         onModeChange={onModeChange}
         onModelSelect={onModelSelect}
+        customOptions={customOptions}
+        modelLocked={modelLocked}
+        modelLockLabel={modelLockLabel}
         onAddAttachment={onAddAttachment}
         onRemoveAttachment={onRemoveAttachment}
         onRetryAttachment={onRetryAttachment}
@@ -181,6 +256,22 @@ export function NewSessionConfigureForm({
           value={selectedRepo}
         />
       ) : null}
+
+      {!isRemote ? (
+        <View className="mt-5">
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">Changes</Text>
+          <SegmentedControl
+            accessibilityLabel="Changes"
+            options={COMMIT_CHOICE_OPTIONS}
+            value={autoCommit ? 'commit' : 'leave'}
+            onChange={next => {
+              onAutoCommitChange(next === 'commit');
+            }}
+          />
+        </View>
+      ) : null}
+
+      {!isRemote ? renderProfileRow() : null}
 
       <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
         {isStarting ? (

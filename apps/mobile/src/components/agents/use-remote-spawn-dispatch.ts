@@ -77,6 +77,12 @@ type UseRemoteSpawnDispatchArgs = {
    * happened.
    */
   onSpawnAdmitted?: () => void;
+  /**
+   * Invoked when a committed spawn settles without navigating (retryable or
+   * non-retryable). Callers use it to re-arm an abandon guard that
+   * `onSpawnAdmitted` armed, so a later back/swipe still confirms.
+   */
+  onSpawnFailed?: () => void;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -136,6 +142,7 @@ export function useRemoteSpawnDispatch({
   instanceList,
   getSubmitPayload,
   onSpawnAdmitted,
+  onSpawnFailed,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
   // Route param is frozen at navigation: missing param means personal, not
@@ -174,11 +181,13 @@ export function useRemoteSpawnDispatch({
   const getSubmitPayloadRef = useRef(getSubmitPayload);
   const spawnFieldsRef = useRef({ mode, selection, organizationId });
   const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
+  const onSpawnFailedRef = useRef(onSpawnFailed);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
     spawnFieldsRef.current = { mode, selection, organizationId };
     onSpawnAdmittedRef.current = onSpawnAdmitted;
-  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted]);
+    onSpawnFailedRef.current = onSpawnFailed;
+  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted, onSpawnFailed]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -225,10 +234,16 @@ export function useRemoteSpawnDispatch({
         }
         const shareId = putSharePayload(submitPayload);
         router.replace(
-          appendShareParams(spawnedPath as string, shareId, { autoSend: true }) as Href
+          appendShareParams(spawnedPath as string, shareId, {
+            autoSend: true,
+            mode: fields.mode,
+          }) as Href
         );
         return;
       }
+      // Not ready: the spawn settled without navigating. Re-arm the caller's
+      // abandon guard so a later back/swipe still confirms.
+      onSpawnFailedRef.current?.();
       if (outcome.status === 'nonRetryable') {
         // A typed non-retryable rejection ends the intent.
         rotateKey();

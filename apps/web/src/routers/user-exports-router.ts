@@ -17,7 +17,7 @@ import {
 } from '@/lib/auth/data-export-download-codes';
 import { db } from '@/lib/drizzle';
 import { sendDataExportDownloadCodeEmail } from '@/lib/email';
-import { adminProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   ORGANIZATION_EXPORT_ROLES,
   organizationExportAccess,
@@ -165,10 +165,9 @@ async function exportableOrganizations(userId: string): Promise<{ id: string; na
  * role on it.
  *
  * The shared predicate, not `ensureOrganizationAccess`, which every other organization
- * router uses. That helper grants `owner` to any `is_admin` caller, so on this router —
- * where every procedure is `adminProcedure` — it would authorise on staff status rather
- * than on membership, and nobody may export another person's or another organization's
- * data.
+ * router uses. That helper grants `owner` to any `is_admin` caller, so it would authorise
+ * a Kilo staff member on staff status rather than on membership, and nobody — staff
+ * included — may export another person's or another organization's data.
  *
  * Shared with the Worker, which re-checks independently, because the two must reach the
  * same verdict. They once did not, and an export generated, showed as ready, and then
@@ -246,8 +245,7 @@ async function createExportRequest(subject: {
       FROM user_data_exports exports
       WHERE ${scopeFilter}
         AND exports.status <> 'failed'
-        -- TEMPORARY: throttle lowered to 5 minutes for pre-launch testing; restore to 24 hours before going live.
-        AND exports.requested_at > now() - interval '5 minutes'
+        AND exports.requested_at > now() - interval '24 hours'
       ORDER BY exports.requested_at DESC
       LIMIT 1
     `);
@@ -421,13 +419,13 @@ function downloadCodeError(result: Exclude<ReserveDownloadCodeResult, 'ok'>): TR
 }
 
 export const userExportsRouter = createTRPCRouter({
-  request: adminProcedure.mutation(async ({ ctx }) => {
+  request: baseProcedure.mutation(async ({ ctx }) => {
     requireWebSession(ctx.authViaToken);
     const row = await createExportRequest({ kiloUserId: ctx.user.id, organizationId: null });
     return serialize(row);
   }),
 
-  requestOrganization: adminProcedure
+  requestOrganization: baseProcedure
     .input(OrganizationExportSchema)
     .mutation(async ({ ctx, input }) => {
       requireWebSession(ctx.authViaToken);
@@ -443,18 +441,18 @@ export const userExportsRouter = createTRPCRouter({
     }),
 
   /** Organizations the caller may export, for rendering the organization buttons. */
-  exportableOrganizations: adminProcedure.query(async ({ ctx }) => {
+  exportableOrganizations: baseProcedure.query(async ({ ctx }) => {
     requireWebSession(ctx.authViaToken);
     return { organizations: await exportableOrganizations(ctx.user.id) };
   }),
 
-  list: adminProcedure.input(ListInputSchema).query(async ({ ctx, input }) => {
+  list: baseProcedure.input(ListInputSchema).query(async ({ ctx, input }) => {
     requireWebSession(ctx.authViaToken);
     // Two independent reasons an export is visible.
     //
     // Anything the caller requested, whatever its subject. Whoever pressed the button
     // always sees the result, even if the access that admitted the request is not
-    // access this query can reproduce — a Kilo staff elevation, for instance.
+    // access this query can still reproduce — an export role revoked afterwards, say.
     //
     // Plus every export belonging to an organization they may export, so a second
     // admin is not refused by the one-active-export-per-org constraint while being
@@ -508,7 +506,7 @@ export const userExportsRouter = createTRPCRouter({
    * held web session alone cannot reach the artifact without also reaching the
    * inbox.
    */
-  requestDownloadCode: adminProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
+  requestDownloadCode: baseProcedure.input(ExportIdSchema).mutation(async ({ ctx, input }) => {
     requireWebSession(ctx.authViaToken);
     await requireDownloadableExport(ctx, input.exportId);
     const email = requireDownloadCodeRecipient(ctx.user.google_user_email);
@@ -539,7 +537,7 @@ export const userExportsRouter = createTRPCRouter({
   }),
 
   /** Step 2 of the download: redeem the emailed code for one signed URL. */
-  createDownload: adminProcedure.input(DownloadInputSchema).mutation(async ({ ctx, input }) => {
+  createDownload: baseProcedure.input(DownloadInputSchema).mutation(async ({ ctx, input }) => {
     requireWebSession(ctx.authViaToken);
     await requireDownloadableExport(ctx, input.exportId);
     const email = requireDownloadCodeRecipient(ctx.user.google_user_email);

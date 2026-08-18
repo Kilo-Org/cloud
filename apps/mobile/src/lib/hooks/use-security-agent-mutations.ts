@@ -8,8 +8,13 @@ import {
   OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
   useHoistedOperationKey,
 } from '@/lib/operation-key';
+import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
+import {
+  type FlattenedSecurityAgentConfig,
+  type SecurityAgentConfig,
+  type SecurityAgentConfigPatch,
+} from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
@@ -35,6 +40,14 @@ export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not 
 /** Surface copy for the missing-configuration state (dismiss sheet). */
 export const SECURITY_CONFIGURATION_COPY =
   'Security service is not configured. Resubmitting cannot succeed until this is fixed.';
+
+/**
+ * Card copy for a reconcile-first sync row: a crash mid-sync left the outcome
+ * uncertain, so the card offers a same-key reconcile retry instead of a blind
+ * re-POST.
+ */
+export const SECURITY_SYNC_RECONCILE_COPY =
+  'A sync may not have completed. Retry to reconcile it, or discard.';
 
 /** True when the error is the server's missing-Worker-configuration rejection. */
 export function isSecurityConfigurationError(error: unknown): boolean {
@@ -111,26 +124,32 @@ export function useSaveSecurityAgentConfig(scope: string) {
 
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (patch: SecurityAgentConfigPatch) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.saveConfig.mutate(patch)
+    mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
+      // The server rejects a save whose revision is stale, so send the revision
+      // the last getConfig returned. `null` means the client saw no config yet.
+      const current = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
+      const expectedRevision = current?.configRevision ?? null;
+      return isPersonalSecurityScope(scope)
+        ? trpcClient.securityAgent.saveConfig.mutate({ ...patch, expectedRevision })
         : trpcClient.organizations.securityAgent.saveConfig.mutate({
             organizationId: scope,
             ...patch,
-          }),
+            expectedRevision,
+          });
+    },
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
-      const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+      const previous = queryClient.getQueryData<FlattenedSecurityAgentConfig>(configQueryKey);
+      queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, ...patch } : old
       );
       return { previous, patch };
     },
     onError: (error, _patch, context) => {
       if (context?.previous) {
-        const keys = Object.keys(context.patch) as (keyof SecurityAgentConfigPatch)[];
+        const keys = Object.keys(context.patch) as (keyof SecurityAgentConfig)[];
         const restoredFields = pick(context.previous, keys);
-        queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+        queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
           old ? { ...old, ...restoredFields } : old
         );
       }
@@ -139,12 +158,6 @@ export function useSaveSecurityAgentConfig(scope: string) {
     onSuccess: result => {
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
-      }
-      if (result.backlogAdmissionWarning) {
-        announcingToast.error(result.backlogAdmissionWarning);
-      }
-      if (result.remediationBacklogAdmissionWarning) {
-        announcingToast.error(result.remediationBacklogAdmissionWarning);
       }
     },
     onSettled: async () => {
@@ -244,12 +257,33 @@ export function useSetSecurityAgentEnabled(scope: string) {
 export function useTriggerSecuritySync(scope: string) {
   const queryClient = useQueryClient();
   const { getKey, rotateKey } = useHoistedOperationKey();
+  // P1-E-40c: Security sync is reconcile-first — persist the row so a crash
+  // mid-flight surfaces a card on relaunch instead of auto-replaying.
+  const { writeReconcileFirst, remove: removeOutboxRow, whenLoaded } = useMutationOutbox();
 
   return useMutation({
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {
-      const operationKey = getKey(securitySyncIntentFingerprint(scope, vars.repoFullName));
+      const fingerprint = securitySyncIntentFingerprint(scope, vars.repoFullName);
+      // Gate on the outbox load first: a sync that races the launch load would
+      // read empty rows and write a fresh key over a crash row, dropping the
+      // stored reconcile key.
+      // A failed outbox read reads as no stored rows, so refuse instead of
+      // writing a fresh key over a crash row the server may already hold.
+      if (!(await whenLoaded())) {
+        throw new Error('Could not read pending syncs. Try again.');
+      }
+      // Persist the reconcile-first row BEFORE the POST and resolve the row's
+      // own operationKey: a stored row keeps its key, so the wire never POSTs
+      // a fresh in-memory key over a crash row. The row carries the scope so
+      // the dashboard shows only its own rows.
+      const operationKey = await writeReconcileFirst({
+        operationKey: vars.operationKey ?? getKey(fingerprint),
+        fingerprint,
+        scope,
+        input: vars,
+      });
       try {
         const result = isPersonalSecurityScope(scope)
           ? await trpcClient.securityAgent.triggerSync.mutate({ ...vars, operationKey })
@@ -259,11 +293,15 @@ export function useTriggerSecuritySync(scope: string) {
               operationKey,
             });
         rotateKey();
+        await removeOutboxRow(fingerprint);
         return result;
       } catch (error) {
         if (!isSecuritySyncRetryable(error)) {
           rotateKey();
+          await removeOutboxRow(fingerprint);
         }
+        // A retryable (ambiguous) failure keeps the row: the server may have
+        // accepted the command, so a relaunch must reconcile, not re-POST.
         throw mapSecuritySyncOperationError(error);
       }
     },

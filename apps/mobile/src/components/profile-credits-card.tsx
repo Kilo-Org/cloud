@@ -57,6 +57,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
 
   const balanceDollars = balance?.balance ?? 0;
+  // A paused query (offline/unknown connectivity, empty cache) is pending but
+  // not fetching, so `balanceLoading` (isLoading) is false while `balance`
+  // is still undefined. Treat "no data yet" as loading so the card shows a
+  // skeleton instead of `$0` on a cold launch before NetInfo settles.
+  const balancePending = balance === undefined && !balanceError;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
   const expiringTotal = fromMicrodollars(
     expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
@@ -132,7 +137,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         )}
       </View>
 
-      {balanceLoading && <Skeleton className="min-h-16 w-full rounded-lg" />}
+      {(balanceLoading || balancePending) && <Skeleton className="min-h-16 w-full rounded-lg" />}
       {balanceError && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
@@ -141,7 +146,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           <Text className="text-sm text-destructive">Failed to load balance. Tap to retry.</Text>
         </Pressable>
       )}
-      {!balanceLoading && !balanceError && (
+      {!balanceLoading && !balancePending && !balanceError && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
             <Text className="text-2xl font-bold">{formatDollars(balanceDollars)}</Text>
@@ -164,13 +169,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-      {!balanceLoading && !balanceError && balanceDollars === 0 && canShowZeroBalanceCta && (
-        <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
-      )}
+      {!balanceLoading &&
+        !balancePending &&
+        !balanceError &&
+        balanceDollars === 0 &&
+        canShowZeroBalanceCta && (
+          <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
+        )}
       {/* Personal-context IAP disclosure only — never show this personal "managed
           outside the iOS app" copy under an org context (org billing isn't personal
           IAP, and a non-money-role member just lacks access). */}
       {!balanceLoading &&
+        !balancePending &&
         !balanceError &&
         balanceDollars === 0 &&
         !canShowZeroBalanceCta &&

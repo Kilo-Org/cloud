@@ -27,7 +27,7 @@ import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
 } from '@/lib/hooks/use-security-agent';
-import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
 type AnalysisMode = SecurityAgentConfig['analysisMode'];
@@ -69,7 +69,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const [remediationModelSlug, setRemediationModelSlug] = useState('');
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('auto');
   const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber

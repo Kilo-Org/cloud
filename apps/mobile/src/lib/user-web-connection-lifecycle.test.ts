@@ -68,7 +68,7 @@ describe('createNativeUserWebConnectionLifecycleHooks', () => {
     expect(native.removeAppStateListener).toHaveBeenCalledTimes(1);
   });
 
-  it('reports only offline-to-online network recovery', () => {
+  it('resumes on unknown → online (first online after boot) and on offline → online', () => {
     const native = createSources();
     const hooks = createNativeUserWebConnectionLifecycleHooks(native.sources);
     const onOnline = vi.fn();
@@ -76,13 +76,37 @@ describe('createNativeUserWebConnectionLifecycleHooks', () => {
       onOnline();
     });
 
+    // Boot is unknown: no resume until NetInfo confirms reachability.
+    native.setConnectivity({ isConnected: null, isInternetReachable: null });
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    // First confirmed online resumes the socket (unknown → online).
     native.setConnectivity({ isConnected: true, isInternetReachable: true });
+    // A repeat online report does not resume again.
     native.setConnectivity({ isConnected: true, isInternetReachable: true });
+    // Going offline does not resume.
     native.setConnectivity({ isConnected: false, isInternetReachable: false });
+    // Recovery resumes once more (offline → online).
     native.setConnectivity({ isConnected: true, isInternetReachable: true });
     cleanup?.();
 
-    expect(onOnline).toHaveBeenCalledTimes(1);
+    expect(onOnline).toHaveBeenCalledTimes(2);
+    expect(native.removeConnectivityListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resume while unknown or on unknown → offline', () => {
+    const native = createSources();
+    const hooks = createNativeUserWebConnectionLifecycleHooks(native.sources);
+    const onOnline = vi.fn();
+    const cleanup = hooks.onOnline?.(() => {
+      onOnline();
+    });
+
+    native.setConnectivity({ isConnected: null, isInternetReachable: null });
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    native.setConnectivity({ isConnected: false, isInternetReachable: false });
+    cleanup?.();
+
+    expect(onOnline).not.toHaveBeenCalled();
     expect(native.removeConnectivityListener).toHaveBeenCalledTimes(1);
   });
 });

@@ -327,6 +327,32 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(stored?.text).toBe('hello');
   });
 
+  it('ready path carries the chosen custom mode so the auto-send keeps it', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'reviewer',
+      getSubmitPayload: () => samplePayload,
+    });
+
+    await runStartAndWaitForReplace(onStart);
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(calledWith).toContain('autoSend=1');
+    expect(calledWith).toContain('mode=reviewer');
+  });
+
+  it('ready path omits mode when the spawn had none', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => samplePayload,
+    });
+
+    await runStartAndWaitForReplace(onStart);
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(calledWith).not.toContain('mode=');
+  });
+
   it('ready path navigates without share params when press-time payload is null', async () => {
     const { onStart } = runHook({
       organizationId: 'org-xyz',

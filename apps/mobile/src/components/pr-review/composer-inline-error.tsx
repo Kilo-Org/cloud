@@ -11,6 +11,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import {
   ensureTermsAcceptedOutcome,
+  TERMS_CHECK_RETRY_COPY,
   TERMS_OUTDATED_COPY,
 } from '@/components/pr-review/discussion/reply-input';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -79,6 +80,10 @@ export function useComposerInlineError(error: unknown, isEdit: boolean) {
         } else if (outcome.kind === 'outdated') {
           setInlineError(TERMS_OUTDATED_COPY);
           setInlineErrorKind('bad-request');
+          setInlineErrorIsLocal(false);
+        } else if (outcome.kind === 'unknown') {
+          setInlineError(TERMS_CHECK_RETRY_COPY);
+          setInlineErrorKind('retryable');
           setInlineErrorIsLocal(false);
         } else {
           setInlineError('You must accept the Terms of Service to post.');

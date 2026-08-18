@@ -180,10 +180,10 @@ describe('ensureTermsAcceptedOutcome', () => {
     expect(acceptTermsMock).not.toHaveBeenCalled();
   });
 
-  it('passes through a getTermsStatus failure as accepted (server enforces on write)', async () => {
+  it('reports a getTermsStatus failure as unknown, not as acceptance', async () => {
     getTermsStatusMock.mockRejectedValueOnce(new Error('Network request failed'));
 
-    await expect(ensureTermsAcceptedOutcome()).resolves.toEqual({ kind: 'accepted' });
+    await expect(ensureTermsAcceptedOutcome()).resolves.toEqual({ kind: 'unknown' });
     expect(alertCalls).toHaveLength(0);
   });
 });

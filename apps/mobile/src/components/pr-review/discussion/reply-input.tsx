@@ -27,22 +27,30 @@ const TERMS_COPY = 'You must be 13 or older to post.';
 const TERMS_ACCEPT_RETRY_COPY = "Couldn't accept the Terms. Check your connection and try again.";
 export const TERMS_OUTDATED_COPY =
   'The Terms of Service changed. Reopen this screen to accept the latest version.';
+export const TERMS_CHECK_RETRY_COPY =
+  "Couldn't check the Terms of Service. Check your connection and try again.";
 
 /**
  * Outcome of the UGC Terms gate. `accepted` means the current version is
  * already accepted or the user accepted now (the caller may post).
  * `dismissed` means the user cancelled the gate. `outdated` means the accept
  * was rejected because the version is stale — terminal, the caller must not
- * post.
+ * post. `unknown` means the Terms status could not be read, so acceptance is
+ * unconfirmed.
  */
-export type TermsGateOutcome = { kind: 'accepted' } | { kind: 'dismissed' } | { kind: 'outdated' };
+export type TermsGateOutcome =
+  | { kind: 'accepted' }
+  | { kind: 'dismissed' }
+  | { kind: 'outdated' }
+  | { kind: 'unknown' };
 
 /**
  * Best-effort UGC Terms gate. Returns `accepted` when the current version is
  * already accepted, or when the user accepts now. A transient accept failure
  * re-prompts with a Retry CTA; an outdated-version reject returns `outdated`
- * (terminal). A `getTermsStatus` failure passes through as `accepted` (the
- * server enforces Terms on the write and the reactive path re-prompts).
+ * (terminal). A `getTermsStatus` failure returns `unknown`: the write may still
+ * be attempted (the server enforces Terms), but a pending Terms error must stay
+ * visible instead of being cleared as if acceptance was confirmed.
  */
 export async function ensureTermsAcceptedOutcome(): Promise<TermsGateOutcome> {
   try {
@@ -52,7 +60,7 @@ export async function ensureTermsAcceptedOutcome(): Promise<TermsGateOutcome> {
     }
     return await promptTermsAcceptance(status.currentVersion);
   } catch {
-    return { kind: 'accepted' };
+    return { kind: 'unknown' };
   }
 }
 
@@ -171,6 +179,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           } else if (outcome.kind === 'outdated') {
             setInlineError(TERMS_OUTDATED_COPY);
             setInlineErrorKind('bad-request');
+          } else if (outcome.kind === 'unknown') {
+            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineErrorKind('retryable');
           } else {
             setInlineError(TERMS_COPY);
             setInlineErrorKind(null);
@@ -206,7 +217,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       setInlineErrorKind('bad-request');
       return;
     }
-    if (outcome.kind !== 'accepted') {
+    if (outcome.kind === 'dismissed') {
       return;
     }
     reply.mutate(

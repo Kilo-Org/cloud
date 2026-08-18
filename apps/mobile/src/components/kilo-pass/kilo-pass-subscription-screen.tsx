@@ -36,6 +36,10 @@ import { RestorePurchasesButton } from './restore-purchases-button';
 
 type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
 
+/** Shown when the App Store account already owns a pass on another Kilo account. */
+export const KILO_PASS_OTHER_ACCOUNT_COPY =
+  'This App Store subscription belongs to another Kilo account. Sign in to that account to manage it.';
+
 /**
  * A failed preflight is either retryable (transient network/5xx) or
  * non-retryable (the server refused the purchase). The retryable variant keeps
@@ -159,20 +163,24 @@ function KiloPassNativeIapContent() {
     productsIsRefetching,
     productsRefetch,
     purchase,
+    ownedByAnotherAccount,
   } = useKiloPassNativeIap();
   useInlinePurchaseErrorOwnership();
   const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());
   const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
   const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
   let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
-  if (errorMessage) {
+  if (ownedByAnotherAccount) {
+    feedback = { type: 'error', text: KILO_PASS_OTHER_ACCOUNT_COPY };
+  } else if (errorMessage) {
     feedback = { type: 'error', text: errorMessage };
   } else if (preflightFailure) {
     feedback = { type: 'error', text: preflightFailure.message };
   }
   const preflightBlocked = preflightFailure?.kind === 'nonRetryable';
   const isRetryDisabled = isPending || productsIsRefetching;
-  const tilesDisabled = isPending || preflightBlocked || preflightPurchase.isPending;
+  const tilesDisabled =
+    isPending || preflightBlocked || preflightPurchase.isPending || ownedByAnotherAccount;
   const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
   const mountedRef = useRef(true);
   useEffect(() => {

@@ -10,13 +10,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useComposerInlineError } from './composer-inline-error';
 
-const { ensureTermsAcceptedOutcomeMock, TERMS_OUTDATED } = vi.hoisted(() => ({
+const { ensureTermsAcceptedOutcomeMock, TERMS_CHECK_RETRY, TERMS_OUTDATED } = vi.hoisted(() => ({
   ensureTermsAcceptedOutcomeMock: vi.fn(),
+  TERMS_CHECK_RETRY: "Couldn't check the Terms of Service. Check your connection and try again.",
   TERMS_OUTDATED: 'The Terms of Service changed. Reopen this screen to accept the latest version.',
 }));
 
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: () => ensureTermsAcceptedOutcomeMock(),
+  TERMS_CHECK_RETRY_COPY: TERMS_CHECK_RETRY,
   TERMS_OUTDATED_COPY: TERMS_OUTDATED,
 }));
 
@@ -98,6 +100,18 @@ describe('useComposerInlineError terms gate', () => {
     expect(latestState?.inlineError).toBe('You must accept the Terms of Service to post.');
     expect(latestState?.inlineErrorKind).toBe(null);
     expect(latestState?.inlineErrorIsLocal).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps a retryable error when the Terms status could not be read', async () => {
+    ensureTermsAcceptedOutcomeMock.mockResolvedValue({ kind: 'unknown' });
+
+    const renderer = await mount(termsRequiredError());
+
+    expect(latestState?.inlineError).toBe(TERMS_CHECK_RETRY);
+    expect(latestState?.inlineErrorKind).toBe('retryable');
+    expect(latestState?.inlineErrorIsLocal).toBe(false);
 
     renderer.unmount();
   });

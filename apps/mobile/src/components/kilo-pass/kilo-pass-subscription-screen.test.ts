@@ -4,7 +4,10 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
+import {
+  KILO_PASS_OTHER_ACCOUNT_COPY,
+  KiloPassSubscriptionScreen,
+} from './kilo-pass-subscription-screen';
 
 // ── Mutable state ────────────────────────────────────────────────────
 
@@ -30,6 +33,7 @@ const mocks = vi.hoisted(() => ({
     productsIsRefetching: false,
     productsRefetch: vi.fn(),
     purchase: vi.fn(),
+    ownedByAnotherAccount: false,
   },
   routerPush: vi.fn(),
 }));
@@ -262,6 +266,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.productsIsRefetching = false;
     mocks.nativeIap.productsRefetch.mockReset();
     mocks.nativeIap.purchase.mockReset();
+    mocks.nativeIap.ownedByAnotherAccount = false;
     mocks.routerPush.mockReset();
   });
 
@@ -288,6 +293,23 @@ describe('KiloPassSubscriptionScreen', () => {
       appleProductId: product.appleProductId,
     });
     expect(mocks.nativeIap.purchase).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('blocked: an App Store pass owned by another Kilo account disables the tiles', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.ownedByAnotherAccount = true;
+
+    const renderer = await renderScreen();
+    const tiles = productTiles(renderer);
+    expect(allText(renderer)).toContain(KILO_PASS_OTHER_ACCOUNT_COPY);
+    expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
+    expect(
+      (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
+        ?.disabled
+    ).toBe(true);
 
     renderer.unmount();
   });

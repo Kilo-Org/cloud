@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchProducts as fetchIapProducts,
@@ -28,6 +29,7 @@ import {
   type AppStoreKiloPassProduct,
   type StoreKiloPassProduct,
 } from '@/lib/kilo-pass/store-products';
+import { getAppStoreKiloPassOwnershipPreflight } from '@/lib/kilo-pass/subscription-card-state';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import {
   createAppStoreKiloPassPurchaseActions,
@@ -88,6 +90,8 @@ export type KiloPassNativeIapContextValue = {
   isRestoringPurchases: boolean;
   errorMessage: string | null;
   clearError: () => void;
+  /** True when the App Store account already owns a pass on another Kilo account. */
+  ownedByAnotherAccount: boolean;
 };
 
 const KiloPassNativeIapContext = createContext<KiloPassNativeIapContextValue | null>(null);
@@ -184,6 +188,17 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     }
     return serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [];
   }, [productsQuery.products, serverProductsQuery.data]);
+
+  const ownedByAnotherAccount = useMemo(
+    () =>
+      getAppStoreKiloPassOwnershipPreflight({
+        availablePurchases,
+        currentAppAccountToken: serverProductsQuery.data?.appAccountToken,
+        enabledAppleProductIds,
+        platformOS: Platform.OS,
+      }) === 'owned-by-another-account',
+    [availablePurchases, enabledAppleProductIds, serverProductsQuery.data]
+  );
 
   const invalidateAfterCompletion = useCallback(async () => {
     await Promise.all([
@@ -340,6 +355,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       isRestoringPurchases,
       errorMessage,
       clearError,
+      ownedByAnotherAccount,
     }),
     [
       clearError,
@@ -347,6 +363,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       errorMessage,
       isRequestingPurchase,
       isRestoringPurchases,
+      ownedByAnotherAccount,
       productsQuery.errorMessage,
       productsQuery.isLoading,
       productsQuery.isRefetching,

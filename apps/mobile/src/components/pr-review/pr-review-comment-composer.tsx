@@ -162,7 +162,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       setInlineErrorIsLocal(false);
       return;
     }
-    if (outcome.kind !== 'accepted') {
+    if (outcome.kind === 'dismissed') {
       return;
     }
     try {

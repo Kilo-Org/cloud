@@ -34,6 +34,7 @@ import {
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import {
   ensureTermsAcceptedOutcome,
+  TERMS_CHECK_RETRY_COPY,
   TERMS_OUTDATED_COPY,
 } from '@/components/pr-review/discussion/reply-input';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -91,6 +92,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           } else if (outcome.kind === 'outdated') {
             setInlineError(TERMS_OUTDATED_COPY);
             setInlineErrorKind('bad-request');
+          } else if (outcome.kind === 'unknown') {
+            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineErrorKind('retryable');
           } else {
             setInlineError('You must accept the Terms of Service to post.');
             setInlineErrorKind(null);
@@ -132,7 +136,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       setInlineErrorKind('bad-request');
       return;
     }
-    if (outcome.kind !== 'accepted') {
+    if (outcome.kind === 'dismissed') {
       return;
     }
     try {

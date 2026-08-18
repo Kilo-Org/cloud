@@ -58,6 +58,22 @@ vi.mock('sonner-native', () => ({
   toast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
+// `use-security-agent-mutations` imports the outbox (P1-E-40c), which pulls in
+// `@sentry/react-native` (Flow) transitively; mock it so this pure-logic test
+// never loads react-native's index.js.
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => ({
+    getStoredOperationKey: vi.fn(() => null),
+    writeSafeRetry: vi.fn(async () => undefined),
+    writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => row.operationKey),
+    remove: vi.fn(async () => undefined),
+    needsReconcile: [],
+    loaded: true,
+    whenLoaded: vi.fn(async () => undefined),
+    refresh: vi.fn(),
+  }),
+}));
+
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onError?: (error: unknown) => void;

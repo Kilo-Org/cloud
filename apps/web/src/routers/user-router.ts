@@ -5,7 +5,11 @@ import {
   SoftDeletePreconditionError,
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
-import { sendSignInCodeEmail } from '@/lib/email';
+import {
+  sendAccountDeletionConfirmationEmail,
+  sendAccountDeletionSupportNotification,
+  sendSignInCodeEmail,
+} from '@/lib/email';
 import {
   consumeSignInCode,
   createSignInCode,
@@ -945,10 +949,42 @@ export const userRouter = createTRPCRouter({
     }),
 
   requestAccountDeletion: baseProcedure
-    .input(z.object({ challengeId: z.uuid(), code: z.string().min(1) }))
+    .input(z.object({ challengeId: z.uuid(), code: z.string().min(1) }).optional())
     .mutation(async ({ ctx, input }) => {
       const userEmail = ctx.user.google_user_email;
       const userId = ctx.user.id;
+
+      // TODO: remove this branch, and make the input required again, once no
+      // shipped client calls this without a challenge. Builds already in the
+      // stores send no input and a required input answers them with a 400, so
+      // they keep the old support-ticket flow: it emails the user and support
+      // and deletes nothing, which is what those builds tell the user happened.
+      // Drop it when the mobile release that sends { challengeId, code } has
+      // rolled out and input-less traffic in Axiom reaches zero.
+      if (!input) {
+        const lastRequested = ctx.user.account_deletion_requested_at;
+        if (
+          lastRequested &&
+          Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
+        ) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Account deletion already requested. Please wait before trying again.',
+          });
+        }
+
+        await Promise.all([
+          sendAccountDeletionConfirmationEmail(userEmail),
+          sendAccountDeletionSupportNotification(userEmail, userId),
+        ]);
+
+        await db
+          .update(kilocode_users)
+          .set({ account_deletion_requested_at: new Date().toISOString() })
+          .where(eq(kilocode_users.id, userId));
+
+        return successResult();
+      }
 
       try {
         await assertUserCanBeSoftDeleted(userId);

@@ -548,6 +548,49 @@ describe('User', () => {
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
     });
 
+    it('replaces a stale WorkOS profile ID for an existing user', async () => {
+      const existingUser = await insertTestUser({
+        google_user_email: 'stale-workos@example.com',
+        web_session_pepper: 'web-pepper-before-workos-relink',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existingUser.id,
+        provider: 'workos',
+        provider_account_id: 'old-workos-profile-id',
+        email: existingUser.google_user_email,
+        avatar_url: 'https://example.com/old-avatar.png',
+        hosted_domain: 'example.com',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: existingUser.google_user_email,
+          google_user_name: 'Stale WorkOS User',
+          google_user_image_url: 'https://example.com/new-avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'new-workos-profile-id',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      const providers = await db.query.user_auth_provider.findMany({
+        where: eq(user_auth_provider.kilo_user_id, existingUser.id),
+      });
+      expect(providers).toEqual([
+        expect.objectContaining({
+          provider: 'workos',
+          provider_account_id: 'new-workos-profile-id',
+        }),
+      ]);
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, existingUser.id),
+      });
+      expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos-relink');
+    });
+
     it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {
       const user = await insertTestUserAndGoogleAuth({
         google_user_email: 'existing-defer@example.com',

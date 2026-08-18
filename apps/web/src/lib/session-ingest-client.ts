@@ -387,6 +387,34 @@ export async function invalidateOrganizationSessionAccess(
   }
 }
 
+export async function invalidateUserAuthCache(kiloUserId: string): Promise<void> {
+  if (!SESSION_INGEST_WORKER_URL || !INTERNAL_API_SECRET) {
+    return;
+  }
+
+  const response = await fetch(`${SESSION_INGEST_WORKER_URL}/internal/user-auth/invalidate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-Internal-Secret': INTERNAL_API_SECRET,
+    },
+    body: JSON.stringify({ kiloUserId }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    await response.text().catch(() => undefined);
+    const error = new Error(
+      `User auth invalidation failed: ${response.status} ${response.statusText}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'invalidate-user-auth' },
+      extra: { kiloUserId, status: response.status },
+    });
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Delete
 // ---------------------------------------------------------------------------

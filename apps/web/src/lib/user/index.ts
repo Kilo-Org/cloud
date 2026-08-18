@@ -9,6 +9,8 @@ import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { invalidateUserAuthCache } from '@/lib/session-ingest-client';
+import { errorExceptInTest } from '@/lib/utils.server';
 import {
   payment_methods,
   kilocode_users,
@@ -1657,6 +1659,14 @@ export async function softDeleteUser(userId: string) {
       .where(eq(security_advisor_scans.kilo_user_id, userId));
   });
 
+  try {
+    await invalidateUserAuthCache(userId);
+  } catch (error) {
+    errorExceptInTest('Failed to invalidate cached user auth after soft-delete', {
+      kiloUserId: userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
   void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
 }
 

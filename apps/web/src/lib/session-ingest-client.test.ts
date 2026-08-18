@@ -10,6 +10,7 @@ import {
   unshareSession,
   fetchSharedSessionMetadata,
   invalidateOrganizationSessionAccess,
+  invalidateUserAuthCache,
 } from './session-ingest-client';
 
 // ---------------------------------------------------------------------------
@@ -639,6 +640,70 @@ describe('invalidateOrganizationSessionAccess', () => {
     expect(timeout).toHaveBeenCalledWith(30_000);
     expect(mockFetch).toHaveBeenCalledWith(
       'https://ingest.test.example.com/internal/session-access/invalidate',
+      expect.objectContaining({ signal })
+    );
+    timeout.mockRestore();
+  });
+});
+
+describe('invalidateUserAuthCache', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  it('reports and throws invalidation failures', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: () => Promise.resolve('cache unavailable'),
+    });
+
+    await expect(invalidateUserAuthCache('usr_blocked')).rejects.toThrow(
+      'User auth invalidation failed: 503 Service Unavailable'
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'invalidate-user-auth' },
+        extra: {
+          kiloUserId: 'usr_blocked',
+          status: 503,
+        },
+      })
+    );
+  });
+
+  it('calls the secret-protected user-auth invalidation endpoint', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+
+    await invalidateUserAuthCache('usr_blocked');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/internal/user-auth/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
+        signal: expect.any(AbortSignal),
+      }
+    );
+  });
+
+  it('sets a 30-second invalidation deadline', async () => {
+    const signal = new AbortController().signal;
+    const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+
+    await invalidateUserAuthCache('usr_blocked');
+
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/internal/user-auth/invalidate',
       expect.objectContaining({ signal })
     );
     timeout.mockRestore();

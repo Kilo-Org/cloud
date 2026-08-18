@@ -1,4 +1,5 @@
 import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
+import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import jwt from 'jsonwebtoken';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -71,6 +72,27 @@ describe('active-sessions-router', () => {
     // though it is comfortably fast in isolation. Give it real headroom
     // rather than a fragile default.
   }, 15_000);
+
+  it('returns a pepper-bearing one-hour user token for session-ingest', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+    const before = Math.floor(Date.now() / 1000);
+    const result = await caller.activeSessions.getToken();
+    const { NEXTAUTH_SECRET } = await import('@/lib/config.server');
+    const payload = jwt.verify(result.token, NEXTAUTH_SECRET, {
+      algorithms: ['HS256'],
+    }) as jwt.JwtPayload & {
+      kiloUserId: string;
+      apiTokenPepper: string | null;
+    };
+
+    expect(payload.kiloUserId).toBe(regularUser.id);
+    expect(payload.apiTokenPepper).toBe(regularUser.api_token_pepper);
+    expect(payload.aud).toBeUndefined();
+    expect(payload).not.toHaveProperty('google_user_email');
+    expect(payload).not.toHaveProperty('organizationId');
+    expect(payload.exp! - payload.iat!).toBe(60 * 60);
+    expect(payload.exp).toBeGreaterThanOrEqual(before + 60 * 60 - 2);
+  });
 
   afterEach(() => {
     jest.restoreAllMocks();

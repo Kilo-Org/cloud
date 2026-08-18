@@ -114,6 +114,9 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
       )
       .returning({ id: kilocode_users.id });
 
+    // This bulk backfill intentionally relies on the session-ingest auth-cache
+    // TTL plus KV propagation rather than issuing one invalidation request per
+    // user. Pepper rotation and non-null blocked_reason remain authoritative.
     totalProcessed += updated.length;
     if (updated.length > 0) {
       await revokeGatewayGrantsForBlockedUsers(updated.map(user => user.id));

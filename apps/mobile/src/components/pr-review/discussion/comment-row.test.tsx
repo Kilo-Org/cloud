@@ -104,7 +104,10 @@ vi.mock('@/lib/utils', () => ({
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-async function render(comment: ReviewComment): Promise<TestRenderer.ReactTestRenderer> {
+async function render(
+  comment: ReviewComment,
+  viewerLogin: string | null = 'bob'
+): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
     await Promise.resolve();
@@ -112,7 +115,7 @@ async function render(comment: ReviewComment): Promise<TestRenderer.ReactTestRen
       createElement(CommentRow, {
         comment,
         onToggleReaction: vi.fn<() => void>(),
-        viewerLogin: 'bob',
+        viewerLogin,
       })
     );
   });
@@ -151,6 +154,10 @@ function selectOverflowAction(index: number): void {
 
 function overflowOptions(): string[] {
   return (lastSheetCall()[0] as { options: string[] }).options;
+}
+
+function disabledButtonIndices(): number[] | undefined {
+  return (lastSheetCall()[0] as { disabledButtonIndices?: number[] }).disabledButtonIndices;
 }
 
 function pressAlertButton(text: string): void {
@@ -279,6 +286,18 @@ describe('CommentRow overflow actions', () => {
     openOverflow(renderer);
 
     expect(overflowOptions()).toEqual(['Report content', 'Cancel']);
+
+    renderer.unmount();
+  });
+
+  it('disables self-target user actions when the login differs only by case', async () => {
+    const renderer = await render(
+      makeComment({ author: { login: 'Bob', avatarUrl: 'https://example.com/b.png' } }),
+      'bob'
+    );
+    openOverflow(renderer);
+
+    expect(disabledButtonIndices()).toEqual([1, 2, 3]);
 
     renderer.unmount();
   });

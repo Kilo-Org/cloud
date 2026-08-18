@@ -76,45 +76,55 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
       }
     }
     function showRetry() {
-      Alert.alert('Terms of Service', TERMS_ACCEPT_RETRY_COPY, [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            resolve({ kind: 'dismissed' });
+      Alert.alert(
+        'Terms of Service',
+        TERMS_ACCEPT_RETRY_COPY,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              resolve({ kind: 'dismissed' });
+            },
           },
-        },
-        {
-          text: 'Retry',
-          onPress: () => {
-            void accept();
+          {
+            text: 'Retry',
+            onPress: () => {
+              void accept();
+            },
           },
-        },
-      ]);
+        ],
+        { cancelable: false }
+      );
     }
     const show = () => {
-      Alert.alert('Terms of Service', TERMS_COPY, [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            resolve({ kind: 'dismissed' });
+      Alert.alert(
+        'Terms of Service',
+        TERMS_COPY,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              resolve({ kind: 'dismissed' });
+            },
           },
-        },
-        {
-          text: 'View terms',
-          onPress: () => {
-            void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
-            show();
+          {
+            text: 'View terms',
+            onPress: () => {
+              void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
+              show();
+            },
           },
-        },
-        {
-          text: 'Accept',
-          onPress: () => {
-            void accept();
+          {
+            text: 'Accept',
+            onPress: () => {
+              void accept();
+            },
           },
-        },
-      ]);
+        ],
+        { cancelable: false }
+      );
     };
     show();
   });

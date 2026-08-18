@@ -9,7 +9,10 @@ import { View } from 'react-native';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
-import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
+import {
+  ensureTermsAcceptedOutcome,
+  TERMS_OUTDATED_COPY,
+} from '@/components/pr-review/discussion/reply-input';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 
@@ -72,6 +75,10 @@ export function useComposerInlineError(error: unknown, isEdit: boolean) {
         if (outcome.kind === 'accepted') {
           setInlineError(null);
           setInlineErrorKind(null);
+          setInlineErrorIsLocal(false);
+        } else if (outcome.kind === 'outdated') {
+          setInlineError(TERMS_OUTDATED_COPY);
+          setInlineErrorKind('bad-request');
           setInlineErrorIsLocal(false);
         } else {
           setInlineError('You must accept the Terms of Service to post.');

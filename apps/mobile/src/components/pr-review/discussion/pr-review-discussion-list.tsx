@@ -66,10 +66,10 @@ export function PrReviewDiscussionList({
   const hiddenLogins = useMemo(() => {
     const set = new Set<string>();
     for (const login of hiddenUsers.data?.blockedLogins ?? []) {
-      set.add(login);
+      set.add(login.toLowerCase());
     }
     for (const login of hiddenUsers.data?.mutedLogins ?? []) {
-      set.add(login);
+      set.add(login.toLowerCase());
     }
     return set;
   }, [hiddenUsers.data]);
@@ -81,12 +81,13 @@ export function PrReviewDiscussionList({
     for (const item of listItems) {
       if (item.kind === 'comment') {
         const login = item.comment.author?.login;
-        if (login == null || !hiddenLogins.has(login)) {
+        if (login == null || !hiddenLogins.has(login.toLowerCase())) {
           result.push(item);
         }
       } else {
         const visibleComments = item.thread.comments.filter(
-          comment => comment.author?.login == null || !hiddenLogins.has(comment.author.login)
+          comment =>
+            comment.author?.login == null || !hiddenLogins.has(comment.author.login.toLowerCase())
         );
         if (visibleComments.length > 0) {
           result.push({ kind: 'thread', thread: { ...item.thread, comments: visibleComments } });

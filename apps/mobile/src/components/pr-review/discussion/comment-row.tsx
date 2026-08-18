@@ -158,7 +158,12 @@ export function CommentRow({
 
   function openOverflow() {
     const author = comment.author;
-    const isSelf = author !== null && viewerLogin !== null && author.login === viewerLogin;
+    // oxlint-disable typescript-eslint/prefer-optional-chain -- the null checks guard the `.toLowerCase()` calls; `author?.login.toLowerCase()` would short-circuit to `undefined === undefined` when both are null
+    const isSelf =
+      author !== null &&
+      viewerLogin !== null &&
+      author.login.toLowerCase() === viewerLogin.toLowerCase();
+    // oxlint-enable typescript-eslint/prefer-optional-chain
     const userActions: { label: string; run: () => void }[] = [];
     if (author !== null) {
       userActions.push({

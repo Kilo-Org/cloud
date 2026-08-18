@@ -155,6 +155,7 @@ import {
 } from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
 import { createAgentSandbox, createAgentSandboxLifecycle } from '../agent-sandbox/factory.js';
+import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import type {
   AgentSandboxLifecycle,
   SandboxDeleteReason,
@@ -731,6 +732,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               ? Promise.resolve({ status: 'absent' })
               : createAgentSandbox(this.env, metadata).discoverSessionWrappers(),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
       });
     }
 
@@ -743,6 +745,34 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   private async canUseSandboxRuntime(): Promise<boolean> {
     return !(await this.hasDeletionIntent());
+  }
+
+  private async containerBillingAdmissionFailure(): Promise<Extract<
+    SessionMessageAdmissionResult,
+    { success: false }
+  > | null> {
+    const metadata = await this.getMetadata();
+    if (!metadata) return null;
+    if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;
+    const admission = await createAgentSandbox(this.env, metadata).ensureBillingAdmission();
+    if (admission.success) return null;
+    const paymentRequired =
+      admission.code === 'insufficient_credits' || admission.code === 'stopping';
+    return {
+      success: false,
+      code: paymentRequired ? 'PAYMENT_REQUIRED' : 'INTERNAL',
+      error: paymentRequired
+        ? 'Container billing requires additional credits'
+        : 'Container billing admission is temporarily unavailable',
+      failureBoundary: 'admission',
+    };
+  }
+
+  private async isContainerBillingBlocked(): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCloudAgentContainerBillingEnabled(this.env, metadata.identity))
+      return false;
+    return createAgentSandbox(this.env, metadata).isBillingBlocked();
   }
 
   private getSandboxLifecycle(): AgentSandboxLifecycle {
@@ -885,6 +915,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>
           isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
+        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
         ensureQueuedMessageEvent: event => {
           this.ensureQueuedMessageEvent({
             executionId: '' as EventSourceId,
@@ -941,8 +972,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         wrapperSupervisor: this.getWrapperSupervisor(),
         handleWrapperTerminalEvent: params => this.handleWrapperTerminalEvent(params),
         keepContainerAlive: () => {
-          void this.keepContainerAlive();
+          void this.keepContainerAliveIfBillingAllowed();
         },
+        isBillingBlocked: () => this.isContainerBillingBlocked(),
         observeCorrelatedAgentActivity: messageId => this.recordCorrelatedAgentActivity(messageId),
         terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
           await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
@@ -977,6 +1009,18 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       this.ingestHandlerSessionId = sessionId;
     }
     return this.ingestHandler;
+  }
+
+  private async keepContainerAliveIfBillingAllowed(): Promise<void> {
+    try {
+      if (await this.isContainerBillingBlocked()) return;
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId, skipped: 'billing-state-unavailable' })
+        .warn('Cloud agent skipped sandbox keepalive');
+      return;
+    }
+    await this.keepContainerAlive();
   }
 
   // ---------------------------------------------------------------------------

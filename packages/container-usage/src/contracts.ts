@@ -148,6 +148,49 @@ export const recordStartResultSchema = z.discriminatedUnion('success', [
 ]);
 export type RecordStartResult = z.infer<typeof recordStartResultSchema>;
 
+export const recordStartV2ResultSchema = z.union([
+  z
+    .object({
+      success: z.literal(true),
+      ack: recordAckSchema,
+      billingMode: z.literal('shadow'),
+    })
+    .strict(),
+  z
+    .object({
+      success: z.literal(true),
+      ack: recordAckSchema,
+      billingMode: z.literal('paid'),
+      remainingMicrodollars: z.number().int(),
+    })
+    .strict(),
+  z
+    .object({
+      success: z.literal(false),
+      error: z
+        .object({
+          code: z.literal('insufficient_credits'),
+          message: z.string().min(1),
+          remainingMicrodollars: z.number().int(),
+          minimumRequiredMicrodollars: z.number().int().positive(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      success: z.literal(false),
+      error: z
+        .object({
+          code: z.enum(['sku_not_found', 'sku_unit_mismatch', 'sku_not_accepting_new_usage']),
+          message: z.string().min(1),
+        })
+        .strict(),
+    })
+    .strict(),
+]);
+export type RecordStartV2Result = z.infer<typeof recordStartV2ResultSchema>;
+
 export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z.object({ verdict: z.literal('continue'), remaining: z.number().int().optional() }).strict(),
   z
@@ -180,6 +223,7 @@ export type HeartbeatAck = z.infer<typeof heartbeatAckSchema>;
 
 export type ContainerUsageRpcMethods = {
   recordStart: (input: RecordStartInput) => Promise<RecordStartResult>;
+  recordStartV2?: (input: RecordStartInput) => Promise<RecordStartV2Result>;
   recordHeartbeat: (input: RecordHeartbeatInput) => Promise<HeartbeatAck>;
   recordStop: (input: RecordStopInput) => Promise<RecordAck>;
 };

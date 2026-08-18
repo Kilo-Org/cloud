@@ -3,6 +3,7 @@ import {
   heartbeatAckSchema,
   recordAckSchema,
   recordStartResultSchema,
+  recordStartV2ResultSchema,
   startIdempotencyKey,
   stopIdempotencyKey,
   type ContainerUsageRpcMethods,
@@ -10,6 +11,7 @@ import {
   type RecordAck,
   type RecordHeartbeatInput,
   type RecordStartInput,
+  type RecordStartV2Result,
   type RecordStartFailureCode,
   type RecordStopInput,
   type UsageContext,
@@ -90,11 +92,7 @@ export class ContainerUsageClient {
   }
 
   async recordStart(input: ClientRecordStartInput): Promise<RecordAck> {
-    const request = {
-      ...input,
-      service: this.service,
-      idempotencyKey: startIdempotencyKey(this.service, input.instanceId, input.startEpochMs),
-    } satisfies RecordStartInput;
+    const request = this.startRequest(input);
     const result = await this.withRetry(async () =>
       recordStartResultSchema.parse(await this.binding.recordStart(request))
     );
@@ -102,6 +100,19 @@ export class ContainerUsageClient {
       throw new ContainerUsageAdmissionError(result.error.code, result.error.message);
     }
     return result.ack;
+  }
+
+  async recordStartV2(input: ClientRecordStartInput): Promise<RecordStartV2Result> {
+    // A deployed Worker RPC proxy may expose an absent method as callable and reject only
+    // when invoked. Keep this check for direct bindings; either failure mode remains fail-closed.
+    const recordStartV2 = this.binding.recordStartV2;
+    if (!recordStartV2) {
+      throw new Error('Container usage meter does not support recordStartV2');
+    }
+    const request = this.startRequest(input);
+    return await this.withRetry(async () =>
+      recordStartV2ResultSchema.parse(await recordStartV2.call(this.binding, request))
+    );
   }
 
   async recordHeartbeat(input: ClientRecordHeartbeatInput): Promise<HeartbeatAck> {
@@ -147,6 +158,14 @@ export class ContainerUsageClient {
       }
     }
     throw lastError;
+  }
+
+  private startRequest(input: ClientRecordStartInput): RecordStartInput {
+    return {
+      ...input,
+      service: this.service,
+      idempotencyKey: startIdempotencyKey(this.service, input.instanceId, input.startEpochMs),
+    };
   }
 }
 

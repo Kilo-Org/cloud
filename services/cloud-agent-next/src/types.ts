@@ -497,6 +497,9 @@ export type GitTokenService = {
 };
 
 export type Env = {
+  CLOUD_AGENT_CONTAINER_BILLING_ENABLED?: string;
+  CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
+  CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for shared sandbox containers with SCM credential containment */
   SandboxContainment: DurableObjectNamespace<Sandbox>;

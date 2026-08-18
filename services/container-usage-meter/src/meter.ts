@@ -14,6 +14,7 @@ import {
   type RecordHeartbeatInput,
   type RecordStartInput,
   type RecordStartResult,
+  type RecordStartV2Result,
   type RecordStopInput,
   type UsageContext,
 } from '@kilocode/container-usage';
@@ -71,6 +72,54 @@ export class ContainerUsageMeter
   implements ContainerUsageRpcMethods
 {
   async recordStart(input: RecordStartInput): Promise<RecordStartResult> {
+    const result = await this.applyStart(input);
+    if (result.kind === 'rejected') {
+      return { success: false, error: { code: result.code, message: result.message } };
+    }
+    return {
+      success: true,
+      ack: {
+        intervalId: intervalId(input.service, input.instanceId, input.startEpochMs),
+        durable: 'pg',
+        dedup: result.dedup,
+      },
+    };
+  }
+
+  async recordStartV2(input: RecordStartInput): Promise<RecordStartV2Result> {
+    const result = await this.applyStart(input);
+    if (result.kind === 'rejected') {
+      if (result.code === 'insufficient_credits') {
+        return {
+          success: false,
+          error: {
+            code: result.code,
+            message: result.message,
+            remainingMicrodollars: result.remainingMicrodollars,
+            minimumRequiredMicrodollars: result.minimumRequiredMicrodollars,
+          },
+        };
+      }
+      return { success: false, error: { code: result.code, message: result.message } };
+    }
+    const ack = {
+      intervalId: intervalId(input.service, input.instanceId, input.startEpochMs),
+      durable: 'pg' as const,
+      dedup: result.dedup,
+    };
+    return result.billingMode === 'paid'
+      ? {
+          success: true,
+          ack,
+          billingMode: 'paid',
+          remainingMicrodollars: result.remainingMicrodollars,
+        }
+      : { success: true, ack, billingMode: 'shadow' };
+  }
+
+  private async applyStart(
+    input: RecordStartInput
+  ): Promise<Awaited<ReturnType<typeof applyStart>>> {
     const parsed = recordStartInputSchema.parse(input);
     assertIdempotencyKey(
       parsed.idempotencyKey,
@@ -94,17 +143,13 @@ export class ContainerUsageMeter
       });
       throw error;
     }
-    switch (result.kind) {
-      case 'rejected':
-        logRpcOutcome('start', parsed.service, 'rejected', { rejectionCode: result.code });
-        return { success: false, error: { code: result.code, message: result.message } };
-      case 'applied':
-        logRpcOutcome('start', parsed.service, 'accepted', { dedup: result.dedup });
-        return {
-          success: true,
-          ack: { intervalId: id, durable: 'pg', dedup: result.dedup },
-        };
-    }
+    logRpcOutcome(
+      'start',
+      parsed.service,
+      result.kind === 'rejected' ? 'rejected' : 'accepted',
+      result.kind === 'rejected' ? { rejectionCode: result.code } : { dedup: result.dedup }
+    );
+    return result;
   }
 
   async recordHeartbeat(input: RecordHeartbeatInput): Promise<HeartbeatAck> {

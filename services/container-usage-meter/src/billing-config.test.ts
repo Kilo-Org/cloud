@@ -59,4 +59,82 @@ describe('container billing configuration', () => {
       'shadow'
     );
   });
+
+  it('uses Cloud Agent payer lists only for Cloud Agent service names', () => {
+    const config = billingConfigFromEnv(
+      env({
+        CONTAINER_BILLING_SERVICES: 'gastown,cloud-agent-next-sandbox',
+        CONTAINER_BILLING_USER_IDS: 'gastown-user',
+        CONTAINER_BILLING_ORG_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: 'cloud-agent-user',
+        CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: 'cloud-agent-org',
+        CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+      })
+    );
+
+    expect(
+      billingModeFor(config, 'cloud-agent-next-sandbox', { type: 'user', id: 'cloud-agent-user' })
+    ).toBe('paid');
+    expect(
+      billingModeFor(config, 'cloud-agent-next-sandbox', { type: 'user', id: 'gastown-user' })
+    ).toBe('shadow');
+    expect(billingModeFor(config, 'gastown', { type: 'user', id: 'cloud-agent-user' })).toBe(
+      'shadow'
+    );
+  });
+
+  it('requires Cloud Agent service names as well as Cloud Agent payer lists', () => {
+    const config = billingConfigFromEnv(
+      env({
+        CONTAINER_BILLING_SERVICES: 'gastown',
+        CONTAINER_BILLING_USER_IDS: '',
+        CONTAINER_BILLING_ORG_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: 'cloud-agent-user',
+        CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: '',
+        CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+      })
+    );
+    expect(
+      billingModeFor(config, 'cloud-agent-next-sandbox', { type: 'user', id: 'cloud-agent-user' })
+    ).toBe('shadow');
+  });
+
+  it('fails Cloud Agent billing closed for empty or malformed Cloud Agent lists', () => {
+    const empty = billingConfigFromEnv(
+      env({
+        CONTAINER_BILLING_SERVICES: 'gastown,cloud-agent-next-sandbox',
+        CONTAINER_BILLING_USER_IDS: 'gastown-user',
+        CONTAINER_BILLING_ORG_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: 'cloud-agent-org',
+        CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+      })
+    );
+    expect(
+      billingModeFor(empty, 'cloud-agent-next-sandbox', { type: 'user', id: 'gastown-user' })
+    ).toBe('shadow');
+
+    const malformed = billingConfigFromEnv(
+      env({
+        CONTAINER_BILLING_SERVICES: 'gastown,cloud-agent-next-sandbox',
+        CONTAINER_BILLING_USER_IDS: 'gastown-user',
+        CONTAINER_BILLING_ORG_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: 'cloud-agent-user,',
+        CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: '',
+        CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+      })
+    );
+    expect(
+      billingModeFor(malformed, 'cloud-agent-next-sandbox', {
+        type: 'user',
+        id: 'cloud-agent-user',
+      })
+    ).toBe('shadow');
+    expect(
+      billingModeFor(malformed, 'cloud-agent-next-sandbox', {
+        type: 'org',
+        id: 'cloud-agent-org',
+      })
+    ).toBe('shadow');
+  });
 });

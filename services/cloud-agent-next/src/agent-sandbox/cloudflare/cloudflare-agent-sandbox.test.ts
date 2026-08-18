@@ -437,6 +437,38 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
+  it('requests paid admission for an organization canary before sandbox work', async () => {
+    const ensureBillingAdmission = vi.fn().mockResolvedValue({
+      success: false,
+      code: 'insufficient_credits',
+      message: 'Low balance',
+    });
+    const sandbox = new CloudflareAgentSandbox(
+      {
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
+        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_cloudflare',
+      } as Env,
+      metadata({ sandboxId: 'usr-shared' }),
+      {
+        resolveSandbox: () => ({}) as SandboxInstance,
+        ensureBillingAdmission,
+        isBillingBlocked: vi.fn().mockResolvedValue(false),
+      }
+    );
+
+    await expect(sandbox.ensureBillingAdmission()).resolves.toMatchObject({
+      success: false,
+      code: 'insufficient_credits',
+    });
+    expect(ensureBillingAdmission).toHaveBeenCalledWith(expect.anything(), {
+      sandboxId: 'usr-shared',
+      subject: { type: 'org', id: 'org_cloudflare' },
+      actor: { type: 'user', id: 'user_cloudflare' },
+      enforcementRequested: true,
+    });
+  });
+
   it('reports malformed worker URLs before degrading to a cold bootstrap', async () => {
     const request = ensureRequest({ cacheEligible: true });
     const bucket = { get: vi.fn(), put: vi.fn() };

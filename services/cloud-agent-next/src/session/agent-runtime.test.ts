@@ -105,6 +105,30 @@ function createWorkspaceReady(): WorkspaceReady {
 }
 
 describe('AgentRuntime', () => {
+  it('rechecks billing immediately before physical delivery', async () => {
+    const createSandbox = vi.fn();
+    const runtime = createAgentRuntime({
+      storage: createMemoryStorage(),
+      env: { WORKER_URL: 'http://worker.test' } as Env,
+      getMetadata: async () => createMetadata(),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: vi.fn(),
+      createAgentSandbox: createSandbox,
+      checkBillingAdmission: async () => ({
+        success: false,
+        code: 'PAYMENT_REQUIRED',
+        error: 'Container billing balance is too low',
+        failureBoundary: 'admission',
+      }),
+    });
+
+    await expect(runtime.send(createPlan())).resolves.toMatchObject({
+      success: false,
+      code: 'PAYMENT_REQUIRED',
+    });
+    expect(createSandbox).not.toHaveBeenCalled();
+  });
+
   it('returns a permanent delivery failure for an intentionally unavailable sandbox capability', async () => {
     const createSandbox = vi.fn(
       () =>

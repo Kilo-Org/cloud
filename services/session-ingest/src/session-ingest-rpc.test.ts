@@ -225,6 +225,76 @@ describe('createSessionForCloudAgent', () => {
     );
     expect(fake.values).not.toHaveBeenCalled();
   });
+
+  it('refuses to change the payer organization of an existing root', async () => {
+    const fake = makeRootWriteDb({
+      existing: {
+        session_id: params.sessionId,
+        kilo_user_id: params.kiloUserId,
+        cloud_agent_session_id: params.cloudAgentSessionId,
+        cloud_agent_session_scope_id: params.cloudAgentSessionId,
+        organization_id: null,
+        parent_session_id: null,
+      },
+    });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).rejects.toThrow(
+      'Cloud Agent root session identity conflict'
+    );
+  });
+
+  it('refuses to remove the payer organization of an existing root', async () => {
+    const fake = makeRootWriteDb({
+      existing: {
+        session_id: params.sessionId,
+        kilo_user_id: params.kiloUserId,
+        cloud_agent_session_id: params.cloudAgentSessionId,
+        cloud_agent_session_scope_id: params.cloudAgentSessionId,
+        organization_id: params.organizationId,
+        parent_session_id: null,
+      },
+    });
+    const rpc = makeRpc(fake.db as never);
+    const { organizationId: _organizationId, ...personalParams } = params;
+
+    await expect(rpc.createSessionForCloudAgent(personalParams)).rejects.toThrow(
+      'Cloud Agent root session identity conflict'
+    );
+  });
+
+  it('accepts an idempotent retry with the same payer organization', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toBeUndefined();
+    expect(fake.values).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an idempotent retry for a personal root', async () => {
+    const { organizationId: _organizationId, ...personalParams } = params;
+    const existing = {
+      session_id: personalParams.sessionId,
+      kilo_user_id: personalParams.kiloUserId,
+      cloud_agent_session_id: personalParams.cloudAgentSessionId,
+      cloud_agent_session_scope_id: personalParams.cloudAgentSessionId,
+      organization_id: null,
+      parent_session_id: null,
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(personalParams)).resolves.toBeUndefined();
+    expect(fake.values).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Kilo SDK persisted identity schemas', () => {

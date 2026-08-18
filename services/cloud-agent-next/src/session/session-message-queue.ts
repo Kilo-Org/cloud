@@ -148,6 +148,10 @@ export type SessionMessageQueueDependencies = {
   recoverExhaustedDeliveryBlock?: () => Promise<void>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   isDeliveryHeld?: () => Promise<boolean>;
+  checkBillingAdmission?: () => Promise<Extract<
+    SessionMessageAdmissionResult,
+    { success: false }
+  > | null>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
   reportQueuedState?: (state: SessionMessageState) => void;
   ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
@@ -253,6 +257,8 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
     case 'BAD_REQUEST':
     case 'PENDING_QUEUE_FULL':
       return { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' };
+    case 'PAYMENT_REQUIRED':
+      return { failureStage: 'pre_dispatch', failureCode: 'payment_required' };
     case 'MODEL_MISSING':
       return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
     case 'WRAPPER_CLEANUP_EXHAUSTED':
@@ -834,6 +840,8 @@ export function createSessionMessageQueue(
 
     const capacityError = await checkPendingQueueCapacity();
     if (capacityError) return capacityError;
+    const billingError = await dependencies.checkBillingAdmission?.();
+    if (billingError) return billingError;
 
     const metadata = await getMetadata();
     const callbackTarget = metadata?.callback?.target;

@@ -1,11 +1,12 @@
-import type {
-  AgentSandbox,
-  EnsureWrapperRequest,
-  StopWrappersResult,
-  TerminalClientResult,
-  WrapperLogs,
-  WrapperObservation,
-  WrapperStopTarget,
+import {
+  AgentSandboxUnavailableError,
+  type AgentSandbox,
+  type EnsureWrapperRequest,
+  type StopWrappersResult,
+  type TerminalClientResult,
+  type WrapperLogs,
+  type WrapperObservation,
+  type WrapperStopTarget,
 } from '../protocol.js';
 import type {
   Env,
@@ -75,9 +76,12 @@ import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgro
 import {
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  ensureSandboxBillingAdmissionInput,
+  isSandboxBillingBlocked,
   isSandboxContainerRunning,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
+import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -188,6 +192,8 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
 export type CloudflareAgentSandboxDependencies = {
   resolveSandbox?: (sandboxId: SandboxId, options?: { sleepAfter?: number }) => SandboxInstance;
   configureBilling?: (sandbox: SandboxInstance, input: SandboxBillingInput) => Promise<void>;
+  ensureBillingAdmission?: typeof ensureSandboxBillingAdmissionInput;
+  isBillingBlocked?: typeof isSandboxBillingBlocked;
   sessionService?: SessionService;
   stopObservedWrappers?: typeof stopObservedWrappers;
   sleep?: (ms: number) => Promise<void>;
@@ -207,6 +213,8 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     sandbox: SandboxInstance,
     input: SandboxBillingInput
   ) => Promise<void>;
+  private readonly ensureSandboxBillingAdmission: typeof ensureSandboxBillingAdmissionInput;
+  private readonly sandboxBillingBlocked: typeof isSandboxBillingBlocked;
   private sandboxIdPromise?: Promise<SandboxId>;
 
   constructor(
@@ -230,6 +238,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.stopObservationDelaysMs =
       dependencies.stopObservationDelaysMs ?? DEFAULT_STOP_OBSERVATION_DELAYS_MS;
     this.configureBilling = dependencies.configureBilling ?? configureSandboxBillingInput;
+    this.ensureSandboxBillingAdmission =
+      dependencies.ensureBillingAdmission ?? ensureSandboxBillingAdmissionInput;
+    this.sandboxBillingBlocked = dependencies.isBillingBlocked ?? isSandboxBillingBlocked;
   }
 
   private resolveSandboxId(): Promise<SandboxId> {
@@ -250,16 +261,60 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     return this.sandboxIdPromise;
   }
 
-  private async getSandbox(options?: { sleepAfter?: number }): Promise<SandboxInstance> {
-    const sandboxId = await this.resolveSandboxId();
-    const sandbox = this.resolveSandbox(sandboxId, options);
-    void this.configureBilling(sandbox, buildSandboxBillingInput(this.metadata, sandboxId)).catch(
-      error => {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Container usage shadow configuration deferred');
-      }
+  private billingInput(sandboxId: SandboxId): SandboxBillingInput {
+    return buildSandboxBillingInput(
+      this.metadata,
+      sandboxId,
+      isCloudAgentContainerBillingEnabled(this.env, this.metadata.identity)
     );
+  }
+
+  async ensureBillingAdmission() {
+    const sandboxId = await this.resolveSandboxId();
+    const sandbox = this.resolveSandbox(sandboxId);
+    const input = this.billingInput(sandboxId);
+    const blocked = await this.sandboxBillingBlocked(sandbox);
+    if (!input.enforcementRequested && !blocked) {
+      return { success: true as const, billingMode: 'shadow' as const };
+    }
+    return this.ensureSandboxBillingAdmission(sandbox, input);
+  }
+
+  async isBillingBlocked(): Promise<boolean> {
+    const sandboxId = await this.resolveSandboxId();
+    return this.sandboxBillingBlocked(this.resolveSandbox(sandboxId));
+  }
+
+  private async getSandbox(options?: {
+    sleepAfter?: number;
+    bypassBilling?: boolean;
+  }): Promise<SandboxInstance> {
+    const sandboxId = await this.resolveSandboxId();
+    const sandbox = this.resolveSandbox(
+      sandboxId,
+      options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
+    );
+    const input = this.billingInput(sandboxId);
+    if (!options?.bypassBilling) {
+      const blocked = await this.sandboxBillingBlocked(sandbox);
+      if (input.enforcementRequested || blocked) {
+        const admission = await this.ensureSandboxBillingAdmission(sandbox, input);
+        if (!admission.success) {
+          throw new AgentSandboxUnavailableError(
+            admission.code === 'insufficient_credits' || admission.code === 'stopping'
+              ? 'Container billing requires additional credits'
+              : 'Container billing admission is temporarily unavailable',
+            'billing_blocked'
+          );
+        }
+      } else {
+        void this.configureBilling(sandbox, input).catch(error => {
+          logger
+            .withFields({ error: error instanceof Error ? error.message : String(error) })
+            .warn('Container usage shadow configuration deferred');
+        });
+      }
+    }
     return sandbox;
   }
 
@@ -765,9 +820,13 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }
 
   async discoverSessionWrappers(): Promise<WrapperObservation> {
-    return discoverSessionWrappers(await this.getSandbox(), this.metadata.identity.sessionId, {
-      inspectContainers: this.usesDevcontainerRuntime(),
-    });
+    return discoverSessionWrappers(
+      await this.getSandbox({ bypassBilling: true }),
+      this.metadata.identity.sessionId,
+      {
+        inspectContainers: this.usesDevcontainerRuntime(),
+      }
+    );
   }
 
   async observeWrappersWithoutWaking(): Promise<WrapperObservation> {
@@ -787,7 +846,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     attemptId: string;
     reason: WrapperStopReason;
   }): Promise<StopWrappersResult> {
-    const sandbox = await this.getSandbox();
+    const sandbox = await this.getSandbox({ bypassBilling: true });
 
     // Inspecting is a container fetch, so it boots a sleeping container. A wrapper is a
     // process, and a process cannot outlive its container (activity expiry SIGTERMs the
@@ -934,7 +993,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }
 
   async delete(reason: SandboxDeleteReason): Promise<void> {
-    const sandbox = await this.getSandbox();
+    const sandbox = await this.getSandbox({ bypassBilling: true });
     if (reason === 'recovery') {
       await sandbox.destroy();
       return;

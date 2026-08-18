@@ -633,6 +633,8 @@ function promptAdmissionError(
       return missingRootKiloSessionResponse();
     case 'PENDING_QUEUE_FULL':
       return facadeError(429, 'KILO_PROMPT_QUEUE_FULL', result.error);
+    case 'PAYMENT_REQUIRED':
+      return facadeError(402, 'KILO_PROMPT_PAYMENT_REQUIRED', result.error);
     case 'SANDBOX_CONNECT_FAILED':
     case 'WORKSPACE_SETUP_FAILED':
     case 'KILO_SERVER_FAILED':

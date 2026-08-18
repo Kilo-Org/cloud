@@ -54,8 +54,8 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Grace period before force exit during shutdown (20 seconds) */
-const SHUTDOWN_TIMEOUT_MS = 20_000;
+/** Grace period before force exit during shutdown (110 seconds) */
+const SHUTDOWN_TIMEOUT_MS = 110_000;
 
 /** Timeout for createKilo() server startup */
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
@@ -973,7 +973,8 @@ async function main() {
       logToFile('shutdown startup cleanup finished');
     }
 
-    // Stop lifecycle timers
+    await lifecycleManager?.drainAndClose();
+    // Stop lifecycle timers after finalization has flushed.
     lifecycleManager?.stop();
     globalFeedManager.close();
     toolCgroup?.stop();

@@ -117,7 +117,8 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         existing.parent_session_id !== null ||
         existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
         (existing.cloud_agent_session_scope_id !== null &&
-          existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId)
+          existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId) ||
+        existing.organization_id !== (parsed.organizationId ?? null)
       ) {
         throw new Error('Cloud Agent root session identity conflict');
       }
@@ -126,9 +127,6 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         .update(cli_sessions_v2)
         .set({
           cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
-          ...(parsed.organizationId !== undefined
-            ? { organization_id: parsed.organizationId }
-            : {}),
         })
         .where(
           and(
@@ -141,9 +139,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     });
 
     const hasMeaningfulChange = existingRow
-      ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId ||
-        (parsed.organizationId !== undefined &&
-          existingRow.organization_id !== parsed.organizationId)
+      ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId
       : true;
 
     if (existingRow && hasMeaningfulChange && persistedRow) {

@@ -12,6 +12,16 @@ function binding(overrides: Partial<ContainerUsageRpcMethods> = {}): ContainerUs
         dedup: false,
       },
     })),
+    recordStartV2: vi.fn(async input => ({
+      success: true as const,
+      ack: {
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg' as const,
+        dedup: false,
+      },
+      billingMode: 'paid' as const,
+      remainingMicrodollars: 10_000_001,
+    })),
     recordHeartbeat: vi.fn(async input => ({
       intervalId: `${input.instanceId}:${input.startEpochMs}`,
       durable: 'pg' as const,
@@ -175,5 +185,32 @@ describe('ContainerUsageClient', () => {
       message: 'SKU is not configured',
     });
     expect(recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('returns versioned paid admission details without changing v1 start behavior', async () => {
+    const rpc = binding();
+    const client = new ContainerUsageClient(rpc, { service: 'cloud-agent-next-sandbox' });
+
+    await expect(client.recordStartV2({ ...context, startEpochMs: 123 })).resolves.toMatchObject({
+      success: true,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_000_001,
+    });
+    expect(rpc.recordStartV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: 'cloud-agent-next-sandbox',
+        idempotencyKey: 'v1:cloud-agent-next-sandbox:instance-1:123:start',
+      })
+    );
+  });
+
+  it('reports unavailable versioned admission support explicitly', async () => {
+    const client = new ContainerUsageClient(binding({ recordStartV2: undefined }), {
+      service: 'cloud-agent-next-sandbox',
+    });
+
+    await expect(client.recordStartV2({ ...context, startEpochMs: 123 })).rejects.toThrow(
+      'does not support recordStartV2'
+    );
   });
 });

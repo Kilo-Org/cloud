@@ -29,6 +29,7 @@ export type LifecycleManager = {
   onDeliveryAcknowledged: (kind: 'async-prompt' | 'sync-command' | 'failed') => void;
   onConnectionRestored: () => void;
   triggerDrainAndClose: () => void;
+  drainAndClose: () => Promise<void>;
   signalCompletion: () => void;
   setAborted: () => void;
   reset: () => void;
@@ -42,12 +43,12 @@ export function createLifecycleManager(
   const { state, kiloClient } = deps;
   let sseTransportTimer: ReturnType<typeof setTimeout> | null = null;
   let stableIdleTimer: ReturnType<typeof setTimeout> | null = null;
-  let drainTimeout: ReturnType<typeof setTimeout> | null = null;
-  let isDraining = false;
   let isAborted = false;
   let rootIdleCandidatePresent = false;
   let idleObservedDuringDelivery = false;
   let postProcessingResolve: (() => void) | null = null;
+  let drainPromise: Promise<void> | null = null;
+  let lifecycleGeneration = 0;
   let postProcessingCompleted = false;
 
   function clearSseTransportTimer(): void {
@@ -68,7 +69,7 @@ export function createLifecycleManager(
     clearSseTransportTimer();
     // Idle is the last expected SSE event. Reconnecting during drain races
     // auto-commit and used to abort the complete event.
-    if (!state.hasSession || isDraining) return;
+    if (!state.hasSession || drainPromise) return;
     sseTransportTimer = setTimeout(() => {
       logToFile('SSE transport timeout — reconnecting event subscription');
       deps.reconnectEventSubscription();
@@ -153,10 +154,10 @@ export function createLifecycleManager(
     }
   }
 
-  function triggerDrainAndClose(): void {
+  function drainAndClose(): Promise<void> {
     state.blockAdmissions();
-    if (isDraining) return;
-    isDraining = true;
+    if (drainPromise) return drainPromise;
+    const drainGeneration = lifecycleGeneration;
     clearStableIdleCandidate();
     clearSseTransportTimer();
     const sealedMessageIds = state.pendingMessageIds;
@@ -173,7 +174,7 @@ export function createLifecycleManager(
       });
     }
 
-    void (async () => {
+    drainPromise = (async () => {
       try {
         await runPostCompletionTasks();
         const uploader = state.logUploader;
@@ -188,6 +189,7 @@ export function createLifecycleManager(
           uploader.stop();
         }
       } finally {
+        if (drainGeneration !== lifecycleGeneration) return;
         const currentSession = state.currentSession;
         if (completeSession && currentSession) {
           const currentBranch = await getCurrentBranch(config.workspacePath, 10_000).catch(
@@ -207,22 +209,30 @@ export function createLifecycleManager(
           });
         }
 
-        if (isDraining) {
-          drainTimeout = setTimeout(() => {
-            void deps
-              .closeConnections()
-              .catch(error =>
-                logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
-              )
-              .finally(() => {
-                isDraining = false;
-                drainTimeout = null;
-                state.clearSession();
-              });
-          }, DRAIN_DELAY_MS);
-        }
+        await new Promise<void>(resolve => setTimeout(resolve, DRAIN_DELAY_MS));
+        if (drainGeneration !== lifecycleGeneration) return;
+        await deps
+          .closeConnections()
+          .catch(error =>
+            logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
+          );
+        state.clearSession();
       }
     })();
+    const currentDrain = drainPromise;
+    void currentDrain.then(
+      () => {
+        if (drainPromise === currentDrain) drainPromise = null;
+      },
+      () => {
+        if (drainPromise === currentDrain) drainPromise = null;
+      }
+    );
+    return currentDrain;
+  }
+
+  function triggerDrainAndClose(): void {
+    void drainAndClose();
   }
 
   function trySealIdleBatch(): void {
@@ -256,8 +266,6 @@ export function createLifecycleManager(
       isAborted = true;
       clearSseTransportTimer();
       clearStableIdleCandidate();
-      if (drainTimeout) clearTimeout(drainTimeout);
-      drainTimeout = null;
     },
     onSessionIdle: () => {
       rootIdleCandidatePresent = true;
@@ -284,6 +292,7 @@ export function createLifecycleManager(
     },
     onConnectionRestored: armStableIdleCandidate,
     triggerDrainAndClose,
+    drainAndClose,
     signalCompletion,
     setAborted: () => {
       isAborted = true;
@@ -291,14 +300,13 @@ export function createLifecycleManager(
       clearStableIdleCandidate();
     },
     reset: () => {
+      lifecycleGeneration += 1;
       isAborted = false;
-      isDraining = false;
       clearStableIdleCandidate();
       postProcessingCompleted = false;
       postProcessingResolve = null;
       clearSseTransportTimer();
-      if (drainTimeout) clearTimeout(drainTimeout);
-      drainTimeout = null;
+      drainPromise = null;
     },
     onSseEvent: resetSseTransportTimer,
   };

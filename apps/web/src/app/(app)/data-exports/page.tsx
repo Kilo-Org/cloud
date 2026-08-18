@@ -1,12 +1,10 @@
-import { getUserFromAuth } from '@/lib/user/server';
-import { notFound } from 'next/navigation';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { PageLayout } from '@/components/PageLayout';
 import { DataExportsClient } from './DataExportsClient';
 import { RequestDataDeletionCard } from './RequestDataDeletionCard';
 
 export default async function DataExportsPage() {
-  const { user } = await getUserFromAuth({ adminOnly: false });
-  if (!user) notFound();
+  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/data-exports');
 
   return (
     <PageLayout

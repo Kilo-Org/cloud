@@ -22,9 +22,11 @@ import type { createGitHubPrReviewOctokit } from '@/lib/github-pr-review/client'
 import {
   buildChecksResult,
   buildFilesPage,
+  buildInboxResult,
   buildOverviewDto,
   buildReviewThreadsResult,
   sliceFileLines,
+  type GraphQlInboxNode,
 } from '@/lib/github-pr-review/mappers';
 import {
   CONVERSATION_COMMENTS_MAX_PAGES,
@@ -32,6 +34,7 @@ import {
   FILE_LINES_MAX,
   FILES_MAX_PAGES,
   FILES_PAGE_SIZE,
+  INBOX_PAGE_SIZE,
   REVIEW_THREADS_PAGE_SIZE,
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
@@ -108,6 +111,13 @@ const ListReviewThreadsInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
     cursor: z.string().min(1).optional(),
+    direction: infiniteQueryDirection,
+  })
+  .strict();
+
+const ListInboxInput = z
+  .object({
+    cursor: z.string().min(1).max(512).optional(),
     direction: infiniteQueryDirection,
   })
   .strict();
@@ -354,6 +364,40 @@ const CONVERSATION_COMMENTS_QUERY = /* GraphQL */ `
   }
 `;
 
+const INBOX_QUERY = /* GraphQL */ `
+  query PrReviewInbox($q: String!, $first: Int!, $after: String) {
+    search(query: $q, type: ISSUE, first: $first, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ... on PullRequest {
+          number
+          title
+          isDraft
+          updatedAt
+          author {
+            login
+            avatarUrl
+          }
+          repository {
+            name
+            owner {
+              login
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// Server-fixed. The caller never supplies or influences the search string, so
+// the inbox can only ever return pull requests the caller's own GitHub token
+// can already see, and a caller cannot widen the query.
+export const INBOX_SEARCH_QUERY = 'is:open is:pr review-requested:@me archived:false';
+
 const ENABLE_AUTO_MERGE_MUTATION = /* GraphQL */ `
   mutation EnableAutoMerge($input: EnablePullRequestAutoMergeInput!) {
     enablePullRequestAutoMerge(input: $input) {
@@ -487,6 +531,7 @@ export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
   REVIEW_THREADS_QUERY,
   REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
   CONVERSATION_COMMENTS_QUERY,
+  INBOX_QUERY,
   ENABLE_AUTO_MERGE_MUTATION,
   DISABLE_AUTO_MERGE_MUTATION,
   RESOLVE_THREAD_MUTATION,
@@ -1578,6 +1623,42 @@ export const githubPrReviewRouter = createTRPCRouter({
           page: 1,
           hasNextPage: connection.pageInfo.hasNextPage,
           endCursor: connection.pageInfo.endCursor,
+        });
+      },
+    });
+  }),
+
+  // The authorized PR inbox: pull requests requesting the caller's review,
+  // paginated through GitHub GraphQL `search`. The query string is
+  // server-fixed (INBOX_SEARCH_QUERY) so the caller can only ever see PRs
+  // their own token can already see. Read-only — no ledger, no Terms check.
+  listInbox: baseProcedure.input(ListInboxInput).query(async ({ ctx, input }) => {
+    return withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const resp = (await octokit.request('POST /graphql', {
+          query: INBOX_QUERY,
+          variables: {
+            q: INBOX_SEARCH_QUERY,
+            first: INBOX_PAGE_SIZE,
+            after: input.cursor ?? null,
+          },
+        })) as {
+          data: {
+            data: {
+              search: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: GraphQlInboxNode[];
+              } | null;
+            } | null;
+            errors?: unknown;
+          };
+        };
+        throwTrpcFromGraphQlErrors(resp.data.errors as never);
+        const connection = resp.data.data?.search ?? null;
+        return buildInboxResult({
+          nodes: connection?.nodes ?? [],
+          pageInfo: connection?.pageInfo ?? null,
         });
       },
     });

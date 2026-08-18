@@ -160,6 +160,29 @@ export type GitHubPrReviewReviewThreadsResult = z.infer<
   typeof GitHubPrReviewReviewThreadsResultSchema
 >;
 
+export const GitHubPrReviewInboxItemSchema = z
+  .object({
+    owner: z.string().min(1),
+    repo: z.string().min(1),
+    number: z.number().int().positive(),
+    title: z.string(),
+    author: GitHubPrReviewAuthorSchema.nullable(),
+    isDraft: z.boolean(),
+    updatedAt: z.string(),
+  })
+  .strict();
+export type GitHubPrReviewInboxItem = z.infer<typeof GitHubPrReviewInboxItemSchema>;
+
+export const GitHubPrReviewInboxResultSchema = z
+  .object({
+    items: z.array(GitHubPrReviewInboxItemSchema),
+    nextCursor: z.string().nullable(),
+  })
+  .strict();
+export type GitHubPrReviewInboxResult = z.infer<typeof GitHubPrReviewInboxResultSchema>;
+
+export const INBOX_PAGE_SIZE = 25;
+
 export const FILES_PAGE_SIZE = 50;
 export const FILES_MAX_PAGES = 60;
 export const FILE_LINES_MAX = 500;

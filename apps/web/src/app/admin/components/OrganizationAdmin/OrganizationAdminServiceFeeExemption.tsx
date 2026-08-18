@@ -135,7 +135,7 @@ export function OrganizationAdminServiceFeeExemption({
               <span className="font-mono break-all">
                 {current.changedByKiloUserId ?? 'Deleted admin'}
               </span>{' '}
-              on {formatLocalTimestamp(current.changedAt)}
+              on {formatLocalTimestamp(current.createdAt)}
             </p>
           </div>
         ) : null}

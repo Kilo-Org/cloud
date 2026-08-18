@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import {
   credit_transactions,
-  organization_service_fee_exemption_history,
+  organization_service_fee_exemptions,
   stripe_service_fee_assessments,
 } from '@kilocode/db/schema';
 import { format } from 'date-fns';
@@ -30,7 +30,6 @@ function baseAssessment(
     assessment_key: `test-${crypto.randomUUID()}`,
     version: SERVICE_FEE_VERSION,
     flow: 'personal_top_up',
-    eligibility: 'eligible',
     outcome: 'charged',
     currency: 'usd',
     eligibility_created_at: '2025-01-10T09:00:00.000Z',
@@ -45,8 +44,8 @@ describe('getRevenueKpiData service fee reporting', () => {
     const user = await insertTestUser();
     const admin = await insertTestUser();
     const organization = await createOrganization(`Org ${crypto.randomUUID()}`, admin.id);
-    const [exemptionHistory] = await db
-      .insert(organization_service_fee_exemption_history)
+    const [exemption] = await db
+      .insert(organization_service_fee_exemptions)
       .values({
         organization_id: organization.id,
         is_exempt: true,
@@ -101,9 +100,8 @@ describe('getRevenueKpiData service fee reporting', () => {
         flow: 'organization_top_up',
         kilo_user_id: null,
         organization_id: organization.id,
-        eligibility: 'exempt',
         outcome: 'exempt',
-        exemption_history_id: exemptionHistory.id,
+        exemption_id: exemption.id,
         eligible_subtotal_minor: 5000,
         expected_fee_minor: 250,
         settled_product_minor: 5000,

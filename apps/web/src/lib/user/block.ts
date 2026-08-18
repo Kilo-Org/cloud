@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { after } from 'next/server';
 import { and, eq, isNull, or, inArray } from 'drizzle-orm';
 import {
   kilocode_users,
@@ -8,6 +9,8 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { invalidateUserAuthCache } from '@/lib/session-ingest-client';
+import { errorExceptInTest } from '@/lib/utils.server';
 
 export type BlockUserParams = {
   kiloUserId: string;
@@ -16,6 +19,28 @@ export type BlockUserParams = {
   /** Run inside an existing transaction; defaults to the shared `db`. */
   dbOrTx?: typeof db | DrizzleTransaction;
 };
+
+async function invalidateUserAuthCacheBestEffort(kiloUserId: string): Promise<void> {
+  try {
+    await invalidateUserAuthCache(kiloUserId);
+  } catch (error) {
+    errorExceptInTest('Failed to invalidate cached user auth after block', {
+      kiloUserId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function scheduleUserAuthCacheInvalidation(kiloUserId: string): void {
+  try {
+    after(() => invalidateUserAuthCacheBestEffort(kiloUserId));
+  } catch (error) {
+    errorExceptInTest('Failed to schedule cached user auth invalidation after block', {
+      kiloUserId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 /**
  * Block a single user.
@@ -100,8 +125,15 @@ export async function blockUser(params: BlockUserParams): Promise<boolean> {
     return true;
   }
 
-  if (executor) {
-    return run(executor);
+  const didBlock = executor ? await run(executor) : await db.transaction(tx => run(tx));
+
+  if (didBlock) {
+    if (executor) {
+      scheduleUserAuthCacheInvalidation(params.kiloUserId);
+    } else {
+      await invalidateUserAuthCacheBestEffort(params.kiloUserId);
+    }
   }
-  return db.transaction(tx => run(tx));
+
+  return didBlock;
 }

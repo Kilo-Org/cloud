@@ -51,6 +51,11 @@ export async function bulkBlockUsers(
   }
 
   const blockedAt = new Date().toISOString();
+  // Bulk blocks intentionally do not fan out one invalidation request per
+  // user. Session-ingest rechecks the authoritative pepper/blocked state when
+  // its short-lived auth cache expires and KV propagation settles; a bounded
+  // bulk invalidation job can be added separately if this path needs a tighter
+  // convergence bound.
   const updated = await db
     .update(kilocode_users)
     .set({

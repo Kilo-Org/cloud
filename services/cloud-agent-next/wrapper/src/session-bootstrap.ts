@@ -5,8 +5,6 @@ import {
   type WrapperCloneTelemetry,
   type WrapperPromptRequest,
   type WrapperPromptPart,
-  type WrapperRestoreTelemetry,
-  type WrapperBootstrapTelemetry,
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
@@ -152,7 +150,12 @@ export type BootstrapProgress = {
   (step: BootstrapProgressStep, message: string): void;
 };
 
-export type WrapperBootstrapResult = WrapperBootstrapTelemetry;
+export type WrapperBootstrapResult = {
+  workspaceWasWarm: boolean;
+  restoredFromBackup: boolean;
+  /** Absent when the workspace was warm and no clone ran. */
+  clone?: WrapperCloneTelemetry;
+};
 
 type GitRunner = (args: string[], opts?: ProcessOptions) => Promise<ExecResult>;
 type ProcessRunner = (
@@ -314,17 +317,34 @@ export function workspaceBootstrapErrorCode(
     : 'WORKSPACE_SETUP_FAILED';
 }
 
-function authenticatedUrl(
-  gitUrl: string,
-  token: string | undefined,
-  platform: 'github' | 'gitlab' | 'bitbucket' | undefined
-): string {
-  if (!token) return gitUrl;
-  const url = new URL(gitUrl);
-  url.username =
-    platform === 'gitlab' ? 'oauth2' : platform === 'bitbucket' ? 'x-token-auth' : 'x-access-token';
-  url.password = token;
-  return url.toString();
+function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
+  const raw = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function isHelperBackedRemote(repo: NonNullable<WrapperSessionReadyRequest['repo']>): boolean {
+  if (repo.kind === 'github') return true;
+  return repo.platform === 'github' || repo.platform === 'gitlab' || repo.platform === 'bitbucket';
+}
+
+function cloneGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
+  const canonical = canonicalGitUrl(repo);
+  if (isHelperBackedRemote(repo) || !repo.token) return canonical;
+  try {
+    const url = new URL(canonical);
+    url.username = 'x-access-token';
+    url.password = repo.token;
+    return url.toString();
+  } catch {
+    return canonical;
+  }
 }
 
 async function exists(filePath: string): Promise<boolean> {
@@ -390,9 +410,9 @@ function isBitbucketReviewSession(
 }
 
 // Wire-format prefix of a Bitbucket outbound session capability (see the
-// git-token-service BitbucketSessionCapabilityCodec). A capability in the origin
-// stays authenticated through the outbound interceptor, unlike a raw token which
-// is stripped after bootstrap.
+// git-token-service BitbucketSessionCapabilityCodec). Presence of a capability
+// qualifies the session for blobless clone; the credential helper authenticates
+// later lazy fetches.
 const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
 
 function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
@@ -406,10 +426,9 @@ function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): bool
 function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
   if (!isCodeReviewSession(request)) return false;
   const repo = request.repo;
-  // GitHub/GitLab keep working credentials via outbound injection. Bitbucket
-  // keeps them only when the session uses an outbound capability (a raw-token
-  // origin is credential-stripped after bootstrap). Other/unknown git remotes
-  // have no such guarantee, so they keep a full clone.
+  // GitHub/GitLab and capability-backed Bitbucket authenticate lazy blob
+  // fetches via the credential helper. Other/unknown git remotes have no such
+  // guarantee, so they keep a full clone.
   if (repo?.kind === 'github') return true;
   if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
   return hasBitbucketReviewCapability(request);
@@ -426,9 +445,8 @@ async function cloneRepository(
     throw new Error('Session metadata is missing a repository source');
   }
 
-  const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  const repoUrl = cloneGitUrl(repo);
   const platform = repo.kind === 'git' ? repo.platform : 'github';
-  const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
   // Code review reads changed files from the working tree and gets the PR diff
   // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
   // commit graph but not every historical file blob, so a blobless partial clone
@@ -436,7 +454,7 @@ async function cloneRepository(
   // which on large repositories otherwise exceeds the clone timeout. Full history
   // is retained, so incremental diffs and merge-base still work. See
   // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
-  // capability-backed Bitbucket, whose origin stays authenticated for lazy fetch).
+  // capability-backed Bitbucket). The credential helper authenticates lazy fetch.
   const useBlobless = isBloblessReviewCloneEligible(request);
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
@@ -634,46 +652,12 @@ async function prepareBranch(
   }
 }
 
-async function sanitizeBitbucketCodeReviewRemote(
+async function sanitizeOriginRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
-): Promise<boolean> {
-  if (!isBitbucketReviewSession(request)) {
-    return false;
-  }
-  // A capability origin stays authenticated through the outbound interceptor and
-  // is safe to expose (scoped to one repo, useless outside this container), so it
-  // must stay in place for a blobless clone's later lazy blob fetches. Only a raw
-  // workspace token needs stripping. Either way this is a handled code-review
-  // remote (return true), so callers do not refresh a token over it.
-  if (hasBitbucketReviewCapability(request)) {
-    return true;
-  }
-  const canonicalUrl = new URL(request.repo.url);
-  canonicalUrl.username = '';
-  canonicalUrl.password = '';
-  const result = await runGit(['remote', 'set-url', 'origin', canonicalUrl.toString()], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  if (result.exitCode !== 0) {
-    throw new Error('Failed to update git remote URL');
-  }
-  return true;
-}
-
-function repositoryUrls(request: WrapperSessionReadyRequest): {
-  canonical: string;
-  authenticated: string;
-} | null {
-  const repo = request.repo;
-  if (!repo) return null;
-  const canonical = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
-  const platform = repo.kind === 'git' ? repo.platform : 'github';
-  return {
-    canonical,
-    authenticated: authenticatedUrl(canonical, repo.token, platform),
-  };
+): Promise<void> {
+  if (!request.repo || !isHelperBackedRemote(request.repo)) return;
+  await setOriginUrl(request, runGit, canonicalGitUrl(request.repo));
 }
 
 async function setOriginUrl(
@@ -690,33 +674,23 @@ async function setOriginUrl(
   }
 }
 
-async function refreshGitRemoteToken(
+async function refreshGitAuthor(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<void> {
   const repo = request.repo;
-  const urls = repositoryUrls(request);
-  if (!repo?.refreshRemote || !repo.token || !urls) return;
+  if (repo?.kind !== 'github' || !repo.gitAuthor) return;
 
-  const result = await runGit(['remote', 'set-url', 'origin', urls.authenticated], {
+  const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
     cwd: request.workspace.workspacePath,
     timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
-  if (result.exitCode !== 0) {
-    throw new Error('Failed to update git remote URL');
-  }
-  if (repo.kind === 'github' && repo.gitAuthor) {
-    const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
-      cwd: request.workspace.workspacePath,
-      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-    });
-    const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
-      cwd: request.workspace.workspacePath,
-      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-    });
-    if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
-      throw new Error('Failed to configure git author identity');
-    }
+  const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
+    cwd: request.workspace.workspacePath,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
+    throw new Error('Failed to configure git author identity');
   }
 }
 
@@ -818,9 +792,8 @@ async function bootstrapEmptyKiloSession(
 
 async function restoreOrBootstrapKiloSession(
   request: WrapperSessionReadyRequest,
-  restore: typeof restoreSession,
-  restorePath: Exclude<WrapperRestoreTelemetry['path'], 'warm'>
-): Promise<WrapperRestoreTelemetry | undefined> {
+  restore: typeof restoreSession
+): Promise<void> {
   if (request.workspace.preferSnapshot) {
     logToFile(
       `bootstrap snapshot restore starting kiloSessionId=${request.kiloSessionId} workspacePath=${request.workspace.workspacePath}`
@@ -830,7 +803,7 @@ async function restoreOrBootstrapKiloSession(
       logToFile(
         `bootstrap snapshot restore ready kiloSessionId=${request.kiloSessionId} downloaded=${result.downloaded} diffsApplied=${result.diffs.applied} diffsSkipped=${result.diffs.skipped} diffsTotal=${result.diffs.total}`
       );
-      return { path: restorePath, diffs: result.diffs };
+      return;
     }
     logToFile(
       `bootstrap snapshot restore failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} subtype=${result.subtype ?? '(none)'}`
@@ -851,7 +824,6 @@ async function restoreOrBootstrapKiloSession(
     logToFile(`bootstrap fresh session using empty import kiloSessionId=${request.kiloSessionId}`);
   }
   await bootstrapEmptyKiloSession(request, restore);
-  return { path: restorePath };
 }
 
 async function reconcileRestoredWorkspace(
@@ -1179,7 +1151,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;
   let cloneTelemetry: WrapperCloneTelemetry | undefined;
-  let restoreTelemetry: WrapperRestoreTelemetry | undefined;
   const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
@@ -1206,9 +1177,8 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap warm workspace refreshing remote kiloSessionId=${request.kiloSessionId}`
       );
-      if (workspaceNeedsBootstrap || !(await sanitizeBitbucketCodeReviewRemote(request, runGit))) {
-        await refreshGitRemoteToken(request, runGit);
-      }
+      await sanitizeOriginRemote(request, runGit);
+      await refreshGitAuthor(request, runGit);
       logToFile(`bootstrap warm workspace remote ready kiloSessionId=${request.kiloSessionId}`);
     } else {
       progress?.('cloning', 'Cloning repository...');
@@ -1216,6 +1186,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
       );
       cloneTelemetry = await cloneRepository(request, runGit, progress, signal);
+      await sanitizeOriginRemote(request, runGit);
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
@@ -1228,8 +1199,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       );
       if (restoredFromBackup) {
         try {
-          const urls = repositoryUrls(request);
-          if (urls) await setOriginUrl(request, runGit, urls.authenticated);
           await reconcileRestoredWorkspace(request, runGit, progress);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -1241,7 +1210,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
-      await sanitizeBitbucketCodeReviewRemote(request, runGit);
 
       await writeRuntimeSkills(request);
 
@@ -1249,20 +1217,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         'kilo_session',
         request.workspace.preferSnapshot ? 'Restoring session...' : 'Importing session...'
       );
-      restoreTelemetry = await restoreOrBootstrapKiloSession(
-        request,
-        restore,
-        restoredFromBackup ? 'backup' : 'cold'
-      );
-      if (restoreTelemetry?.diffs) {
-        const restoreLabel = restoreTelemetry.path === 'backup' ? 'Resume restore' : 'Cold restore';
-        progress?.(
-          'kilo_session',
-          restoreTelemetry.diffs.skipped > 0
-            ? `${restoreLabel} incomplete, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
-            : `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
-        );
-      }
+      await restoreOrBootstrapKiloSession(request, restore);
 
       if (request.materialized.setupCommands?.length) {
         progress?.('setup_commands', 'Running setup commands...');
@@ -1274,19 +1229,14 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     signal.throwIfAborted();
-    if (!workspaceNeedsBootstrap && workspaceWasWarm) {
-      restoreTelemetry = { path: 'warm' };
-      progress?.('kilo_session', 'Warm workspace reused');
-    }
     logToFile(
-      `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} restorePath=${restoreTelemetry?.path ?? '(none)'}`
+      `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap}`
     );
     progress?.('kilo_server', 'Starting Kilo...');
     return {
       workspaceWasWarm,
       restoredFromBackup,
       ...(cloneTelemetry ? { clone: cloneTelemetry } : {}),
-      ...(restoreTelemetry ? { restore: restoreTelemetry } : {}),
     };
   } catch (error) {
     if (error instanceof RestoredWorkspaceReconciliationError) {

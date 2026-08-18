@@ -1,20 +1,43 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import {
+  createOrganization,
+  addUserToOrganization,
+  updateUserRoleInOrganization,
+} from '@/lib/organizations/organizations';
 import {
   organization_audit_logs,
   organization_memberships,
+  organization_invitations,
   organizations,
+  external_side_effect_outbox,
   type User,
   type Organization,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { sendOrganizationInviteEmail } from '@/lib/email';
+import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
+import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
 }));
+
+// Mock `updateUserRoleInOrganization` so the failed-role-update test can drive a
+// failure inside the transaction while every other test keeps the real
+// implementation. SWC makes ESM exports non-configurable, so `jest.spyOn` on the
+// named export fails; replace it on the module instead.
+jest.mock('@/lib/organizations/organizations', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/organizations/organizations');
+  return {
+    ...actual,
+    updateUserRoleInOrganization: jest.fn(
+      actual.updateUserRoleInOrganization as typeof updateUserRoleInOrganization
+    ),
+  };
+});
 
 // Mock the email service to prevent actual API calls during tests
 jest.mock('@/lib/email', () => ({
@@ -184,6 +207,48 @@ describe('organizations members trpc router', () => {
           actor_name: regularUser.google_user_name,
         }),
       ]);
+    });
+
+    it('leaves zero audit rows when a role update fails', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@failed-role-update.example.com`,
+        google_user_name: 'Failed Role Update Target',
+        is_admin: false,
+      });
+      // The user is a member, so the pre-check passes and the mutation enters the
+      // role-update transaction. The mocked update then fails inside it, so the
+      // audit row written in the same transaction must roll back.
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest
+        .mocked(updateUserRoleInOrganization)
+        .mockResolvedValueOnce({ success: false, updated: 'none' });
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+          role: 'admin',
+        })
+      ).rejects.toThrow('Failed to update user role');
+
+      const auditRows = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.action, 'organization.member.change_role'),
+            eq(organization_audit_logs.actor_id, regularUser.id)
+          )
+        );
+
+      const rowsForTarget = auditRows.filter(row =>
+        row.message.includes(targetUser.google_user_email)
+      );
+      expect(rowsForTarget).toHaveLength(0);
     });
 
     it('should update daily usage limit for organization owner', async () => {
@@ -856,6 +921,258 @@ describe('organizations members trpc router', () => {
 
       expect(result).toHaveProperty('acceptInviteUrl');
       expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
+      expect(result).toHaveProperty('invitationId');
+      expect(result).toHaveProperty('emailStatus', 'pending');
+    });
+
+    it('writes an invitation and outbox row and does not send mail in the mutation', async () => {
+      const sendInviteEmail = jest.mocked(sendOrganizationInviteEmail);
+      sendInviteEmail.mockClear();
+
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@outbox-invite.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      expect(sendInviteEmail).not.toHaveBeenCalled();
+
+      const outboxRows = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRows).toHaveLength(1);
+      expect(outboxRows[0].status).toBe('pending');
+      expect(outboxRows[0].payload.to).toBe(email);
+    });
+
+    it('drain sends the invite email once and marks the row delivered', async () => {
+      const sendInviteEmail = jest.mocked(sendOrganizationInviteEmail);
+      sendInviteEmail.mockClear();
+
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@drain-invite.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      expect(sendInviteEmail).not.toHaveBeenCalled();
+
+      await dispatchQueuedInviteEmails();
+
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+
+      expect(outboxRow.status).toBe('delivered');
+      expect(sendInviteEmail).toHaveBeenCalledWith(expect.objectContaining({ to: email }));
+    });
+
+    it('resendInvite resets the same outbox row without inserting a second', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@resend-invite.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      // Simulate a terminal failure after 8 attempts.
+      await db
+        .update(external_side_effect_outbox)
+        .set({ status: 'failed', attempts: 8, last_error: 'send failed' })
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+
+      const resendResult = await caller.organizations.members.resendInvite({
+        organizationId: testOrganization.id,
+        inviteId: result.invitationId,
+      });
+
+      expect(resendResult).toEqual({ success: true, updated: result.invitationId });
+
+      const outboxRows = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+
+      expect(outboxRows).toHaveLength(1);
+      expect(outboxRows[0].status).toBe('pending');
+      expect(outboxRows[0].attempts).toBe(0);
+      expect(outboxRows[0].last_error).toBeNull();
+    });
+
+    it('resendInvite refuses a revoked invitation and leaves the outbox row terminal', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@resend-after-revoke.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      await caller.organizations.members.deleteInvite({
+        organizationId: testOrganization.id,
+        inviteId: result.invitationId,
+      });
+
+      await expect(
+        caller.organizations.members.resendInvite({
+          organizationId: testOrganization.id,
+          inviteId: result.invitationId,
+        })
+      ).rejects.toThrow('This invitation has expired');
+
+      // The revoked invitation's outbox row must stay terminal: no re-arm.
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRow.status).toBe('failed');
+      expect(outboxRow.last_error).toBe('revoked');
+    });
+
+    it('resetInviteEmailForResend does not re-arm a revoked invitation outbox row', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@reset-fence-revoke.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      // Revoke the invitation: this expires the invitation and marks the outbox
+      // row `failed` atomically.
+      await caller.organizations.members.deleteInvite({
+        organizationId: testOrganization.id,
+        inviteId: result.invitationId,
+      });
+
+      // Call the DB reset directly, bypassing the router-level guard, to prove
+      // the fence itself refuses a revoked invitation.
+      const reset = await resetInviteEmailForResend(db, result.invitationId);
+
+      expect(reset).toBeNull();
+
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRow.status).toBe('failed');
+      expect(outboxRow.last_error).toBe('revoked');
+    });
+
+    it('resendInvite refuses an expired invitation and does not reset the outbox row', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@resend-after-expiry.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      // Simulate a terminal send failure, then expiry.
+      await db
+        .update(external_side_effect_outbox)
+        .set({ status: 'failed', attempts: 8, last_error: 'send failed' })
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      await db
+        .update(organization_invitations)
+        .set({ expires_at: sql`NOW() - interval '1 hour'` })
+        .where(eq(organization_invitations.id, result.invitationId));
+
+      await expect(
+        caller.organizations.members.resendInvite({
+          organizationId: testOrganization.id,
+          inviteId: result.invitationId,
+        })
+      ).rejects.toThrow('This invitation has expired');
+
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRow.status).toBe('failed');
+      expect(outboxRow.attempts).toBe(8);
+      expect(outboxRow.last_error).toBe('send failed');
+    });
+
+    it('resendInvite refuses an already-accepted invitation', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@resend-after-accept.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      await db
+        .update(organization_invitations)
+        .set({ accepted_at: sql`NOW()` })
+        .where(eq(organization_invitations.id, result.invitationId));
+
+      await expect(
+        caller.organizations.members.resendInvite({
+          organizationId: testOrganization.id,
+          inviteId: result.invitationId,
+        })
+      ).rejects.toThrow('This invitation has already been accepted');
+    });
+
+    it('marks the outbox row failed after eight send failures and leaves the invitation unchanged', async () => {
+      const sendInviteEmail = jest.mocked(sendOrganizationInviteEmail);
+      sendInviteEmail.mockRejectedValue(new Error('send failed'));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@eight-failures.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      try {
+        // Drive eight send failures. Each drain claims the pending row, fails the
+        // send, and backs off; clearing `next_attempt_at` makes the next pass
+        // claim it again. The eighth failure transitions the row to `failed`.
+        for (let i = 0; i < 8; i++) {
+          await dispatchQueuedInviteEmails();
+          await db
+            .update(external_side_effect_outbox)
+            .set({ next_attempt_at: null })
+            .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+        }
+
+        const [outboxRow] = await db
+          .select()
+          .from(external_side_effect_outbox)
+          .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+
+        expect(outboxRow.status).toBe('failed');
+        expect(outboxRow.attempts).toBe(8);
+
+        // The invitation row is untouched: still pending, not accepted, not expired.
+        const [invitation] = await db
+          .select()
+          .from(organization_invitations)
+          .where(eq(organization_invitations.id, result.invitationId));
+        expect(invitation.accepted_at).toBeNull();
+        expect(new Date(invitation.expires_at).getTime()).toBeGreaterThan(Date.now());
+      } finally {
+        sendInviteEmail.mockResolvedValue({ sent: true });
+      }
     });
 
     it('should allow owner to invite owner', async () => {
@@ -1064,6 +1381,38 @@ describe('organizations members trpc router', () => {
         success: true,
         updated: testInviteId,
       });
+    });
+
+    it('revoked invitation never produces a later invite email', async () => {
+      const sendInviteEmail = jest.mocked(sendOrganizationInviteEmail);
+      sendInviteEmail.mockClear();
+
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@revoke-no-mail.example.com`;
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+
+      await caller.organizations.members.deleteInvite({
+        organizationId: testOrganization.id,
+        inviteId: result.invitationId,
+      });
+
+      await dispatchQueuedInviteEmails();
+
+      // The revoked invitation's email must never be sent, even though the drain
+      // may still deliver other pending rows.
+      expect(sendInviteEmail).not.toHaveBeenCalledWith(expect.objectContaining({ to: email }));
+
+      const [outboxRow] = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, result.invitationId));
+      expect(outboxRow.status).toBe('failed');
+      expect(outboxRow.last_error).toBe('revoked');
     });
 
     it('should allow system admin to delete any invitation', async () => {

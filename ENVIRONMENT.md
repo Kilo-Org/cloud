@@ -230,6 +230,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `ABUSE_SERVICE_CF_ACCESS_CLIENT_ID` - Cloudflare Access client ID for abuse service. [PUBLIC]
 - `ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET` - Cloudflare Access client secret for abuse service. `[SECRET]`
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
+- `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
 

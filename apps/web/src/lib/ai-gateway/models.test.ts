@@ -130,12 +130,6 @@ describe('isFreeModel', () => {
         flags: ['reasoning', 'vision'],
         inference_provider_restriction: ['openai'],
       });
-      expect(getInferenceProvider(gpt_5_6_sol_discounted_model)).toEqual({
-        slug: 'openai',
-        name: 'OPENAI',
-        training: false,
-        retainsPrompts: true,
-      });
       expect(
         await hasBestEffortGuessDataCollectionRequirement(gpt_5_6_sol_discounted_model.public_id)
       ).toBe(false);

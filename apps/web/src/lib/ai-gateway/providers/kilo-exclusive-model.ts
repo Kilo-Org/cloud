@@ -194,15 +194,6 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   if (model.flags.includes('stealth')) {
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
   }
-  if (model.inference_provider_restriction.length === 1) {
-    const slug = model.inference_provider_restriction[0];
-    return {
-      slug,
-      name: slug.toUpperCase(),
-      training: model.flags.includes('requires-data-collection'),
-      retainsPrompts: true,
-    };
-  }
   if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
     return null;
   }

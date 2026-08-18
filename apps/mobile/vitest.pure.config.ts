@@ -32,6 +32,7 @@ export default defineProject({
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',
+      'src/lib/query/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/pr-review/**/*.test.tsx',

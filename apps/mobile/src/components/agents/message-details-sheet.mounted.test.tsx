@@ -193,6 +193,42 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('returns to the details view when Android back is pressed in the Select text view', async () => {
+    const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
+
+    const modal = () => {
+      const found = renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+      );
+      if (!found[0]) {
+        throw new Error('Modal not found');
+      }
+      return found[0];
+    };
+
+    await act(async () => {
+      await Promise.resolve();
+      press(findByTestID(renderer.root, 'message-details-select-text')[0]);
+    });
+
+    const onRequestClose = modal().props.onRequestClose as (() => void) | undefined;
+    expect(typeof onRequestClose).toBe('function');
+
+    await act(async () => {
+      await Promise.resolve();
+      onRequestClose?.();
+    });
+
+    const sheetHeaderTitles = () =>
+      renderer.root
+        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'SheetHeader')
+        .map(node => node.props.title as string | undefined);
+    expect(sheetHeaderTitles()).toContain('Message details');
+    expect(sheetHeaderTitles()).not.toContain('Select text');
+
+    await unmount(renderer);
+  });
+
   it('hides Select text for a streaming assistant text part but keeps Copy message', async () => {
     const renderer = await mountSheet(
       storedMessage(assistantInfo(), [textPartWithTime('streaming body', { start: 1 })])

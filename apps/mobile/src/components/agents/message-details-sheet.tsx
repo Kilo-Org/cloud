@@ -47,7 +47,13 @@ export function MessageDetailsSheet({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={
+        selectVisible
+          ? () => {
+              setSelectVisible(false);
+            }
+          : onClose
+      }
     >
       {selectVisible ? (
         <MessageTextSelectSheet

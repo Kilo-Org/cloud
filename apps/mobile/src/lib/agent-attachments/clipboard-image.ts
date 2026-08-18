@@ -62,6 +62,20 @@ export async function hasClipboardImage(): Promise<boolean> {
 }
 
 /**
+ * Check whether the clipboard holds a URL.
+ * Uses `hasUrlAsync`, which is iOS/macOS only and raises no iOS paste
+ * prompt. Returns `false` on any error (including the Android
+ * `UnavailabilityError`).
+ */
+export async function hasClipboardUrl(): Promise<boolean> {
+  try {
+    return await Clipboard.hasUrlAsync();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Read the clipboard text. Returns `''` when the clipboard holds no text,
  * the read was denied, or the read failed.
  */

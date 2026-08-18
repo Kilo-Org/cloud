@@ -61,7 +61,10 @@ import {
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
-import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
+import {
+  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  useClipboardPaste,
+} from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -422,8 +425,12 @@ export function ChatComposer({
         onChangeText: handleChangeText,
       });
     },
-    onUnreadable: () => {
-      toast.error(describeClassificationFailure('unreadable'));
+    onFailure: reason => {
+      toast.error(
+        reason === 'empty'
+          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          : describeClassificationFailure('unreadable')
+      );
     },
   });
 

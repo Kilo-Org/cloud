@@ -223,6 +223,27 @@ describe('appendShareParams', () => {
     );
   });
 
+  it('appends the spawn mode so the destination seeds it', () => {
+    expect(
+      appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { autoSend: true, mode: 'reviewer' })
+    ).toBe('/(app)/agent-chat/ses_1?shareId=abc123&autoSend=1&mode=reviewer');
+  });
+
+  it('does not append mode when it is empty or omitted', () => {
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { mode: '' })).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123'
+    );
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123')).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123'
+    );
+  });
+
+  it('URL-encodes the mode', () => {
+    expect(appendShareParams('/(app)/agent-chat/ses_1', 'abc123', { mode: 'my agent' })).toBe(
+      '/(app)/agent-chat/ses_1?shareId=abc123&mode=my%20agent'
+    );
+  });
+
   it('URL-encodes the shareId', () => {
     const encoded = appendShareParams('/(app)/agent-chat/new', 'id with spaces');
     expect(encoded).toBe('/(app)/agent-chat/new?shareId=id%20with%20spaces');

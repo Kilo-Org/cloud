@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 
-import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { useHoistedOperationKey } from '@/lib/operation-key';

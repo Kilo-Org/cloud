@@ -2,25 +2,42 @@ import { Pressable } from 'react-native';
 import { type Href, useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
 
-import { getModeIcon, MODE_OPTIONS, normalizeAgentMode } from '@/components/agents/mode-options';
+import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
+import {
+  type AgentMode,
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+  type ModeOption,
+  normalizeAgentMode,
+} from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setModePickerBridge } from '@/lib/picker-bridge';
 import { cn } from '@/lib/utils';
 
-export type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
+export type { AgentMode };
 
 type ModeSelectorProps = {
   value: AgentMode;
   onChange: (mode: AgentMode) => void;
   disabled?: boolean;
+  customOptions?: ModeOption[];
 };
 
-export function ModeSelector({ value, onChange, disabled = false }: Readonly<ModeSelectorProps>) {
+export function ModeSelector({
+  value,
+  onChange,
+  disabled = false,
+  customOptions = [],
+}: Readonly<ModeSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
   const selectedValue = normalizeAgentMode(value);
-  const selectedLabel = MODE_OPTIONS.find(m => m.value === selectedValue)?.label ?? 'Code';
+  const allOptions = [...MODE_OPTIONS, ...dedupeCustomModeOptions(customOptions)];
+  const selectedOption = ensureSelectedCustomOption(allOptions, selectedValue).find(
+    m => m.value === selectedValue
+  );
+  const selectedLabel = selectedOption?.label ?? selectedValue;
   const ModeIcon = getModeIcon(selectedValue);
 
   function handlePress() {
@@ -30,6 +47,7 @@ export function ModeSelector({ value, onChange, disabled = false }: Readonly<Mod
     setModePickerBridge({
       currentValue: selectedValue,
       onSelect: onChange,
+      customOptions,
     });
     router.push('/(app)/agent-chat/mode-picker' as Href);
   }

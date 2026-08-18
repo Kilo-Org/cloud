@@ -150,7 +150,7 @@ describe('readNewSessionPrefill', () => {
   });
 
   it.each([
-    ['unknown', 'code'],
+    ['unknown', 'unknown'],
     ['architect', 'plan'],
     ['build', 'code'],
   ])('normalizes mode "%s" to "%s"', (input, expected) => {

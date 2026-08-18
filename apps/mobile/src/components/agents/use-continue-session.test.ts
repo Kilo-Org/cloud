@@ -130,15 +130,19 @@ vi.mock('@/components/agents/mobile-session-manager', () => ({
     return record.data?.code === 'CONFLICT' && record.message === 'creation_in_progress';
   },
 }));
-vi.mock('@/components/agents/mode-options', () => ({
-  normalizeAgentMode: (mode: string | null | undefined) =>
-    mode === 'code' ||
-    mode === 'plan' ||
-    mode === 'debug' ||
-    mode === 'orchestrator' ||
-    mode === 'ask'
-      ? mode
-      : 'code',
+vi.mock('@/components/agents/mode-normalize', () => ({
+  normalizeAgentMode: (mode: string | null | undefined) => {
+    if (mode === 'build') {
+      return 'code';
+    }
+    if (mode === 'architect') {
+      return 'plan';
+    }
+    if (!mode) {
+      return 'code';
+    }
+    return mode;
+  },
 }));
 vi.mock('@/components/agents/new-session-prefill', () => ({
   appendNewSessionPrefill: (base: string) => base,

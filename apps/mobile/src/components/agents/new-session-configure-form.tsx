@@ -7,6 +7,7 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { type ModeOption } from '@/components/agents/mode-normalize';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
@@ -39,6 +40,12 @@ type NewSessionConfigureFormProps = {
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
   onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Custom mode options shown under the built-ins in the mode picker. */
+  customOptions?: ModeOption[];
+  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
+  modelLocked?: boolean;
+  /** Agent name shown in the locked model chip's accessibility label. */
+  modelLockLabel?: string;
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
@@ -95,6 +102,9 @@ export function NewSessionConfigureForm({
   onChangeText,
   onModeChange,
   onModelSelect,
+  customOptions = [],
+  modelLocked = false,
+  modelLockLabel,
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
@@ -213,6 +223,9 @@ export function NewSessionConfigureForm({
         onChangeText={onChangeText}
         onModeChange={onModeChange}
         onModelSelect={onModelSelect}
+        customOptions={customOptions}
+        modelLocked={modelLocked}
+        modelLockLabel={modelLockLabel}
         onAddAttachment={onAddAttachment}
         onRemoveAttachment={onRemoveAttachment}
         onRetryAttachment={onRetryAttachment}

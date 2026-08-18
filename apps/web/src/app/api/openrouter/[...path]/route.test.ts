@@ -1249,51 +1249,6 @@ describe('percentage-routed partner fallback', () => {
     });
   });
 
-  it('truncates oversized partner response bodies', async () => {
-    const failedPartnerResponse = upstreamJsonResponse({ error: 'partner failed' }, 500);
-    const cancelLoggingBody = jest.fn();
-    const oversizedBody = 'x'.repeat(16 * 1024 + 1);
-    jest.spyOn(failedPartnerResponse, 'clone').mockReturnValue(
-      new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(new TextEncoder().encode(oversizedBody));
-          },
-          cancel() {
-            cancelLoggingBody();
-          },
-        })
-      )
-    );
-    mockedUpstreamRequest
-      .mockResolvedValueOnce({ type: 'success', response: failedPartnerResponse })
-      .mockResolvedValueOnce({
-        type: 'success',
-        response: upstreamJsonResponse({ type: 'message', id: 'fallback-response' }),
-      });
-
-    const { POST } = await import('./route');
-    const response = await POST(
-      makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
-        max_tokens: 1_024,
-        messages: [{ role: 'user', content: 'hello' }],
-      }) as never
-    );
-    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
-    await mockedAfter.mock.calls[0]?.[0];
-
-    expect(response.status).toBe(200);
-    expect(cancelLoggingBody).toHaveBeenCalledTimes(1);
-    expect(consoleWarn).toHaveBeenCalledWith('Partner request failed before managed fallback', {
-      partner_provider: partnerProvider.id,
-      fallback_provider: provider.id,
-      status_code: 500,
-      body: 'x'.repeat(16 * 1024),
-      body_truncated: true,
-    });
-  });
-
   it('does not retry a successful partner response', async () => {
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',

@@ -971,11 +971,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     after(
       (async () => {
         try {
-          const { body, truncated } = await readPartnerFailureBody(responseForLogging);
           console.warn('Partner request failed before managed fallback', {
             ...partnerFailureLog,
-            body,
-            ...(truncated ? { body_truncated: true } : {}),
+            body: await readPartnerFailureBody(responseForLogging),
           });
         } catch (error) {
           console.warn('Partner request failed before managed fallback', {

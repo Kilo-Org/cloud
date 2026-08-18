@@ -1929,7 +1929,7 @@ describe('organization admin router', () => {
         expect(second.current.isExempt).toBe(true);
         expect(second.current.reason).toBe('renewed with updated documentation');
         expect(second.current.id).toBe(second.history.id);
-        expect(second.current.createdAt).not.toBe(first.current.createdAt);
+        expect(second.current.id).not.toBe(first.current.id);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({
           organizationId: org.id,

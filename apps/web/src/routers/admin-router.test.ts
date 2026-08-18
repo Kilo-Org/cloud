@@ -1,6 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
+import {
+  createDeletionInProgressBlockedReason,
+  createSoftDeletedBlockedReason,
+} from '@kilocode/db/user-soft-delete';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -78,5 +82,57 @@ describe('admin.users.updateBlockStatus', () => {
     // Existing block is never overwritten; the original reason and pepper stand.
     expect(after?.blocked_reason).toBe('first reason');
     expect(after?.api_token_pepper).toBe('first-block-pepper');
+  });
+
+  test('unblocking a deletion-in-progress user is refused and leaves fields intact', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const blockedAt = new Date().toISOString();
+    const blockedReason = createDeletionInProgressBlockedReason(new Date(blockedAt));
+    const user = await insertTestUser({
+      api_token_pepper: 'deleting-pepper',
+      blocked_reason: blockedReason,
+      blocked_at: blockedAt,
+      blocked_by_kilo_user_id: admin.id,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.users.updateBlockStatus({
+        userId: user.id,
+        blocked_reason: null,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const after = await getBlockState(user.id);
+    expect(after?.blocked_reason).toBe(blockedReason);
+    expect(after?.blocked_at).not.toBeNull();
+    expect(after?.blocked_by_kilo_user_id).toBe(admin.id);
+    expect(after?.api_token_pepper).toBe('deleting-pepper');
+  });
+
+  test('unblocking a soft-deleted user is refused and leaves fields intact', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const blockedAt = new Date().toISOString();
+    const blockedReason = createSoftDeletedBlockedReason(new Date(blockedAt));
+    const user = await insertTestUser({
+      api_token_pepper: 'deleted-pepper',
+      blocked_reason: blockedReason,
+      blocked_at: blockedAt,
+      blocked_by_kilo_user_id: admin.id,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.users.updateBlockStatus({
+        userId: user.id,
+        blocked_reason: null,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const after = await getBlockState(user.id);
+    expect(after?.blocked_reason).toBe(blockedReason);
+    expect(after?.blocked_at).not.toBeNull();
+    expect(after?.blocked_by_kilo_user_id).toBe(admin.id);
+    expect(after?.api_token_pepper).toBe('deleted-pepper');
   });
 });

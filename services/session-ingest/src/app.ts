@@ -43,7 +43,7 @@ async function hasValidInternalSecret(c: {
 
 const requireValidInternalSecret = createMiddleware<{
   Bindings: Env;
-  Variables: { user_id: string };
+  Variables: { user_id: string; deletionAudience?: boolean };
 }>(async (c, next) => {
   let isValid: boolean;
   try {
@@ -66,6 +66,7 @@ export const app = new Hono<{
   Bindings: Env;
   Variables: {
     user_id: string;
+    deletionAudience?: boolean;
   };
 }>();
 

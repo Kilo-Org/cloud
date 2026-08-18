@@ -121,7 +121,8 @@ export async function deleteBlobs(
   blobsToDelete: {
     folderName: FolderName;
     filename: FileName;
-  }[]
+  }[],
+  options?: { signal?: AbortSignal }
 ) {
   const objects = blobsToDelete.map(blob => ({
     Key: getBlobKey(sessionId, blob.folderName, blob.filename),
@@ -134,7 +135,8 @@ export async function deleteBlobs(
         Objects: objects,
         Quiet: true,
       },
-    })
+    }),
+    options?.signal ? { abortSignal: options.signal } : undefined
   );
 }
 

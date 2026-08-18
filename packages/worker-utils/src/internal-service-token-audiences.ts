@@ -9,3 +9,4 @@ export const GITLAB_CREDENTIAL_BROKER_AUDIENCE = 'git-token-service:gitlab-crede
 export const GITHUB_USER_ACCESS_TOKEN_AUDIENCE = 'git-token-service:github-user-access-token';
 export const USER_DATA_EXPORT_AUDIENCE = 'user-data-export';
 export const USER_DATA_EXPORT_ASSERTION_TTL_SECONDS = 5 * 60;
+export const SESSION_INGEST_USER_DELETION_AUDIENCE = 'session-ingest:user-deletion';

@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import { SignJWT } from 'jose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-import { kiloJwtAuthMiddleware } from './kilo-jwt-auth';
+import { kiloJwtAuthMiddleware, type KiloJwtAuthVariables } from './kilo-jwt-auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
@@ -86,11 +87,14 @@ function makeEnv(secret: string, ticketStore: TicketStore = makeTicketStore()): 
 }
 
 function makeApp() {
-  const app = new Hono<{ Bindings: TestEnv; Variables: { user_id: string } }>();
+  const app = new Hono<{ Bindings: TestEnv; Variables: KiloJwtAuthVariables }>();
   app.use('/api/*', kiloJwtAuthMiddleware);
   app.get('/api/me', c => c.json({ user_id: c.get('user_id') }));
   app.get('/api/user/cli', c => c.json({ user_id: c.get('user_id') }));
   app.get('/api/user/web', c => c.json({ user_id: c.get('user_id') }));
+  app.delete('/api/session/:sessionId', c =>
+    c.json({ user_id: c.get('user_id'), deletionAudience: c.get('deletionAudience') === true })
+  );
   return app;
 }
 
@@ -337,5 +341,72 @@ describe('kiloJwtAuthMiddleware', () => {
       success: false,
       error: 'Invalid or expired ticket',
     });
+  });
+
+  it('rejects session-ingest user-deletion audience tokens on non-delete routes', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'deleted' });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({ version: 3, kiloUserId: 'usr_123' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience(SESSION_INGEST_USER_DELETION_AUDIENCE)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Deletion token cannot be used for this request',
+    });
+  });
+
+  it('accepts session-ingest user-deletion audience tokens on leaf session DELETE', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'deleted' });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({ version: 3, kiloUserId: 'usr_123' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience(SESSION_INGEST_USER_DELETION_AUDIENCE)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/session/ses_abc', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123', deletionAudience: true });
+  });
+
+  it('rejects a token bound to a different audience', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'usr_123',
+      apiTokenPepper: 'pepper-current',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience('user-data-export')
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
   });
 });

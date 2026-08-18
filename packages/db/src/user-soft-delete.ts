@@ -1,9 +1,14 @@
-export const SOFT_DELETED_BLOCK_REASON_PREFIX = 'soft-deleted at ';
+import { like, sql, type Column } from 'drizzle-orm';
+import {
+  DELETION_IN_PROGRESS_BLOCK_REASON_PREFIX,
+  SOFT_DELETED_BLOCK_REASON_PREFIX,
+} from './user-soft-delete-reasons';
 
-export function createSoftDeletedBlockedReason(at = new Date()): string {
-  return `${SOFT_DELETED_BLOCK_REASON_PREFIX}${at.toISOString()}`;
-}
+export * from './user-soft-delete-reasons';
 
-export function isSoftDeletedBlockedReason(reason: string | null): boolean {
-  return reason?.startsWith(SOFT_DELETED_BLOCK_REASON_PREFIX) ?? false;
+export function goneOrDeletingBlockedReasonSql(column: Column) {
+  return sql`(${like(column, `${SOFT_DELETED_BLOCK_REASON_PREFIX}%`)} OR ${like(
+    column,
+    `${DELETION_IN_PROGRESS_BLOCK_REASON_PREFIX}%`
+  )})`;
 }

@@ -6,6 +6,8 @@ export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
 export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
+export const WEB_MCP_DISCOVER_MESSAGE = 'kilo.tabs.webMcpDiscover';
+export const WEB_MCP_EXECUTE_MESSAGE = 'kilo.tabs.webMcpExecute';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 /**
  * Characters of visible page text one snapshot returns. A/B-measured: a 24k
@@ -67,13 +69,16 @@ export interface BrowserScriptingInjectionResult {
   // Firefox sets `error` (the thrown/rejected value) when the injected function fails; `result` is absent.
   readonly error?: unknown;
   readonly result?: unknown;
+  // Chrome reports the target document and frame of a successful injection.
+  readonly documentId?: string;
+  readonly frameId?: number;
 }
 
 export interface BrowserScriptingApi {
   readonly executeScript: (details: {
     readonly args: string[];
     readonly func: (...args: string[]) => unknown;
-    readonly target: { readonly tabId: number };
+    readonly target: { readonly tabId: number; readonly documentIds?: string[] };
     readonly world: 'MAIN';
   }) => Promise<BrowserScriptingInjectionResult[]> | BrowserScriptingInjectionResult[];
 }
@@ -139,6 +144,23 @@ export interface ViewportScreenshot {
   readonly width: number;
 }
 
+export interface WebMcpToolDescriptor {
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  readonly origin: string;
+  readonly inputSchema: unknown;
+}
+
+export interface WebMcpDiscoveryResult {
+  readonly documentId: string;
+  readonly tools: WebMcpToolDescriptor[];
+}
+
+export interface WebMcpExecutionResult {
+  readonly value: unknown;
+}
+
 export type EvalTabResult =
   | {
       readonly description?: string;
@@ -170,6 +192,17 @@ export type TabDebuggerRequest =
   | {
       readonly tabId: number;
       readonly type: typeof VIEWPORT_SCREENSHOT_MESSAGE;
+    }
+  | {
+      readonly tabId: number;
+      readonly type: typeof WEB_MCP_DISCOVER_MESSAGE;
+    }
+  | {
+      readonly arguments: string;
+      readonly documentId: string;
+      readonly tabId: number;
+      readonly toolName: string;
+      readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     };
 
 export type TabDebuggerResponse =
@@ -192,6 +225,16 @@ export type TabDebuggerResponse =
       readonly result: EvalTabResult;
       readonly ok: true;
       readonly type: typeof VIEWPORT_SCREENSHOT_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof WEB_MCP_DISCOVER_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     }
   | {
       readonly error: string;
@@ -230,6 +273,17 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(VIEWPORT_SCREENSHOT_MESSAGE),
   }),
   z.object({
+    tabId: z.number(),
+    type: z.literal(WEB_MCP_DISCOVER_MESSAGE),
+  }),
+  z.object({
+    arguments: z.string(),
+    documentId: z.string(),
+    tabId: z.number(),
+    toolName: z.string(),
+    type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
+  }),
+  z.object({
     code: z.string(),
     tabId: z.number(),
     timeoutMs: z.number().optional(),
@@ -256,6 +310,16 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(VIEWPORT_SCREENSHOT_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(WEB_MCP_DISCOVER_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
   }),
   z.object({
     error: z.string(),
@@ -801,6 +865,88 @@ const runInjectedPageSnapshot = (
 };
 /* eslint-enable unicorn/consistent-function-scoping */
 
+/* eslint-disable unicorn/consistent-function-scoping */
+// eslint-disable-next-line max-params -- the injected function is serialized into the page, so every input must arrive as a positional string argument.
+const runInjectedWebMcpDiscover = async (): Promise<WebMcpToolDescriptor[]> => {
+  const { modelContext } = document as Document & {
+    modelContext?: {
+      getTools?: () => Promise<unknown>;
+    };
+  };
+  const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
+  const isToolRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+  if (modelContext === undefined || typeof modelContext.getTools !== 'function') {
+    return [];
+  }
+
+  const tools = await modelContext.getTools();
+  if (!isArray(tools)) {
+    return [];
+  }
+
+  const descriptors: WebMcpToolDescriptor[] = [];
+  for (const tool of tools) {
+    const record = isToolRecord(tool) ? tool : {};
+    descriptors.push({
+      description: typeof record['description'] === 'string' ? record['description'] : '',
+      inputSchema: record['inputSchema'],
+      name: typeof record['name'] === 'string' ? record['name'] : '',
+      origin: typeof record['origin'] === 'string' ? record['origin'] : '',
+      title: typeof record['title'] === 'string' ? record['title'] : '',
+    });
+  }
+
+  return descriptors;
+};
+
+const runInjectedWebMcpExecute = async (
+  toolNameText: string,
+  argumentsText: string
+): Promise<unknown> => {
+  const { modelContext } = document as Document & {
+    modelContext?: {
+      getTools?: () => Promise<unknown>;
+      executeTool?: (tool: unknown, argumentsText: string) => Promise<unknown>;
+    };
+  };
+  const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
+  const isToolRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+  if (
+    modelContext === undefined ||
+    typeof modelContext.getTools !== 'function' ||
+    typeof modelContext.executeTool !== 'function'
+  ) {
+    throw new Error('WebMCP is not available in this document.');
+  }
+
+  const tools = await modelContext.getTools();
+  if (!isArray(tools)) {
+    throw new TypeError('WebMCP returned no tools.');
+  }
+
+  let tool: unknown = undefined;
+  for (const candidate of tools) {
+    const record = isToolRecord(candidate) ? candidate : {};
+    if (record['name'] === toolNameText) {
+      tool = candidate;
+      break;
+    }
+  }
+
+  if (tool === undefined) {
+    throw new Error(`WebMCP tool "${toolNameText}" is not available.`);
+  }
+
+  const result = await modelContext.executeTool(tool, argumentsText);
+
+  return result;
+};
+/* eslint-enable unicorn/consistent-function-scoping */
+
 const withTimeout = async <Result>(
   promise: Promise<Result>,
   timeoutMs: number
@@ -979,6 +1125,105 @@ export const getPageSnapshotInTabWithScripting = async ({
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to read page snapshot.',
+      ok: false,
+    };
+  }
+};
+
+const isWebMcpToolDescriptorArray = (value: unknown): value is WebMcpToolDescriptor[] =>
+  Array.isArray(value);
+
+export const discoverWebMcpToolsInTab = async ({
+  scriptingApi,
+  tabId,
+}: {
+  readonly scriptingApi: BrowserScriptingApi;
+  readonly tabId: number;
+}): Promise<EvalTabResult> => {
+  try {
+    const [response] = await withTimeout(
+      Promise.resolve(
+        scriptingApi.executeScript({
+          args: [],
+          func: runInjectedWebMcpDiscover,
+          target: { tabId },
+          world: 'MAIN',
+        })
+      ),
+      DEFAULT_EVAL_TIMEOUT_MS
+    );
+
+    if (response?.error !== undefined) {
+      const detail = extractInjectionErrorText(response.error);
+
+      return {
+        error:
+          detail === undefined
+            ? 'Failed to discover WebMCP tools.'
+            : `Failed to discover WebMCP tools: ${detail}`,
+        ok: false,
+      };
+    }
+
+    const documentId = typeof response?.documentId === 'string' ? response.documentId : '';
+    const tools = isWebMcpToolDescriptorArray(response?.result) ? response.result : [];
+
+    // The browser must report the target document; without it the tools cannot be bound to a page.
+    if (documentId === '') {
+      return { ok: true, value: { documentId: '', tools: [] } satisfies WebMcpDiscoveryResult };
+    }
+
+    return { ok: true, value: { documentId, tools } satisfies WebMcpDiscoveryResult };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to discover WebMCP tools.',
+      ok: false,
+    };
+  }
+};
+
+export const executeWebMcpToolInTab = async ({
+  arguments: argumentsText,
+  documentId,
+  scriptingApi,
+  tabId,
+  toolName,
+}: {
+  readonly arguments: string;
+  readonly documentId: string;
+  readonly scriptingApi: BrowserScriptingApi;
+  readonly tabId: number;
+  readonly toolName: string;
+}): Promise<EvalTabResult> => {
+  try {
+    const [response] = await withTimeout(
+      Promise.resolve(
+        scriptingApi.executeScript({
+          args: [toolName, argumentsText],
+          func: runInjectedWebMcpExecute,
+          target: { documentIds: [documentId], tabId },
+          world: 'MAIN',
+        })
+      ),
+      DEFAULT_EVAL_TIMEOUT_MS
+    );
+
+    if (response?.error !== undefined) {
+      const detail = extractInjectionErrorText(response.error);
+
+      return {
+        error:
+          detail === undefined
+            ? 'WebMCP tool execution failed.'
+            : `WebMCP tool execution failed: ${detail}`,
+        ok: false,
+      };
+    }
+
+    return { ok: true, value: response?.result };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'WebMCP tool execution failed.',
       ok: false,
     };
   }

@@ -15,7 +15,6 @@ const ONE_PASSWORD_CLI_DOCS = 'https://www.1password.dev/cli/get-started';
 
 export type Project = (typeof PROJECTS)[number];
 export type Environment = (typeof ENVIRONMENTS)[number];
-export type Values = Record<Environment, string>;
 export type VercelContext = {
   project: Project;
   orgId: string;
@@ -156,6 +155,77 @@ function vercel(
   );
 }
 
+function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const commandArgs = [
+      'dlx',
+      VERCEL_PACKAGE,
+      ...args,
+      '--scope',
+      'kilocode',
+      '--non-interactive',
+      '--no-color',
+      '--cwd',
+      context.cwd,
+    ];
+    const child = spawn('pnpm', commandArgs, {
+      cwd: context.cwd,
+      env: {
+        ...process.env,
+        VERCEL_ORG_ID: context.orgId,
+        VERCEL_PROJECT_ID: context.project,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stdout: Buffer[] = [];
+    let outputBytes = 0;
+    let settled = false;
+
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const capture = (chunk: Buffer, keep: boolean) => {
+      outputBytes += chunk.length;
+      if (outputBytes > 10 * 1024 * 1024) {
+        child.kill();
+        fail(
+          new Error(
+            `pnpm ${commandArgs.slice(0, 3).join(' ')} failed; provider output exceeded 10 MiB.`
+          )
+        );
+        return;
+      }
+      if (keep) stdout.push(chunk);
+    };
+
+    child.stdout.on('data', chunk => capture(Buffer.from(chunk), true));
+    child.stderr.on('data', chunk => capture(Buffer.from(chunk), false));
+    child.once('error', error => {
+      if (errorCode(error) === 'ENOENT') {
+        const message = missingCommandMessage('pnpm', commandArgs);
+        if (message) {
+          fail(new MissingCommandError(message));
+          return;
+        }
+      }
+      fail(error);
+    });
+    child.once('close', status => {
+      if (settled) return;
+      if (status === 0) {
+        settled = true;
+        resolve(Buffer.concat(stdout).toString('utf8'));
+        return;
+      }
+      fail(
+        new Error(`pnpm ${commandArgs.slice(0, 3).join(' ')} failed; provider output was redacted.`)
+      );
+    });
+  });
+}
+
 function vercelAccessError(error: unknown): Error {
   const details = error instanceof Error ? error.message.trim() : '';
   return new Error(
@@ -228,6 +298,31 @@ export function setVariable(
     ],
     value
   );
+}
+
+export async function redeployLatest(
+  context: VercelContext,
+  environment: Exclude<Environment, 'development'>
+): Promise<string> {
+  const response = parseJson(
+    await vercelAsync(context, [
+      'list',
+      context.project,
+      '--environment',
+      environment,
+      '--status',
+      'READY',
+      '--format=json',
+    ]),
+    `List ${context.project}/${environment} deployments`
+  );
+  const deployment = records(response.deployments)[0];
+  const url = deployment ? stringValue(deployment, 'url') : undefined;
+  if (!url) {
+    throw new Error(`No ready deployment found for ${context.project}/${environment}.`);
+  }
+
+  return (await vercelAsync(context, ['redeploy', url, '--target', environment])).trim();
 }
 
 // setVaultValue streams the secret template to `op` over /dev/fd/3 (see

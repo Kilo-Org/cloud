@@ -1,6 +1,15 @@
+import { Directory, File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
 
-/** A captured FilePart URL, stored in memory only. No bytes are downloaded. */
+import { getSafeCacheFilename } from '@/lib/share-remote-file';
+
+import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
+
+const CACHE_DIR_NAME = 'session-file-parts';
+
+/** A captured FilePart URL. `data:` URLs are written to disk and stored as a
+ *  small `file://` URI; `http(s)` URLs are stored as-is. No bytes are
+ *  downloaded. */
 export type FilePartCacheEntry = {
   url: string;
   mime: string;
@@ -32,8 +41,39 @@ function getVersionSnapshot(): number {
 }
 
 /**
- * Record a captured FilePart URL. Stores the URL string only — never downloads
- * bytes. First write wins: a later call for the same `partId` is a no-op.
+ * Resolve the URL to store for a captured FilePart. A `data:` URL is written
+ * to disk and stored as a `file://` URI; an `http(s)` URL is stored as-is. On
+ * any decode or write failure the raw URL is stored instead. Never throws.
+ */
+function resolveCacheUrl(
+  partId: string,
+  payload: Readonly<{ url: string; mime: string; filename?: string }>
+): string {
+  if (!payload.url.startsWith('data:')) {
+    return payload.url;
+  }
+  const stripped = stripDataUrlBase64Prefix(payload.url, payload.mime);
+  if (stripped === undefined) {
+    return payload.url;
+  }
+  try {
+    const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
+    directory.create({ idempotent: true, intermediates: true });
+    const file = new File(
+      directory,
+      getSafeCacheFilename({ id: partId, filename: payload.filename ?? 'file' })
+    );
+    file.write(stripped, { encoding: 'base64' });
+    return file.uri;
+  } catch {
+    return payload.url;
+  }
+}
+
+/**
+ * Record a captured FilePart URL. A `data:` URL is written to disk and stored
+ * as a `file://` URI; an `http(s)` URL is stored as-is. Never downloads bytes.
+ * First write wins: a later call for the same `partId` is a no-op.
  */
 export function cacheFilePart(
   partId: string,
@@ -43,7 +83,7 @@ export function cacheFilePart(
     return;
   }
   entriesByPartId.set(partId, {
-    url: payload.url,
+    url: resolveCacheUrl(partId, payload),
     mime: payload.mime,
     ...(payload.filename ? { filename: payload.filename } : {}),
   });
@@ -64,9 +104,14 @@ export function useFilePartCache(partId: string): FilePartCacheEntry | undefined
   return entriesByPartId.get(partId);
 }
 
-/** True only for `http:`, `https:`, and `data:` URLs. */
+/** True only for `http:`, `https:`, `data:`, and `file:` URLs. */
 export function isUsableFilePartUrl(url: string): boolean {
-  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
+  return (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('file://')
+  );
 }
 
 /** Test-only: clear in-memory state between cases. */

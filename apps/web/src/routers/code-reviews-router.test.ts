@@ -76,6 +76,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 }));
 
 import { db } from '@/lib/drizzle';
+import type { SuccessResult } from '@/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
@@ -1918,7 +1919,8 @@ describe('codeReviewRouter attempts', () => {
     // status CAS and lost) or a BAD_REQUEST (it read 'pending' before the CAS
     // ran). Both are non-success outcomes; the test must not depend on which one.
     const fulfilled = results.filter(
-      (r): r is PromiseFulfilledResult<{ success: boolean }> => r.status === 'fulfilled'
+      (r): r is PromiseFulfilledResult<SuccessResult<{ message: string }>> =>
+        r.status === 'fulfilled'
     );
     expect(fulfilled).toHaveLength(1);
     expect(fulfilled[0].value.success).toBe(true);

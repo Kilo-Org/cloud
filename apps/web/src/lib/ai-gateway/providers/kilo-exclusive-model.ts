@@ -194,14 +194,21 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   if (model.flags.includes('stealth')) {
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
   }
-  if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
-    return null;
+
+  let slug: OpenRouterInferenceProviderId;
+  if (model.inference_provider_restriction.length === 1) {
+    slug = model.inference_provider_restriction[0];
+  } else {
+    if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
+      return null;
+    }
+    slug = OpenRouterInferenceProviderIdSchema.parse(model.gateway);
   }
-  const slug = OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+
   return {
     slug,
     name: slug.toUpperCase(),
-    training: false,
+    training: model.flags.includes('requires-data-collection'),
     retainsPrompts: true,
   };
 }

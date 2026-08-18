@@ -25,7 +25,10 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isDeadFreeModel, isKiloExclusiveRateLimitedModel } from '@/lib/ai-gateway/models';
+import {
+  isDisabledKiloExclusiveModel,
+  isKiloExclusiveRateLimitedModel,
+} from '@/lib/ai-gateway/models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -673,7 +676,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    isDeadFreeModel(effectiveModelIdLowerCased) ||
+    isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
     (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);

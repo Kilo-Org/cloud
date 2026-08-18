@@ -150,10 +150,8 @@ export function shouldRedactErrorResponse(provider: ProviderId, model: string): 
   return provider === 'experiment' || isKiloStealthModel(model);
 }
 
-export function isDeadFreeModel(model: string): boolean {
-  return !!kiloExclusiveModels.find(
-    m => m.public_id === model && m.status === 'disabled' && !m.pricing
-  );
+export function isDisabledKiloExclusiveModel(model: string): boolean {
+  return !!kiloExclusiveModels.find(m => m.public_id === model && m.status === 'disabled');
 }
 
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {

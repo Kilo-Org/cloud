@@ -388,7 +388,7 @@ Video files must not.
 - Actor emails:
 - Org IDs:
 - Stripe Checkout / invoice / charge IDs:
-- Assessment id / key:
+- Assessment key:
 - Result: PASS | FAIL | N/A | BLOCKED
 - Notes:
 
@@ -486,7 +486,7 @@ JOIN credit_transactions ct
     a.stripe_invoice_id,
     a.stripe_payment_intent_id
   )
-WHERE a.id = '<assessment-id>';
+WHERE a.assessment_key = '<assessment-key>';
 ```
 
 Expect `ct.amount_microdollars = a.settled_product_minor * 10000` for top-ups
@@ -562,7 +562,7 @@ After every completed, failed, or abandoned payment attempt:
 3. Verify no assessment remains `pending`:
 
 ```sql
-SELECT id, assessment_key, flow, outcome, stripe_checkout_session_id,
+SELECT assessment_key, flow, outcome, stripe_checkout_session_id,
        stripe_invoice_id, failure_code, created_at
 FROM stripe_service_fee_assessments
 WHERE outcome = 'pending'
@@ -1265,7 +1265,7 @@ newest row is the revoke row with `is_exempt = false`.
 **UI expect:** no `Grant exemption`, no `Exempt` / `Fees apply` service-fee
 card, no exemption history.
 
-**Database expect:** no new exemption history rows from this actor.
+**Database expect:** no new exemption-log rows from this actor.
 
 **Video** (`video-evidence`, one clip)
 

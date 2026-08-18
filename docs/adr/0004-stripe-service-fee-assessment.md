@@ -138,12 +138,12 @@ in Kilo's favor restores the funds and must be reversible without violating that
 
 ### Organization exemptions are exact, internal, and time-resolved
 
-A platform admin may exempt an exact organization, with a required reason and internal-only history.
+A platform admin may exempt an exact organization, with a required reason recorded in an internal append-only log.
 Exemptions do not inherit to parent organizations, child organizations, or members' personal
 purchases, and are never inferred from seat counts, plan, sponsorship, hierarchy, or trial settings.
 
-Eligibility is resolved against the exemption history row effective at the billing object's creation
-instant, not against current state at webhook delivery. Exemption history is not written to
+Eligibility is resolved against the exemption-log row effective at the billing object's creation
+instant, not against current state at webhook delivery. The exemption log is not written to
 `organization_audit_logs`, which is reachable by customers through an organization-scoped procedure.
 
 ## Invariants (what not to change without revisiting this ADR)

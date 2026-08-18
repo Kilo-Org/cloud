@@ -166,7 +166,7 @@ Renewal and proration invoices are unaffected: they compute from actual discount
 
 ### Activation-boundary replacement
 
-Exemption drift needs no special handling: resolving the latest exemption history row at or before `eligibility_created_at` is already correct for any delivery delay.
+Exemption drift needs no special handling: resolving the latest exemption-log row at or before `eligibility_created_at` is already correct for any delivery delay.
 
 Only the activation instant can genuinely straddle a single request. For a Checkout created within one minute of `SERVICE_FEE_ACTIVATION_UNIX_SECONDS`, compare the prepared decision against the returned `session.created`; if they disagree, expire the session and create one replacement with the correct decision. If the replacement also disagrees, fail open with a fee-free session and a missed assessment. Outside that window, do not add an expire/replace round trip to every purchase.
 
@@ -176,11 +176,11 @@ Add the following tables to `packages/db/src/schema.ts`. Follow `packages/db/AGE
 
 Use the repository's existing idioms rather than inventing new ones:
 
-- Primary keys: reuse the shared `idPrimaryKeyColumn` (`packages/db/src/schema.ts:2688`). Do not use `defaultRandom()`.
+- Primary keys: use `assessment_key` directly for assessments. Reuse the shared `idPrimaryKeyColumn` (`packages/db/src/schema.ts:2688`) for exemption-log row IDs. Do not use `defaultRandom()`.
 - Timestamps: `timestamp({ withTimezone: true, mode: 'string' })`, with `.defaultNow().notNull()`, and an `$onUpdateFn` returning `now()` for `updated_at`.
 
 ```ts
-// packages/db/src/schema.ts:2688, reuse rather than redefine
+// packages/db/src/schema.ts:2688, reuse for exemption-log IDs rather than redefine
 const idPrimaryKeyColumn = uuid()
   .default(sql`pg_catalog.gen_random_uuid()`)
   .primaryKey()
@@ -716,7 +716,7 @@ Contracts:
 - `reason`: trimmed string, minimum 3, maximum 500 characters.
 - `get` returns current state, last reason/actor/time, and history newest first.
 - Normalize database timestamps to UTC ISO before returning them.
-- `set` runs in one database transaction, locks the current state row or takes an organization-scoped advisory transaction lock, inserts one history row, and upserts current state linked to the same actor and reason.
+- `set` runs in one database transaction, takes an organization-scoped advisory transaction lock, and appends one exemption-log row. Current state is that newest row.
 - Repeating the same state with a new reason is allowed and creates history because the stated reason is an auditable admin decision.
 - Reject deleted or missing organizations.
 - Never write `organization_audit_logs`.
@@ -963,7 +963,7 @@ Exit condition: the wire API version is pinned and green, as a standalone review
 
 1. Add closed service-fee types/constants.
 2. Implement pure fee, line-net, and cumulative-refund calculations with unit tests, including the `type === 'discount'` filter and the zero-product refund guard.
-3. Add the three database tables and generated migration, reusing `idPrimaryKeyColumn` and `enumCheck()`.
+3. Add the two database tables and generated migration, using `assessment_key` as the assessment primary key and `enumCheck()`.
 4. Add assessment repository functions and database integration tests.
 5. Add exact-organization exemption read/mutation functions and tests.
 6. Verify schema, migration bootstrap, package typecheck, and format.

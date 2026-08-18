@@ -12,12 +12,18 @@ import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
+const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 
 afterEach(() => {
   if (originalFriendliApiKey === undefined) {
     delete process.env.FRIENDLI_API_KEY;
   } else {
     process.env.FRIENDLI_API_KEY = originalFriendliApiKey;
+  }
+  if (originalOpenAiApiKey === undefined) {
+    delete process.env.OPENAI_API_KEY;
+  } else {
+    process.env.OPENAI_API_KEY = originalOpenAiApiKey;
   }
 });
 
@@ -203,15 +209,29 @@ describe('applyVercelSettings BYOK pinning', () => {
       anthropic: [{ apiKey: 'sk-anthropic' }],
     });
   });
+
+  it('does not add managed OpenAI credentials to user BYOK settings', async () => {
+    process.env.OPENAI_API_KEY = 'openai-managed-key';
+    const request = byokRequest([]);
+
+    await applyVercelSettings('openai/gpt-5', request, [
+      { decryptedAPIKey: 'sk-user-openai', providerId: 'openai' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      openai: [{ apiKey: 'sk-user-openai' }],
+    });
+  });
 });
 
 describe('applyVercelSettings managed requests', () => {
-  function managedRequest(): GatewayRequest {
+  function managedRequest(provider?: GatewayRequest['body']['provider']): GatewayRequest {
     return {
       kind: 'chat_completions',
       body: {
         model: 'moonshotai/kimi-k3',
         messages: [{ role: 'user', content: 'hello' }],
+        provider,
       },
     };
   }
@@ -221,6 +241,47 @@ describe('applyVercelSettings managed requests', () => {
     const request = managedRequest();
 
     await applyVercelSettings('moonshotai/kimi-k3', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
+
+  it('adds managed OpenAI credentials when OpenAI is an allowed provider', async () => {
+    process.env.OPENAI_API_KEY = 'openai-managed-key';
+    const request = managedRequest({ only: ['openai', 'anthropic'] });
+
+    await applyVercelSettings('openai/gpt-5', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      openai: [{ apiKey: 'openai-managed-key' }],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['openai', 'anthropic']);
+  });
+
+  it('adds managed OpenAI credentials when providers are unrestricted', async () => {
+    process.env.OPENAI_API_KEY = 'openai-managed-key';
+    const request = managedRequest();
+
+    await applyVercelSettings('openai/gpt-5', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      openai: [{ apiKey: 'openai-managed-key' }],
+    });
+  });
+
+  it('does not add managed OpenAI credentials when OpenAI is excluded', async () => {
+    process.env.OPENAI_API_KEY = 'openai-managed-key';
+    const request = managedRequest({ only: ['anthropic'] });
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, null);
+
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
+
+  it('does not add managed OpenAI credentials when the key is empty', async () => {
+    process.env.OPENAI_API_KEY = '';
+    const request = managedRequest({ only: ['openai'] });
+
+    await applyVercelSettings('openai/gpt-5', request, null);
 
     expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
   });

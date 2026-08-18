@@ -13,6 +13,14 @@ const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCost
   ...overrides,
 });
 
+const fallbackOnlyModel = {
+  ...claude_opus_4_7_stealth_model,
+  pricing: claude_opus_4_7_stealth_model.pricing && {
+    ...claude_opus_4_7_stealth_model.pricing,
+    fallbackOnly: true,
+  },
+};
+
 describe('calculateKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
   test('uses the 20% lower flat price for uncached tokens', () => {
     const result = calculateKiloExclusiveCost_mUsd(
@@ -37,7 +45,7 @@ describe('calculateKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
 
   test('uses fallback-only pricing when market cost is missing', () => {
     const result = calculateKiloExclusiveCost_mUsd(
-      { ...claude_opus_4_7_stealth_model, fallbackOnly: true },
+      fallbackOnlyModel,
       makeUsage({ inputTokens: 100_000, outputTokens: 10_000 })
     );
     expect(result).toBe(600_000);
@@ -45,7 +53,7 @@ describe('calculateKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
 
   test('preserves reported market cost with fallback-only pricing', () => {
     const result = calculateKiloExclusiveCost_mUsd(
-      { ...claude_opus_4_7_stealth_model, fallbackOnly: true },
+      fallbackOnlyModel,
       makeUsage({ inputTokens: 100_000, outputTokens: 10_000, cost_mUsd: 123_000 })
     );
     expect(result).toBeUndefined();

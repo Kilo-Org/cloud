@@ -1193,7 +1193,7 @@ export function calculateKiloExclusiveCost_mUsd(
   if (!pricing) {
     return 0;
   }
-  if (model.fallbackOnly && usage.cost_mUsd > 0) {
+  if (pricing.fallbackOnly && usage.cost_mUsd > 0) {
     return undefined;
   }
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
@@ -1212,7 +1212,7 @@ export function calculateKiloExclusiveCost_mUsd(
         cacheHitTokens: usage.cacheHitTokens,
         cacheWriteTokens: usage.cacheWriteTokens,
       },
-      pricing
+      pricing.tiers
     )
   );
 }

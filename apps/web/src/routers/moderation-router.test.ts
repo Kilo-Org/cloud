@@ -25,9 +25,15 @@ describe('moderation-router', () => {
   });
 
   afterEach(async () => {
-    await db.delete(content_moderation_reports).where(eq(content_moderation_reports.kilo_user_id, user.id));
-    await db.delete(user_moderation_blocks).where(eq(user_moderation_blocks.blocker_user_id, user.id));
-    await db.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, user.id));
+    await db
+      .delete(content_moderation_reports)
+      .where(eq(content_moderation_reports.kilo_user_id, user.id));
+    await db
+      .delete(user_moderation_blocks)
+      .where(eq(user_moderation_blocks.blocker_user_id, user.id));
+    await db
+      .delete(user_moderation_mutes)
+      .where(eq(user_moderation_mutes.blocker_user_id, user.id));
     await db.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, user.id));
     await db.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, user.id));
   });

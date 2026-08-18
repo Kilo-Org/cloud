@@ -10531,7 +10531,10 @@ export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
 export const content_moderation_reports = pgTable(
   'content_moderation_reports',
   {
-    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
     kilo_user_id: text().notNull(),
     surface: text().notNull(),
     target_kind: text().notNull(),
@@ -10540,7 +10543,10 @@ export const content_moderation_reports = pgTable(
     session_id: text(),
     reason: text().notNull(),
     context_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
-    receipt_id: uuid().default(sql`pg_catalog.gen_random_uuid()`).notNull().unique(),
+    receipt_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .notNull()
+      .unique(),
     triage_status: text().notNull().default('received'),
     appeal_status: text().notNull().default('none'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -10561,7 +10567,10 @@ export type NewContentModerationReport = typeof content_moderation_reports.$infe
 export const user_moderation_blocks = pgTable(
   'user_moderation_blocks',
   {
-    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
     blocker_user_id: text().notNull(),
     blocked_github_login: text().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -10580,7 +10589,10 @@ export type NewUserModerationBlock = typeof user_moderation_blocks.$inferInsert;
 export const user_moderation_mutes = pgTable(
   'user_moderation_mutes',
   {
-    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
     blocker_user_id: text().notNull(),
     muted_github_login: text().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -10599,7 +10611,10 @@ export type NewUserModerationMute = typeof user_moderation_mutes.$inferInsert;
 export const user_terms_acceptances = pgTable(
   'user_terms_acceptances',
   {
-    id: uuid().default(sql`pg_catalog.gen_random_uuid()`).primaryKey().notNull(),
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
     kilo_user_id: text().notNull(),
     terms_version: text().notNull(),
     age_posture: text().notNull().default('13_plus'),

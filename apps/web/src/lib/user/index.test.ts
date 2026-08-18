@@ -4914,7 +4914,16 @@ describe('User', () => {
         })
         .returning();
 
-      if (!report || !otherReport || !block || !otherBlock || !mute || !otherMute || !terms || !otherTerms) {
+      if (
+        !report ||
+        !otherReport ||
+        !block ||
+        !otherBlock ||
+        !mute ||
+        !otherMute ||
+        !terms ||
+        !otherTerms
+      ) {
         throw new Error('Failed to seed moderation rows');
       }
 
@@ -4945,10 +4954,7 @@ describe('User', () => {
           .where(eq(user_moderation_blocks.id, otherBlock.id))
       ).toHaveLength(1);
       expect(
-        await db
-          .select()
-          .from(user_moderation_mutes)
-          .where(eq(user_moderation_mutes.id, mute.id))
+        await db.select().from(user_moderation_mutes).where(eq(user_moderation_mutes.id, mute.id))
       ).toHaveLength(0);
       expect(
         await db

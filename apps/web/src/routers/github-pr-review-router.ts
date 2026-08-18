@@ -1582,8 +1582,9 @@ export const githubPrReviewRouter = createTRPCRouter({
   }),
 
   // Post a single immediate review comment (no pending review required).
-  createReviewComment: baseProcedure.input(CreateReviewCommentInput).mutation(
-    async ({ ctx, input }) => {
+  createReviewComment: baseProcedure
+    .input(CreateReviewCommentInput)
+    .mutation(async ({ ctx, input }) => {
       await assertTermsAccepted(ctx.user.id);
       return runPrCommentMutation({
         userId: ctx.user.id,
@@ -1618,44 +1619,41 @@ export const githubPrReviewRouter = createTRPCRouter({
           return { commentId: response.data.id, nodeId: response.data.node_id };
         },
       });
-    }
-  ),
+    }),
 
   // Reply to an existing review comment (creates a child comment in the
   // same thread).
-  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(
-    async ({ ctx, input }) => {
-      await assertTermsAccepted(ctx.user.id);
-      return runPrCommentMutation({
-        userId: ctx.user.id,
-        distinctId: ctx.user.google_user_email ?? ctx.user.id,
-        intent: 'reply_comment',
-        input,
-        operationKey: input.operationKey,
-        providerRefKey: 'commentId',
-        write: async octokit => {
-          const response = await octokit.pulls.createReplyForReviewComment(
-            buildReplyToCommentParams({
-              owner: input.owner,
-              repo: input.repo,
-              number: input.number,
-              commentId: input.commentId,
-              body: input.body,
-            })
-          );
-          return { commentId: response.data.id, nodeId: response.data.node_id };
-        },
-        readRef: async (octokit, commentId) => {
-          const response = await octokit.pulls.getReviewComment({
+  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(async ({ ctx, input }) => {
+    await assertTermsAccepted(ctx.user.id);
+    return runPrCommentMutation({
+      userId: ctx.user.id,
+      distinctId: ctx.user.google_user_email ?? ctx.user.id,
+      intent: 'reply_comment',
+      input,
+      operationKey: input.operationKey,
+      providerRefKey: 'commentId',
+      write: async octokit => {
+        const response = await octokit.pulls.createReplyForReviewComment(
+          buildReplyToCommentParams({
             owner: input.owner,
             repo: input.repo,
-            comment_id: commentId,
-          });
-          return { commentId: response.data.id, nodeId: response.data.node_id };
-        },
-      });
-    }
-  ),
+            number: input.number,
+            commentId: input.commentId,
+            body: input.body,
+          })
+        );
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+      readRef: async (octokit, commentId) => {
+        const response = await octokit.pulls.getReviewComment({
+          owner: input.owner,
+          repo: input.repo,
+          comment_id: commentId,
+        });
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+    });
+  }),
 
   // Submit a pending review with an optional batch of inline comments and
   // an overall event (APPROVE / REQUEST_CHANGES / COMMENT). The confirmed

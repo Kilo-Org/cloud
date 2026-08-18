@@ -1416,12 +1416,8 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(user_moderation_blocks)
       .where(eq(user_moderation_blocks.blocker_user_id, userId));
-    await tx
-      .delete(user_moderation_mutes)
-      .where(eq(user_moderation_mutes.blocker_user_id, userId));
-    await tx
-      .delete(user_terms_acceptances)
-      .where(eq(user_terms_acceptances.kilo_user_id, userId));
+    await tx.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, userId));
+    await tx.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, userId));
 
     // Code indexing data
     await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

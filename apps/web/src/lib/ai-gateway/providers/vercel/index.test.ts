@@ -19,10 +19,11 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
-const { getCachedVercelInferenceProviderIdsForModel } = jest.requireMock<
-  typeof import('@/lib/ai-gateway/providers/gateway-models-cache')
->('@/lib/ai-gateway/providers/gateway-models-cache');
-const getVercelInferenceProvidersMock = jest.mocked(getCachedVercelInferenceProviderIdsForModel);
+type GetVercelInferenceProviders = (modelId: string) => Promise<string[] | null>;
+const { getCachedVercelInferenceProviderIdsForModel: getVercelInferenceProvidersMock } =
+  jest.requireMock<{
+    getCachedVercelInferenceProviderIdsForModel: jest.MockedFunction<GetVercelInferenceProviders>;
+  }>('@/lib/ai-gateway/providers/gateway-models-cache');
 
 beforeEach(() => {
   getVercelInferenceProvidersMock.mockReset();

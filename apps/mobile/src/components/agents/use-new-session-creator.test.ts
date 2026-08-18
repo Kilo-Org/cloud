@@ -145,6 +145,7 @@ function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
     selectedRepo: '',
     setIsCreating: vi.fn(() => undefined),
     variant: 'medium',
+    autoCommit: false,
     ...overrides,
   };
 }
@@ -259,6 +260,7 @@ function runCreator(args: {
   variant?: string;
   organizationId?: string;
   selectedRepo?: string;
+  autoCommit?: boolean;
   profileId?: string | null;
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
@@ -297,6 +299,7 @@ function runCreator(args: {
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
+      autoCommit: args.autoCommit ?? false,
       profileId: args.profileId,
     });
   } finally {
@@ -623,6 +626,28 @@ describe('useNewSessionCreator profileId', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('profileId');
+  });
+});
+
+describe('useNewSessionCreator autoCommit', () => {
+  it('sends autoCommit false (Leave changes) by default', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: false });
+  });
+
+  it('sends autoCommit true when Commit and push is chosen', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ autoCommit: true });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: true });
   });
 });
 

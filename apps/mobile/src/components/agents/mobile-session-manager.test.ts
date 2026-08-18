@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
-import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { createSessionManager, type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 // Keep this suite on the pure vitest project: mock every RN / Expo / SDK
 // side-effect import that `mobile-session-manager.ts` pulls transitively
@@ -43,22 +43,31 @@ vi.mock('@/components/agents/tool-card-image-cache', () => ({
 
 const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();
+const sendMessageMutate = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate },
       prepareSession: { mutate: prepareSessionMutate },
+      sendMessage: { mutate: sendMessageMutate },
     },
     organizations: {
-      cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } },
+      cloudAgentNext: {
+        prepareSession: { mutate: prepareSessionMutate },
+        sendMessage: { mutate: sendMessageMutate },
+      },
     },
   },
 }));
 
 const { buildRemoteAttachmentParts } =
   await import('@/components/agents/mobile-session-manager-helpers');
-const { fetchSessionWithNotFoundRetry, isCloudPrepareRetryableError, readFetchSessionErrorCode } =
-  await import('@/components/agents/mobile-session-manager');
+const {
+  fetchSessionWithNotFoundRetry,
+  isCloudPrepareRetryableError,
+  readFetchSessionErrorCode,
+  createMobileAgentSessionManager,
+} = await import('@/components/agents/mobile-session-manager');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
 
@@ -328,5 +337,49 @@ describe('fetchSessionWithNotFoundRetry', () => {
     ).rejects.toBe(error);
     expect(queryMock).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
+type CapturedSendInput = {
+  sessionId: string;
+  payload: unknown;
+  messageId?: string;
+  attachments?: unknown;
+};
+
+type CapturedManagerConfig = { api: { send: (input: CapturedSendInput) => Promise<unknown> } };
+
+describe('createMobileAgentSessionManager api.send', () => {
+  it('omits autoCommit from the send payload', async () => {
+    sendMessageMutate.mockReset();
+    sendMessageMutate.mockResolvedValue(undefined);
+    const createSessionManagerMock = createSessionManager as unknown as {
+      mockImplementation: (impl: (config: CapturedManagerConfig) => unknown) => void;
+    };
+    let captured: CapturedManagerConfig | undefined = undefined;
+    createSessionManagerMock.mockImplementation(config => {
+      captured = config;
+      return {};
+    });
+
+    createMobileAgentSessionManager({
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- fake store, never read by the mocked createSessionManager
+      store: {} as never,
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- fake connection, never read by the mocked createSessionManager
+      userWebConnection: {} as never,
+    });
+
+    expect(captured).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by expect above
+    await captured!.api.send({ sessionId: 'c-1', payload: 'hi', messageId: 'm-1' });
+
+    expect(sendMessageMutate).toHaveBeenCalledTimes(1);
+    const payload = sendMessageMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('autoCommit');
+    expect(payload).toMatchObject({
+      cloudAgentSessionId: 'c-1',
+      payload: 'hi',
+      messageId: 'm-1',
+    });
   });
 });

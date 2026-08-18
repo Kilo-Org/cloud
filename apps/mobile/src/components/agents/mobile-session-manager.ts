@@ -258,7 +258,6 @@ export function createMobileAgentSessionManager({
           const baseInput = {
             cloudAgentSessionId: input.sessionId as string,
             payload: input.payload,
-            autoCommit: true,
             messageId: input.messageId,
             ...(input.attachments ? { attachments: input.attachments } : {}),
           };

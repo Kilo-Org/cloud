@@ -360,6 +360,7 @@ describe('useContinueSession cloud operationKey', () => {
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
       prompt: 'seed-text',
       githubRepo: 'owner/repo',
+      autoCommit: false,
       autoInitiate: true,
       operationKey: expect.any(String),
     });

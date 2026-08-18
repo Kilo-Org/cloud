@@ -28,6 +28,8 @@ type UseNewSessionCreatorInput = {
   selectedRepo: string;
   setIsCreating: (value: boolean) => void;
   variant: string;
+  /** Commit and push the agent's changes (true) or leave them uncommitted (false). */
+  autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
 };
@@ -53,6 +55,7 @@ export function useNewSessionCreator({
   selectedRepo,
   setIsCreating,
   variant,
+  autoCommit,
   profileId,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useRouter();
@@ -91,6 +94,7 @@ export function useNewSessionCreator({
       model,
       variant: variant || undefined,
       repo: selectedRepo,
+      autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
@@ -118,7 +122,7 @@ export function useNewSessionCreator({
         model,
         variant: variant || undefined,
         githubRepo: selectedRepo,
-        autoCommit: true,
+        autoCommit,
         autoInitiate: true,
         operationKey,
       };
@@ -190,6 +194,7 @@ export function useNewSessionCreator({
     model,
     mode,
     variant,
+    autoCommit,
     organizationId,
     profileId,
     queryClient,

@@ -8,6 +8,7 @@ import { type RepositorySectionView } from '@/components/agents/new-session-repo
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { Button } from '@/components/ui/button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
   type AgentAttachment,
@@ -18,6 +19,11 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
+
+const COMMIT_CHOICE_OPTIONS = [
+  { value: 'leave', label: 'Leave changes' },
+  { value: 'commit', label: 'Commit and push' },
+] as const;
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -61,6 +67,9 @@ type NewSessionConfigureFormProps = {
   isProfileLoading: boolean;
   isProfileError: boolean;
   onRetryProfile: () => void;
+  // Commit choice (Cloud Agent only).
+  autoCommit: boolean;
+  onAutoCommitChange: (next: boolean) => void;
   // Start.
   isSpawningRemote: boolean;
   isStartDisabled: boolean;
@@ -111,6 +120,8 @@ export function NewSessionConfigureForm({
   isProfileLoading,
   isProfileError,
   onRetryProfile,
+  autoCommit,
+  onAutoCommitChange,
   isSpawningRemote,
   isStartDisabled,
   onStartSession,
@@ -231,6 +242,20 @@ export function NewSessionConfigureForm({
           repositories={repositories}
           value={selectedRepo}
         />
+      ) : null}
+
+      {!isRemote ? (
+        <View className="mt-5">
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">Changes</Text>
+          <SegmentedControl
+            accessibilityLabel="Changes"
+            options={COMMIT_CHOICE_OPTIONS}
+            value={autoCommit ? 'commit' : 'leave'}
+            onChange={next => {
+              onAutoCommitChange(next === 'commit');
+            }}
+          />
+        </View>
       ) : null}
 
       {!isRemote ? renderProfileRow() : null}

@@ -48,6 +48,10 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 
+vi.mock('@/components/ui/segmented-control', () => ({
+  SegmentedControl: 'SegmentedControl',
+}));
+
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));
@@ -157,6 +161,8 @@ function defaultProps() {
     isProfileLoading: false,
     isProfileError: false,
     onRetryProfile: vi.fn(),
+    autoCommit: false,
+    onAutoCommitChange: vi.fn(),
     isSpawningRemote: false,
     isStartDisabled: false,
     onStartSession: vi.fn(),
@@ -461,5 +467,52 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findTextContent(element, t => t === 'Environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  // ── Case 11: commit choice (cloud-only, default Leave) ──
+  it('renders the commit control as Leave changes by default for a cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      autoCommit: false,
+    }) as Node;
+
+    const control = findElementByType(element, 'SegmentedControl');
+    expect(control).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(control!.value).toBe('leave');
+    expect(findTextContent(element, t => t === 'Changes')).toBe(true);
+  });
+
+  it('renders the commit control as Commit and push when autoCommit is true', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      autoCommit: true,
+    }) as Node;
+
+    const control = findElementByType(element, 'SegmentedControl');
+    expect(control).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(control!.value).toBe('commit');
+  });
+
+  it('does not render the commit control for a remote target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+    }) as Node;
+
+    expect(findElementByType(element, 'SegmentedControl')).toBeNull();
+    expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 });

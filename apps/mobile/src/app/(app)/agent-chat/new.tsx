@@ -68,6 +68,8 @@ function NewSessionScreenBody() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasPrompt, setHasPrompt] = useState(false);
+  // Commit choice for the cloud session: Leave changes (false) is the default.
+  const [autoCommit, setAutoCommit] = useState(false);
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
   // Armed right before a successful Start/spawn navigation so the discard
@@ -224,6 +226,7 @@ function NewSessionScreenBody() {
     selectedRepo,
     setIsCreating,
     variant,
+    autoCommit,
     profileId,
   });
 
@@ -452,6 +455,8 @@ function NewSessionScreenBody() {
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}
         onRetryProfile={() => void refetchProfile()}
+        autoCommit={autoCommit}
+        onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         onStartSession={handleStartSession}

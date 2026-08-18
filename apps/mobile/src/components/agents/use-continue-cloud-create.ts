@@ -50,7 +50,7 @@ export function useContinueCloudCreate(
         model: dest.model,
         variant: dest.variant || undefined,
         githubRepo: dest.repo,
-        autoCommit: true,
+        autoCommit: false,
         autoInitiate: true,
         operationKey,
       };

@@ -131,6 +131,14 @@ export type EnsuredWrapper =
 export type AgentSandbox = {
   ensureWrapper(request: EnsureWrapperRequest): Promise<EnsuredWrapper>;
   discoverSessionWrappers(): Promise<WrapperObservation>;
+  /**
+   * Observe session wrappers without booting a stopped container. A wrapper is
+   * a process and a process cannot outlive its container, so "container not
+   * running" is already proof of absence. Callers that only need to learn
+   * whether a wrapper survives — not to stop one — use this instead of
+   * `discoverSessionWrappers`, whose container fetch wakes the container.
+   */
+  observeWrappersWithoutWaking(): Promise<WrapperObservation>;
   stopWrappers(request: {
     target: WrapperStopTarget;
     attemptId: string;

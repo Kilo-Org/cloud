@@ -66,7 +66,9 @@ export function createLifecycleManager(
 
   function resetSseTransportTimer(): void {
     clearSseTransportTimer();
-    if (!state.hasSession) return;
+    // Idle is the last expected SSE event. Reconnecting during drain races
+    // auto-commit and used to abort the complete event.
+    if (!state.hasSession || isDraining) return;
     sseTransportTimer = setTimeout(() => {
       logToFile('SSE transport timeout — reconnecting event subscription');
       deps.reconnectEventSubscription();
@@ -156,13 +158,17 @@ export function createLifecycleManager(
     if (isDraining) return;
     isDraining = true;
     clearStableIdleCandidate();
+    clearSseTransportTimer();
     const sealedMessageIds = state.pendingMessageIds;
     const session = state.currentSession;
+    // Capture before post-processing. SSE timeout / ingest disconnect can set
+    // aborted during auto-commit; a sealed idle batch must still complete.
+    const completeSession = !isAborted ? session : undefined;
 
-    if (session && !isAborted) {
+    if (completeSession) {
       state.sendToIngest({
         streamEventType: 'wrapper_finalizing',
-        data: { wrapperRunId: session.wrapperRunId },
+        data: { wrapperRunId: completeSession.wrapperRunId },
         timestamp: new Date().toISOString(),
       });
     }
@@ -183,7 +189,7 @@ export function createLifecycleManager(
         }
       } finally {
         const currentSession = state.currentSession;
-        if (currentSession && !isAborted) {
+        if (completeSession && currentSession) {
           const currentBranch = await getCurrentBranch(config.workspacePath, 10_000).catch(
             () => ''
           );
@@ -201,18 +207,20 @@ export function createLifecycleManager(
           });
         }
 
-        drainTimeout = setTimeout(() => {
-          void deps
-            .closeConnections()
-            .catch(error =>
-              logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
-            )
-            .finally(() => {
-              isDraining = false;
-              drainTimeout = null;
-              state.clearSession();
-            });
-        }, DRAIN_DELAY_MS);
+        if (isDraining) {
+          drainTimeout = setTimeout(() => {
+            void deps
+              .closeConnections()
+              .catch(error =>
+                logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
+              )
+              .finally(() => {
+                isDraining = false;
+                drainTimeout = null;
+                state.clearSession();
+              });
+          }, DRAIN_DELAY_MS);
+        }
       }
     })();
   }

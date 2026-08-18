@@ -611,6 +611,8 @@ type AdminCodingPlanSubscriptionItem = {
   canceledAt: string | null;
   createdAt: string;
   costKiloCredits: number;
+  inventoryKeyId: string | null;
+  upstreamPlanId: string | null;
 };
 
 const INVENTORY_STATUS_ORDER = [
@@ -1092,6 +1094,7 @@ function SubscriptionsTable({
                 <TableHead>User</TableHead>
                 <TableHead>Subscription</TableHead>
                 <TableHead>Provider / plan</TableHead>
+                <TableHead>Inventory / upstream</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Billing date</TableHead>
                 <TableHead className="text-right">Price</TableHead>
@@ -1101,13 +1104,13 @@ function SubscriptionsTable({
             <TableBody>
               {isError ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-red-300">
+                  <TableCell colSpan={8} className="h-24 text-center text-red-300">
                     Unable to load subscriptions.
                   </TableCell>
                 </TableRow>
               ) : items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
+                  <TableCell colSpan={8} className="text-muted-foreground h-24 text-center">
                     {isLoading ? 'Loading subscriptions...' : 'No subscriptions recorded.'}
                   </TableCell>
                 </TableRow>
@@ -1121,6 +1124,8 @@ function SubscriptionsTable({
                       : formatDateLabel(billingDate.date);
                   const canCancel = item.status === 'active' && !item.cancelAtPeriodEnd;
                   const canExtend = item.status === 'active';
+                  const inventoryKeyId = item.inventoryKeyId;
+                  const upstreamPlanId = item.upstreamPlanId;
 
                   return (
                     <TableRow key={item.id}>
@@ -1152,6 +1157,44 @@ function SubscriptionsTable({
                       <TableCell className="min-w-56 font-mono text-xs">
                         <div>{item.providerName}</div>
                         <div className="text-muted-foreground mt-1">{item.planName}</div>
+                      </TableCell>
+                      <TableCell className="min-w-72 font-mono text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-24 shrink-0 font-sans">
+                            Inventory key
+                          </span>
+                          <span>{inventoryKeyId ?? '—'}</span>
+                          {inventoryKeyId ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                              aria-label={`Copy inventory key ${inventoryKeyId}`}
+                              onClick={() => void copyIdentifier(inventoryKeyId, 'Inventory key')}
+                            >
+                              <Copy className="size-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="text-muted-foreground w-24 shrink-0 font-sans">
+                            Upstream plan
+                          </span>
+                          <span>{upstreamPlanId ?? '—'}</span>
+                          {upstreamPlanId ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                              aria-label={`Copy upstream plan ${upstreamPlanId}`}
+                              onClick={() => void copyIdentifier(upstreamPlanId, 'Upstream plan')}
+                            >
+                              <Copy className="size-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <SubscriptionStatusBadge status={displayStatus} />
@@ -1219,11 +1262,15 @@ function SubscriptionsTable({
 }
 
 async function copySubscriptionId(subscriptionId: string): Promise<void> {
+  await copyIdentifier(subscriptionId, 'Subscription ID');
+}
+
+async function copyIdentifier(value: string, label: string): Promise<void> {
   try {
-    await navigator.clipboard.writeText(subscriptionId);
-    toast.success('Subscription ID copied');
+    await navigator.clipboard.writeText(value);
+    toast.success(`${label} copied`);
   } catch {
-    toast.error('Failed to copy subscription ID');
+    toast.error(`Failed to copy ${label.toLowerCase()}`);
   }
 }
 

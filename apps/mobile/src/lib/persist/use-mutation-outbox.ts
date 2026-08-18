@@ -8,6 +8,12 @@ import {
   writeOutboxRow,
 } from '@/lib/persist/mutation-outbox';
 
+/**
+ * What one load did: applied its rows, failed to read them, or was superseded
+ * by a newer load (identity change or an explicit refresh) and applied nothing.
+ */
+type LoadOutcome = 'loaded' | 'failed' | 'superseded';
+
 /** A row the caller supplies; the taxonomy is forced by the write helper. */
 export type OutboxRowInput = {
   operationKey: string;
@@ -83,31 +89,36 @@ export function useMutationOutbox(): {
   // useFencedDraftLoad).
   const loadGenerationRef = useRef(0);
 
-  // Single loader for the launch load, `refresh`, and a `whenLoaded` retry.
-  // Returns false when the rows could not be read (or the load was superseded
-  // by an identity change), so a caller must not treat the empty list as truth.
-  const runLoad = useCallback(async (): Promise<boolean> => {
+  // Single loader for the launch load, `refresh`, and a `whenLoaded` retry. A
+  // superseded load applies nothing and marks nothing: the load that
+  // superseded it releases the waiters, so `loaded` stays generation-fenced.
+  const runLoad = useCallback(async (): Promise<LoadOutcome> => {
     loadGenerationRef.current += 1;
     const generation = loadGenerationRef.current;
     if (!userId) {
       rowsRef.current = [];
       setRows([]);
       loadFailedRef.current = false;
-      return true;
+      markLoaded();
+      return 'loaded';
     }
     const loadedRows = await listOutboxRows(userId);
     if (loadGenerationRef.current !== generation) {
-      return false;
+      return 'superseded';
     }
     if (loadedRows === null) {
+      // Marked loaded even though the read failed: `whenLoaded` reports the
+      // failure and retries, so a waiter is never left hanging.
       loadFailedRef.current = true;
-      return false;
+      markLoaded();
+      return 'failed';
     }
     loadFailedRef.current = false;
     rowsRef.current = loadedRows;
     setRows(loadedRows);
-    return true;
-  }, [userId]);
+    markLoaded();
+    return 'loaded';
+  }, [userId, markLoaded]);
 
   const whenLoaded = useCallback(async (): Promise<boolean> => {
     if (!loadedRef.current) {
@@ -117,7 +128,7 @@ export function useMutationOutbox(): {
     }
     // A failed read must never pass as "no stored rows"; re-read so the user's
     // retry can succeed, and report the failure so the caller refuses.
-    return loadFailedRef.current ? runLoad() : true;
+    return loadFailedRef.current ? (await runLoad()) === 'loaded' : true;
   }, [runLoad]);
 
   // `loaded` stays false while the identity is still resolving, so a submit
@@ -131,16 +142,11 @@ export function useMutationOutbox(): {
       return undefined;
     }
     resetLoaded();
-    // Marked loaded even when the read failed: `whenLoaded` reports the
-    // failure and retries, so a waiter is never left hanging.
-    void (async () => {
-      await runLoad();
-      markLoaded();
-    })();
+    void runLoad();
     return () => {
       loadGenerationRef.current += 1;
     };
-  }, [isLoading, runLoad, markLoaded, resetLoaded]);
+  }, [isLoading, runLoad, resetLoaded]);
 
   const getStoredOperationKey = useCallback((fingerprint: string): string | null => {
     const row = rowsRef.current.find(

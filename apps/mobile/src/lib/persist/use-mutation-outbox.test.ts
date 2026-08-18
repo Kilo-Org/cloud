@@ -46,12 +46,23 @@ function Harness({ resultRef }: { resultRef: { current: OutboxResult | null } })
   return null;
 }
 
-function mountOutbox(): { resultRef: { current: OutboxResult | null } } {
+function mountOutbox(): {
+  resultRef: { current: OutboxResult | null };
+  rerender: () => void;
+} {
   const resultRef: { current: OutboxResult | null } = { current: null };
+  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
-    TestRenderer.create(createElement(Harness, { resultRef }));
+    renderer = TestRenderer.create(createElement(Harness, { resultRef }));
   });
-  return { resultRef };
+  return {
+    resultRef,
+    rerender: () => {
+      act(() => {
+        renderer?.update(createElement(Harness, { resultRef }));
+      });
+    },
+  };
 }
 
 function requireResult(resultRef: { current: OutboxResult | null }): OutboxResult {
@@ -262,6 +273,35 @@ describe('useMutationOutbox load gating', () => {
     });
 
     expect(requireResult(resultRef).getStoredOperationKey('fp-1')).toBe('op-key-1');
+  });
+
+  it('never releases waiters on a superseded load (identity changed mid-load)', async () => {
+    const staleLoad = deferred<OutboxRow[]>();
+    listOutboxRowsMock.mockImplementationOnce(async () => staleLoad.promise);
+    const { resultRef, rerender } = mountOutbox();
+
+    // The identity flips before the first load settles, so its rows belong to
+    // the previous user and must apply to nothing.
+    const freshLoad = deferred<OutboxRow[]>();
+    listOutboxRowsMock.mockImplementationOnce(async () => freshLoad.promise);
+    identityMock.value = { userId: 'u2', isLoading: false };
+    rerender();
+
+    await act(async () => {
+      staleLoad.resolve([safeRetryRow({ fingerprint: 'fp-stale' })]);
+    });
+    await flushMicrotasks();
+
+    expect(requireResult(resultRef).loaded).toBe(false);
+    expect(requireResult(resultRef).getStoredOperationKey('fp-stale')).toBeNull();
+
+    await act(async () => {
+      freshLoad.resolve([safeRetryRow({ fingerprint: 'fp-fresh' })]);
+    });
+    await flushMicrotasks();
+
+    expect(requireResult(resultRef).loaded).toBe(true);
+    expect(requireResult(resultRef).getStoredOperationKey('fp-fresh')).toBe('op-key-1');
   });
 
   it('is loaded immediately when the identity resolves to no user', async () => {

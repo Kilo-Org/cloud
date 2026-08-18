@@ -232,21 +232,25 @@ describe('generateReviewPrompt', () => {
     );
   });
 
-  it('maps roast configs to balanced guidance (no roast copy)', async () => {
+  it('includes roast style guidance when review_style is "roast"', async () => {
     const roastConfig = { ...baseConfig, review_style: 'roast' as const };
     const { prompt } = await generateReviewPrompt(roastConfig, 'owner/repo', 1);
 
-    // No roast guidance leaks into the prompt.
-    expect(prompt).not.toContain('ROAST MODE ACTIVATED');
-    expect(prompt).not.toContain('# COMMENT FORMAT (ROAST MODE)');
-    expect(prompt).not.toContain('🔥 **The Roast**');
-    expect(prompt).not.toContain('## Summary Format (ROAST MODE)');
-    expect(prompt).not.toContain('Code Review Roast 🔥');
+    expect(prompt).toContain('ROAST MODE ACTIVATED');
+  });
 
-    // Balanced (default) guidance is used instead.
-    expect(prompt).toContain('# COMMENT FORMAT');
-    expect(prompt).toContain('## Summary Format');
-    expect(prompt).toContain('## Code Review Summary');
+  it('includes roast comment format when review_style is "roast"', async () => {
+    const roastConfig = { ...baseConfig, review_style: 'roast' as const };
+    const { prompt } = await generateReviewPrompt(roastConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('🔥 **The Roast**');
+  });
+
+  it('includes roast summary format when review_style is "roast"', async () => {
+    const roastConfig = { ...baseConfig, review_style: 'roast' as const };
+    const { prompt } = await generateReviewPrompt(roastConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('Code Review Roast 🔥');
   });
 
   it('does not include roast guidance when review_style is "balanced"', async () => {

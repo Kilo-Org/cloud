@@ -6,7 +6,11 @@ import { type CodeReviewActionRequiredState } from '@kilocode/app-shared/code-re
 
 import { parseParam } from '@/lib/route-params';
 
-export { GATE_THRESHOLDS, REVIEW_FOCUS_AREAS } from '@kilocode/app-shared/code-review';
+export {
+  GATE_THRESHOLDS,
+  REVIEW_FOCUS_AREAS,
+  REVIEW_STYLES,
+} from '@kilocode/app-shared/code-review';
 
 export type ReviewerPlatform = CodeReviewPlatform;
 

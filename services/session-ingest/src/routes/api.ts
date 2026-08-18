@@ -21,6 +21,7 @@ import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { signSessionShareToken } from '../services/session-share-token';
+import { canCreateCliSessionForUser } from '../services/user-session-admission';
 
 export type ApiContext = {
   Bindings: Env;
@@ -86,16 +87,30 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
 
-  const [createdRow] = await db
-    .insert(cli_sessions_v2)
-    .values({
-      session_id: body.sessionId,
-      kilo_user_id: kiloUserId,
-    })
-    .onConflictDoNothing({
-      target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-    })
-    .returning();
+  const result = await db.transaction(async tx => {
+    if (!(await canCreateCliSessionForUser(tx, kiloUserId))) {
+      return { status: 'not_admitted' } as const;
+    }
+
+    const [createdRow] = await tx
+      .insert(cli_sessions_v2)
+      .values({
+        session_id: body.sessionId,
+        kilo_user_id: kiloUserId,
+      })
+      .onConflictDoNothing({
+        target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      })
+      .returning();
+
+    return { status: 'admitted', createdRow } as const;
+  });
+
+  if (result.status === 'not_admitted') {
+    return c.json({ success: false, error: 'User account not found' }, 403);
+  }
+
+  const { createdRow } = result;
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);

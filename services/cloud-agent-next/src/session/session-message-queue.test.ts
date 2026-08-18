@@ -1352,6 +1352,36 @@ describe('SessionMessageQueue', () => {
     expect(pending?.intent?.turn).toMatchObject({ attachments });
   });
 
+  it('admits an empty prompt when attachment files are present', async () => {
+    const harness = createQueueHarness();
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: '', attachments },
+    });
+
+    expect(result).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+  });
+
+  it('rejects an empty prompt with no attachments', async () => {
+    const harness = createQueueHarness();
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: '' },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: 'BAD_REQUEST',
+      error: 'No prompt provided',
+    });
+  });
+
   it('rejects queue admission once durable pending capacity is exhausted', async () => {
     const harness = createQueueHarness();
     for (let index = 0; index < PENDING_SESSION_MESSAGE_LIMIT; index++) {

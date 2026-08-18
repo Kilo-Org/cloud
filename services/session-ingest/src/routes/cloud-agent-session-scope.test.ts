@@ -10,6 +10,9 @@ vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('../dos/SessionAccessCacheDO', () => ({ getSessionAccessCacheDO: vi.fn() }));
 vi.mock('../ingest/direct-ingest', () => ({ handleDirectIngestRequest: vi.fn() }));
 vi.mock('../services/session-access', () => ({ resolveAccessibleKiloSession: vi.fn() }));
+vi.mock('../services/user-session-admission', () => ({
+  canCreateCliSessionForUser: vi.fn(),
+}));
 vi.mock('../session-events', () => ({
   mapSessionEventRow: vi.fn(row => ({ id: row.session_id, updatedAt: row.updated_at })),
   notifyUserSessionEvent: vi.fn(),
@@ -26,6 +29,7 @@ import { cloudAgentSessionScopeHeaders } from '@kilocode/session-ingest-contract
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { cloudAgentSessionScopeApi } from './cloud-agent-session-scope';
 
 const rootSessionId = 'ses_12345678901234567890123456';
@@ -113,6 +117,27 @@ describe('Cloud Agent session scope routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     workerUtils.hasOrganizationAccess.mockResolvedValue(true);
+    vi.mocked(canCreateCliSessionForUser).mockResolvedValue(true);
+  });
+
+  it('rejects a blocked or missing user before locking the root or inserting a child', async () => {
+    const { db, insertedValues } = makeDb([], []);
+    vi.mocked(canCreateCliSessionForUser).mockResolvedValueOnce(false);
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(insertedValues).toHaveLength(0);
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+    expect(workerUtils.hasOrganizationAccess).not.toHaveBeenCalled();
   });
 
   it('rejects an incomplete or invalid session scope assertion before database access', async () => {

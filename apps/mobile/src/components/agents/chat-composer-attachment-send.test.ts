@@ -7,12 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ChatComposer } from './chat-composer';
 
-// The composer's uncontrolled input is covered by Appium E2E; this suite pins
-// the draft-restore contract that a native E2E cannot easily prove: a restored
-// draft must be readable by an immediate send (before any keystroke). The
-// component is invoked as a plain function with mocked hooks so the restore
-// effect runs synchronously, and the submit path is driven through the
-// onSubmit handler found on the ChatComposerInputRow element in the tree.
+// The attachment-only send contract: a ready (`uploaded`) attachment with an
+// empty draft must enable send and deliver `prompt: ''` plus the wire payload.
+// Unlike chat-composer.test.ts, this suite uses the real
+// `resolveChatComposerControlState` so `canSend` follows text and ready
+// attachments, and mocks `useAgentAttachmentUpload` with a controllable return.
 
 const onSendMock = vi.fn(async () => undefined);
 
@@ -22,6 +21,13 @@ const onSendMock = vi.fn(async () => undefined);
 // re-render (`rerender`) with the refs — the composer's live text and its
 // applied-draft flag — intact, and start a fresh instance with `mount`.
 const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor: 0 }));
+
+// Controllable upload state. The mock factory reads these at call time, so a
+// test mutates them before mounting to drive the ready vs empty cases.
+const uploadState = vi.hoisted(() => ({
+  attachments: [] as { status?: string; remoteFilename?: string }[],
+  toWirePayload: (() => undefined) as () => unknown,
+}));
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -132,24 +138,8 @@ vi.mock('@/components/agents/use-text-height', () => ({
   }),
 }));
 
-vi.mock('@/components/agents/chat-composer-input-state', () => ({
-  // The real gate (hasText → canSend) is covered by chat-composer-input-state
-  // tests; this suite isolates the restore → send path. `canSend` follows the
-  // live draft (textRef, the first useRef slot) so an empty draft stays
-  // non-sendable now that handleSend no longer guards on `!trimmed`.
-  resolveChatComposerControlState: () => {
-    const draft = (refSlots.slots[0]?.current as string | undefined) ?? '';
-    return {
-      canSend: draft.trim().length > 0,
-      inputAccessibilityDisabled: false,
-      inputEditable: true,
-      paperclipDisabled: false,
-      showToolbar: true,
-      toolbarDisabled: false,
-      voiceDisabled: false,
-    };
-  },
-}));
+// NOTE: `resolveChatComposerControlState` is intentionally NOT mocked here so
+// `canSend` follows text and ready attachments through the real helper.
 
 vi.mock('@/components/ui/blur-bar', () => ({
   BlurBar: () => null,
@@ -174,14 +164,14 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 
 vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
   useAgentAttachmentUpload: () => ({
-    attachments: [],
+    attachments: uploadState.attachments,
     addCandidates: vi.fn(async () => undefined),
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
     isUploading: false,
     hasFailedAttachments: false,
-    toWirePayload: () => undefined,
+    toWirePayload: uploadState.toWirePayload,
     toSubmissionPayload: () => undefined,
   }),
 }));
@@ -279,15 +269,6 @@ function requireInputRowOnSubmit(render: React.ReactElement): () => void {
   return onSubmit;
 }
 
-function requireInputRowOnChangeText(render: React.ReactElement): (text: string) => void {
-  const rowProps = findInputRowProps(render);
-  const onChangeText = rowProps?.onChangeText as ((text: string) => void) | undefined;
-  if (onChangeText === undefined) {
-    throw new Error('ChatComposerInputRow element did not carry an onChangeText handler');
-  }
-  return onChangeText;
-}
-
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
   return rerender(props);
@@ -309,76 +290,30 @@ beforeEach(() => {
   vi.clearAllMocks();
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
+  uploadState.attachments = [];
+  uploadState.toWirePayload = () => undefined;
 });
 
-// The restore contract has one axis: whether the host resolved a draft. Both
-// cases run the identical mount → submit sequence, so one table drives them.
-const RESTORE_CASES = [
-  {
-    name: 'sends the restored draft immediately on submit, before any keystroke',
-    initialDraft: 'Restored draft text',
-    sent: 'Restored draft text',
-  },
-  {
-    name: 'does not send when there is no restored draft',
-    initialDraft: undefined,
-    sent: null,
-  },
-] as const;
+describe('ChatComposer attachment-only send', () => {
+  it('sends an empty draft with a ready attachment, passing prompt and the wire payload', async () => {
+    uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
+    uploadState.toWirePayload = () => ({ path: 'path-1', files: ['file.png'] });
 
-describe('ChatComposer draft restore', () => {
-  it.each(RESTORE_CASES)('$name', async ({ initialDraft, sent }) => {
-    const render = await mount(
-      makeProps({
-        draftKey: 'agent-composer:sess-1',
-        initialDraft,
-      })
-    );
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
 
-    // The restore effect runs synchronously under the mocked hooks; submit
-    // must read the restored text from the live ref, not the mount-time ''.
     requireInputRowOnSubmit(render)();
     await settle();
 
-    if (sent === null) {
-      expect(onSendMock).not.toHaveBeenCalled();
-      return;
-    }
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith(sent, undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('', { path: 'path-1', files: ['file.png'] }, undefined);
   });
 
-  // The host mounts the composer before identity (`user.getMe`) and the draft
-  // load settle, so `initialDraft` is undefined on the first render and arrives
-  // later. Both cases below start from that first render.
-  it('is usable before the draft settles and applies a draft that arrives after mount', async () => {
-    await mount(makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: undefined }));
+  it('does not send an empty draft with no attachments', async () => {
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
 
-    const settled = await rerender(
-      makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: 'Restored draft text' })
-    );
-    requireInputRowOnSubmit(settled)();
+    requireInputRowOnSubmit(render)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', undefined, undefined);
-  });
-
-  it('keeps text typed before the draft settles instead of restoring over it', async () => {
-    const pending = await mount(
-      makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: undefined })
-    );
-    requireInputRowOnChangeText(pending)('typed while identity was loading');
-
-    const settled = await rerender(
-      makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: 'Restored draft text' })
-    );
-    requireInputRowOnSubmit(settled)();
-    await settle();
-
-    expect(onSendMock).toHaveBeenCalledWith(
-      'typed while identity was loading',
-      undefined,
-      undefined
-    );
+    expect(onSendMock).not.toHaveBeenCalled();
   });
 });

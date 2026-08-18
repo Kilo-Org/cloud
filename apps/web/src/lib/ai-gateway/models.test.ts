@@ -122,7 +122,7 @@ describe('isFreeModel', () => {
       expect(gpt_5_6_sol_stealth_model.internal_id).toBe('openai/gpt-5.6-sol:optimized');
       expect(gpt_5_6_sol_stealth_model.gateway).toBe('martian');
       expect(getInferenceProvider(gpt_5_6_sol_stealth_model)?.slug).toBe('stealth');
-      expect(gpt_5_6_sol_stealth_model.pricing).toEqual([
+      expect(gpt_5_6_sol_stealth_model.pricing?.tiers).toEqual([
         {
           start_context_length: 0,
           pricing: {
@@ -147,9 +147,9 @@ describe('isFreeModel', () => {
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
       for (const model of kiloExclusiveModels) {
         if (model.pricing) {
-          expect(model.pricing[0].start_context_length).toBe(0);
+          expect(model.pricing.tiers[0].start_context_length).toBe(0);
           let previousStartContextLength = -1;
-          for (const tier of model.pricing) {
+          for (const tier of model.pricing.tiers) {
             expect(typeof tier.pricing.prompt_per_million).toBe('number');
             expect(typeof tier.pricing.completion_per_million).toBe('number');
             expect(tier.start_context_length).toBeGreaterThan(previousStartContextLength);

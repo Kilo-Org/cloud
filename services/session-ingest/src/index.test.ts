@@ -213,6 +213,60 @@ describe('session access invalidation route', () => {
   });
 });
 
+describe('internal-secret middleware', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('protects the session export route with the shared internal-secret middleware', async () => {
+    const res = await app.request(
+      '/internal/session/ses_12345678901234567890123456/export',
+      { method: 'GET' },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 503 when the Secrets Store cannot resolve the internal secret', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const suppliedSecret = 'caller-supplied-secret';
+
+    const res = await app.request(
+      '/internal/session/ses_12345678901234567890123456/export',
+      {
+        method: 'GET',
+        headers: {
+          'X-Internal-Secret': suppliedSecret,
+        },
+      },
+      {
+        ...defaultEnv,
+        INTERNAL_API_SECRET_PROD: {
+          get: async () => {
+            throw new Error('secret store unavailable');
+          },
+        },
+      }
+    );
+
+    const body = await res.json();
+    expect(res.status).toBe(503);
+    expect(body).toEqual({ success: false, error: 'Service temporarily unavailable' });
+    expect(JSON.stringify(body)).not.toContain('secret store unavailable');
+    expect(JSON.stringify(body)).not.toContain(suppliedSecret);
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'internal-api-secret-get',
+        errorClass: 'Error',
+      })
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(suppliedSecret);
+    error.mockRestore();
+  });
+});
+
 describe('public session route', () => {
   beforeEach(() => {
     vi.resetAllMocks();

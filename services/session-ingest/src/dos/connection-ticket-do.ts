@@ -8,13 +8,9 @@ const ticketStateSchema = z.object({
   expiresAt: z.number().int(),
 });
 
-export const connectionTicketConsumeResponseSchema = z.object({
-  userId: z.string().min(1),
-});
-
 type TicketState = z.infer<typeof ticketStateSchema>;
 export type TicketMintRequest = TicketState;
-export type ConnectionTicketConsumeResponse = z.infer<typeof connectionTicketConsumeResponseSchema>;
+export type ConnectionTicketConsumeResponse = { userId: string };
 
 export class ConnectionTicketDO extends DurableObject<Env> {
   async mint(input: TicketMintRequest): Promise<void> {

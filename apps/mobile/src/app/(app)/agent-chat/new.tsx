@@ -9,6 +9,8 @@ import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
+import { lockedModelOption, resolvePinnedAgentModel } from '@/components/agents/mode-normalize';
+import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import {
   NewSessionModelProvider,
   useNewSessionModelState,
@@ -136,6 +138,18 @@ function NewSessionScreenBody() {
   const { saveModel } = usePersistedAgentModel();
   const attachments = useAgentAttachmentUpload({ organizationId });
 
+  // Custom modes and the pinned model come from the effective default profile.
+  // The lock applies only to the Cloud Agent target; a remote target keeps the
+  // unlocked model view and never sends a gateway pin.
+  const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
+  const pinned = resolvePinnedAgentModel({ slug: mode, profileAgents });
+  const displayModel = pinned.model ?? modelView.selectedValue;
+  const displayVariant = pinned.model ? (pinned.variant ?? '') : modelView.selectedVariant;
+  const modelOptionsForToolbar =
+    pinned.model && !modelView.options.some(option => option.id === pinned.model)
+      ? [...modelView.options, lockedModelOption(pinned)]
+      : modelView.options;
+
   const trpc = useTRPC();
   const {
     repositories,
@@ -189,12 +203,12 @@ function NewSessionScreenBody() {
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
     mode,
-    model,
+    model: displayModel,
     organizationId,
     onCreated: handleCreated,
     selectedRepo,
     setIsCreating,
-    variant,
+    variant: displayVariant,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -335,7 +349,7 @@ function NewSessionScreenBody() {
         isCreating,
         isRemoteTargetSelected,
         isSubmitting,
-        model,
+        model: displayModel,
         selectedRepo,
       });
 
@@ -361,9 +375,12 @@ function NewSessionScreenBody() {
         isModelsError={isModelsError}
         isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
         mode={mode}
-        model={modelView.selectedValue}
-        variant={modelView.selectedVariant}
-        modelOptions={modelView.options}
+        model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
+        variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
+        modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
+        customOptions={customOptions}
+        modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
+        modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}
         initialPrompt={initialPrompt}
         onChangeText={handlePromptChange}
         onModeChange={setMode}

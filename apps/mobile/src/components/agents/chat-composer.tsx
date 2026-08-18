@@ -63,6 +63,8 @@ import {
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useClipboardPaste } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
@@ -121,8 +123,14 @@ type ChatComposerProps = {
   onModeChange: (mode: AgentMode) => void;
   model: string;
   variant: string;
-  modelOptions: ModelOption[];
+  modelOptions: (ModelOption | SessionModelOption)[];
   onModelSelect: (modelId: string, variant: string) => void;
+  /** Custom mode options shown under the built-ins in the mode picker. */
+  customOptions?: ModeOption[];
+  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
+  modelLocked?: boolean;
+  /** Agent name shown in the locked model chip's accessibility label. */
+  modelLockLabel?: string;
   organizationId?: string;
   /** Only Cloud Agent sessions can receive attachments. */
   attachmentsEnabled?: boolean;
@@ -169,6 +177,9 @@ export function ChatComposer({
   variant,
   modelOptions,
   onModelSelect,
+  customOptions = [],
+  modelLocked = false,
+  modelLockLabel,
   organizationId,
   attachmentsEnabled = true,
   activeSessionType = null,
@@ -789,6 +800,9 @@ export function ChatComposer({
             disabled={control.toolbarDisabled}
             onPaste={attachmentsEnabled ? pasteClipboard : undefined}
             pasteDisabled={!control.inputEditable}
+            customOptions={customOptions}
+            modelLocked={modelLocked}
+            modelLockLabel={modelLockLabel}
           />
         </Animated.View>
       ) : null}

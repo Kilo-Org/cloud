@@ -19,6 +19,7 @@ import {
   pasteTextIntoComposer,
 } from '@/components/agents/composer-paste-text';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type ModeOption } from '@/components/agents/mode-normalize';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
@@ -72,6 +73,12 @@ type NewSessionPromptProps = {
   onChangeText: (text: string) => void;
   onModeChange: (mode: AgentMode) => void;
   onModelSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Custom mode options shown under the built-ins in the mode picker. */
+  customOptions?: ModeOption[];
+  /** Locks the model picker to the pinned agent model (Cloud Agent only). */
+  modelLocked?: boolean;
+  /** Agent name shown in the locked model chip's accessibility label. */
+  modelLockLabel?: string;
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
@@ -106,6 +113,9 @@ export function NewSessionPrompt({
   onChangeText,
   onModeChange,
   onModelSelect,
+  customOptions = [],
+  modelLocked = false,
+  modelLockLabel,
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
@@ -319,6 +329,9 @@ export function NewSessionPrompt({
           onModelSelect={onModelSelect}
           disabled={isCreating}
           isLoadingModels={isLoadingModels}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
           className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}

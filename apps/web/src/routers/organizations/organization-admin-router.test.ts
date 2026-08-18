@@ -5,7 +5,6 @@ import {
   credit_transactions,
   organization_seats_purchases,
   organization_memberships,
-  organization_service_fee_exemption_history,
   organization_service_fee_exemptions,
   platform_integrations,
   kilo_pass_org_agreements,
@@ -1831,9 +1830,6 @@ describe('organization admin router', () => {
         .delete(organization_service_fee_exemptions)
         .where(eq(organization_service_fee_exemptions.organization_id, organizationId));
       await db
-        .delete(organization_service_fee_exemption_history)
-        .where(eq(organization_service_fee_exemption_history.organization_id, organizationId));
-      await db
         .delete(organization_memberships)
         .where(eq(organization_memberships.organization_id, organizationId));
       await db.delete(organizations).where(eq(organizations.id, organizationId));
@@ -1855,7 +1851,7 @@ describe('organization admin router', () => {
           reason: 'nonprofit partner',
           changedByKiloUserId: adminUser.id,
         });
-        expect(result.current.currentHistoryId).toBe(result.history.id);
+        expect(result.current.id).toBe(result.history.id);
         expect(result.history).toMatchObject({
           organizationId: org.id,
           isExempt: true,
@@ -1863,7 +1859,7 @@ describe('organization admin router', () => {
           changedByKiloUserId: adminUser.id,
         });
         // Timestamps are normalized to UTC ISO at the API boundary.
-        expect(new Date(result.current.changedAt).toISOString()).toBe(result.current.changedAt);
+        expect(new Date(result.current.createdAt).toISOString()).toBe(result.current.createdAt);
         expect(new Date(result.history.createdAt).toISOString()).toBe(result.history.createdAt);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({
@@ -1895,7 +1891,7 @@ describe('organization admin router', () => {
 
         expect(revoked.current.isExempt).toBe(false);
         expect(revoked.current.reason).toBe('revoked after contract review');
-        expect(revoked.current.currentHistoryId).toBe(revoked.history.id);
+        expect(revoked.current.id).toBe(revoked.history.id);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({
           organizationId: org.id,
@@ -1915,7 +1911,7 @@ describe('organization admin router', () => {
       }
     });
 
-    it('allows repeating the same state with a new reason and keeps the original createdAt', async () => {
+    it('allows repeating the same state with a new reason and appends another row', async () => {
       const org = await createExemptionTestOrganization();
       try {
         const caller = await createCallerForUser(adminUser.id);
@@ -1932,8 +1928,8 @@ describe('organization admin router', () => {
 
         expect(second.current.isExempt).toBe(true);
         expect(second.current.reason).toBe('renewed with updated documentation');
-        expect(second.current.currentHistoryId).toBe(second.history.id);
-        expect(second.current.createdAt).toBe(first.current.createdAt);
+        expect(second.current.id).toBe(second.history.id);
+        expect(second.current.createdAt).not.toBe(first.current.createdAt);
 
         const view = await caller.organizations.admin.getServiceFeeExemption({
           organizationId: org.id,

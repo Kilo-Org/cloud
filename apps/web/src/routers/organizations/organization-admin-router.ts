@@ -221,7 +221,7 @@ const SetServiceFeeExemptionInputSchema = z.object({
     .max(ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH),
 });
 
-const AdminOrganizationServiceFeeExemptionHistorySchema = z.object({
+const AdminOrganizationServiceFeeExemptionRecordSchema = z.object({
   id: z.uuid(),
   organizationId: z.uuid(),
   isExempt: z.boolean(),
@@ -230,19 +230,9 @@ const AdminOrganizationServiceFeeExemptionHistorySchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
-const AdminOrganizationServiceFeeExemptionCurrentSchema = z.object({
-  organizationId: z.uuid(),
-  isExempt: z.boolean(),
-  currentHistoryId: z.uuid(),
-  reason: z.string(),
-  changedByKiloUserId: z.string().nullable(),
-  changedAt: z.iso.datetime(),
-  createdAt: z.iso.datetime(),
-});
-
 const AdminOrganizationServiceFeeExemptionViewSchema = z.object({
-  current: AdminOrganizationServiceFeeExemptionCurrentSchema.nullable(),
-  history: z.array(AdminOrganizationServiceFeeExemptionHistorySchema),
+  current: AdminOrganizationServiceFeeExemptionRecordSchema.nullable(),
+  history: z.array(AdminOrganizationServiceFeeExemptionRecordSchema),
 });
 
 const GrantCreditInputSchema = z
@@ -585,8 +575,8 @@ export const organizationAdminRouter = createTRPCRouter({
     .input(SetServiceFeeExemptionInputSchema)
     .output(
       z.object({
-        current: AdminOrganizationServiceFeeExemptionCurrentSchema,
-        history: AdminOrganizationServiceFeeExemptionHistorySchema,
+        current: AdminOrganizationServiceFeeExemptionRecordSchema,
+        history: AdminOrganizationServiceFeeExemptionRecordSchema,
       })
     )
     .mutation(async ({ input, ctx }) => {

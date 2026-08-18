@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive renderer: image viewer, preview modal, and file:///data:/http(s) resolve+share paths share one component */
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -46,6 +47,10 @@ function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | '
 
 /** Resolve the file text for a preview, keeping the file for a later share. */
 async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>) {
+  if (url.startsWith('file://')) {
+    return new File(url).text();
+  }
+
   if (url.startsWith('data:')) {
     const file = writeDataUrlToCache(url, part);
     return file.text();
@@ -66,6 +71,10 @@ async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' |
 
 /** Share a FilePart, materializing a `data:` URL or downloading an `http(s)` URL. */
 async function shareFilePart(url: string, part: FilePart): Promise<void> {
+  if (url.startsWith('file://')) {
+    await shareLocalFile(url, { mimeType: part.mime });
+    return;
+  }
   if (url.startsWith('data:')) {
     const file = writeDataUrlToCache(url, part);
     await shareLocalFile(file.uri, { mimeType: part.mime });

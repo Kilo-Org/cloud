@@ -347,7 +347,7 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shares a data: URL via shareLocalFile for "Open in external app"', async () => {
+  it('shares a captured data: URL as a file:// URI via shareLocalFile for "Open in external app"', async () => {
     cacheFilePart('part-1', {
       url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
@@ -367,6 +367,55 @@ describe('FilePartRenderer mounted', () => {
       'file:///cache/session-file-parts/part-1-report.pdf',
       { mimeType: 'application/pdf' }
     );
+
+    await unmount(renderer);
+  });
+
+  it('resolves a file:// URL for text preview without re-downloading', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'file:///cache/session-file-parts/part-1-readme.md',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Hello');
+    expect(shareRemoteFileMock.downloadRemoteFile).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('shares a file:// URL via shareLocalFile without re-downloading', async () => {
+    cacheFilePart('part-1', {
+      url: 'file:///cache/session-file-parts/part-1-report.pdf',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'application/pdf', filename: 'report.pdf', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheet(1);
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-report.pdf',
+      { mimeType: 'application/pdf' }
+    );
+    expect(shareRemoteFileMock.shareRemoteFile).not.toHaveBeenCalled();
+    expect(shareRemoteFileMock.downloadRemoteFile).not.toHaveBeenCalled();
 
     await unmount(renderer);
   });

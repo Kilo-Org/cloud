@@ -11,6 +11,10 @@ import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { sendSignInCodeEmail } from '@/lib/email';
+import {
+  sendAccountDeletionConfirmationEmail,
+  sendAccountDeletionSupportNotification,
+} from '@/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 
@@ -19,6 +23,8 @@ jest.mock('@/lib/email', () => {
   return {
     ...actual,
     sendSignInCodeEmail: jest.fn(),
+    sendAccountDeletionConfirmationEmail: jest.fn(),
+    sendAccountDeletionSupportNotification: jest.fn(),
   };
 });
 
@@ -35,6 +41,8 @@ jest.mock('@/lib/user', () => {
 });
 
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
+const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmationEmail);
+const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
 
@@ -1035,12 +1043,16 @@ describe('user router - account deletion', () => {
     });
 
     mockSendSignInCodeEmail.mockReset();
+    mockSendDeletionConfirmation.mockReset();
+    mockSendDeletionSupportNotification.mockReset();
     mockPerformGdprRemoval.mockReset();
     mockAssertUserCanBeSoftDeleted.mockReset();
 
     mockAssertUserCanBeSoftDeleted.mockResolvedValue(undefined);
     mockPerformGdprRemoval.mockResolvedValue({ warnings: [] });
     mockSendSignInCodeEmail.mockResolvedValue({ sent: false, reason: 'provider_not_configured' });
+    mockSendDeletionConfirmation.mockResolvedValue({ sent: true });
+    mockSendDeletionSupportNotification.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -1111,6 +1123,26 @@ describe('user router - account deletion', () => {
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
     expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('no input keeps the legacy request flow: emails only, no removal', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+
+    const result = await caller.user.requestAccountDeletion();
+
+    expect(result).toEqual({ success: true });
+    expect(mockSendDeletionConfirmation).toHaveBeenCalledWith(deletionUser.google_user_email);
+    expect(mockSendDeletionSupportNotification).toHaveBeenCalledWith(
+      deletionUser.google_user_email,
+      deletionUser.id
+    );
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+
+    const [stored] = await db
+      .select({ requestedAt: kilocode_users.account_deletion_requested_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, deletionUser.id));
+    expect(stored?.requestedAt).not.toBeNull();
   });
 
   it('valid code calls performGdprRemoval once', async () => {

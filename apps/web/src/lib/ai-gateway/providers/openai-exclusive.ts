@@ -41,7 +41,7 @@ export const gpt_5_6_sol_discounted_model: KiloExclusiveModel = {
   internal_id: 'openai/gpt-5.6-sol',
   display_name: 'OpenAI: GPT-5.6 Sol (50% off)',
   description:
-    'GPT-5.6 Sol served by OpenAI through Vercel AI Gateway at 50% lower cost than other available inference providers. OpenAI does not use prompts or completions from this endpoint for training.',
+    'GPT-5.6 Sol served by OpenAI through Vercel AI Gateway at 50% lower cost than other available inference providers.',
   status: 'public',
   context_length: 1_050_000,
   max_completion_tokens: 128_000,

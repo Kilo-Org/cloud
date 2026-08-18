@@ -70,7 +70,7 @@ pnpm dev:status --json
 Required:
 
 | Service | Why |
-| --- | --- |
+|---|---|
 | Web app on the reported port | Every browser step |
 | Worktree Postgres from `.env.local` `POSTGRES_URL` | Assessment, credit, exemption, revenue checks |
 | Stripe webhook forwarder | Settlement, emails, subscription activation |
@@ -96,7 +96,7 @@ Fees apply only to billing objects created at or after
 `2026-09-01T00:00:00Z` (`SERVICE_FEE_ACTIVATION_UNIX_SECONDS`).
 
 | Wall clock | How to run this file |
-| --- | --- |
+|---|---|
 | On or after 2026-09-01 UTC | Use the committed constant. Run V30 only if a pre-activation fixture still exists. |
 | Before 2026-09-01 UTC | Keep the committed constant for V30. For every "fee applies" journey, use a **local uncommitted** override of `SERVICE_FEE_ACTIVATION_UNIX_SECONDS` to `0`. Record the override in the run log. Revert it before any commit. |
 
@@ -122,7 +122,7 @@ Treat the override as a guarded local fault:
 Use the account already configured in `.env.local`.
 
 | Item | Value |
-| --- | --- |
+|---|---|
 | Success card | `4242 4242 4242 4242` |
 | Expiry | Any future month |
 | CVC | Any 3 digits |
@@ -133,7 +133,7 @@ Before V8, V9, and V32, create these Stripe test-mode promotion codes. They are
 operator fixtures, not product features:
 
 | Code | Coupon | Restriction |
-| --- | --- | --- |
+|---|---|---|
 | `VALIDATE20` | 20% off, unrestricted, redeemable on Checkout | None |
 | `VALIDATE100` | 100% off, unrestricted | None |
 | `VALIDATEKPONLY` | 20% off, `applies_to` = Personal Kilo Pass product only | Must not apply to the fee product |
@@ -198,7 +198,7 @@ user with no Kilo Pass and a separate payment fingerprint. Add those
 supplemental personas to the run log; do not overload `P-PERSONAL` after V7.
 
 | Persona | Fake email pattern | Role |
-| --- | --- | --- |
+|---|---|---|
 | `P-ADMIN` | `kilo-<user>-<timestamp>@admin.example.com` | Platform admin |
 | `P-OWNER` | `kilo-<user>-<timestamp>-owner@example.com` | Org owner / billing |
 | `P-MEMBER` | `kilo-<user>-<timestamp>-member@example.com` | Org member, no billing |
@@ -226,7 +226,7 @@ Admin bootstrap requires the `@admin.example.com` suffix. A fake
 Create from `$BASE/organizations/new` while signed in as `P-OWNER`:
 
 | Org | Name | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | `ORG-A` | `Fee Validate A <timestamp>` | Fee-paying org |
 | `ORG-B` | `Fee Validate B <timestamp>` | Exemption target |
 | `ORG-CHILD` | created from `ORG-B` admin hierarchy as a child | Proves exemptions do not inherit |
@@ -416,7 +416,7 @@ for a later successful event, even if its Stripe amounts were correct.
 ### 2.3 Shared browser session names
 
 | Session | Persona |
-| --- | --- |
+|---|---|
 | `sf-admin` | `P-ADMIN` |
 | `sf-owner` | `P-OWNER` |
 | `sf-member` | `P-MEMBER` |
@@ -537,7 +537,7 @@ Expect one row and one key. Related Stripe IDs enrich that row.
 ### 3.6 Amount cheat sheet
 
 | Principal | Expected fee | Customer pays before tax |
-| ---: | ---: | ---: |
+|---:|---:|---:|
 | $10.00 | $0.50 | $10.50 |
 | $20.00 | $1.00 | $21.00 |
 | $49.00 | $2.45 | $51.45 |
@@ -586,7 +586,7 @@ failures.
 ## 4. Journey index
 
 | ID | Journey | Invariant |
-| --- | --- | --- |
+|---|---|---|
 | V0 | Fixtures: users, orgs, Stripe promos | Later journeys have clean actors |
 | V1 | Personal $100 top-up | Fee $5; credits $100 |
 | V2 | Organization $100 top-up | Fee $5; org credits $100 |
@@ -627,7 +627,7 @@ classifier tests; do not invent a Checkout.
 Acceptance-criteria map from `GOAL.md`:
 
 | Goal criterion | Journeys |
-| --- | --- |
+|---|---|
 | 1 Activation boundary | V30, and any fee-applies journey after the override or after 2026-09-01 |
 | 2 Eligible flows | V1–V7, V10 |
 | 3 Excluded flows | V12; V13 N/A; V14/V15 N/A |
@@ -710,7 +710,7 @@ charged.
 **Database expect**
 
 | Column | Value |
-| --- | --- |
+|---|---|
 | `flow` | `personal_top_up` |
 | `outcome` | `charged` |
 | `eligible_subtotal_minor` | `10000` |
@@ -792,7 +792,7 @@ not $52.50. Kilo settings still show `$50`, not `$52.50`.
 **Database expect**
 
 | Column | Value |
-| --- | --- |
+|---|---|
 | `flow` | `personal_auto_top_up_setup` |
 | `outcome` | `charged` |
 | `eligible_subtotal_minor` | `5000` |
@@ -925,7 +925,7 @@ tier. Credit grant / threshold matches the $49 tier, not $51.45.
 **Database expect**
 
 | Column | Value |
-| --- | --- |
+|---|---|
 | `flow` | `personal_kilo_pass` |
 | `outcome` | `charged` |
 | `eligible_subtotal_minor` | `4900` |

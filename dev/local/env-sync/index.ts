@@ -79,7 +79,7 @@ async function syncEnvVars(options: {
         plan.envLocalAutoCreates.length > 0
           ? await computePlanAsync(repoRoot, serviceFilter, refreshSourceBackedSecrets)
           : plan;
-      await applyPlan(applyReadyPlan, repoRoot, { missingSecretsOnly });
+      await applyPlan(applyReadyPlan, repoRoot);
       console.log(`\n${GREEN}✓ Applied${RESET}`);
     } else {
       console.log('Skipped.');

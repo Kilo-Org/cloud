@@ -94,9 +94,10 @@ type FilePartRendererProps = {
 
 type PreviewMode = 'markdown' | 'text';
 
-/** Prefer the captured cache URL, falling back to the part's own URL. */
+/** Prefer the captured cache URL, falling back to the part's own URL. The
+ *  cached URL is produced by our cache and is always trusted. */
 function resolveUsableUrl(cachedUrl: string | undefined, partUrl: string): string | undefined {
-  if (cachedUrl && isUsableFilePartUrl(cachedUrl)) {
+  if (cachedUrl) {
     return cachedUrl;
   }
   if (isUsableFilePartUrl(partUrl)) {

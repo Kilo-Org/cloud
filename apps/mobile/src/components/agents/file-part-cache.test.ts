@@ -166,17 +166,28 @@ describe('cacheFilePart', () => {
 
     expect(getFilePartCacheEntry('part-1')?.url).toBe('data:application/pdf;base64,QUJD');
   });
+
+  it('does not store a file:// URL', () => {
+    cacheFilePart('part-1', {
+      url: 'file:///etc/passwd',
+      mime: 'text/plain',
+      filename: 'passwd',
+    });
+
+    expect(fileInstances).toHaveLength(0);
+    expect(getFilePartCacheEntry('part-1')).toBeUndefined();
+  });
 });
 
 describe('isUsableFilePartUrl', () => {
-  it('accepts http, https, data, and file schemes', () => {
+  it('accepts http, https, and data schemes', () => {
     expect(isUsableFilePartUrl('http://example.com/a.png')).toBe(true);
     expect(isUsableFilePartUrl('https://example.com/a.png')).toBe(true);
     expect(isUsableFilePartUrl('data:image/png;base64,AAA')).toBe(true);
-    expect(isUsableFilePartUrl('file:///cache/a.png')).toBe(true);
   });
 
-  it('rejects other schemes', () => {
+  it('rejects file and other schemes', () => {
+    expect(isUsableFilePartUrl('file:///cache/a.png')).toBe(false);
     expect(isUsableFilePartUrl('ftp://example.com/a.png')).toBe(false);
     expect(isUsableFilePartUrl('')).toBe(false);
   });

@@ -85,9 +85,7 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
       expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
       expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
-      expect(autoFreeModels.map(({ model }) => model)).toContain(
-        tencent_hy3_free_model.public_id
-      );
+      expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
     });
 
     test('retains the disabled LongCat 2.0 configuration for later enablement', async () => {

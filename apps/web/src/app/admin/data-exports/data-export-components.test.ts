@@ -22,6 +22,7 @@ const summaryFixture = {
 const healthyRow: DataExportListRow = {
   id: '2c4f8a10-1111-4222-8333-444455556666',
   user: { id: 'user-1', email: 'ready@example.com', name: 'Ready User' },
+  subject: { type: 'user', organization: null },
   status: 'ready',
   schemaVersion: 1,
   currentSource: null,
@@ -63,6 +64,13 @@ const degradedRow: DataExportListRow = {
   ...healthyRow,
   id: '9d8c7b6a-5555-4666-8777-888899990000',
   user: { id: 'user-2', email: 'stuck@example.com', name: null },
+  subject: {
+    type: 'organization',
+    organization: {
+      id: '5f9022b7-424e-4fa8-a0d7-b84cf3fc73ad',
+      name: 'Stuck Organization',
+    },
+  },
   status: 'processing',
   currentSource: 'kilocode_users',
   attemptCount: 2,
@@ -121,7 +129,7 @@ describe('DataExportsSummaryStrip', () => {
 });
 
 describe('DataExportsTable', () => {
-  it('renders rows with health, status, user, and one-shot execution details', () => {
+  it('renders rows with subject, requester, health, and execution details', () => {
     const html = renderToStaticMarkup(
       React.createElement(DataExportsTable, {
         rows: [healthyRow, degradedRow],
@@ -132,7 +140,14 @@ describe('DataExportsTable', () => {
 
     // Links and navigation targets
     expect(html).toContain('href="/admin/users/user-1"');
+    expect(html).toContain('href="/admin/organizations/5f9022b7-424e-4fa8-a0d7-b84cf3fc73ad"');
     expect(html).toContain('href="/admin/data-exports/2c4f8a10-1111-4222-8333-444455556666"');
+
+    // Subject and requester are distinct concepts
+    expect(html).toContain('Personal');
+    expect(html).toContain('Organization');
+    expect(html).toContain('Stuck Organization');
+    expect(html).toContain('Requester');
 
     // Health badges use text, not color alone
     expect(html).toContain('OK');

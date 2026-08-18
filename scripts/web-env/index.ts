@@ -18,6 +18,7 @@ import {
   stripSurroundingQuotes,
   trackedEnvFiles,
   type Environment,
+  type VaultEnvironment,
 } from './shared.js';
 
 async function askSensitivity(name: string): Promise<boolean> {
@@ -131,10 +132,14 @@ async function main(): Promise<void> {
   const tempDirectory = mkdtempSync(path.join(os.tmpdir(), 'kilo-web-env-'));
 
   try {
-    const updatesProductionVault = sensitive && environments.includes('production');
-    console.log(`Checking Vercel${updatesProductionVault ? ' and 1Password' : ''} access...`);
+    const vaultEnvironments = sensitive
+      ? environments.filter(
+          (environment): environment is VaultEnvironment => environment !== 'development'
+        )
+      : [];
+    console.log(`Checking Vercel${vaultEnvironments.length > 0 ? ' and 1Password' : ''} access...`);
     const contexts = resolveVercelContexts(tempDirectory);
-    const vault = updatesProductionVault ? resolveVault() : undefined;
+    const vault = vaultEnvironments.length > 0 ? resolveVault() : undefined;
     const values = await collectValues(options, environments);
     const defaults = options.only
       ? new Map<string, string>()
@@ -154,7 +159,9 @@ async function main(): Promise<void> {
     }
     for (const [file, value] of defaults)
       console.log(`- ${file}: ${options.name}=${JSON.stringify(value)}`);
-    console.log(`- 1Password: ${updatesProductionVault ? 'update Production copy' : 'skip'}`);
+    console.log(
+      `- 1Password: ${vaultEnvironments.length > 0 ? `update ${vaultEnvironments.join(' and ')} fields` : 'skip'}`
+    );
     console.log(
       `- Deployments: ${
         deployableEnvironments.length > 0
@@ -185,10 +192,12 @@ async function main(): Promise<void> {
       }
     }
     if (vault) {
-      const productionValue = values.production;
-      if (!productionValue) throw new Error('Missing production value.');
-      console.log('Updating 1Password Production copy...');
-      await setVaultValue(vault, options.name, productionValue);
+      for (const environment of vaultEnvironments) {
+        const value = values[environment];
+        if (!value) throw new Error(`Missing ${environment} value.`);
+        console.log(`Updating 1Password ${environment} copy...`);
+        await setVaultValue(vault, options.name, value, environment);
+      }
     }
 
     if (

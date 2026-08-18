@@ -9,6 +9,7 @@ import {
   resolveVercelContexts,
   setVaultValue,
   stripSurroundingQuotes,
+  type VaultEnvironment,
 } from './shared.js';
 
 // These tests mutate shared process.env (PATH and FAKE_OP_*) and restore it in a
@@ -37,17 +38,20 @@ if (args[0] === 'account' && args[1] === 'list') {
 } else if (args[0] === 'vault' && args[1] === 'get') {
   process.stdout.write(JSON.stringify({ id: 'vault-id' }));
 } else if (args[0] === 'item' && args[1] === 'list') {
-  const items = process.env.FAKE_OP_EXISTING
+  const items = process.env.FAKE_OP_EXISTING !== 'none'
     ? [{ id: 'existing-id', title: 'TEST_SECRET' }]
     : [];
   process.stdout.write(JSON.stringify(items));
 } else if (args[0] === 'item' && args[1] === 'get') {
+  const passwordFields = process.env.FAKE_OP_EXISTING === 'production'
+    ? [{ id: 'password', label: 'password', type: 'CONCEALED', purpose: 'PASSWORD', value: 'old-production-value' }]
+    : [{ id: 'generated-staging-id', label: 'password (staging)', type: 'CONCEALED', value: 'old-staging-value' }];
   process.stdout.write(JSON.stringify({
     id: 'existing-id',
     title: 'TEST_SECRET',
     category: 'PASSWORD',
     fields: [
-      { id: 'password', label: 'password', type: 'CONCEALED', purpose: 'PASSWORD', value: 'old-value' },
+      ...passwordFields,
       { id: 'notesPlain', label: 'notesPlain', type: 'STRING', purpose: 'NOTES', value: '' }
     ],
     sections: []
@@ -87,7 +91,10 @@ if (args[2] === 'list') {
 }
 `;
 
-async function captureOpInvocations(existing: boolean): Promise<Invocation[]> {
+async function captureOpInvocations(
+  existing: 'none' | VaultEnvironment,
+  environment: VaultEnvironment
+): Promise<Invocation[]> {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-op-test-'));
   const logFile = path.join(directory, 'op.jsonl');
   writeFileSync(path.join(directory, 'op'), FAKE_OP, { mode: 0o700 });
@@ -97,14 +104,14 @@ async function captureOpInvocations(existing: boolean): Promise<Invocation[]> {
   const originalExisting = process.env.FAKE_OP_EXISTING;
   process.env.PATH = `${directory}:${originalPath ?? ''}`;
   process.env.FAKE_OP_LOG = logFile;
-  if (existing) process.env.FAKE_OP_EXISTING = '1';
-  else delete process.env.FAKE_OP_EXISTING;
+  process.env.FAKE_OP_EXISTING = existing;
 
   try {
     await setVaultValue(
       { accountId: 'account-id', vaultId: 'vault-id' },
       'TEST_SECRET',
-      'secret-value'
+      `new-${environment}-value`,
+      environment
     );
     return readFileSync(logFile, 'utf8')
       .trim()
@@ -182,7 +189,7 @@ void test('redeployLatest redeploys the latest ready deployment for the target e
 });
 
 void test('setVaultValue creates an item from a template without sending the secret through stdin', async () => {
-  const invocations = await captureOpInvocations(false);
+  const invocations = await captureOpInvocations('none', 'production');
   const create = invocations.find(invocation => invocation.args[1] === 'create');
   assert.ok(create);
   assert.deepEqual(create.args, [
@@ -196,13 +203,20 @@ void test('setVaultValue creates an item from a template without sending the sec
     '--format=json',
   ]);
   assert.equal(create.stdin, '');
-  const item = JSON.parse(create.templateInput) as { title?: string; fields?: unknown[] };
+  const item = JSON.parse(create.templateInput) as {
+    title?: string;
+    fields?: Array<{ id?: string; label?: string; value?: string }>;
+  };
   assert.equal(item.title, 'TEST_SECRET');
-  assert.ok(item.fields?.some(field => JSON.stringify(field).includes('secret-value')));
+  assert.equal(item.fields?.find(field => field.id === 'password')?.value, 'new-production-value');
+  assert.equal(
+    item.fields?.find(field => field.label === 'password (staging)'),
+    undefined
+  );
 });
 
 void test('setVaultValue updates an item from a template without sending the secret through stdin', async () => {
-  const invocations = await captureOpInvocations(true);
+  const invocations = await captureOpInvocations('production', 'production');
   const edit = invocations.find(invocation => invocation.args[1] === 'edit');
   assert.ok(edit);
   assert.deepEqual(edit.args, [
@@ -217,9 +231,74 @@ void test('setVaultValue updates an item from a template without sending the sec
     '--format=json',
   ]);
   assert.equal(edit.stdin, '');
-  const item = JSON.parse(edit.templateInput) as { title?: string; fields?: unknown[] };
+  const item = JSON.parse(edit.templateInput) as {
+    title?: string;
+    fields?: Array<{ id?: string; label?: string; value?: string }>;
+  };
   assert.equal(item.title, 'TEST_SECRET');
-  assert.ok(item.fields?.some(field => JSON.stringify(field).includes('secret-value')));
+  assert.equal(item.fields?.find(field => field.id === 'password')?.value, 'new-production-value');
+});
+
+void test('setVaultValue creates a staging-only item without a production value', async () => {
+  const invocations = await captureOpInvocations('none', 'staging');
+  const create = invocations.find(invocation => invocation.args[1] === 'create');
+  assert.ok(create);
+  const item = JSON.parse(create.templateInput) as {
+    fields?: Array<{ id?: string; label?: string; type?: string; value?: string }>;
+  };
+  assert.deepEqual(
+    item.fields?.find(field => field.label === 'password (staging)'),
+    {
+      id: 'password-staging',
+      label: 'password (staging)',
+      type: 'CONCEALED',
+      value: 'new-staging-value',
+    }
+  );
+  assert.equal(
+    item.fields?.find(field => field.id === 'password'),
+    undefined
+  );
+});
+
+void test('setVaultValue adds staging to an item that only has production', async () => {
+  const invocations = await captureOpInvocations('production', 'staging');
+  const edit = invocations.find(invocation => invocation.args[1] === 'edit');
+  assert.ok(edit);
+  const item = JSON.parse(edit.templateInput) as {
+    fields?: Array<{ id?: string; label?: string; value?: string }>;
+  };
+  assert.equal(item.fields?.find(field => field.id === 'password')?.value, 'old-production-value');
+  assert.equal(
+    item.fields?.find(field => field.label === 'password (staging)')?.value,
+    'new-staging-value'
+  );
+});
+
+void test('setVaultValue updates an existing staging field by label', async () => {
+  const invocations = await captureOpInvocations('staging', 'staging');
+  const edit = invocations.find(invocation => invocation.args[1] === 'edit');
+  assert.ok(edit);
+  const item = JSON.parse(edit.templateInput) as {
+    fields?: Array<{ id?: string; label?: string; value?: string }>;
+  };
+  const staging = item.fields?.find(field => field.label === 'password (staging)');
+  assert.equal(staging?.id, 'generated-staging-id');
+  assert.equal(staging?.value, 'new-staging-value');
+});
+
+void test('setVaultValue adds production to an item that only has staging', async () => {
+  const invocations = await captureOpInvocations('staging', 'production');
+  const edit = invocations.find(invocation => invocation.args[1] === 'edit');
+  assert.ok(edit);
+  const item = JSON.parse(edit.templateInput) as {
+    fields?: Array<{ id?: string; label?: string; value?: string }>;
+  };
+  assert.equal(item.fields?.find(field => field.id === 'password')?.value, 'new-production-value');
+  assert.equal(
+    item.fields?.find(field => field.label === 'password (staging)')?.value,
+    'old-staging-value'
+  );
 });
 
 void test('resolveVault selects the kilocode account before resolving the vault', () => {

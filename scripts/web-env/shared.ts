@@ -24,6 +24,7 @@ export type OnePasswordContext = {
   accountId: string;
   vaultId: string;
 };
+export type VaultEnvironment = Extract<Environment, 'staging' | 'production'>;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -478,10 +479,42 @@ function setAuditNote(item: JsonRecord, note: string): void {
   notes.value = preserved ? `${preserved}\n${note}` : note;
 }
 
+function vaultPasswordField(environment: VaultEnvironment, value: string): JsonRecord {
+  if (environment === 'production') {
+    return {
+      id: 'password',
+      label: 'password',
+      type: 'CONCEALED',
+      purpose: 'PASSWORD',
+      value,
+    };
+  }
+  return {
+    id: 'password-staging',
+    label: 'password (staging)',
+    type: 'CONCEALED',
+    value,
+  };
+}
+
+function findVaultPasswordField(
+  fields: JsonRecord[],
+  environment: VaultEnvironment
+): JsonRecord | undefined {
+  const matches = fields.filter(field =>
+    environment === 'production' ? field.id === 'password' : field.label === 'password (staging)'
+  );
+  if (matches.length > 1) {
+    throw new Error(`1Password item has more than one ${environment} password field.`);
+  }
+  return matches[0];
+}
+
 export async function setVaultValue(
   context: OnePasswordContext,
   name: string,
-  value: string
+  value: string,
+  environment: VaultEnvironment
 ): Promise<void> {
   const note = auditNote();
   const existing = findVaultItem(context, name);
@@ -490,13 +523,7 @@ export async function setVaultValue(
       title: name,
       category: 'PASSWORD',
       fields: [
-        {
-          id: 'password',
-          label: 'password',
-          type: 'CONCEALED',
-          purpose: 'PASSWORD',
-          value,
-        },
+        vaultPasswordField(environment, value),
         {
           id: 'notesPlain',
           label: 'notesPlain',
@@ -523,10 +550,12 @@ export async function setVaultValue(
       ),
       `Create ${name}`
     );
-    const createdPassword = records(created.fields).find(field => field.id === 'password');
+    const createdPassword = findVaultPasswordField(records(created.fields), environment);
     const createdNotes = records(created.fields).find(field => field.id === 'notesPlain');
     if (createdPassword?.value !== value || createdNotes?.value !== note) {
-      throw new Error(`1Password did not persist the new ${name} value and audit note.`);
+      throw new Error(
+        `1Password did not persist the new ${name} ${environment} value and audit note.`
+      );
     }
     return;
   }
@@ -546,11 +575,19 @@ export async function setVaultValue(
     ]),
     `Read ${name}`
   );
-  const password = records(item.fields).find(field => field.id === 'password');
-  if (!password || password.type !== 'CONCEALED') {
-    throw new Error(`1Password item ${name} does not have a concealed password field.`);
+  const fields = records(item.fields);
+  const password = findVaultPasswordField(fields, environment);
+  if (password && password.type !== 'CONCEALED') {
+    throw new Error(`1Password item ${name} does not have a concealed ${environment} field.`);
   }
-  password.value = value;
+  if (password) password.value = value;
+  else {
+    const itemFields = item.fields;
+    if (!Array.isArray(itemFields)) {
+      throw new Error('1Password item does not have editable fields.');
+    }
+    itemFields.push(vaultPasswordField(environment, value));
+  }
   setAuditNote(item, note);
   const expectedNotes = stringValue(
     records(item.fields).find(field => field.id === 'notesPlain') ?? {},
@@ -573,10 +610,12 @@ export async function setVaultValue(
     ),
     `Update ${name}`
   );
-  const updatedPassword = records(updated.fields).find(field => field.id === 'password');
+  const updatedPassword = findVaultPasswordField(records(updated.fields), environment);
   const updatedNotes = records(updated.fields).find(field => field.id === 'notesPlain');
   if (updatedPassword?.value !== value || updatedNotes?.value !== expectedNotes) {
-    throw new Error(`1Password did not persist the updated ${name} value and audit note.`);
+    throw new Error(
+      `1Password did not persist the updated ${name} ${environment} value and audit note.`
+    );
   }
 }
 

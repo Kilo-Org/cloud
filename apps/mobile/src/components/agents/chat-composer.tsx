@@ -393,6 +393,8 @@ export function ChatComposer({
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
+    readyAttachmentsCount: upload.attachments.filter(attachment => attachment.status === 'uploaded')
+      .length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
     hasText,
@@ -589,7 +591,7 @@ export function ChatComposer({
 
   async function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!trimmed || !control.canSend) {
+    if (!control.canSend) {
       return;
     }
     if (upload.isUploading) {

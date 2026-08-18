@@ -84,12 +84,8 @@ describe('getPercentageRoutedPartnerProvider', () => {
     expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
   });
 
-  it.each(['chat_completions', 'messages'] as const)('routes %s requests', kind => {
+  it.each(['chat_completions', 'messages', 'responses'] as const)('routes %s requests', kind => {
     expect(selectPartner({ request: request(kind) })).toBe(PROVIDERS.FRIENDLI_GLM);
-  });
-
-  it('does not route unsupported responses requests', () => {
-    expect(selectPartner({ request: request('responses') })).toBeNull();
   });
 
   it('allows an empty provider object', () => {

@@ -53,11 +53,6 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
         } satisfies AutoFreeModel,
       ]
     : []),
-  {
-    model: 'poolside/laguna-s-2.1:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
 ];
 
 export function selectAutoFreeCandidate(
@@ -83,6 +78,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels.map(({ model }) => model),
+  'poolside/laguna-s-2.1:free',
   ...(tencent_hy3_free_model.status === 'public' ? [tencent_hy3_free_model.public_id] : []),
   ...(longcat_2_free_model.status === 'public' ? [longcat_2_free_model.public_id] : []),
 

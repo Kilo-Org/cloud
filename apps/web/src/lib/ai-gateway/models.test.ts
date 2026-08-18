@@ -189,19 +189,13 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
-        'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights non-Laguna auto-free models higher than Laguna', () => {
-      const lagunaModel = autoFreeModels.find(({ model }) => model.includes('laguna'));
-      expect(lagunaModel?.weight).toBe(1);
-
-      for (const candidate of autoFreeModels) {
-        if (!candidate.model.includes('laguna')) {
-          expect(candidate.weight).toBe(9);
-        }
-      }
+    test('keeps Laguna preferred without including it in Auto Free', () => {
+      const lagunaModel = 'poolside/laguna-s-2.1:free';
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(lagunaModel);
+      expect(preferredModels).toContain(lagunaModel);
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

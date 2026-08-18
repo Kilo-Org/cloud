@@ -10,7 +10,11 @@ import {
 } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
+import {
+  type FlattenedSecurityAgentConfig,
+  type SecurityAgentConfig,
+  type SecurityAgentConfigPatch,
+} from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
@@ -135,17 +139,17 @@ export function useSaveSecurityAgentConfig(scope: string) {
     },
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
-      const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+      const previous = queryClient.getQueryData<FlattenedSecurityAgentConfig>(configQueryKey);
+      queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, ...patch } : old
       );
       return { previous, patch };
     },
     onError: (error, _patch, context) => {
       if (context?.previous) {
-        const keys = Object.keys(context.patch) as (keyof SecurityAgentConfigPatch)[];
+        const keys = Object.keys(context.patch) as (keyof SecurityAgentConfig)[];
         const restoredFields = pick(context.previous, keys);
-        queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+        queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
           old ? { ...old, ...restoredFields } : old
         );
       }

@@ -247,8 +247,8 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     );
     expect(outboxMock.remove).toHaveBeenCalledTimes(1);
     // The row is written before the mutate fires.
-    expect(outboxMock.writeReconcileFirst.mock.invocationCallOrder[0]).toBeLessThan(
-      personalTriggerSyncMutateMock.mock.invocationCallOrder[0]
+    expect(outboxMock.writeReconcileFirst.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      personalTriggerSyncMutateMock.mock.invocationCallOrder[0] ?? 0
     );
   });
 

@@ -692,8 +692,8 @@ describe('useNewSessionCreator mutation outbox (P1-E-40c)', () => {
     );
     expect(outboxMock.remove).toHaveBeenCalledTimes(1);
     // The row is written before the mutate fires.
-    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0]).toBeLessThan(
-      prepareSessionMutate.mock.invocationCallOrder[0]
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      prepareSessionMutate.mock.invocationCallOrder[0] ?? 0
     );
   });
 

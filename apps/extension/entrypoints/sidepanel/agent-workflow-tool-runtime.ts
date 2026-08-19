@@ -22,6 +22,8 @@ import type { ApprovalKind, ApprovalOutcome } from './pending-approval';
 
 // ---------- tool context ----------
 
+type MaybePromise<Value> = Promise<Value> | Value;
+
 export interface WorkflowToolContext {
   readonly selectedTabUrl: string;
   readonly selectedTabId: number;
@@ -29,7 +31,7 @@ export interface WorkflowToolContext {
   readonly mode: 'safe' | 'dangerous';
   readonly allowWorkflowsInSafeMode: boolean;
   readonly storage: {
-    getItem(key: string): unknown;
+    getItem(key: string): MaybePromise<unknown>;
     setItem(key: string, value: unknown): void | Promise<void>;
     removeItem(key: string): void | Promise<void>;
   };
@@ -97,10 +99,10 @@ const NEXT_STEP_RUNS_ASK_USER =
 // ---------- helpers ----------
 
 // Zod's generic "Invalid input" gives a model nothing to act on for the one field it most often garbles. Field-specific guidance replaces it.
-const ARGS_FIELD_GUIDANCE: Record<string, string> = {
+const ARGS_FIELD_GUIDANCE = {
   script:
     'script must be a non-empty string: the workflow function body (or a full async function) using the page.* helpers',
-};
+} satisfies Record<string, string>;
 
 /**
  * Format a zod failure into a field-level message the model can act on.
@@ -110,7 +112,7 @@ const formatArgsError = (toolName: string, error: z.ZodError): string => {
     .slice(0, 5)
     .map(issue => {
       const path = issue.path.join('.') || '(root)';
-      const guidance = ARGS_FIELD_GUIDANCE[path];
+      const guidance = Object.entries(ARGS_FIELD_GUIDANCE).find(([key]) => key === path)?.[1];
       return `${path}: ${guidance ?? issue.message}`;
     })
     .join('; ');

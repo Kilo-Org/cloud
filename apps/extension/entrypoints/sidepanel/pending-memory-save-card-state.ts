@@ -43,12 +43,7 @@ export const buildDeleteMemoryAriaLabel = (memory: {
   text: string;
 }): string => `Delete memory "${buildMemoryPreviewLabel(memory)}"`;
 
-export const deriveNoteCharacterCount = (
-  note: string
-): {
-  count: number;
-  max: number;
-} => ({
+export const deriveNoteCharacterCount = (note: string) => ({
   count: note.length,
   max: MAX_MEMORY_NOTE_LENGTH,
 });

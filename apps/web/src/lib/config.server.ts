@@ -60,7 +60,6 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
-export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET');
 export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
@@ -473,6 +472,26 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
+
+/**
+ * User-deletion HMAC key. Required because the sign-in/sign-up identity
+ * fence HMACs the email on every account creation and provider link, so a
+ * missing value would fail authentication rather than only deletion. Fail at
+ * boot instead.
+ */
+export const USER_DELETION_AUDIT_HMAC_KEY = requireEnv(
+  'USER_DELETION_AUDIT_HMAC_KEY',
+  getEnvVariable('USER_DELETION_AUDIT_HMAC_KEY')
+);
+/**
+ * AES-256 key for user-deletion checkpoints and provider credentials.
+ * Must be a base64-encoded 32-byte key.
+ */
+export const USER_DELETION_ENCRYPTION_KEY = requireEnv(
+  'USER_DELETION_ENCRYPTION_KEY',
+  getEnvVariable('USER_DELETION_ENCRYPTION_KEY')
+);
+export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET') || '';
 
 // Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
 const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');

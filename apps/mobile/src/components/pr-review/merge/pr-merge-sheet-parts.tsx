@@ -25,11 +25,11 @@ import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconn
 const NO_ENABLED_METHODS_MESSAGE =
   'This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.';
 
-const SHORT_METHOD_LABELS: Record<AllowedMergeMethod, string> = {
+const SHORT_METHOD_LABELS = {
   merge: 'Merge',
   squash: 'Squash',
   rebase: 'Rebase',
-};
+} satisfies Record<AllowedMergeMethod, string>;
 
 function MethodPicker({
   methodOptions,

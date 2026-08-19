@@ -1,4 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 export type ReadFileDisplay = {
   path: string;
@@ -29,39 +30,31 @@ export function isMarkdownPath(filePath: string): boolean {
   return /\.mdx?$/i.test(filePath.trim());
 }
 
+/** Zod's validation `.catch()` fallback, not a Promise catch. */
+function tolerant<T>(schema: z.ZodType<T>, fallback: T): z.ZodType<T> {
+  // oxlint-disable-next-line promise/prefer-await-to-then -- zod schema fallback, not a Promise
+  return schema.catch(fallback);
+}
+
+const readFileDisplaySchema = z.object({
+  display: z.object({
+    type: z.literal('file'),
+    text: z.string(),
+    path: tolerant(z.string(), ''),
+    lineStart: z.number(),
+    lineEnd: z.number(),
+    totalLines: z.number(),
+    truncated: tolerant(z.literal(true), false),
+  }),
+});
+
 export function parseReadFileDisplay(metadata: unknown): ReadFileDisplay | undefined {
-  if (metadata === null || typeof metadata !== 'object') {
+  const parsed = readFileDisplaySchema.safeParse(metadata);
+  if (!parsed.success) {
     return undefined;
   }
-  const display = (metadata as { display?: unknown }).display;
-  if (display === null || typeof display !== 'object') {
-    return undefined;
-  }
-  const d = display as Record<string, unknown>;
-  if (d.type !== 'file') {
-    return undefined;
-  }
-  if (typeof d.text !== 'string') {
-    return undefined;
-  }
-  if (
-    typeof d.lineStart !== 'number' ||
-    !Number.isFinite(d.lineStart) ||
-    typeof d.lineEnd !== 'number' ||
-    !Number.isFinite(d.lineEnd) ||
-    typeof d.totalLines !== 'number' ||
-    !Number.isFinite(d.totalLines)
-  ) {
-    return undefined;
-  }
-  return {
-    path: typeof d.path === 'string' ? d.path : '',
-    text: d.text,
-    lineStart: d.lineStart,
-    lineEnd: d.lineEnd,
-    totalLines: d.totalLines,
-    truncated: d.truncated === true,
-  };
+  const { path, text, lineStart, lineEnd, totalLines, truncated } = parsed.data.display;
+  return { path, text, lineStart, lineEnd, totalLines, truncated };
 }
 
 const LINE_PREFIX = /^(\d+): (.*)$/;
@@ -113,10 +106,7 @@ function stripLinePrefixes(body: string):
   };
 }
 
-function trailerFields(
-  trailer: string | undefined,
-  lineEnd: number
-): { totalLines: number; truncated: boolean } {
+function trailerFields(trailer: string | undefined, lineEnd: number) {
   if (!trailer) {
     return { totalLines: lineEnd, truncated: false };
   }

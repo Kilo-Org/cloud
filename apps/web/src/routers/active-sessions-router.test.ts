@@ -72,7 +72,7 @@ describe('active-sessions-router', () => {
     jest.restoreAllMocks();
   });
 
-  describe('getToken', () => {
+  describe('web ticket minting', () => {
     it('mints a one-use ticket and returns { token, expiresAt }', async () => {
       const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({ ticket: 'ticket-abc', expiresAt: 1_700_000_060 }), {
@@ -90,6 +90,22 @@ describe('active-sessions-router', () => {
       expect(calledUrl).toBe('https://test-ingest.example.com/api/user/web-ticket');
       expect(init.method).toBe('POST');
       expect((init.headers as Record<string, string>).Authorization).toContain('Bearer ');
+    });
+
+    it('mints the same ticket through the createWebTicket mutation', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ticket: 'ticket-abc', expiresAt: 1_700_000_060 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.activeSessions.createWebTicket()).resolves.toEqual({
+        token: 'ticket-abc',
+        expiresAt: 1_700_000_060,
+      });
     });
 
     it('throws PRECONDITION_FAILED when the worker returns a non-2xx response', async () => {

@@ -95,14 +95,17 @@ export function ChildSessionSection({
             {taskName}
           </Text>
           <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
-            {typeof latestActivity === 'string' ? (
-              latestActivity
-            ) : (
-              <>
-                <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
-                {latestActivity.context ? ` ${latestActivity.context}` : ''}
-              </>
-            )}
+            {
+              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
+              typeof latestActivity === 'string' ? (
+                latestActivity
+              ) : (
+                <>
+                  <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
+                  {latestActivity.context ? ` ${latestActivity.context}` : ''}
+                </>
+              )
+            }
           </Text>
         </View>
 

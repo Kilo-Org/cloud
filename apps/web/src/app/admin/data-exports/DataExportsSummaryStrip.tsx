@@ -31,6 +31,18 @@ function buildItems(summary: DataExportSummary): SummaryItem[] {
       value: summary.active,
     },
     {
+      key: 'ready',
+      label: 'Ready exports',
+      hint: 'Available to download',
+      value: summary.ready,
+    },
+    {
+      key: 'expired',
+      label: 'Expired exports',
+      hint: 'No longer downloadable',
+      value: summary.expired,
+    },
+    {
       key: 'pending-dispatches',
       label: 'Pending dispatches',
       hint: 'Outbox entries due now',
@@ -64,7 +76,7 @@ function buildItems(summary: DataExportSummary): SummaryItem[] {
 }
 
 const stripGridClass =
-  'grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3 xl:grid-cols-6';
+  'grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4 xl:grid-cols-8';
 
 export function DataExportsSummaryStrip({
   summary,
@@ -76,7 +88,7 @@ export function DataExportsSummaryStrip({
   if (isLoading && !summary) {
     return (
       <section aria-label="Export workload summary" className={stripGridClass}>
-        {Array.from({ length: 6 }, (_, index) => (
+        {Array.from({ length: 8 }, (_, index) => (
           <div key={index} className="bg-card flex flex-col gap-2 p-3">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-6 w-12" />

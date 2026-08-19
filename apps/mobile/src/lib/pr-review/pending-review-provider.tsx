@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { z } from 'zod';
 import { clearDraft, loadDraft, prReviewDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
@@ -21,30 +22,20 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 // between queue and submit. Stale items are never sent: the submit
 // sheet partitions the queue and submits only the fresh items, leaving
 // stale items queued for the user to edit or delete.
-export type PendingReviewItem = {
-  id: string;
-  path: string;
-  side: 'LEFT' | 'RIGHT';
-  line: number;
-  startLine?: number;
-  body: string;
-  commitSha: string;
-};
+const PendingReviewItemSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  side: z.union([z.literal('LEFT'), z.literal('RIGHT')]),
+  line: z.number(),
+  startLine: z.number().optional(),
+  body: z.string(),
+  commitSha: z.string(),
+});
+
+export type PendingReviewItem = z.infer<typeof PendingReviewItemSchema>;
 
 function isPendingReviewItem(value: unknown): value is PendingReviewItem {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const item = value as Record<string, unknown>;
-  return (
-    typeof item.id === 'string' &&
-    typeof item.path === 'string' &&
-    (item.side === 'LEFT' || item.side === 'RIGHT') &&
-    typeof item.line === 'number' &&
-    (item.startLine === undefined || typeof item.startLine === 'number') &&
-    typeof item.body === 'string' &&
-    typeof item.commitSha === 'string'
-  );
+  return PendingReviewItemSchema.safeParse(value).success;
 }
 
 /**

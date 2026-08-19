@@ -10,7 +10,7 @@ export function collapseOnMarkViewed(
   expanded: Record<string, boolean>,
   path: string,
   currentlyViewed: boolean
-): Record<string, boolean> {
+) {
   if (currentlyViewed) {
     return expanded;
   }

@@ -18,11 +18,11 @@ import { DiffLine } from '@/components/pr-review/diff/diff-line';
 
 import { type ToolPatchFile, type ToolPatchModel } from './tool-patch-model';
 
-const OPERATION_LABEL: Record<ToolPatchFile['operation'], string> = {
+const OPERATION_LABEL = {
   add: 'Added',
   delete: 'Deleted',
   update: 'Updated',
-};
+} satisfies Record<ToolPatchFile['operation'], string>;
 
 type ToolPatchPreviewProps = {
   model: ToolPatchModel;

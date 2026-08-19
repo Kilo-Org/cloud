@@ -74,10 +74,15 @@ export const buildDraftFromForm = (
   ...(fields.id === undefined ? {} : { id: fields.id }),
 });
 
+export interface ApplyUpsertResult {
+  store: RemoteMcpStore;
+  error: string | null;
+}
+
 export const applyUpsert = (
   store: RemoteMcpStore,
   draft: RemoteMcpServerDraft
-): { store: RemoteMcpStore; error: string | null } => {
+): ApplyUpsertResult => {
   try {
     const nextStore = upsertRemoteMcpServer(store, draft);
     return { error: null, store: nextStore };

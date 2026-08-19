@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { z } from 'zod';
 
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_RECENTS_KEY } from '@/lib/storage-keys';
@@ -16,6 +17,15 @@ export type RecentPr = {
    */
   lastResult?: 'ok' | 'failed';
 };
+
+const recentPrSchema = z.object({
+  owner: z.string(),
+  repo: z.string(),
+  number: z.number(),
+  title: z.string(),
+  lastOpenedAt: z.number(),
+  lastResult: z.enum(['ok', 'failed']).optional(),
+});
 
 const RECENT_PR_LIMIT = 10;
 
@@ -39,22 +49,13 @@ function parseRecents(raw: string | null): RecentPr[] {
       return [];
     }
     return parsed.flatMap((entry): RecentPr[] => {
-      if (
-        entry &&
-        typeof entry === 'object' &&
-        typeof (entry as Record<string, unknown>).owner === 'string' &&
-        typeof (entry as Record<string, unknown>).repo === 'string' &&
-        typeof (entry as Record<string, unknown>).number === 'number' &&
-        typeof (entry as Record<string, unknown>).title === 'string' &&
-        typeof (entry as Record<string, unknown>).lastOpenedAt === 'number'
-      ) {
-        // Legacy entries predate `lastResult`; read a missing field as 'ok'
-        // so an installed app's existing recents survive the upgrade.
-        const record = entry as Record<string, unknown>;
-        const lastResult = record.lastResult === 'failed' ? 'failed' : 'ok';
-        return [{ ...(entry as RecentPr), lastResult }];
+      const result = recentPrSchema.safeParse(entry);
+      if (!result.success) {
+        return [];
       }
-      return [];
+      // Legacy entries predate `lastResult`; read a missing field as 'ok'
+      // so an installed app's existing recents survive the upgrade.
+      return [{ ...result.data, lastResult: result.data.lastResult === 'failed' ? 'failed' : 'ok' }];
     });
   } catch {
     return [];

@@ -49,7 +49,7 @@ function FormField({
 }: Readonly<FormFieldProps>) {
   const colors = useThemeColors();
   const [validationError, setValidationError] = useState<string | null>(null);
-  const valueRef = useRef(typeof defaultValue === 'string' ? defaultValue : '');
+  const valueRef = useRef(defaultValue ?? '');
   const displayedError = validate ? validationError : error;
 
   return (

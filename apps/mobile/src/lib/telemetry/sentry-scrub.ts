@@ -6,6 +6,11 @@
  * `beforeBreadcrumb` drops the event silently, which would hide crashes.
  */
 
+/* oxlint-disable anti-slop/no-runtime-typeof -- Sentry event/breadcrumb payloads are
+ * external, arbitrarily shaped, and must never throw on a malformed shape; a
+ * zod schema for the full Sentry Event/Breadcrumb type would risk silently
+ * dropping fields this walker isn't meant to know about. */
+
 /** Strip the query string from a URL. Returns empty string if parsing fails. */
 function stripQuery(url: unknown): string {
   if (typeof url !== 'string') {
@@ -49,7 +54,7 @@ function redactTokens(
  * - Redacts token-shaped values (20+ base64url chars or `Bearer ` prefix)
  *   in `event.extra` and `event.tags`.
  */
-export function scrubEvent(event: unknown): unknown {
+export function scrubEvent<T>(event: T): T {
   try {
     if (event == null || typeof event !== 'object') {
       return event;
@@ -105,7 +110,7 @@ export function scrubEvent(event: unknown): unknown {
  * - Strips the query string from `breadcrumb.data.url`.
  * - Leaves navigation and fetch breadcrumbs otherwise intact.
  */
-export function scrubBreadcrumb(breadcrumb: unknown): unknown {
+export function scrubBreadcrumb<T>(breadcrumb: T): T | null {
   try {
     if (breadcrumb == null || typeof breadcrumb !== 'object') {
       return breadcrumb;

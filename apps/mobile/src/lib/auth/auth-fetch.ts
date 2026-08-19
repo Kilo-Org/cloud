@@ -1,6 +1,10 @@
+import { z } from 'zod';
+
 import { API_BASE_URL } from '@/lib/config';
 import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import { parseAuthErrorCode } from '@/lib/auth/native-auth-contract';
+
+const stringCodeErrorSchema = z.object({ code: z.string() });
 
 /**
  * Minimal fetch helper for auth endpoints. Returns success with parsed body
@@ -41,10 +45,5 @@ export async function postAuth(
 }
 
 export function hasStringCode(error: unknown): error is { code: string } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code: unknown }).code === 'string'
-  );
+  return stringCodeErrorSchema.safeParse(error).success;
 }

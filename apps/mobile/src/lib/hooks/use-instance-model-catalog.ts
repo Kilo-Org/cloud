@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   type InstanceModelCatalogResult,
   listInstanceModels,
-  type RemoteModelCatalogV1,
 } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
@@ -23,10 +22,7 @@ import { useUserWebConnection } from '@/components/agents/user-web-connection-pr
  * gateway fallback therefore means "this instance has never answered", not
  * "the last read failed".
  */
-export function useInstanceModelCatalog(connectionId: string | null): {
-  catalog: RemoteModelCatalogV1 | null;
-  isLoading: boolean;
-} {
+export function useInstanceModelCatalog(connectionId: string | null) {
   const connection = useUserWebConnection();
   const { data, isPending } = useQuery<InstanceModelCatalogResult>({
     queryKey: ['instance-model-catalog', connectionId],

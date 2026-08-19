@@ -122,11 +122,7 @@ export function selectThreadAnchorLabel(thread: ReviewThread): string {
  * Returns the same `isResolved` value with the `isOutdated` label
  * surfaced for the badges in the thread header. Purely presentational.
  */
-export function selectThreadBadges(thread: ReviewThread): {
-  readonly resolved: boolean;
-  readonly outdated: boolean;
-  readonly fileLevel: boolean;
-} {
+export function selectThreadBadges(thread: ReviewThread) {
   return {
     resolved: thread.isResolved,
     outdated: thread.isOutdated,

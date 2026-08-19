@@ -4,6 +4,7 @@ import {
   createRemoteMcpToolCall,
   createSafeToolCall,
   createToolResult,
+  createWebMcpToolCall,
   createWorkflowToolCall,
 } from '@/src/shared/agent-conversation';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
@@ -309,5 +310,48 @@ describe('schema rejection of unknown workflow-shaped tool', () => {
       },
     ]);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('web MCP tool-call persistence round-trip', () => {
+  it('preserves every WebMCP route field through a persist -> reload cycle', () => {
+    const toolCall = createWebMcpToolCall({
+      arguments: { query: 'kilo' },
+      definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+      documentId: 'doc-1',
+      name: 'search',
+      providerToolCallId: 'call_webmcp_1',
+      tabId: 7,
+      webMcpOrigin: 'https://example.com',
+    });
+    const store: StoredAgentConversationStore = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            toolCall,
+            createToolResult({ ok: true, toolCallId: toolCall.id, value: { hits: 2 } }),
+          ],
+          id: 'conversation-1',
+          title: 'WebMCP chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    const reloaded = normalizeStoredConversationStore(toPersistedConversationStore(store));
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      arguments: { query: 'kilo' },
+      definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+      documentId: 'doc-1',
+      id: toolCall.id,
+      name: 'search',
+      providerToolCallId: 'call_webmcp_1',
+      tabId: 7,
+      type: 'tool-call',
+      webMcpOrigin: 'https://example.com',
+    });
   });
 });

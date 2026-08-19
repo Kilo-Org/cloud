@@ -47,8 +47,10 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     activeSessions: {
-      getToken: {
+      createWebTicket: {
         mutate: mocks.mutate,
+      },
+      getToken: {
         query: mocks.query,
       },
     },
@@ -63,7 +65,7 @@ describe('UserWebConnectionProvider', () => {
     mocks.createUserWebConnection.mockClear();
   });
 
-  it('mints the ingest ticket via the getToken mutation', async () => {
+  it('mints the ingest ticket via the createWebTicket mutation', async () => {
     const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
     await act(() => {
       holder.renderer = TestRenderer.create(createElement(UserWebConnectionProvider, null));

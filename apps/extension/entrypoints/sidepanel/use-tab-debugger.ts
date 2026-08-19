@@ -1,6 +1,7 @@
 import { browser } from '#imports';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { z } from 'zod';
 import { getTabListQueryKey } from '@/src/shared/side-panel-query-options';
 import { deriveInspectableTabState } from '@/src/shared/tab-debugger-selection';
 import { LIST_INSPECTABLE_TABS_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
@@ -32,28 +33,18 @@ interface TabsQueryApi {
   }) => Promise<readonly { readonly id?: number | undefined }[]>;
 }
 
+const activeTabIdSchema = z.looseObject({ id: z.number().optional() });
+
 /**
  * Best-effort active-tab lookup for the side panel's own window.
  * Never throws: query failures and invalid ids degrade to `undefined`.
  */
 export const getActiveTabId = async (tabsApi: TabsQueryApi): Promise<number | undefined> => {
   try {
-    const tabs: unknown = await tabsApi.query({ active: true, currentWindow: true });
+    const tabs = await tabsApi.query({ active: true, currentWindow: true });
+    const firstTab = activeTabIdSchema.safeParse(tabs[0]);
 
-    if (!Array.isArray(tabs) || tabs.length === 0) {
-      return undefined;
-    }
-
-    const [firstTabCandidate] = tabs as unknown[];
-    const firstTab: unknown = firstTabCandidate;
-
-    if (typeof firstTab !== 'object' || firstTab === null || !('id' in firstTab)) {
-      return undefined;
-    }
-
-    const { id } = firstTab;
-
-    return typeof id === 'number' ? id : undefined;
+    return firstTab.success ? firstTab.data.id : undefined;
   } catch {
     return undefined;
   }
@@ -61,16 +52,7 @@ export const getActiveTabId = async (tabsApi: TabsQueryApi): Promise<number | un
 
 let rememberedSelectedTabId: number | null = null;
 
-export const useTabDebugger = (): {
-  readonly activeTabId: number | undefined;
-  readonly inspectableTabs: InspectableTab[];
-  readonly isLoadingTabs: boolean;
-  readonly loadInspectableTabs: (options?: { readonly showLoading?: boolean }) => Promise<void>;
-  readonly selectDefaultTab: () => void;
-  readonly selectTab: (tabId: number) => void;
-  readonly selectedTabId: number | undefined;
-  readonly tabDebuggerError: string | undefined;
-} => {
+export const useTabDebugger = () => {
   const [inspectableTabs, setInspectableTabs] = useState<InspectableTab[]>([]);
   const [selectedTabId, setSelectedTabId] = useState<number | undefined>(
     rememberedSelectedTabId ?? undefined

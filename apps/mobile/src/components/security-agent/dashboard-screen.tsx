@@ -40,11 +40,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-const METRIC_TONE_CLASS: Record<DashboardMetricTone, string> = {
+const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
-};
+} satisfies Record<DashboardMetricTone, string>;
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();

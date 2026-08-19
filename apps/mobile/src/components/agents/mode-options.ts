@@ -23,13 +23,13 @@ export const MODE_OPTIONS: ModeOption[] = [
   { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
 ];
 
-const MODE_ICONS: Record<BuiltinAgentMode, LucideIcon> = {
+const MODE_ICONS = {
   code: Code,
   plan: NotebookPen,
   debug: Bug,
   orchestrator: Workflow,
   ask: HelpCircle,
-};
+} satisfies Record<BuiltinAgentMode, LucideIcon>;
 
 export function getModeIcon(mode: string | null | undefined): LucideIcon {
   const normalized = normalizeAgentMode(mode);

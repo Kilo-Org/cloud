@@ -30,12 +30,7 @@ export function buildMessageActionSheetOptions({
   canDelete,
   canRetry = false,
   isPendingMessage = false,
-}: BuildMessageActionSheetOptionsInput): {
-  actions: MessageAction[];
-  options: string[];
-  cancelButtonIndex: number;
-  destructiveButtonIndex?: number;
-} {
+}: BuildMessageActionSheetOptionsInput) {
   const actions: MessageAction[] = [];
   const canUseApiBackedActions = !isPendingMessage;
   if (canRetry) {

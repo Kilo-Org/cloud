@@ -15,11 +15,11 @@ type Severity = 'info' | 'warn' | 'danger';
 
 // 'info' has no dedicated tone token yet — map to warn (amber). If a
 // true neutral-info tone is needed later, add a token pair in global.css.
-const SEVERITY_TO_TONE: Record<Severity, ToneKey> = {
+const SEVERITY_TO_TONE = {
   info: 'warn',
   warn: 'warn',
   danger: 'danger',
-};
+} satisfies Record<Severity, ToneKey>;
 
 type BannerConfig = {
   icon: LucideIcon;

@@ -9,22 +9,22 @@ import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-type SecurityAgentSetupProps = {
+type SecurityAgentSetupProps<T> = {
   title: string;
   description: string;
   buttonLabel: string;
   url: string;
   /** Awaited in `finally` so permission/config/repository queries refresh after the browser closes. */
-  onConnected: () => Promise<unknown>;
+  onConnected: () => Promise<T>;
 };
 
-export function SecurityAgentSetup({
+export function SecurityAgentSetup<T>({
   title,
   description,
   buttonLabel,
   url,
   onConnected,
-}: Readonly<SecurityAgentSetupProps>) {
+}: Readonly<SecurityAgentSetupProps<T>>) {
   const colors = useThemeColors();
   const tabBarPadding = useTabBarBottomPadding();
   const [connecting, setConnecting] = useState(false);

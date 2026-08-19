@@ -5,6 +5,7 @@ import appsFlyer, {
   AppsFlyerPurchaseConnector,
   StoreKitVersion,
 } from 'react-native-appsflyer';
+import { z } from 'zod';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
@@ -37,22 +38,26 @@ function handleError(message: string) {
   };
 }
 
+const ErrorRecordSchema = z.looseObject({
+  code: z.string().optional(),
+  message: z.string().optional(),
+});
+
+const rejectionStringSchema = z.string();
+
 function rejectionText(error: unknown): string {
-  if (typeof error === 'string') {
-    return error;
+  const asString = rejectionStringSchema.safeParse(error);
+  if (asString.success) {
+    return asString.data;
   }
   if (error instanceof Error) {
     return error.message;
   }
-  if (typeof error === 'object' && error !== null) {
-    const record = error as { code?: unknown; message?: unknown };
-    const parts: string[] = [];
-    if (typeof record.code === 'string') {
-      parts.push(record.code);
-    }
-    if (typeof record.message === 'string') {
-      parts.push(record.message);
-    }
+  const record = ErrorRecordSchema.safeParse(error);
+  if (record.success) {
+    const parts = [record.data.code, record.data.message].filter(
+      (part): part is string => part !== undefined
+    );
     if (parts.length > 0) {
       return parts.join(' ');
     }
@@ -64,12 +69,12 @@ function isConnectorAlreadyConfigured(error: unknown): boolean {
   if (error == null) {
     return false;
   }
-  if (typeof error === 'object') {
-    const record = error as { code?: unknown; message?: unknown };
-    if (record.code === CONNECTOR_ALREADY_CONFIGURED) {
+  const record = ErrorRecordSchema.safeParse(error);
+  if (record.success) {
+    if (record.data.code === CONNECTOR_ALREADY_CONFIGURED) {
       return true;
     }
-    if (record.message === CONNECTOR_ALREADY_CONFIGURED) {
+    if (record.data.message === CONNECTOR_ALREADY_CONFIGURED) {
       return true;
     }
   }
@@ -162,6 +167,7 @@ export function initAppsFlyer(): void {
   // Resume the SDK if it was stopped by a prior reset. Native stop may throw
   // synchronously — catch it so initSdk still proceeds.
   try {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: a bare test/native mock may omit `stop` even though the shipped SDK types always declare it
     if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
       appsFlyer.stop(false);
     }
@@ -242,6 +248,7 @@ export function resetAppsFlyerState(): void {
   pendingEvents.length = 0;
 
   try {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: a bare test/native mock may omit `stop` even though the shipped SDK types always declare it
     if (typeof (appsFlyer as Record<string, unknown>).stop === 'function') {
       appsFlyer.stop(true);
     }

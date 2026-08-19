@@ -2,7 +2,7 @@ import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 
 const posthogApiKey = process.env['VITE_POSTHOG_API_KEY'];
-if (typeof posthogApiKey !== 'string' || posthogApiKey.trim().length === 0) {
+if (posthogApiKey === undefined || posthogApiKey.trim().length === 0) {
   console.warn(
     'VITE_POSTHOG_API_KEY is not set; extension analytics will be disabled in this build.'
   );

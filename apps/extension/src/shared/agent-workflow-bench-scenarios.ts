@@ -388,6 +388,7 @@ const REMOTEOK_SCENARIO: BenchScenario = {
   usesDate: false,
 };
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- exported as an open dictionary; workflow-create-benchmark.ts looks scenarios up by a dynamic scenario id from CLI args
 export const BENCH_SCENARIOS: Readonly<Record<string, BenchScenario>> = {
   allrecipes: ALLRECIPES_SCENARIO,
   arxiv: ARXIV_SCENARIO,

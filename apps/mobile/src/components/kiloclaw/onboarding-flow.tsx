@@ -16,6 +16,7 @@ import { X } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { z } from 'zod';
 
 import { AccessRequiredScreen } from '@/components/kiloclaw/access-required-screen';
 import { resolveAccessRequiredSubcase } from '@/components/kiloclaw/empty-state-content';
@@ -73,6 +74,10 @@ function resolveHeaderTitle(
   return botName ?? '';
 }
 
+// `gatewayReady` returns an untyped platform response (Record<string, unknown>);
+// `status` is only meaningful when it is a number (an HTTP status code).
+const gatewayReadyStatusSchema = z.number().optional();
+
 function resolveUserTimezone(): string | undefined {
   try {
     return new Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
@@ -111,7 +116,7 @@ export function OnboardingFlow() {
     // may already exist, in which case we should redirect rather than block.
     const hasAccessWithInstance =
       (data.state === 'has_access' || data.state === 'pending_settlement') &&
-      typeof data.instanceId === 'string';
+      data.instanceId !== null;
     dispatch({
       type: 'onboarding-state-loaded',
       eligible,
@@ -140,7 +145,7 @@ export function OnboardingFlow() {
       type: 'gateway-readiness-changed',
       ready: gatewayReadyData.ready === true,
       settled: gatewayReadyData.settled === true,
-      status: typeof gatewayReadyData.status === 'number' ? gatewayReadyData.status : null,
+      status: gatewayReadyStatusSchema.safeParse(gatewayReadyData.status).data ?? null,
       nowMs: Date.now(),
     });
   }, [gatewayReadyData]);

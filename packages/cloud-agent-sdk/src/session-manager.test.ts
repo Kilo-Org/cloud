@@ -2645,6 +2645,87 @@ describe('createSessionManager', () => {
       const sc = atomValue<{ mode?: string }>(config.store, mgr.atoms.sessionConfig);
       expect(sc?.mode).toBe('e-code');
     });
+
+    it('keeps mode and variant after a compact/summarize assistant message', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: 'plan',
+          variant: 'high',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-compact',
+          sessionID: 'ses-1',
+          role: 'assistant',
+          modelID: '',
+          providerID: '',
+          mode: 'primary',
+          summary: true,
+          time: { created: 2 },
+          agent: '',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ mode?: string; variant?: string | null }>(
+        config.store,
+        mgr.atoms.sessionConfig
+      );
+      expect(sc?.mode).toBe('plan');
+      expect(sc?.variant).toBe('high');
+    });
+
+    it('keeps mode and variant when an assistant message omits agent', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: 'debug',
+          variant: 'max',
+        }),
+      });
+      const mgr = createSessionManager(config);
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-stripped',
+          sessionID: 'ses-1',
+          role: 'assistant',
+          modelID: 'claude-3-5-sonnet',
+          providerID: 'test',
+          mode: 'primary',
+          time: { created: 2 },
+          agent: '',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ mode?: string; variant?: string | null }>(
+        config.store,
+        mgr.atoms.sessionConfig
+      );
+      expect(sc?.mode).toBe('debug');
+      expect(sc?.variant).toBe('max');
+    });
   });
 
   // -------------------------------------------------------------------------

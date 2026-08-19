@@ -1,5 +1,16 @@
 import { z } from 'zod';
-import type { RemoteMcpAgentToolName, WorkflowToolName } from '@/src/shared/agent-conversation';
+import type { WebMcpGatewayToolName } from '@/src/shared/kilo-gateway-chat-client';
+
+const remoteMcpAgentToolNameSchema = z.templateLiteral(['mcp_', z.string()]);
+const workflowToolNameSchema = z.enum([
+  'delete_workflow',
+  'get_workflow',
+  'run_workflow',
+  'save_memory',
+  'save_workflow',
+  'search_workflows',
+]);
+const genericStringSchema = z.string();
 
 export const conversationEventSchema = z.union([
   z.object({
@@ -41,9 +52,7 @@ export const conversationEventSchema = z.union([
   z.object({
     arguments: z.record(z.string(), z.unknown()),
     id: z.string(),
-    name: z.custom<RemoteMcpAgentToolName>(
-      value => typeof value === 'string' && value.startsWith('mcp_')
-    ),
+    name: remoteMcpAgentToolNameSchema,
     providerToolCallId: z.string().optional(),
     remoteToolName: z.string(),
     serverId: z.string(),
@@ -53,21 +62,21 @@ export const conversationEventSchema = z.union([
   z.object({
     arguments: z.record(z.string(), z.unknown()),
     id: z.string(),
-    name: z.custom<WorkflowToolName>(
-      (value): value is WorkflowToolName =>
-        typeof value === 'string' &&
-        [
-          'delete_workflow',
-          'get_workflow',
-          'run_workflow',
-          'save_memory',
-          'save_workflow',
-          'search_workflows',
-        ].includes(value)
-    ),
+    name: workflowToolNameSchema,
     providerToolCallId: z.string().optional(),
     tabId: z.number(),
     type: z.literal('tool-call'),
+  }),
+  z.object({
+    arguments: z.record(z.string(), z.unknown()),
+    definitionSignature: z.string(),
+    documentId: z.string(),
+    id: z.string(),
+    name: z.custom<WebMcpGatewayToolName>(value => genericStringSchema.safeParse(value).success),
+    providerToolCallId: z.string().optional(),
+    tabId: z.number(),
+    type: z.literal('tool-call'),
+    webMcpOrigin: z.string(),
   }),
   z.object({
     error: z.string().optional(),

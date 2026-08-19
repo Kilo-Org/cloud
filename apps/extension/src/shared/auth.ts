@@ -77,7 +77,7 @@ const userResponseSchema = z.object({
 export const getKiloApiBaseUrl = (): string => {
   const configuredUrl = import.meta.env.VITE_KILO_API_BASE_URL;
 
-  if (typeof configuredUrl === 'string' && configuredUrl.trim().length > 0) {
+  if (configuredUrl !== undefined && configuredUrl.trim().length > 0) {
     return trimTrailingSlash(configuredUrl.trim());
   }
 

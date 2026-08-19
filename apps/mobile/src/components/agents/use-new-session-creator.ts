@@ -35,6 +35,20 @@ type UseNewSessionCreatorInput = {
   profileId?: string | null;
 };
 
+type PrepareSessionInput = {
+  prompt: string;
+  initialMessageId: string;
+  mode: AgentMode;
+  model: string;
+  variant: string | undefined;
+  githubRepo: string;
+  autoCommit: boolean;
+  autoInitiate: boolean;
+  operationKey: string;
+  profileId?: string;
+  attachments?: AgentAttachmentWire;
+};
+
 type UseNewSessionCreatorResult = {
   createSessionFromDraft: () => Promise<void>;
   promptRef: RefObject<string>;
@@ -123,19 +137,7 @@ export function useNewSessionCreator({
 
     try {
       const initialMessageId = generateMessageId();
-      const baseInput: {
-        prompt: string;
-        initialMessageId: string;
-        mode: AgentMode;
-        model: string;
-        variant: string | undefined;
-        githubRepo: string;
-        autoCommit: boolean;
-        autoInitiate: boolean;
-        operationKey: string;
-        profileId?: string;
-        attachments?: AgentAttachmentWire;
-      } = {
+      const baseInput: PrepareSessionInput = {
         prompt,
         initialMessageId,
         mode,

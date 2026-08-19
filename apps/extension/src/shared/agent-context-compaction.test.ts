@@ -5,6 +5,7 @@ import {
   createSafeToolCall,
   createToolResult,
   createUserMessage,
+  createWebMcpToolCall,
 } from './agent-conversation';
 import {
   KEEP_RECENT_EXCHANGES,
@@ -94,6 +95,20 @@ describe('render events as transcript', () => {
       }),
     ]);
     expect(text).toContain('Tool call (get_memory): memory-42');
+  });
+
+  it('labels a WebMCP tool call with its origin', () => {
+    const text = renderEventsAsTranscript([
+      createWebMcpToolCall({
+        arguments: { query: 'kilo' },
+        definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+        documentId: 'doc-1',
+        name: 'search',
+        tabId: 1,
+        webMcpOrigin: 'https://example.com',
+      }),
+    ]);
+    expect(text).toContain('Tool call (search): from https://example.com: {"query":"kilo"}');
   });
 
   it('omits screenshot data URLs instead of dumping base64 into the transcript', () => {

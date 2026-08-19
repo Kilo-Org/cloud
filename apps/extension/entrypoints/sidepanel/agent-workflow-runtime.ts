@@ -1,4 +1,5 @@
 import { browser } from '#imports';
+import type { Browser } from 'wxt/browser';
 import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
@@ -93,7 +94,11 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
   }
   const preNavigationUrl = tab.url;
 
-  type TabListener = (updatedTabId: number, changeInfo: object, tabInfo: object) => void;
+  type TabListener = (
+    updatedTabId: number,
+    changeInfo: Browser.tabs.OnUpdatedInfo,
+    tabInfo: Browser.tabs.Tab
+  ) => void;
   let listener: TabListener | undefined = undefined;
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined = undefined;
 
@@ -149,13 +154,16 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
         });
       }, WORKFLOW_NAVIGATION_TIMEOUT_MS);
 
-      listener = (updatedTabId: number, changeInfo: object, _tabInfo: object): void => {
+      listener = (
+        updatedTabId: number,
+        changeInfo: Browser.tabs.OnUpdatedInfo,
+        _tabInfo: Browser.tabs.Tab
+      ): void => {
         if (updatedTabId !== tabId) {
           return;
         }
 
-        const info = changeInfo as { status?: string };
-        if (info.status !== 'complete') {
+        if (changeInfo.status !== 'complete') {
           return;
         }
 

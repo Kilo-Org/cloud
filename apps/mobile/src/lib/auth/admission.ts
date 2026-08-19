@@ -2,6 +2,7 @@ import * as AppIntegrity from '@expo/app-integrity';
 import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import * as z from 'zod';
 
 import { API_BASE_URL, PLAY_INTEGRITY_PROJECT_NUMBER } from '@/lib/config';
 import { ATTEST_KEY_ID_KEY } from '@/lib/storage-keys';
@@ -51,13 +52,10 @@ async function requestChallenge(): Promise<{ challenge: string }> {
   return response.json() as Promise<{ challenge: string }>;
 }
 
+const invalidKeyErrorSchema = z.object({ code: z.literal('ERR_APP_INTEGRITY_INVALID_KEY') });
+
 function isInvalidKeyError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: unknown }).code === 'ERR_APP_INTEGRITY_INVALID_KEY'
-  );
+  return invalidKeyErrorSchema.safeParse(error).success;
 }
 
 /**

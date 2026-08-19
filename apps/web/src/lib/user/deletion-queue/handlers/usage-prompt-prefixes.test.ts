@@ -335,7 +335,11 @@ async function insertUsage(
   return id;
 }
 
-async function insertUsageRows(userId: string, count: number, userPromptPrefix = 'private prompt') {
+async function insertUsageRows(
+  userId: string,
+  count: number,
+  userPromptPrefix: string | null = 'private prompt'
+) {
   const start = Date.parse('2020-01-01T00:00:00.000Z');
   const rows = Array.from({ length: count }, (_, index) => ({
     id: crypto.randomUUID(),

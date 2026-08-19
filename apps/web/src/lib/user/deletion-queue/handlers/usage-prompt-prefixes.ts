@@ -97,11 +97,12 @@ export const handleUsagePromptPrefixes: DeletionHandler = async ({ request, step
   const userId = request.user_id;
   if (!userId) return { kind: 'needs_attention', errorCode: 'legacy_identity_unresolved' };
 
-  let parsedProgress = parseUsagePrefixProgress(step.progress_json);
-  if (!parsedProgress) {
+  const initialProgress = parseUsagePrefixProgress(step.progress_json);
+  if (!initialProgress) {
     return { kind: 'needs_attention', errorCode: 'usage_prefix_progress_invalid' };
   }
 
+  let parsedProgress = initialProgress;
   let progress: UserDeletionTaskProgress = step.progress_json;
 
   while (true) {

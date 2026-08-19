@@ -25,7 +25,7 @@ type ConsentDetailsProps = {
 };
 
 export function VoiceTranscriptionControl() {
-  const { userId } = useCurrentUserId();
+  const { userId, isLoading, isError, refetch } = useCurrentUserId();
   const supportsOnDevice = voiceInputController.supportsOnDevice();
   const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');
 
@@ -55,6 +55,23 @@ export function VoiceTranscriptionControl() {
 
   if (supportsOnDevice) {
     return <Text className="mt-3 text-sm text-muted-foreground">On device</Text>;
+  }
+
+  if (isLoading) {
+    return <Text className="mt-3 text-sm text-muted-foreground">Loading…</Text>;
+  }
+
+  if (isError) {
+    return (
+      <View className="mt-3 gap-2">
+        <Text className="text-sm text-muted-foreground">
+          Could not load your transcription setting.
+        </Text>
+        <Button variant="outline" onPress={refetch} accessibilityLabel="Retry">
+          <Text>Retry</Text>
+        </Button>
+      </View>
+    );
   }
 
   // No non-retryable unhappy state exists: `readVoiceNetworkConsent` never

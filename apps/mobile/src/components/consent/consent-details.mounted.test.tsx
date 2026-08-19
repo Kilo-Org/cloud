@@ -1,5 +1,6 @@
 /* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
+/* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
 import TestRenderer from 'react-test-renderer';
 import { toast } from 'sonner-native';
@@ -347,5 +348,53 @@ describe('Voice transcription section', () => {
 
     expect(findTextStrings(renderer.root)).toContain('Sign in to manage online transcription.');
     expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows a loading placeholder and no switch while the user loads', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: true,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows a retry CTA that refetches when loading the user fails', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    const refetch = vi.fn();
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Could not load your transcription setting.');
+    expect(texts).not.toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    const buttons = renderer.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    );
+    expect(buttons.length).toBe(1);
+    const button = buttons[0];
+    if (!button) {
+      throw new Error('expected a Retry Button');
+    }
+    TestRenderer.act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(refetch).toHaveBeenCalled();
   });
 });

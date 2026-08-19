@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { storage } from '#imports';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
@@ -19,8 +20,12 @@ import {
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
+  WEB_MCP_DISCOVER_MESSAGE,
+  WEB_MCP_EXECUTE_MESSAGE,
+  discoverWebMcpToolsInTab,
   evalInTab,
   evalInTabWithScripting,
+  executeWebMcpToolInTab,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
   isTabDebuggerRequest,
@@ -137,6 +142,40 @@ const handleTabDebuggerRequest = async ({
       }
 
       return { error: 'Viewport screenshot API is unavailable.', ok: false };
+    }
+
+    if (request.type === WEB_MCP_DISCOVER_MESSAGE) {
+      if (scriptingApi) {
+        return {
+          ok: true,
+          result: await discoverWebMcpToolsInTab({
+            scriptingApi,
+            tabId: request.tabId,
+          }),
+          type: WEB_MCP_DISCOVER_MESSAGE,
+        };
+      }
+
+      return { error: 'WebMCP discovery API is unavailable.', ok: false };
+    }
+
+    if (request.type === WEB_MCP_EXECUTE_MESSAGE) {
+      if (scriptingApi) {
+        return {
+          ok: true,
+          result: await executeWebMcpToolInTab({
+            arguments: request.arguments,
+            definitionSignature: request.definitionSignature,
+            documentId: request.documentId,
+            scriptingApi,
+            tabId: request.tabId,
+            toolName: request.toolName,
+          }),
+          type: WEB_MCP_EXECUTE_MESSAGE,
+        };
+      }
+
+      return { error: 'WebMCP execution API is unavailable.', ok: false };
     }
 
     if (debuggerApi) {

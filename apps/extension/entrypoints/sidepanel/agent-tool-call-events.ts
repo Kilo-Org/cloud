@@ -3,6 +3,7 @@ import {
   createEvalToolCall,
   createRemoteMcpToolCall,
   createSafeToolCall,
+  createWebMcpToolCall,
   createWorkflowToolCall,
 } from '@/src/shared/agent-conversation';
 import type {
@@ -10,11 +11,13 @@ import type {
   RemoteMcpAgentToolName,
   RemoteMcpToolCallEvent,
   SafeToolName,
+  WebMcpToolCallEvent,
   WorkflowToolCallEvent,
   WorkflowToolName,
 } from '@/src/shared/agent-conversation';
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
 import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
+import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
 
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
@@ -103,6 +106,38 @@ export const isRemoteMcpToolCallEvent = (toolCall: {
 export const isWorkflowToolCallEvent = (toolCall: {
   readonly name: string;
 }): toolCall is WorkflowToolCallEvent => isWorkflowToolName(toolCall.name);
+
+export const isWebMcpToolCallEvent = (toolCall: {
+  readonly name: string;
+}): toolCall is WebMcpToolCallEvent => 'webMcpOrigin' in toolCall;
+
+export const toWebMcpToolCallEvents = (
+  toolCalls: readonly {
+    readonly arguments: Record<string, unknown>;
+    readonly id: string;
+    readonly name: string;
+  }[],
+  routes: ReadonlyMap<string, WebMcpToolRoute>
+): WebMcpToolCallEvent[] =>
+  toolCalls.flatMap(toolCall => {
+    const route = routes.get(toolCall.name);
+
+    if (route === undefined) {
+      return [];
+    }
+
+    return [
+      createWebMcpToolCall({
+        arguments: toolCall.arguments,
+        definitionSignature: route.definitionSignature,
+        documentId: route.documentId,
+        name: toolCall.name,
+        providerToolCallId: toolCall.id,
+        tabId: route.tabId,
+        webMcpOrigin: route.origin,
+      }),
+    ];
+  });
 
 /*
  * Always emit an event for an mcp_ call, even when its route is gone (server

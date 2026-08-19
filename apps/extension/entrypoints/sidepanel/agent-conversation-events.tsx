@@ -286,6 +286,19 @@ const ToolExchangeEvent = ({
     );
   }
 
+  if ('webMcpOrigin' in toolCall) {
+    return (
+      <ToolExchangePanel
+        argumentsText={formatToolValue(toolCall.arguments)}
+        imageAlt={`Image produced by ${toolCall.name}`}
+        resultText={getToolExchangeResultText(result, false)}
+        status={getToolExchangeStatus(result)}
+        subtitle={toolCall.webMcpOrigin}
+        title={toolCall.name}
+      />
+    );
+  }
+
   const screenshotDataUrl =
     result?.ok === true ? getViewportScreenshotDataUrl(toolCall.name, result.value) : undefined;
 

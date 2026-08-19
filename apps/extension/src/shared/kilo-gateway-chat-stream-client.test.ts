@@ -7,9 +7,34 @@ import {
   KiloGatewayStreamStalledError,
   parseKiloGatewayChatCompletionStream,
 } from './kilo-api-client';
+import type { KiloGatewayToolDefinition, KiloGatewayToolName } from './kilo-api-client';
 import type { FetchLike } from './auth';
+import { buildWebMcpToolDefinitions } from './web-mcp-tools';
 
 const jsonRequestBodySchema = z.record(z.string(), z.unknown());
+
+const gatewayTool = (name: KiloGatewayToolName): KiloGatewayToolDefinition => ({
+  function: {
+    description: 'A gateway tool',
+    name,
+    parameters: { type: 'object' },
+  },
+  type: 'function',
+});
+
+const searchPageTools = buildWebMcpToolDefinitions({
+  documentId: 'doc-1',
+  tabId: 1,
+  tools: [
+    {
+      description: 'Search the page',
+      inputSchema: { type: 'object' },
+      name: 'search_page',
+      origin: 'https://example.com',
+      title: 'Search the page',
+    },
+  ],
+}).tools;
 
 const parseJsonRequestBody = (body: BodyInit | null | undefined): unknown => {
   if (typeof body !== 'string') {
@@ -111,7 +136,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_page_snapshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
@@ -139,7 +164,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('mcp_fixture-mcp_get_weather')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
@@ -147,6 +172,83 @@ describe('kilo gateway chat stream client', () => {
           arguments: { city: 'Skopje' },
           id: 'call_mcp_1',
           name: 'mcp_fixture-mcp_get_weather',
+        },
+      ],
+    });
+  });
+
+  it('accepts an offered page tool name from the stream', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_page_1","type":"function","function":{"name":"search_page","arguments":"{\\"query\\":\\"weather\\"}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Search this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: searchPageTools,
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: { query: 'weather' },
+          id: 'call_page_1',
+          name: 'search_page',
+        },
+      ],
+    });
+  });
+
+  it('rejects an unoffered tool name from the stream', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_bad_1","type":"function","function":{"name":"delete_everything","arguments":"{}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Do something', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: searchPageTools,
+      })
+    ).rejects.toThrow('Gateway stream tool call did not include a supported tool name.');
+  });
+
+  it('concatenates a fragmented offered page name across tool call deltas', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_page_1","type":"function","function":{"name":"search","arguments":"{\\"query\\":\\"weather\\"}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"_page"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Search this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: searchPageTools,
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: { query: 'weather' },
+          id: 'call_page_1',
+          name: 'search_page',
         },
       ],
     });
@@ -167,7 +269,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'kilo-auto/frontier',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_viewport_screenshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
@@ -205,7 +307,7 @@ describe('kilo gateway chat stream client', () => {
           reasoningDeltas.push(delta);
         },
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_page_snapshot')],
       })
     ).resolves.toStrictEqual({
       content: 'Calling the tool.',
@@ -237,7 +339,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'kilo-auto/frontier',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_page_snapshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
@@ -265,7 +367,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'kilo-auto/frontier',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_page_snapshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
@@ -293,7 +395,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_page_snapshot')],
       })
     ).rejects.toThrow('Gateway tool call arguments were not valid JSON.');
   });
@@ -313,7 +415,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [],
+        tools: [gatewayTool('get_page_snapshot')],
       })
     ).rejects.toThrow('Gateway tool call arguments were not an object.');
   });
@@ -579,7 +681,11 @@ describe('kilo gateway chat stream client', () => {
       'data: [DONE]\n\n',
     ].join('');
 
-    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+    const completion = parseKiloGatewayChatCompletionStream(
+      sse,
+      new Set<KiloGatewayToolName>(),
+      () => {}
+    );
 
     expect(completion.usage).toStrictEqual({
       promptTokens: 1200,
@@ -593,7 +699,11 @@ describe('kilo gateway chat stream client', () => {
       'data: [DONE]\n\n',
     ].join('');
 
-    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+    const completion = parseKiloGatewayChatCompletionStream(
+      sse,
+      new Set<KiloGatewayToolName>(),
+      () => {}
+    );
 
     expect(completion.usage).toStrictEqual({
       costUsd: 0.0123,
@@ -608,7 +718,11 @@ describe('kilo gateway chat stream client', () => {
       'data: [DONE]\n\n',
     ].join('');
 
-    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+    const completion = parseKiloGatewayChatCompletionStream(
+      sse,
+      new Set<KiloGatewayToolName>(),
+      () => {}
+    );
 
     expect(completion.usage).toStrictEqual({
       promptTokens: 800,
@@ -623,7 +737,11 @@ describe('kilo gateway chat stream client', () => {
       'data: [DONE]\n\n',
     ].join('');
 
-    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+    const completion = parseKiloGatewayChatCompletionStream(
+      sse,
+      new Set<KiloGatewayToolName>(),
+      () => {}
+    );
 
     expect(completion.usage).toStrictEqual({
       promptTokens: 500,

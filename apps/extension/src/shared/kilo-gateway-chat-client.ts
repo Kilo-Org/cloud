@@ -1,3 +1,5 @@
+export type WebMcpGatewayToolName = string & { readonly __webMcpToolName: unique symbol };
+
 export type KiloGatewayToolName =
   | 'delete_workflow'
   | 'eval'
@@ -13,7 +15,8 @@ export type KiloGatewayToolName =
   | 'search_memories'
   | 'search_workflows'
   | 'web_search'
-  | `mcp_${string}`;
+  | `mcp_${string}`
+  | WebMcpGatewayToolName;
 
 export type KiloGatewayChatContentPart =
   | {

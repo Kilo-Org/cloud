@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RemoteMcpAgentToolName, WorkflowToolName } from '@/src/shared/agent-conversation';
+import type { WebMcpGatewayToolName } from '@/src/shared/kilo-gateway-chat-client';
 
 export const conversationEventSchema = z.union([
   z.object({
@@ -68,6 +69,17 @@ export const conversationEventSchema = z.union([
     providerToolCallId: z.string().optional(),
     tabId: z.number(),
     type: z.literal('tool-call'),
+  }),
+  z.object({
+    arguments: z.record(z.string(), z.unknown()),
+    definitionSignature: z.string(),
+    documentId: z.string(),
+    id: z.string(),
+    name: z.custom<WebMcpGatewayToolName>(value => typeof value === 'string'),
+    providerToolCallId: z.string().optional(),
+    tabId: z.number(),
+    type: z.literal('tool-call'),
+    webMcpOrigin: z.string(),
   }),
   z.object({
     error: z.string().optional(),

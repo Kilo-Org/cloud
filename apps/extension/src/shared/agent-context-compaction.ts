@@ -81,12 +81,16 @@ const getToolCallDetail = (
     return stringifyToolValue(event.arguments);
   }
 
-  if (event.name === 'eval') {
-    return event.code;
+  if ('webMcpOrigin' in event) {
+    return `from ${event.webMcpOrigin}: ${stringifyToolValue(event.arguments)}`;
   }
 
   if ('arguments' in event) {
     return stringifyToolValue(event.arguments);
+  }
+
+  if (event.name === 'eval') {
+    return event.code;
   }
 
   return event.query ?? event.elementId ?? event.memoryId ?? event.snapshotId;

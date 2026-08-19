@@ -496,13 +496,13 @@ export function SessionDetailContent({
       // pending, schedule the one-shot 4s follow-up. Runs once against the
       // current value and again on every later write until the session's data
       // has landed (or the effect is cancelled).
-      const checkAndSchedule = () => {
+      const checkAndSchedule = (): boolean => {
         if (cancelled) {
-          return;
+          return true;
         }
         const fetched = store.get(manager.atoms.fetchedSessionData);
         if (fetched?.kiloSessionId !== sessionId) {
-          return;
+          return false;
         }
         unsubscribe?.();
         unsubscribe = null;
@@ -512,6 +512,7 @@ export function SessionDetailContent({
             void refetch(false);
           }, 4000);
         }
+        return true;
       };
 
       if (!shouldRefetchOnFocus(seededSessionIdRef.current, sessionId)) {
@@ -519,9 +520,14 @@ export function SessionDetailContent({
         // request. Seed the ref and keep the pending-decision follow-up. The
         // manager's fetch can land before this effect runs (switchSession
         // writes first), so check the current value once before subscribing.
+        // Subscribe only when the data has not landed yet; a match schedules
+        // at most one follow-up and stops listening.
         seededSessionIdRef.current = sessionId;
-        checkAndSchedule();
-        unsubscribe = store.sub(manager.atoms.fetchedSessionData, checkAndSchedule);
+        if (!checkAndSchedule()) {
+          unsubscribe = store.sub(manager.atoms.fetchedSessionData, () => {
+            checkAndSchedule();
+          });
+        }
       } else {
         void refetch(true);
       }

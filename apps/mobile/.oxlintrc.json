@@ -13,6 +13,10 @@
     {
       "name": "anti-slop",
       "specifier": "../../tools/oxlint/anti-slop/index.ts"
+    },
+    {
+      "name": "zod-utils",
+      "specifier": "../../tools/oxlint/zod-utils.mjs"
     }
   ],
   "options": {
@@ -194,7 +198,8 @@
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
     "anti-slop/no-runtime-typeof": "error",
-    "anti-slop/no-unknown-returns": "error"
+    "anti-slop/no-unknown-returns": "error",
+    "zod-utils/no-inline-zod-schema": "error"
   },
   "overrides": [
     {
@@ -242,7 +247,8 @@
         "anti-slop/no-reflect-apply": "off",
         "anti-slop/no-reflect-get": "off",
         "anti-slop/no-runtime-typeof": "off",
-        "anti-slop/no-unknown-returns": "off"
+        "anti-slop/no-unknown-returns": "off",
+        "zod-utils/no-inline-zod-schema": "off"
       }
     }
   ]

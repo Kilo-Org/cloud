@@ -50,7 +50,6 @@
     "@types/node": "catalog:",
     "@types/proper-lockfile": "4.1.4",
     "@typescript/native-preview": "catalog:",
-    "eslint": "9.39.4",
     "eslint-plugin-zod-utils": "1.0.11",
     "husky": "9.1.7",
     "ink": "6.8.0",
@@ -61,7 +60,6 @@
     "proper-lockfile": "4.1.2",
     "react": "19.2.6",
     "tsx": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "8.46.4"
+    "typescript": "catalog:"
   }
 }

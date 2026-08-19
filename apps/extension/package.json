@@ -19,7 +19,7 @@
     "zip:firefox": "wxt zip -b firefox --mv3",
     "typecheck": "pnpm --filter @kilocode/trpc build && tsc --noEmit",
     "compile": "pnpm run typecheck",
-    "lint": "pnpm -w exec oxlint --type-aware --type-check --import-plugin --react-plugin --react-perf-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --deny-warnings --config apps/extension/.oxlintrc.json apps/extension && pnpm -w exec eslint --quiet apps/extension",
+    "lint": "pnpm -w exec oxlint --type-aware --type-check --import-plugin --react-plugin --react-perf-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --deny-warnings --config apps/extension/.oxlintrc.json apps/extension",
     "format": "pnpm -w exec oxfmt apps/extension",
     "format:check": "pnpm -w exec oxfmt --list-different apps/extension",
     "test": "vitest --run",

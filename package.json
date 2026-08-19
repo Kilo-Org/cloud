@@ -46,9 +46,12 @@
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
     "@expo/fingerprint": "0.16.7",
+    "@oxlint/plugins": "1.78.0",
     "@types/node": "catalog:",
     "@types/proper-lockfile": "4.1.4",
     "@typescript/native-preview": "catalog:",
+    "eslint": "9.39.4",
+    "eslint-plugin-zod-utils": "1.0.11",
     "husky": "9.1.7",
     "ink": "6.8.0",
     "oxfmt": "0.40.0",
@@ -58,6 +61,7 @@
     "proper-lockfile": "4.1.2",
     "react": "19.2.6",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "typescript-eslint": "8.46.4"
   }
 }

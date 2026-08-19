@@ -1,9 +1,26 @@
 {
   "$schema": "../node_modules/oxlint/configuration_schema.json",
-  "plugins": ["oxc", "typescript", "unicorn", "react", "import", "promise"],
+  "plugins": [
+    "oxc",
+    "typescript",
+    "unicorn",
+    "react",
+    "import",
+    "promise"
+  ],
   "jsPlugins": [
-    { "name": "react-native", "specifier": "oxlint-plugin-react-native" },
-    { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }
+    {
+      "name": "react-native",
+      "specifier": "oxlint-plugin-react-native"
+    },
+    {
+      "name": "sonarjs",
+      "specifier": "eslint-plugin-sonarjs"
+    },
+    {
+      "name": "anti-slop",
+      "specifier": "../../tools/oxlint/anti-slop/index.ts"
+    }
   ],
   "options": {
     "typeAware": true
@@ -17,7 +34,10 @@
     "restriction": "error",
     "nursery": "error"
   },
-  "ignorePatterns": ["dist/*", "node_modules/**"],
+  "ignorePatterns": [
+    "dist/*",
+    "node_modules/**"
+  ],
   "rules": {
     "no-restricted-imports": [
       "error",
@@ -25,7 +45,9 @@
         "paths": [
           {
             "name": "react-native",
-            "importNames": ["Image"],
+            "importNames": [
+              "Image"
+            ],
             "message": "Import Image from @/components/ui/image instead."
           },
           {
@@ -44,7 +66,10 @@
     "import/no-self-import": "error",
     "import/no-duplicates": "error",
     "import/no-mutable-exports": "error",
-    "import/consistent-type-specifier-style": ["error", "prefer-inline"],
+    "import/consistent-type-specifier-style": [
+      "error",
+      "prefer-inline"
+    ],
     "promise/always-return": "error",
     "promise/catch-or-return": "error",
     "promise/no-nesting": "error",
@@ -102,7 +127,12 @@
     ],
     "react/no-is-mounted": "off",
     "react/jsx-no-useless-fragment": "off",
-    "react/jsx-max-depth": ["error", { "max": 10 }],
+    "react/jsx-max-depth": [
+      "error",
+      {
+        "max": 10
+      }
+    ],
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "react/react-in-jsx-scope": "off",
@@ -125,14 +155,33 @@
     "no-undef": "off",
     "no-eq-null": "off",
     "sort-keys": "off",
-    "sort-imports": ["error", { "ignoreCase": true, "ignoreDeclarationSort": true }],
+    "sort-imports": [
+      "error",
+      {
+        "ignoreCase": true,
+        "ignoreDeclarationSort": true
+      }
+    ],
     "func-style": "off",
-    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
     "curly": "error",
     "no-promise-executor-return": "off",
     "capitalized-comments": "off",
     "id-length": "off",
-    "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+    "max-lines": [
+      "error",
+      {
+        "max": 300,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
     "max-lines-per-function": "off",
     "max-statements": "off",
     "import/max-dependencies": "off",
@@ -149,41 +198,80 @@
     "oxc/no-optional-chaining": "off",
     "@typescript-eslint/strict-boolean-expressions": "off",
     "@typescript-eslint/no-import-type-side-effects": "off",
-    "@typescript-eslint/consistent-type-definitions": ["error", "type"],
+    "@typescript-eslint/consistent-type-definitions": [
+      "error",
+      "type"
+    ],
     "@typescript-eslint/no-namespace": "off",
     "import/no-namespace": "off",
     "oxc/no-rest-spread-properties": "off",
-    "react/only-export-components": "off"
+    "react/only-export-components": "off",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "error",
+    "anti-slop/no-unknown-returns": "error"
   },
   "overrides": [
     {
-      "files": ["src/components/ui/image.tsx"],
+      "files": [
+        "src/components/ui/image.tsx"
+      ],
       "rules": {
         "no-restricted-imports": "off"
       }
     },
     {
-      "files": ["src/components/ui/icons.ts"],
+      "files": [
+        "src/components/ui/icons.ts"
+      ],
       "rules": {
         "no-restricted-imports": "off"
       }
     },
     {
-      "files": ["src/components/ui/**/*.tsx"],
+      "files": [
+        "src/components/ui/**/*.tsx"
+      ],
       "rules": {
         "react/jsx-no-constructed-context-values": "off"
       }
     },
     {
-      "files": ["src/app/**/_layout.tsx", "src/app/**/*.tsx"],
+      "files": [
+        "src/app/**/_layout.tsx",
+        "src/app/**/*.tsx"
+      ],
       "rules": {
         "import/no-default-export": "off"
       }
     },
     {
-      "files": ["src/app/_layout.tsx"],
+      "files": [
+        "src/app/_layout.tsx"
+      ],
       "rules": {
         "react/style-prop-object": "off"
+      }
+    },
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__tests__/**",
+        "**/*test-utils*",
+        "**/*test-helpers*"
+      ],
+      "rules": {
+        "anti-slop/no-chained-type-assertions": "off",
+        "anti-slop/no-known-value-widening": "off",
+        "anti-slop/no-object-parameters": "off",
+        "anti-slop/no-reflect-apply": "off",
+        "anti-slop/no-reflect-get": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-returns": "off"
       }
     }
   ]

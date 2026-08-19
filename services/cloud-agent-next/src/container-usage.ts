@@ -33,6 +33,7 @@ const LAST_START_EPOCH_STORAGE_KEY = 'container-usage:last-start-epoch:v1';
 const START_ADMISSION_STORAGE_KEY = 'container-usage:start-admission:v1';
 const BILLING_BLOCK_STORAGE_KEY = 'container-usage:budget-block:v1';
 const BILLING_FORCE_STOP_SECONDS = 120;
+const BILLING_FORCE_STOP_RETRY_SECONDS = 5;
 
 // oxlint-disable-next-line no-empty-object-type -- Matches the Sandbox 0.12.1 constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
@@ -108,6 +109,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       client: this.usageClient,
       storage: this.ctx.storage,
       stopOnStoppedState: false,
+      deferBudgetStopFinalSettlement: true,
       beforeHeartbeatDelivery: context => this.ensureStartAcknowledged(context),
       beforeStopDelivery: context => this.ensureStartAcknowledged(context),
       onGenerationClosed: () => this.schedulePendingGenerationIfRunning(),
@@ -260,6 +262,14 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
           message: 'Container billing rollout is not enabled in the usage meter',
         };
       }
+      if (block && result.billingMode !== 'paid') {
+        await clearBillingContext(this.ctx.storage);
+        return {
+          success: false,
+          code: 'configuration_mismatch',
+          message: 'Container billing remains stopped until funded paid admission succeeds',
+        };
+      }
       await this.ctx.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
       await this.ctx.storage.put(START_ADMISSION_STORAGE_KEY, {
         generation: context.generation,
@@ -268,7 +278,11 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
           ? { remainingMicrodollars: result.remainingMicrodollars }
           : {}),
       });
-      await this.ctx.storage.delete(BILLING_BLOCK_STORAGE_KEY);
+      // A budget block is cleared only by a later paid admission. Shadow
+      // configuration must not resume work that was stopped for insufficient funds.
+      if (result.billingMode === 'paid') {
+        await this.ctx.storage.delete(BILLING_BLOCK_STORAGE_KEY);
+      }
       return result.billingMode === 'paid'
         ? {
             success: true,
@@ -404,8 +418,11 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   }
 
   override async onStop(params?: ContainerStopParams): Promise<void> {
-    const stoppedAtMs = Date.now();
     await super.onStop();
+    // `onStop` is the first durable lifecycle signal after the container has
+    // actually stopped. Do not use the earlier budget verdict or force-destroy
+    // request as the usage boundary.
+    const stoppedAtMs = await this.getObservedStopTime();
     const activityExpiryRequested = this.activityExpiryRequested;
     this.activityExpiryRequested = false;
     this.runShadowTask('stop lifecycle', async () => {
@@ -460,12 +477,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     });
   }
 
-  override async destroy(): Promise<void> {
-    const block = await this.getBillingBlock();
-    await super.destroy();
-    if (block) await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
-  }
-
   private runBillingExclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.billingLifecycleTail.then(operation, operation);
     this.billingLifecycleTail = result.then(
@@ -480,6 +491,12 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       this.logShadowFailure(error, operation);
     });
     this.ctx.waitUntil(promise);
+  }
+
+  override async destroy(): Promise<void> {
+    const block = await this.getBillingBlock();
+    await super.destroy();
+    if (block) await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
   }
 
   private schedulePendingGenerationIfRunning(): void {
@@ -565,6 +582,16 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     return stored === undefined ? undefined : billingBlockSchema.parse(stored);
   }
 
+  private async getObservedStopTime(): Promise<number> {
+    try {
+      return stoppedAtFromState(await this.getState());
+    } catch {
+      // The lifecycle callback itself is still authoritative when the control
+      // plane cannot provide a state transition timestamp.
+      return Date.now();
+    }
+  }
+
   private async logBudgetWarning(budget: {
     verdict: string;
     remainingMicrodollars?: number;
@@ -594,15 +621,26 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     budget: { verdict: string; remainingMicrodollars?: number },
     expected: { generation: string; startEpochMs: number }
   ): Promise<void> {
-    const now = Date.now();
-    const block = {
-      generation: expected.generation,
-      startEpochMs: expected.startEpochMs,
-      blockedAt: now,
-      forceStopAt: now + BILLING_FORCE_STOP_SECONDS * 1_000,
-      remainingMicrodollars: budget.remainingMicrodollars,
-    };
-    await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
+    const active = await getBillingContext(this.ctx.storage);
+    if (
+      !active ||
+      active.generation !== expected.generation ||
+      active.startEpochMs !== expected.startEpochMs
+    ) {
+      return;
+    }
+    const existing = await this.getBillingBlock();
+    if (existing && existing.generation !== expected.generation) return;
+    const block =
+      existing ??
+      ({
+        generation: expected.generation,
+        startEpochMs: expected.startEpochMs,
+        blockedAt: Date.now(),
+        forceStopAt: Date.now() + BILLING_FORCE_STOP_SECONDS * 1_000,
+        remainingMicrodollars: budget.remainingMicrodollars,
+      } satisfies z.infer<typeof billingBlockSchema>);
+    if (!existing) await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
     await this.scheduleForceStop(block);
     logger
       .withTags({ logTag: 'container_billing_stop' })
@@ -617,8 +655,19 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   }
 
   async billingForceStop(generation: string): Promise<void> {
+    return this.runBillingExclusive(() => this.forceStopBillingGeneration(generation));
+  }
+
+  private async forceStopBillingGeneration(generation: string): Promise<void> {
     const block = await this.getBillingBlock();
-    if (!block || block.generation !== generation || this.ctx.container?.running !== true) return;
+    if (!block || block.generation !== generation) return;
+    const active = await getBillingContext(this.ctx.storage);
+    if (
+      !active ||
+      active.generation !== block.generation ||
+      active.startEpochMs !== block.startEpochMs
+    )
+      return;
     logger
       .withTags({ logTag: 'container_billing_force_stop' })
       .withFields({
@@ -627,7 +676,21 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
         stopLatencyMs: Date.now() - block.blockedAt,
       })
       .error('Force-destroying container after billing stop deadline');
-    await this.destroy();
+    try {
+      // The control plane may fail after the deadline. Keep the durable block and
+      // reissue destroy until the physical stop hook settles the generation.
+      await this.destroy();
+    } catch (error) {
+      logger
+        .withFields({
+          error: error instanceof Error ? error.message : String(error),
+          sandboxClass: this.sandboxClassName,
+          generation,
+        })
+        .warn('Billing force-destroy issuance failed; retrying');
+      await this.schedule(BILLING_FORCE_STOP_RETRY_SECONDS, 'billingForceStop', generation);
+      throw error;
+    }
   }
 
   private async createBillingGeneration(

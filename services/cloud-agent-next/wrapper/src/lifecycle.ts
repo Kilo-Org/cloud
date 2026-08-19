@@ -154,6 +154,40 @@ export function createLifecycleManager(
     }
   }
 
+  async function finalizeDrain(
+    drainGeneration: number,
+    completeSession: typeof state.currentSession | undefined,
+    sealedMessageIds: string[]
+  ): Promise<void> {
+    if (drainGeneration !== lifecycleGeneration) return;
+    const currentSession = state.currentSession;
+    if (completeSession && currentSession) {
+      const currentBranch = await getCurrentBranch(config.workspacePath, 10_000).catch(() => '');
+      if (drainGeneration !== lifecycleGeneration) return;
+      const gateResult = state.consumeObservedGateResult();
+      state.sendToIngest({
+        streamEventType: 'complete',
+        data: {
+          exitCode: 0,
+          kiloSessionId: currentSession.kiloSessionId,
+          messageIds: sealedMessageIds,
+          ...(currentBranch ? { currentBranch } : {}),
+          ...(gateResult ? { gateResult } : {}),
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    await new Promise<void>(resolve => setTimeout(resolve, DRAIN_DELAY_MS));
+    if (drainGeneration !== lifecycleGeneration) return;
+    await deps
+      .closeConnections()
+      .catch(error =>
+        logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
+      );
+    if (drainGeneration === lifecycleGeneration) state.clearSession();
+  }
+
   function drainAndClose(): Promise<void> {
     state.blockAdmissions();
     if (drainPromise) return drainPromise;
@@ -189,34 +223,7 @@ export function createLifecycleManager(
           uploader.stop();
         }
       } finally {
-        if (drainGeneration !== lifecycleGeneration) return;
-        const currentSession = state.currentSession;
-        if (completeSession && currentSession) {
-          const currentBranch = await getCurrentBranch(config.workspacePath, 10_000).catch(
-            () => ''
-          );
-          const gateResult = state.consumeObservedGateResult();
-          state.sendToIngest({
-            streamEventType: 'complete',
-            data: {
-              exitCode: 0,
-              kiloSessionId: currentSession.kiloSessionId,
-              messageIds: sealedMessageIds,
-              ...(currentBranch ? { currentBranch } : {}),
-              ...(gateResult ? { gateResult } : {}),
-            },
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        await new Promise<void>(resolve => setTimeout(resolve, DRAIN_DELAY_MS));
-        if (drainGeneration !== lifecycleGeneration) return;
-        await deps
-          .closeConnections()
-          .catch(error =>
-            logToFile(`close failed: ${error instanceof Error ? error.message : String(error)}`)
-          );
-        state.clearSession();
+        await finalizeDrain(drainGeneration, completeSession, sealedMessageIds);
       }
     })();
     const currentDrain = drainPromise;

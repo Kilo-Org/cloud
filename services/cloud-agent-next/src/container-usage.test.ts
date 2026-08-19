@@ -62,6 +62,8 @@ const sdk = vi.hoisted(() => {
 
     async destroy(): Promise<void> {
       this.superDestroyCalled = true;
+      const storage = this.ctx.storage as unknown as MemoryStorage;
+      if (storage.clearOnDestroy) storage.clear();
     }
   }
   return { StockSandbox };
@@ -75,6 +77,7 @@ class MemoryStorage {
   private readonly values = new Map<string, unknown>();
   failWrites = false;
   hangReads = false;
+  clearOnDestroy = false;
 
   async get<T>(key: string): Promise<T | undefined> {
     if (this.hangReads) return await new Promise(() => undefined);
@@ -88,6 +91,10 @@ class MemoryStorage {
 
   async delete(key: string): Promise<boolean> {
     return this.values.delete(key);
+  }
+
+  clear(): void {
+    this.values.clear();
   }
 }
 
@@ -248,7 +255,7 @@ describe('MeteredSandbox', () => {
     ).resolves.toMatchObject({ success: false, code: 'configuration_mismatch' });
   });
 
-  it('persists stop enforcement, reports final usage, and resumes only after new admission', async () => {
+  it('settles a graceful budget stop from physical onStop and resumes only after paid admission', async () => {
     const rpc = createRpc();
     vi.mocked(rpc.recordStartV2!).mockResolvedValue({
       success: true,
@@ -283,9 +290,16 @@ describe('MeteredSandbox', () => {
       callback: 'billingForceStop',
       payload: active.generation,
     });
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+    vi.spyOn(Date, 'now').mockReturnValue(361_000);
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ usageSinceLast: 60, reason: 'runtime_signal' })
+    );
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
     expect(rpc.recordStop).toHaveBeenCalledOnce();
-    await sandbox.billingForceStop(active.generation);
-    expect(sandbox.superDestroyCalled).toBe(true);
     expect(await sandbox.isBillingBlocked()).toBe(true);
 
     sandbox.setPhysicalRunning(false);
@@ -295,6 +309,157 @@ describe('MeteredSandbox', () => {
     ).resolves.toMatchObject({ success: true, billingMode: 'paid' });
     expect(await sandbox.isBillingBlocked()).toBe(false);
     expect(rpc.recordStartV2).toHaveBeenCalledTimes(2);
+  });
+
+  it('settles force-stop usage at the physical stop after the deadline', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
+      success: true,
+      ack: ack(),
+      billingMode: 'paid',
+      remainingMicrodollars: 20_000_000,
+    });
+    vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
+      ...ack(),
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active paid billing context');
+    sandbox.mockState = { status: 'running' };
+
+    now.mockReturnValue(301_000);
+    await sandbox.billingHeartbeatTick(active.generation);
+    now.mockReturnValue(421_000);
+    await sandbox.billingForceStop(active.generation);
+    expect(sandbox.superDestroyCalled).toBe(true);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ usageSinceLast: 120, reason: 'runtime_signal' })
+    );
+    expect(await sandbox.isBillingBlocked()).toBe(true);
+  });
+
+  it('uses the container stop transition rather than a late onStop callback time', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+
+    now.mockReturnValue(400_000);
+    sandbox.mockState = { status: 'stopped' };
+    Object.assign(sandbox.mockState, { lastChange: 301_000 });
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ usageSinceLast: 300, startEpochMs: active.startEpochMs })
+    );
+  });
+
+  it('restores the durable billing block when destroy clears storage', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
+      success: true,
+      ack: ack(),
+      billingMode: 'paid',
+      remainingMicrodollars: 20_000_000,
+    });
+    vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
+      ...ack(),
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active paid billing context');
+    sandbox.mockState = { status: 'running' };
+    await sandbox.billingHeartbeatTick(active.generation);
+
+    storage.clearOnDestroy = true;
+    await sandbox.billingForceStop(active.generation);
+
+    expect(await sandbox.isBillingBlocked()).toBe(true);
+  });
+
+  it('reissues a failed durable force-destroy without clearing the billing block', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
+      success: true,
+      ack: ack(),
+      billingMode: 'paid',
+      remainingMicrodollars: 20_000_000,
+    });
+    vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
+      ...ack(),
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active paid billing context');
+    sandbox.mockState = { status: 'running' };
+    await sandbox.billingHeartbeatTick(active.generation);
+    const destroy = vi.spyOn(sandbox, 'destroy').mockRejectedValueOnce(new Error('unavailable'));
+
+    await expect(sandbox.billingForceStop(active.generation)).rejects.toThrow('unavailable');
+
+    expect(await sandbox.isBillingBlocked()).toBe(true);
+    expect(sandbox.schedules).toContainEqual({
+      when: 5,
+      callback: 'billingForceStop',
+      payload: active.generation,
+    });
+    await sandbox.billingForceStop(active.generation);
+    expect(destroy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not clear a budget block for a shadow admission', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStartV2!)
+      .mockResolvedValueOnce({
+        success: true,
+        ack: ack(),
+        billingMode: 'paid',
+        remainingMicrodollars: 20_000_000,
+      })
+      .mockResolvedValueOnce({ success: true, ack: ack(), billingMode: 'shadow' });
+    vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
+      ...ack(),
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active paid billing context');
+    sandbox.mockState = { status: 'running' };
+    await sandbox.billingHeartbeatTick(active.generation);
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+
+    await expect(sandbox.ensureBillingAdmission(billingInput)).resolves.toMatchObject({
+      success: false,
+      code: 'configuration_mismatch',
+    });
+    expect(await sandbox.isBillingBlocked()).toBe(true);
   });
 
   it('admits one start per physical generation and short-circuits active acquisition', async () => {

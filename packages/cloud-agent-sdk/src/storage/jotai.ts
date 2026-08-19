@@ -28,7 +28,19 @@ type JotaiSessionStorage = SessionStorage & {
   };
 };
 
-function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
+function createJotaiStorage(
+  store: JotaiStore,
+  options?: { schedule?: (cb: () => void) => void }
+): JotaiSessionStorage {
+  // Coalescing scheduler. On device this is `requestAnimationFrame`; under
+  // node (every vitest/jest run) it runs the callback synchronously so landed
+  // assertions stay deterministic. Never default to `queueMicrotask`.
+  const schedule =
+    options?.schedule ??
+    (typeof requestAnimationFrame === 'function'
+      ? (cb: () => void) => requestAnimationFrame(() => cb())
+      : (cb: () => void) => cb());
+
   const messageIdsAtom = atom<string[]>([]);
   const messagesAtom = atom<Map<string, MessageInfo>>(new Map());
   // Stable parts map. The atom holds this one reference for its lifetime;
@@ -41,8 +53,33 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
   const partsSnapshot = new Map<string, Part[] | null>();
   const subscribers = new Map<string, Set<() => void>>();
 
+  // Coalesced delta publication. `applyPartDelta` marks a message id dirty and
+  // schedules one flush; the flush bumps `partsRevisionAtom` once and notifies
+  // once per dirty id. Structural operations flush pending work first.
+  const dirtyPartIds = new Set<string>();
+  let flushScheduled = false;
+
   function bumpPartsRevision(): void {
     store.set(partsRevisionAtom, r => r + 1);
+  }
+
+  function flushPendingDeltas(): void {
+    if (!flushScheduled) return;
+    flushScheduled = false;
+    const dirty = [...dirtyPartIds];
+    dirtyPartIds.clear();
+    if (dirty.length === 0) return;
+    bumpPartsRevision();
+    for (const messageId of dirty) {
+      partsSnapshot.set(messageId, null);
+      notify(subscribers, `parts:${messageId}`);
+    }
+  }
+
+  function scheduleFlush(): void {
+    if (flushScheduled) return;
+    flushScheduled = true;
+    schedule(flushPendingDeltas);
   }
 
   return {
@@ -54,6 +91,7 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
     },
 
     upsertMessage(info) {
+      flushPendingDeltas();
       const messages = store.get(messagesAtom);
       const existing = messages.get(info.id);
       const next = new Map(messages);
@@ -76,6 +114,7 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
     },
 
     upsertPart(messageId, part) {
+      flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
       const nextArr = upsertPartDroppingStaleSyntheticTextParts(arr, part);
       partsMap.set(messageId, nextArr);
@@ -111,12 +150,16 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
           partsMap.set(messageId, nextArr);
         }
       }
-      bumpPartsRevision();
+      // State write is immediate; publication is coalesced to one flush.
+      // Invalidate the cached snapshot so a `getParts` before the flush
+      // rebuilds from the freshly written parts instead of the stale cache.
       partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      dirtyPartIds.add(messageId);
+      scheduleFlush();
     },
 
     deletePart(messageId, partId) {
+      flushPendingDeltas();
       const arr = partsMap.get(messageId);
       if (!arr) return;
       const filtered = arr.filter(p => p.id !== partId);
@@ -152,6 +195,7 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
     },
 
     clear() {
+      flushPendingDeltas();
       const existingMessageIds = store.get(messageIdsAtom);
       const existingPartMessageIds = [...partsMap.keys()];
 
@@ -171,6 +215,7 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
     },
 
     deleteMessage(messageId) {
+      flushPendingDeltas();
       const messages = store.get(messagesAtom);
       if (!messages.has(messageId)) return;
 

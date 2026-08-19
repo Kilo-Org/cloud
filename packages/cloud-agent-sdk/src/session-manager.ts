@@ -138,6 +138,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are still on this session';
 
 /**
+ * Maximum number of retained messages. Once the loaded transcript exceeds this,
+ * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
+ */
+const RETAINED_MESSAGE_WINDOW = 200;
+
+/**
  * Shared empty-parts sentinel. `memoizedStoredMessage` compares `cached.parts
  * === parts`; `partsMap.get(id) ?? []` would allocate a fresh array on every
  * `partsRevision` bump, defeating the memo for rows that have no parts entry.
@@ -379,6 +385,14 @@ type SessionManager = {
    * already surfaced for the active session.
    */
   loadOlderMessages(): Promise<void>;
+  /**
+   * Drop the oldest loaded older-page(s) from local storage while the retained
+   * transcript exceeds `RETAINED_MESSAGE_WINDOW`. Pops the oldest stack entry,
+   * deletes its messages, restores the pre-page cursor, and re-arms
+   * `hasOlderMessages`. No-op below the window or with an empty stack. Never
+   * trims the initial bounded page (it is not on the stack).
+   */
+  trimRetainedHistory(): void;
   /**
    * Merge a freshly fetched `associatedPr` (or null after an unlink) into the
    * current `fetchedSessionData` atom. Mobile calls this after a focus refetch.
@@ -747,6 +761,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
   /**
+   * Stack of loaded older pages, oldest first. Each entry records the cursor
+   * that was current before that page was fetched and the message ids the page
+   * added. `trimRetainedHistory` pops from the front (oldest) to stay under
+   * `RETAINED_MESSAGE_WINDOW`. The initial bounded page is never pushed here,
+   * so the live tail always survives.
+   */
+  let retainedHistoryStack: Array<{ cursorBefore: string | null; messageIds: string[] }> = [];
+  /**
    * Last non-empty `mode` from a remote prompt send. Used as agent inheritance
    * fallback when `sessionConfigAtom.mode` is absent/`''`. Reset on switch/destroy.
    */
@@ -820,6 +842,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesInFlight = null;
     lastPromptMode = null;
     olderMessagesTerminal = false;
+    retainedHistoryStack = [];
     currentCapabilities = undefined;
     pendingInterruptSession = null;
   }
@@ -1211,7 +1234,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
 
       if (outcome.kind === 'success') {
-        applyPage(outcome, expectedGeneration);
+        if (applyPage(outcome, expectedGeneration)) {
+          retainedHistoryStack.push({
+            cursorBefore: cursor,
+            messageIds: outcome.messages.map(m => m.info.id),
+          });
+        }
         store.set(isLoadingOlderMessagesAtom, false);
         return;
       }
@@ -1239,6 +1267,35 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (olderMessagesInFlight === loadPromise) {
         olderMessagesInFlight = null;
       }
+    }
+  }
+
+  function trimRetainedHistory(): void {
+    const storage = store.get(sessionStorageAtom);
+    if (!storage) return;
+    // The cursor must be the OLDEST popped entry's `cursorBefore`, not the
+    // last one popped. When two or more pages drop in one pass, overwriting
+    // on every pop leaves the cursor pointing at the newest dropped page, so
+    // `loadOlderMessages` could not re-fetch the oldest dropped page.
+    let trimmedAny = false;
+    let oldestCursorBefore: string | null = null;
+    while (
+      storage.getMessageIds().length > RETAINED_MESSAGE_WINDOW &&
+      retainedHistoryStack.length > 0
+    ) {
+      const entry = retainedHistoryStack.shift();
+      if (!entry) break;
+      if (!trimmedAny) {
+        trimmedAny = true;
+        oldestCursorBefore = entry.cursorBefore;
+      }
+      for (const id of entry.messageIds) {
+        storage.deleteMessage(id);
+      }
+    }
+    if (trimmedAny) {
+      olderMessagesCursor = oldestCursorBefore;
+      store.set(hasOlderMessagesAtom, true);
     }
   }
 
@@ -1757,6 +1814,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession.storage.clear();
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
+    // Reset the retained-history stack so a later `trimRetainedHistory`
+    // cannot restore a pre-clear cursor.
+    retainedHistoryStack = [];
     // Same idle reset as clearAllAtoms: an in-flight older-page fetch will
     // hit the generation guard and return without clearing these atoms.
     store.set(isLoadingOlderMessagesAtom, false);
@@ -1887,6 +1947,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     switchSession,
     hydrateChildSession,
     loadOlderMessages,
+    trimRetainedHistory,
     updateFetchedAssociatedPr,
     send,
     setRemoteModelOverride,

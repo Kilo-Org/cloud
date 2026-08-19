@@ -4271,6 +4271,41 @@ describe('createSessionManager', () => {
       expect(fetchSnapshotPage).not.toHaveBeenCalled();
     });
 
+    it('resets retained history so trimRetainedHistory cannot restore a pre-clear cursor', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: [makePageMessage('init-0', 'ses-1', 'init')],
+            nextCursor: 'cursor-A',
+          });
+        }
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('old-0', 'ses-1', 'old')],
+          nextCursor: null,
+        });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages(); // pushes a retained-history stack entry
+
+      mgr.clearTranscript();
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+      // Re-populate storage above the window so a stale stack entry would trim.
+      for (let i = 0; i < 250; i++) {
+        latestStorage?.upsertMessage(stubUserMessage({ id: `post-${i}`, sessionID: 'ses-1' }));
+      }
+
+      mgr.trimRetainedHistory();
+
+      // The stack was reset by clearTranscript, so no pre-clear cursor is restored.
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    });
+
     it('purges all replayed history on reconnect with no post-clear send', async () => {
       // E2E case 4: /clear → kill/reconnect, no send → view stays cleared.
       const fetchSnapshotPage = jest.fn().mockResolvedValue({
@@ -5623,6 +5658,153 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(
       atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
     ).toEqual(['msg-current']);
+  });
+
+  // -------------------------------------------------------------------------
+  // trimRetainedHistory
+  // -------------------------------------------------------------------------
+
+  describe('trimRetainedHistory', () => {
+    function makeMessages(prefix: string, count: number): SessionSnapshotPage['messages'] {
+      return Array.from({ length: count }, (_, i) =>
+        makePageMessage(`${prefix}-${i}`, 'ses-1', `${prefix}-${i}`)
+      );
+    }
+
+    it('is a no-op below the window', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: makeMessages('init', 5),
+          nextCursor: 'cursor-A',
+        })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(5);
+
+      mgr.trimRetainedHistory();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(5);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    });
+
+    it('is a no-op with an empty stack even above the window (never trims the initial page)', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: makeMessages('init', 250),
+          nextCursor: 'cursor-A',
+        })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+
+      mgr.trimRetainedHistory();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    });
+
+    it('drops the oldest loaded page above the window, restores its cursor, and loadOlderMessages brings it back', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('init', 150),
+            nextCursor: 'cursor-A',
+          });
+        }
+        if (options.cursor === 'cursor-A') {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('old', 100),
+            nextCursor: 'cursor-B',
+          });
+        }
+        return makePage({ kiloSessionId: 'ses-1', nextCursor: null });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+
+      const before = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(before).toHaveLength(250);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      mgr.trimRetainedHistory();
+
+      const after = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(after).toHaveLength(150);
+      expect(after.map(m => m.info.id)).not.toContain('old-0');
+      expect(after.map(m => m.info.id)).toContain('init-0');
+      // Cursor restored to the pre-page value, so more history is available again.
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      // loadOlderMessages re-fetches from the restored cursor and brings the page back.
+      await mgr.loadOlderMessages();
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+    });
+
+    it('restores the OLDEST popped cursor when two pages drop in one pass', async () => {
+      const calls: Array<{ cursor?: string }> = [];
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        calls.push({ ...options });
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('init', 150),
+            nextCursor: 'cursor-A',
+          });
+        }
+        if (options.cursor === 'cursor-A') {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('oldA', 100),
+            nextCursor: 'cursor-B',
+          });
+        }
+        if (options.cursor === 'cursor-B') {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('oldB', 100),
+            nextCursor: null,
+          });
+        }
+        return makePage({ kiloSessionId: 'ses-1', nextCursor: null });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages(); // pageA (cursor-A)
+      await mgr.loadOlderMessages(); // pageB (cursor-B)
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(350);
+
+      mgr.trimRetainedHistory();
+
+      // Both older pages drop (350 -> 150); only the initial page survives.
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(150);
+
+      calls.length = 0;
+      await mgr.loadOlderMessages();
+      // Re-fetch starts from the OLDEST dropped page's cursor, so the oldest
+      // page (oldA) comes back, not the newer dropped page (oldB).
+      expect(calls[calls.length - 1]).toEqual({ cursor: 'cursor-A' });
+      const ids = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
+        m => m.info.id
+      );
+      expect(ids).toContain('oldA-0');
+      expect(ids).not.toContain('oldB-0');
+    });
   });
 
   // -------------------------------------------------------------------------

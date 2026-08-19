@@ -24,7 +24,10 @@ const { alertCalls, getTermsStatusMock, acceptTermsMock, draftLoadMock } = vi.ho
   alertCalls: [] as AlertCall[],
   getTermsStatusMock: vi.fn(),
   acceptTermsMock: vi.fn(),
-  draftLoadMock: vi.fn((): { settled: boolean; value: string | null } => ({ settled: true, value: null })),
+  draftLoadMock: vi.fn((): { settled: boolean; value: string | null } => ({
+    settled: true,
+    value: null,
+  })),
 }));
 
 vi.mock('react-native', () => ({

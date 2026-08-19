@@ -82,6 +82,7 @@ import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
+import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
 import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { cn } from '@/lib/utils';
@@ -296,6 +297,31 @@ export function ChatComposer({
   const measureRef = useRef(measure);
   measureRef.current = measure;
 
+  // Coalesce the three derived setters (measure node, hasText, slash command)
+  // to at most one publication per animation frame. Typing can fire many
+  // onChangeText calls in a single frame; publishing derived state once per
+  // frame keeps the send button and slash suggestions from re-rendering on
+  // every keystroke. The publish closure reads `measureRef` at call time and
+  // uses the stable `setHasText`/`setSlashCommandInput` setters, so it stays
+  // valid for the lifetime of the component.
+  const composerFrameCoalescerRef = useRef<FrameCoalescer<string> | null>(null);
+  composerFrameCoalescerRef.current ??= createFrameCoalescer<string>(value => {
+    measureRef.current.setText(value);
+    setHasText(value.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(value));
+  });
+  const composerFrameCoalescer = composerFrameCoalescerRef.current;
+
+  // Flush the coalescer on unmount so a pending derived-state publication is
+  // committed before teardown and the scheduled frame callback becomes a
+  // no-op instead of firing setState after the component is gone.
+  useEffect(
+    () => () => {
+      composerFrameCoalescer.flush();
+    },
+    [composerFrameCoalescer]
+  );
+
   // Flush the debounced draft write when the app leaves `active` and on
   // unmount, so a backgrounded-then-killed app (or a navigation away) does
   // not lose the last keystrokes inside the 500 ms window.
@@ -376,6 +402,10 @@ export function ChatComposer({
   // hasText, slash-command state, and the measure node, then persists the
   // durable draft exactly like a keystroke.
   function applyComposerText(value: string) {
+    // Drain any pending coalesced typing so a stale value cannot overwrite the
+    // copied prompt on the next frame. The direct setters below then land the
+    // copied prompt in one commit.
+    composerFrameCoalescer.flush();
     textRef.current = value;
     measure.setText(value);
     setHasText(value.trim().length > 0);
@@ -408,9 +438,10 @@ export function ChatComposer({
 
   function handleChangeText(value: string) {
     textRef.current = value;
-    measure.setText(value);
-    setHasText(value.trim().length > 0);
-    setSlashCommandInput(getSlashCommandCandidate(value));
+    // Derived state (measure node, hasText, slash command) is coalesced to one
+    // publication per frame; the live submit-time ref and the debounced draft
+    // write stay synchronous so neither can lag a keystroke.
+    composerFrameCoalescer.push(value);
     // Delivery applies text BEFORE onDelivered fires, so any
     // handleChangeText after shareDelivered is a user edit. Disarm
     // so a later gate resolution (upload completion) cannot
@@ -435,6 +466,10 @@ export function ChatComposer({
     onChangeText: handleChangeText,
     addCandidates,
     onDelivered: () => {
+      // Commit the coalesced `hasText` before the delivery check so the
+      // auto-send effect sees the delivered text in the same commit, not on
+      // the next frame.
+      composerFrameCoalescer.flush();
       setAutoSendArmed(
         shouldArmAutoSendOnDelivery({
           autoSend: autoSendRef.current,
@@ -648,6 +683,11 @@ export function ChatComposer({
       : undefined;
 
   function clearDraft() {
+    // Drain any pending coalesced value (a final voice transcript can `push`
+    // after `submit`'s `flush`). Publishing it here clears `hasPending` so the
+    // already-scheduled frame callback becomes a no-op; the direct setters
+    // below then override the published value in the same batched commit.
+    composerFrameCoalescer.flush();
     textRef.current = '';
     setHasText(false);
     setSlashCommandInput(null);
@@ -662,7 +702,13 @@ export function ChatComposer({
 
   async function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!control.canSend) {
+    // Decide admission from live values, not render-time `control.canSend`,
+    // which can lag behind a same-frame edit. An empty prompt with no ready
+    // attachment is never sent.
+    const readyAttachmentsCount = upload.attachments.filter(
+      attachment => attachment.status === 'uploaded'
+    ).length;
+    if ((trimmed.length === 0 && readyAttachmentsCount === 0) || disabled || isSending) {
       return;
     }
     if (upload.isUploading) {
@@ -746,6 +792,10 @@ export function ChatComposer({
   }
 
   async function submit() {
+    // Commit any coalesced derived state (hasText, measure, slash command)
+    // before the send decision, so a submit in the same frame as the last
+    // keystroke never reads stale derived state.
+    composerFrameCoalescer.flush();
     // `settleVoiceInputBeforeSubmit` is the sole admission owner for the
     // entire voice-settle + asynchronous send sequence. It acquires the
     // SubmitLock, sets pending state, waits for the final transcript, runs

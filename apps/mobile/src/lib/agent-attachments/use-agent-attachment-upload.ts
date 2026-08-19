@@ -5,6 +5,7 @@ import { toast } from 'sonner-native';
 
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { createFrameCoalescer } from '@/lib/coalesce-frame';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
   canAddAttachments,
@@ -155,6 +156,9 @@ export function useAgentAttachmentUpload(
           terminal: undefined,
           progress: 0,
         });
+        const progressCoalescer = createFrameCoalescer<number | null>(progress => {
+          updateAttachment(attachment.id, { progress });
+        });
         try {
           const { key } = await uploadOne({
             organizationId,
@@ -165,10 +169,11 @@ export function useAgentAttachmentUpload(
             contentLength: attachment.size,
             localUri: attachment.localUri,
             onProgress: progress => {
-              updateAttachment(attachment.id, { progress });
+              progressCoalescer.push(progress);
             },
             onTask: task => {
               cancelHandlesRef.current.set(attachment.id, async () => {
+                progressCoalescer.cancel();
                 await task.cancelAsync();
                 deleteCacheOwnedFile(attachment.localUri);
               });
@@ -181,6 +186,9 @@ export function useAgentAttachmentUpload(
           if (!liveIdsRef.current.has(attachment.id)) {
             return;
           }
+          // Drain any pending progress before the terminal flip so the chip
+          // lands on `progress: 1` and never sticks at a stale percentage.
+          progressCoalescer.flush();
           updateAttachment(attachment.id, {
             status: 'uploaded',
             remoteFilename: key.split('/').at(-1),
@@ -198,6 +206,9 @@ export function useAgentAttachmentUpload(
           if (!liveIdsRef.current.has(attachment.id)) {
             return;
           }
+          // Drain any pending progress before the terminal flip so the chip
+          // lands on the error state and never sticks at a stale percentage.
+          progressCoalescer.flush();
           const { retryable, reason } = classifyUploadFailure(error);
           updateAttachment(attachment.id, {
             status: 'error',

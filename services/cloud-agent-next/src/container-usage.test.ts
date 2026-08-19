@@ -189,7 +189,7 @@ describe('MeteredSandbox', () => {
 
   it('accepts any successful meter admission before a selected cold start', async () => {
     const rpc = createRpc();
-    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    const { sandbox, flushShadowTasks } = createSandbox(rpc);
 
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })

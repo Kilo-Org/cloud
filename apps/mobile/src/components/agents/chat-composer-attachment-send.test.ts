@@ -28,9 +28,12 @@ const uploadState = vi.hoisted(() => ({
   attachments: [] as { status?: string; remoteFilename?: string }[],
   toWirePayload: (() => undefined) as () => unknown,
   uploadPending: (() => ({ ok: false })) as () => unknown,
+  isUploading: false,
 }));
 
 const markAttachmentsSentMock = vi.hoisted(() => vi.fn(async () => undefined));
+
+const toastErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -94,7 +97,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: toastErrorMock },
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
@@ -172,7 +175,7 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
-    isUploading: false,
+    isUploading: uploadState.isUploading,
     hasFailedAttachments: false,
     toWirePayload: uploadState.toWirePayload,
     toSubmissionPayload: () => undefined,
@@ -305,6 +308,7 @@ beforeEach(() => {
   uploadState.attachments = [];
   uploadState.toWirePayload = () => undefined;
   uploadState.uploadPending = () => ({ ok: false });
+  uploadState.isUploading = false;
 });
 
 describe('ChatComposer attachment-only send', () => {
@@ -339,5 +343,19 @@ describe('ChatComposer attachment-only send', () => {
 
     expect(onSendMock).not.toHaveBeenCalled();
     expect(markAttachmentsSentMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts when a send is blocked by an in-flight upload', async () => {
+    uploadState.attachments = [{ status: 'uploading' }];
+    uploadState.isUploading = true;
+    uploadState.uploadPending = () => ({ ok: false });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith('Wait for attachments to finish uploading.');
   });
 });

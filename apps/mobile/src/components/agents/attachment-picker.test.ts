@@ -1,6 +1,8 @@
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 import { pickAgentAttachments } from './attachment-picker';
@@ -103,6 +105,20 @@ describe('agent attachment picker', () => {
     expect(announcingToastMock.error).toHaveBeenCalledWith(
       'Could not open the photo picker. Restart Kilo and try again.'
     );
+  });
+
+  it('launches the picker when the launch context write fails', async () => {
+    vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error('store write failed'));
+    const result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/photo.jpg', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickWithSheetSelection(1);
+
+    expect(candidates).toHaveLength(1);
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 });
 

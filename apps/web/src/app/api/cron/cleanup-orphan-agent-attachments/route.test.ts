@@ -28,6 +28,7 @@ const mockDelete = jest.mocked(db.delete);
 const BATCH_SIZE = 500;
 
 let selectedRows: { r2_key: string }[];
+let deletedRows: { r2_key: string }[];
 let capturedLimit: number | undefined;
 
 function makeRequest(headers?: Record<string, string>) {
@@ -41,6 +42,7 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     selectedRows = [];
+    deletedRows = [];
     capturedLimit = undefined;
     mockSend.mockResolvedValue(undefined as never);
     mockSelect.mockReturnValue({
@@ -55,7 +57,7 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
     } as never);
     mockDelete.mockReturnValue({
       where: () => ({
-        returning: () => Promise.resolve(selectedRows.map(row => ({ r2_key: row.r2_key }))),
+        returning: () => Promise.resolve(deletedRows),
       }),
     } as never);
   });
@@ -73,6 +75,7 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
       { r2_key: 'user-1/cloud-agent/msg-1/file.pdf' },
       { r2_key: 'user-2/cloud-agent/msg-2/file.png' },
     ];
+    deletedRows = selectedRows;
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
@@ -106,5 +109,20 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
     expect(capturedLimit).toBe(BATCH_SIZE);
     expect(mockSend).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('keeps the object when the conditional delete returns no row for a consumed key', async () => {
+    selectedRows = [{ r2_key: 'user-1/cloud-agent/msg-1/file.pdf' }];
+    // The row was marked consumed between the select and the delete, so the
+    // conditional delete returns no row and the object must survive.
+    deletedRows = [];
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    expect(response.status).toBe(200);
+    expect(mockSend).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body.deletedObjects).toBe(0);
+    expect(body.deletedRows).toBe(0);
   });
 });

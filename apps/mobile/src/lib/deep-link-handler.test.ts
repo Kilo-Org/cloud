@@ -6,6 +6,7 @@ import { redirectSystemPath } from './deep-link-handler';
 import {
   _resetDeepLinkLaunchForTests,
   _setGetLinkingURLForTests,
+  _setSecureStoreForTests,
   captureLaunchDeepLink,
   getPendingDeepLink,
 } from './deep-link-launch';
@@ -20,6 +21,10 @@ vi.mock('expo-router', () => ({
   router: {
     navigate: mocks.navigate,
   },
+}));
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
 }));
 
 vi.mock('@kilocode/app-shared/universal-links', async importOriginal => {
@@ -53,6 +58,18 @@ const MAPPED_CASES = [
 describe('redirectSystemPath', () => {
   beforeEach(() => {
     _resetDeepLinkLaunchForTests();
+    _setSecureStoreForTests({
+      setItemAsync: async () => {
+        await Promise.resolve();
+      },
+      deleteItemAsync: async () => {
+        await Promise.resolve();
+      },
+      getItemAsync: async () => {
+        await Promise.resolve();
+        return null;
+      },
+    });
     setGitHubInstallReturnOutcome(null);
     mocks.navigate.mockReset();
     mocks.shouldThrow = false;

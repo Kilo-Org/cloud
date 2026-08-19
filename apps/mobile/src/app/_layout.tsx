@@ -54,7 +54,13 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
-import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
+import {
+  captureLaunchDeepLink,
+  getPendingDeepLink,
+  getPendingDeepLinkSnapshot,
+  restorePersistedPendingDeepLink,
+  subscribeToPendingDeepLink,
+} from '@/lib/deep-link-launch';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -211,6 +217,13 @@ function RootLayoutNav() {
   // the splash; the authenticated mount abandons or rescopes it on identity.
   useEffect(() => {
     void restorePersistedCacheOnColdStart(queryClient);
+  }, []);
+
+  // Restore a deep-link destination persisted before process death. Runs before
+  // the gate effect so a restored destination is present when the shell
+  // settles; the observable slot re-triggers the consumer if it lands later.
+  useEffect(() => {
+    void restorePersistedPendingDeepLink();
   }, []);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
@@ -478,11 +491,7 @@ function RootLayoutNav() {
 
       markStartupComplete('app');
       setStartupFinished(true);
-      // Navigate to pending deep link (cold start universal link / notification tap)
-      const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
-      if (pendingNavigation) {
-        router.navigate(pendingNavigation.href as Href);
-      }
+      // Deep-link navigation is owned by the pendingDeepLink effect below.
       // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
     }
   }, [
@@ -501,8 +510,27 @@ function RootLayoutNav() {
     onConsentReviewRoute,
   ]);
 
+  // Reactive snapshot of the pending deep-link slot so a destination stashed
+  // after the gate effect last ran (e.g. a notification tap while signed out,
+  // or a restored persisted record) is consumed without waiting for an
+  // unrelated dependency change.
+  const pendingDeepLink = useSyncExternalStore(
+    subscribeToPendingDeepLink,
+    getPendingDeepLinkSnapshot
+  );
+
   // Declared after the auth effect so that on the same flush a pending
-  // notification navigate runs first and the share gate opens on top.
+  // deep-link navigate runs first and the share gate opens on top.
+  useEffect(() => {
+    if (pendingDeepLink === null || !isShellReady) {
+      return;
+    }
+    const navigation = resolvePendingNavigation(getPendingDeepLink());
+    if (navigation) {
+      router.navigate(navigation.href as Href);
+    }
+  }, [pendingDeepLink, isShellReady, router]);
+
   useEffect(() => {
     if (pendingShareId === null || !isShellReady) {
       return;

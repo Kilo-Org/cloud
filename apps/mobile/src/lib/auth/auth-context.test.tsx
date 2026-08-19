@@ -61,6 +61,10 @@ const hoisted = vi.hoisted(() => {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   };
 
+  const deepLinkLaunch = {
+    clearPendingDeepLink: vi.fn(),
+  };
+
   return {
     callOrder,
     secureStore,
@@ -70,6 +74,7 @@ const hoisted = vi.hoisted(() => {
     posthogStorage,
     sentry,
     appState,
+    deepLinkLaunch,
   };
 });
 
@@ -108,6 +113,10 @@ vi.mock('@/lib/analytics/posthog', () => ({
 vi.mock('@/lib/appsflyer', () => ({
   resetAppsFlyerState: hoisted.appsflyer.resetAppsFlyerState,
   trackEvent: hoisted.appsflyer.trackEvent,
+}));
+
+vi.mock('@/lib/deep-link-launch', () => ({
+  clearPendingDeepLink: hoisted.deepLinkLaunch.clearPendingDeepLink,
 }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
@@ -170,6 +179,7 @@ vi.mock('@/lib/storage-keys', () => ({
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   REFRESH_TOKEN_KEY: 'refresh-token',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
@@ -330,6 +340,8 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
+    expect(hoisted.deepLinkLaunch.clearPendingDeepLink).toHaveBeenCalled();
 
     unmount();
   });

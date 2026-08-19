@@ -40,3 +40,9 @@ export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';
 /** iOS App Attest key identifier. The key itself lives in the Secure Enclave. */
 export const ATTEST_KEY_ID_KEY = 'auth-attest-key-id';
+/**
+ * Durable mirror of the pending deep-link destination (P1-E-43b). Written
+ * fire-and-forget on `setPendingDeepLink`, restored on cold start, and deleted
+ * when the slot is consumed or on sign-out.
+ */
+export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';

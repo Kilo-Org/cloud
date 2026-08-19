@@ -1,11 +1,14 @@
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
-import { ANDROID_NOTIFICATION_CHANNELS, type PushData, pushDataSchema } from '@kilocode/notifications';
+import {
+  ANDROID_NOTIFICATION_CHANNELS,
+  type PushData,
+  pushDataSchema,
+} from '@kilocode/notifications';
 
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -82,15 +85,11 @@ export function setupNotificationResponseHandler() {
 
     const path = notificationPathForData(data);
     Notifications.clearLastNotificationResponse();
-    // If the router is ready, navigate immediately; otherwise store as pending.
-    // navigate (not replace) so the target screen keeps a back stack — replace
-    // on a stack root leaves canGoBack() false and strands the user — while
-    // still deduplicating if the route is already on top.
-    try {
-      router.navigate(path as Href);
-    } catch {
-      setPendingDeepLink(path, 'notification');
-    }
+    // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
+    // `router.navigate` queues rather than throws when the router is unmounted,
+    // so a tap while at the consent/force-update/login gate would navigate past
+    // the gate and be dropped by the root redirect.
+    setPendingDeepLink(path, 'notification');
   });
 
   return subscription;

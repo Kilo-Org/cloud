@@ -1,16 +1,94 @@
+import * as Sentry from '@sentry/react-native';
+
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
+
+import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 type DeepLinkSource = 'universal-link' | 'notification';
 
 type GetLinkingURL = () => string | null;
 
+/** Minimal SecureStore surface used by the durable mirror. */
+type SecureStoreLike = {
+  setItemAsync: (key: string, value: string) => Promise<void>;
+  deleteItemAsync: (key: string) => Promise<void>;
+  getItemAsync: (key: string) => Promise<string | null>;
+};
+
+/** Persisted shape of the pending slot, mirroring the in-memory slot. */
+type PendingDeepLinkRecord = {
+  href: string;
+  source: DeepLinkSource;
+  storedAt: number;
+};
+
+/** A persisted record older than this is discarded on restore. */
+const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
 let launchLinkHandled = false;
 
+// Monotonic epoch bumped on every set, consume, and clear. Restore captures it
+// before its async read and only fills when it is unchanged, so a live capture
+// or consume that happens during the read can never be overwritten or re-armed.
+let pendingDeepLinkEpoch = 0;
+
+// Observable slot: listeners are notified whenever the pending slot changes,
+// so the layout can consume through useSyncExternalStore instead of waiting
+// for an unrelated dependency change.
+const pendingDeepLinkListeners = new Set<() => void>();
+
 // Test-only override so captureLaunchDeepLink can stay synchronous without
 // pulling expo-linking (→ RN) into suites that only touch the pending slot.
 let getLinkingURLForTests: GetLinkingURL | null = null;
+
+// Test-only override so the durable mirror can be exercised without loading
+// expo-secure-store (→ expo-modules-core → RN) into unit-test graphs.
+let secureStoreForTests: SecureStoreLike | null = null;
+
+function notifyPendingDeepLinkListeners(): void {
+  for (const listener of pendingDeepLinkListeners) {
+    listener();
+  }
+}
+
+// Lazy require so modules that only use the pending slot (e.g. notifications →
+// unread-counts tests) do not load expo-secure-store (→ expo-modules-core → RN)
+// at import time. Static `import` would pull RN into those unit-test graphs.
+function getSecureStore(): SecureStoreLike {
+  if (secureStoreForTests) {
+    return secureStoreForTests;
+  }
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load; see comment above
+  return require('expo-secure-store') as SecureStoreLike;
+}
+
+// Serializes every SecureStore write to PENDING_DEEP_LINK_KEY through one FIFO
+// chain so a later delete (consume or sign-out) always lands after an earlier
+// persist. Each write stays fire-and-forget from the caller's view, but chains
+// onto the previous write so call order is preserved.
+let pendingDeepLinkWriteChain: Promise<void> = Promise.resolve();
+
+function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
+  pendingDeepLinkWriteChain = pendingDeepLinkWriteChain.then(write).catch(error => {
+    Sentry.captureException(error);
+  });
+}
+
+/** Fire-and-forget durable mirror. A failure is reported to Sentry; the
+ *  in-memory slot still works for the live process. */
+function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
+  const record: PendingDeepLinkRecord = { href, source, storedAt: Date.now() };
+  enqueuePendingDeepLinkWrite(() =>
+    getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record))
+  );
+}
+
+/** Fire-and-forget delete of the durable mirror. */
+function deletePersistedPendingDeepLink(): void {
+  enqueuePendingDeepLinkWrite(() => getSecureStore().deleteItemAsync(PENDING_DEEP_LINK_KEY));
+}
 
 /**
  * Stash a deep-link href for the root layout to consume after gates clear.
@@ -25,13 +103,16 @@ export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
   if (source === 'universal-link') {
     pendingDeepLink = href;
     pendingSource = source;
-    return;
-  }
-  // notification
-  if (pendingDeepLink === null || pendingSource === 'notification') {
+  } else if (pendingDeepLink === null || pendingSource === 'notification') {
+    // notification
     pendingDeepLink = href;
     pendingSource = source;
+  } else {
+    return;
   }
+  pendingDeepLinkEpoch += 1;
+  persistPendingDeepLink(href, source);
+  notifyPendingDeepLinkListeners();
 }
 
 /** Get-and-clear. Single consumer is `_layout.tsx`. */
@@ -39,7 +120,107 @@ export function getPendingDeepLink(): string | null {
   const href = pendingDeepLink;
   pendingDeepLink = null;
   pendingSource = null;
+  pendingDeepLinkEpoch += 1;
+  deletePersistedPendingDeepLink();
+  notifyPendingDeepLinkListeners();
   return href;
+}
+
+/**
+ * Drop the pending destination in memory AND persist. Used by sign-out so a
+ * different account signed in later in this process cannot navigate to the
+ * previous account's destination. The in-memory clear is synchronous; the
+ * persisted delete chains behind any in-flight persist on the write chain.
+ */
+export function clearPendingDeepLink(): void {
+  pendingDeepLink = null;
+  pendingSource = null;
+  pendingDeepLinkEpoch += 1;
+  deletePersistedPendingDeepLink();
+  notifyPendingDeepLinkListeners();
+}
+
+/** Current pending href without clearing. For `useSyncExternalStore`. */
+export function getPendingDeepLinkSnapshot(): string | null {
+  return pendingDeepLink;
+}
+
+/** Subscribe to pending-slot changes. Returns an unsubscribe function. */
+export function subscribeToPendingDeepLink(listener: () => void): () => void {
+  pendingDeepLinkListeners.add(listener);
+  return () => {
+    pendingDeepLinkListeners.delete(listener);
+  };
+}
+
+/**
+ * Restore a destination persisted before process death. Reads the record,
+ * discards it when older than 24 h or when it fails to parse, and otherwise
+ * feeds it back through `setPendingDeepLink` (precedence rules unchanged).
+ *
+ * Fills ONLY an empty slot: a live capture (`checkInitialNotification`,
+ * `captureLaunchDeepLink`) already ran at module scope and owns the slot, so a
+ * stale persisted record must never overwrite a fresh live one, re-arm a
+ * consumed slot, or wipe a live persist.
+ */
+export async function restorePersistedPendingDeepLink(): Promise<void> {
+  // Capture the epoch before the async read. If any set, consume, or clear
+  // happens during the read, the live state wins and restore must not fill.
+  const startEpoch = pendingDeepLinkEpoch;
+  const raw = await readPersistedPendingDeepLink();
+  if (raw === null) {
+    return;
+  }
+
+  // A live capture or consume happened during the read: leave the slot alone.
+  if (pendingDeepLinkEpoch !== startEpoch) {
+    return;
+  }
+
+  const record = parsePendingDeepLinkRecord(raw);
+
+  // A live capture owns the slot: leave both the slot and the persisted record
+  // alone. Deleting here would wipe the live persist still queued on the chain.
+  if (getPendingDeepLinkSnapshot() !== null) {
+    return;
+  }
+
+  if (record === null || Date.now() - record.storedAt > PENDING_DEEP_LINK_TTL_MS) {
+    deletePersistedPendingDeepLink();
+    return;
+  }
+
+  setPendingDeepLink(record.href, record.source);
+}
+
+async function readPersistedPendingDeepLink(): Promise<string | null> {
+  try {
+    return await getSecureStore().getItemAsync(PENDING_DEEP_LINK_KEY);
+  } catch (error) {
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
+function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isPendingDeepLinkRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPendingDeepLinkRecord(value: unknown): value is PendingDeepLinkRecord {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.href === 'string' &&
+    (record.source === 'universal-link' || record.source === 'notification') &&
+    typeof record.storedAt === 'number'
+  );
 }
 
 function readLaunchUrl(): string | null {
@@ -86,15 +267,22 @@ export function wasLaunchLinkHandled(): boolean {
   return launchLinkHandled;
 }
 
-/** Test-only: reset module-private latch and pending slot between cases. */
+/** Test-only: reset module-private latch, pending slot, and listeners between cases. */
 export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;
   pendingSource = null;
   launchLinkHandled = false;
   getLinkingURLForTests = null;
+  pendingDeepLinkListeners.clear();
+  pendingDeepLinkWriteChain = Promise.resolve();
 }
 
 /** Test-only: stub the synchronous launch-URL reader without loading expo-linking. */
 export function _setGetLinkingURLForTests(fn: GetLinkingURL | null): void {
   getLinkingURLForTests = fn;
+}
+
+/** Test-only: stub the SecureStore surface without loading expo-secure-store. */
+export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
+  secureStoreForTests = store;
 }

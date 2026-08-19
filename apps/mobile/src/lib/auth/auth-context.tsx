@@ -14,6 +14,7 @@ import {
 
 import { discardPostHog } from '@/lib/analytics/posthog';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
+import { clearPendingDeepLink } from '@/lib/deep-link-launch';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
@@ -54,6 +55,7 @@ import {
   LEGACY_EXCHANGE_DONE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
+  PENDING_DEEP_LINK_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -251,6 +253,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         setAuthEpoch(currentAuthEpoch());
         clearActiveToken();
         try {
+          // Drop the pending deep-link destination in memory AND persist before
+          // the deletion batch, so a different account signed in later in this
+          // process cannot navigate to the previous account's destination. The
+          // in-memory clear is synchronous; the persisted delete chains behind
+          // any in-flight persist.
+          clearPendingDeepLink();
           // Independent local cleanup, concurrent via allSettled: a
           // rejection in any member must never stop the others or the
           // preference clears. The credential deletion and the identity-hint
@@ -269,6 +277,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             deleteAccountMetadata(SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
+            deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that

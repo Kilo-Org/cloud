@@ -21,7 +21,10 @@ export default {
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
-    supportedChatApis: ['chat_completions', 'responses'],
+    supportedChatApis: [
+      'chat_completions',
+      // 'responses', // supported, not tested
+    ],
     responseTransforms: null,
     async transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
@@ -34,7 +37,6 @@ export default {
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
     supportedChatApis: [
       'chat_completions',
-      // 'messages', // supported, not tested
       // 'responses', // supported, not tested
     ],
     responseTransforms: null,

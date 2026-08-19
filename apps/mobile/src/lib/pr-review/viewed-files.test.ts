@@ -173,11 +173,11 @@ describe('viewed-files', () => {
 
   it('a late first read does not overwrite a write', async () => {
     // Gate the first SecureStore read so it finishes after the write.
-    let releaseRead: (value: string | null) => void = () => {};
+    let releaseRead: (value: string | null) => void = undefined as unknown as (value: string | null) => void;
     const readGate = new Promise<string | null>(resolve => {
       releaseRead = resolve;
     });
-    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => readGate);
+    vi.mocked(SecureStore.getItemAsync).mockReturnValueOnce(readGate);
 
     // Start a first read while the cache is empty.
     const firstRead = getViewedFiles(REF, SHA1);
@@ -197,11 +197,11 @@ describe('viewed-files', () => {
     setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
 
     // Gate the first SecureStore read so it finishes after the clear.
-    let releaseRead: (value: string | null) => void = () => {};
+    let releaseRead: (value: string | null) => void = undefined as unknown as (value: string | null) => void;
     const readGate = new Promise<string | null>(resolve => {
       releaseRead = resolve;
     });
-    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => readGate);
+    vi.mocked(SecureStore.getItemAsync).mockReturnValueOnce(readGate);
 
     // Start a first read while the cache is empty but the store has content.
     const firstRead = getViewedFiles(REF, SHA1);

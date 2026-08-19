@@ -90,15 +90,20 @@ function computeNextViewedPaths(
 }
 
 async function readMap(): Promise<ViewedFileMap> {
-  if (cachedMap !== null) {
-    return cachedMap;
+  const cached = cachedMap;
+  if (cached !== null) {
+    return cached;
   }
   const gen = generation;
   const raw = await SecureStore.getItemAsync(PR_REVIEW_VIEWED_KEY);
-  const parsed = parseMap(raw);
-  if (gen === generation) {
-    cachedMap = parsed;
+  if (gen !== generation) {
+    // A write or clear happened while this read was in flight. A write
+    // publishes the fresh map to `cachedMap`; a clear nulls it. Return the
+    // authoritative current state, never the stale parse.
+    return cachedMap ?? {};
   }
+  const parsed = parseMap(raw);
+  cachedMap = parsed;
   return parsed;
 }
 

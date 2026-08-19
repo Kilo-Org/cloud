@@ -189,7 +189,7 @@ describe('viewed-files', () => {
 
     // Release the stale first read (the store was empty when it started).
     releaseRead(null);
-    await firstRead;
+    await expect(firstRead).resolves.toEqual(['src/index.ts']);
 
     // The write must not be overwritten by the late read.
     await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['src/index.ts']);
@@ -217,7 +217,7 @@ describe('viewed-files', () => {
     releaseRead(
       JSON.stringify({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } })
     );
-    await firstRead;
+    await expect(firstRead).resolves.toEqual([]);
 
     // The cache must stay empty; the next read re-reads the now-empty store.
     const getItemMock = vi.mocked(SecureStore.getItemAsync);

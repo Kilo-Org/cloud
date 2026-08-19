@@ -90,13 +90,16 @@ export const launchExtensionContext = async (): Promise<{
   await access(join(extensionPath, 'manifest.json'));
   const isHeaded = process.env['EXTENSION_E2E_HEADED'] === '1';
 
+  const executablePath = process.env['EXTENSION_E2E_EXECUTABLE_PATH'];
+  const channel = process.env['EXTENSION_E2E_CHANNEL'] === 'chrome' ? 'chrome' : 'chromium';
+
   const context = await chromium.launchPersistentContext(userDataDir, {
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
       ...EXTENSION_E2E_LAUNCH_ARGS,
     ],
-    channel: process.env['EXTENSION_E2E_CHANNEL'] === 'chrome' ? 'chrome' : 'chromium',
+    ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
     ignoreDefaultArgs: ['--enable-automation'],
     userAgent: EXTENSION_E2E_USER_AGENT,

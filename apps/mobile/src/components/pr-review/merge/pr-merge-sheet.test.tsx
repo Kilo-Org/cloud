@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive suite for merge draft save, restore, clear, and settle-gate contracts */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -144,7 +145,7 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
 }));
 
 vi.mock('@/lib/persist/use-draft-flush', () => ({
-  useDraftFlushOnBackground: () => {},
+  useDraftFlushOnBackground: () => undefined,
 }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({

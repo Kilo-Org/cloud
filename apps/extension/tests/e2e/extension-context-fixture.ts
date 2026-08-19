@@ -96,7 +96,7 @@ export const launchExtensionContext = async (): Promise<{
       `--load-extension=${extensionPath}`,
       ...EXTENSION_E2E_LAUNCH_ARGS,
     ],
-    channel: 'chromium',
+    channel: process.env['EXTENSION_E2E_CHANNEL'] === 'chrome' ? 'chrome' : 'chromium',
     headless: !isHeaded,
     ignoreDefaultArgs: ['--enable-automation'],
     userAgent: EXTENSION_E2E_USER_AGENT,

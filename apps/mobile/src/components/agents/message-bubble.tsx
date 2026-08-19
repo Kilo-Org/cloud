@@ -15,7 +15,7 @@ import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { selectMessageFailure } from './message-failure-state';
 import { PartRenderer } from './part-renderer';
-import { isFilePart, isTextPart } from './part-types';
+import { firstHumanText, isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
 import { type OpenChildSession } from './child-session-section';
 
@@ -101,6 +101,10 @@ function MessageBubbleImpl({
         .map(p => p.text)
         .join('\n\n')
     : '';
+  // Copy-to-composer re-sends only the first human-authored text part, so a
+  // synthesized attachment notice is not copied and a file-only row hides the
+  // button entirely.
+  const copyText = isUser ? firstHumanText(message.parts) : '';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
       <View className="gap-1 px-4 py-1">
@@ -125,12 +129,12 @@ function MessageBubbleImpl({
               <Text>Retry</Text>
             </Button>
           ) : null}
-          {failure.canCopy && onCopyToComposer ? (
+          {failure.canCopy && onCopyToComposer && copyText !== '' ? (
             <Button
               variant="outline"
               size="sm"
               onPress={() => {
-                onCopyToComposer(userTextContent);
+                onCopyToComposer(copyText);
               }}
               accessibilityRole="button"
               accessibilityLabel="Copy to composer"

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import type * as PartTypes from './part-types';
 import {
   assistantMessage,
   findElementByType,
@@ -50,10 +51,14 @@ vi.mock('./file-part-renderer', () => ({
 vi.mock('./part-renderer', () => ({
   PartRenderer: () => null,
 }));
-vi.mock('./part-types', () => ({
-  isFilePart: vi.fn(() => false),
-  isTextPart: vi.fn(() => false),
-}));
+vi.mock('./part-types', async () => {
+  const actual = await vi.importActual<typeof PartTypes>('./part-types');
+  return {
+    ...actual,
+    isFilePart: vi.fn(() => false),
+    isTextPart: vi.fn(() => false),
+  };
+});
 vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),
 }));
@@ -296,6 +301,71 @@ describe('MessageBubble failure footer', () => {
     }
     (retry.props.onPress as () => void)();
     expect(onRetryMessage).toHaveBeenCalledWith(message);
+  });
+});
+
+describe('MessageBubble copy-to-composer human text', () => {
+  it('passes only the first human text part to Copy, not the synthesized notice', async () => {
+    const message = userMessage('m-copy-human');
+    message.parts = [
+      {
+        id: 'm-copy-human-prompt',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-human',
+        type: 'text',
+        text: 'prompt',
+      },
+      {
+        id: 'm-copy-human-notice',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-human',
+        type: 'text',
+        text: 'binary attachment saved: … path=…',
+        synthetic: true,
+      },
+    ] as typeof message.parts;
+
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const tree = await renderBubbleWithHandlers(message, {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onCopyToComposer,
+    });
+
+    const copy = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Copy to composer'
+    );
+    expect(copy).not.toBeNull();
+    if (!copy) {
+      throw new Error('expected Copy to composer button');
+    }
+    (copy.props.onPress as () => void)();
+    expect(onCopyToComposer).toHaveBeenCalledWith('prompt');
+  });
+
+  it('hides Copy for a file-only failed row', async () => {
+    const message = userMessage('m-copy-file');
+    message.parts = [
+      {
+        id: 'm-copy-file-file',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-file',
+        type: 'file',
+        mime: 'text/plain',
+        url: 'x',
+      },
+    ] as typeof message.parts;
+
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const tree = await renderBubbleWithHandlers(message, {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onCopyToComposer,
+    });
+
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).toBeNull();
   });
 });
 

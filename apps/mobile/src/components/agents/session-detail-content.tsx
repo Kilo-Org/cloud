@@ -60,6 +60,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  resolveRetryPrompt,
   retryMessageAndClear,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
@@ -91,7 +92,6 @@ import {
 } from '@/components/agents/child-session-sheet-state';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
-import { isTextPart } from '@/components/agents/part-types';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
@@ -737,39 +737,13 @@ export function SessionDetailContent({
     ]
   );
 
-  // Retry payload by row kind: a delivery failure re-sends the user row's own
-  // text; an assistant failure re-sends the newest user row before it. Returns
-  // null when no user row precedes the assistant row, which suppresses Retry.
-  const resolveRetryPrompt = useCallback(
-    (message: StoredMessage): string | null => {
-      if (message.info.role === 'user') {
-        return message.parts
-          .filter(isTextPart)
-          .map(part => part.text)
-          .join('\n\n');
-      }
-      const index = messages.findIndex(candidate => candidate.info.id === message.info.id);
-      for (let i = index - 1; i >= 0; i -= 1) {
-        const candidate = messages[i];
-        if (candidate?.info.role === 'user') {
-          return candidate.parts
-            .filter(isTextPart)
-            .map(part => part.text)
-            .join('\n\n');
-        }
-      }
-      return null;
-    },
-    [messages]
-  );
-
   const handleCopyToComposer = useCallback((text: string) => {
     composerControlRef.current?.setText(text);
   }, []);
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
-      const prompt = resolveRetryPrompt(message);
+      const prompt = resolveRetryPrompt(message, messages);
       if (prompt === null) {
         return;
       }
@@ -788,7 +762,7 @@ export function SessionDetailContent({
         }
       );
     },
-    [resolveRetryPrompt, requiresModel, pinned.model, currentModel, handleSend, manager]
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
   );
 
   const renderItem = useCallback(
@@ -806,7 +780,7 @@ export function SessionDetailContent({
       const deliveryState =
         item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
-      const retryPrompt = resolveRetryPrompt(item.message);
+      const retryPrompt = resolveRetryPrompt(item.message, messages);
       return (
         <MessageBubble
           message={item.message}
@@ -831,7 +805,7 @@ export function SessionDetailContent({
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
-      resolveRetryPrompt,
+      messages,
       handleRetryMessage,
       handleCopyToComposer,
     ]

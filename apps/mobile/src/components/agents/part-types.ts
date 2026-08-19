@@ -11,6 +11,18 @@ export function isTextPart(part: Part): part is TextPart {
   return part.type === 'text';
 }
 
+/**
+ * Returns the first human-authored text part's text, or '' when there is none.
+ * Mirrors the continuation-seed predicate: synthesized attachment notices and
+ * ignored parts are skipped, so a file-only message yields an empty string.
+ */
+export function firstHumanText(parts: readonly Part[]): string {
+  const part = parts.find(
+    (p): p is TextPart => isTextPart(p) && p.synthetic !== true && p.ignored !== true
+  );
+  return part?.text ?? '';
+}
+
 /** CLI snapshot-init progress injected as a synthetic text part (matches kilo-vscode). */
 export function isSnapshotProgressPart(part: Part): boolean {
   return isTextPart(part) && part.synthetic === true && part.text.includes('Initializing snapshot');

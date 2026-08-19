@@ -1,11 +1,13 @@
-import type { Part, StoredMessage, ToolPart } from '@/components/cloud-agent-next/types';
+import type { AssistantMessage } from '@/types/opencode.gen';
+import type { Part, StoredMessage, TextPart, ToolPart } from '@/components/cloud-agent-next/types';
 import {
   groupAssistantParts,
+  groupConsecutiveAssistantMessages,
   summarizeAgentWork,
   toSharedTranscriptMessages,
 } from './shared-transcript';
 
-function makeTextPart(id: string, text: string): Part {
+function makeTextPart(id: string, text: string): TextPart {
   return {
     id,
     sessionID: 'ses_1',
@@ -70,6 +72,24 @@ describe('toSharedTranscriptMessages', () => {
     expect(toSharedTranscriptMessages(messages)).toHaveLength(2);
   });
 
+  it('sorts messages by id so ingest order matches the session viewers', () => {
+    const messages = [
+      {
+        info: { id: 'msg_01b7fa18c001cFOIstYxPGt15e', role: 'assistant', time: { created: 2 } },
+        parts: [{ id: 'prt_2' }],
+      },
+      {
+        info: { id: 'msg_01b7f4849000FKpn0X20lnhq7c', role: 'user', time: { created: 1 } },
+        parts: [{ id: 'prt_1' }],
+      },
+    ];
+
+    expect(toSharedTranscriptMessages(messages).map(message => message.info.id)).toEqual([
+      'msg_01b7f4849000FKpn0X20lnhq7c',
+      'msg_01b7fa18c001cFOIstYxPGt15e',
+    ]);
+  });
+
   it('drops messages without a role or created timestamp', () => {
     const messages = [
       { info: { id: 'no_role' }, parts: [{ id: 'p1' }] },
@@ -109,6 +129,25 @@ describe('groupAssistantParts', () => {
     ]);
   });
 
+  it('hides synthetic snapshot-init progress text', () => {
+    const snapshotPart: Part = {
+      ...makeTextPart('snap', '⠦ Initializing snapshot…'),
+      synthetic: true,
+    };
+    const segments = groupAssistantParts([
+      snapshotPart,
+      makeStepStart('s1'),
+      makeTextPart('txt1', 'Hello! Here are the files.'),
+    ]);
+
+    expect(segments).toEqual([
+      {
+        type: 'chat',
+        parts: [expect.objectContaining({ id: 'txt1' })],
+      },
+    ]);
+  });
+
   it('hides empty reasoning and internal plan tools', () => {
     const planTool: ToolPart = {
       ...makeToolPart('plan', 'plan_enter'),
@@ -125,6 +164,50 @@ describe('groupAssistantParts', () => {
         type: 'chat',
         parts: [expect.objectContaining({ id: 'txt1' })],
       },
+    ]);
+  });
+});
+
+describe('groupConsecutiveAssistantMessages', () => {
+  it('merges consecutive assistant messages into one turn', () => {
+    const user: StoredMessage = {
+      info: {
+        id: 'user_1',
+        sessionID: 'ses_1',
+        role: 'user',
+        time: { created: 1 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      },
+      parts: [makeTextPart('u1', 'look around')],
+    };
+    const firstInfo: AssistantMessage = {
+      id: 'assistant_1',
+      sessionID: 'ses_1',
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'user_1',
+      modelID: 'test-model',
+      providerID: 'test-provider',
+      mode: 'code',
+      agent: 'test-agent',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    const firstAssistant: StoredMessage = {
+      info: firstInfo,
+      parts: [makeToolPart('t1', 'read')],
+    };
+    const secondAssistant: StoredMessage = {
+      ...firstAssistant,
+      info: { ...firstInfo, id: 'assistant_2', time: { created: 4, completed: 5 } },
+      parts: [makeToolPart('t2', 'grep')],
+    };
+
+    expect(groupConsecutiveAssistantMessages([user, firstAssistant, secondAssistant])).toEqual([
+      [user],
+      [firstAssistant, secondAssistant],
     ]);
   });
 });

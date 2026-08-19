@@ -335,6 +335,9 @@ describe('public session route', () => {
         kiloUserId: 'usr_123',
         title: 'Shared title',
         ownerName: 'Shared owner',
+        gitUrl: 'https://github.com/owner/repo',
+        gitBranch: 'main',
+        createdAt: '2026-08-19T10:00:00.000Z',
       },
     ]);
 
@@ -346,6 +349,9 @@ describe('public session route', () => {
       success: true,
       title: 'Shared title',
       owner_name: 'Shared owner',
+      git_url: 'https://github.com/owner/repo',
+      git_branch: 'main',
+      created_at: '2026-08-19T10:00:00.000Z',
     });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });

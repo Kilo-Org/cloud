@@ -34,27 +34,31 @@ function makeUserMessage(): StoredMessage {
   };
 }
 
+function makeAssistantInfo(id: string, created: number): StoredMessage['info'] {
+  return {
+    id,
+    sessionID: 'ses_1',
+    role: 'assistant',
+    time: { created, completed: created + 1 },
+    parentID: 'user_1',
+    modelID: 'test-model',
+    providerID: 'test-provider',
+    mode: 'code',
+    agent: 'test-agent',
+    path: { cwd: '/', root: '/' },
+    cost: 0,
+    tokens: {
+      input: 0,
+      output: 0,
+      reasoning: 0,
+      cache: { read: 0, write: 0 },
+    },
+  };
+}
+
 function makeAssistantMessage(): StoredMessage {
   return {
-    info: {
-      id: 'assistant_1',
-      sessionID: 'ses_1',
-      role: 'assistant',
-      time: { created: 2, completed: 3 },
-      parentID: 'user_1',
-      modelID: 'test-model',
-      providerID: 'test-provider',
-      mode: 'code',
-      agent: 'test-agent',
-      path: { cwd: '/', root: '/' },
-      cost: 0,
-      tokens: {
-        input: 0,
-        output: 0,
-        reasoning: 0,
-        cache: { read: 0, write: 0 },
-      },
-    },
+    info: makeAssistantInfo('assistant_1', 2),
     parts: [
       {
         id: 'reason_1',

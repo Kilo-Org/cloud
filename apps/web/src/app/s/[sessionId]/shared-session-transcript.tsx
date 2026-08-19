@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
 import { PartRenderer } from '@/components/cloud-agent-next/PartRenderer';
 import { isAssistantMessage, isUserMessage } from '@/components/cloud-agent-next/types';
 import type { Part, StoredMessage } from '@/components/cloud-agent-next/types';
 import { cn } from '@/lib/utils';
-import { groupAssistantParts } from './shared-transcript';
+import { groupAssistantParts, groupConsecutiveAssistantMessages } from './shared-transcript';
 
 function AgentWorkGroup({ parts, summary }: { parts: Part[]; summary: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -39,8 +39,8 @@ function AgentWorkGroup({ parts, summary }: { parts: Part[]; summary: string }) 
   );
 }
 
-function SharedAssistantMessage({ message }: { message: StoredMessage }) {
-  const segments = groupAssistantParts(message.parts);
+function SharedTranscriptSegments({ parts, segmentKey }: { parts: Part[]; segmentKey: string }) {
+  const segments = groupAssistantParts(parts);
   if (segments.length === 0) {
     return null;
   }
@@ -49,14 +49,14 @@ function SharedAssistantMessage({ message }: { message: StoredMessage }) {
     <div className="space-y-2 py-2">
       {segments.map((segment, index) =>
         segment.type === 'chat' ? (
-          <div key={`${message.info.id}-chat-${index}`} className="space-y-2">
+          <div key={`${segmentKey}-chat-${index}`} className="space-y-2">
             {segment.parts.map((part, partIndex) => (
               <PartRenderer key={part.id || partIndex} part={part} isStreaming={false} />
             ))}
           </div>
         ) : (
           <AgentWorkGroup
-            key={`${message.info.id}-work-${index}`}
+            key={`${segmentKey}-work-${index}`}
             parts={segment.parts}
             summary={segment.summary}
           />
@@ -73,12 +73,22 @@ export function SharedSessionTranscript({ messages }: { messages: StoredMessage[
 
   return (
     <div className="flex flex-col">
-      {messages.map(message => {
-        if (isUserMessage(message.info)) {
-          return <MessageBubble key={message.info.id} message={message} isStreaming={false} />;
+      {groupConsecutiveAssistantMessages(messages).map(turn => {
+        const first = turn[0];
+        if (!first) {
+          return null;
         }
-        if (isAssistantMessage(message.info)) {
-          return <SharedAssistantMessage key={message.info.id} message={message} />;
+        if (isUserMessage(first.info)) {
+          return <MessageBubble key={first.info.id} message={first} isStreaming={false} />;
+        }
+        if (isAssistantMessage(first.info)) {
+          return (
+            <SharedTranscriptSegments
+              key={first.info.id}
+              parts={turn.flatMap(message => message.parts)}
+              segmentKey={first.info.id}
+            />
+          );
         }
         return null;
       })}

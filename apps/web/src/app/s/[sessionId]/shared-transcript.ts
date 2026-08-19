@@ -1,5 +1,6 @@
 import type { Part, StoredMessage, ToolPart } from '@/components/cloud-agent-next/types';
 import {
+  isAssistantMessage,
   isFilePart,
   isPatchPart,
   isReasoningPart,
@@ -10,6 +11,7 @@ import {
   isToolPart,
   shouldRenderReasoningPart,
 } from '@/components/cloud-agent-next/types';
+import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 
 type SnapshotMessage = {
   info: { id: string; role?: unknown; time?: unknown };
@@ -33,7 +35,7 @@ function hasCreatedTime(info: SnapshotMessage['info']): boolean {
 
 export function toSharedTranscriptMessages(messages: SnapshotMessage[]): StoredMessage[] {
   const result: StoredMessage[] = [];
-  for (const message of messages) {
+  for (const message of sortSessionMessagesForDisplay(messages)) {
     if (message.info.role !== 'user' && message.info.role !== 'assistant') {
       continue;
     }
@@ -45,7 +47,33 @@ export function toSharedTranscriptMessages(messages: SnapshotMessage[]): StoredM
   return result;
 }
 
+export function groupConsecutiveAssistantMessages(messages: StoredMessage[]): StoredMessage[][] {
+  const turns: StoredMessage[][] = [];
+  for (const message of messages) {
+    const lastTurn = turns.at(-1);
+    const lastMessage = lastTurn?.at(-1);
+    if (
+      lastTurn &&
+      lastMessage &&
+      isAssistantMessage(lastMessage.info) &&
+      isAssistantMessage(message.info)
+    ) {
+      lastTurn.push(message);
+      continue;
+    }
+    turns.push([message]);
+  }
+  return turns;
+}
+
+function isSnapshotProgressPart(part: Part): boolean {
+  return isTextPart(part) && part.synthetic === true && part.text.includes('Initializing snapshot');
+}
+
 function isHiddenSharedPart(part: Part): boolean {
+  if (isSnapshotProgressPart(part)) {
+    return true;
+  }
   if (isStepStartPart(part) || isStepFinishPart(part) || isPatchPart(part)) {
     return true;
   }

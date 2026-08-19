@@ -221,6 +221,9 @@ const SharedSessionMetadataResponseSchema = z
     success: z.literal(true),
     title: z.string().nullable(),
     owner_name: z.string().nullable(),
+    git_url: z.string().nullable().optional(),
+    git_branch: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
   })
   .strict();
 
@@ -304,6 +307,14 @@ export async function unshareSession(sessionId: string, userId: string): Promise
   }
 }
 
+export type SharedSessionMetadata = {
+  title: string | null;
+  ownerName: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  createdAt: string | null;
+};
+
 /**
  * Resolve the metadata for a public session share token without downloading
  * the session snapshot. The token is intentionally never included in errors
@@ -311,7 +322,7 @@ export async function unshareSession(sessionId: string, userId: string): Promise
  */
 export async function fetchSharedSessionMetadata(
   shareToken: string
-): Promise<{ title: string | null; ownerName: string | null } | null> {
+): Promise<SharedSessionMetadata | null> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
@@ -346,7 +357,13 @@ export async function fetchSharedSessionMetadata(
     throw error;
   }
 
-  return { title: parsed.data.title, ownerName: parsed.data.owner_name };
+  return {
+    title: parsed.data.title,
+    ownerName: parsed.data.owner_name,
+    gitUrl: parsed.data.git_url ?? null,
+    gitBranch: parsed.data.git_branch ?? null,
+    createdAt: parsed.data.created_at ?? null,
+  };
 }
 
 /**

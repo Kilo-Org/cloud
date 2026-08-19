@@ -23,9 +23,6 @@ jest.mock('@/lib/session-ingest-client', () => ({
   fetchSharedSessionSnapshot: jest.fn(),
 }));
 jest.mock('@/components/AnimatedLogo', () => ({ AnimatedLogo: () => null }));
-jest.mock('@/components/CopyableCommand', () => ({
-  CopyableCommand: ({ command }: { command: string }) => React.createElement('code', null, command),
-}));
 jest.mock('@/app/share/[shareId]/open-in-cli-button', () => ({
   OpenInCliButton: ({ command }: { command: string }) =>
     React.createElement('button', null, command),
@@ -51,6 +48,9 @@ describe('SharedSessionPage', () => {
     mockFetchSharedSessionMetadata.mockResolvedValue({
       title: 'A shared session',
       ownerName: 'Ada Lovelace',
+      gitUrl: 'https://github.com/owner/repo.git',
+      gitBranch: 'main',
+      createdAt: '2026-08-19T12:00:00.000Z',
     });
     mockFetchSharedSessionSnapshot.mockResolvedValue({
       info: { id: 'ses_1' },
@@ -68,12 +68,39 @@ describe('SharedSessionPage', () => {
 
     expect(mockFetchSharedSessionMetadata).toHaveBeenCalledWith(shareToken);
     expect(mockFetchSharedSessionSnapshot).toHaveBeenCalledWith(shareToken);
-    expect(html).toContain('Ada Lovelace shared a session');
+    expect(html).toContain('Shared by Ada Lovelace');
     expect(html).toContain('A shared session');
+    expect(html).toContain('owner/repo');
+    expect(html).toContain('main');
+    expect(html).toContain('Aug 19, 2026');
     expect(html).toContain('data-message-count="1"');
     expect(html).toContain('kilo import https://app.test.example.com/s/' + shareToken);
+    expect(html).toContain('https://kilo.ai/install');
+    expect(html).toContain('Install Kilo');
     expect(html).toContain(`data-session-id="${shareToken}"`);
     expect(html).toContain(`data-path="/s/${shareToken}"`);
+  });
+
+  it('falls back to a shared-by heading when the session has no title', async () => {
+    const shareToken = 'untitled.share.token';
+    mockFetchSharedSessionMetadata.mockResolvedValue({
+      title: null,
+      ownerName: 'Grace Hopper',
+      gitUrl: null,
+      gitBranch: null,
+      createdAt: null,
+    });
+    mockFetchSharedSessionSnapshot.mockResolvedValue({
+      info: { id: 'ses_2' },
+      messages: [],
+    });
+
+    const html = renderToStaticMarkup(
+      await SharedSessionPage({ params: Promise.resolve({ sessionId: shareToken }) })
+    );
+
+    expect(html).toContain('Grace Hopper shared a session');
+    expect(html).not.toContain('Shared by Grace Hopper');
   });
 
   it('uses not-found behavior when metadata cannot be resolved', async () => {

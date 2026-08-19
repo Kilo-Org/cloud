@@ -1,4 +1,7 @@
-import type { SessionMessage } from '@/lib/session-ingest-client';
+type IdentifiedSessionMessage = {
+  info: { id: string };
+  parts: Array<{ id: string }>;
+};
 
 /**
  * Message display ordering for V2 (StoredMessage-shaped) sessions.
@@ -12,10 +15,13 @@ import type { SessionMessage } from '@/lib/session-ingest-client';
  * `msg_`/`part_` + big-endian hex timestamp + random suffix, so plain
  * lexicographic ordering matches chronological order.
  *
- * Read-only views that render the raw export (e.g. the admin session trace
- * viewer) must apply the same ordering to match what users see.
+ * Read-only views that render the raw export (the admin session trace viewer
+ * and the public shared-session page) must apply the same ordering to match
+ * what users see.
  */
-export function sortSessionMessagesForDisplay(messages: SessionMessage[]): SessionMessage[] {
+export function sortSessionMessagesForDisplay<T extends IdentifiedSessionMessage>(
+  messages: T[]
+): T[] {
   const byIdAscending = (a: { id: string }, b: { id: string }) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 

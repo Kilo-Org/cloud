@@ -1422,6 +1422,9 @@ export function SessionDetailContent({
         onLoadOlderMessages={() => {
           void manager.loadOlderMessages();
         }}
+        onReachedBottom={() => {
+          manager.trimRetainedHistory();
+        }}
         renderItem={renderItem}
       />
     );

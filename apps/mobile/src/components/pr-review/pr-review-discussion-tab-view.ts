@@ -4,17 +4,8 @@
 // seven outcomes can be unit-tested. The tab renders exactly what it rendered
 // before; this module only owns the decision.
 
-export type DiscussionTabViewKind =
-  | 'permission'
-  | 'not-found'
-  | 'reconnect'
-  | 'retryable'
-  | 'loading'
-  | 'empty'
-  | 'happy';
-
 export type DiscussionTabView = {
-  kind: DiscussionTabViewKind;
+  kind: 'permission' | 'not-found' | 'reconnect' | 'retryable' | 'loading' | 'empty' | 'happy';
 };
 
 export function selectDiscussionTabView(args: {

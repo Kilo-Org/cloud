@@ -1635,18 +1635,6 @@ export async function anonymizeCloudUserData(
       )
     );
 
-  // Microdollar usage metadata: strip user-authored prompt prefix and system prompt reference
-  await tx.execute(sql`
-    UPDATE ${microdollar_usage_metadata}
-    SET user_prompt_prefix = NULL,
-        system_prompt_prefix_id = NULL
-    WHERE id IN (
-      SELECT id FROM ${microdollar_usage}
-      WHERE kilo_user_id = ${userId}
-    )
-    AND (user_prompt_prefix IS NOT NULL OR system_prompt_prefix_id IS NOT NULL)
-  `);
-
   // ── 4. Nullify FK references ─────────────────────────────────────────
   await tx
     .update(user_feedback)

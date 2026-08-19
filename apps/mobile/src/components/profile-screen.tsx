@@ -43,8 +43,21 @@ import {
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
-function providerIcon(_provider: string) {
-  return KeyRound;
+const PROVIDER_LABELS: Record<string, string> = {
+  anaconda: 'Anaconda',
+  apple: 'Apple',
+  discord: 'Discord',
+  email: 'Email',
+  'fake-login': 'Test Account',
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  google: 'Google',
+  linkedin: 'LinkedIn',
+  workos: 'Enterprise SSO',
+};
+
+function providerLabel(provider: string) {
+  return PROVIDER_LABELS[provider] ?? provider;
 }
 
 export function ProfileScreen() {
@@ -244,24 +257,17 @@ export function ProfileScreen() {
               />
             )}
 
-            {data?.providers.map(p => {
-              const Icon = providerIcon(p.provider);
-              return (
-                <Animated.View
-                  key={`${p.provider}-${p.email}`}
-                  className="flex-row items-start gap-3 rounded-lg bg-secondary p-3"
-                  entering={FadeIn.duration(200)}
-                >
-                  <Icon size={18} color={colors.secondaryForeground} />
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-sm font-medium capitalize">{p.provider}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {p.email}
-                    </Text>
-                  </View>
-                </Animated.View>
-              );
-            })}
+            {data?.providers.map((p, index) => (
+              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+                <ConfigureRow
+                  icon={KeyRound}
+                  title={providerLabel(p.provider)}
+                  subtitle={p.email}
+                  className="rounded-lg bg-secondary px-3"
+                  last={index === data.providers.length - 1}
+                />
+              </Animated.View>
+            ))}
           </View>
         )}
 

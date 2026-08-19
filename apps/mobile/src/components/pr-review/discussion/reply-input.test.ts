@@ -24,7 +24,7 @@ const { alertCalls, getTermsStatusMock, acceptTermsMock, draftLoadMock } = vi.ho
   alertCalls: [] as AlertCall[],
   getTermsStatusMock: vi.fn(),
   acceptTermsMock: vi.fn(),
-  draftLoadMock: vi.fn(() => ({ settled: true, value: null })),
+  draftLoadMock: vi.fn((): { settled: boolean; value: string | null } => ({ settled: true, value: null })),
 }));
 
 vi.mock('react-native', () => ({
@@ -359,6 +359,46 @@ describe('ReplyInput draft clear on submit', () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(clearDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReplyInput seeds the field from the settled draft during render', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mountReplyInput(): React.ReactElement | null {
+    return findElement({
+      // eslint-disable-next-line new-cap
+      node: ReplyInput({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 42,
+        reply: makeReply(vi.fn()),
+      }),
+      type: 'TextInput',
+      prop: 'accessibilityLabel',
+      value: 'Reply body',
+    });
+  }
+
+  it('seeds the defaultValue from the settled draft value', () => {
+    draftLoadMock.mockReturnValue({ settled: true, value: 'saved reply' });
+    const input = mountReplyInput();
+    if (!input) {
+      throw new Error('Reply body TextInput not found');
+    }
+    expect((input.props as { defaultValue?: string }).defaultValue).toBe('saved reply');
+  });
+
+  it('seeds an empty field when the settled draft has no value (no stale previous-thread text)', () => {
+    draftLoadMock.mockReturnValue({ settled: true, value: null });
+    const input = mountReplyInput();
+    if (!input) {
+      throw new Error('Reply body TextInput not found');
+    }
+    expect((input.props as { defaultValue?: string }).defaultValue).toBe('');
   });
 });
 

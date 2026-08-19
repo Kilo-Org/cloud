@@ -168,20 +168,17 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
   const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: replyDraftKey });
   useDraftFlushOnBackground(userId, replyDraftKey, true);
 
-  // Restore the stored draft into the input once the load settles for a new
-  // identity/thread, and reset the field so a reused instance never keeps the
-  // previous account's or thread's text (which it could then save under the
-  // new key).
+  // Seed the field once per identity/thread, during render, before the input
+  // mounts. The settled gate already unmounts the field on an identity/entity
+  // change, so re-seeding here (and resetting to empty when there is no draft)
+  // keeps a reused instance from showing or saving the previous account's or
+  // thread's text under the new key.
   const replySeedKey = `${userId ?? 'anonymous'}\u0000${replyDraftKey}`;
   const seededKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!draft.settled || seededKeyRef.current === replySeedKey) {
-      return;
-    }
+  if (draft.settled && seededKeyRef.current !== replySeedKey) {
     seededKeyRef.current = replySeedKey;
     bodyRef.current = draft.value ?? '';
-    setResetKey(prev => prev + 1);
-  }, [draft.settled, draft.value, replySeedKey]);
+  }
 
   // Mirror mutation error into the inline box. Reply is NOT
   // optimistic, so the user can hit the inline error and retry

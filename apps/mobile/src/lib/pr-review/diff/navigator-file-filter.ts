@@ -12,8 +12,3 @@ export function filterNavigatorFiles(files: PrReviewFile[], query: string): PrRe
   }
   return files.filter(file => file.path.toLowerCase().includes(needle));
 }
-
-/** True when a search is active, so the navigator must load the full listed set. */
-export function shouldLoadAllFiles(query: string): boolean {
-  return query.trim().length > 0;
-}

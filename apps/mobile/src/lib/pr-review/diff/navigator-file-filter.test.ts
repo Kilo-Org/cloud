@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterNavigatorFiles, shouldLoadAllFiles } from './navigator-file-filter';
+import { filterNavigatorFiles } from './navigator-file-filter';
 import { type PrReviewFile } from './pr-review-file-types';
 
 function makeFile(path: string): PrReviewFile {
@@ -29,19 +29,5 @@ describe('filterNavigatorFiles', () => {
   it('returns [] when nothing matches', () => {
     const files = [makeFile('a.ts'), makeFile('b.ts')];
     expect(filterNavigatorFiles(files, 'zzz')).toEqual([]);
-  });
-});
-
-describe('shouldLoadAllFiles', () => {
-  it('is false for an empty string', () => {
-    expect(shouldLoadAllFiles('')).toBe(false);
-  });
-
-  it('is false for whitespace only', () => {
-    expect(shouldLoadAllFiles('   ')).toBe(false);
-  });
-
-  it('is true for a real needle', () => {
-    expect(shouldLoadAllFiles('src')).toBe(true);
   });
 });

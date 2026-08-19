@@ -34,10 +34,7 @@ import {
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
-import {
-  filterNavigatorFiles,
-  shouldLoadAllFiles,
-} from '@/lib/pr-review/diff/navigator-file-filter';
+import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
@@ -99,7 +96,7 @@ export function PrDiffFileNavigator({
   const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
   const fetchAll = useFetchToCompletion(query, changedFiles);
 
-  const hasActiveSearch = shouldLoadAllFiles(searchRef.current);
+  const hasActiveSearch = searchRef.current.trim().length > 0;
 
   // Rule 2: an active search drives fetch-to-completion so the filter still
   // searches the full listed set. `run()` no-ops while the first page is in

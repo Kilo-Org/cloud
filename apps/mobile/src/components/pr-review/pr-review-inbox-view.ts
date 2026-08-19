@@ -31,15 +31,7 @@ export function selectPrInboxView(args: {
   const { isLoading, itemCount, firstPageErrorState, laterPageError } = args;
 
   if (firstPageErrorState) {
-    let kind: PrInboxViewKind = 'retryable';
-    if (firstPageErrorState.kind === 'permission') {
-      kind = 'permission';
-    } else if (firstPageErrorState.kind === 'not-found') {
-      kind = 'not-found';
-    } else if (firstPageErrorState.kind === 'reconnect') {
-      kind = 'reconnect';
-    }
-    return { kind, showLoadMoreRetry: false };
+    return { kind: firstPageErrorState.kind, showLoadMoreRetry: false };
   }
 
   if (isLoading) {

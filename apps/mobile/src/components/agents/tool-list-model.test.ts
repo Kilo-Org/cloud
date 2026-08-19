@@ -132,6 +132,86 @@ describe('buildResultRowsModel — glob rows', () => {
   });
 });
 
+describe('buildResultRowsModel — live CLI shapes', () => {
+  it('lifts glob No files found into the caption and keeps no rows', () => {
+    const model = buildResultRowsModel('No files found', 'glob');
+    expect(model.caption).toBe('No files found');
+    expect(model.rows).toEqual([]);
+    expect(model.truncated).toBe(false);
+  });
+
+  it('keeps a single glob path as one row with no caption', () => {
+    const model = buildResultRowsModel('/repo/apps/mobile/AGENTS.md', 'glob');
+    expect(model.caption).toBeUndefined();
+    expect(model.rows).toEqual([{ text: '/repo/apps/mobile/AGENTS.md', emphasis: false }]);
+    expect(model.truncated).toBe(false);
+  });
+
+  it('keeps every glob path as a row', () => {
+    const model = buildResultRowsModel('/repo/a.ts\n/repo/b.ts\n/repo/c.ts', 'glob');
+    expect(model.rows).toEqual([
+      { text: '/repo/a.ts', emphasis: false },
+      { text: '/repo/b.ts', emphasis: false },
+      { text: '/repo/c.ts', emphasis: false },
+    ]);
+  });
+
+  it('drops the opencode truncated note and flags truncation', () => {
+    const output =
+      '/repo/a.ts\n/repo/b.ts\n\n(Results are truncated: showing first 100 results. Consider using a more specific path or pattern.)';
+    const model = buildResultRowsModel(output, 'glob');
+    expect(model.rows).toEqual([
+      { text: '/repo/a.ts', emphasis: false },
+      { text: '/repo/b.ts', emphasis: false },
+    ]);
+    expect(model.truncated).toBe(true);
+  });
+
+  it('drops the core truncated note and flags truncation', () => {
+    const output = '/repo/a.ts\n\n(Results truncated: showing first 1 files.)';
+    const model = buildResultRowsModel(output, 'glob');
+    expect(model.rows).toEqual([{ text: '/repo/a.ts', emphasis: false }]);
+    expect(model.truncated).toBe(true);
+  });
+
+  it('drops the partial note without flagging truncation', () => {
+    const output = '/repo/a.ts\n\n(Some discovered files could not be read.)';
+    const model = buildResultRowsModel(output, 'glob');
+    expect(model.rows).toEqual([{ text: '/repo/a.ts', emphasis: false }]);
+    expect(model.truncated).toBe(false);
+  });
+
+  it('lifts grep No files found into the caption and keeps no rows', () => {
+    const model = buildResultRowsModel('No files found', 'grep');
+    expect(model.caption).toBe('No files found');
+    expect(model.rows).toEqual([]);
+  });
+
+  it('keeps the live grep header and match rows', () => {
+    const output = 'Found 1 matches\n/repo/src/a.ts:\n  Line 1: hello';
+    const model = buildResultRowsModel(output, 'grep');
+    expect(model.caption).toBe('Found 1 matches');
+    expect(model.rows).toEqual([
+      { text: '/repo/src/a.ts:', emphasis: true },
+      { text: 'Line 1: hello', emphasis: false },
+    ]);
+  });
+
+  it('drops grep truncated and partial notes without adding rows', () => {
+    const output =
+      'Found 2 matches\n/repo/src/a.ts:\n  Line 1: hello\n\n' +
+      '(Results truncated. Consider using a more specific path or pattern.)\n' +
+      '(Some paths were inaccessible.)';
+    const model = buildResultRowsModel(output, 'grep');
+    expect(model.caption).toBe('Found 2 matches');
+    expect(model.rows).toEqual([
+      { text: '/repo/src/a.ts:', emphasis: true },
+      { text: 'Line 1: hello', emphasis: false },
+    ]);
+    expect(model.truncated).toBe(true);
+  });
+});
+
 describe('buildResultRowsModel — list rows', () => {
   it('renders every line as a plain row', () => {
     const model = buildResultRowsModel('added.ts\napp.ts\ngone.ts', 'list');

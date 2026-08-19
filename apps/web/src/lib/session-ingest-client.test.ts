@@ -9,6 +9,7 @@ import {
   shareSession,
   unshareSession,
   fetchSharedSessionMetadata,
+  fetchSharedSessionSnapshot,
   invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
 
@@ -562,6 +563,74 @@ describe('fetchSharedSessionMetadata', () => {
     });
 
     await expect(shareSession('ses_abc123', 'user_123')).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSharedSessionSnapshot
+// ---------------------------------------------------------------------------
+
+describe('fetchSharedSessionSnapshot', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  it('returns the parsed snapshot and avoids caching', async () => {
+    const snapshot = makeSnapshot([
+      { role: 'assistant', parts: [{ type: 'text', text: 'hello' }] },
+    ]);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(snapshot),
+    });
+
+    await expect(fetchSharedSessionSnapshot('share.jwt.token')).resolves.toEqual(snapshot);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/session/share.jwt.token',
+      { cache: 'no-store' }
+    );
+  });
+
+  it('returns null on 404', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' });
+
+    await expect(fetchSharedSessionSnapshot('share.jwt.token')).resolves.toBeNull();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('throws on an operational response without capturing the token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+
+    await expect(fetchSharedSessionSnapshot('secret.share.jwt.token')).rejects.toThrow(
+      'Session ingest snapshot failed: 503 Service Unavailable'
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+        extra: { status: 503 },
+      })
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
+  });
+
+  it('throws on a malformed successful response without capturing the token', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ messages: 'nope' }),
+    });
+
+    await expect(fetchSharedSessionSnapshot('secret.share.jwt.token')).rejects.toThrow(
+      'Session ingest snapshot response was malformed'
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
   });
 });
 

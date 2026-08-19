@@ -349,6 +349,48 @@ export async function fetchSharedSessionMetadata(
   return { title: parsed.data.title, ownerName: parsed.data.owner_name };
 }
 
+/**
+ * Fetch the public session snapshot for a share token. The token is
+ * intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSessionSnapshot(
+  shareToken: string
+): Promise<SessionSnapshot | null> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}`;
+  const response = await fetch(url, { cache: 'no-store' });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      `Session ingest snapshot failed: ${response.status} ${response.statusText}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+      extra: { status: response.status },
+    });
+    throw error;
+  }
+
+  const parsed = SessionSnapshotSchema.safeParse(await response.json().catch(() => undefined));
+  if (!parsed.success) {
+    const error = new Error('Session ingest snapshot response was malformed');
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+      extra: { status: response.status, issues: parsed.error.issues },
+    });
+    throw error;
+  }
+
+  return parsed.data;
+}
+
 // ---------------------------------------------------------------------------
 // Authorization cache invalidation
 // ---------------------------------------------------------------------------

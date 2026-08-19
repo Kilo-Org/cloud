@@ -1,5 +1,10 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { createOperationCoordinator } from '@/components/agents/use-history-backfill';
@@ -21,7 +26,11 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
-import { scheduleCacheMaintenance, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import {
+  reconcileFirstPage,
+  scheduleCacheMaintenance,
+  withInfiniteRetention,
+} from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 
@@ -216,6 +225,8 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
 
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const sortBy = resolveSortBy(options?.sortBy);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const stored = useStoredSessions(options);
   const active = useActiveSessions(options);
 
@@ -275,13 +286,14 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     [storedSessions, sortBy]
   );
 
-  // Departure-triggered stored refetch. Only the active poll has a refetch
+  // Departure-triggered stored reset. Only the active poll has a refetch
   // interval (10s); the stored/history list does not. When a session id
   // leaves the active set, the just-terminated session has not yet shown up
-  // in history, so refetching once makes it reappear. We use `refetch()` so
-  // the fresh fetch bypasses the 30s `staleTime` that would otherwise keep
-  // the cached page hidden. The refetch only refreshes loaded pages —
-  // sufficient because a just-terminated session always lands on page 1.
+  // in history, so resetting the stored list to page one and refetching makes
+  // it reappear. `reconcileFirstPage` empties the cached pages and invalidates
+  // the prefix, so the refetch starts from `initialPageParam` (page one). A
+  // plain `refetch()` would only refresh pages still in cache, and after
+  // `maxPages` evicts page one the newest session never reappears.
   //
   // The guard is strictly "id present before, absent now": the empty→populated
   // transition (first poll) is ignored, and the initial mount with a non-empty
@@ -302,10 +314,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     }
     if (departedId) {
       scheduleCacheMaintenance(() => {
-        void storedRefetch();
+        reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
       });
     }
-  }, [activeSessionIds, storedRefetch]);
+  }, [activeSessionIds, queryClient, trpc]);
 
   return {
     storedSessions,

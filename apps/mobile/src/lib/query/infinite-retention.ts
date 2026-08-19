@@ -23,8 +23,13 @@ export function withInfiniteRetention<T extends object>(
 }
 
 /**
- * Trim every matching infinite query to page one, then invalidate the same
- * prefix so the retained page is refetched.
+ * Reset every matching infinite query to empty, then invalidate the same
+ * prefix so page one is refetched from `initialPageParam`.
+ *
+ * The reset empties `pages`/`pageParams` rather than keeping `pages[0]`:
+ * after `maxPages` evicts the oldest page from the front of the array,
+ * `pages[0]` is no longer page one, so keeping it would refetch the wrong
+ * cursor. Invalidate then refills page one from `initialPageParam`.
  *
  * Uses `setQueriesData` (plural) on purpose: callers hold an invalidate
  * prefix while the live cache keys carry the query input as well, so
@@ -41,11 +46,10 @@ export function reconcileFirstPage(
     if (typeof old !== 'object' || old === null || !('pages' in old)) {
       return old;
     }
-    const data = old as { pages: unknown[]; pageParams: unknown[] };
     return {
       ...old,
-      pages: data.pages.slice(0, 1),
-      pageParams: data.pageParams.slice(0, 1),
+      pages: [],
+      pageParams: [],
     };
   });
   void queryClient.invalidateQueries({ queryKey: queryKeyPrefix });

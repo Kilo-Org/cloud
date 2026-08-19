@@ -42,7 +42,7 @@ describe('withInfiniteRetention', () => {
 });
 
 describe('reconcileFirstPage', () => {
-  it('trims to page one through a prefix key when the cached key carries an extra input segment', () => {
+  it('resets a multi-page cached entry to empty pages/pageParams through a prefix key', () => {
     const queryClient = new QueryClient();
     const prefix = ['trpc', 'cliSessionsV2', 'list'];
     const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
@@ -58,8 +58,44 @@ describe('reconcileFirstPage', () => {
     reconcileFirstPage(queryClient, prefix);
 
     const data = queryClient.getQueryData(fullKey) as { pages: Page[]; pageParams: unknown[] };
-    expect(data.pages).toHaveLength(1);
-    expect(data.pageParams).toHaveLength(1);
+    expect(data.pages).toEqual([]);
+    expect(data.pageParams).toEqual([]);
+  });
+
+  it('resets to empty even when maxPages has trimmed page one from the front', () => {
+    const queryClient = new QueryClient();
+    const prefix = ['trpc', 'cliSessionsV2', 'list'];
+    const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
+    // After maxPages evicts page 1, `pages[0]` is page 2, not page 1. The
+    // reset must not keep that stale head — it empties the list instead.
+    queryClient.setQueryData(fullKey, {
+      pages: [
+        page([{ id: 'b', title: 'b' }]),
+        page([{ id: 'c', title: 'c' }]),
+        page([{ id: 'd', title: 'd' }]),
+      ],
+      pageParams: [1, 2, 3],
+    });
+
+    reconcileFirstPage(queryClient, prefix);
+
+    const data = queryClient.getQueryData(fullKey) as { pages: Page[]; pageParams: unknown[] };
+    expect(data.pages).toEqual([]);
+    expect(data.pageParams).toEqual([]);
+  });
+
+  it('invalidates the prefix so page one is refetched from initialPageParam', () => {
+    const queryClient = new QueryClient();
+    const prefix = ['trpc', 'cliSessionsV2', 'list'];
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    queryClient.setQueryData([...prefix, { input: { organizationId: 'org-1' } }], {
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+
+    reconcileFirstPage(queryClient, prefix);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: prefix });
   });
 
   it('leaves a non-infinite entry under the same prefix untouched', () => {

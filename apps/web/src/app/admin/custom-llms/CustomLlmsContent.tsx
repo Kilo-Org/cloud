@@ -116,11 +116,11 @@ export function CustomLlmsContent() {
     setEditor(initialEditorState);
   }, []);
 
-  const openCopy = useCallback((sourcePublicId: string) => {
+  const openCopy = useCallback((sourcePublicId: string, sourceDisplayName: string) => {
     setCopy({
       sourcePublicId,
-      publicId: '',
-      displayName: '',
+      publicId: sourcePublicId,
+      displayName: sourceDisplayName,
       validationError: null,
     });
   }, []);
@@ -335,7 +335,7 @@ export function CustomLlmsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => openCopy(item.public_id)}
+                      onClick={() => openCopy(item.public_id, item.definition.display_name)}
                       aria-label={`Copy ${item.public_id}`}
                       title="Copy custom LLM"
                     >

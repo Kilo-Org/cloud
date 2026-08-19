@@ -10,17 +10,20 @@ export type DeletionHandlerRetry = {
   kind: 'retry';
   errorCode: string;
   httpStatusClass?: string;
+  progress?: UserDeletionTaskProgress;
 };
 
 export type DeletionHandlerRateLimited = {
   kind: 'rate_limited';
   retryAfterMs: number;
+  progress?: UserDeletionTaskProgress;
 };
 
 export type DeletionHandlerNeedsAttention = {
   kind: 'needs_attention';
   errorCode: string;
   resourceHmac?: string;
+  progress?: UserDeletionTaskProgress;
 };
 
 export type DeletionHandlerManualAction = {

@@ -1,6 +1,7 @@
 import { and, eq, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
+import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { generateInternalServiceToken } from '@/lib/tokens';
@@ -119,6 +120,14 @@ async function deleteLeafSession(
   return { kind: 'deleted' };
 }
 
+function withProgress(
+  outcome: DeletionHandlerOutcome,
+  progress: UserDeletionTaskProgress
+): DeletionHandlerOutcome {
+  if (outcome.kind === 'not_applicable') return outcome;
+  return { ...outcome, progress };
+}
+
 export const handleCliV2Sessions: DeletionHandler = async ({ request, step, context }) => {
   const absence = userIdKeyedAbsenceOutcome(request);
   if (absence) return absence;
@@ -140,7 +149,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
     const leaves = await loadLeafSessions(userId);
     if (leaves.length === 0) {
       if (await anySessionExists(userId)) {
-        return { kind: 'needs_attention', errorCode: 'cyclic_session_graph' };
+        return { kind: 'needs_attention', errorCode: 'cyclic_session_graph', progress };
       }
       return (progress.processed_count ?? 0) === 0
         ? { kind: 'not_applicable' }
@@ -165,7 +174,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
       if (!firstFailure) firstFailure = result.outcome;
     }
 
-    if (firstFailure) return firstFailure;
+    if (firstFailure) return withProgress(firstFailure, progress);
     if (sawConflict) {
       return { kind: 'continue', progress };
     }

@@ -192,6 +192,53 @@ describe('applyReasoningDetailsTransform', () => {
     expect(request.body.messages[0]).not.toHaveProperty('reasoning_details');
   });
 
+  it('keeps id-less Gemini signatures on the message when tool calls are present', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'message-signature',
+                format: 'google-gemini-v1',
+              },
+              {
+                type: 'reasoning.encrypted',
+                data: 'tool-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body.messages[0]).toMatchObject({
+      extra_content: { google: { thought_signature: 'message-signature' } },
+      tool_calls: [
+        {
+          id: 'call-1',
+          extra_content: { google: { thought_signature: 'tool-signature' } },
+        },
+      ],
+    });
+  });
+
   it('does not touch Messages requests', () => {
     const request = makeMessagesRequest('vendor/model');
 

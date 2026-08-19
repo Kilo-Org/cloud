@@ -105,7 +105,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
       const toolCall =
         typeof detail.id === 'string'
           ? toolCalls.find(candidate => candidate.id === detail.id)
-          : toolCalls[0];
+          : undefined;
       setGeminiThoughtSignature(toolCall ?? message, detail.data);
     }
   }

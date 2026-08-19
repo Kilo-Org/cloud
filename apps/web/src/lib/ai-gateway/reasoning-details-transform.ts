@@ -43,6 +43,8 @@ function mapGeminiThoughtToReasoningDetails(value: unknown) {
     return;
   }
 
+  // OpenRouter commonly emits every block with index 0. Its AI SDK provider
+  // merges adjacent text by type and always keeps encrypted blocks discrete.
   const details: Array<ReasoningDetailText | ReasoningDetailEncrypted> = [];
   const google = getGoogleExtraContent(value);
   if (typeof value.content === 'string' && google?.thought === true) {

@@ -2513,7 +2513,14 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.childSessionHydrationState
       );
-      expect(childHydrationState('child-1')).toEqual({ status: 'ready' });
+      expect(childHydrationState('child-1')).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      });
     });
 
     it('merges fetched history into live child messages without duplicating them', async () => {
@@ -2584,7 +2591,14 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.childSessionHydrationState
       );
-      expect(updatedChildHydrationState('child-deduped')).toEqual({ status: 'ready' });
+      expect(updatedChildHydrationState('child-deduped')).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      });
     });
 
     it('ignores stale child snapshots after the active root session changes', async () => {
@@ -2646,7 +2660,365 @@ describe('createSessionManager', () => {
       const retriedChildHydrationState = atomValue<
         (childSessionId: string) => { status: string; message?: string }
       >(config.store, mgr.atoms.childSessionHydrationState);
-      expect(retriedChildHydrationState('child-retry')).toEqual({ status: 'ready' });
+      expect(retriedChildHydrationState('child-retry')).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      });
+    });
+
+    it('prefers fetchSnapshotPage over fetchSnapshot and stores the child cursor', async () => {
+      const childMessage = createStoredMessage('msg-child-page', 'child-page', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child-page',
+        sessionID: 'child-page',
+        messageID: childMessage.info.id,
+        text: 'Paged child message',
+      });
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'child-page',
+          messages: [{ info: childMessage.info, parts: [childPart] }],
+          nextCursor: 'cursor-A',
+        })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      await mgr.hydrateChildSession(kiloId('child-page'));
+
+      expect(fetchSnapshotPage).toHaveBeenCalledWith(kiloId('child-page'), {});
+      expect(config.fetchSnapshot).not.toHaveBeenCalled();
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-page')).toEqual([
+        { info: childMessage.info, parts: [childPart] },
+      ]);
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-page')).toEqual({
+        status: 'ready',
+        cursor: 'cursor-A',
+        hasOlder: true,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      });
+    });
+
+    it('sets the error state when the first child page is null', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => null);
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-null'));
+
+      const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(state('child-null')).toEqual({
+        status: 'error',
+        message: 'This session is no longer available.',
+      });
+    });
+
+    it('sets the error state when the first child page is a typed failure', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-fail'));
+
+      const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(state('child-fail')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('loadOlderChildMessages pages by the child cursor and updates only per-child state', async () => {
+      const firstMessage = createStoredMessage('msg-child-old-1', 'child-old', 'assistant');
+      const secondMessage = createStoredMessage('msg-child-old-2', 'child-old', 'assistant');
+      const firstPart = stubTextPart({
+        id: 'part-child-old-1',
+        sessionID: 'child-old',
+        messageID: firstMessage.info.id,
+        text: 'First page',
+      });
+      const secondPart = stubTextPart({
+        id: 'part-child-old-2',
+        sessionID: 'child-old',
+        messageID: secondMessage.info.id,
+        text: 'Second page',
+      });
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: 'child-old',
+            messages: [{ info: firstMessage.info, parts: [firstPart] }],
+            nextCursor: 'cursor-A',
+          });
+        }
+        return makePage({
+          kiloSessionId: 'child-old',
+          messages: [{ info: secondMessage.info, parts: [secondPart] }],
+          nextCursor: null,
+        });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      await mgr.hydrateChildSession(kiloId('child-old'));
+
+      await mgr.loadOlderChildMessages(kiloId('child-old'));
+
+      expect(fetchSnapshotPage).toHaveBeenCalledWith(kiloId('child-old'), {
+        cursor: 'cursor-A',
+      });
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-old')).toEqual([
+        { info: firstMessage.info, parts: [firstPart] },
+        { info: secondMessage.info, parts: [secondPart] },
+      ]);
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-old')).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      });
+      // Root pagination state is untouched by the child load.
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+    });
+
+    it('loadOlderChildMessages is a no-op for a non-ready child', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'child-x' })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      fetchSnapshotPage.mockClear();
+
+      await mgr.loadOlderChildMessages(kiloId('child-x'));
+
+      expect(fetchSnapshotPage).not.toHaveBeenCalled();
+    });
+
+    it('loadOlderChildMessages keeps status ready and surfaces a retryable older error', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+        return { kind: 'retryable_failure' as const };
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-retryable'));
+      await mgr.loadOlderChildMessages(kiloId('child-retryable'));
+
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+          omittedItemCount?: number;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-retryable')).toEqual({
+        status: 'ready',
+        cursor: 'cursor-A',
+        hasOlder: true,
+        isLoadingOlder: false,
+        olderError: { kind: 'retryable' },
+        omittedItemCount: 0,
+      });
+      // Root pagination atoms are untouched by the child's later-page failure.
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+    });
+
+    it('loadOlderChildMessages maps a thrown later-page fetch to a retryable older error', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+        throw new Error('fetch failed');
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-throw'));
+      await mgr.loadOlderChildMessages(kiloId('child-throw'));
+
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+          omittedItemCount?: number;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-throw')).toEqual({
+        status: 'ready',
+        cursor: 'cursor-A',
+        hasOlder: true,
+        isLoadingOlder: false,
+        olderError: { kind: 'retryable' },
+        omittedItemCount: 0,
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+    });
+
+    it('loadOlderChildMessages surfaces invalid_data as a non-retryable older error', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+        return { kind: 'invalid_data' as const };
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-invalid'));
+      await mgr.loadOlderChildMessages(kiloId('child-invalid'));
+
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+          omittedItemCount?: number;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-invalid')).toEqual({
+        status: 'ready',
+        cursor: 'cursor-A',
+        hasOlder: true,
+        isLoadingOlder: false,
+        olderError: { kind: 'invalid_data' },
+        omittedItemCount: 0,
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+    });
+
+    it('loadOlderChildMessages surfaces too_large as a non-retryable older error', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+        return { kind: 'too_large' as const };
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-large'));
+      await mgr.loadOlderChildMessages(kiloId('child-large'));
+
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+          omittedItemCount?: number;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-large')).toEqual({
+        status: 'ready',
+        cursor: 'cursor-A',
+        hasOlder: true,
+        isLoadingOlder: false,
+        olderError: { kind: 'too_large' },
+        omittedItemCount: 0,
+      });
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+    });
+
+    it('loadOlderChildMessages accumulates omittedItemCount across pages', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor)
+          return makePage({ kiloSessionId: id, nextCursor: 'cursor-A', omittedItemCount: 2 });
+        return makePage({ kiloSessionId: id, nextCursor: null, omittedItemCount: 3 });
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-omit'));
+      await mgr.loadOlderChildMessages(kiloId('child-omit'));
+
+      const state = atomValue<
+        (childSessionId: string) => { status: string; omittedItemCount?: number }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-omit')).toEqual(
+        expect.objectContaining({ status: 'ready', omittedItemCount: 5 })
+      );
     });
   });
 

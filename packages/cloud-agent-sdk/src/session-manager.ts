@@ -113,7 +113,19 @@ type StandaloneSuggestion = {
 type ChildSessionHydrationState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready' }
+  | {
+      status: 'ready';
+      /** Opaque cursor for the child's next older page, or null when fully read. */
+      cursor: string | null;
+      /** True when the child has more older history to load. */
+      hasOlder: boolean;
+      /** True while `loadOlderChildMessages` is fetching a page for this child. */
+      isLoadingOlder: boolean;
+      /** Typed failure from the child's most recent older-messages load. */
+      olderError: OlderMessagesError | null;
+      /** Total items omitted across every page loaded for this child so far. */
+      omittedItemCount: number;
+    }
   | { status: 'error'; message: string };
 
 const IDLE_CHILD_SESSION_HYDRATION_STATE = {
@@ -378,6 +390,14 @@ type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   /**
+   * Load the next page of older messages for a hydrated child session using
+   * that child's own cursor. Replays through the child apply path, updates
+   * only per-child pagination state, and never touches the root session's
+   * cursor or atoms. No-op when `fetchSnapshotPage` is absent, the child is
+   * not ready, or the child has no cursor.
+   */
+  loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void>;
+  /**
    * Load the next page of older messages for the active session using the
    * stored cursor. Dedupes concurrent calls, never clears existing/live
    * messages, and classifies typed failures into `olderMessagesError`.
@@ -447,6 +467,8 @@ type SessionManager = {
 // ---------------------------------------------------------------------------
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+/** Terminal message for a child session whose first page is a worker 404 (not-found). */
+const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
 const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
   'selected model is not available for this cloud agent session';
 const SELECTED_MODEL_UNAVAILABLE_ERROR =
@@ -868,6 +890,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     );
   }
 
+  /**
+   * Replay a child page/snapshot's messages into the active storage through
+   * the chat processor. Child pages must never go through `applyPage`: that
+   * path drops any page whose `info.id` is not the root session id, and a
+   * child page never carries the root id.
+   */
+  function replayChildMessages(
+    storage: JotaiSessionStorage,
+    messages: SessionSnapshot['messages']
+  ): void {
+    const chatProcessor = createChatProcessor(storage, {
+      onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
+    });
+    for (const message of messages) {
+      chatProcessor.process({ type: 'message.updated', info: message.info });
+      for (const part of message.parts) {
+        chatProcessor.process({ type: 'message.part.updated', part });
+      }
+    }
+  }
+
   async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
     const existingState = store.get(childSessionHydrationStatesAtom).get(childSessionId);
     if (existingState?.status === 'ready') return;
@@ -887,21 +931,52 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const request = (async () => {
       try {
+        if (config.fetchSnapshotPage) {
+          const page = await config.fetchSnapshotPage(childSessionId, {});
+          if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+
+          // A null page (worker 404) or any typed failure on the first page is
+          // a terminal hydration error for this child.
+          if (page === null) {
+            setChildSessionHydrationState(childSessionId, {
+              status: 'error',
+              message: CHILD_SESSION_NOT_FOUND_MESSAGE,
+            });
+            return;
+          }
+          if (page.kind !== 'success') {
+            setChildSessionHydrationState(childSessionId, {
+              status: 'error',
+              message: formatError(page),
+            });
+            return;
+          }
+
+          replayChildMessages(storage, page.messages);
+          setChildSessionHydrationState(childSessionId, {
+            status: 'ready',
+            cursor: page.nextCursor,
+            hasOlder: page.nextCursor !== null,
+            isLoadingOlder: false,
+            olderError: null,
+            omittedItemCount: page.omittedItemCount,
+          });
+          return;
+        }
+
+        // Legacy fallback: full snapshot, no pagination state.
         const snapshot = await config.fetchSnapshot(childSessionId);
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
 
-        const chatProcessor = createChatProcessor(storage, {
-          onToolAttachment: config.onToolAttachment,
-          onFilePart: config.onFilePart,
+        replayChildMessages(storage, snapshot.messages);
+        setChildSessionHydrationState(childSessionId, {
+          status: 'ready',
+          cursor: null,
+          hasOlder: false,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
         });
-        for (const message of snapshot.messages) {
-          chatProcessor.process({ type: 'message.updated', info: message.info });
-          for (const part of message.parts) {
-            chatProcessor.process({ type: 'message.part.updated', part });
-          }
-        }
-
-        setChildSessionHydrationState(childSessionId, { status: 'ready' });
       } catch (err) {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
         setChildSessionHydrationState(childSessionId, {
@@ -919,6 +994,81 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         childSessionHydrationRequests.delete(childSessionId);
       }
     }
+  }
+
+  async function loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void> {
+    if (!config.fetchSnapshotPage) return;
+    const fetchSnapshotPage = config.fetchSnapshotPage;
+
+    const state = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+    if (!state || state.status !== 'ready') return;
+    if (state.cursor === null) return;
+    if (state.isLoadingOlder) return;
+
+    const storage = store.get(sessionStorageAtom);
+    const rootSessionId = activeSessionId;
+    if (!storage || !rootSessionId) return;
+
+    const generation = childSessionHydrationGeneration;
+    const cursor = state.cursor;
+
+    setChildSessionHydrationState(childSessionId, { ...state, isLoadingOlder: true });
+
+    let outcome: SessionSnapshotPageOutcome | null;
+    try {
+      outcome = await fetchSnapshotPage(childSessionId, { cursor });
+    } catch (_err) {
+      // Network/transport-level failure maps to a retryable older error. The
+      // cursor is preserved so a retry continues from here.
+      if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+      const current = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+      if (!current || current.status !== 'ready') return;
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        isLoadingOlder: false,
+        olderError: { kind: 'retryable' },
+      });
+      return;
+    }
+    if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+
+    const current = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+    if (!current || current.status !== 'ready') return;
+
+    if (outcome === null) {
+      // Access-not-found (worker 404): terminal for this child.
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        isLoadingOlder: false,
+        hasOlder: false,
+        olderError: { kind: 'invalid_data' },
+      });
+      return;
+    }
+
+    if (outcome.kind === 'success') {
+      replayChildMessages(storage, outcome.messages);
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        cursor: outcome.nextCursor,
+        hasOlder: outcome.nextCursor !== null,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: current.omittedItemCount + outcome.omittedItemCount,
+      });
+      return;
+    }
+
+    // Typed failure. A later-page failure only writes `olderError`; it never
+    // changes the hydration status (a first-page failure is handled by
+    // `hydrateChildSession`). `retryable_failure` maps to the retryable kind;
+    // `invalid_data` and `too_large` map directly.
+    setChildSessionHydrationState(childSessionId, {
+      ...current,
+      isLoadingOlder: false,
+      olderError:
+        outcome.kind === 'retryable_failure' ? { kind: 'retryable' } : { kind: outcome.kind },
+    });
   }
 
   function updateCapabilityAtoms(session: CloudAgentSession): void {
@@ -1946,6 +2096,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   return {
     switchSession,
     hydrateChildSession,
+    loadOlderChildMessages,
     loadOlderMessages,
     trimRetainedHistory,
     updateFetchedAssociatedPr,

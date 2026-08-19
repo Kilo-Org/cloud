@@ -51,7 +51,7 @@ const DEFAULT_COMPLETION_TIMEOUT_MS = 90_000;
 interface StreamingToolCallBuffer {
   arguments: string;
   id: string | undefined;
-  name: KiloGatewayToolName | undefined;
+  name: string | undefined;
 }
 
 interface StreamingAccumulator {
@@ -91,32 +91,11 @@ const variantToGatewayEffort: Record<string, string> = {
   xhigh: 'xhigh',
 };
 const toolArgumentsSchema = z.record(z.string(), z.unknown());
-const builtInToolNameSchema = z.enum([
-  'delete_workflow',
-  'eval',
-  'find_in_page',
-  'get_element_details',
-  'get_memory',
-  'get_page_snapshot',
-  'get_viewport_screenshot',
-  'get_workflow',
-  'run_workflow',
-  'save_memory',
-  'save_workflow',
-  'search_memories',
-  'search_workflows',
-  'web_search',
-]);
-// Built-in tools plus dynamically mapped remote MCP tools (mcp_<slug>_<tool>).
-const gatewayToolNameSchema = z.union([
-  builtInToolNameSchema,
-  z.custom<`mcp_${string}`>(value => typeof value === 'string' && value.startsWith('mcp_')),
-]);
 const streamingToolCallDeltaSchema = z.object({
   function: z
     .object({
       arguments: z.string().optional(),
-      name: gatewayToolNameSchema.optional(),
+      name: z.string().optional(),
     })
     .optional(),
   id: z.string().optional(),
@@ -204,10 +183,16 @@ const getString = (value: unknown, message: string): string => {
 
   return value;
 };
-const isGatewayToolName = (value: unknown): value is KiloGatewayToolName =>
-  gatewayToolNameSchema.safeParse(value).success;
-const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCallRequest => {
-  if (value.name === undefined) {
+const parseToolCallBuffer = (
+  value: StreamingToolCallBuffer,
+  allowedToolNames: ReadonlySet<KiloGatewayToolName>
+): KiloGatewayToolCallRequest => {
+  const name =
+    value.name === undefined
+      ? undefined
+      : [...allowedToolNames].find(allowed => allowed === value.name);
+
+  if (name === undefined) {
     throw new TypeError('Gateway stream tool call did not include a supported tool name.');
   }
 
@@ -230,7 +215,7 @@ const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCal
   return {
     arguments: argumentsRecord.data,
     id: getString(value.id, 'Gateway eval tool call did not include an id.'),
-    name: value.name,
+    name,
   };
 };
 // SSE allows CRLF, LF, or CR; a blank line ends a record. Match a real upstream regardless of framing.
@@ -273,8 +258,9 @@ const mergeStreamingToolCall = (
   };
 
   if (functionValue !== undefined) {
-    if (isGatewayToolName(functionValue.name)) {
-      next.name = functionValue.name;
+    if (functionValue.name !== undefined) {
+      next.name =
+        current.name === undefined ? functionValue.name : current.name + functionValue.name;
     }
 
     if (functionValue.arguments !== undefined) {
@@ -346,7 +332,10 @@ const applyStreamingData = (
     }
   }
 };
-const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatCompletion => {
+const toCompletion = (
+  accumulator: StreamingAccumulator,
+  allowedToolNames: ReadonlySet<KiloGatewayToolName>
+): KiloGatewayChatCompletion => {
   const reasoningDetails = [...accumulator.reasoningDetailsByIndex.entries()]
     .toSorted(([left], [right]) => left - right)
     .map(([, block]) => block);
@@ -358,13 +347,15 @@ const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatComplet
     ...(reasoningDetails.length === 0 ? {} : { reasoningDetails }),
     ...(accumulator.usage === undefined ? {} : { usage: accumulator.usage }),
     toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
-      parseToolCallBuffer(toolCall)
+      parseToolCallBuffer(toolCall, allowedToolNames)
     ),
   };
 };
 
+// eslint-disable-next-line max-params -- The test-only parser mirrors the live consume signature.
 export const parseKiloGatewayChatCompletionStream = (
   text: string,
+  allowedToolNames: ReadonlySet<KiloGatewayToolName>,
   onContentDelta: (delta: string) => void,
   onReasoningDelta: (delta: string) => void = () => {}
 ): KiloGatewayChatCompletion => {
@@ -388,7 +379,7 @@ export const parseKiloGatewayChatCompletionStream = (
     }
   }
 
-  return toCompletion(accumulator);
+  return toCompletion(accumulator, allowedToolNames);
 };
 const consumeStreamReader = async ({
   accumulator,
@@ -424,8 +415,8 @@ const consumeStreamReader = async ({
 };
 const consumeKiloGatewayChatCompletionStream = async (
   body: ReadableStream<Uint8Array>,
-  onContentDelta: (delta: string) => void,
-  onReasoningDelta: (delta: string) => void
+  handlers: StreamingDeltaHandlers,
+  allowedToolNames: ReadonlySet<KiloGatewayToolName>
 ): Promise<KiloGatewayChatCompletion> => {
   const accumulator: StreamingAccumulator = {
     content: '',
@@ -439,7 +430,6 @@ const consumeKiloGatewayChatCompletionStream = async (
   };
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  const handlers = { onContentDelta, onReasoningDelta };
 
   await consumeStreamReader({ accumulator, decoder, handlers, reader });
 
@@ -447,7 +437,7 @@ const consumeKiloGatewayChatCompletionStream = async (
     applyStreamingData(accumulator, data, handlers);
   }
 
-  return toCompletion(accumulator);
+  return toCompletion(accumulator, allowedToolNames);
 };
 export const fetchKiloGatewayChatCompletionStream = async ({
   apiBaseUrl,
@@ -465,6 +455,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   tools,
 }: FetchKiloGatewayChatCompletionStreamOptions): Promise<KiloGatewayChatCompletion> => {
   const reasoningRequest = toReasoningRequest(thinkingEffort);
+  const allowedToolNames = new Set(tools.map(tool => tool.function.name));
   const requestBody = {
     messages,
     model,
@@ -568,8 +559,8 @@ export const fetchKiloGatewayChatCompletionStream = async ({
     });
     return await consumeKiloGatewayChatCompletionStream(
       watchedBody,
-      onContentDelta,
-      onReasoningDelta
+      { onContentDelta, onReasoningDelta },
+      allowedToolNames
     );
   } catch (error) {
     if (stall.stalled && signal?.aborted !== true) {

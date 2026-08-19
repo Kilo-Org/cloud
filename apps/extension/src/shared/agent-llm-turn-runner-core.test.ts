@@ -5,10 +5,21 @@ import { createSafeToolCall, createUserMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { FetchLike } from './auth';
 import { maxAgentToolRounds } from './agent-tool-round-limit';
-import type { KiloGatewayToolCallRequest } from './kilo-api-client';
+import type { KiloGatewayToolCallRequest, KiloGatewayToolDefinition } from './kilo-api-client';
 import { runLlmTurn } from './agent-llm-turn-runner-core';
 
 const stringBodySchema = z.string();
+
+// The stream gate validates streamed tool-call names against the offered `tools` set.
+// Fixtures stream a `get_page_snapshot` call, so the offered set must include that name.
+const getPageSnapshotTool: KiloGatewayToolDefinition = {
+  function: {
+    description: 'Read a bounded, sanitized snapshot of the selected browser tab.',
+    name: 'get_page_snapshot',
+    parameters: { type: 'object' },
+  },
+  type: 'function',
+};
 
 function* createGatewayResponses(): Generator<Response, Response> {
   yield streamResponse([
@@ -131,7 +142,7 @@ describe('agent LLM turn runner core', () => {
         ),
       token: 'token-1',
       tooManyToolRoundsMessage: 'Too many tool rounds.',
-      tools: [],
+      tools: [getPageSnapshotTool],
       updateAssistantMessage: (_eventId, text) => {
         updatedMessages.push(text);
       },
@@ -191,7 +202,7 @@ describe('agent LLM turn runner core', () => {
         ),
       token: 'token-1',
       tooManyToolRoundsMessage: 'Too many tool rounds.',
-      tools: [],
+      tools: [getPageSnapshotTool],
       updateAssistantMessage: () => {},
       updateThinkingBlock: () => {},
     });
@@ -375,7 +386,7 @@ describe('stream retry', () => {
       ),
     token: 'token',
     tooManyToolRoundsMessage: 'too many rounds',
-    tools: [],
+    tools: [getPageSnapshotTool],
     updateAssistantMessage: () => {},
     updateThinkingBlock: () => {},
   });
@@ -643,7 +654,7 @@ describe('identical failing tool call guard', () => {
         })),
       token: 'token-1',
       tooManyToolRoundsMessage: 'Too many tool rounds.',
-      tools: [],
+      tools: [getPageSnapshotTool],
       updateAssistantMessage: () => {},
       updateThinkingBlock: () => {},
     });
@@ -700,7 +711,7 @@ describe('per-tool failure cap', () => {
         ),
       token: 'token-1',
       tooManyToolRoundsMessage: 'Too many tool rounds.',
-      tools: [],
+      tools: [getPageSnapshotTool],
       updateAssistantMessage: () => {},
       updateThinkingBlock: () => {},
     });
@@ -726,7 +737,7 @@ describe('continue nudge', () => {
     model: 'kilo-auto/efficient',
     noResponseMessage: 'no response',
     token: 'token',
-    tools: [],
+    tools: [getPageSnapshotTool],
     tooManyToolRoundsMessage: 'too many rounds',
     toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
       toolCalls.flatMap(toolCall =>

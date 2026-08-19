@@ -1,6 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, type AppStateStatus, Platform } from 'react-native';
 
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
@@ -12,6 +12,11 @@ import {
   pendingDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import {
+  clearPendingExternalAuth,
+  readPendingExternalAuth,
+  writePendingExternalAuth,
+} from '@/lib/auth/pending-external-auth';
 
 type DeviceAuthResult = DeviceAuthState & {
   start: (mode?: 'signin' | 'signup') => Promise<void>;
@@ -36,10 +41,17 @@ export function useDeviceAuth(): DeviceAuthResult {
 
   const timeoutReference = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const abortReference = useRef<AbortController | undefined>(undefined);
-  const pollCleanupRef = useRef<(() => void) | undefined>(undefined);
+  const pollCleanupRef = useRef<{ cleanup: () => void; pollNow: () => void } | undefined>(
+    undefined
+  );
   // The device secret is stored ONLY in a ref — never in React state, never in
   // a URL, never in the clipboard. It is consumed in the POST body only.
   const deviceCodeReference = useRef<string | undefined>(undefined);
+  // Monotonic epoch bumped at the top of every start(). The mount restore read
+  // captures it before its async SecureStore read and bails when it changed, so
+  // a live start() that begins while the read is in flight always wins and the
+  // restore never clobbers it or starts a second poll.
+  const flowEpochRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (timeoutReference.current) {
@@ -51,17 +63,77 @@ export function useDeviceAuth(): DeviceAuthResult {
       abortReference.current = undefined;
     }
     if (pollCleanupRef.current) {
-      pollCleanupRef.current();
+      pollCleanupRef.current.cleanup();
       pollCleanupRef.current = undefined;
     }
     deviceCodeReference.current = undefined;
+    void clearPendingExternalAuth();
   }, []);
 
   // Cleanup on unmount
   useEffect(() => cleanup, [cleanup]);
 
+  // Android opens a plain browser and returns via AppState 'active', so poll
+  // once immediately on foreground while pending — bounded by pollNow (one per
+  // foreground, never within 1 s of the previous poll).
+  useEffect(() => {
+    const handleChange = (nextState: AppStateStatus) => {
+      if (nextState !== 'active') {
+        return;
+      }
+      if (state.status !== 'pending') {
+        return;
+      }
+      pollCleanupRef.current?.pollNow();
+    };
+    const subscription = AppState.addEventListener('change', handleChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [state.status]);
+
+  // Restore a pending transaction that survived process death. The record is
+  // read once on mount; an absent or expired record leaves the screen idle.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restorePending() {
+      const epochAtRead = flowEpochRef.current;
+      const result = await readPendingExternalAuth();
+      if (cancelled || flowEpochRef.current !== epochAtRead) {
+        return;
+      }
+      if (result.kind === 'stale') {
+        await clearPendingExternalAuth();
+        return;
+      }
+      if (result.kind === 'none') {
+        return;
+      }
+      const record = result.record;
+      deviceCodeReference.current = record.deviceCode;
+      setState(pendingDeviceAuthState(record.userCode, record.verificationUrl, true));
+      const abort = new AbortController();
+      abortReference.current = abort;
+      pollCleanupRef.current = startDeviceAuthPoll({
+        code: record.userCode,
+        deviceCode: record.deviceCode,
+        signal: abort.signal,
+        setState,
+        cleanup,
+        startedAt: record.startedAt,
+      });
+    }
+
+    void restorePending();
+    return () => {
+      cancelled = true;
+    };
+  }, [cleanup]);
+
   const start = useCallback(
     async (mode?: 'signin' | 'signup') => {
+      flowEpochRef.current += 1;
       cleanup();
       setState(pendingDeviceAuthState(undefined, undefined));
 
@@ -122,6 +194,16 @@ export function useDeviceAuth(): DeviceAuthResult {
 
         deviceCodeReference.current = deviceCode;
 
+        // Persist the pending transaction so a process death mid-sign-in can
+        // resume it. The device code is a secret, so it lives in SecureStore
+        // only (never React state, a URL, or the clipboard).
+        void writePendingExternalAuth({
+          deviceCode,
+          userCode,
+          verificationUrl: data.verificationUrl,
+          startedAt: Date.now(),
+        });
+
         // Sign-in uses the server-provided verificationUrl which points directly
         // at /device-auth?code=... Sign-up instead routes through the sign-in
         // page with signup=true so the web UI renders the create-account flow;
@@ -158,6 +240,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState(
           errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
         );
+        void clearPendingExternalAuth();
       } finally {
         clearTimeout(startTimeout);
       }

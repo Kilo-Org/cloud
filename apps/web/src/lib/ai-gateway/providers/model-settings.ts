@@ -42,7 +42,13 @@ export async function getOpenRouterDerivedModelVariants(
         verbosity: useAnthropicProvider ? VerbositySchema.safeParse(effort).data : undefined,
       },
     ]);
-  if (!reasoning.mandatory && !variants.some(([effort]) => effort === 'none')) {
+  if (
+    !reasoning.mandatory &&
+    !variants.some(([effort]) => effort === 'none') &&
+    // Kimi does not support non-reasoning despite what OpenRouter says
+    // https://huggingface.co/moonshotai/Kimi-K3#6-model-usage
+    model !== 'moonshotai/kimi-k3'
+  ) {
     variants.unshift(['none', { reasoning: { enabled: false, effort: 'none' } }]);
   }
   return Object.fromEntries(variants);
@@ -71,14 +77,11 @@ export function getAiSdkProvider(
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';
   }
-  if (
-    isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
-    (!directProviderId && isMinimaxModel(model)) // on Vercel AI Gateway, this is necessary for reasoning to show
-  ) {
+  if (isClaudeModel(model)) {
     return 'anthropic';
   }
   if (isOpenAiModel(model) || isGrokModel(model) || isMuseModel(model)) {
-    // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
+    // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects."
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';
   }

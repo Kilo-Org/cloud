@@ -1,7 +1,19 @@
+import { z } from 'zod';
+
 // Shared tRPC error helpers. tRPC v11 client errors expose `data.code` /
 // `data.message`; server-shaped errors expose `shape.data.code` /
 // `shape.data.message`. Anything else is treated as an unknown transient
 // error.
+
+const DirectErrorSchema = z.looseObject({
+  data: z.looseObject({ code: z.string().optional(), message: z.string().optional() }),
+});
+const ShapedErrorSchema = z.looseObject({
+  shape: z.looseObject({
+    data: z.looseObject({ code: z.string().optional(), message: z.string().optional() }),
+  }),
+});
+const TopLevelCodeSchema = z.looseObject({ code: z.string() });
 
 /**
  * Extracts a field from an unknown tRPC error. Reads `data[field]` first,
@@ -10,31 +22,18 @@
  * exists.
  */
 export function readTrpcErrorField(error: unknown, field: 'code' | 'message'): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
+  const direct = DirectErrorSchema.safeParse(error);
+  if (direct.success && direct.data.data[field] !== undefined) {
+    return direct.data.data[field];
   }
-  const record = error as Record<string, unknown>;
-  const data = record.data;
-  if (data && typeof data === 'object') {
-    const value = (data as Record<string, unknown>)[field];
-    if (typeof value === 'string') {
-      return value;
-    }
-  }
-  const shape = record.shape;
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>).data;
-    if (shapeData && typeof shapeData === 'object') {
-      const value = (shapeData as Record<string, unknown>)[field];
-      if (typeof value === 'string') {
-        return value;
-      }
-    }
+  const shaped = ShapedErrorSchema.safeParse(error);
+  if (shaped.success && shaped.data.shape.data[field] !== undefined) {
+    return shaped.data.shape.data[field];
   }
   if (field === 'code') {
-    const top = record.code;
-    if (typeof top === 'string') {
-      return top;
+    const top = TopLevelCodeSchema.safeParse(error);
+    if (top.success) {
+      return top.data.code;
     }
   }
   if (field === 'message' && error instanceof Error) {

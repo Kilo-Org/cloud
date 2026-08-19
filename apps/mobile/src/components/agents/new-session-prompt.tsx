@@ -30,6 +30,7 @@ import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
   CLIPBOARD_PASTE_EMPTY_MESSAGE,
   useClipboardPaste,
@@ -181,11 +182,10 @@ export function NewSessionPrompt({
     },
     onFailure: reason => {
       toast.error(
-        reason === 'empty'
-          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
-          : describeClassificationFailure('unreadable')
+        reason === 'empty' ? CLIPBOARD_PASTE_EMPTY_MESSAGE : describeClassificationFailure(reason)
       );
     },
+    maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
 
   function handlePromptInputLayout(event: LayoutChangeEvent) {

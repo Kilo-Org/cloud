@@ -68,9 +68,11 @@ const awaitSettled = async (promise: Promise<unknown>): Promise<void> => {
   }
 };
 
-export const createSerialAsyncChain = (): {
+interface SerialAsyncChain {
   readonly enqueue: <TValue>(work: () => Promise<TValue>) => Promise<TValue>;
-} => {
+}
+
+export const createSerialAsyncChain = (): SerialAsyncChain => {
   let chain: Promise<unknown> | undefined = undefined;
 
   return {

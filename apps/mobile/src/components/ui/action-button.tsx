@@ -18,19 +18,19 @@ type ActionButtonProps = {
   className?: string;
 };
 
-const TONE_TEXT: Record<ActionButtonTone, string> = {
+const TONE_TEXT = {
   accent: 'text-foreground',
   warn: 'text-warn',
   danger: 'text-destructive',
   neutral: 'text-foreground',
-};
+} satisfies Record<ActionButtonTone, string>;
 
-const TONE_ICON: Record<ActionButtonTone, keyof ThemeColors> = {
+const TONE_ICON = {
   accent: 'foreground',
   warn: 'warn',
   danger: 'destructive',
   neutral: 'foreground',
-};
+} satisfies Record<ActionButtonTone, keyof ThemeColors>;
 
 /**
  * Flex-1 outlined action button for dashboard grids.

@@ -569,6 +569,7 @@ export type UserDeletionPylonReplyState =
 
 export type UserDeletionTaskProgress = {
   processed_count?: number;
+  scanned_count?: number;
   page_offset?: number;
   cursor?: string;
   clean_pass?: boolean;
@@ -597,6 +598,7 @@ export type UserDeletionAuditDetails = {
 export type UserDeletionActivityDetails = {
   duration_ms?: number;
   processed_count?: number;
+  scanned_count?: number;
   http_status_class?: string;
   retry_at?: string;
   error_code?: string;
@@ -1987,8 +1989,6 @@ export const CustomLlmProviderSchema = z.enum([
   'openai', // uses Responses API
   'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
-  'alibaba', // identical to openai-compatible, but reports cache write tokens that alibaba bills separately
-  'mistral', // uses Chat Completions API with possibly complex content objects for e.g. thinking
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;

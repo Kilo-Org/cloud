@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { CLI_MODEL_ID } from '@kilocode/cloud-agent-sdk';
 import type { KiloGatewayModelOption } from './kilo-api-client';
 import type { ExtensionModelPickerRow } from './model-picker-rows';
-import { buildExtensionModelPickerRows } from './model-picker-rows';
+import {
+  buildExtensionModelPickerRows,
+  CLI_CATALOG_ID_PREFIX,
+  isGatewayModelId,
+  modelRowDisplayId,
+} from './model-picker-rows';
 
 const model = (
   id: string,
@@ -151,5 +157,35 @@ describe('extension model picker rows', () => {
     );
 
     expect(favoriteFlags).toStrictEqual({ all: false, fav: true, rec: false });
+  });
+});
+
+describe('isGatewayModelId()', () => {
+  it('accepts a gateway catalog id', () => {
+    expect(isGatewayModelId('anthropic/claude-sonnet-4')).toBe(true);
+  });
+
+  it('rejects the synthetic CLI default id', () => {
+    expect(isGatewayModelId(CLI_MODEL_ID)).toBe(false);
+  });
+
+  it('rejects a CLI-catalog row id', () => {
+    expect(isGatewayModelId(`${CLI_CATALOG_ID_PREFIX}opencode/grok-code`)).toBe(false);
+  });
+
+  it('rejects an empty id', () => {
+    expect(isGatewayModelId('')).toBe(false);
+  });
+});
+
+describe('modelRowDisplayId()', () => {
+  it('strips the CLI-catalog prefix', () => {
+    expect(modelRowDisplayId(`${CLI_CATALOG_ID_PREFIX}opencode/grok-code`)).toBe(
+      'opencode/grok-code'
+    );
+  });
+
+  it('leaves a gateway id untouched', () => {
+    expect(modelRowDisplayId('anthropic/claude-sonnet-4')).toBe('anthropic/claude-sonnet-4');
   });
 });

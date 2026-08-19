@@ -16,11 +16,59 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import {
   markTaskManuallyVerified,
+  persistHandlerOutcome,
   persistRejectedPreflight,
   retryBlockedPreflight,
 } from '@/lib/user/deletion-queue/deletion-outcomes';
 import { runDeletionPreflight } from '@/lib/user/deletion-queue/deletion-preflight';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+
+describe('persistHandlerOutcome progress', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('writes retry progress onto the step', async () => {
+    const { requestId, claimToken } = await enqueueRunningStep(UserDeletionStepKey.CliV2Sessions);
+
+    const result = await persistHandlerOutcome({
+      requestId,
+      stepKey: UserDeletionStepKey.CliV2Sessions,
+      claimToken,
+      outcome: {
+        kind: 'retry',
+        errorCode: 'http_500',
+        httpStatusClass: '5xx',
+        progress: { processed_count: 10 },
+      },
+    });
+
+    expect(result.kind).toBe('applied');
+    const step = await loadStep(requestId, UserDeletionStepKey.CliV2Sessions);
+    expect(step?.status).toBe(UserDeletionStepStatus.RetryWait);
+    expect(step?.progress_json).toEqual({ processed_count: 10 });
+  });
+
+  it('writes needs_attention progress onto the step', async () => {
+    const { requestId, claimToken } = await enqueueRunningStep(UserDeletionStepKey.CliV2Sessions);
+
+    const result = await persistHandlerOutcome({
+      requestId,
+      stepKey: UserDeletionStepKey.CliV2Sessions,
+      claimToken,
+      outcome: {
+        kind: 'needs_attention',
+        errorCode: 'session_identity_mismatch',
+        progress: { processed_count: 7 },
+      },
+    });
+
+    expect(result.kind).toBe('applied');
+    const step = await loadStep(requestId, UserDeletionStepKey.CliV2Sessions);
+    expect(step?.status).toBe(UserDeletionStepStatus.NeedsAttention);
+    expect(step?.progress_json).toEqual({ processed_count: 7 });
+  });
+});
 
 describe('markTaskManuallyVerified', () => {
   beforeEach(async () => {
@@ -287,6 +335,38 @@ describe('shared preflight outcomes', () => {
     expect(request?.preflight_attention_code).toBeNull();
   });
 });
+
+async function enqueueRunningStep(stepKey: UserDeletionStepKey) {
+  const admin = await insertTestUser({ is_admin: true });
+  const user = await insertTestUser({
+    google_user_email: `running-${stepKey}-${crypto.randomUUID()}@example.com`,
+  });
+  const [result] = await enqueueUserDeletionTargets({
+    actor: { kiloUserId: admin.id },
+    targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+  });
+  expect(result.status).toBe('enqueued');
+  if (result.status !== 'enqueued') throw new Error('expected enqueued');
+  const claimToken = crypto.randomUUID();
+  await db
+    .update(user_deletion_requests)
+    .set({ status: UserDeletionRequestStatus.InProgress })
+    .where(eq(user_deletion_requests.id, result.requestId));
+  await db
+    .update(user_deletion_steps)
+    .set({
+      status: UserDeletionStepStatus.Running,
+      claim_token: claimToken,
+      claimed_until: new Date(Date.now() + 60_000).toISOString(),
+    })
+    .where(
+      and(
+        eq(user_deletion_steps.request_id, result.requestId),
+        eq(user_deletion_steps.step_key, stepKey)
+      )
+    );
+  return { requestId: result.requestId, claimToken };
+}
 
 async function enqueueStuckStep(params: {
   stepKey: UserDeletionStepKey;

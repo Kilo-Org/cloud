@@ -595,12 +595,17 @@ export async function createOrUpdateUser(
       existingProviders.length === 1 && existingProviders[0].provider === 'fake-login';
 
     // Link this new provider to the existing user if they don't already have it.
+    // WorkOS profile IDs can change when an organization's SSO connection is
+    // recreated, so a verified SSO callback may also replace a stale WorkOS ID.
     // fake-login is placeholder auth (dev-only) - always allow upgrading from it.
     // Callers pass autoLinkToExistingUser=true only when the credential proves
     // ownership of the email (consumed magic-link/code, or a provider-asserted
     // email_verified claim). Proof authorizes the link; without proof the
     // sign-in keeps the DIFFERENT-OAUTH refusal below.
-    const shouldLink = !hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser);
+    const shouldRelinkWorkOS =
+      args.provider === 'workos' && hasThisProvider && autoLinkToExistingUser;
+    const shouldLink =
+      (!hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser)) || shouldRelinkWorkOS;
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -1641,18 +1646,6 @@ export async function anonymizeCloudUserData(
         )`
       )
     );
-
-  // Microdollar usage metadata: strip user-authored prompt prefix and system prompt reference
-  await tx.execute(sql`
-    UPDATE ${microdollar_usage_metadata}
-    SET user_prompt_prefix = NULL,
-        system_prompt_prefix_id = NULL
-    WHERE id IN (
-      SELECT id FROM ${microdollar_usage}
-      WHERE kilo_user_id = ${userId}
-    )
-    AND (user_prompt_prefix IS NOT NULL OR system_prompt_prefix_id IS NOT NULL)
-  `);
 
   // ── 4. Nullify FK references ─────────────────────────────────────────
   await tx

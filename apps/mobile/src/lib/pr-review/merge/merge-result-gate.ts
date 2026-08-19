@@ -66,7 +66,7 @@ export function gateMergeResult(result: MergePullRequestResult): MergeResultGate
   // cross-repo / not-requested paths leave it absent. The sheet
   // collapses both to "clean" (no banner) because the user did not
   // ask for a delete.
-  if ('branchDeleteError' in result && typeof result.branchDeleteError === 'string') {
+  if ('branchDeleteError' in result) {
     return { kind: 'partial', reason: result.branchDeleteError };
   }
   return { kind: 'clean' };

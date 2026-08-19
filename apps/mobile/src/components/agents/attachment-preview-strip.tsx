@@ -147,6 +147,9 @@ function AttachmentChip({
           className="h-full w-full"
           contentFit="cover"
           transition={0}
+          allowDownscaling
+          recyclingKey={attachment.id}
+          cachePolicy="memory"
         />
       ) : (
         <View

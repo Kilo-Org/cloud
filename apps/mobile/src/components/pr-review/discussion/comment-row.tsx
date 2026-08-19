@@ -53,19 +53,19 @@ type ModerationFailure =
   | { kind: 'terminal'; message: string }
   | { kind: 'retryable'; message: string };
 
-const TERMINAL_MESSAGES: Record<ModerationAction, string> = {
+const TERMINAL_MESSAGES = {
   'report-content': "This comment can't be reported.",
   'report-user': "This user can't be reported.",
   mute: "This user can't be muted.",
   block: "This user can't be blocked.",
-};
+} satisfies Record<ModerationAction, string>;
 
-const RETRYABLE_MESSAGES: Record<ModerationAction, string> = {
+const RETRYABLE_MESSAGES = {
   'report-content': "Couldn't report this comment. Check your connection and try again.",
   'report-user': "Couldn't report this user. Check your connection and try again.",
   mute: "Couldn't mute this user. Check your connection and try again.",
   block: "Couldn't block this user. Check your connection and try again.",
-};
+} satisfies Record<ModerationAction, string>;
 
 /** Terminal moderation failures must not be retried; everything else is retryable. */
 export function moderationFailure(action: ModerationAction, error: unknown): ModerationFailure {

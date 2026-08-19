@@ -108,6 +108,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
   // node_modules/react-native-gesture-handler/lib/typescript/handlers/gestures/gesture.d.ts:5),
   // which a host-instance ref does not satisfy, while at runtime it only reads
   // `handlerTag` off the ref object. One cast, here, is the whole workaround.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- RNGH's external ref type is a real mismatch with a host-instance ref; only `handlerTag` is read at runtime, so a local type fix is not possible.
   const scrollGestureRefs = [verticalRef, horizontalRef] as unknown as RefObject<ComponentType>[];
 
   const applyZoom = useCallback(

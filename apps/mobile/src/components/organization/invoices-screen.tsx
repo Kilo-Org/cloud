@@ -25,15 +25,20 @@ import {
 } from '@/lib/organization-invoice-download';
 import { cn, firstNonEmpty, formatDate } from '@/lib/utils';
 
-const STATUS_META: Record<string, { label: string; pillClass: string; textClass: string }> = {
+const STATUS_META = {
   paid: { label: 'Paid', pillClass: 'bg-good', textClass: 'text-good-foreground' },
   open: { label: 'Open', pillClass: 'bg-warn', textClass: 'text-warn-foreground' },
   void: { label: 'Void', pillClass: 'bg-muted', textClass: 'text-muted-foreground' },
-};
+} satisfies Record<string, { label: string; pillClass: string; textClass: string }>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 function statusMeta(status: string): { label: string; pillClass: string; textClass: string } {
   return (
-    STATUS_META[status] ?? {
+    lookup(STATUS_META, status) ?? {
       label: status.charAt(0).toUpperCase() + status.slice(1),
       pillClass: 'bg-muted',
       textClass: 'text-muted-foreground',

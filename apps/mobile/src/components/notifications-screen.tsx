@@ -340,7 +340,7 @@ export function NotificationsScreen() {
           return undefined;
         }
         const next = variables[category];
-        if (typeof next !== 'boolean') {
+        if (next === undefined) {
           return undefined;
         }
         return applyAgentPushOptimistic({

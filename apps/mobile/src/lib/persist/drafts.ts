@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { utf8ByteLength } from '@/lib/utf8-utils';
@@ -46,9 +47,11 @@ export function draftScope(userId: string): string {
   return `${DRAFT_SCOPE_PREFIX}${userId}`;
 }
 
+const stringDraftSchema = z.string();
+
 /** Runtime shape guard for a composer text draft (a JSON string). */
 export function isStringDraft(value: unknown): value is string {
-  return typeof value === 'string';
+  return stringDraftSchema.safeParse(value).success;
 }
 
 /** Shape validator for one loaded draft value, supplied by the caller. */
@@ -65,6 +68,46 @@ export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
 /** Pending-review draft entity key, unique per pull request. */
 export function prReviewDraftKey(owner: string, repo: string, number: number): string {
   return `pr-review:${owner}/${repo}#${number}`;
+}
+
+/** Merge-sheet draft entity key, unique per pull request. */
+export function prMergeDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-merge:${owner}/${repo}#${number}`;
+}
+
+/** Reply draft entity key, unique per review comment thread. */
+// eslint-disable-next-line eslint/max-params -- the key encodes owner, repo, number, and comment id
+export function prReplyDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  commentId: number
+): string {
+  return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
+}
+
+/** Inline review-comment draft entity key, unique per diff position. */
+// eslint-disable-next-line eslint/max-params -- the key encodes the full diff position
+export function prCommentDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  path: string,
+  side: string,
+  line: number,
+  startLine?: number
+): string {
+  return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
+}
+
+const mergeDraftSchema = z.object({
+  title: z.string(),
+  message: z.string(),
+});
+
+/** Runtime shape guard for a merge-sheet draft ({ title, message }). */
+export function isMergeDraft(value: unknown): value is { title: string; message: string } {
+  return mergeDraftSchema.safeParse(value).success;
 }
 
 /** Security dismiss draft entity key, unique per scope and finding. */

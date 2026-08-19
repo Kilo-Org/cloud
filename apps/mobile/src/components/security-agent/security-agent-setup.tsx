@@ -10,22 +10,22 @@ import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-ret
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 
-type SecurityAgentSetupProps = {
+type SecurityAgentSetupProps<T> = {
   title: string;
   description: string;
   buttonLabel: string;
   url: string;
   /** Awaited in `finally` so permission/config/repository queries refresh after the browser closes. */
-  onConnected: () => Promise<unknown>;
+  onConnected: () => Promise<T>;
 };
 
-export function SecurityAgentSetup({
+export function SecurityAgentSetup<T>({
   title,
   description,
   buttonLabel,
   url,
   onConnected,
-}: Readonly<SecurityAgentSetupProps>) {
+}: Readonly<SecurityAgentSetupProps<T>>) {
   const colors = useThemeColors();
   const tabBarPadding = useTabBarBottomPadding();
   const [connecting, setConnecting] = useState(false);

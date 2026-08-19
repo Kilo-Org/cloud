@@ -43,9 +43,20 @@ export async function uploadOne(args: {
   contentLength: number;
   localUri: string;
   onProgress: (progress: number | null) => void;
+  onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+  isCancelled?: () => boolean;
 }): Promise<UploadOutcome> {
-  const { organizationId, attachmentId, path, contentType, contentLength, localUri, onProgress } =
-    args;
+  const {
+    organizationId,
+    attachmentId,
+    path,
+    contentType,
+    contentLength,
+    localUri,
+    onProgress,
+    onTask,
+    isCancelled,
+  } = args;
   const baseInput = {
     messageUuid: path,
     attachmentId,
@@ -59,6 +70,10 @@ export async function uploadOne(args: {
         organizationId,
       })
     : await trpcClient.cloudAgentNext.getAttachmentUploadUrl.mutate(baseInput);
+
+  if (isCancelled?.()) {
+    throw new Error('Upload cancelled');
+  }
 
   // Per-chip determinate progress via `createUploadTask` (the
   // main-module `createUploadTask` throws at runtime in SDK 55, so we
@@ -82,6 +97,7 @@ export async function uploadOne(args: {
       }
     }
   );
+  onTask?.(task);
   const uploadResult = await task.uploadAsync();
   if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
     throw new Error(`Upload failed with status ${uploadResult?.status ?? 'no response'}`);

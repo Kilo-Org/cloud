@@ -31,14 +31,14 @@ const PLATFORM_CONFIG = {
   },
 } as const;
 
-export function ProviderConnectCard({
+export function ProviderConnectCard<T>({
   scope,
   platform,
   onConnected,
 }: Readonly<{
   scope: string;
   platform: 'github' | 'gitlab';
-  onConnected: () => Promise<unknown>;
+  onConnected: () => Promise<T>;
 }>) {
   const colors = useThemeColors();
   const [connecting, setConnecting] = useState(false);

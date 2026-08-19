@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import type { QueryObserverResult, RefetchOptions } from '@tanstack/react-query';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
@@ -10,18 +11,22 @@ const emptyModelOptions: KiloGatewayModelOption[] = [];
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
 
+interface UseGatewayModelsResult {
+  readonly modelLoadError: string | undefined;
+  readonly isLoading: boolean;
+  readonly modelOptions: KiloGatewayModelOption[];
+  readonly refetchModels: (
+    options?: RefetchOptions
+  ) => Promise<QueryObserverResult<KiloGatewayModelOption[]>>;
+}
+
 export const useGatewayModels = ({
   auth,
   organizationId,
 }: {
   auth: StoredAuth;
   organizationId: string | undefined;
-}): {
-  readonly modelLoadError: string | undefined;
-  readonly isLoading: boolean;
-  readonly modelOptions: KiloGatewayModelOption[];
-  readonly refetchModels: () => Promise<unknown>;
-} => {
+}): UseGatewayModelsResult => {
   const query = useQuery({
     enabled: auth.token !== '',
     queryFn: ({ signal }) =>

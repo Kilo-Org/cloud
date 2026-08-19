@@ -51,6 +51,7 @@ vi.mock('react', async () => {
       return refSlots.slots[index] as React.RefObject<T>;
     }),
     useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useImperativeHandle: vi.fn(),
   };
 });
 

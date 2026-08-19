@@ -1,3 +1,6 @@
+/* oxlint-disable anti-slop/no-runtime-typeof -- walks arbitrary ReactNode
+ * trees and untyped component props at runtime; there is no shared
+ * discriminant to narrow string/number leaves or generic prop values. */
 import { isValidElement, type ReactNode } from 'react';
 
 /**

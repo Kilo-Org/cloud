@@ -13,7 +13,7 @@ type Decorated = {
  * Never treat NaN as epoch 0.
  */
 function parseCreatedAtMs(session: ActiveSession): number | null {
-  if (typeof session.createdAt !== 'string') {
+  if (session.createdAt === undefined) {
     return null;
   }
   const ms = parseTimestamp(session.createdAt).getTime();

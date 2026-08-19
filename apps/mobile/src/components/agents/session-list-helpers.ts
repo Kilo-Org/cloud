@@ -20,17 +20,17 @@ export type SessionSection = {
   data: StoredSession[];
 };
 
-const platformExpansion: Record<string, string[]> = {
-  'cloud-agent': ['cloud-agent', 'cloud-agent-web'],
-  extension: ['vscode', 'agent-manager'],
-};
+const platformExpansion: ReadonlyMap<string, string[]> = new Map([
+  ['cloud-agent', ['cloud-agent', 'cloud-agent-web']],
+  ['extension', ['vscode', 'agent-manager']],
+]);
 
 function stripGitSuffix(value: string): string {
   return value.endsWith('.git') ? value.slice(0, -4) : value;
 }
 
 export function expandPlatformFilter(filter: string[]): string[] {
-  return filter.flatMap(p => platformExpansion[p] ?? [p]);
+  return filter.flatMap(p => platformExpansion.get(p) ?? [p]);
 }
 
 export function formatGitUrlProject(gitUrl: string): string {
@@ -103,9 +103,9 @@ export function formatSessionTotalCost(microdollars: number | null | undefined):
 export function selectSessionCostInputs(
   persistedMicrodollars: number | null | undefined,
   liveUsd: number
-): { totalMicrodollars: number | null; breakdownCostUsd: number } {
+) {
   const persisted =
-    typeof persistedMicrodollars === 'number' && Number.isFinite(persistedMicrodollars)
+    persistedMicrodollars != null && Number.isFinite(persistedMicrodollars)
       ? Math.max(0, persistedMicrodollars)
       : 0;
   const live = Number.isFinite(liveUsd) ? Math.max(0, Math.round(liveUsd * 1_000_000)) : 0;

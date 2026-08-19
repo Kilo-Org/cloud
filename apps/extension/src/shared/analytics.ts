@@ -62,7 +62,7 @@ let lifecycleEpoch = 0;
 
 const readApiKey = (): string | undefined => {
   const key = import.meta.env.VITE_POSTHOG_API_KEY;
-  return typeof key === 'string' && key.trim().length > 0 ? key.trim() : undefined;
+  return key !== undefined && key.trim().length > 0 ? key.trim() : undefined;
 };
 
 const createPostHogClient = (apiKey: string): PostHog => {
@@ -105,13 +105,19 @@ export const __setFirefoxPermissionsReaderForTests = (reader?: FirefoxPermission
   firefoxPermissionsReader = reader;
 };
 
-const readFirefoxPermissions = async (): Promise<unknown> => {
-  if (firefoxPermissionsReader) {
-    return firefoxPermissionsReader();
-  }
+const readFirefoxPermissions = async (): Promise<z.infer<
+  typeof permissionsGetAllSchema
+> | null> => {
+  const raw = await (async () => {
+    if (firefoxPermissionsReader) {
+      return firefoxPermissionsReader();
+    }
+    const { browser } = await import('wxt/browser');
+    return browser.permissions.getAll();
+  })();
 
-  const { browser } = await import('wxt/browser');
-  return browser.permissions.getAll();
+  const parsed = permissionsGetAllSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 };
 
 const isTruthyEnvFlag = (value: unknown): boolean => value === true || value === 'true';
@@ -126,13 +132,12 @@ export const getFirefoxUsageDataGranted = async (): Promise<boolean> => {
     return true;
   }
 
-  const raw = await readFirefoxPermissions();
-  const parsed = permissionsGetAllSchema.safeParse(raw);
-  if (!parsed.success) {
+  const parsed = await readFirefoxPermissions();
+  if (parsed === null) {
     return false;
   }
 
-  const dataCollection = parsed.data.data_collection;
+  const dataCollection = parsed.data_collection;
   if (dataCollection === undefined) {
     // Firefox < 140: no built-in data_collection consent surface.
     return false;

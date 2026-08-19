@@ -1,7 +1,11 @@
 import { type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type ChildSessionHydrationState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type ChildSessionHydrationState,
+  type OlderMessagesError,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -26,6 +30,11 @@ type ChildSessionSheetProps = {
   getChildMessages: (sessionId: string) => StoredMessage[];
   hydrationState: ChildSessionHydrationState;
   isStreaming: boolean;
+  hasOlderMessages: boolean;
+  isLoadingOlderMessages: boolean;
+  olderMessagesError: OlderMessagesError | null;
+  olderMessagesOmittedItemCount: number;
+  onLoadOlderMessages: () => void;
   renderPart: RenderPartFn;
   onOpenChildSession: OpenChildSession;
   onRetry: () => void;
@@ -34,9 +43,6 @@ type ChildSessionSheetProps = {
   onDismiss?: () => void;
 };
 
-// eslint-disable-next-line no-empty-function -- child sessions are hydrated one-shot, no pagination
-function noopLoadOlder(): void {}
-
 export function ChildSessionSheet({
   visible,
   sessionId,
@@ -44,6 +50,11 @@ export function ChildSessionSheet({
   getChildMessages,
   hydrationState,
   isStreaming,
+  hasOlderMessages,
+  isLoadingOlderMessages,
+  olderMessagesError,
+  olderMessagesOmittedItemCount,
+  onLoadOlderMessages,
   renderPart,
   onOpenChildSession,
   onRetry,
@@ -66,11 +77,11 @@ export function ChildSessionSheet({
         sessionId={sessionId}
         items={messages}
         keyExtractor={message => message.info.id}
-        hasOlderMessages={false}
-        isLoadingOlderMessages={false}
-        olderMessagesError={null}
-        olderMessagesOmittedItemCount={0}
-        onLoadOlderMessages={noopLoadOlder}
+        hasOlderMessages={hasOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onLoadOlderMessages={onLoadOlderMessages}
         renderItem={({ item }) => (
           <MessageErrorBoundary>
             <View className="px-4 py-1">

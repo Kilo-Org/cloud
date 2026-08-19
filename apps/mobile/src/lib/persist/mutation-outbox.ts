@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
@@ -50,18 +51,17 @@ export function outboxScope(userId: string): string {
   return `${OUTBOX_SCOPE_PREFIX}${userId}`;
 }
 
+const outboxRowSchema = z.object({
+  taxonomy: z.enum(['safe-retry', 'reconcile-first']),
+  operationKey: z.string(),
+  fingerprint: z.string(),
+  scope: z.string().optional(),
+  input: z.unknown(),
+});
+
 /** Runtime shape guard for a stored outbox row. */
 export function isOutboxRow(value: unknown): value is OutboxRow {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return (
-    (record.taxonomy === 'safe-retry' || record.taxonomy === 'reconcile-first') &&
-    typeof record.operationKey === 'string' &&
-    typeof record.fingerprint === 'string' &&
-    (record.scope === undefined || typeof record.scope === 'string')
-  );
+  return outboxRowSchema.safeParse(value).success;
 }
 
 function fullKey(userId: string, fingerprint: string): string {

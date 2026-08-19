@@ -7,7 +7,15 @@ import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AppState,
   type GestureResponderEvent,
@@ -54,7 +62,10 @@ import {
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { VoiceInputStatus } from '@/components/voice-input-control';
-import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
+import {
+  AGENT_ATTACHMENT_MAX_BYTES,
+  AGENT_ATTACHMENT_MAX_FILES,
+} from '@/lib/agent-attachments/constants';
 import {
   type AgentAttachmentSubmissionPayload,
   type AgentAttachmentWire,
@@ -74,6 +85,7 @@ import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
+import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
 import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { cn } from '@/lib/utils';
@@ -105,6 +117,11 @@ type AndroidDismissKeyboardGesture = {
   startPageY: number;
   dismissed: boolean;
   failed: boolean;
+};
+
+/** Imperative handle the host uses to set composer text (Retry / Copy to composer). */
+export type ChatComposerControl = {
+  setText: (text: string) => void;
 };
 
 type ChatComposerProps = {
@@ -167,6 +184,8 @@ type ChatComposerProps = {
   initialDraft?: string;
   /** Active session id, used to scope the Android picker launch context. */
   sessionId?: string | null;
+  /** Imperative handle the host binds to call `setText`. */
+  controlRef?: Ref<ChatComposerControl>;
 };
 
 export function ChatComposer({
@@ -198,6 +217,7 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   sessionId = null,
+  controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -255,7 +275,7 @@ export function ChatComposer({
   // and writes through it during settle. The adapter routes every read and
   // write through the SubmitLock above, so the helper participates in the
   // same admission gate without introducing a second, racing authority.
-  const submissionLockRef: { current: boolean } = {
+  const submissionLockRef = {
     get current() {
       return sendLockRef.current.isLocked();
     },
@@ -266,7 +286,7 @@ export function ChatComposer({
         sendLockRef.current.release();
       }
     },
-  };
+  } satisfies { current: boolean };
   const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({
@@ -282,6 +302,31 @@ export function ChatComposer({
   // inputEpoch bump (remount), never on a stray measure identity change.
   const measureRef = useRef(measure);
   measureRef.current = measure;
+
+  // Coalesce the three derived setters (measure node, hasText, slash command)
+  // to at most one publication per animation frame. Typing can fire many
+  // onChangeText calls in a single frame; publishing derived state once per
+  // frame keeps the send button and slash suggestions from re-rendering on
+  // every keystroke. The publish closure reads `measureRef` at call time and
+  // uses the stable `setHasText`/`setSlashCommandInput` setters, so it stays
+  // valid for the lifetime of the component.
+  const composerFrameCoalescerRef = useRef<FrameCoalescer<string> | null>(null);
+  composerFrameCoalescerRef.current ??= createFrameCoalescer<string>(value => {
+    measureRef.current.setText(value);
+    setHasText(value.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(value));
+  });
+  const composerFrameCoalescer = composerFrameCoalescerRef.current;
+
+  // Flush the coalescer on unmount so a pending derived-state publication is
+  // committed before teardown and the scheduled frame callback becomes a
+  // no-op instead of firing setState after the component is gone.
+  useEffect(
+    () => () => {
+      composerFrameCoalescer.flush();
+    },
+    [composerFrameCoalescer]
+  );
 
   // Flush the debounced draft write when the app leaves `active` and on
   // unmount, so a backgrounded-then-killed app (or a navigation away) does
@@ -358,11 +403,51 @@ export function ChatComposer({
   const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
-  function handleChangeText(value: string) {
+  // One place text is written into the live input from an external caller
+  // (slash-command select, Retry / Copy to composer). Sets text, selection,
+  // hasText, slash-command state, and the measure node, then persists the
+  // durable draft exactly like a keystroke.
+  function applyComposerText(value: string) {
+    // Drain any pending coalesced typing so a stale value cannot overwrite the
+    // copied prompt on the next frame. The direct setters below then land the
+    // copied prompt in one commit.
+    composerFrameCoalescer.flush();
     textRef.current = value;
     measure.setText(value);
     setHasText(value.trim().length > 0);
-    setSlashCommandInput(getSlashCommandCandidate(value));
+    setSlashCommandInput(null);
+    inputRef.current?.setNativeProps({
+      text: value,
+      selection: { start: value.length, end: value.length },
+    });
+    selectionRef.current = { start: value.length, end: value.length };
+    inputRef.current?.focus();
+    if (draftKey && userId) {
+      saveDraft(userId, draftKey, value);
+    }
+  }
+
+  // Hold the latest applyComposerText so the imperative handle stays stable
+  // while the composer does not remount when identity resolves.
+  const applyComposerTextRef = useRef(applyComposerText);
+  applyComposerTextRef.current = applyComposerText;
+
+  useImperativeHandle(
+    controlRef,
+    () => ({
+      setText: (text: string) => {
+        applyComposerTextRef.current(text);
+      },
+    }),
+    []
+  );
+
+  function handleChangeText(value: string) {
+    textRef.current = value;
+    // Derived state (measure node, hasText, slash command) is coalesced to one
+    // publication per frame; the live submit-time ref and the debounced draft
+    // write stay synchronous so neither can lag a keystroke.
+    composerFrameCoalescer.push(value);
     // Delivery applies text BEFORE onDelivered fires, so any
     // handleChangeText after shareDelivered is a user edit. Disarm
     // so a later gate resolution (upload completion) cannot
@@ -393,6 +478,10 @@ export function ChatComposer({
     onChangeText: handleChangeText,
     addCandidates,
     onDelivered: () => {
+      // Commit the coalesced `hasText` before the delivery check so the
+      // auto-send effect sees the delivered text in the same commit, not on
+      // the next frame.
+      composerFrameCoalescer.flush();
       setAutoSendArmed(
         shouldArmAutoSendOnDelivery({
           autoSend: autoSendRef.current,
@@ -453,11 +542,10 @@ export function ChatComposer({
     },
     onFailure: reason => {
       toast.error(
-        reason === 'empty'
-          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
-          : describeClassificationFailure('unreadable')
+        reason === 'empty' ? CLIPBOARD_PASTE_EMPTY_MESSAGE : describeClassificationFailure(reason)
       );
     },
+    maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
 
   const commandList = useMemo(
@@ -608,6 +696,11 @@ export function ChatComposer({
       : undefined;
 
   function clearDraft() {
+    // Drain any pending coalesced value (a final voice transcript can `push`
+    // after `submit`'s `flush`). Publishing it here clears `hasPending` so the
+    // already-scheduled frame callback becomes a no-op; the direct setters
+    // below then override the published value in the same batched commit.
+    composerFrameCoalescer.flush();
     textRef.current = '';
     setHasText(false);
     setSlashCommandInput(null);
@@ -622,7 +715,14 @@ export function ChatComposer({
 
   async function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!control.canSend) {
+    // Decide admission from live values, not render-time `control.canSend`,
+    // which can lag behind a same-frame edit. An empty prompt with no sendable
+    // attachment is never sent. "Sendable" counts non-terminal chips: upload is
+    // deferred to send, so chips are still `pending` (not `uploaded`) here.
+    const sendableAttachmentsCount = upload.attachments.filter(
+      attachment => !(attachment.status === 'error' && attachment.terminal === true)
+    ).length;
+    if ((trimmed.length === 0 && sendableAttachmentsCount === 0) || disabled || isSending) {
       return;
     }
     if (upload.hasFailedAttachments) {
@@ -720,20 +820,14 @@ export function ChatComposer({
     if (sendLockRef.current.isLocked()) {
       return;
     }
-    const value = `/${command.name} `;
-    textRef.current = value;
-    measure.setText(value);
-    setHasText(true);
-    setSlashCommandInput(null);
-    inputRef.current?.setNativeProps({
-      text: value,
-      selection: { start: value.length, end: value.length },
-    });
-    selectionRef.current = { start: value.length, end: value.length };
-    inputRef.current?.focus();
+    applyComposerText(`/${command.name} `);
   }
 
   async function submit() {
+    // Commit any coalesced derived state (hasText, measure, slash command)
+    // before the send decision, so a submit in the same frame as the last
+    // keystroke never reads stale derived state.
+    composerFrameCoalescer.flush();
     // `settleVoiceInputBeforeSubmit` is the sole admission owner for the
     // entire voice-settle + asynchronous send sequence. It acquires the
     // SubmitLock, sets pending state, waits for the final transcript, runs

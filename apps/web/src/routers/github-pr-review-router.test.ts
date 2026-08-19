@@ -4,7 +4,7 @@
 import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
-import { prLedgerResourceKey } from './github-pr-review-router';
+import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
 
 const getGitHubUserAccessToken = jest.fn();
 
@@ -66,14 +66,43 @@ type OctokitMock = {
     get: jest.Mock;
   };
   git: { deleteRef: jest.Mock };
+  repos: {
+    get: jest.Mock;
+    listCommitStatusesForRef: jest.Mock;
+  };
+  checks: {
+    listForRef: jest.Mock;
+  };
+  paginate: jest.Mock;
   request: jest.Mock;
 };
+
+const checkRunsFixture = [
+  {
+    name: 'ci',
+    status: 'completed',
+    conclusion: 'success',
+    details_url: null,
+    html_url: null,
+    app: { name: 'CI' },
+  },
+];
+
+const commitStatusesFixture = [
+  {
+    context: 'continuous-integration',
+    state: 'success',
+    target_url: null,
+    updated_at: '2026-01-01T00:00:00Z',
+  },
+];
 
 const tokenOctokits = new Map<string, OctokitMock>();
 
 function buildOctokit(token: string): OctokitMock {
   const existing = tokenOctokits.get(token);
   if (existing) return existing;
+  const checks = { listForRef: jest.fn() };
   const octokit: OctokitMock = {
     __token: token,
     pulls: {
@@ -88,6 +117,16 @@ function buildOctokit(token: string): OctokitMock {
       get: jest.fn(),
     },
     git: { deleteRef: jest.fn() },
+    repos: {
+      get: jest.fn(),
+      listCommitStatusesForRef: jest.fn(),
+    },
+    checks,
+    // listChecks calls paginate(checks.listForRef, …) then
+    // paginate(repos.listCommitStatusesForRef, …); dispatch on the method.
+    paginate: jest.fn(async (method: unknown) =>
+      method === checks.listForRef ? checkRunsFixture : commitStatusesFixture
+    ),
     request: jest.fn(),
   };
   tokenOctokits.set(token, octokit);
@@ -979,6 +1018,344 @@ describe('githubPrReviewRouter.listReviewThreads conversation comments', () => {
     });
 
     expect(result).toEqual({ threads: [], conversation: [], nextCursor: null });
+  });
+});
+
+describe('githubPrReviewRouter.listInbox', () => {
+  const inboxNode = (overrides: Record<string, unknown> = {}) => ({
+    number: 1,
+    title: 'Fix the thing',
+    isDraft: false,
+    updatedAt: '2026-01-01T00:00:00Z',
+    author: { login: 'octocat', avatarUrl: 'https://avatars.example/octocat.png' },
+    repository: { name: 'hello', owner: { login: 'octocat' } },
+    ...overrides,
+  });
+
+  function mockSearch(octokit: OctokitMock, search: unknown) {
+    octokit.request.mockResolvedValueOnce({
+      data: { data: { search } },
+    });
+  }
+
+  it('maps search nodes to inbox items and returns nextCursor from pageInfo', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockSearch(buildOctokit('t1'), {
+      pageInfo: { hasNextPage: true, endCursor: 'CURSOR_1' },
+      nodes: [inboxNode()],
+    });
+
+    const result = await caller.listInbox({ direction: 'forward' });
+
+    expect(result).toEqual({
+      items: [
+        {
+          owner: 'octocat',
+          repo: 'hello',
+          number: 1,
+          title: 'Fix the thing',
+          author: { login: 'octocat', avatarUrl: 'https://avatars.example/octocat.png' },
+          isDraft: false,
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+      nextCursor: 'CURSOR_1',
+    });
+  });
+
+  it('returns nextCursor: null when hasNextPage is false', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockSearch(buildOctokit('t1'), {
+      pageInfo: { hasNextPage: false, endCursor: 'CURSOR_2' },
+      nodes: [inboxNode()],
+    });
+
+    const result = await caller.listInbox({ direction: 'forward' });
+
+    expect(result.nextCursor).toBeNull();
+    expect(result.items).toHaveLength(1);
+  });
+
+  it('drops a node missing repository fields instead of throwing', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockSearch(buildOctokit('t1'), {
+      pageInfo: { hasNextPage: false, endCursor: null },
+      nodes: [
+        // A non-PullRequest node: GraphQL returns it as `{}` (no fragment match).
+        { number: 1, title: 'orphan' },
+        inboxNode(),
+        inboxNode({ repository: null }),
+      ],
+    });
+
+    const result = await caller.listInbox({ direction: 'forward' });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({ owner: 'octocat', repo: 'hello', number: 1 });
+  });
+
+  it('drops a null node and a node missing number, returning the rest of the page', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockSearch(buildOctokit('t1'), {
+      pageInfo: { hasNextPage: false, endCursor: null },
+      nodes: [
+        // GitHub types `search.nodes` as `[SearchResultItem]`, so an element
+        // can be null; the mapper must drop it, not throw.
+        null,
+        // A node missing `number` alone has no identity and must be dropped.
+        inboxNode({ number: undefined }),
+        inboxNode(),
+      ],
+    });
+
+    const result = await caller.listInbox({ direction: 'forward' });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({ owner: 'octocat', repo: 'hello', number: 1 });
+  });
+
+  it('returns { items: [], nextCursor: null } for a null connection', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockSearch(buildOctokit('t1'), null);
+
+    const result = await caller.listInbox({ direction: 'forward' });
+
+    expect(result).toEqual({ items: [], nextCursor: null });
+  });
+
+  it('passes the server-fixed search string and page size as GraphQL variables', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+    mockSearch(octokit, { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] });
+
+    await caller.listInbox({ direction: 'forward' });
+
+    const call = octokit.request.mock.calls[0] as unknown[];
+    const body = call[1] as {
+      query: string;
+      variables: { q: string; first: number; after: string | null };
+    };
+    expect(body.query).toContain('query PrReviewInbox');
+    expect(body.variables.q).toBe(INBOX_SEARCH_QUERY);
+    expect(body.variables.first).toBe(25);
+    expect(body.variables.after).toBeNull();
+  });
+
+  it('rejects an extra q field (input is .strict())', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(
+      caller.listInbox({ q: 'is:pr author:me', direction: 'forward' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('surfaces a GraphQL errors[] FORBIDDEN as a tRPC FORBIDDEN', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').request.mockResolvedValueOnce({
+      data: { data: null, errors: [{ type: 'FORBIDDEN', message: 'no access' }] },
+    });
+
+    await expect(caller.listInbox({ direction: 'forward' })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('rotates the credential and retries once on a raw 401', async () => {
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+      .mockResolvedValueOnce(connected('t2', 'auth_1', 2));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    const t2Octokit = buildOctokit('t2');
+    t1Octokit.request.mockRejectedValueOnce({ status: 401, message: 'gone' });
+    mockSearch(t2Octokit, { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] });
+
+    const result = await caller.listInbox({ direction: 'forward' });
+
+    expect(result).toEqual({ items: [], nextCursor: null });
+    expect(t1Octokit.request).toHaveBeenCalledTimes(1);
+    expect(t2Octokit.request).toHaveBeenCalledTimes(1);
+    expect(t2Octokit.__token).toBe('t2');
+  });
+});
+
+describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-GH-44b)', () => {
+  const overviewPrData = {
+    number: 1,
+    title: 'Fix the thing',
+    body: 'body',
+    user: { login: 'octocat', avatar_url: 'https://avatars.example/octocat.png' },
+    state: 'open',
+    draft: false,
+    merged: false,
+    base: { ref: 'main', repo: { full_name: 'octocat/hello' } },
+    head: { ref: 'feature/x', sha: 'a'.repeat(40), repo: { full_name: 'octocat/hello' } },
+    node_id: 'PR_1',
+    commits: 3,
+    changed_files: 2,
+    additions: 10,
+    deletions: 4,
+    mergeable: true,
+    mergeable_state: 'clean',
+    auto_merge: null,
+  };
+
+  const overviewRepoData = {
+    allow_merge_commit: true,
+    allow_squash_merge: true,
+    allow_rebase_merge: false,
+    allow_auto_merge: true,
+    delete_branch_on_merge: true,
+    allow_update_branch: true,
+    permissions: { push: true, admin: false, maintain: false },
+  };
+
+  const overviewGraphQlData = {
+    repository: { pullRequest: { reviewDecision: 'APPROVED' } },
+    viewer: { login: 'octocat' },
+  };
+
+  function mockOverview(octokit: OctokitMock, graphQl: unknown = overviewGraphQlData) {
+    octokit.pulls.get.mockResolvedValueOnce({ data: overviewPrData });
+    octokit.repos.get.mockResolvedValueOnce({ data: overviewRepoData });
+    octokit.request.mockResolvedValueOnce({ data: { data: graphQl } });
+  }
+
+  // Polls an assertion until it passes or the timeout elapses. Used to wait for
+  // the async `call` callback (which starts after the token fetch microtask) to
+  // have kicked off its legs before asserting ordering.
+  async function waitFor(assertion: () => void, timeoutMs = 1000): Promise<void> {
+    const start = Date.now();
+    for (;;) {
+      try {
+        assertion();
+        return;
+      } catch {
+        if (Date.now() - start > timeoutMs) {
+          assertion();
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
+  }
+
+  it('getPullRequest starts repos.get and the GraphQL leg before pulls.get resolves', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    let resolvePulls!: (value: unknown) => void;
+    octokit.pulls.get.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolvePulls = resolve;
+      })
+    );
+    octokit.repos.get.mockResolvedValueOnce({ data: overviewRepoData });
+    octokit.request.mockResolvedValueOnce({ data: { data: overviewGraphQlData } });
+
+    const resultPromise = caller.getPullRequest({ owner: 'octocat', repo: 'hello', number: 1 });
+
+    await waitFor(() => expect(octokit.pulls.get).toHaveBeenCalledTimes(1));
+
+    // The other two legs were already started before pulls.get resolved.
+    expect(octokit.repos.get).toHaveBeenCalledTimes(1);
+    expect(octokit.request).toHaveBeenCalledTimes(1);
+
+    resolvePulls({ data: overviewPrData });
+
+    await expect(resultPromise).resolves.toMatchObject({ number: 1, title: 'Fix the thing' });
+  });
+
+  it('listChecks starts both paginate calls before either resolves', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    let resolveChecks!: (value: unknown) => void;
+    octokit.paginate.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveChecks = resolve;
+        })
+    );
+
+    const resultPromise = caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    await waitFor(() => expect(octokit.paginate).toHaveBeenCalledTimes(2));
+
+    resolveChecks(checkRunsFixture);
+
+    await expect(resultPromise).resolves.toMatchObject({
+      rollup: { total: 2, success: 2, failure: 0, pending: 0, skipped: 0 },
+    });
+  });
+
+  it('surfaces the repos.get error when repos.get rejects and the GraphQL leg rejects later (no unhandled rejection)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.pulls.get.mockResolvedValueOnce({ data: overviewPrData });
+    octokit.repos.get.mockRejectedValueOnce({ status: 404, message: 'repo not found' });
+    let rejectGraphQl!: (reason: unknown) => void;
+    octokit.request.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectGraphQl = reject;
+      })
+    );
+
+    const resultPromise = caller.getPullRequest({ owner: 'octocat', repo: 'hello', number: 1 });
+
+    await waitFor(() => expect(octokit.repos.get).toHaveBeenCalledTimes(1));
+
+    // The GraphQL leg rejects after repos.get already rejected.
+    rejectGraphQl({ status: 401, message: 'gone' });
+
+    await expect(resultPromise).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('rotates the credential and retries once on a raw 401 from pulls.get', async () => {
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+      .mockResolvedValueOnce(connected('t2', 'auth_1', 2));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    const t2Octokit = buildOctokit('t2');
+
+    t1Octokit.pulls.get.mockRejectedValueOnce({ status: 401, message: 'gone' });
+    mockOverview(t2Octokit);
+
+    const result = await caller.getPullRequest({ owner: 'octocat', repo: 'hello', number: 1 });
+
+    expect(result).toMatchObject({ number: 1, title: 'Fix the thing' });
+    expect(t1Octokit.pulls.get).toHaveBeenCalledTimes(1);
+    expect(t2Octokit.pulls.get).toHaveBeenCalledTimes(1);
+    expect(t2Octokit.__token).toBe('t2');
+  });
+
+  it('degrades the GraphQL enrichment to a null reviewDecision when the GraphQL leg fails with a non-401 error', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.pulls.get.mockResolvedValueOnce({ data: overviewPrData });
+    octokit.repos.get.mockResolvedValueOnce({ data: overviewRepoData });
+    octokit.request.mockRejectedValueOnce(new Error('graphql 5xx'));
+
+    const result = await caller.getPullRequest({ owner: 'octocat', repo: 'hello', number: 1 });
+
+    expect(result.reviewDecision).toBeNull();
+    expect(result.repo.viewerLogin).toBeNull();
+    expect(result.number).toBe(1);
   });
 });
 

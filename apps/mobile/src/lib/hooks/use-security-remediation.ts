@@ -8,6 +8,8 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -26,9 +28,11 @@ async function invalidateRemediationQueries(
         queryKey: trpc.securityAgent.getAnalysis.queryKey({ findingId }),
       }),
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() }),
-      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
     ]);
+    scheduleCacheMaintenance(() => {
+      reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+    });
     return;
   }
   const ownerInput = { organizationId: scope };
@@ -43,12 +47,15 @@ async function invalidateRemediationQueries(
       queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
     }),
     queryClient.invalidateQueries({
-      queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
-    }),
-    queryClient.invalidateQueries({
       queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
     }),
   ]);
+  scheduleCacheMaintenance(() => {
+    reconcileFirstPage(
+      queryClient,
+      trpc.organizations.securityAgent.listFindings.queryKey(ownerInput)
+    );
+  });
 }
 
 export function useStartSecurityRemediation(scope: string) {

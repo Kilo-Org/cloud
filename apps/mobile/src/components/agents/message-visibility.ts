@@ -20,8 +20,10 @@ import {
 export function partRendersContent(part: Part): boolean {
   if (isTextPart(part)) {
     // Snapshot-init progress shows only in the fixed WorkingIndicator row, and
-    // TextPartRenderer renders nothing for empty text.
-    return !isSnapshotProgressPart(part) && part.text !== '';
+    // TextPartRenderer renders nothing for blank text. Whitespace-only text is
+    // blank: markdown draws no ink for it, so counting it as content adds a
+    // zero-height row that eats a transcript gap and doubles the visible one.
+    return !isSnapshotProgressPart(part) && part.text.trim() !== '';
   }
   if (isToolPart(part)) {
     // ToolPartRenderer renders nothing for the plan-mode transition tools.

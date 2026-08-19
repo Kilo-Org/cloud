@@ -145,23 +145,23 @@ const readViewportScreenshot = async (tabId: number): Promise<EvalTabResult> => 
 const getSnapshot = async (
   tabId: number,
   options: { readonly query?: string; readonly textStart?: number } = {}
-): Promise<PageSnapshot | string> => {
+): Promise<{ error: string; ok: false } | { ok: true; value: PageSnapshot }> => {
   const result = await readPageSnapshot(tabId, options);
 
   if (!result.ok) {
-    return result.error;
+    return { error: result.error, ok: false };
   }
 
   const snapshot = pageSnapshotSchema.safeParse(result.value);
 
   if (!snapshot.success) {
-    return 'Page snapshot was invalid.';
+    return { error: 'Page snapshot was invalid.', ok: false };
   }
 
   const pageSnapshot = toPageSnapshot(snapshot.data);
   cacheSnapshot(tabId, pageSnapshot);
 
-  return pageSnapshot;
+  return { ok: true, value: pageSnapshot };
 };
 
 const searchableFields = ['text', 'label', 'href', 'role', 'tag'] as const;
@@ -277,14 +277,16 @@ const runSafeToolCall = async (
   }
 
   if (toolCall.name === 'get_page_snapshot') {
-    const snapshot = await getSnapshot(
+    const snapshotResult = await getSnapshot(
       toolCall.tabId,
       toolCall.textStart === undefined ? {} : { textStart: toolCall.textStart }
     );
 
-    if (typeof snapshot === 'string') {
-      return { error: snapshot, ok: false };
+    if (!snapshotResult.ok) {
+      return { error: snapshotResult.error, ok: false };
     }
+
+    const snapshot = snapshotResult.value;
 
     // Serving the same unchanged page again only burns context and invites a snapshot loop; a compact marker tells the model to act on what it already has.
     const contentKey = JSON.stringify({
@@ -326,13 +328,13 @@ const runSafeToolCall = async (
   }
 
   // One injection serves both halves of find_in_page: the snapshot nodes and the full-page text matches come from the same walk.
-  const snapshot = await getSnapshot(toolCall.tabId, { query });
+  const snapshotResult = await getSnapshot(toolCall.tabId, { query });
 
-  if (typeof snapshot === 'string') {
-    return { error: snapshot, ok: false };
+  if (!snapshotResult.ok) {
+    return { error: snapshotResult.error, ok: false };
   }
 
-  return { ok: true, value: getFindResults(snapshot, query) };
+  return { ok: true, value: getFindResults(snapshotResult.value, query) };
 };
 
 // One executor per turn: its unchanged-snapshot memory must not cross conversations (or a compaction), where the marker would reference a snapshot the model never saw.

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
@@ -11,19 +12,17 @@ const onMutationError = (error: { message: string }) => {
   announcingToast.error(error.message || 'Something went wrong');
 };
 
+const TrpcHttpStatusErrorSchema = z.looseObject({
+  data: z.looseObject({ httpStatus: z.number().optional() }),
+});
+
 /**
  * Extract the tRPC `data.httpStatus` field without an `as` cast. Returns
  * `undefined` for any shape that doesn't match the tRPC error envelope.
  */
 function getTrpcHttpStatus(error: unknown): number | undefined {
-  if (error === null || typeof error !== 'object' || !('data' in error)) {
-    return undefined;
-  }
-  const data = error.data;
-  if (data === null || typeof data !== 'object' || !('httpStatus' in data)) {
-    return undefined;
-  }
-  return typeof data.httpStatus === 'number' ? data.httpStatus : undefined;
+  const parsed = TrpcHttpStatusErrorSchema.safeParse(error);
+  return parsed.success ? parsed.data.data.httpStatus : undefined;
 }
 
 /**
@@ -148,8 +147,8 @@ export function useKiloClawMutations(organizationId?: string | null) {
 
   // Extracts mutationFn from personal or org path and injects organizationId
   type AnyMutPath = {
-    mutationOptions: (opts: object) => {
-      // eslint-disable-next-line typescript-eslint/no-explicit-any -- wrapping arbitrary tRPC mutations
+    mutationOptions: (opts: Record<string, never>) => {
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any, anti-slop/no-unknown-returns -- wrapping arbitrary tRPC mutations, type-erased across ~15 heterogeneous procedures; each useMutation call site below supplies its own TData
       mutationFn?: ((...args: any[]) => Promise<unknown>) | undefined;
       mutationKey: unknown[];
     };
@@ -161,11 +160,13 @@ export function useKiloClawMutations(organizationId?: string | null) {
     const personalFn = personalOpts.mutationFn ?? asyncNoop;
     const orgFn = orgOpts.mutationFn ?? asyncNoop;
 
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- type-erased across ~15 heterogeneous tRPC mutation procedures; each useMutation call site below supplies its own TData
     let mutationFn: (...args: unknown[]) => Promise<unknown> = asyncNoop;
     if (isResolved && isOrg) {
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      // oxlint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn = (input: unknown) =>
         orgFn(
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload merge across heterogeneous tRPC mutation inputs; no static shape to narrow against
           input && typeof input === 'object' ? { ...input, organizationId } : { organizationId }
         );
     } else if (isResolved) {

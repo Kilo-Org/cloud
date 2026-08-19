@@ -20,7 +20,7 @@ function isValidIdentifier(value: string): boolean {
  * host, non-GitHub hosts, or malformed input.
  */
 export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
-  if (typeof href !== 'string' || href.length === 0) {
+  if (href.length === 0) {
     return null;
   }
   const match = GITHUB_PR_PATTERN.exec(href);
@@ -50,7 +50,7 @@ export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
  * do not hide the URL. Returns `null` when no token parses as a PR URL.
  */
 export function findFirstGitHubPrUrl(text: string): GitHubPrUrl | null {
-  if (typeof text !== 'string' || text.length === 0) {
+  if (text.length === 0) {
     return null;
   }
   const trimmed = text.trim();

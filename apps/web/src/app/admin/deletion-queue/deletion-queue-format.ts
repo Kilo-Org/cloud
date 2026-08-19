@@ -72,6 +72,58 @@ export function deletionStepDescription(stepKey: string): string {
   return STEP_LABELS[stepKey]?.description ?? '';
 }
 
+export function deletionStepCountLabel(stepKey: string, count: number): string {
+  switch (stepKey) {
+    case 'usage_prompt_prefixes':
+      return `${count} scrubbed`;
+    case 'kiloclaw_destroy':
+      return `${count} destroyed`;
+    case 'customerio':
+    case 'substack':
+      return `${count} removed`;
+    default:
+      return `${count} deleted`;
+  }
+}
+
+export function deletionStepProgressLabel(
+  stepKey: string,
+  processedCount: number,
+  scannedCount = 0
+): string | null {
+  const parts: string[] = [];
+  if (processedCount > 0) parts.push(deletionStepCountLabel(stepKey, processedCount));
+  if (scannedCount > 0) parts.push(`${scannedCount} scanned`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+export function formatActivityDetail(item: {
+  stepKey: string | null;
+  details: {
+    processedCount: number | null;
+    scannedCount?: number | null;
+    errorCode: string | null;
+    httpStatusClass?: string | null;
+  };
+}): string {
+  const count =
+    item.stepKey && item.details.processedCount != null
+      ? deletionStepCountLabel(item.stepKey, item.details.processedCount)
+      : null;
+  const scanned = item.details.scannedCount != null ? `${item.details.scannedCount} scanned` : null;
+  return (
+    [
+      item.stepKey ? deletionStepLabel(item.stepKey) : null,
+      count,
+      scanned,
+      item.details.errorCode,
+      item.details.httpStatusClass,
+    ]
+      .filter(Boolean)
+      .join(' · ') || '—'
+  );
+}
+
 export function shortId(id: string): string {
   return id.length > 8 ? `${id.slice(0, 8)}…` : id;
 }

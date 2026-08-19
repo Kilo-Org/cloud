@@ -10,6 +10,8 @@ import {
 } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
   type FlattenedSecurityAgentConfig,
   type SecurityAgentConfig,
@@ -88,17 +90,17 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
   return classifyPrReviewMutationError(error).kind === 'retryable';
 }
 
-function mapOperationInProgress(error: unknown, copy: string): unknown {
+function mapOperationInProgress(error: unknown, copy: string) {
   return isOperationInProgress(error) ? new Error(copy) : error;
 }
 
 /** Maps the raw in-progress marker onto retryable sync copy; others pass through. */
-export function mapSecuritySyncOperationError(error: unknown): unknown {
+export function mapSecuritySyncOperationError(error: unknown) {
   return mapOperationInProgress(error, SECURITY_SYNC_IN_PROGRESS_COPY);
 }
 
 /** Same marker, dismissal copy: the dismiss sheet must not talk about a sync. */
-export function mapSecurityDismissOperationError(error: unknown): unknown {
+export function mapSecurityDismissOperationError(error: unknown) {
   return mapOperationInProgress(error, SECURITY_DISMISS_IN_PROGRESS_COPY);
 }
 
@@ -163,26 +165,25 @@ export function useSaveSecurityAgentConfig(scope: string) {
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: configQueryKey });
       if (isPersonalSecurityScope(scope)) {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
-          }),
-          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
-        ]);
+        await queryClient.invalidateQueries({
+          queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
+        });
+        scheduleCacheMaintenance(() => {
+          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+        });
         return;
       }
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey({
-            organizationId: scope,
-          }),
+      await queryClient.invalidateQueries({
+        queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey({
+          organizationId: scope,
         }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.listFindings.queryKey({
-            organizationId: scope,
-          }),
-        }),
-      ]);
+      });
+      scheduleCacheMaintenance(() => {
+        reconcileFirstPage(
+          queryClient,
+          trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
+        );
+      });
     },
   });
 }

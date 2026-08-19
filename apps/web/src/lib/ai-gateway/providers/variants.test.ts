@@ -32,7 +32,7 @@ describe('getFallbackModelVariants', () => {
     ['google/gemini-3.1-pro-preview', ['minimal', 'low', 'medium', 'high']],
     ['z-ai/glm-5.2', ['none', 'high', 'xhigh']],
     ['xai/grok-4.5', ['low', 'medium', 'high']],
-    ['moonshotai/kimi-k3', ['none', 'low', 'high', 'max']],
+    ['moonshotai/kimi-k3', ['low', 'high', 'max']],
     ['inception/mercury-2', ['instant', 'low', 'medium', 'high']],
     ['meta/muse-1', ['none', 'minimal', 'low', 'medium', 'high', 'xhigh']],
     ['nvidia/nemotron-3-super-120b-a12b:free', ['none', 'medium', 'high']],

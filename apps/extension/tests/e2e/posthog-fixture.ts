@@ -20,7 +20,10 @@ export interface PosthogRecorder {
 export const EXTENSION_E2E_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36';
 
-export const EXTENSION_E2E_LAUNCH_ARGS = ['--disable-blink-features=AutomationControlled'] as const;
+export const EXTENSION_E2E_LAUNCH_ARGS = [
+  '--disable-blink-features=AutomationControlled',
+  '--enable-features=WebMCP',
+] as const;
 
 export const applyPosthogE2eBrowserWorkarounds = async (context: BrowserContext): Promise<void> => {
   await context.addInitScript(() => {

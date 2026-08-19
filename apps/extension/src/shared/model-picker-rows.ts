@@ -1,4 +1,20 @@
+import { CLI_MODEL_ID } from '@kilocode/cloud-agent-sdk';
 import type { KiloGatewayModelOption } from './kilo-api-client';
+
+/** Prefix of a picker row projected from a remote CLI's own model catalog. */
+export const CLI_CATALOG_ID_PREFIX = 'cli:';
+
+/**
+ * Server-side model preferences (favorites, last selected) are keyed by gateway
+ * model id. The synthetic "CLI default" row and every CLI-catalog row are not
+ * gateway models, so their ids must never reach those endpoints.
+ */
+export const isGatewayModelId = (id: string): boolean =>
+  id !== '' && id !== CLI_MODEL_ID && !id.startsWith(CLI_CATALOG_ID_PREFIX);
+
+/** Id shown to the user: a CLI-catalog row shows the CLI's own provider/model. */
+export const modelRowDisplayId = (id: string): string =>
+  id.startsWith(CLI_CATALOG_ID_PREFIX) ? id.slice(CLI_CATALOG_ID_PREFIX.length) : id;
 
 export type ExtensionModelPickerRow =
   | { key: string; title: string; type: 'header' }

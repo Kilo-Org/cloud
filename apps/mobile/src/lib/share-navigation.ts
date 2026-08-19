@@ -49,7 +49,7 @@ export function appendShareParams(
 }
 
 /** Parse the destination params a focused delivery must set from a pending href. */
-export function parseShareHrefParams(href: string): { organizationId: string | undefined } {
+export function parseShareHrefParams(href: string) {
   const queryStart = href.indexOf('?');
   if (queryStart === -1) {
     return { organizationId: undefined };
@@ -98,6 +98,9 @@ function normalizePath(path: string): string[] {
  * Delivery waits until the formSheet is fully gone — never a fixed timer.
  */
 export function navigationContainsShareGate(state: unknown): boolean {
+  // Walks the untyped React Navigation state tree, which has no shared
+  // discriminant to narrow on.
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see above
   if (!state || typeof state !== 'object') {
     return false;
   }

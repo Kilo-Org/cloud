@@ -3,7 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
-import { buildExtensionModelPickerRows } from '@/src/shared/model-picker-rows';
+import {
+  buildExtensionModelPickerRows,
+  isGatewayModelId,
+  modelRowDisplayId,
+} from '@/src/shared/model-picker-rows';
 import { ModelPickerModelRow } from './model-picker-row';
 import { useModelPreferences } from './use-model-preferences';
 
@@ -40,7 +44,8 @@ export const ModelPicker = ({
   const selectedOption = modelOptions.find(option => option.id === model);
   // Always show the conversation's own model: its name when the catalog has it, its raw id
   // While the catalog is missing or stale. 'Loading models...' means no model is stored yet.
-  const triggerLabel = selectedOption?.name ?? (model === '' ? 'Loading models...' : model);
+  const triggerLabel =
+    selectedOption?.name ?? (model === '' ? 'Loading models...' : modelRowDisplayId(model));
 
   const rows = useMemo(
     () =>
@@ -196,7 +201,8 @@ export const ModelPicker = ({
                         model={row.model}
                         onSelect={handleSelect}
                         onToggleFavorite={toggleFavorite}
-                        showStar={status !== 'terminal'}
+                        // Favorites are stored per gateway model id; a CLI row has none.
+                        showStar={status !== 'terminal' && isGatewayModelId(row.model.id)}
                         starDisabled={status === 'loading'}
                       />
                     </div>

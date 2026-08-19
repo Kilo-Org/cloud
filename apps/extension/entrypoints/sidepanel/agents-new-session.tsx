@@ -2,6 +2,7 @@
 /* eslint-disable max-lines -- Cohesive single-purpose new-session form; splitting would scatter form state */
 import { storage } from '#imports';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import {
@@ -18,16 +19,20 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 import {
+  CLI_MODEL_ID,
+  cliModelLabel,
   createRemoteSessionOnConnection,
   formatSessionError,
   parseCreateSessionResponse,
 } from '@kilocode/cloud-agent-sdk';
+import type { CreateRemoteSessionInput } from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
 import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
+import { isGatewayModelId } from '@/src/shared/model-picker-rows';
 import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
+import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { useExtensionAgents } from './agents-provider';
 import { activeSessionsQueryKey, sessionHistoryQueryKey } from './agents-session-list';
 import { ModelPicker } from './model-picker';
@@ -41,6 +46,19 @@ const PROMPT_MIN_LENGTH = 3;
 const PROMPT_MAX_LENGTH = 4000;
 const MODE = 'code' as const;
 
+/**
+ * Synthetic first row for a CLI target: keep the CLI on its own configured
+ * model. Picking it omits `model` from `create_session`, so the CLI decides.
+ * The shared picker hides the favorite star on it: model preferences are keyed
+ * by gateway model id, and this id is not one.
+ */
+const CLI_DEFAULT_MODEL_OPTION: KiloGatewayModelOption = {
+  id: CLI_MODEL_ID,
+  isPreferred: true,
+  name: cliModelLabel(null),
+  variants: [],
+};
+
 export { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH, MODE };
 // Exported for focused test coverage.
 
@@ -50,10 +68,7 @@ export { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH, MODE };
 
 const storedAuthQueryKey = ['side-panel', 'stored-auth'] as const;
 
-const useStoredAuth = (): {
-  readonly auth: StoredAuth | undefined;
-  readonly isLoading: boolean;
-} => {
+const useStoredAuth = () => {
   const query = useQuery({
     queryFn: async () => (await loadStoredAuth(storage)) ?? null,
     queryKey: storedAuthQueryKey,
@@ -115,7 +130,7 @@ export const buildSubmitInput = ({
   selectedVariant: string;
   selectedRepo: string;
   initialMessageId: string;
-}): Record<string, unknown> => ({
+}) => ({
   autoCommit: true,
   autoInitiate: true,
   githubRepo: selectedRepo,
@@ -124,6 +139,32 @@ export const buildSubmitInput = ({
   model: selectedModel,
   prompt,
   ...(selectedVariant ? { variant: selectedVariant } : {}),
+});
+
+/**
+ * `create_session` carries the model itself, so a CLI session starts on the
+ * picked gateway model — no first-prompt override needed. `CLI_MODEL_ID` means
+ * "leave the CLI on its own model": the field is omitted from the wire.
+ */
+export const buildCreateRemoteSessionInput = ({
+  organizationId,
+  selectedModel,
+  selectedVariant,
+}: {
+  organizationId: string | null | undefined;
+  selectedModel: string;
+  selectedVariant: string;
+}): CreateRemoteSessionInput => ({
+  ...(organizationId === null || organizationId === undefined ? {} : { orgId: organizationId }),
+  ...(selectedModel === '' || selectedModel === CLI_MODEL_ID
+    ? {}
+    : {
+        model: {
+          modelID: selectedModel,
+          providerID: 'kilo',
+          ...(selectedVariant ? { variant: selectedVariant } : {}),
+        },
+      }),
 });
 
 /**
@@ -172,13 +213,14 @@ export const submitBlockedReason = ({
   return null;
 };
 
+const modelPreferencesGetResultSchema = z.looseObject({
+  favorites: z.array(z.unknown()),
+});
+
 const isModelPreferencesGetResult = (
   value: unknown
 ): value is { favorites: string[]; lastSelected: LastSelected | null } =>
-  typeof value === 'object' &&
-  value !== null &&
-  'favorites' in value &&
-  Array.isArray((value as Record<string, unknown>)['favorites']);
+  modelPreferencesGetResultSchema.safeParse(value).success;
 
 export { isModelPreferencesGetResult };
 // Exported for focused test coverage.
@@ -293,6 +335,10 @@ export const AgentsNewSession = ({
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedVariant, setSelectedVariant] = useState('');
+  /* A CLI target keeps its own model choice, so switching targets never leaks
+     the synthetic CLI id into a cloud submit, or a cloud model into the CLI. */
+  const [cliModel, setCliModel] = useState<string>(CLI_MODEL_ID);
+  const [cliVariant, setCliVariant] = useState('');
   /** 'cloud' or a CLI instance connectionId. */
   const [runTarget, setRunTarget] = useState('cloud');
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
@@ -363,17 +409,26 @@ export const AgentsNewSession = ({
     setSelectedRepo(repos[0]?.fullName ?? '');
   }, [repos, selectedRepo]);
 
+  // ---- Picker values per run target ----
+  const pickerModelOptions = useMemo(
+    () => (isCloudTarget ? modelOptions : [CLI_DEFAULT_MODEL_OPTION, ...modelOptions]),
+    [isCloudTarget, modelOptions]
+  );
+  const pickerModel = isCloudTarget ? selectedModel : cliModel;
+  const pickerVariant = isCloudTarget ? selectedVariant : cliVariant;
+
   // ---- Variants for current model ----
   const selectedModelOption = useMemo(
-    () => modelOptions.find(opt => opt.id === selectedModel),
-    [modelOptions, selectedModel]
+    () => modelOptions.find(opt => opt.id === pickerModel),
+    [modelOptions, pickerModel]
   );
   const availableVariants = selectedModelOption?.variants ?? [];
 
   // ---- Derived state ----
   const trimmed = trimValue(prompt);
   const isPromptValid = trimmed.length >= PROMPT_MIN_LENGTH && trimmed.length <= PROMPT_MAX_LENGTH;
-  // A CLI instance inherits repo and model from the CLI; cloud needs both.
+  /* A CLI instance inherits the repo from the CLI and defaults to its own
+     model; cloud needs both picked. */
   const isFormValid = isCloudTarget
     ? isPromptValid && selectedModel !== '' && selectedRepo !== ''
     : isPromptValid;
@@ -415,22 +470,34 @@ export const AgentsNewSession = ({
   // ---- Handlers ----
   const handleModelSelect = useCallback(
     (modelId: string) => {
-      setSelectedModel(modelId);
-      setIsModelUserSelected(true);
-      setSelectedVariant('');
-      setLastSelectedMutation.mutate({ model: modelId });
+      if (isCloudTarget) {
+        setSelectedModel(modelId);
+        setIsModelUserSelected(true);
+        setSelectedVariant('');
+      } else {
+        setCliModel(modelId);
+        setCliVariant('');
+      }
+      if (isGatewayModelId(modelId)) {
+        // Never persist a non-gateway id: it would wipe the real lastSelected.
+        setLastSelectedMutation.mutate({ model: modelId });
+      }
     },
-    [setLastSelectedMutation]
+    [isCloudTarget, setLastSelectedMutation]
   );
 
   const handleVariantSelect = useCallback(
     (variant: string) => {
-      setSelectedVariant(variant);
-      if (selectedModel) {
-        setLastSelectedMutation.mutate({ model: selectedModel, variant });
+      if (isCloudTarget) {
+        setSelectedVariant(variant);
+      } else {
+        setCliVariant(variant);
+      }
+      if (isGatewayModelId(pickerModel)) {
+        setLastSelectedMutation.mutate({ model: pickerModel, variant });
       }
     },
-    [selectedModel, setLastSelectedMutation]
+    [isCloudTarget, pickerModel, setLastSelectedMutation]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -447,7 +514,11 @@ export const AgentsNewSession = ({
         const raw = await createRemoteSessionOnConnection(
           userWebConnection,
           runTarget,
-          organizationId === null ? undefined : { orgId: organizationId }
+          buildCreateRemoteSessionInput({
+            organizationId,
+            selectedModel: cliModel,
+            selectedVariant: cliVariant,
+          })
         );
         const parsed = parseCreateSessionResponse(raw);
         if (!parsed.ok) {
@@ -518,6 +589,8 @@ export const AgentsNewSession = ({
     isSubmitting,
     isCloudTarget,
     runTarget,
+    cliModel,
+    cliVariant,
     userWebConnection,
     trimmed,
     selectedModel,
@@ -659,66 +732,67 @@ export const AgentsNewSession = ({
 
         {/* Toolbar: model + variant + repo */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Model picker (cloud target only) — same component as the browser tab.
+          {/* Model picker — same component as the browser tab, for both run
+              targets. A CLI target also gets the synthetic "CLI default" row.
               The wrapper's min width stops the flexible trigger collapsing to a
               sliver once the repo and Run-on pickers share the row; the row
               wraps instead. */}
-          {isCloudTarget && auth !== undefined ? (
+          {auth === undefined ? null : (
             <div className="flex min-w-36 flex-1">
               <ModelPicker
                 auth={auth}
-                disabled={isSubmitting || modelOptions.length === 0}
-                model={selectedModel}
-                modelOptions={modelOptions}
+                disabled={isSubmitting || pickerModelOptions.length === 0}
+                model={pickerModel}
+                modelOptions={pickerModelOptions}
                 onModelChange={handleModelSelect}
                 organizationId={organizationId ?? undefined}
               />
             </div>
-          ) : null}
-          {isCloudTarget
-            ? (() => {
-                if (modelLoadError !== undefined) {
-                  return (
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
-                      <span className="type-label text-status-red-400">{modelLoadError}</span>
-                      <button
-                        className="type-label text-link hover:text-link-hover underline underline-offset-4"
-                        onClick={() => {
-                          void refetchModels();
-                        }}
-                        type="button"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  );
-                }
-                if (isModelsLoading) {
-                  return null;
-                }
-                if (modelOptions.length === 0) {
-                  return (
-                    <div className="flex items-center gap-1.5">
-                      <span className="type-label text-foreground-muted">No models available</span>
-                      <button
-                        className="type-label text-link hover:text-link-hover underline underline-offset-4"
-                        onClick={() => {
-                          void refetchModels();
-                        }}
-                        type="button"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  );
-                }
-                return null;
-              })()
-            : null}
+          )}
+          {(() => {
+            if (modelLoadError !== undefined) {
+              return (
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="size-3.5 shrink-0 text-status-red-400" />
+                  <span className="type-label text-status-red-400">{modelLoadError}</span>
+                  <button
+                    className="type-label text-link hover:text-link-hover underline underline-offset-4"
+                    onClick={() => {
+                      void refetchModels();
+                    }}
+                    type="button"
+                  >
+                    Retry
+                  </button>
+                </div>
+              );
+            }
+            if (isModelsLoading) {
+              return null;
+            }
+            if (modelOptions.length === 0) {
+              return (
+                <div className="flex items-center gap-1.5">
+                  <span className="type-label text-foreground-muted">
+                    {isCloudTarget ? 'No models available' : 'Only the CLI model is available'}
+                  </span>
+                  <button
+                    className="type-label text-link hover:text-link-hover underline underline-offset-4"
+                    onClick={() => {
+                      void refetchModels();
+                    }}
+                    type="button"
+                  >
+                    Retry
+                  </button>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
-          {/* Variant picker (cloud target only) */}
-          {isCloudTarget && availableVariants.length > 0 ? (
+          {/* Variant picker */}
+          {availableVariants.length > 0 ? (
             <div className="relative">
               <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-within:ring-2 focus-within:ring-brand-primary-ring">
                 <select
@@ -728,7 +802,7 @@ export const AgentsNewSession = ({
                   onChange={changeEvent => {
                     handleVariantSelect(changeEvent.target.value);
                   }}
-                  value={selectedVariant}
+                  value={pickerVariant}
                 >
                   <option value="">Auto</option>
                   {availableVariants.map(variant => (
@@ -918,7 +992,7 @@ export const AgentsNewSession = ({
         {/* CLI target hint */}
         {isCloudTarget || selectedInstance === undefined ? null : (
           <p className="type-label -mt-2 text-foreground-muted">
-            Runs in {selectedInstance.projectName} with the repository and model of the CLI.
+            Runs in {selectedInstance.projectName} with the repository of the CLI.
           </p>
         )}
 

@@ -7,18 +7,20 @@ export type HtmlImage = {
   aspectRatio: number | undefined;
 };
 
-const ENTITIES: Record<string, string> = {
+const ENTITIES = {
   '&amp;': '&',
   '&quot;': '"',
   '&#39;': "'",
   '&lt;': '<',
   '&gt;': '>',
-};
+} satisfies Record<string, string>;
 
 const ENTITY_RE = /&(?:amp|quot|#39|lt|gt);/g;
 
 function decodeEntities(value: string): string {
-  return value.replace(ENTITY_RE, match => ENTITIES[match] ?? match);
+  return value.replace(ENTITY_RE, match =>
+    Object.hasOwn(ENTITIES, match) ? ENTITIES[match as keyof typeof ENTITIES] : match
+  );
 }
 
 const ATTR_SRC = /(?:^|\s)src\s*=\s*["']([^"']*)["']/i;

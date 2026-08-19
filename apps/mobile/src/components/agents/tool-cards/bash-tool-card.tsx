@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Terminal } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
@@ -9,6 +10,8 @@ import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
+const bashToolInputSchema = z.object({ command: z.string() });
+
 /**
  * Sheet body for a bash tool part: the `$ command` block, the output block,
  * and the error. Renders only inside the detail sheet — attachments and the
@@ -16,7 +19,7 @@ import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
  */
 export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
-  const command = typeof input.command === 'string' ? input.command : '';
+  const command = bashToolInputSchema.safeParse(input).data?.command ?? '';
   const commandText = `$ ${command}`;
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;

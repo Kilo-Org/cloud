@@ -9,42 +9,33 @@ import {
   useRef,
   useState,
 } from 'react';
+import { z } from 'zod';
 import { clearDraft, loadDraft, prReviewDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
 // One queued inline comment in the pending review. The composer fills
-// this in when the user taps "Add to review"; the submit sheet drains
-// the whole list into one `submitReview` batch call.
+// this in when the user taps "Add to review"; the submit sheet submits
+// only the fresh items in one `submitReview` batch call.
 //
 // `commitSha` records the PR head SHA at the time the comment was
-// queued so the submit sheet can flag "may be outdated" if the head
-// moves between queue and submit. Submission itself always uses the
-// LATEST head SHA (per the S3 contract) — a per-item 422 surfaces
-// inline so the user can decide whether to retry or drop the comment.
-export type PendingReviewItem = {
-  id: string;
-  path: string;
-  side: 'LEFT' | 'RIGHT';
-  line: number;
-  startLine?: number;
-  body: string;
-  commitSha: string;
-};
+// queued so the submit sheet can flag it "outdated" if the head moves
+// between queue and submit. Stale items are never sent: the submit
+// sheet partitions the queue and submits only the fresh items, leaving
+// stale items queued for the user to edit or delete.
+const PendingReviewItemSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  side: z.union([z.literal('LEFT'), z.literal('RIGHT')]),
+  line: z.number(),
+  startLine: z.number().optional(),
+  body: z.string(),
+  commitSha: z.string(),
+});
+
+export type PendingReviewItem = z.infer<typeof PendingReviewItemSchema>;
 
 function isPendingReviewItem(value: unknown): value is PendingReviewItem {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const item = value as Record<string, unknown>;
-  return (
-    typeof item.id === 'string' &&
-    typeof item.path === 'string' &&
-    (item.side === 'LEFT' || item.side === 'RIGHT') &&
-    typeof item.line === 'number' &&
-    (item.startLine === undefined || typeof item.startLine === 'number') &&
-    typeof item.body === 'string' &&
-    typeof item.commitSha === 'string'
-  );
+  return PendingReviewItemSchema.safeParse(value).success;
 }
 
 /**
@@ -90,6 +81,7 @@ type PendingReviewContextValue = {
   addComment: (item: PendingReviewItem) => void;
   updateComment: (id: string, body: string) => void;
   removeComment: (id: string) => void;
+  removeComments: (ids: readonly string[]) => void;
   clear: () => void;
 };
 
@@ -134,9 +126,10 @@ export function PendingReviewProvider({
   // Guards hydration against a result that resolves after unmount, after a
   // key change, or after an explicit clear: every effect run captures the
   // current generation and every cleanup (unmount or a superseding run) bumps
-  // it, so a stale load never applies. `clear()` bumps the generation too, so
-  // a late hydration can never merge old stored comments back into the queue
-  // after a successful submit or discard (refs dodge the flow narrowing that
+  // it, so a stale load never applies. `removeComments()` (submit) and
+  // `clear()` (discard) bump the generation too, so a late hydration can never
+  // merge old stored comments back into the queue after a successful submit or
+  // discard (refs dodge the flow narrowing that
   // makes a local `let active` read as always-truthy to type-aware lint).
   const hydrationGenerationRef = useRef(0);
   useEffect(() => {
@@ -173,7 +166,7 @@ export function PendingReviewProvider({
   // First-write guard: the persistence effect writes only once `hydrated`
   // is true. An empty queue clears the persisted entry (an empty list has
   // nothing worth storing) — this is what makes `removeComment`-to-empty
-  // and the submit-success `clear()` durable.
+  // and the submit-success `removeComments`-to-empty durable.
   useEffect(() => {
     if (!hydrated || !userId || !draftEntityKey) {
       return;
@@ -201,26 +194,45 @@ export function PendingReviewProvider({
     setItems(previous => previous.filter(item => item.id !== id));
   }, []);
 
+  const removeComments = useCallback((ids: readonly string[]) => {
+    // An empty id list is a true no-op. APPROVE with no fresh comments
+    // calls this before hydration; bumping the generation or marking
+    // hydrated would discard the in-flight load and let the empty-state
+    // persistence effect clear the stored draft.
+    if (ids.length === 0) {
+      return;
+    }
+    const idSet = new Set(ids);
+    setItems(previous => previous.filter(item => !idSet.has(item.id)));
+    // Same guard `clear()` carries: invalidate any in-flight hydration so a
+    // late load cannot merge the just-posted comments back into the queue
+    // after a successful submit. Mark hydration settled too, so the remaining
+    // items persist even when the invalidated load never resolves. The
+    // persistence effect writes the remainder (an empty remainder clears the
+    // stored entry through its empty-state branch), so no direct clearDraft.
+    hydrationGenerationRef.current += 1;
+    setHydrated(true);
+  }, []);
+
   const clear = useCallback(() => {
     setItems([]);
     // A successful clear invalidates any in-flight hydration: a late load
     // must not merge the old stored comments back into the queue after the
-    // user submitted the review or discarded the queue. Mark hydration
-    // settled too, so a later addComment persists even when the invalidated
-    // load never resolves.
+    // user discarded the queue. Mark hydration settled too, so a later
+    // addComment persists even when the invalidated load never resolves.
     hydrationGenerationRef.current += 1;
     setHydrated(true);
-    // Clear the persisted entry directly (submit success / explicit discard):
-    // the persistence effect would also clear on the empty state, but this
-    // runs synchronously so a submit-then-navigate can never leave the entry.
+    // Clear the persisted entry directly (explicit discard): the persistence
+    // effect would also clear on the empty state, but this runs synchronously
+    // so a discard-then-navigate can never leave the entry.
     if (userId && draftEntityKey) {
       void clearDraft(userId, draftEntityKey);
     }
   }, [userId, draftEntityKey]);
 
   const value = useMemo<PendingReviewContextValue>(
-    () => ({ items, addComment, updateComment, removeComment, clear }),
-    [items, addComment, updateComment, removeComment, clear]
+    () => ({ items, addComment, updateComment, removeComment, removeComments, clear }),
+    [items, addComment, updateComment, removeComment, removeComments, clear]
   );
 
   return <PendingReviewContext value={value}>{children}</PendingReviewContext>;

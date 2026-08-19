@@ -838,7 +838,7 @@ describe('restored new-session submit', () => {
   });
 });
 
-type DraftLoadState = { settled: boolean; text: string | null };
+type DraftLoadState = { settled: boolean; value: string | null };
 
 function FencedDraftHarness({
   userId,
@@ -919,14 +919,14 @@ describe('useFencedDraftLoad generation fencing', () => {
         firstLoad.resolve(staleText);
       });
       await flushMicrotasks();
-      expect(renders.at(-1)).toEqual({ settled: false, text: null });
+      expect(renders.at(-1)).toEqual({ settled: false, value: null });
 
       // The current generation's load resolves: it publishes.
       await act(async () => {
         secondLoad.resolve(freshText);
       });
       await flushMicrotasks();
-      expect(renders.at(-1)).toEqual({ settled: true, text: freshText });
+      expect(renders.at(-1)).toEqual({ settled: true, value: freshText });
       expect(vi.mocked(loadDraft)).toHaveBeenCalledWith(
         second.userId,
         second.entityKey,
@@ -961,7 +961,7 @@ describe('useFencedDraftLoad generation fencing', () => {
       gate.resolve('late draft');
     });
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: false, text: null });
+    expect(renders.at(-1)).toEqual({ settled: false, value: null });
   });
 });
 

@@ -34,13 +34,13 @@ const E2E_LATENCY_RULES: readonly (readonly [procedure: string, delayMs: number]
 ];
 
 function requestUrlString(url: RequestInfo | URL): string {
-  if (typeof url === 'string') {
-    return url;
-  }
   if (url instanceof URL) {
     return url.href;
   }
-  return url.url;
+  if (url instanceof Request) {
+    return url.url;
+  }
+  return url;
 }
 
 function e2eLatencyForUrl(url: string): number {

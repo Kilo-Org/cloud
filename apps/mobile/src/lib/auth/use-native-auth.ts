@@ -178,27 +178,21 @@ export function useNativeAuth(): NativeAuthResult {
         return;
       }
 
-      const body: Record<string, unknown> = {
-        provider: 'google',
-        supportsRefresh: true,
-      };
-
-      if (serverAuthCode) {
-        body.serverAuthCode = serverAuthCode;
-        body.googleClientId = GOOGLE_WEB_CLIENT_ID;
-      } else {
-        body.idToken = idToken;
-      }
-
       let admissionBody: Record<string, unknown> = {};
       try {
         admissionBody = await resolveAdmission();
       } catch {
         return;
       }
-      Object.assign(body, admissionBody);
 
-      const result = await postAuth('/api/auth/native/token', body);
+      const result = await postAuth('/api/auth/native/token', {
+        provider: 'google',
+        supportsRefresh: true,
+        ...(serverAuthCode
+          ? { serverAuthCode, googleClientId: GOOGLE_WEB_CLIENT_ID }
+          : { idToken }),
+        ...admissionBody,
+      });
 
       if (result.ok) {
         const parsed = parseTokenPair(result.data);

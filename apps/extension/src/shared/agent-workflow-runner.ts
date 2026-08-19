@@ -24,6 +24,12 @@ export type WorkflowRunResult =
       dryRunActions?: { action: string; selector: string }[] | undefined;
     };
 
+// The value a workflow script carries across navigations via { navigate, state }.
+interface WorkflowScriptState {
+  // eslint-disable-next-line typescript-eslint/consistent-indexed-object-style -- A named interface (not a Record alias) is the sanctioned owner contract for anti-slop/no-known-value-widening.
+  readonly [key: string]: unknown;
+}
+
 interface EvalTabOkResult {
   ok: true;
   value: unknown;
@@ -56,18 +62,19 @@ const isNavigationDestroyedEval = (error: string): boolean =>
  * shape gate. The benchmark scorer applies the same coercion when it binds a
  * verifying run's input, so a coerced run scores like a well-formed one.
  */
-export const coerceWorkflowRunInput = (input: unknown): unknown => {
-  if (typeof input !== 'string') {
+export const coerceWorkflowRunInput = (input: unknown) => {
+  const asString = stringSchema.safeParse(input);
+  if (!asString.success) {
     return input;
   }
-  const trimmed = input.trim();
+  const trimmed = asString.data.trim();
   if (trimmed === '') {
-    return undefined;
+    return;
   }
   if (trimmed.startsWith('{')) {
     try {
       const parsed: unknown = JSON.parse(trimmed);
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      if (jsonRecordSchema.safeParse(parsed).success) {
         return parsed;
       }
     } catch {
@@ -88,6 +95,9 @@ export const coerceWorkflowRunInput = (input: unknown): unknown => {
   }
   return input;
 };
+
+const stringSchema = z.string();
+const jsonRecordSchema = z.record(z.string(), z.unknown());
 
 const scriptEnvelopeSchema = z.object({
   dryRunActions: z
@@ -419,12 +429,7 @@ const validateNavigationState = (
   const nextState = innerValue['state'];
 
   // Reject null, undefined, primitives, and arrays as navigation state.
-  if (
-    nextState === null ||
-    nextState === undefined ||
-    typeof nextState !== 'object' ||
-    Array.isArray(nextState)
-  ) {
+  if (!jsonRecordSchema.safeParse(nextState).success) {
     return {
       errorResult: {
         error:
@@ -516,10 +521,7 @@ export const runWorkflow = async (
   // 2a. Tolerant string coercion; the shape gate below catches what does not parse.
   const coercedInput = coerceWorkflowRunInput(input);
   // 2b. Input shape gate — before any navigation. Name the declared params: a weak model that sent a bare string loops on a generic message (measured), but corrects when told the exact object to send.
-  if (
-    coercedInput !== undefined &&
-    (typeof coercedInput !== 'object' || coercedInput === null || Array.isArray(coercedInput))
-  ) {
+  if (coercedInput !== undefined && !jsonRecordSchema.safeParse(coercedInput).success) {
     const params = workflow.params ?? [];
     const exampleParam = params.find(param => param.required === true) ?? params[0];
     const example = exampleParam === undefined ? '{}' : `{"${exampleParam.name}": "<value>"}`;
@@ -602,7 +604,7 @@ export const runWorkflow = async (
 
   // 3. Initialize before the loop. `state.input` mirrors `input` on the first
   // Page for scripts written against the old contract.
-  let state: unknown = { input: normalizedInput };
+  let state: WorkflowScriptState = { input: normalizedInput };
   let pagesVisited = 0;
   let navigationRecoveries = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
@@ -714,10 +716,7 @@ export const runWorkflow = async (
       );
     }
 
-    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Value passed zod validation; runtime checks follow.
-    const innerValue = envelope.data.value as Record<string, unknown>;
-
-    if (innerValue === null || innerValue === undefined || typeof innerValue !== 'object') {
+    if (!jsonRecordSchema.safeParse(envelope.data.value).success) {
       /* Same reasoning as above: a dry-run script that falls through without a
          return value usually read post-action content that never rendered. */
       if (dryRun && dryRunActions.length > 0) {
@@ -736,11 +735,14 @@ export const runWorkflow = async (
       }
 
       return resultWithActions(
-        { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
+        { error: invalidValueError(envelope.data.value, dryRun), ok: false, pageUrl: url },
         dryRun,
         dryRunActions
       );
     }
+
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding jsonRecordSchema check guarantees a plain object.
+    const innerValue = envelope.data.value as Record<string, unknown>;
 
     // Success: { done: true, result: <unknown> }
     if (innerValue['done'] === true) {
@@ -752,7 +754,8 @@ export const runWorkflow = async (
     }
 
     // Navigation: { navigate: string, state: object }
-    if (typeof innerValue['navigate'] === 'string' && innerValue['navigate'].length > 0) {
+    const navigateValue = stringSchema.safeParse(innerValue['navigate']);
+    if (navigateValue.success && navigateValue.data.length > 0) {
       const validationResult = validateNavigationState(workflow, innerValue, url);
 
       if (validationResult.kind === 'error') {

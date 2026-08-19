@@ -1,4 +1,5 @@
 import { MutationCache, type Query, QueryCache, QueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { reportTrpcError } from '@/lib/force-update-signal';
@@ -18,20 +19,27 @@ type TrpcErrorData = {
   authRequired?: boolean;
 };
 
+const trpcErrorDataSchema = z.object({
+  code: z.string().optional(),
+  authRequired: z.boolean().optional(),
+});
+const trpcErrorShapeSchema = z.object({
+  data: z.unknown().optional(),
+  shape: z.object({ data: z.unknown().optional() }).optional(),
+});
+
 /** The serialized tRPC error data, from either the direct or shaped variant. */
 function trpcErrorData(error: unknown): TrpcErrorData | undefined {
-  if (typeof error !== 'object' || error === null) {
+  const parsedError = trpcErrorShapeSchema.safeParse(error);
+  if (!parsedError.success) {
     return undefined;
   }
-  const direct = (error as { data?: unknown }).data;
-  if (typeof direct === 'object' && direct !== null) {
-    return direct as TrpcErrorData;
+  const direct = trpcErrorDataSchema.safeParse(parsedError.data.data);
+  if (direct.success) {
+    return direct.data;
   }
-  const shaped = (error as { shape?: { data?: unknown } }).shape?.data;
-  if (typeof shaped === 'object' && shaped !== null) {
-    return shaped as TrpcErrorData;
-  }
-  return undefined;
+  const shaped = trpcErrorDataSchema.safeParse(parsedError.data.shape?.data);
+  return shaped.success ? shaped.data : undefined;
 }
 
 /**
@@ -48,16 +56,17 @@ function isPermissionDeniedError(error: unknown): boolean {
   return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
 }
 
+type QueryKeyInput = { organizationId?: unknown };
+
+const queryKeyMetaSchema = z.object({ input: z.unknown().optional() });
+
 /** The `input` field of a tRPC query key's meta segment, or undefined. */
-function queryKeyInput(queryKey: unknown): unknown {
+function queryKeyInput(queryKey: unknown): QueryKeyInput | undefined {
   if (!Array.isArray(queryKey) || queryKey.length < 2) {
     return undefined;
   }
-  const meta = queryKey[1];
-  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) {
-    return undefined;
-  }
-  return (meta as { input?: unknown }).input;
+  const parsedMeta = queryKeyMetaSchema.safeParse(queryKey[1]);
+  return parsedMeta.success ? (parsedMeta.data.input as QueryKeyInput | undefined) : undefined;
 }
 
 /**
@@ -75,7 +84,7 @@ function removePermissionDeniedQueries(
     return;
   }
   const input = queryKeyInput(query.queryKey);
-  const organizationId = (input as { organizationId?: unknown } | undefined)?.organizationId;
+  const organizationId = input?.organizationId;
   if (organizationId !== undefined && organizationId !== null) {
     queryClient.removeQueries({
       queryKey: [query.queryKey[0], { input: { organizationId } }],

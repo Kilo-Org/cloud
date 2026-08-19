@@ -606,10 +606,21 @@ test('Agents new session spawns onto a connected CLI instance', async () => {
     await expect(runOn).toBeVisible({ timeout: 10_000 });
     await runOn.selectOption(DEFAULT_INSTANCE.connectionId);
 
-    // Cloud-only pickers leave the form; the CLI hint appears.
-    await expect(sidePanel.getByLabel('Model', { exact: true })).toBeHidden();
+    // The CLI target keeps the model picker and starts on the CLI's own model.
+    const modelTrigger = sidePanel.getByLabel('Model', { exact: true });
+    await expect(modelTrigger).toBeVisible({ timeout: 10_000 });
+    await expect(modelTrigger).toContainText('CLI default');
+    // The repo still comes from the CLI checkout, so that picker stays hidden.
     await expect(sidePanel.getByLabel('Select repository')).toBeHidden();
     await expect(sidePanel.getByText(/Runs in checkout-service/)).toBeVisible();
+
+    // Overriding the CLI model with a gateway model.
+    await modelTrigger.click();
+    await sidePanel
+      .getByRole('dialog', { name: 'Select model' })
+      .locator('[data-model-id="anthropic/claude-sonnet-4"]')
+      .click();
+    await expect(modelTrigger).toContainText('Claude Sonnet 4');
 
     await sidePanel.getByRole('button', { name: 'Start session' }).click();
 
@@ -623,6 +634,10 @@ test('Agents new session spawns onto a connected CLI instance', async () => {
         (message as { command?: string }).command === 'create_session'
     );
     expect(spawnCommands.length).toBeGreaterThan(0);
+    // The picked gateway model travels with the spawn command, so the CLI starts on it.
+    expect(spawnCommands[0]).toMatchObject({
+      data: { model: { modelID: 'anthropic/claude-sonnet-4', providerID: 'kilo' } },
+    });
     await expect(sidePanel.getByRole('heading', { name: 'Spawned session' })).toBeVisible({
       timeout: 15_000,
     });
@@ -907,6 +922,70 @@ test('Agents new session toolbar stays usable at the narrowest panel width', asy
       () => document.documentElement.scrollWidth - window.innerWidth
     );
     expect(overflow).toBeLessThanOrEqual(0);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('Agents session header reports context usage and session cost', async () => {
+  const sessionId = DEFAULT_CLOUD_SESSION.kiloSessionId;
+  let eventCounter = 0;
+  const ev = (streamEventType: string, data: unknown): Record<string, unknown> => ({
+    data,
+    eventId: ++eventCounter,
+    executionId: 'exec-usage',
+    sessionId,
+    streamEventType,
+    timestamp: new Date().toISOString(),
+  });
+  const kilocode = (type: string, properties: unknown): Record<string, unknown> =>
+    ev('kilocode', { properties, type });
+  // 1200 input + 300 output + 100 reasoning + 400 cache read = 2000 context tokens.
+  const events: Record<string, unknown>[] = [
+    kilocode('session.created', { info: { id: sessionId } }),
+    kilocode('message.updated', {
+      info: {
+        agent: 'build',
+        cost: 0.0125,
+        id: 'msg-usage-1',
+        mode: 'code',
+        modelID: 'claude-sonnet-4',
+        path: { cwd: '/', root: '/' },
+        providerID: 'anthropic',
+        role: 'assistant',
+        sessionID: sessionId,
+        time: { completed: Date.now(), created: Date.now() },
+        tokens: { cache: { read: 400, write: 0 }, input: 1200, output: 300, reasoning: 100 },
+      },
+    }),
+    kilocode('message.part.updated', {
+      part: {
+        id: 'part-usage-1',
+        messageID: 'msg-usage-1',
+        sessionID: sessionId,
+        text: 'Done with the fix.',
+        type: 'text',
+      },
+    }),
+    ev('complete', { currentBranch: 'main' }),
+  ];
+
+  const { cleanup, getSidePanel } = await setupAgentsTest({ cloudAgentWsEvents: events });
+  try {
+    const sidePanel = await getSidePanel();
+    await navigateToAgentsMode(sidePanel);
+    await sidePanel.getByText('Fix login bug').click();
+    await expect(sidePanel.getByLabel('Back to sessions')).toBeVisible({ timeout: 10_000 });
+    await expect(sidePanel.getByText('Done with the fix.')).toBeVisible({ timeout: 10_000 });
+
+    // The indicator reports the summed context tokens, never a fabricated value.
+    const indicator = sidePanel.getByLabel(/^Context usage:/u);
+    await expect(indicator).toBeVisible({ timeout: 10_000 });
+    await expect(indicator).toHaveAttribute('aria-label', /2,000 tokens/u);
+
+    // The popover carries the session cost streamed with the assistant message.
+    await indicator.click();
+    await expect(sidePanel.getByText('Session cost $0.0125')).toBeVisible({ timeout: 10_000 });
   } finally {
     await cleanup();
   }

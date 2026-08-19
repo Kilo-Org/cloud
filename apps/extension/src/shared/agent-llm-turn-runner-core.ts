@@ -37,6 +37,7 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly noResponseMessage: string;
   readonly onUsage?: OnTurnUsage | undefined;
   readonly organizationId?: string | undefined;
+  readonly prepareTools?: (() => Promise<KiloGatewayToolDefinition[]>) | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly supportsImages?: boolean | undefined;
   readonly thinkingEffort?: string | undefined;
@@ -160,6 +161,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   noResponseMessage,
   onUsage,
   organizationId,
+  prepareTools,
   signal,
   supportsImages = false,
   thinkingEffort,
@@ -210,12 +212,14 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       ok: false,
     };
   };
-  const getGatewayChatCompletion = (
+  const getGatewayChatCompletion = async (
     nextEvents: AgentConversationEvent[],
     onContentDelta: (delta: string) => void,
     onReasoningDelta: (delta: string) => void
-  ) =>
-    fetchKiloGatewayChatCompletionStream({
+  ) => {
+    const requestTools = prepareTools === undefined ? tools : await prepareTools();
+
+    return fetchKiloGatewayChatCompletionStream({
       apiBaseUrl,
       // A high-effort model legitimately streams for minutes; anything else past two minutes is a pathological trickle worth cutting and retrying.
       completionTimeoutMs: isHighEffort(thinkingEffort) ? 300_000 : 120_000,
@@ -228,8 +232,9 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       signal,
       thinkingEffort,
       token,
-      tools,
+      tools: requestTools,
     });
+  };
 
   const appendCompletion = async (
     nextEvents: AgentConversationEvent[]

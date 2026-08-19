@@ -1,4 +1,6 @@
+/* eslint-disable max-lines */
 import { storage } from '#imports';
+import { z } from 'zod';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import {
@@ -19,8 +21,12 @@ import {
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
+  WEB_MCP_DISCOVER_MESSAGE,
+  WEB_MCP_EXECUTE_MESSAGE,
+  discoverWebMcpToolsInTab,
   evalInTab,
   evalInTabWithScripting,
+  executeWebMcpToolInTab,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
   isTabDebuggerRequest,
@@ -59,16 +65,31 @@ interface ChromeRuntimeApi {
  * extension `id` but reports the host page's web origin, while an extension page reports an
  * extension-scheme origin (`chrome-extension://` on Chrome, `moz-extension://` on Firefox).
  */
+const extensionSchemeSchema = z
+  .string()
+  .refine(value => value.startsWith('chrome-extension://') || value.startsWith('moz-extension://'));
+
 const isExtensionScheme = (value: unknown): boolean =>
-  typeof value === 'string' &&
-  (value.startsWith('chrome-extension://') || value.startsWith('moz-extension://'));
+  extensionSchemeSchema.safeParse(value).success;
+
+const extensionSenderSchema = z.object({
+  id: z.string().optional(),
+  origin: z.unknown().optional(),
+  url: z.unknown().optional(),
+});
 
 const isTrustedExtensionSender = (sender: unknown, runtimeId: string | undefined): boolean => {
-  if (runtimeId === undefined || typeof sender !== 'object' || sender === null) {
+  if (runtimeId === undefined) {
     return false;
   }
 
-  const { id, origin, url } = sender as { id?: unknown; origin?: unknown; url?: unknown };
+  const parsed = extensionSenderSchema.safeParse(sender);
+
+  if (!parsed.success) {
+    return false;
+  }
+
+  const { id, origin, url } = parsed.data;
 
   // Same-extension is already pinned by `id === runtimeId`, so origin only separates an extension page from a content script.
   return id === runtimeId && (isExtensionScheme(origin) || isExtensionScheme(url));
@@ -137,6 +158,40 @@ const handleTabDebuggerRequest = async ({
       }
 
       return { error: 'Viewport screenshot API is unavailable.', ok: false };
+    }
+
+    if (request.type === WEB_MCP_DISCOVER_MESSAGE) {
+      if (scriptingApi) {
+        return {
+          ok: true,
+          result: await discoverWebMcpToolsInTab({
+            scriptingApi,
+            tabId: request.tabId,
+          }),
+          type: WEB_MCP_DISCOVER_MESSAGE,
+        };
+      }
+
+      return { error: 'WebMCP discovery API is unavailable.', ok: false };
+    }
+
+    if (request.type === WEB_MCP_EXECUTE_MESSAGE) {
+      if (scriptingApi) {
+        return {
+          ok: true,
+          result: await executeWebMcpToolInTab({
+            arguments: request.arguments,
+            definitionSignature: request.definitionSignature,
+            documentId: request.documentId,
+            scriptingApi,
+            tabId: request.tabId,
+            toolName: request.toolName,
+          }),
+          type: WEB_MCP_EXECUTE_MESSAGE,
+        };
+      }
+
+      return { error: 'WebMCP execution API is unavailable.', ok: false };
     }
 
     if (debuggerApi) {

@@ -19,7 +19,7 @@ import {
 } from '@/lib/auth/pending-external-auth';
 
 type DeviceAuthResult = DeviceAuthState & {
-  start: (mode?: 'signin' | 'signup') => Promise<void>;
+  start: (mode?: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void>;
   cancel: () => void;
   openBrowser: () => Promise<void>;
 };
@@ -132,7 +132,7 @@ export function useDeviceAuth(): DeviceAuthResult {
   }, [cleanup]);
 
   const start = useCallback(
-    async (mode?: 'signin' | 'signup') => {
+    async (mode?: 'signin' | 'signup' | 'sso', ssoEmail?: string) => {
       flowEpochRef.current += 1;
       cleanup();
       setState(pendingDeviceAuthState(undefined, undefined));
@@ -208,14 +208,23 @@ export function useDeviceAuth(): DeviceAuthResult {
         // at /device-auth?code=... Sign-up instead routes through the sign-in
         // page with signup=true so the web UI renders the create-account flow;
         // callbackPath then forwards the user to /device-auth?code=... after
-        // account creation to complete the device-auth approval.
-        const browserUrl =
-          mode === 'signup'
-            ? `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-                callbackPath: `/device-auth?code=${userCode}&app=1`,
-                signup: 'true',
-              }).toString()}`
-            : data.verificationUrl;
+        // account creation to complete the device-auth approval. SSO recovery
+        // routes through the sign-in page with sso=true and the email so the web
+        // SSO page resolves the organization; the organization id is NOT put in
+        // the URL — it stays in client state and as a Sentry tag.
+        let browserUrl = data.verificationUrl;
+        if (mode === 'signup') {
+          browserUrl = `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
+            callbackPath: `/device-auth?code=${userCode}&app=1`,
+            signup: 'true',
+          }).toString()}`;
+        } else if (mode === 'sso') {
+          browserUrl = `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
+            sso: 'true',
+            email: ssoEmail ?? '',
+            callbackPath: `/device-auth?code=${userCode}&app=1`,
+          }).toString()}`;
+        }
 
         setState(pendingDeviceAuthState(userCode, browserUrl));
 

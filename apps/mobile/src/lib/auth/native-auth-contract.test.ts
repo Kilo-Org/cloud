@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseAuthError,
   parseAuthErrorCode,
   parseDeviceAuthCodeResponse,
   parseDeviceAuthTokenResponse,
@@ -218,5 +219,26 @@ describe('parseAuthErrorCode', () => {
 
   it('returns undefined for non-object', () => {
     expect(parseAuthErrorCode(null)).toBeUndefined();
+  });
+});
+
+// --- parseAuthError ---
+
+describe('parseAuthError', () => {
+  it('returns the code and ssoOrganizationId for an SSO error', () => {
+    expect(parseAuthError({ error: 'SSO_ERROR', ssoOrganizationId: 'org_1' })).toEqual({
+      code: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+  });
+
+  it('tolerates the absence of ssoOrganizationId', () => {
+    expect(parseAuthError({ error: 'BLOCKED' })).toEqual({ code: 'BLOCKED' });
+  });
+
+  it('returns undefined for null, undefined, and non-error objects', () => {
+    expect(parseAuthError(null)).toBeUndefined();
+    expect(parseAuthError(undefined)).toBeUndefined();
+    expect(parseAuthError({ success: true })).toBeUndefined();
   });
 });

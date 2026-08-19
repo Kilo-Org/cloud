@@ -1,0 +1,114 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { IdleAuth } from '../idle-auth';
+
+type StartFn = (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void>;
+
+const ssoRecovery = vi.hoisted(() => {
+  const value: { email: string; ssoOrganizationId: string | undefined } | null = {
+    email: 'user@example.com',
+    ssoOrganizationId: 'org_1',
+  };
+  return { value };
+});
+
+vi.mock('@/lib/auth/use-native-auth', () => ({
+  useNativeAuth: () => ({
+    busy: undefined,
+    googleConfigured: false,
+    signInWithApple: vi.fn(),
+    signInWithGoogle: vi.fn(),
+    requestEmailCode: vi.fn(),
+    verifyEmailCode: vi.fn(),
+    ssoRecovery: ssoRecovery.value,
+    clearSsoRecovery: vi.fn(),
+  }),
+}));
+
+vi.mock('expo-apple-authentication', () => ({
+  AppleAuthenticationButton: 'AppleAuthenticationButton',
+  AppleAuthenticationButtonStyle: { WHITE: 0, BLACK: 1 },
+  AppleAuthenticationButtonType: { SIGN_IN: 0 },
+  isAvailableAsync: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
+  View: 'View',
+}));
+
+vi.mock('sonner-native', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
+vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
+
+type R = TestRenderer.ReactTestRenderer;
+type I = TestRenderer.ReactTestInstance;
+
+async function mountIdleAuth(start: StartFn): Promise<R> {
+  const ref: { current: R | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(createElement(IdleAuth, { start }));
+    await Promise.resolve();
+  });
+  const r = ref.current;
+  if (!r) {
+    throw new Error('renderer was not created');
+  }
+  return r;
+}
+
+function texts(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        typeof n.props.children === 'string'
+    )
+    .map(n => n.props.children as string);
+}
+
+function findButton(root: I, label: string): I {
+  const buttons = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
+  const btn = buttons.find(b => (b.props.accessibilityLabel as string) === label);
+  if (!btn) {
+    throw new Error(`button "${label}" not found`);
+  }
+  return btn;
+}
+
+describe('IdleAuth SSO recovery', () => {
+  beforeEach(() => {
+    ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
+  });
+
+  it('shows the recovery copy and forwards the SSO start', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    expect(texts(renderer.root)).toContain('Your organization uses single sign-on.');
+
+    const btn = findButton(renderer.root, 'Continue with SSO');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+
+    expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});

@@ -1,7 +1,12 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN hooks under vitest (node env, no jsdom) */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import * as React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 
 import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
+import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 
 import {
   buildChallengeEntry,
@@ -77,20 +82,37 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
   };
 });
 
+// useSsoRecovery reports the organization id to Sentry; stub the SDK so the
+// hook can be mounted without a native runtime.
+vi.mock('@sentry/react-native', () => ({
+  addBreadcrumb: vi.fn(),
+}));
+
+// postAuth is the single fetch boundary for native auth; stub it so the SSO
+// recovery path can be driven without a network.
+vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
+  const mod = await importOriginal<typeof AuthFetchTypes>();
+  return {
+    ...mod,
+    postAuth: vi.fn(),
+  };
+});
+
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const {
-  AUTH_ERROR_MESSAGES,
-  DEFAULT_ERROR_MESSAGE,
-  mapError,
-  RETRYABLE_ADMISSION_ERROR,
-  resolveAdmission,
-} = await import('@/lib/auth/use-native-auth');
+const { AUTH_ERROR_MESSAGES, DEFAULT_ERROR_MESSAGE, mapError, RETRYABLE_ADMISSION_ERROR } =
+  await import('@/lib/auth/auth-error-messages');
+
+const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
 const { toast } = await import('sonner-native');
 
 const mockGetAdmission = vi.mocked(getAdmission);
+
+const { useNativeAuth } = await import('@/lib/auth/use-native-auth');
+const { postAuth } = await import('@/lib/auth/auth-fetch');
+const mockPostAuth = vi.mocked(postAuth);
 
 // ── C12: Config invariant ────────────────────────────────────────────────
 
@@ -308,5 +330,68 @@ describe('challenge binding', () => {
     it('returns undefined when the entry is null (no server challenge)', () => {
       expect(selectChallengeId(null, email)).toBeUndefined();
     });
+  });
+});
+
+// ── SSO recovery (hook) ────────────────────────────────────────────────
+
+type NativeAuthResult = ReturnType<typeof useNativeAuth>;
+
+function NativeAuthHarness({ resultRef }: { resultRef: { current: NativeAuthResult | null } }) {
+  const result = useNativeAuth();
+  resultRef.current = result;
+  return null;
+}
+
+async function mountNativeAuth(): Promise<{ current: NativeAuthResult | null }> {
+  const resultRef: { current: NativeAuthResult | null } = { current: null };
+  await act(async () => {
+    TestRenderer.create(React.createElement(NativeAuthHarness, { resultRef }));
+    await Promise.resolve();
+  });
+  return resultRef;
+}
+
+describe('useNativeAuth SSO recovery', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('exposes ssoRecovery (initially null) and clearSsoRecovery', async () => {
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+
+    expect(result).not.toBeNull();
+    expect(result?.ssoRecovery).toBeNull();
+    expect(typeof result?.clearSsoRecovery).toBe('function');
+  });
+
+  it('sets ssoRecovery on an SSO_ERROR and clears it on a new attempt', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(resultRef.current?.ssoRecovery).toEqual({
+      email: 'user@example.com',
+      ssoOrganizationId: 'org_1',
+    });
+
+    // A new attempt clears the recovery state before posting.
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    await act(async () => {
+      await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(resultRef.current?.ssoRecovery).toBeNull();
   });
 });

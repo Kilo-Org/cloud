@@ -10,7 +10,10 @@ const emailCodeResponseSchema = z.object({
   success: z.literal(true),
   challengeId: z.uuid().optional(),
 });
-const errorResponseSchema = z.object({ error: z.string() });
+const errorResponseSchema = z.object({
+  error: z.string(),
+  ssoOrganizationId: z.string().min(1).optional(),
+});
 
 export type TokenPair =
   | { token: string; refreshToken: string; expiresIn: number }
@@ -115,9 +118,18 @@ export function parseEmailCodeResponse(value: unknown) {
   return result.success ? result.data : null;
 }
 
-export function parseAuthErrorCode(value: unknown): string | undefined {
+export function parseAuthError(
+  value: unknown
+): { code: string; ssoOrganizationId?: string } | undefined {
   const result = errorResponseSchema.safeParse(value);
-  return result.success ? result.data.error : undefined;
+  if (!result.success) {
+    return undefined;
+  }
+  return { code: result.data.error, ssoOrganizationId: result.data.ssoOrganizationId };
+}
+
+export function parseAuthErrorCode(value: unknown): string | undefined {
+  return parseAuthError(value)?.code;
 }
 
 export type ChallengeEntry = { email: string; challengeId: string };

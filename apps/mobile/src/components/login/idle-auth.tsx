@@ -17,7 +17,7 @@ import { useNativeAuth } from '@/lib/auth/use-native-auth';
 
 export function IdleAuth({
   start,
-}: Readonly<{ start: (mode: 'signin' | 'signup') => Promise<void> }>) {
+}: Readonly<{ start: (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void> }>) {
   const colorScheme = useColorScheme();
   const {
     busy,
@@ -26,6 +26,8 @@ export function IdleAuth({
     signInWithGoogle,
     requestEmailCode,
     verifyEmailCode,
+    ssoRecovery,
+    clearSsoRecovery,
   } = useNativeAuth();
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -56,6 +58,15 @@ export function IdleAuth({
     };
   }, []);
 
+  // A verify-step SSO_ERROR sets ssoRecovery while the user is on the OTP view,
+  // which hides the recovery block. Return to the main view so the block (and
+  // its "Continue with SSO" control) becomes visible.
+  useEffect(() => {
+    if (ssoRecovery) {
+      setView('main');
+    }
+  }, [ssoRecovery]);
+
   const handleSendCode = async () => {
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
@@ -75,6 +86,20 @@ export function IdleAuth({
     setBrowserAuthStarting(true);
     try {
       await start('signin');
+    } finally {
+      browserAuthStartingRef.current = false;
+      setBrowserAuthStarting(false);
+    }
+  };
+
+  const startSsoAuth = async (email: string) => {
+    if (browserAuthStartingRef.current) {
+      return;
+    }
+    browserAuthStartingRef.current = true;
+    setBrowserAuthStarting(true);
+    try {
+      await start('sso', email);
     } finally {
       browserAuthStartingRef.current = false;
       setBrowserAuthStarting(false);
@@ -106,6 +131,32 @@ export function IdleAuth({
 
   return (
     <View className="gap-3">
+      {ssoRecovery && (
+        <View className="gap-2 rounded-md border border-border bg-card p-3">
+          <Text>Your organization uses single sign-on.</Text>
+          <Button
+            size="lg"
+            className="flex-row gap-2"
+            disabled={authBusy}
+            onPress={() => void startSsoAuth(ssoRecovery.email)}
+            accessibilityLabel="Continue with SSO"
+          >
+            {browserAuthStarting ? <ActivityIndicator size="small" /> : null}
+            <Text>Continue with SSO</Text>
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={authBusy}
+            onPress={() => {
+              clearSsoRecovery();
+            }}
+            accessibilityLabel="Use a different email"
+          >
+            <Text>Use a different email</Text>
+          </Button>
+        </View>
+      )}
+
       {showApple && (
         <View
           className={authBusy ? 'opacity-50' : undefined}

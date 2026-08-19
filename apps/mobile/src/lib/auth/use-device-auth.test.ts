@@ -40,6 +40,7 @@ vi.mock('@/lib/auth/pending-external-auth', () => ({
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
+import { openAuthSessionAsync } from 'expo-web-browser';
 import {
   clearPendingExternalAuth,
   readPendingExternalAuth,
@@ -333,5 +334,29 @@ describe('useDeviceAuth hook', () => {
 
     expect(resultRef.current?.code).toBe('FRESH');
     expect(resultRef.current?.resumed).toBe(false);
+  });
+
+  it('builds the SSO browser URL from start("sso", email) without the organization id', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({
+        code: 'USER-123',
+        verificationUrl: 'https://app.kilo.ai/device-auth?code=USER-123',
+      })
+    );
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('sso', 'user@example.com');
+    });
+
+    expect(vi.mocked(openAuthSessionAsync)).toHaveBeenCalledTimes(1);
+    const url = new URL(vi.mocked(openAuthSessionAsync).mock.calls[0]?.[0] ?? '');
+    expect(url.searchParams.get('sso')).toBe('true');
+    expect(url.searchParams.get('email')).toBe('user@example.com');
+    expect(url.searchParams.get('callbackPath')).toBe('/device-auth?code=USER-123&app=1');
+    expect(url.searchParams.has('ssoOrganizationId')).toBe(false);
   });
 });

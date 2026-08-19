@@ -36,6 +36,14 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public API key for client-side analytics; used in `apps/web/src/components/PostHogProvider.tsx`. [PUBLIC]
 - `NEXT_PUBLIC_POSTHOG_DEBUG` - Enables PostHog debug logging; checked in `apps/web/src/components/PostHogProvider.tsx` and `apps/web/src/lib/stytch.ts`. [PUBLIC]
+- `POSTHOG_PERSONAL_API_KEY` - PostHog personal API key used by user-deletion PostHog cleanup. `[SECRET]`
+- `POSTHOG_ENVIRONMENT_ID` - PostHog project/environment ID used by user-deletion PostHog cleanup. [SERVER]
+- `POSTHOG_HOST` - Optional PostHog API host override for user-deletion cleanup; defaults to `https://us.posthog.com`. [SERVER]
+- `PYLON_API_KEY` - Pylon REST API key used by user-deletion contact and reply cleanup. `[SECRET]`
+- `PYLON_HOST` - Optional Pylon API host override for local user-deletion cleanup; defaults to `https://api.usepylon.com`. [SERVER]
+- `PYLON_FINAL_EMAIL_AUTHOR_USER_ID` - Optional Pylon staff user id used to match an already-posted deletion reply. [SERVER]
+- `CUSTOMERIO_TRACK_BASE` - Optional Customer.io Track API base override for local user-deletion cleanup; defaults to `https://track.customer.io`. [SERVER]
+- `SUBSTACK_PUBLICATION_URL` - Substack publication origin used by user-deletion subscriber cleanup; no default. Required for the Substack deletion step. [SERVER]
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
@@ -69,7 +77,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `STYTCH_PROJECT_SECRET` - Stytch project secret. `[SECRET]`
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
-- `SUPPORT_API_SECRET` - Dedicated shared secret for the customer-support-automation GDPR web app. Accepted only on `GET /api/internal/support/users` and `POST /api/internal/support/users/gdpr-removal` via `Authorization: Bearer`. Not a user JWT and not `INTERNAL_API_SECRET`. Leak = enumerate any email + wipe any non-admin, non-bot, non-live-subscription customer. Distinct values for Development / Staging / Production. Do not put the production value on Cloud preview deployments. Rotate by updating Cloud and CSA together. `[SECRET]`
+- `SUPPORT_API_SECRET` - Shared bearer token for Customer Support Automation (CSA) internal API calls; used in `apps/web/src/app/api/internal/support/`. Leak can look up any email and enqueue deletion for non-admin, non-bot, non-live-subscription customers; access disable is deferred to worker preflight and pending requests can be cancelled. Keep production values off preview deployments; rotate Cloud and CSA together. `[SECRET]`
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 
@@ -188,6 +196,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Encryption & Secrets
 
 - `BYOK_ENCRYPTION_KEY` - Base64 encryption key for Bring-Your-Own-Key encryption of sensitive app data. `[SECRET]`
+- `USER_DELETION_AUDIT_HMAC_KEY` - Base64 32-byte HMAC key for user-deletion email hashes and audit subjects. `[SECRET]`
+- `USER_DELETION_ENCRYPTION_KEY` - Base64 32-byte AES key for user-deletion effect checkpoints and provider credentials. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY` - Server-only BytePlus secret access key for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY`. `[SECRET]`
 - `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Encryption key for credit category labels/values. `[SECRET]`

@@ -73,6 +73,12 @@ import {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  UserDeletionRequestStatus,
+  UserDeletionStepStatus,
+  UserDeletionStepKey,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionAuditEventType,
+  UserDeletionProviderScope,
   ImpactReferralProduct,
   ImpactAdvocateProgramKey,
   ImpactAttributionTouchType,
@@ -116,6 +122,10 @@ import {
   MCPGatewayAuditOutcome,
 } from './schema-types';
 import type {
+  UserDeletionTaskProgress,
+  UserDeletionManualEvidence,
+  UserDeletionAuditDetails,
+  UserDeletionActivityDetails,
   CustomLlmDefinition,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
@@ -235,6 +245,12 @@ export const SCHEMA_CHECK_ENUMS = {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  UserDeletionRequestStatus,
+  UserDeletionStepStatus,
+  UserDeletionStepKey,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionAuditEventType,
+  UserDeletionProviderScope,
   ImpactReferralProduct,
   ImpactAdvocateProgramKey,
   ImpactAttributionTouchType,
@@ -747,6 +763,215 @@ export const user_data_export_outbox = pgTable(
 );
 
 export type UserDataExportOutbox = typeof user_data_export_outbox.$inferSelect;
+
+export const user_deletion_requests = pgTable(
+  'user_deletion_requests',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    status: text()
+      .$type<UserDeletionRequestStatus>()
+      .notNull()
+      .default(UserDeletionRequestStatus.Pending),
+    catalog_version: integer().notNull().default(1),
+    requested_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    target_email: text(),
+    target_email_hmac: text().notNull(),
+    pylon_ticket_ref: text(),
+    cloud_subject_resolution: text().$type<UserDeletionCloudSubjectResolution>().notNull(),
+    cloud_subject_proof_ref: text(),
+    preflight_attention_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_progress_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    anonymized_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancelled_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_user_deletion_requests_active_email_hmac')
+      .on(table.target_email_hmac)
+      .where(sql`${table.status} IN ('pending', 'in_progress', 'finalizing')`),
+    uniqueIndex('UQ_user_deletion_requests_active_user_id')
+      .on(table.user_id)
+      .where(
+        sql`${table.user_id} IS NOT NULL AND ${table.status} IN ('pending', 'in_progress', 'finalizing')`
+      ),
+    uniqueIndex('UQ_user_deletion_requests_active_pylon_ticket')
+      .on(sql`regexp_replace(${table.pylon_ticket_ref}, '^#', '')`)
+      .where(
+        sql`${table.pylon_ticket_ref} IS NOT NULL AND ${table.status} IN ('pending', 'in_progress', 'finalizing')`
+      ),
+    index('IDX_user_deletion_requests_fairness')
+      .on(table.last_progress_at, table.created_at, table.id)
+      .where(sql`${table.status} IN ('pending', 'in_progress', 'finalizing')`),
+    index('IDX_user_deletion_requests_email_hmac').on(table.target_email_hmac),
+    index('IDX_user_deletion_requests_user_id').on(table.user_id),
+    enumCheck('user_deletion_requests_status_check', table.status, UserDeletionRequestStatus),
+    enumCheck(
+      'user_deletion_requests_cloud_subject_resolution_check',
+      table.cloud_subject_resolution,
+      UserDeletionCloudSubjectResolution
+    ),
+    check('user_deletion_requests_catalog_version_positive', sql`${table.catalog_version} >= 1`),
+    check(
+      'user_deletion_requests_completed_at_check',
+      sql`(${table.status} = 'completed') = (${table.completed_at} IS NOT NULL)`
+    ),
+    check(
+      'user_deletion_requests_cancelled_at_check',
+      sql`(${table.status} = 'cancelled') = (${table.cancelled_at} IS NOT NULL)`
+    ),
+    check(
+      'user_deletion_requests_active_email_check',
+      sql`(${table.status} IN ('pending', 'in_progress', 'finalizing')) = (${table.target_email} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type UserDeletionRequest = typeof user_deletion_requests.$inferSelect;
+export type NewUserDeletionRequest = typeof user_deletion_requests.$inferInsert;
+
+export const user_deletion_steps = pgTable(
+  'user_deletion_steps',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_id: uuid()
+      .notNull()
+      .references(() => user_deletion_requests.id, { onDelete: 'cascade' }),
+    step_key: text().$type<UserDeletionStepKey>().notNull(),
+    status: text()
+      .$type<UserDeletionStepStatus>()
+      .notNull()
+      .default(UserDeletionStepStatus.Pending),
+    available_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claim_token: uuid(),
+    claimed_until: timestamp({ withTimezone: true, mode: 'string' }),
+    window_attempt_count: integer().notNull().default(0),
+    lifetime_attempt_count: integer().notNull().default(0),
+    progress_json: jsonb().$type<UserDeletionTaskProgress>().notNull().default({}),
+    last_error_code: text(),
+    rate_limited_since: timestamp({ withTimezone: true, mode: 'string' }),
+    manual_evidence_json: jsonb().$type<UserDeletionManualEvidence>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_user_deletion_steps_request_step').on(table.request_id, table.step_key),
+    index('IDX_user_deletion_steps_due')
+      .on(table.status, table.available_at, table.id)
+      .where(sql`${table.status} IN ('pending', 'retry_wait', 'running')`),
+    index('IDX_user_deletion_steps_request_id').on(table.request_id),
+    enumCheck('user_deletion_steps_step_key_check', table.step_key, UserDeletionStepKey),
+    enumCheck('user_deletion_steps_status_check', table.status, UserDeletionStepStatus),
+    check(
+      'user_deletion_steps_window_attempt_count_nonnegative',
+      sql`${table.window_attempt_count} >= 0`
+    ),
+    check(
+      'user_deletion_steps_lifetime_attempt_count_nonnegative',
+      sql`${table.lifetime_attempt_count} >= 0`
+    ),
+    check(
+      'user_deletion_steps_claim_fields_check',
+      sql`(${table.claim_token} IS NULL) = (${table.claimed_until} IS NULL)`
+    ),
+    check(
+      'user_deletion_steps_manual_evidence_check',
+      sql`(${table.status} = 'manually_verified') = (${table.manual_evidence_json} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type UserDeletionStep = typeof user_deletion_steps.$inferSelect;
+export type NewUserDeletionStep = typeof user_deletion_steps.$inferInsert;
+
+export const user_deletion_audit_events = pgTable(
+  'user_deletion_audit_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_id: uuid().references(() => user_deletion_requests.id, { onDelete: 'cascade' }),
+    event_type: text().$type<UserDeletionAuditEventType>().notNull(),
+    actor_kilo_user_id: text(),
+    target_email_hmac: text().notNull(),
+    subject_key: text().notNull(),
+    details_json: jsonb().$type<UserDeletionAuditDetails>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_deletion_audit_events_idempotent')
+      .on(table.request_id, table.event_type, table.subject_key)
+      .where(sql`${table.request_id} IS NOT NULL`),
+    index('IDX_user_deletion_audit_events_request_id').on(table.request_id),
+    index('IDX_user_deletion_audit_events_hmac').on(table.target_email_hmac),
+    enumCheck(
+      'user_deletion_audit_events_event_type_check',
+      table.event_type,
+      UserDeletionAuditEventType
+    ),
+  ]
+);
+
+export type UserDeletionAuditEvent = typeof user_deletion_audit_events.$inferSelect;
+export type NewUserDeletionAuditEvent = typeof user_deletion_audit_events.$inferInsert;
+
+export const user_deletion_activity = pgTable(
+  'user_deletion_activity',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_id: uuid()
+      .notNull()
+      .references(() => user_deletion_requests.id, { onDelete: 'cascade' }),
+    step_key: text().$type<UserDeletionStepKey>(),
+    event_type: text().notNull(),
+    details_json: jsonb().$type<UserDeletionActivityDetails>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_user_deletion_activity_request_created').on(table.request_id, table.created_at),
+  ]
+);
+
+export type UserDeletionActivity = typeof user_deletion_activity.$inferSelect;
+export type NewUserDeletionActivity = typeof user_deletion_activity.$inferInsert;
+
+export const user_deletion_provider_credentials = pgTable(
+  'user_deletion_provider_credentials',
+  {
+    provider_scope: text().$type<UserDeletionProviderScope>().primaryKey().notNull(),
+    encrypted_material: text().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    updated_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+  },
+  table => [
+    enumCheck(
+      'user_deletion_provider_credentials_scope_check',
+      table.provider_scope,
+      UserDeletionProviderScope
+    ),
+  ]
+);
+
+export type UserDeletionProviderCredential = typeof user_deletion_provider_credentials.$inferSelect;
+export type NewUserDeletionProviderCredential =
+  typeof user_deletion_provider_credentials.$inferInsert;
 
 export const user_affiliate_attributions = pgTable(
   'user_affiliate_attributions',

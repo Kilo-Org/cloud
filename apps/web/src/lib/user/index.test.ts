@@ -127,6 +127,8 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  user_deletion_requests,
+  user_deletion_steps,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
@@ -159,6 +161,8 @@ import {
   SecurityAuditLogActorType,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionRequestStatus,
 } from '@kilocode/db/schema-types';
 
 jest.mock('@/lib/stripe-client', () => ({
@@ -179,6 +183,8 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(user_deletion_steps);
+    await db.delete(user_deletion_requests);
     await db.delete(deployments_ephemeral);
     await db.delete(operation_ledgers);
     await db.delete(analytics_event_outbox);
@@ -5084,6 +5090,33 @@ describe('User', () => {
           .from(user_terms_acceptances)
           .where(eq(user_terms_acceptances.id, otherTerms.id))
       ).toHaveLength(1);
+    });
+
+    it('does not mutate user deletion queue rows', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'pii-to-scrub@example.com',
+      });
+      const [request] = await db
+        .insert(user_deletion_requests)
+        .values({
+          user_id: user.id,
+          status: UserDeletionRequestStatus.InProgress,
+          target_email: user.google_user_email,
+          target_email_hmac: 'a'.repeat(64),
+          cloud_subject_resolution: UserDeletionCloudSubjectResolution.CurrentUser,
+        })
+        .returning();
+      if (!request) throw new Error('expected request');
+
+      await softDeleteUser(user.id);
+
+      const [after] = await db
+        .select()
+        .from(user_deletion_requests)
+        .where(eq(user_deletion_requests.id, request.id));
+      expect(after?.target_email).toBe('pii-to-scrub@example.com');
+      expect(after?.status).toBe(UserDeletionRequestStatus.InProgress);
+      expect(after?.anonymized_at).toBeNull();
     });
   });
 

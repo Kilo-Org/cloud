@@ -7,6 +7,7 @@ const unavailableModelIds: ReadonlySet<string> = new Set([
   'nvidia/nemotron-nano-12b-v2-vl:free',
   'nvidia/nemotron-nano-9b-v2:free',
   'openai/gpt-oss-20b:free',
+  'z-ai/glm-5.2:free',
 ]);
 
 export function isUnavailableModel(modelId: string): boolean {

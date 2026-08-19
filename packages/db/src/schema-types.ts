@@ -477,6 +477,132 @@ export const AffiliateEventDeliveryState = {
 export type AffiliateEventDeliveryState =
   (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
 
+export const UserDeletionRequestStatus = {
+  Pending: 'pending',
+  InProgress: 'in_progress',
+  Finalizing: 'finalizing',
+  Completed: 'completed',
+  Cancelled: 'cancelled',
+} as const;
+
+export type UserDeletionRequestStatus =
+  (typeof UserDeletionRequestStatus)[keyof typeof UserDeletionRequestStatus];
+
+export const UserDeletionStepStatus = {
+  Pending: 'pending',
+  Running: 'running',
+  RetryWait: 'retry_wait',
+  NeedsAttention: 'needs_attention',
+  ManualActionRequired: 'manual_action_required',
+  Succeeded: 'succeeded',
+  NotApplicable: 'not_applicable',
+  ManuallyVerified: 'manually_verified',
+} as const;
+
+export type UserDeletionStepStatus =
+  (typeof UserDeletionStepStatus)[keyof typeof UserDeletionStepStatus];
+
+export const UserDeletionStepKey = {
+  KiloclawDestroy: 'kiloclaw_destroy',
+  Customerio: 'customerio',
+  CliV1Blobs: 'cli_v1_blobs',
+  CliV2Sessions: 'cli_v2_sessions',
+  UsagePromptPrefixes: 'usage_prompt_prefixes',
+  Posthog: 'posthog',
+  Substack: 'substack',
+  Anonymize: 'anonymize',
+  PylonReply: 'pylon_reply',
+  PylonContact: 'pylon_contact',
+} as const;
+
+export type UserDeletionStepKey = (typeof UserDeletionStepKey)[keyof typeof UserDeletionStepKey];
+
+export const UserDeletionCloudSubjectResolution = {
+  CurrentUser: 'current_user',
+  AuthoritativeAbsence: 'authoritative_absence',
+  PriorQueueCleanup: 'prior_queue_cleanup',
+  LegacyIdentityUnresolved: 'legacy_identity_unresolved',
+} as const;
+
+export type UserDeletionCloudSubjectResolution =
+  (typeof UserDeletionCloudSubjectResolution)[keyof typeof UserDeletionCloudSubjectResolution];
+
+export const UserDeletionAuditEventType = {
+  RequestCreated: 'request_created',
+  IntakeRefused: 'intake_refused',
+  AccessDisabled: 'access_disabled',
+  AccessAbsent: 'access_absent',
+  PreflightDisposition: 'preflight_disposition',
+  TaskDisposition: 'task_disposition',
+  ManualRetry: 'manual_retry',
+  ManualAction: 'manual_action',
+  Anonymized: 'anonymized',
+  ReadyForCustomerReply: 'deletion_ready_for_customer_reply',
+  Cancelled: 'cancelled',
+  Completed: 'completed',
+} as const;
+
+export type UserDeletionAuditEventType =
+  (typeof UserDeletionAuditEventType)[keyof typeof UserDeletionAuditEventType];
+
+export const UserDeletionProviderScope = {
+  Kiloclaw: 'kiloclaw',
+  Customerio: 'customerio',
+  CloudStorage: 'cloud_storage',
+  SessionIngest: 'session_ingest',
+  Posthog: 'posthog',
+  Substack: 'substack',
+  Pylon: 'pylon',
+} as const;
+
+export type UserDeletionProviderScope =
+  (typeof UserDeletionProviderScope)[keyof typeof UserDeletionProviderScope];
+
+export const UserDeletionPylonReplyState = {
+  Posting: 'posting',
+  Ambiguous: 'ambiguous',
+  Posted: 'posted',
+} as const;
+
+export type UserDeletionPylonReplyState =
+  (typeof UserDeletionPylonReplyState)[keyof typeof UserDeletionPylonReplyState];
+
+export type UserDeletionTaskProgress = {
+  processed_count?: number;
+  page_offset?: number;
+  cursor?: string;
+  clean_pass?: boolean;
+  encrypted_resource_ids?: string;
+  provider_ref?: string;
+  checkpoint_at?: string;
+  reply_state?: UserDeletionPylonReplyState;
+  reply_message_id?: string;
+  close_confirmed?: boolean;
+};
+
+export type UserDeletionManualEvidence = {
+  reason: string;
+  evidence: string;
+  actor_kilo_user_id: string;
+  recorded_at: string;
+};
+
+export type UserDeletionAuditDetails = {
+  code?: string;
+  catalog_version?: number;
+  step_key?: string;
+  disposition?: string;
+};
+
+export type UserDeletionActivityDetails = {
+  duration_ms?: number;
+  processed_count?: number;
+  http_status_class?: string;
+  retry_at?: string;
+  error_code?: string;
+  resource_hmac?: string;
+};
+
 export const ImpactReferralProduct = {
   KiloClaw: 'kiloclaw',
   KiloPass: 'kilo_pass',
@@ -1725,6 +1851,7 @@ export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
+  discount: z.number().optional(),
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;

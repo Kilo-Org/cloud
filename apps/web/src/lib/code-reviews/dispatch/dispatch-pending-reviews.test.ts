@@ -254,6 +254,7 @@ describe('tryDispatchPendingReviews', () => {
         terminalReason: cloud_agent_code_reviews.terminal_reason,
         dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
         errorMessage: cloud_agent_code_reviews.error_message,
+        model: cloud_agent_code_reviews.model,
       })
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, reviewId))
@@ -298,6 +299,27 @@ describe('tryDispatchPendingReviews', () => {
     );
     expect(mockDispatchReview).toHaveBeenCalledWith(
       expect.objectContaining({ reviewId: review.id, skipBalanceCheck: true })
+    );
+  });
+
+  it('persists the selected model when the review is dispatched', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
+      reviewId: params.reviewId,
+      sessionInput: { prompt: 'Review this change.', model: 'openai/gpt-5' },
+    }));
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({ owner, status: 'pending', createdAt: timestamp, updatedAt: timestamp })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({ type: 'user', id: testUser.id, userId: testUser.id });
+
+    expect(await getStoredReview(review.id)).toEqual(
+      expect.objectContaining({ model: 'openai/gpt-5' })
     );
   });
 

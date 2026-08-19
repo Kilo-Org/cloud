@@ -5,7 +5,9 @@
 // trims the indented match rows; glob drops the trailing `---` separator and
 // folds the `[N files truncated]` marker into the model's flag; list is one
 // plain row per line. All kinds lift a leading `Found N ...` summary into a
-// muted caption.
+// muted caption. Glob and grep lift `No files found` into the caption and
+// drop a whole-line parenthetical note (`^\(.*\)$`); a dropped note that
+// contains `truncated` (any case) sets the flag.
 //
 // Task rows (D8): the task array comes from `state.metadata.todos`, then
 // `state.input.todos`, then a JSON parse of `state.output`. Unknown status
@@ -47,6 +49,8 @@ export type ResultRowsKind = 'grep' | 'glob' | 'list';
 
 const CAPTION_PATTERN = /^Found \d+/;
 const TRUNCATED_LINE_PATTERN = /^\[\d+ files truncated\]$/;
+const EMPTY_RESULT_LINE = 'No files found';
+const STATUS_NOTE_PATTERN = /^\(.*\)$/;
 
 /**
  * Convert a tool output string into display rows. Every line becomes at most
@@ -73,7 +77,19 @@ export function buildResultRowsModel(output: string, kind: ResultRowsKind): Resu
       truncated = true;
     }
 
-    if (!isGlobSeparator && !isGlobTruncation) {
+    const isLiveKind = kind === 'glob' || kind === 'grep';
+    const isEmptyResult = isLiveKind && line === EMPTY_RESULT_LINE;
+    const isStatusNote = isLiveKind && STATUS_NOTE_PATTERN.test(line);
+
+    if (isEmptyResult && caption === undefined) {
+      caption = line.slice(0, RESULT_ROW_CHARACTER_CAP);
+    }
+
+    if (isStatusNote && line.toLowerCase().includes('truncated')) {
+      truncated = true;
+    }
+
+    if (!isGlobSeparator && !isGlobTruncation && !isEmptyResult && !isStatusNote) {
       if (rows.length >= RESULT_ROW_CAP) {
         truncated = true;
         break;

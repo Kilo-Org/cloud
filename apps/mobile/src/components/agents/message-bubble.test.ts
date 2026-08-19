@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
 import { describe, expect, it, vi } from 'vitest';
 
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+
 import {
   assistantMessage,
   findElementByType,
@@ -32,6 +34,9 @@ vi.mock('@/components/ui/bubble', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
+}));
+vi.mock('@/components/ui/button', () => ({
+  Button: 'Button',
 }));
 vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
@@ -148,6 +153,149 @@ describe('MessageBubble failed delivery state', () => {
       reason: 'exhausted',
     });
     expect(findText(tree, t => t === 'Queued')).toBe(false);
+  });
+});
+
+async function renderBubbleWithHandlers(
+  message: StoredMessage,
+  props: {
+    deliveryState?: MessageDeliveryState;
+    onRetryMessage?: (m: StoredMessage) => void;
+    onCopyToComposer?: (text: string) => void;
+  }
+): Promise<unknown> {
+  const { MessageBubble } = await import('./message-bubble');
+  // eslint-disable-next-line new-cap
+  return MessageBubble.type({ message, ...props });
+}
+
+function assistantMessageWithError(id: string, errorName: string): StoredMessage {
+  const message = assistantMessage(id);
+  (message.info as { error?: { name: string; data: unknown } }).error = {
+    name: errorName,
+    data: { message: 'raw' },
+  };
+  return message;
+}
+
+describe('MessageBubble failure footer', () => {
+  it('renders the failed-delivery footer with Retry and Copy to composer', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-fail'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(
+      findText(tree, t => t === 'We could not deliver this message after several attempts.')
+    ).toBe(true);
+    const retry = findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry');
+    expect(retry).not.toBeNull();
+    expect(retry?.props.accessibilityRole).toBe('button');
+    const copy = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Copy to composer'
+    );
+    expect(copy).not.toBeNull();
+    expect(copy?.props.accessibilityRole).toBe('button');
+  });
+
+  it('renders the assistant failure footer with Retry and no Copy to composer', async () => {
+    const tree = await renderBubbleWithHandlers(assistantMessageWithError('m-asst', 'APIError'), {
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+    });
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    const retry = findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry');
+    expect(retry).not.toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).toBeNull();
+  });
+
+  it('omits the Retry button for a non-retryable assistant error', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-nr', 'ProviderAuthError'),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('does not render the footer when no handler is supplied', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-nohandler'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+    });
+    expect(findText(tree, t => t === 'Failed to deliver')).toBe(false);
+  });
+
+  it('names the failure row on the title text without grouping the CTA buttons', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-a11y'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The footer container is a plain View: no accessible, no role, no label,
+    // so Retry and Copy stay individually focusable.
+    const footer = findElementByType(tree, 'View', p => p.className === 'gap-1 px-4 py-1');
+    expect(footer).not.toBeNull();
+    expect(footer?.props.accessible).toBeUndefined();
+    expect(footer?.props.accessibilityRole).toBeUndefined();
+    expect(footer?.props.accessibilityLabel).toBeUndefined();
+
+    // The row name lives on the title Text, which still announces the row.
+    const title = findElementByLabel(tree, 'Failed to deliver. Retry available.');
+    expect(title).not.toBeNull();
+    expect(title?.props.children).toBe('Failed to deliver');
+  });
+
+  it('presses Retry to retry the failed message and Copy to composer to restore the user text', async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(true);
+
+    const message = userMessage('m-press');
+    const onRetryMessage = vi.fn<(message: StoredMessage) => void>();
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const tree = await renderBubbleWithHandlers(message, {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onRetryMessage,
+      onCopyToComposer,
+    });
+
+    const retry = findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry');
+    expect(retry).not.toBeNull();
+    if (!retry) {
+      throw new Error('expected Retry button');
+    }
+    (retry.props.onPress as () => void)();
+    expect(onRetryMessage).toHaveBeenCalledWith(message);
+
+    const copy = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Copy to composer'
+    );
+    expect(copy).not.toBeNull();
+    if (!copy) {
+      throw new Error('expected Copy to composer button');
+    }
+    (copy.props.onPress as () => void)();
+    expect(onCopyToComposer).toHaveBeenCalledWith('hi');
+  });
+
+  it('presses Retry on an assistant row to retry the failed message', async () => {
+    const message = assistantMessageWithError('m-asst-press', 'APIError');
+    const onRetryMessage = vi.fn<(message: StoredMessage) => void>();
+    const tree = await renderBubbleWithHandlers(message, { onRetryMessage });
+
+    const retry = findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry');
+    expect(retry).not.toBeNull();
+    if (!retry) {
+      throw new Error('expected Retry button');
+    }
+    (retry.props.onPress as () => void)();
+    expect(onRetryMessage).toHaveBeenCalledWith(message);
   });
 });
 
@@ -270,6 +418,31 @@ function findElementByTypeFn(
     }
   } else if (children && typeof children === 'object') {
     return findElementByTypeFn(children, typeFn);
+  }
+  return null;
+}
+
+function findElementByLabel(
+  node: unknown,
+  label: string
+): { type: unknown; props: Record<string, unknown> } | null {
+  if (node == null || typeof node !== 'object') {
+    return null;
+  }
+  const element = node as { type?: unknown; props?: Record<string, unknown> };
+  if (element.props?.accessibilityLabel === label) {
+    return element as { type: unknown; props: Record<string, unknown> };
+  }
+  const children = element.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const hit = findElementByLabel(child, label);
+      if (hit) {
+        return hit;
+      }
+    }
+  } else if (children && typeof children === 'object') {
+    return findElementByLabel(children, label);
   }
   return null;
 }

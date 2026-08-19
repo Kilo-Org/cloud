@@ -49,8 +49,10 @@ export async function renderBubble(
   holdQueuedSlot?: boolean
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
+  // MessageBubble is wrapped in React.memo; invoke its inner component directly
+  // to inspect the unrendered element tree.
   // eslint-disable-next-line new-cap
-  return MessageBubble({ message, deliveryState, holdQueuedSlot });
+  return MessageBubble.type({ message, deliveryState, holdQueuedSlot });
 }
 
 export function findText(node: unknown, predicate: (text: string) => boolean): boolean {

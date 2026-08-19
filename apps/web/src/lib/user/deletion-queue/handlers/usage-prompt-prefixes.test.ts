@@ -88,6 +88,7 @@ describe('handleUsagePromptPrefixes', () => {
     expect(first.kind).toBe('continue');
     if (first.kind !== 'continue') throw new Error('expected first page to continue');
     expect(first.progress?.processed_count).toBe(USER_DELETION_USAGE_PREFIX_BATCH_SIZE);
+    expect(first.progress?.scanned_count).toBe(USER_DELETION_USAGE_PREFIX_BATCH_SIZE);
     expect(first.progress?.cursor).toContain('\t');
 
     const firstPageIds = rows.slice(0, USER_DELETION_USAGE_PREFIX_BATCH_SIZE).map(row => row.id);
@@ -115,6 +116,7 @@ describe('handleUsagePromptPrefixes', () => {
     expect(second.kind).toBe('succeeded');
     if (second.kind !== 'succeeded') throw new Error('expected second page to succeed');
     expect(second.progress?.processed_count).toBe(rows.length);
+    expect(second.progress?.scanned_count).toBe(rows.length);
 
     const remaining = await db
       .select({ user_prompt_prefix: microdollar_usage_metadata.user_prompt_prefix })
@@ -140,7 +142,56 @@ describe('handleUsagePromptPrefixes', () => {
 
     expect(outcome).toMatchObject({
       kind: 'succeeded',
-      progress: { processed_count: 0 },
+      progress: { processed_count: 0, scanned_count: 1 },
+    });
+  });
+
+  it('keeps scanning already-clean pages in one claim until a dirty page finishes', async () => {
+    const { user, request, step, claimToken } = await prepareRunningStep();
+    await insertUsageRows(user.id, USER_DELETION_USAGE_PREFIX_BATCH_SIZE, null);
+    const dirtyId = await insertUsage(user.id, 'still dirty', null, 2);
+
+    const outcome = await handleUsagePromptPrefixes({
+      request,
+      step,
+      context: handlerContext(request.id, claimToken),
+    });
+
+    expect(outcome).toMatchObject({
+      kind: 'succeeded',
+      progress: {
+        processed_count: 1,
+        scanned_count: USER_DELETION_USAGE_PREFIX_BATCH_SIZE + 1,
+      },
+    });
+    const metadata = await loadMetadata(dirtyId);
+    expect(metadata?.user_prompt_prefix).toBeNull();
+  });
+
+  it('yields continue after clean pages when the time budget is gone', async () => {
+    const { user, request, step, claimToken } = await prepareRunningStep();
+    await insertUsageRows(user.id, USER_DELETION_USAGE_PREFIX_BATCH_SIZE * 2, null);
+
+    let remainingMs = 20_000;
+    const outcome = await handleUsagePromptPrefixes({
+      request,
+      step,
+      context: {
+        ...handlerContext(request.id, claimToken),
+        remainingMs: () => {
+          const current = remainingMs;
+          remainingMs = 1;
+          return current;
+        },
+      },
+    });
+
+    expect(outcome).toMatchObject({
+      kind: 'continue',
+      progress: {
+        processed_count: 0,
+        scanned_count: USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
+      },
     });
   });
 
@@ -284,7 +335,7 @@ async function insertUsage(
   return id;
 }
 
-async function insertUsageRows(userId: string, count: number) {
+async function insertUsageRows(userId: string, count: number, userPromptPrefix = 'private prompt') {
   const start = Date.parse('2020-01-01T00:00:00.000Z');
   const rows = Array.from({ length: count }, (_, index) => ({
     id: crypto.randomUUID(),
@@ -309,7 +360,7 @@ async function insertUsageRows(userId: string, count: number) {
     rows.map(row => ({
       id: row.id,
       message_id: `message-${row.id}`,
-      user_prompt_prefix: 'private prompt',
+      user_prompt_prefix: userPromptPrefix,
       max_tokens: 1,
       latency: 1,
     }))

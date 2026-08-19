@@ -155,6 +155,7 @@ function isStaleRequest(lastProgressAt: string, asOf: string): boolean {
 function taskProgress(step: UserDeletionStep) {
   return {
     processedCount: step.progress_json.processed_count ?? 0,
+    scannedCount: step.progress_json.scanned_count ?? 0,
     pageOffset: step.progress_json.page_offset ?? null,
     cleanPass: step.progress_json.clean_pass ?? false,
   };
@@ -170,6 +171,7 @@ function serializeTaskSummary(step: UserDeletionStep) {
     lifetimeAttemptCount: step.lifetime_attempt_count,
     availableAt: iso(step.available_at),
     processedCount: progress.processedCount,
+    scannedCount: progress.scannedCount,
     pageOffset: progress.pageOffset,
     cleanPass: progress.cleanPass,
     rateLimitedSince: nullableIso(step.rate_limited_since),
@@ -207,6 +209,7 @@ function serializeRequest(request: UserDeletionRequest, tasks: UserDeletionStep[
           lifetimeAttemptCount: 0,
           availableAt: iso(request.created_at),
           processedCount: 0,
+          scannedCount: 0,
           pageOffset: null,
           cleanPass: false,
           rateLimitedSince: null,
@@ -229,6 +232,7 @@ function serializeActivity(row: UserDeletionActivity) {
     details: {
       durationMs: row.details_json.duration_ms ?? null,
       processedCount: row.details_json.processed_count ?? null,
+      scannedCount: row.details_json.scanned_count ?? null,
       httpStatusClass: row.details_json.http_status_class ?? null,
       retryAt: row.details_json.retry_at ?? null,
       errorCode: row.details_json.error_code ?? null,

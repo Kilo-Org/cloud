@@ -291,7 +291,10 @@ async function persistTaskDispositionTx(
         requestId: request.id,
         stepKey,
         eventType: 'continue',
-        details: { processed_count: outcome.progress?.processed_count },
+        details: {
+          processed_count: outcome.progress?.processed_count,
+          scanned_count: outcome.progress?.scanned_count,
+        },
       });
       break;
     case 'retry': {
@@ -451,6 +454,7 @@ async function persistTaskDispositionTx(
         details: {
           processed_count:
             outcome.kind === 'succeeded' ? outcome.progress?.processed_count : undefined,
+          scanned_count: outcome.kind === 'succeeded' ? outcome.progress?.scanned_count : undefined,
         },
       });
       break;

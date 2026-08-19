@@ -164,18 +164,20 @@ export function createLifecycleManager(
     if (completeSession && currentSession) {
       const currentBranch = await getCurrentBranch(config.workspacePath, 10_000).catch(() => '');
       if (drainGeneration !== lifecycleGeneration) return;
-      const gateResult = state.consumeObservedGateResult();
-      state.sendToIngest({
-        streamEventType: 'complete',
-        data: {
-          exitCode: 0,
-          kiloSessionId: currentSession.kiloSessionId,
-          messageIds: sealedMessageIds,
-          ...(currentBranch ? { currentBranch } : {}),
-          ...(gateResult ? { gateResult } : {}),
-        },
-        timestamp: new Date().toISOString(),
-      });
+      if (!isAborted) {
+        const gateResult = state.consumeObservedGateResult();
+        state.sendToIngest({
+          streamEventType: 'complete',
+          data: {
+            exitCode: 0,
+            kiloSessionId: currentSession.kiloSessionId,
+            messageIds: sealedMessageIds,
+            ...(currentBranch ? { currentBranch } : {}),
+            ...(gateResult ? { gateResult } : {}),
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     await new Promise<void>(resolve => setTimeout(resolve, DRAIN_DELAY_MS));

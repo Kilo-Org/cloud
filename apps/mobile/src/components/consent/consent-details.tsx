@@ -23,7 +23,7 @@ type ConsentDetailsProps = {
   readonly mode?: ConsentMode;
 };
 
-function VoiceTranscriptionControl() {
+export function VoiceTranscriptionControl() {
   const { userId } = useCurrentUserId();
   const supportsOnDevice = voiceInputController.supportsOnDevice();
   const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');

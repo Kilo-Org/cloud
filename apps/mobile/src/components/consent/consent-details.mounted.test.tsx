@@ -2,8 +2,8 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
 import { createElement } from 'react';
 import TestRenderer from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
-import { ConsentDetails } from './consent-details';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----
 
@@ -57,15 +57,21 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   }),
 }));
 
-vi.mock('@/lib/voice-input/native-voice-input', () => ({
-  voiceInputController: { supportsOnDevice: () => true },
+const voiceInputControllerMock = vi.hoisted(() => ({
+  supportsOnDevice: vi.fn<() => boolean>(() => true),
 }));
 
-vi.mock('@/lib/voice-input/voice-network-consent', () => ({
-  readVoiceNetworkConsent: vi.fn(() => 'unset'),
+vi.mock('@/lib/voice-input/native-voice-input', () => ({
+  voiceInputController: voiceInputControllerMock,
+}));
+
+const voiceNetworkConsentMock = vi.hoisted(() => ({
+  readVoiceNetworkConsent: vi.fn<() => Promise<'granted' | 'declined' | 'unset'>>(),
   writeVoiceNetworkConsent: vi.fn(),
   subscribeToVoiceNetworkConsent: vi.fn(() => () => undefined),
 }));
+
+vi.mock('@/lib/voice-input/voice-network-consent', () => voiceNetworkConsentMock);
 
 // ---- helpers ----
 
@@ -130,6 +136,16 @@ function findTextStrings(root: TestRenderer.ReactTestInstance): string[] {
     .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
     .map(n => (n.props as { children?: unknown }).children)
     .filter((child): child is string => typeof child === 'string');
+}
+
+function findSwitches(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Switch');
+}
+
+async function flush() {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 10);
+  });
 }
 
 // ---- tests ----
@@ -208,5 +224,63 @@ describe('ConsentDetails copy', () => {
 
     const texts = collectTextStrings(footer);
     expect(texts.some((t: string) => t.includes('masked on your device'))).toBe(true);
+  });
+});
+
+describe('Voice transcription section', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+  });
+
+  function mountVoiceControl(): TestRenderer.ReactTestRenderer {
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(createElement(VoiceTranscriptionControl));
+    });
+    // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- act callback assignment, not statically guaranteed
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  it('shows On device with no switch when on-device is supported', () => {
+    const renderer = mountVoiceControl();
+    expect(findTextStrings(renderer.root)).toContain('On device');
+    expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows Online, allowed with the switch on when consent is granted', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    expect(findTextStrings(renderer.root)).toContain('Online, allowed');
+    const switches = findSwitches(renderer.root);
+    expect(switches.length).toBe(1);
+    const sw = switches[0];
+    if (!sw) {
+      throw new Error('expected a Switch');
+    }
+    expect((sw.props as { value?: boolean }).value).toBe(true);
+  });
+
+  it('shows Online, not allowed with the switch off when consent is unset', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    expect(findTextStrings(renderer.root)).toContain('Online, not allowed');
+    const switches = findSwitches(renderer.root);
+    expect(switches.length).toBe(1);
+    const sw = switches[0];
+    if (!sw) {
+      throw new Error('expected a Switch');
+    }
+    expect((sw.props as { value?: boolean }).value).toBe(false);
   });
 });

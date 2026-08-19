@@ -277,6 +277,8 @@ describe('useVoiceInput integration', () => {
 
         expect(mockController.start).toHaveBeenCalledTimes(1);
         expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(true);
+        expect(alertMock.alert).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
       });
 
       it('starts with network recognition when on-device is unsupported and consent is granted', async () => {
@@ -316,6 +318,11 @@ describe('useVoiceInput integration', () => {
 
         expect(mockController.start).not.toHaveBeenCalled();
         expect(alertMock.alert).toHaveBeenCalledTimes(1);
+        expect(alertMock.alert).toHaveBeenCalledWith(
+          'Speech is processed online',
+          expect.stringContaining('This device cannot transcribe offline'),
+          expect.any(Array)
+        );
         expect(toastMock.error).not.toHaveBeenCalled();
       });
 

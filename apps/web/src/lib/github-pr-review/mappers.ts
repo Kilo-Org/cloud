@@ -8,10 +8,13 @@ import {
   type GitHubPrReviewChecksResult,
   type GitHubPrReviewFile,
   type GitHubPrReviewFilesResult,
+  type GitHubPrReviewInboxItem,
+  type GitHubPrReviewInboxResult,
   type GitHubPrReviewReviewComment,
   type GitHubPrReviewReviewThread,
   type GitHubPrReviewReviewThreadsResult,
   GitHubPrReviewFilesResultSchema,
+  GitHubPrReviewInboxResultSchema,
   GitHubPrReviewReviewThreadsResultSchema,
 } from './dtos';
 import {
@@ -345,6 +348,50 @@ export function buildReviewThreadsResult(args: {
     conversation: conversation.map(mapReviewComment),
     nextCursor,
   });
+}
+
+// A GraphQL `search(type: ISSUE)` node. GitHub can return non-PullRequest
+// nodes as `{}` (the inline fragment matches nothing), so every field is
+// optional and `buildInboxResult` drops a node missing its identity.
+export type GraphQlInboxNode = {
+  number?: number | null;
+  title?: string | null;
+  isDraft?: boolean | null;
+  updatedAt?: string | null;
+  author?: { login: string; avatarUrl: string | null } | null;
+  repository?: {
+    name?: string | null;
+    owner?: { login?: string | null } | null;
+  } | null;
+};
+
+/** Map an inbox `search` connection into the wire DTO, dropping non-PR nodes. */
+export function buildInboxResult(args: {
+  nodes: (GraphQlInboxNode | null)[];
+  pageInfo: { hasNextPage: boolean; endCursor: string | null } | null;
+}): GitHubPrReviewInboxResult {
+  const { nodes, pageInfo } = args;
+  const items: GitHubPrReviewInboxItem[] = [];
+  for (const node of nodes) {
+    if (!node) continue;
+    const owner = node.repository?.owner?.login;
+    const repo = node.repository?.name;
+    const number = node.number;
+    if (!owner || !repo || typeof number !== 'number') continue;
+    items.push({
+      owner,
+      repo,
+      number,
+      title: node.title ?? '',
+      author: node.author
+        ? { login: node.author.login, avatarUrl: node.author.avatarUrl ?? null }
+        : null,
+      isDraft: Boolean(node.isDraft),
+      updatedAt: node.updatedAt ?? '',
+    });
+  }
+  const nextCursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
+  return GitHubPrReviewInboxResultSchema.parse({ items, nextCursor });
 }
 
 export { GitHubRestUserSchema };

@@ -204,6 +204,14 @@ export function useFetchToCompletion(
       while (queryRef.current.hasNextPage) {
         // eslint-disable-next-line no-await-in-loop -- sequential cursor pagination
         const result = await queryRef.current.fetchNextPage();
+        // fetchNextPage resolves (does not throw) on a failed page while
+        // keeping prior pages and hasNextPage. Route that through the
+        // catch so the load-all retry can render.
+        if (result.error) {
+          throw result.error instanceof Error
+            ? result.error
+            : new Error('Failed to load next page');
+        }
         if (!result.data || !result.hasNextPage) {
           break;
         }

@@ -1,5 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { NextRequest } from 'next/server';
+import { inspect } from 'util';
 
 jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 jest.mock('@/lib/r2/client', () => ({
@@ -31,6 +32,7 @@ const BATCH_SIZE = 500;
 let selectedRows: { r2_key: string }[];
 let deletedRows: { r2_key: string }[];
 let capturedLimit: number | undefined;
+let capturedWhere: unknown;
 
 function makeRequest(headers?: Record<string, string>) {
   return new NextRequest('http://localhost/api/cron/cleanup-orphan-agent-attachments', {
@@ -45,15 +47,19 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
     selectedRows = [];
     deletedRows = [];
     capturedLimit = undefined;
+    capturedWhere = undefined;
     mockSend.mockResolvedValue(undefined as never);
     mockSelect.mockReturnValue({
       from: () => ({
-        where: () => ({
-          limit: (n: number) => {
-            capturedLimit = n;
-            return Promise.resolve(selectedRows);
-          },
-        }),
+        where: (whereArg: unknown) => {
+          capturedWhere = whereArg;
+          return {
+            limit: (n: number) => {
+              capturedLimit = n;
+              return Promise.resolve(selectedRows);
+            },
+          };
+        },
       }),
     } as never);
     mockDelete.mockReturnValue({
@@ -110,6 +116,17 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
     expect(capturedLimit).toBe(BATCH_SIZE);
     expect(mockSend).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('selects only unconsumed rows older than the 24-hour cutoff', async () => {
+    await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    const serialized = inspect(capturedWhere, { depth: 10 });
+    // Both predicates must be present: a dropped `consumed_at IS NULL` or
+    // `created_at < now() - interval '24 hours'` filter fails this test.
+    expect(serialized).toContain('consumed_at');
+    expect(serialized).toContain('created_at');
+    expect(serialized).toContain("interval '24 hours'");
   });
 
   it('keeps the object when the conditional delete returns no row for a consumed key', async () => {

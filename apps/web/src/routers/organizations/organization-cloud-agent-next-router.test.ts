@@ -56,6 +56,11 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
+const mockMarkCloudAgentAttachmentUploadsConsumed =
+  jest.fn<
+    (input: { userId: string; attachments?: { path: string; files: string[] } }) => Promise<void>
+  >();
+
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
@@ -159,6 +164,7 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
+  markCloudAgentAttachmentUploadsConsumed: mockMarkCloudAgentAttachmentUploadsConsumed,
 }));
 
 jest.mock('@/routers/organizations/utils', () => {
@@ -308,6 +314,10 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     expect(mockSendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: ORGANIZATION_ID })
     );
+    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
+      userId: 'user-1',
+      attachments,
+    });
   });
 
   it('normalizes legacy image requests to canonical Worker attachments', async () => {
@@ -326,6 +336,10 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments: images }));
     expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
+      userId: 'user-1',
+      attachments: images,
+    });
   });
 
   it('routes free follow-up prompt models through the balance-skip client', async () => {
@@ -663,6 +677,10 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
     );
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
+      userId: 'user-1',
+      attachments: images,
+    });
   });
 
   it('forwards stable Bitbucket identity for organization sessions', async () => {

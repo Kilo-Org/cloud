@@ -22,6 +22,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
+  Switch: 'Switch',
   View: 'View',
 }));
 
@@ -43,6 +44,27 @@ vi.mock('@/components/ui/text', () => ({
 
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
+  PRIVACY_URL: 'https://kilo.ai/privacy-app',
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({
+    userId: 'u1',
+    email: 'a@b.c',
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/voice-input/native-voice-input', () => ({
+  voiceInputController: { supportsOnDevice: () => true },
+}));
+
+vi.mock('@/lib/voice-input/voice-network-consent', () => ({
+  readVoiceNetworkConsent: vi.fn(() => 'unset'),
+  writeVoiceNetworkConsent: vi.fn(),
+  subscribeToVoiceNetworkConsent: vi.fn(() => () => undefined),
 }));
 
 // ---- helpers ----
@@ -123,6 +145,7 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Product analytics');
     expect(titles).toContain('Error screenshots and session replay');
     expect(titles).toContain('Install attribution');
+    expect(titles).toContain('Voice transcription');
   });
 
   it('onboarding heading states the default-on behavior', () => {

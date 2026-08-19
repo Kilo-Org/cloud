@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
-import { Platform, ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Section } from '@/components/consent/section';
@@ -9,10 +10,75 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { PRIVACY_URL } from '@/lib/config';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { voiceInputController } from '@/lib/voice-input/native-voice-input';
+import {
+  readVoiceNetworkConsent,
+  subscribeToVoiceNetworkConsent,
+  type VoiceNetworkConsent,
+  writeVoiceNetworkConsent,
+} from '@/lib/voice-input/voice-network-consent';
 
 type ConsentDetailsProps = {
   readonly mode?: ConsentMode;
 };
+
+function VoiceTranscriptionControl() {
+  const { userId } = useCurrentUserId();
+  const supportsOnDevice = voiceInputController.supportsOnDevice();
+  const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');
+
+  useEffect(() => {
+    if (!userId) {
+      setConsent('unset');
+      return undefined;
+    }
+    let active = true;
+    void (async () => {
+      const value = await readVoiceNetworkConsent(userId);
+      // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- active is cleared on unmount
+      if (active) {
+        setConsent(value);
+      }
+    })();
+    const unsubscribe = subscribeToVoiceNetworkConsent((changedUserId, value) => {
+      if (changedUserId === userId) {
+        setConsent(value);
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [userId]);
+
+  if (supportsOnDevice) {
+    return <Text className="mt-3 text-sm text-muted-foreground">On device</Text>;
+  }
+
+  const allowed = consent === 'granted';
+  const label = allowed ? 'Online, allowed' : 'Online, not allowed';
+
+  const handleToggle = (next: boolean) => {
+    if (!userId) {
+      return;
+    }
+    const value: 'granted' | 'declined' = next ? 'granted' : 'declined';
+    setConsent(value);
+    void writeVoiceNetworkConsent(userId, value);
+  };
+
+  return (
+    <View className="mt-3 flex-row items-center justify-between gap-3">
+      <Text className="flex-1 text-sm text-muted-foreground">{label}</Text>
+      <Switch
+        value={allowed}
+        onValueChange={handleToggle}
+        accessibilityLabel="Online transcription"
+      />
+    </View>
+  );
+}
 
 export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   const router = useRouter();
@@ -104,6 +170,13 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
           what="Install source and campaign identifiers."
           why="Understand which channels bring new users."
           who="AppsFlyer."
+        />
+        <Section
+          title="Voice transcription"
+          what="Your recording while you dictate."
+          why="To turn speech into text."
+          who="On-device only, or Apple or Google when this device cannot transcribe offline."
+          footer={<VoiceTranscriptionControl />}
         />
 
         <Text className="mt-6 text-xs text-muted-foreground">

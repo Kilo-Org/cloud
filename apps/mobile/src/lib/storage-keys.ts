@@ -52,3 +52,9 @@ export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';
  * recreation. Deleted on sign-out: it carries a user id and a session id.
  */
 export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
+/**
+ * Per-user network-fallback consent for voice transcription (P1-I-68a). Not
+ * deleted on sign-out — a per-user decision must survive sign-out and sign-in
+ * of the same account, matching `CONSENT_USER_KEY_PREFIX`.
+ */
+export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';

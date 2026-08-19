@@ -611,6 +611,63 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     renderer.unmount();
   });
 
+  it('deletes the cache-owned file when removed during the presign window (onTask not yet called)', async () => {
+    // Simulate the presign window: `uploadOne` captures `onTask` but does not
+    // hand the task back before the upload settles, so `task` stays undefined.
+    let capturedOnTask: ((task: { cancelAsync: () => Promise<void> }) => void) | undefined =
+      undefined;
+    hoisted.uploadOne.mockImplementation(
+      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+        capturedOnTask = args.onTask;
+        // Never resolves: the upload stays in the presign window, so the task
+        // is never handed back through `onTask`.
+        const result = await new Promise<{ key: string }>(resolve => {
+          resolveUpload = resolve;
+        });
+        return result;
+      }
+    );
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    // The task was never handed back, so no cancelAsync; the finally cleanup
+    // must still delete the cache-owned file.
+    expect(capturedOnTask).toBeDefined();
+    expect(hoisted.cancelAsync).not.toHaveBeenCalled();
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('deletes the cache-owned file even when cancelAsync rejects', async () => {
+    hoisted.cancelAsync.mockRejectedValue(new Error('cancel failed'));
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
+    renderer.unmount();
+  });
+
   it('does not delete a picker-provided URI on remove', async () => {
     const renderer = await mountHook();
     await act(async () => {

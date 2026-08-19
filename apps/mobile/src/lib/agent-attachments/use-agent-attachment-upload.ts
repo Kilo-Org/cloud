@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the upload hook owns the full per-attachment FSM (start, progress, cancel, settle) plus the pre-presign cancel-handle registration, which together exceed the default line budget */
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -159,6 +160,22 @@ export function useAgentAttachmentUpload(
         const progressCoalescer = createFrameCoalescer<number | null>(progress => {
           updateAttachment(attachment.id, { progress });
         });
+        // Register the cancel handle BEFORE the presign `await` so a
+        // remove/reset/unmount during that window still deletes the
+        // cache-owned file. The PUT itself cannot be cancelled before the
+        // task exists (the task is created after the signed URL returns), but
+        // the cache file is the leak this handle closes.
+        let task: { cancelAsync: () => Promise<void> } | undefined = undefined;
+        cancelHandlesRef.current.set(attachment.id, async () => {
+          progressCoalescer.cancel();
+          try {
+            if (task) {
+              await task.cancelAsync();
+            }
+          } finally {
+            deleteCacheOwnedFile(attachment.localUri);
+          }
+        });
         try {
           const { key } = await uploadOne({
             organizationId,
@@ -171,12 +188,8 @@ export function useAgentAttachmentUpload(
             onProgress: progress => {
               progressCoalescer.push(progress);
             },
-            onTask: task => {
-              cancelHandlesRef.current.set(attachment.id, async () => {
-                progressCoalescer.cancel();
-                await task.cancelAsync();
-                deleteCacheOwnedFile(attachment.localUri);
-              });
+            onTask: t => {
+              task = t;
             },
           });
           // Row 3.3 stale-outcome guard: a removed or reset upload must not

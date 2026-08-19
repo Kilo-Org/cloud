@@ -1,4 +1,5 @@
 /* eslint-disable max-lines */
+import { z } from 'zod';
 import type { KiloGatewayChatMessage, KiloGatewayToolDefinition } from './kilo-api-client';
 import type { KiloGatewayToolName } from './kilo-gateway-chat-client';
 import { MAX_SNAPSHOT_TEXT_LENGTH } from './tab-debugger';
@@ -406,31 +407,16 @@ export const createWorkflowToolDefinitions = ({
 const getProviderToolCallId = (toolCall: ToolCallEvent): string =>
   'source' in toolCall ? toolCall.id : (toolCall.providerToolCallId ?? toolCall.id);
 
-const screenshotValueSchema = {
-  safeParse(
-    value: unknown
-  ): { success: true; data: { dataUrl: string; mediaType: string } } | { success: false } {
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'dataUrl' in value &&
-      typeof value.dataUrl === 'string' &&
-      value.dataUrl.startsWith('data:image/') &&
-      'mediaType' in value &&
-      typeof value.mediaType === 'string'
-    ) {
-      return { data: { dataUrl: value.dataUrl, mediaType: value.mediaType }, success: true };
-    }
-
-    return { success: false };
-  },
-};
+const screenshotValueSchema = z.looseObject({
+  dataUrl: z.string().startsWith('data:image/'),
+  mediaType: z.string(),
+});
 
 const getToolResultValue = (
   event: ToolResultEvent,
   toolCall: ToolCallEvent,
   supportsImages: boolean
-): unknown => {
+) => {
   if (toolCall.name !== 'get_viewport_screenshot') {
     return event.value;
   }

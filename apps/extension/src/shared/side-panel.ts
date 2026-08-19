@@ -32,7 +32,7 @@ export type NativeContextMenusClickListener = (
 ) => void;
 
 export interface NativeContextMenusApi {
-  create(options: NativeContextMenusCreateOptions): unknown;
+  create(options: NativeContextMenusCreateOptions): void;
   remove?(menuItemId: string): Promise<void> | void;
   onClicked: {
     addListener(listener: NativeContextMenusClickListener): void;
@@ -58,7 +58,7 @@ export const registerAddToMemoryMenu = async (menusApi?: NativeContextMenusApi):
     title: 'Add to memory',
   };
 
-  if (typeof menusApi.remove === 'function') {
+  if (menusApi.remove !== undefined) {
     try {
       await menusApi.remove(ADD_TO_MEMORY_MENU_ID);
     } catch {

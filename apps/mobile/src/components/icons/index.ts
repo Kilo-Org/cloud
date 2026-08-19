@@ -11,6 +11,7 @@ export { GmailIcon } from './gmail-icon';
 export { GoogleIcon } from './google-icon';
 
 /** Maps catalog entry IDs to brand icon components. */
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- callers elsewhere index this by a plain runtime string
 export const CATALOG_ICONS: Partial<Record<string, BrandIconComponent>> = {
   telegram: TelegramIcon,
   discord: DiscordIcon,

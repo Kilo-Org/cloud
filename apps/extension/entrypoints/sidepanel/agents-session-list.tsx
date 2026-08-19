@@ -37,9 +37,7 @@ export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey }
  * section observe this query; an identical key plus input means React Query
  * serves them from one request.
  */
-const activeSessionsListInput = (
-  organizationId: string | null
-): { organizationId: string | null; includeCloudAgentSessions: boolean } => ({
+const activeSessionsListInput = (organizationId: string | null) => ({
   includeCloudAgentSessions: true,
   organizationId,
 });

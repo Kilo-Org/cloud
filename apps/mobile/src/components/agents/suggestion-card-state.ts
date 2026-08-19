@@ -12,10 +12,7 @@ export function resolveSuggestionPresentation(
     : 'compact';
 }
 
-export function createSuggestionActionLock(): {
-  tryAcquire: () => boolean;
-  release: () => void;
-} {
+export function createSuggestionActionLock() {
   let held = false;
   return {
     tryAcquire: () => {

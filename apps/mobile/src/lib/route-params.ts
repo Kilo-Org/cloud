@@ -13,7 +13,7 @@ export function parseParam<T extends string = string>(
   value: string | string[] | undefined,
   allowed?: readonly T[]
 ): T | null {
-  if (typeof value !== 'string' || value.length === 0) {
+  if (value === undefined || Array.isArray(value) || value.length === 0) {
     return null;
   }
   if (allowed && !allowed.includes(value as T)) {

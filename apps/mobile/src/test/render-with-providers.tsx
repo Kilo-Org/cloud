@@ -35,6 +35,9 @@ type RenderWithProvidersResult = {
   unmount: () => void;
 };
 
+/** Named so the widening below reads as an owned contract, not an anonymous object type. */
+type PendingRendererRef = { current: TestRenderer.ReactTestRenderer | undefined };
+
 /**
  * Build a `QueryClient` configured for deterministic tests: retries disabled so a
  * rejected query surfaces immediately, and no background refetching.
@@ -63,7 +66,7 @@ export async function renderWithProviders(
   const inner = Wrapper ? createElement(Wrapper, null, ui) : ui;
   const tree = createElement(QueryClientProvider, { client: queryClient }, inner);
 
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  const ref: PendingRendererRef = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(tree);
     await Promise.resolve();

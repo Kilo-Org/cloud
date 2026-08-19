@@ -6,6 +6,7 @@ import {
   type Persister,
   persistQueryClientRestore,
 } from '@tanstack/react-query-persist-client';
+import { z } from 'zod';
 
 import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -59,18 +60,26 @@ const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query'
 
 type QueryCacheReader = { getQueryData?: QueryClient['getQueryData'] };
 
+const cachedUserSchema = z.object({ id: z.string().min(1) });
+
 /** Authoritative user id from the cached `user.getMe` result, or null. */
 export function readCachedUserId(queryClient: QueryCacheReader): string | null {
-  const data = queryClient.getQueryData?.<{ id?: unknown } | undefined>(GET_ME_QUERY_KEY);
-  return typeof data?.id === 'string' && data.id.length > 0 ? data.id : null;
+  const data = queryClient.getQueryData?.(GET_ME_QUERY_KEY);
+  const parsed = cachedUserSchema.safeParse(data);
+  return parsed.success ? parsed.data.id : null;
 }
 
-/** The `input` field of a tRPC query key's meta segment, or undefined. */
-function metaInput(meta: unknown): unknown {
-  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) {
+const queryKeyMetaSchema = z.object({ input: z.unknown().optional() });
+const plainObjectSchema = z.record(z.string(), z.unknown());
+
+/** The `input` field of a tRPC query key's meta segment, when it is a plain object. */
+function metaInput(meta: unknown): Record<string, unknown> | undefined {
+  const parsedMeta = queryKeyMetaSchema.safeParse(meta);
+  if (!parsedMeta.success) {
     return undefined;
   }
-  return (meta as { input?: unknown }).input;
+  const parsedInput = plainObjectSchema.safeParse(parsedMeta.data.input);
+  return parsedInput.success ? parsedInput.data : undefined;
 }
 
 type AllowedProcedure = {
@@ -104,10 +113,10 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
     // snapshot of this procedure is ever written.
     isAllowedInput: meta => {
       const input = metaInput(meta);
-      if (input == null || typeof input !== 'object') {
+      if (input === undefined) {
         return true;
       }
-      return (input as { organizationId?: unknown }).organizationId == null;
+      return input.organizationId == null;
     },
   },
   {
@@ -122,20 +131,19 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
     // enforced separately in {@link shouldPersistReadCacheQuery}.
     isAllowedInput: meta => {
       const input = metaInput(meta);
-      if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+      if (input === undefined) {
         return false;
       }
-      const candidate = input as Record<string, unknown>;
-      if (Object.keys(candidate).length !== DEFAULT_SESSION_LIST_KEY_COUNT) {
+      if (Object.keys(input).length !== DEFAULT_SESSION_LIST_KEY_COUNT) {
         return false;
       }
       return (
-        candidate.limit === DEFAULT_SESSION_LIST_INPUT.limit &&
-        candidate.orderBy === DEFAULT_SESSION_LIST_INPUT.orderBy &&
-        candidate.includeChildren === DEFAULT_SESSION_LIST_INPUT.includeChildren &&
-        candidate.createdOnPlatform === DEFAULT_SESSION_LIST_INPUT.createdOnPlatform &&
-        candidate.gitUrl === DEFAULT_SESSION_LIST_INPUT.gitUrl &&
-        (candidate.organizationId === null || candidate.organizationId === undefined)
+        input.limit === DEFAULT_SESSION_LIST_INPUT.limit &&
+        input.orderBy === DEFAULT_SESSION_LIST_INPUT.orderBy &&
+        input.includeChildren === DEFAULT_SESSION_LIST_INPUT.includeChildren &&
+        input.createdOnPlatform === DEFAULT_SESSION_LIST_INPUT.createdOnPlatform &&
+        input.gitUrl === DEFAULT_SESSION_LIST_INPUT.gitUrl &&
+        (input.organizationId === null || input.organizationId === undefined)
       );
     },
   },

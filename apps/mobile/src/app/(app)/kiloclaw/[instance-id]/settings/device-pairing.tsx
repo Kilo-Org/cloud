@@ -30,12 +30,12 @@ import {
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-const CHANNEL_LABELS: Record<string, string> = {
+const CHANNEL_LABELS = {
   telegram: 'Telegram',
   discord: 'Discord',
   slack: 'Slack',
   github: 'GitHub',
-};
+} satisfies Record<string, string>;
 
 export default function DevicePairingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -121,7 +121,9 @@ export default function DevicePairingScreen() {
   const hasAnyRequests = channelRequests.length > 0 || deviceRequests.length > 0;
 
   function handleApproveChannel(channel: string, code: string) {
-    const label = CHANNEL_LABELS[channel] ?? channel.charAt(0).toUpperCase() + channel.slice(1);
+    const label = Object.hasOwn(CHANNEL_LABELS, channel)
+      ? CHANNEL_LABELS[channel as keyof typeof CHANNEL_LABELS]
+      : channel.charAt(0).toUpperCase() + channel.slice(1);
     Alert.alert(
       'Approve pairing request',
       `Allow ${label} (code: ${code}) to connect to your instance?`,
@@ -197,8 +199,9 @@ export default function DevicePairingScreen() {
                       )}
                       <View className="flex-1 gap-0.5">
                         <Text className="text-sm font-medium">
-                          {CHANNEL_LABELS[request.channel] ??
-                            request.channel.charAt(0).toUpperCase() + request.channel.slice(1)}
+                          {Object.hasOwn(CHANNEL_LABELS, request.channel)
+                            ? CHANNEL_LABELS[request.channel as keyof typeof CHANNEL_LABELS]
+                            : request.channel.charAt(0).toUpperCase() + request.channel.slice(1)}
                         </Text>
                         <View className="flex-row items-center gap-1.5">
                           <View className="rounded bg-muted px-1.5 py-0.5">

@@ -132,46 +132,21 @@ const compareModelOptions = (
   return left.name.localeCompare(right.name);
 };
 
-const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModelOption => {
-  const option: {
-    contextLength?: number;
-    hasUserByokAvailable?: boolean;
-    id: string;
-    isFree?: boolean;
-    isPreferred: boolean;
-    mayTrainOnYourPrompts?: boolean;
-    name: string;
-    supportsImages?: boolean;
-    variants: string[];
-  } = {
-    id: model.id,
-    isPreferred: model.isPreferred,
-    name: model.name,
-    variants: model.variants,
-  };
-
-  if (model.contextLength !== undefined) {
-    option.contextLength = model.contextLength;
-  }
-
-  if (model.hasUserByokAvailable !== undefined) {
-    option.hasUserByokAvailable = model.hasUserByokAvailable;
-  }
-
-  if (model.isFree !== undefined) {
-    option.isFree = model.isFree;
-  }
-
-  if (model.mayTrainOnYourPrompts !== undefined) {
-    option.mayTrainOnYourPrompts = model.mayTrainOnYourPrompts;
-  }
-
-  if (model.supportsImages !== undefined) {
-    option.supportsImages = model.supportsImages;
-  }
-
-  return option;
-};
+const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModelOption => ({
+  id: model.id,
+  isPreferred: model.isPreferred,
+  name: model.name,
+  variants: model.variants,
+  ...(model.contextLength === undefined ? {} : { contextLength: model.contextLength }),
+  ...(model.hasUserByokAvailable === undefined
+    ? {}
+    : { hasUserByokAvailable: model.hasUserByokAvailable }),
+  ...(model.isFree === undefined ? {} : { isFree: model.isFree }),
+  ...(model.mayTrainOnYourPrompts === undefined
+    ? {}
+    : { mayTrainOnYourPrompts: model.mayTrainOnYourPrompts }),
+  ...(model.supportsImages === undefined ? {} : { supportsImages: model.supportsImages }),
+});
 
 export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModelOption[] => {
   const parsed = gatewayModelsResponseSchema.safeParse(value);

@@ -257,8 +257,14 @@ function generateCreationKey(): string {
   // opaque per-attempt bookkeeping identifier, never parsed as a UUID by
   // anything, so a plain random fallback string is sufficient on the rare
   // environment without it.
+  // `globalThis.crypto` is typed as always present (lib.dom.d.ts), but that
+  // static type does not reflect every real Hermes/RN runtime. Reading it
+  // through `Reflect.get` keeps the existence check honest instead of a typed
+  // access that TypeScript (wrongly, for this runtime) would treat as always
+  // true and flag the fallback branch below as unreachable.
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- see comment above: a typed access would make TS treat the runtime fallback as dead code
   const cryptoApi = Reflect.get(globalThis, 'crypto') as { randomUUID?: () => string } | undefined;
-  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+  if (cryptoApi?.randomUUID !== undefined) {
     return cryptoApi.randomUUID();
   }
   return `spawn-${Date.now()}-${Math.random().toString(36).slice(2)}`;

@@ -71,23 +71,23 @@ function classifyCheckTone(status: string, conclusion: string | null): CheckTone
   }
 }
 
-const TONE_COLOR: Record<CheckTone, keyof ReturnType<typeof useThemeColors>> = {
+const TONE_COLOR = {
   success: 'good',
   failure: 'destructive',
   pending: 'mutedForeground',
   skipped: 'mutedForeground',
   neutral: 'mutedForeground',
   warning: 'warn',
-};
+} satisfies Record<CheckTone, keyof ReturnType<typeof useThemeColors>>;
 
-const TONE_ICON: Record<CheckTone, typeof CheckCircle2> = {
+const TONE_ICON = {
   success: CheckCircle2,
   failure: XCircle,
   pending: Loader2,
   skipped: MinusCircle,
   neutral: Circle,
   warning: AlertTriangle,
-};
+} satisfies Record<CheckTone, typeof CheckCircle2>;
 
 function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
   const colors = useThemeColors();

@@ -68,12 +68,7 @@
   ],
   "overrides": [
     {
-      "files": [
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "tests/**",
-        "scripts/**"
-      ],
+      "files": ["**/*.test.ts", "**/*.test.tsx", "tests/**", "scripts/**"],
       "rules": {
         "anti-slop/no-chained-type-assertions": "off",
         "anti-slop/no-known-value-widening": "off",

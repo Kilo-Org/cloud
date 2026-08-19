@@ -9,7 +9,7 @@
     "eslint-plugin-sonarjs",
     "@sentry/cli"
   ],
-  "ignoreBinaries": ["oxfmt", "oxlint"],
+  "ignoreBinaries": ["oxfmt", "oxlint", "eslint"],
   "ignore": ["src/components/ui/**"],
   "postcss": {
     "config": ["postcss.config.mjs"]

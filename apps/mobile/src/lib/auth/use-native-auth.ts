@@ -21,7 +21,7 @@ import {
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 
-export const AUTH_ERROR_MESSAGES: Record<string, string> = {
+export const AUTH_ERROR_MESSAGES = {
   'EMAIL-ALREADY-USED':
     "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
   'DIFFERENT-OAUTH':
@@ -40,14 +40,17 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
   // Admission: server refuses the device under enforce mode — non-retryable.
   ADMISSION_REQUIRED:
     "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-};
+} satisfies Record<string, string>;
 
 export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
 export const RETRYABLE_ADMISSION_ERROR =
   'We could not verify this device. Check your connection and try again.';
 
 export function mapError(errorCode: string | undefined): string {
-  return (errorCode && AUTH_ERROR_MESSAGES[errorCode]) ?? DEFAULT_ERROR_MESSAGE;
+  return (
+    (errorCode && AUTH_ERROR_MESSAGES[errorCode as keyof typeof AUTH_ERROR_MESSAGES]) ??
+    DEFAULT_ERROR_MESSAGE
+  );
 }
 
 export async function resolveAdmission(): Promise<
@@ -214,27 +217,21 @@ export function useNativeAuth(): NativeAuthResult {
         return;
       }
 
-      const body: Record<string, unknown> = {
-        provider: 'google',
-        supportsRefresh: true,
-      };
-
-      if (serverAuthCode) {
-        body.serverAuthCode = serverAuthCode;
-        body.googleClientId = GOOGLE_WEB_CLIENT_ID;
-      } else {
-        body.idToken = idToken;
-      }
-
       let admissionBody: Record<string, unknown> = {};
       try {
         admissionBody = await resolveAdmission();
       } catch {
         return;
       }
-      Object.assign(body, admissionBody);
 
-      const result = await postAuth('/api/auth/native/token', body);
+      const result = await postAuth('/api/auth/native/token', {
+        provider: 'google',
+        supportsRefresh: true,
+        ...(serverAuthCode
+          ? { serverAuthCode, googleClientId: GOOGLE_WEB_CLIENT_ID }
+          : { idToken }),
+        ...admissionBody,
+      });
 
       if (result.ok) {
         const parsed = parseTokenPair(result.data);

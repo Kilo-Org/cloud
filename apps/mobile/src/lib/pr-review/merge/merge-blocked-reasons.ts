@@ -256,17 +256,17 @@ export function getAllowedMergeMethods(repo: PrOverviewRepoSettings): AllowedMer
   return methods;
 }
 
-export const PR_MERGE_LABELS: Record<AllowedMergeMethod, string> = {
+export const PR_MERGE_LABELS = {
   merge: 'Create a merge commit',
   squash: 'Squash and merge',
   rebase: 'Rebase and merge',
-};
+} satisfies Record<AllowedMergeMethod, string>;
 
-export const PR_MERGE_DESCRIPTIONS: Record<AllowedMergeMethod, string> = {
+export const PR_MERGE_DESCRIPTIONS = {
   merge: 'Combine all commits from this branch into the base branch with a merge commit.',
   squash: 'Combine all commits from this branch into a single commit on the base branch.',
   rebase: 'Replay all commits from this branch onto the base branch without a merge commit.',
-};
+} satisfies Record<AllowedMergeMethod, string>;
 
 /** The default method the picker selects on first open. */
 export function defaultMergeMethodFor(repo: PrOverviewRepoSettings): AllowedMergeMethod {

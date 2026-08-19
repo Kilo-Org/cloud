@@ -8,7 +8,7 @@ describe('scrubEvent', () => {
       request: { url: 'https://api.example.com/trpc/getUser?input=%7B%22id%22%3A%221%22%7D' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.request.url).toBe('https://api.example.com/trpc/getUser');
   });
@@ -18,7 +18,7 @@ describe('scrubEvent', () => {
       request: { url: 'https://api.example.com/data?repo=kilocode&org=myorg' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.request.url).toBe('https://api.example.com/data');
   });
@@ -28,7 +28,7 @@ describe('scrubEvent', () => {
       contexts: { response: { url: 'https://cdn.example.com/file?token=abc' } },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.contexts.response.url).toBe('https://cdn.example.com/file');
   });
@@ -38,7 +38,7 @@ describe('scrubEvent', () => {
       user: { email: 'user@example.com', id: 'abc' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.user.email).toBeUndefined();
     expect(result.user.id).toBe('abc');
@@ -49,7 +49,7 @@ describe('scrubEvent', () => {
       user: { username: 'jdoe', id: 'abc' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.user.username).toBeUndefined();
     expect(result.user.id).toBe('abc');
@@ -60,7 +60,7 @@ describe('scrubEvent', () => {
       user: { ip_address: '1.2.3.4', id: 'abc' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.user.ip_address).toBeUndefined();
     expect(result.user.id).toBe('abc');
@@ -71,7 +71,7 @@ describe('scrubEvent', () => {
       extra: { auth: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.extra.auth).toBe('[redacted]');
   });
@@ -81,7 +81,7 @@ describe('scrubEvent', () => {
       extra: { token: 'abcdefghijklmnopqrst' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.extra.token).toBe('[redacted]');
   });
@@ -91,7 +91,7 @@ describe('scrubEvent', () => {
       extra: { count: 42, name: 'short' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.extra.count).toBe(42);
     expect(result.extra.name).toBe('short');
@@ -102,7 +102,7 @@ describe('scrubEvent', () => {
       tags: { session: 'Bearer tok1234567890abcdef' },
     };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.tags.session).toBe('[redacted]');
   });
@@ -114,8 +114,10 @@ describe('scrubEvent', () => {
   });
 
   it('returns undefined unchanged without throwing', () => {
-    expect(() => scrubEvent(undefined)).not.toThrow();
-    expect(scrubEvent(undefined)).toBeUndefined();
+    expect(() => {
+      scrubEvent<Record<string, unknown> | undefined>(undefined);
+    }).not.toThrow();
+    expect(scrubEvent<Record<string, unknown> | undefined>(undefined)).toBeUndefined();
   });
 
   it('returns string input unchanged without throwing', () => {
@@ -146,7 +148,7 @@ describe('scrubEvent', () => {
   it('leaves URL without query string unchanged', () => {
     const event = { request: { url: 'https://api.example.com/trpc/getUser' } };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.request.url).toBe('https://api.example.com/trpc/getUser');
   });
@@ -154,7 +156,7 @@ describe('scrubEvent', () => {
   it('does not mutate extra when no token values present', () => {
     const event = { extra: { env: 'production', build: 123 } };
 
-    const result = scrubEvent(event) as typeof event;
+    const result = scrubEvent(event);
 
     expect(result.extra).toEqual({ env: 'production', build: 123 });
   });
@@ -198,10 +200,10 @@ describe('scrubBreadcrumb', () => {
       data: { url: 'https://example.com/page?secret=123', method: 'GET' },
     };
 
-    const result = scrubBreadcrumb(breadcrumb) as typeof breadcrumb;
+    const result = scrubBreadcrumb(breadcrumb);
 
-    expect(result.data.url).toBe('https://example.com/page');
-    expect(result.data.method).toBe('GET');
+    expect(result?.data.url).toBe('https://example.com/page');
+    expect(result?.data.method).toBe('GET');
   });
 
   it('returns null input unchanged without throwing', () => {

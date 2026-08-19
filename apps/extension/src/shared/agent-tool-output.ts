@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { AgentToolName } from './agent-conversation';
 
 interface ViewportScreenshotResult {
@@ -5,14 +6,13 @@ interface ViewportScreenshotResult {
   readonly mediaType: 'image/png';
 }
 
+const viewportScreenshotResultSchema = z.object({
+  dataUrl: z.string().refine(value => value.startsWith('data:image/png;base64,')),
+  mediaType: z.literal('image/png'),
+});
+
 const isViewportScreenshotResult = (value: unknown): value is ViewportScreenshotResult =>
-  typeof value === 'object' &&
-  value !== null &&
-  'dataUrl' in value &&
-  typeof value.dataUrl === 'string' &&
-  value.dataUrl.startsWith('data:image/png;base64,') &&
-  'mediaType' in value &&
-  value.mediaType === 'image/png';
+  viewportScreenshotResultSchema.safeParse(value).success;
 
 export const getViewportScreenshotDataUrl = (
   toolName: AgentToolName,

@@ -44,7 +44,7 @@ export const selectFinalAnswer = (events: readonly BenchEvent[]): string => {
       event !== undefined &&
       event.type === 'message' &&
       event.role === 'assistant' &&
-      typeof event.text === 'string' &&
+      event.text !== undefined &&
       event.text.trim() !== ''
     ) {
       return event.text;
@@ -89,7 +89,9 @@ export const scoreTaskCorrectness = ({
           (exchange.call.name === 'run_workflow' && exchange.call.arguments['dryRun'] !== true))
     );
 
-  const predicates: Record<string, BenchPredicate> = {
+  type BenchPredicateMap = Record<string, BenchPredicate>;
+
+  const predicates: BenchPredicateMap = {
     actionPerformed: predicate(
       actionOk,
       scenario.requiresAction

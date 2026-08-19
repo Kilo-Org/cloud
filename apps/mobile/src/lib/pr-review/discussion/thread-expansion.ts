@@ -40,16 +40,13 @@ export function toggleThreadExpanded(
   state: Record<string, boolean>,
   threadId: string,
   isResolved: boolean
-): Record<string, boolean> {
+) {
   const current = expandedForThread(state, threadId, isResolved);
   return { ...state, [threadId]: !current };
 }
 
 /** Force expand (deferred settle path). Same reference if already true. */
-export function expandThread(
-  state: Record<string, boolean>,
-  threadId: string
-): Record<string, boolean> {
+export function expandThread(state: Record<string, boolean>, threadId: string) {
   if (state[threadId] === true) {
     return state;
   }

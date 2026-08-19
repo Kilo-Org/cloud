@@ -18,12 +18,12 @@ export type PrMutationSurface = 'create-comment' | 'submit-review' | 'reply' | '
 
 // Existing retryable fallback copy per surface (mirrors the sheet/composer
 // defaults so an in-progress duplicate reads like a normal retryable failure).
-const PR_SURFACE_RETRYABLE_COPY: Record<PrMutationSurface, string> = {
+const PR_SURFACE_RETRYABLE_COPY = {
   'create-comment': 'Could not post comment.',
   'submit-review': 'Could not submit review. Check your connection and try again.',
   reply: 'Could not reply.',
   merge: 'Could not merge pull request.',
-};
+} satisfies Record<PrMutationSurface, string>;
 
 export function isPrOperationAmbiguous(error: unknown): boolean {
   return error instanceof Error && error.message === PR_OPERATION_AMBIGUOUS_MESSAGE;
@@ -52,7 +52,7 @@ export function isPrMutationRetryable(error: unknown): boolean {
  * sheets show the marker copy instead of a code-derived classification. Every
  * other error passes through unchanged.
  */
-export function mapPrOperationError(error: unknown, surface: PrMutationSurface): unknown {
+export function mapPrOperationError<T>(error: T, surface: PrMutationSurface): T | Error {
   if (isOperationInProgress(error)) {
     return new Error(PR_SURFACE_RETRYABLE_COPY[surface]);
   }

@@ -60,11 +60,8 @@ export type DeviceAuthCodeResult = {
   verificationUrl: string;
 };
 
-export function buildDeviceAuthPollRequest(deviceCode: string): {
-  deviceCode: string;
-  supportsRefresh: true;
-} {
-  return { deviceCode, supportsRefresh: true };
+export function buildDeviceAuthPollRequest(deviceCode: string) {
+  return { deviceCode, supportsRefresh: true as const };
 }
 
 export function shouldRefreshBeforeRequest(

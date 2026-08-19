@@ -31,10 +31,10 @@ import { cn } from '@/lib/utils';
 const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
 type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
 
-const URL_PLACEHOLDER: Record<ManualReviewPlatform, string> = {
+const URL_PLACEHOLDER = {
   github: 'https://github.com/owner/repo/pull/123',
   gitlab: 'https://gitlab.com/group/project/-/merge_requests/123',
-};
+} satisfies Record<ManualReviewPlatform, string>;
 
 // The shared suffix check (matchesCodeReviewUrlSuffix, ported from web's
 // code-review-links.ts) only looks at the end of the URL — it isn't
@@ -46,10 +46,10 @@ const URL_PLACEHOLDER: Record<ManualReviewPlatform, string> = {
 // it — otherwise structure-free URLs like https://github.com/pull/123 would
 // pass. GitLab nests groups arbitrarily deep, so only the protocol is
 // anchored there; the shared suffix requires the /-/merge_requests/<n> tail.
-const URL_HOST_PATTERN: Record<ManualReviewPlatform, RegExp> = {
+const URL_HOST_PATTERN = {
   github: /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\//,
   gitlab: /^https:\/\//,
-};
+} satisfies Record<ManualReviewPlatform, RegExp>;
 
 function isValidManualReviewUrl(platform: ManualReviewPlatform, url: string): boolean {
   return URL_HOST_PATTERN[platform].test(url) && matchesCodeReviewUrlSuffix(platform, url);

@@ -12,8 +12,24 @@
 // tool inputs are not unified patches.
 
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 import { languageForPath } from '@/lib/pr-review/diff/highlight';
+
+/** Zod's validation `.catch()` fallback, not a Promise catch. */
+function tolerant<T>(schema: z.ZodType<T>, fallback: T): z.ZodType<T> {
+  // oxlint-disable-next-line promise/prefer-await-to-then -- zod schema fallback, not a Promise
+  return schema.catch(fallback);
+}
+
+const editToolInputSchema = tolerant(
+  z.object({
+    filePath: tolerant(z.string(), ''),
+    oldString: tolerant(z.string(), ''),
+    newString: tolerant(z.string(), ''),
+  }),
+  { filePath: '', oldString: '', newString: '' }
+);
 
 // Sized for the scrolling detail sheet: an order of magnitude above the old
 // transcript-preview caps (1000/2000) because the sheet scrolls and only one
@@ -40,9 +56,7 @@ export function buildToolDiffModel(part: ToolPart): ToolDiffModel | null {
   const input = part.state.input as Record<string, unknown>;
 
   if (tool === 'edit') {
-    const filePath = typeof input.filePath === 'string' ? input.filePath : '';
-    const oldString = typeof input.oldString === 'string' ? input.oldString : '';
-    const newString = typeof input.newString === 'string' ? input.newString : '';
+    const { filePath, oldString, newString } = editToolInputSchema.parse(input);
 
     const slicedOld = oldString.slice(0, EDIT_CHARACTER_CAP);
     const slicedNew = newString.slice(0, EDIT_CHARACTER_CAP);

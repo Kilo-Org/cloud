@@ -49,12 +49,17 @@ const mutationDataSchema = z.object({
   success: z.literal(true),
 });
 
-const successEnvelopeSchema = <Schema extends z.ZodType>(dataSchema: Schema) =>
-  z.object({
-    result: z.object({
-      data: dataSchema,
-    }),
-  });
+const favoritesSuccessEnvelopeSchema = z.object({
+  result: z.object({
+    data: favoritesDataSchema,
+  }),
+});
+
+const mutationSuccessEnvelopeSchema = z.object({
+  result: z.object({
+    data: mutationDataSchema,
+  }),
+});
 
 const errorEnvelopeSchema = z.object({
   error: z.object({
@@ -107,14 +112,11 @@ const performModelPreferencesFetch = async ({
   readonly token: string;
   readonly url: string;
 }): Promise<Response> => {
-  const headers: Record<string, string> = {
+  const headers = {
     Accept: 'application/json',
     Authorization: `Bearer ${token}`,
+    ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
   };
-
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-  }
 
   try {
     return await fetch(url, {
@@ -132,22 +134,10 @@ const performModelPreferencesFetch = async ({
   }
 };
 
-const readModelPreferencesPayload = async (response: Response): Promise<unknown> => {
-  try {
-    return await response.json();
-  } catch (error) {
-    throw new ModelPreferencesError('Model preferences response was not JSON', {
-      cause: error,
-      status: response.status,
-      trpcCode: null,
-    });
-  }
-};
-
 const requestModelPreferences = async <Data>({
   apiBaseUrl,
   body,
-  dataSchema,
+  successEnvelopeSchema,
   fetch,
   method,
   organizationId,
@@ -157,7 +147,7 @@ const requestModelPreferences = async <Data>({
 }: {
   readonly apiBaseUrl: string;
   readonly body?: string;
-  readonly dataSchema: z.ZodType<Data>;
+  readonly successEnvelopeSchema: z.ZodType<{ result: { data: Data } }>;
   readonly fetch: FetchLike;
   readonly method: 'GET' | 'POST';
   readonly organizationId?: string | undefined;
@@ -178,7 +168,17 @@ const requestModelPreferences = async <Data>({
     ...(body === undefined ? {} : { body }),
     ...(signal === undefined ? {} : { signal }),
   });
-  const payload = await readModelPreferencesPayload(response);
+  // eslint-disable-next-line unicorn/no-useless-undefined -- initialized in the try block below
+  let payload: unknown = undefined;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new ModelPreferencesError('Model preferences response was not JSON', {
+      cause: error,
+      status: response.status,
+      trpcCode: null,
+    });
+  }
   const errorEnvelope = errorEnvelopeSchema.safeParse(payload);
 
   if (errorEnvelope.success) {
@@ -195,7 +195,7 @@ const requestModelPreferences = async <Data>({
     });
   }
 
-  const successEnvelope = successEnvelopeSchema(dataSchema).safeParse(payload);
+  const successEnvelope = successEnvelopeSchema.safeParse(payload);
 
   if (!successEnvelope.success) {
     throw new ModelPreferencesError('Model preferences response envelope was malformed', {
@@ -235,10 +235,10 @@ export const fetchModelPreferences = async ({
 }> => {
   const data = await requestModelPreferences({
     apiBaseUrl,
-    dataSchema: favoritesDataSchema,
     fetch,
     method: 'GET',
     procedure: 'modelPreferences.get',
+    successEnvelopeSchema: favoritesSuccessEnvelopeSchema,
     token,
     ...(organizationId === undefined ? {} : { organizationId }),
     ...(signal === undefined ? {} : { signal }),
@@ -258,10 +258,10 @@ export const addModelFavorite = async ({
   await requestModelPreferences({
     apiBaseUrl,
     body: JSON.stringify({ model }),
-    dataSchema: mutationDataSchema,
     fetch,
     method: 'POST',
     procedure: 'modelPreferences.addFavorite',
+    successEnvelopeSchema: mutationSuccessEnvelopeSchema,
     token,
     ...(organizationId === undefined ? {} : { organizationId }),
     ...(signal === undefined ? {} : { signal }),
@@ -279,10 +279,10 @@ export const removeModelFavorite = async ({
   await requestModelPreferences({
     apiBaseUrl,
     body: JSON.stringify({ model }),
-    dataSchema: mutationDataSchema,
     fetch,
     method: 'POST',
     procedure: 'modelPreferences.removeFavorite',
+    successEnvelopeSchema: mutationSuccessEnvelopeSchema,
     token,
     ...(organizationId === undefined ? {} : { organizationId }),
     ...(signal === undefined ? {} : { signal }),

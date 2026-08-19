@@ -4,11 +4,11 @@ import { formatContextSummary, getContextRatio, getContextTone } from '@/src/sha
 import { formatSessionCost } from '@/src/shared/session-cost';
 import { DESIGN_TOKENS } from './design-tokens';
 
-const toneStroke: Record<'danger' | 'safe' | 'warn', string> = {
+const toneStroke = {
   danger: DESIGN_TOKENS.statusRed500,
   safe: DESIGN_TOKENS.statusGreen500,
   warn: DESIGN_TOKENS.statusYellow500,
-};
+} satisfies Record<'danger' | 'safe' | 'warn', string>;
 
 const RADIUS = 6;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;

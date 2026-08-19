@@ -56,11 +56,11 @@ export type OrgKiloPassRowState = {
   loading: boolean;
 };
 
-const TIER_LABELS: Record<'tier_19' | 'tier_49' | 'tier_199', string> = {
+const TIER_LABELS = {
   tier_19: '$19',
   tier_49: '$49',
   tier_199: '$199',
-};
+} satisfies Record<'tier_19' | 'tier_49' | 'tier_199', string>;
 
 function paidSeatsLabel(count: number): string {
   return `${count} paid ${count === 1 ? 'seat' : 'seats'}`;

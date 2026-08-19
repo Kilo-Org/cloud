@@ -7,7 +7,7 @@ import { repoNameFromGitUrl } from './session-list-helpers';
 
 type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'slack' | 'github';
 
-const PLATFORM_TO_KIND: Readonly<Record<string, SessionPlatformIconKind>> = {
+const PLATFORM_TO_KIND = {
   'cloud-agent': 'cloud',
   'cloud-agent-web': 'cloud',
   cli: 'terminal',
@@ -15,7 +15,7 @@ const PLATFORM_TO_KIND: Readonly<Record<string, SessionPlatformIconKind>> = {
   'agent-manager': 'code',
   slack: 'slack',
   github: 'github',
-};
+} satisfies Record<string, SessionPlatformIconKind>;
 
 /**
  * Map a backend `created_on_platform` string to a list/detail icon kind.
@@ -28,7 +28,9 @@ export function sessionPlatformIconKind(
   if (platform == null || platform === '') {
     return null;
   }
-  return PLATFORM_TO_KIND[platform] ?? null;
+  return Object.hasOwn(PLATFORM_TO_KIND, platform)
+    ? PLATFORM_TO_KIND[platform as keyof typeof PLATFORM_TO_KIND]
+    : null;
 }
 
 type RowPlatformPresentationInput = Readonly<{

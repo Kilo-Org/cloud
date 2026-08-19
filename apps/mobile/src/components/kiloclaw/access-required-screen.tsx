@@ -35,7 +35,7 @@ type SubcaseContent = {
   tone: ToneKey;
 };
 
-const SUBCASE_CONTENT: Record<AccessRequiredSubcase, SubcaseContent> = {
+const SUBCASE_CONTENT = {
   trial_expired: {
     body: "To keep using KiloClaw, go to kilo.ai/claw from your browser. You can't subscribe in the app.",
     ctaLabel: 'Open kilo.ai/claw',
@@ -84,7 +84,7 @@ const SUBCASE_CONTENT: Record<AccessRequiredSubcase, SubcaseContent> = {
     title: 'Legacy plan detected',
     tone: 'warn',
   },
-};
+} satisfies Record<AccessRequiredSubcase, SubcaseContent>;
 
 type AccessRequiredScreenProps = {
   subcase: AccessRequiredSubcase;

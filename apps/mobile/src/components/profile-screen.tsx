@@ -43,7 +43,7 @@ import {
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
-const PROVIDER_LABELS: Record<string, string> = {
+const PROVIDER_LABELS = {
   anaconda: 'Anaconda',
   apple: 'Apple',
   discord: 'Discord',
@@ -54,10 +54,15 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   linkedin: 'LinkedIn',
   workos: 'Enterprise SSO',
-};
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 function providerLabel(provider: string) {
-  return PROVIDER_LABELS[provider] ?? provider;
+  return lookup(PROVIDER_LABELS, provider) ?? provider;
 }
 
 export function ProfileScreen() {

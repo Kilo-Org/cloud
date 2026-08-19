@@ -15,11 +15,14 @@ export interface AgentFooterControlDisplay {
   readonly thinkingLabel: string;
 }
 
-const modelLabels: Record<string, string> = {
+const modelLabels = {
   'Claude Opus 4': 'Opus 4',
   'Claude Sonnet 4': 'Sonnet 4',
   'GPT-5': 'GPT-5',
-};
+} satisfies Record<string, string>;
+
+const getModelLabel = (model: string): string | undefined =>
+  Object.entries(modelLabels).find(([key]) => key === model)?.[1];
 
 export const defaultMode = 'safe';
 
@@ -30,6 +33,6 @@ export const getFooterControlDisplay = (
   modeIcon: footer.mode === 'safe' ? 'shield' : 'alert',
   modeIconTone: footer.mode === 'safe' ? 'safe' : 'danger',
   modeLabel: footer.mode === 'safe' ? 'Safe' : 'Danger',
-  modelLabel: modelLabels[footer.model] ?? footer.model,
+  modelLabel: getModelLabel(footer.model) ?? footer.model,
   thinkingLabel: thinkingEffortLabel(footer.thinkingEffort),
 });

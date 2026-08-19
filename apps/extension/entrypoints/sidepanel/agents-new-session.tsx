@@ -2,6 +2,7 @@
 /* eslint-disable max-lines -- Cohesive single-purpose new-session form; splitting would scatter form state */
 import { storage } from '#imports';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import {
@@ -26,7 +27,6 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import type { CreateRemoteSessionInput } from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
 import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
 import { isGatewayModelId } from '@/src/shared/model-picker-rows';
@@ -68,10 +68,7 @@ export { PROMPT_MAX_LENGTH, PROMPT_MIN_LENGTH, MODE };
 
 const storedAuthQueryKey = ['side-panel', 'stored-auth'] as const;
 
-const useStoredAuth = (): {
-  readonly auth: StoredAuth | undefined;
-  readonly isLoading: boolean;
-} => {
+const useStoredAuth = () => {
   const query = useQuery({
     queryFn: async () => (await loadStoredAuth(storage)) ?? null,
     queryKey: storedAuthQueryKey,
@@ -133,7 +130,7 @@ export const buildSubmitInput = ({
   selectedVariant: string;
   selectedRepo: string;
   initialMessageId: string;
-}): Record<string, unknown> => ({
+}) => ({
   autoCommit: true,
   autoInitiate: true,
   githubRepo: selectedRepo,
@@ -216,13 +213,14 @@ export const submitBlockedReason = ({
   return null;
 };
 
+const modelPreferencesGetResultSchema = z.looseObject({
+  favorites: z.array(z.unknown()),
+});
+
 const isModelPreferencesGetResult = (
   value: unknown
 ): value is { favorites: string[]; lastSelected: LastSelected | null } =>
-  typeof value === 'object' &&
-  value !== null &&
-  'favorites' in value &&
-  Array.isArray((value as Record<string, unknown>)['favorites']);
+  modelPreferencesGetResultSchema.safeParse(value).success;
 
 export { isModelPreferencesGetResult };
 // Exported for focused test coverage.

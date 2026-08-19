@@ -72,12 +72,7 @@ export function ModelPickerSelectionScopeProvider({
 }
 
 function toSessionModelOption(option: ModelOption | SessionModelOption): SessionModelOption {
-  if (
-    'displayId' in option &&
-    typeof option.displayId === 'string' &&
-    'showGatewayMetadata' in option &&
-    typeof option.showGatewayMetadata === 'boolean'
-  ) {
+  if ('displayId' in option && 'showGatewayMetadata' in option) {
     return {
       ...option,
       displayId: option.displayId,

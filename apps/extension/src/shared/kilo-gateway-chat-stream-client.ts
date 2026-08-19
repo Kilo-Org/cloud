@@ -80,16 +80,16 @@ interface StreamReaderContext {
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const organizationHeaderName = 'x-kilocode-organizationid';
 // Map exposed catalog variants to the gateway reasoning effort. `xhigh` and `max` both run at xhigh effort; `max` additionally requests maximum verbosity (handled in toReasoningRequest).
-const variantToGatewayEffort: Record<string, string> = {
-  high: 'high',
-  instant: 'none',
-  low: 'low',
-  max: 'xhigh',
-  medium: 'medium',
-  minimal: 'minimal',
-  none: 'none',
-  xhigh: 'xhigh',
-};
+const variantToGatewayEffort = new Map<string, string>([
+  ['high', 'high'],
+  ['instant', 'none'],
+  ['low', 'low'],
+  ['max', 'xhigh'],
+  ['medium', 'medium'],
+  ['minimal', 'minimal'],
+  ['none', 'none'],
+  ['xhigh', 'xhigh'],
+]);
 const toolArgumentsSchema = z.record(z.string(), z.unknown());
 const streamingToolCallDeltaSchema = z.object({
   function: z
@@ -125,6 +125,12 @@ const streamDataSchema = z.object({
 });
 // Reasoning blocks stream incrementally like content: text accumulates while structural fields (type/signature/data/index) carry their final value. Providers may require these signed/encrypted blocks replayed verbatim on the assistant tool-call message or they reject the continuation.
 const appendableReasoningKeys = new Set(['data', 'summary', 'text']);
+const numberValueSchema = z.number();
+const stringValueSchema = z.string();
+const isNumberValue = (value: unknown): value is number =>
+  numberValueSchema.safeParse(value).success;
+const isStringValue = (value: unknown): value is string =>
+  stringValueSchema.safeParse(value).success;
 const mergeReasoningDetail = (
   detailsByIndex: Map<number, Record<string, unknown>>,
   block: unknown,
@@ -137,7 +143,7 @@ const mergeReasoningDetail = (
   }
 
   const record = parsed.data;
-  const index = typeof record['index'] === 'number' ? record['index'] : fallbackIndex;
+  const index = isNumberValue(record['index']) ? record['index'] : fallbackIndex;
   const current = detailsByIndex.get(index) ?? {};
 
   for (const [key, value] of Object.entries(record)) {
@@ -145,9 +151,7 @@ const mergeReasoningDetail = (
       const existing = current[key];
 
       current[key] =
-        appendableReasoningKeys.has(key) &&
-        typeof value === 'string' &&
-        typeof existing === 'string'
+        appendableReasoningKeys.has(key) && isStringValue(value) && isStringValue(existing)
           ? existing + value
           : value;
     }
@@ -158,7 +162,7 @@ const mergeReasoningDetail = (
 const toReasoningRequest = (
   variant: string | undefined
 ): { reasoning: { effort: string; enabled: boolean }; verbosity?: 'max' } | undefined => {
-  const gatewayEffort = variant === undefined ? undefined : variantToGatewayEffort[variant];
+  const gatewayEffort = variant === undefined ? undefined : variantToGatewayEffort.get(variant);
 
   if (gatewayEffort === undefined) {
     return;
@@ -169,6 +173,7 @@ const toReasoningRequest = (
     ...(variant === 'max' ? { verbosity: 'max' } : {}),
   };
 };
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- generic SSE JSON parse helper; every call site validates the result with its own zod schema immediately after.
 const parseJson = (value: string): unknown => {
   try {
     return JSON.parse(value);
@@ -176,8 +181,8 @@ const parseJson = (value: string): unknown => {
     throw new TypeError('Gateway stream JSON was invalid.');
   }
 };
-const getString = (value: unknown, message: string): string => {
-  if (typeof value !== 'string' || value.length === 0) {
+const getString = (value: string | undefined, message: string): string => {
+  if (value === undefined || value.length === 0) {
     throw new TypeError(message);
   }
 
@@ -290,7 +295,7 @@ const applyStreamingData = (
     const { cost, prompt_tokens: promptTokens } = parsed.data.usage;
     accumulator.usage = {
       promptTokens,
-      ...(typeof cost === 'number' ? { costUsd: cost } : {}),
+      ...(cost !== null && cost !== undefined ? { costUsd: cost } : {}),
     };
   }
 
@@ -300,7 +305,11 @@ const applyStreamingData = (
     return;
   }
 
-  if (typeof choice.finish_reason === 'string' && choice.finish_reason !== '') {
+  if (
+    choice.finish_reason !== null &&
+    choice.finish_reason !== undefined &&
+    choice.finish_reason !== ''
+  ) {
     accumulator.finishReason = choice.finish_reason;
   }
 
@@ -310,12 +319,12 @@ const applyStreamingData = (
   }
   const { content, reasoning, reasoning_details: reasoningDetails, tool_calls: toolCalls } = delta;
 
-  if (typeof content === 'string' && content.length > 0) {
+  if (content !== null && content !== undefined && content.length > 0) {
     accumulator.content += content;
     handlers.onContentDelta(content);
   }
 
-  if (typeof reasoning === 'string' && reasoning.length > 0) {
+  if (reasoning !== null && reasoning !== undefined && reasoning.length > 0) {
     accumulator.reasoning += reasoning;
     handlers.onReasoningDelta(reasoning);
   }
@@ -468,14 +477,15 @@ export const fetchKiloGatewayChatCompletionStream = async ({
 
   // Watchdog: a stalled response — before the first byte or mid-stream — surfaces as a typed, retriable error instead of hanging the turn forever. Each read races against the stall timer, so the guarantee holds even when the underlying fetch ignores its abort signal.
   const stallController = new AbortController();
-  const stall: {
+  interface StallState {
     cancelReader?: () => void;
     error?: Error;
     reject?: (error: Error) => void;
     stalled: boolean;
     timer?: ReturnType<typeof setTimeout>;
     totalTimer?: ReturnType<typeof setTimeout>;
-  } = { stalled: false };
+  }
+  const stall: StallState = { stalled: false };
   // eslint-disable-next-line promise/avoid-new -- A deferred rejection has no promise-returning primitive to defer to.
   const stallPromise = new Promise<never>((_resolve, reject) => {
     stall.reject = reject;

@@ -49,7 +49,9 @@ export const selectSessionCostUsd = (
   liveUsd: number
 ): number => {
   const persisted =
-    typeof persistedMicrodollars === 'number' && Number.isFinite(persistedMicrodollars)
+    persistedMicrodollars !== null &&
+    persistedMicrodollars !== undefined &&
+    Number.isFinite(persistedMicrodollars)
       ? Math.max(0, persistedMicrodollars / 1_000_000)
       : 0;
   const live = Number.isFinite(liveUsd) ? Math.max(0, liveUsd) : 0;

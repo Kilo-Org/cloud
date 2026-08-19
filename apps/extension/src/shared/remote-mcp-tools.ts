@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { AgentMode } from './agent-conversation';
 import type { KiloGatewayToolDefinition } from './kilo-api-client';
 import type { RemoteMcpCachedTool, RemoteMcpServer } from './remote-mcp';
@@ -24,12 +25,10 @@ const MAX_REMOTE_MCP_TOOLS = 128;
 export const MAX_REMOTE_MCP_RESULT_CHARS = 64 * 1024;
 const sourceNamePattern = /^[a-zA-Z0-9_-]+$/;
 
+const jsonObjectSchemaShape = z.looseObject({ type: z.literal('object') });
+
 const isObjectSchema = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' &&
-  value !== null &&
-  !Array.isArray(value) &&
-  'type' in value &&
-  value.type === 'object';
+  jsonObjectSchemaShape.safeParse(value).success;
 
 const isModeAllowedServer = (mode: AgentMode, server: RemoteMcpServer): boolean =>
   server.enabled &&
@@ -132,7 +131,7 @@ export const resolveRemoteMcpToolRoute = (
     : { ok: true, route };
 };
 
-export const capRemoteMcpToolResult = (value: unknown): unknown => {
+export const capRemoteMcpToolResult = (value: unknown) => {
   const serialized = JSON.stringify(value);
 
   if (serialized === undefined || serialized.length <= MAX_REMOTE_MCP_RESULT_CHARS) {

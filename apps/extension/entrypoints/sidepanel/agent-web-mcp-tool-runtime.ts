@@ -1,4 +1,5 @@
 import { browser } from '#imports';
+import { z } from 'zod';
 import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import {
   WEB_MCP_DISCOVER_MESSAGE,
@@ -13,23 +14,30 @@ import { capRemoteMcpToolResult } from '@/src/shared/remote-mcp-tools';
  * result enters conversation state as an object, not a quoted string. A
  * non-JSON string and null pass through verbatim.
  */
-const parseWebMcpResult = (value: unknown): unknown => {
-  if (typeof value !== 'string') {
+const stringSchema = z.string();
+const jsonRecordSchema = z.record(z.string(), z.unknown());
+
+const parseWebMcpResult = (value: unknown) => {
+  const asString = stringSchema.safeParse(value);
+  if (!asString.success) {
     return value;
   }
 
   try {
-    return JSON.parse(value);
+    const parsed: unknown = JSON.parse(asString.data);
+    return parsed;
   } catch {
-    return value;
+    return asString.data;
   }
 };
 
 const isRecordObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+  jsonRecordSchema.safeParse(value).success;
 
 const isWebMcpDiscoveryResult = (value: unknown): value is WebMcpDiscoveryResult =>
-  isRecordObject(value) && typeof value['documentId'] === 'string' && Array.isArray(value['tools']);
+  isRecordObject(value) &&
+  stringSchema.safeParse(value['documentId']).success &&
+  Array.isArray(value['tools']);
 
 /*
  * Discover the WebMCP tools registered by the selected tab's page through the

@@ -18,10 +18,12 @@ export type ChildSessionCardState = {
 };
 
 function getStringProperty(obj: unknown, key: string): string | undefined {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over heterogeneous tool inputs; no static shape to narrow against
   if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
     return undefined;
   }
   const value = (obj as Record<string, unknown>)[key];
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over heterogeneous tool inputs; no static shape to narrow against
   return typeof value === 'string' ? value : undefined;
 }
 
@@ -100,6 +102,7 @@ export function getChildSessionCardState(
 }
 
 export function getChildSessionActivityLabel(activity: ChildSessionActivity | string): string {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing the string-vs-object ChildSessionActivity variant has no non-typeof discriminant
   if (typeof activity === 'string') {
     return activity;
   }

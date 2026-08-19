@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { FilePlus } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -15,6 +16,8 @@ import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
 const WRITE_CODE_CHARACTER_CAP = 50_000;
 
+const optionalStringSchema = z.string().optional();
+
 /**
  * Sheet body for a write tool part: markdown or highlighted code from
  * `input.content`, plus the error. Diff preview is gone. Renders only inside
@@ -23,8 +26,8 @@ const WRITE_CODE_CHARACTER_CAP = 50_000;
  */
 export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
-  const filePath = typeof input.filePath === 'string' ? input.filePath : '';
-  const content = typeof input.content === 'string' ? input.content : '';
+  const filePath = optionalStringSchema.safeParse(input.filePath).data ?? '';
+  const content = optionalStringSchema.safeParse(input.content).data ?? '';
   const error = part.state.status === 'error' ? part.state.error : undefined;
   const isFinal = part.state.status === 'completed' || part.state.status === 'error';
 

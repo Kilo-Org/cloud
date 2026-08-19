@@ -8,10 +8,10 @@ import {
   addContextLoadState,
   type ExpandSeparatorState,
   type ListItem,
-  readTrpcErrorCode,
   setContextLines,
 } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { trpcClient } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type UsePrDiffContextLoaderResult = {
   expandedContext: Record<string, Record<number, ExpandSeparatorState>>;
@@ -87,7 +87,7 @@ export function usePrDiffContextLoader(args: {
             })
           );
         } catch (error: unknown) {
-          const code = readTrpcErrorCode(error);
+          const code = readTrpcErrorField(error, 'code');
           const status = code === 'NOT_FOUND' ? 'unavailable' : 'error';
           setExpandedContext(prev =>
             addContextLoadState({

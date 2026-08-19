@@ -220,6 +220,7 @@ const WEB_RESEARCH_SCENARIO: BenchTaskScenario = {
   useCase: 'research',
 };
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- exported as an open dictionary; workflow-create-benchmark.ts looks scenarios up by a dynamic scenario id from CLI args
 export const TASK_BENCH_SCENARIOS: Readonly<Record<string, BenchTaskScenario>> = {
   'action-cart': ACTION_CART_SCENARIO,
   'action-login': ACTION_LOGIN_SCENARIO,

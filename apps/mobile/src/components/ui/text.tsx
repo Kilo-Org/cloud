@@ -33,19 +33,19 @@ type TextVariantProps = VariantProps<typeof textVariants>;
 
 type TextVariant = NonNullable<TextVariantProps['variant']>;
 
-const ROLE: Partial<Record<TextVariant, Role>> = {
+const ROLE = {
   h1: 'heading',
   h2: 'heading',
   h3: 'heading',
   h4: 'heading',
-};
+} satisfies Partial<Record<TextVariant, Role>>;
 
-const ARIA_LEVEL: Partial<Record<TextVariant, string>> = {
+const ARIA_LEVEL = {
   h1: '1',
   h2: '2',
   h3: '3',
   h4: '4',
-};
+} satisfies Partial<Record<TextVariant, string>>;
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
@@ -64,8 +64,8 @@ function Text({
   return (
     <Component
       className={cn(textVariants({ variant }), textClass, className)}
-      role={variant ? ROLE[variant] : undefined}
-      aria-level={variant ? ARIA_LEVEL[variant] : undefined}
+      role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
+      aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
     />
   );

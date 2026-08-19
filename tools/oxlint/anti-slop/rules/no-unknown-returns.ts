@@ -1,8 +1,8 @@
-import { defineRule } from "@oxlint/plugins";
+import { defineRule } from '@oxlint/plugins';
 
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree } from '@oxlint/plugins';
 
-import { lexicalTypeParameterNames } from "../shared/lexical-type-parameters.ts";
+import { lexicalTypeParameterNames } from '../shared/lexical-type-parameters.ts';
 
 type FunctionWithReturnType =
   | ESTree.ArrowFunctionExpression
@@ -14,8 +14,8 @@ type FunctionWithReturnType =
   | ESTree.TSMethodSignature;
 
 function referencedAliasName(type: ESTree.TSType): string | null {
-  if (type.type === "TSParenthesizedType") return referencedAliasName(type.typeAnnotation);
-  if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") return null;
+  if (type.type === 'TSParenthesizedType') return referencedAliasName(type.typeAnnotation);
+  if (type.type !== 'TSTypeReference' || type.typeName.type !== 'Identifier') return null;
   return type.typeArguments === null ||
     type.typeArguments === undefined ||
     type.typeArguments.params.length === 0
@@ -26,14 +26,14 @@ function referencedAliasName(type: ESTree.TSType): string | null {
 /** Ban function contracts that return unknown instead of a parsed domain type. */
 export const noUnknownReturnsRule = defineRule({
   meta: {
-    type: "problem",
+    type: 'problem',
     docs: {
       description:
-        "Disallow functions whose explicit return contract is unknown or Promise<unknown>.",
+        'Disallow functions whose explicit return contract is unknown or Promise<unknown>.',
     },
     messages: {
       unknownReturn:
-        "This function exposes `unknown` to its caller. Parse the value at its boundary and return a named domain type.",
+        'This function exposes `unknown` to its caller. Parse the value at its boundary and return a named domain type.',
     },
   },
   createOnce(context) {
@@ -42,21 +42,19 @@ export const noUnknownReturnsRule = defineRule({
     const resolvesToUnknown = (
       type: ESTree.TSType,
       shadowedAliases: ReadonlySet<string>,
-      visited = new Set<string>(),
+      visited = new Set<string>()
     ): boolean => {
-      if (type.type === "TSUnknownKeyword") return true;
-      if (type.type === "TSParenthesizedType") {
+      if (type.type === 'TSUnknownKeyword') return true;
+      if (type.type === 'TSParenthesizedType') {
         return resolvesToUnknown(type.typeAnnotation, shadowedAliases, visited);
       }
-      if (type.type === "TSUnionType") {
-        return type.types.some((member) =>
-          resolvesToUnknown(member, shadowedAliases, visited),
-        );
+      if (type.type === 'TSUnionType') {
+        return type.types.some(member => resolvesToUnknown(member, shadowedAliases, visited));
       }
       if (
-        type.type === "TSTypeReference" &&
-        type.typeName.type === "Identifier" &&
-        (type.typeName.name === "Promise" || type.typeName.name === "PromiseLike")
+        type.type === 'TSTypeReference' &&
+        type.typeName.type === 'Identifier' &&
+        (type.typeName.name === 'Promise' || type.typeName.name === 'PromiseLike')
       ) {
         const value = type.typeArguments?.params[0];
         return value !== undefined && resolvesToUnknown(value, shadowedAliases, visited);
@@ -81,12 +79,12 @@ export const noUnknownReturnsRule = defineRule({
       if (
         !resolvesToUnknown(
           annotation.typeAnnotation,
-          lexicalTypeParameterNames(node, context.sourceCode.visitorKeys),
+          lexicalTypeParameterNames(node, context.sourceCode.visitorKeys)
         )
       ) {
         return;
       }
-      context.report({ node: annotation.typeAnnotation, messageId: "unknownReturn" });
+      context.report({ node: annotation.typeAnnotation, messageId: 'unknownReturn' });
     };
 
     return {
@@ -94,8 +92,8 @@ export const noUnknownReturnsRule = defineRule({
         aliases.clear();
         for (const statement of node.body) {
           const declaration =
-            statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-          if (declaration?.type === "TSTypeAliasDeclaration") {
+            statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+          if (declaration?.type === 'TSTypeAliasDeclaration') {
             aliases.set(declaration.id.name, declaration);
           }
         }

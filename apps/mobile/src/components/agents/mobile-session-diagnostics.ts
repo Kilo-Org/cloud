@@ -21,6 +21,7 @@ type ErrorRecord = {
 };
 
 function getRecord(value: unknown): Record<string, unknown> | null {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over an arbitrary caught error shape; no static shape to narrow against
   if (typeof value !== 'object' || value === null) {
     return null;
   }
@@ -28,10 +29,12 @@ function getRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function getString(value: unknown): string | undefined {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over an arbitrary caught error shape; no static shape to narrow against
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function getNumber(value: unknown): number | undefined {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over an arbitrary caught error shape; no static shape to narrow against
   return typeof value === 'number' ? value : undefined;
 }
 

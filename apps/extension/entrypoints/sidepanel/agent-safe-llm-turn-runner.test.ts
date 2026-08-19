@@ -31,13 +31,21 @@ vi.mock('./agent-workflow-tool-runtime', () => ({
   }),
 }));
 
+// eslint-disable-next-line vitest/prefer-import-in-mock
+vi.mock('./agent-web-mcp-tool-runtime', () => ({
+  discoverWebMcpTools: vi.fn(),
+  executeWebMcpToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'webmcp' }),
+}));
+
 import { runSafeLlmTurn } from './agent-safe-llm-turn-runner';
 // eslint-disable-next-line import/first
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
 // eslint-disable-next-line import/first
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 // eslint-disable-next-line import/first
-import type { KiloGatewayToolDefinition } from '@/src/shared/kilo-api-client';
+import { discoverWebMcpTools, executeWebMcpToolCall } from './agent-web-mcp-tool-runtime';
+// eslint-disable-next-line import/first
+import type { KiloGatewayToolDefinition, KiloGatewayToolName } from '@/src/shared/kilo-api-client';
 
 const makeToolDef = (name: string): KiloGatewayToolDefinition =>
   ({
@@ -149,5 +157,140 @@ describe('safe turn runner workflow wiring', () => {
     const [event, ctx] = vi.mocked(executeWorkflowToolCall).mock.calls[0]!;
     expect(event.name).toBe('run_workflow');
     expect(ctx.mode).toBe('safe');
+  });
+
+  it('does not discover WebMCP tools when allowWebMcpInSafeMode is false', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(discoverWebMcpTools).mockClear();
+
+    await runSafeLlmTurn(buildOptions());
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const { prepareTools, tools } = firstCall[0];
+
+    const prepared = await prepareTools!();
+
+    expect(discoverWebMcpTools).not.toHaveBeenCalled();
+    expect(prepared).toBe(tools);
+  });
+
+  it('discovers and appends WebMCP tools when allowWebMcpInSafeMode is true', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(discoverWebMcpTools).mockClear();
+    vi.mocked(discoverWebMcpTools).mockResolvedValue({
+      documentId: 'doc-1',
+      tools: [
+        {
+          description: 'D',
+          inputSchema: {},
+          name: 'double',
+          origin: 'https://example.com',
+          title: 'Double',
+        },
+      ],
+    });
+
+    await runSafeLlmTurn(buildOptions({ allowWebMcpInSafeMode: true }));
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const { prepareTools, tools } = firstCall[0];
+
+    const prepared = await prepareTools!();
+
+    expect(discoverWebMcpTools).toHaveBeenCalledWith(7);
+    expect(prepared).toHaveLength(tools.length + 1);
+    expect(prepared.at(-1)!.function.name).toBe('double');
+  });
+
+  it('populates the route map so a WebMCP tool call resolves', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(discoverWebMcpTools).mockClear();
+    vi.mocked(discoverWebMcpTools).mockResolvedValue({
+      documentId: 'doc-1',
+      tools: [
+        {
+          description: 'D',
+          inputSchema: {},
+          name: 'double',
+          origin: 'https://example.com',
+          title: 'Double',
+        },
+      ],
+    });
+
+    await runSafeLlmTurn(buildOptions({ allowWebMcpInSafeMode: true }));
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const { prepareTools, toToolCallEvents } = firstCall[0];
+
+    await prepareTools!();
+
+    const events = toToolCallEvents([
+      { arguments: { value: 21 }, id: 'tc-1', name: 'double' as KiloGatewayToolName },
+    ]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.name).toBe('double');
+    expect(events[0]).toHaveProperty('webMcpOrigin', 'https://example.com');
+  });
+
+  it('clears the route map when a later refresh fails, returning only fixed tools', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(discoverWebMcpTools).mockClear();
+    vi.mocked(discoverWebMcpTools)
+      .mockResolvedValueOnce({
+        documentId: 'doc-1',
+        tools: [
+          {
+            description: 'D',
+            inputSchema: {},
+            name: 'double',
+            origin: 'https://example.com',
+            title: 'Double',
+          },
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await runSafeLlmTurn(buildOptions({ allowWebMcpInSafeMode: true }));
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const { prepareTools, toToolCallEvents, tools } = firstCall[0];
+
+    const firstPrepared = await prepareTools!();
+    expect(firstPrepared).toHaveLength(tools.length + 1);
+
+    const secondPrepared = await prepareTools!();
+    expect(secondPrepared).toBe(tools);
+
+    const events = toToolCallEvents([
+      { arguments: { value: 21 }, id: 'tc-1', name: 'double' as KiloGatewayToolName },
+    ]);
+    expect(events).toHaveLength(0);
+  });
+
+  it('routes a WebMCP event to executeWebMcpToolCall before any other branch', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(executeWebMcpToolCall).mockClear();
+    vi.mocked(executeWorkflowToolCall).mockClear();
+
+    vi.mocked(runLlmTurn).mockImplementation(async options => {
+      const toolCall = {
+        arguments: { value: 21 },
+        definitionSignature: 'sig',
+        documentId: 'doc-1',
+        id: 'tc-1',
+        name: 'double',
+        tabId: 7,
+        type: 'tool-call' as const,
+        webMcpOrigin: 'https://example.com',
+      };
+      await options.executeToolCall(toolCall);
+    });
+
+    await runSafeLlmTurn(buildOptions({ workflowToolContext: makeWorkflowCtx() }));
+
+    expect(executeWebMcpToolCall).toHaveBeenCalledOnce();
+    expect(executeWorkflowToolCall).not.toHaveBeenCalled();
   });
 });

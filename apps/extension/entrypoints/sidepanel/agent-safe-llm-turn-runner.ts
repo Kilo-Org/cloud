@@ -2,6 +2,7 @@
 import type {
   AgentConversationEvent,
   RemoteMcpToolCallEvent,
+  WebMcpToolCallEvent,
   WorkflowToolCallEvent,
 } from '@/src/shared/agent-conversation';
 import { createSafeToolDefinitions } from '@/src/shared/agent-llm-harness';
@@ -14,20 +15,26 @@ import type {
   KiloGatewayToolDefinition,
 } from '@/src/shared/kilo-api-client';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
+import { buildWebMcpToolDefinitions } from '@/src/shared/web-mcp-tools';
+import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
 import { createSafeToolExecutor } from './agent-safe-tool-runtime';
-import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
+  isWebMcpToolCallEvent,
   isWorkflowToolCallEvent,
   isWorkflowToolName,
   toSafeToolCallEvents,
+  toWebMcpToolCallEvents,
   toWorkflowToolCallEvents,
 } from './agent-tool-call-events';
+import { discoverWebMcpTools, executeWebMcpToolCall } from './agent-web-mcp-tool-runtime';
+import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
 
 interface RunSafeLlmTurnOptions {
+  readonly allowWebMcpInSafeMode?: boolean;
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
@@ -57,9 +64,11 @@ interface RunSafeLlmTurnOptions {
 type SafeRunToolCallEvent =
   | ReturnType<typeof toSafeToolCallEvents>[number]
   | WorkflowToolCallEvent
-  | RemoteMcpToolCallEvent;
+  | RemoteMcpToolCallEvent
+  | WebMcpToolCallEvent;
 
 export const runSafeLlmTurn = ({
+  allowWebMcpInSafeMode = false,
   executeRemoteMcpToolCall,
   remoteMcpTools = [],
   selectedTabId,
@@ -80,10 +89,23 @@ export const runSafeLlmTurn = ({
     token: options.token,
   });
 
+  // The fixed tool set never changes within a turn; WebMCP page tools are appended per-request by prepareTools.
+  const fixedTools = [
+    ...createSafeToolDefinitions({ supportsImages }),
+    ...workflowTools,
+    ...remoteMcpTools,
+  ];
+  // Rebuilt on every discovery so a stale route can never resolve a later call.
+  let webMcpRoutes: ReadonlyMap<string, WebMcpToolRoute> = new Map();
+
   return runLlmTurn<SafeRunToolCallEvent>({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      if (isWebMcpToolCallEvent(toolCall)) {
+        return executeWebMcpToolCall(toolCall);
+      }
+
       if (isWorkflowToolCallEvent(toolCall)) {
         if (workflowToolContext === undefined) {
           return {
@@ -109,9 +131,45 @@ export const runSafeLlmTurn = ({
     failureMessage: error => (error instanceof Error ? error.message : 'Failed to run safe mode.'),
     maxToolRounds: maxAgentToolRounds,
     noResponseMessage: 'The model did not return a response.',
+    prepareTools: async () => {
+      webMcpRoutes = new Map();
+
+      if (!allowWebMcpInSafeMode) {
+        return fixedTools;
+      }
+
+      const discovery = await discoverWebMcpTools(selectedTabId);
+
+      if (discovery === undefined || discovery.documentId === '') {
+        return fixedTools;
+      }
+
+      const {
+        routes,
+        tools: webMcpTools,
+        warning,
+      } = buildWebMcpToolDefinitions({
+        documentId: discovery.documentId,
+        tabId: selectedTabId,
+        tools: discovery.tools,
+      });
+      webMcpRoutes = routes;
+
+      if (warning !== undefined) {
+        console.warn(warning);
+      }
+
+      return [...fixedTools, ...webMcpTools];
+    },
     supportsImages,
     toToolCallEvents: toolCalls =>
       toolCalls.flatMap<SafeRunToolCallEvent>(toolCall => {
+        const webMcpEvents = toWebMcpToolCallEvents([toolCall], webMcpRoutes);
+
+        if (webMcpEvents.length > 0) {
+          return webMcpEvents;
+        }
+
         if (isWorkflowToolName(toolCall.name)) {
           return toWorkflowToolCallEvents([toolCall], selectedTabId);
         }
@@ -122,6 +180,6 @@ export const runSafeLlmTurn = ({
       }),
     tooManyToolRoundsMessage:
       'The model requested too many safe read rounds. Send another message to continue.',
-    tools: [...createSafeToolDefinitions({ supportsImages }), ...workflowTools, ...remoteMcpTools],
+    tools: fixedTools,
   });
 };

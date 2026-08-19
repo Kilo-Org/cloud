@@ -1,7 +1,11 @@
 import { browser } from '#imports';
 import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
-import { WEB_MCP_EXECUTE_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
-import type { EvalTabResult } from '@/src/shared/tab-debugger';
+import {
+  WEB_MCP_DISCOVER_MESSAGE,
+  WEB_MCP_EXECUTE_MESSAGE,
+  isTabDebuggerResponse,
+} from '@/src/shared/tab-debugger';
+import type { EvalTabResult, WebMcpDiscoveryResult } from '@/src/shared/tab-debugger';
 
 const MAX_WEB_MCP_RESULT_CHARS = 64 * 1024;
 
@@ -34,6 +38,52 @@ const capWebMcpToolResult = (value: unknown): unknown => {
     truncated: true,
     value: serialized.slice(0, MAX_WEB_MCP_RESULT_CHARS),
   };
+};
+
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isWebMcpDiscoveryResult = (value: unknown): value is WebMcpDiscoveryResult =>
+  isRecordObject(value) && typeof value['documentId'] === 'string' && Array.isArray(value['tools']);
+
+/*
+ * Discover the WebMCP tools registered by the selected tab's page through the
+ * background transport. Never throws: an invalid, non-ok, or wrong-typed
+ * response, a non-ok inner result, or a thrown sendMessage rejection all
+ * resolve to undefined so a discovery failure silently disables page tools for
+ * the turn.
+ */
+export const discoverWebMcpTools = async (
+  tabId: number
+): Promise<WebMcpDiscoveryResult | undefined> => {
+  try {
+    const response: unknown = await browser.runtime.sendMessage({
+      tabId,
+      type: WEB_MCP_DISCOVER_MESSAGE,
+    });
+
+    if (!isTabDebuggerResponse(response)) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      return undefined;
+    }
+
+    if (response.type !== WEB_MCP_DISCOVER_MESSAGE) {
+      return undefined;
+    }
+
+    if (!response.result.ok) {
+      return undefined;
+    }
+
+    const { value } = response.result;
+
+    return isWebMcpDiscoveryResult(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 /*

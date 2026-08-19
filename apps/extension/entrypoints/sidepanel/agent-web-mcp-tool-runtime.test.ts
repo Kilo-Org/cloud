@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createWebMcpToolCall } from '@/src/shared/agent-conversation';
-import { WEB_MCP_EXECUTE_MESSAGE } from '@/src/shared/tab-debugger';
+import { WEB_MCP_DISCOVER_MESSAGE, WEB_MCP_EXECUTE_MESSAGE } from '@/src/shared/tab-debugger';
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('#imports', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { executeWebMcpToolCall } from './agent-web-mcp-tool-runtime';
+import { discoverWebMcpTools, executeWebMcpToolCall } from './agent-web-mcp-tool-runtime';
 
 const definitionSignature = '["double","Double","D","https://example.com",{}]';
 
@@ -140,5 +140,75 @@ describe('webmcp tool executor', () => {
       toolName: 'double',
       type: WEB_MCP_EXECUTE_MESSAGE,
     });
+  });
+});
+
+describe('webmcp tool discovery', () => {
+  const discoveryResult = {
+    documentId: 'doc-1',
+    tools: [
+      {
+        description: 'D',
+        inputSchema: {},
+        name: 'double',
+        origin: 'https://example.com',
+        title: 'Double',
+      },
+    ],
+  };
+
+  it('returns the discovery result on a valid ok response', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: { ok: true, value: discoveryResult },
+      type: WEB_MCP_DISCOVER_MESSAGE,
+    });
+
+    await expect(discoverWebMcpTools(7)).resolves.toStrictEqual(discoveryResult);
+    expect(mocks.sendMessage).toHaveBeenCalledWith({ tabId: 7, type: WEB_MCP_DISCOVER_MESSAGE });
+  });
+
+  it('returns undefined on a non-ok response', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ error: 'tab closed', ok: false });
+
+    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+  });
+
+  it('returns undefined on a wrong-typed response', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: { ok: true, value: discoveryResult },
+      type: WEB_MCP_EXECUTE_MESSAGE,
+    });
+
+    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+  });
+
+  it('returns undefined on a non-ok inner result', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: { error: 'no tools', ok: false },
+      type: WEB_MCP_DISCOVER_MESSAGE,
+    });
+
+    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+  });
+
+  it('returns undefined on an invalid response', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ unexpected: true });
+
+    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+  });
+
+  it('returns undefined when sendMessage throws', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockRejectedValueOnce(new Error('background disconnected'));
+
+    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
   });
 });

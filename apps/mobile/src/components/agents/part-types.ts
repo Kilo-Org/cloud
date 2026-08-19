@@ -12,14 +12,12 @@ export function isTextPart(part: Part): part is TextPart {
 }
 
 /**
- * Returns the first human-authored text part's text, or '' when there is none.
- * Mirrors the continuation-seed predicate: synthesized attachment notices and
- * ignored parts are skipped, so a file-only message yields an empty string.
+ * Returns the first text part's text, or '' when there is none.
+ * The human-authored prompt is always the first text part, so only `ignored`
+ * parts are skipped. A file-only message yields an empty string.
  */
 export function firstHumanText(parts: readonly Part[]): string {
-  const part = parts.find(
-    (p): p is TextPart => isTextPart(p) && p.synthetic !== true && p.ignored !== true
-  );
+  const part = parts.find((p): p is TextPart => isTextPart(p) && p.ignored !== true);
   return part?.text ?? '';
 }
 

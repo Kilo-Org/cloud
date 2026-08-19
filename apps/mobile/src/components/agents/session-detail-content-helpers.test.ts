@@ -77,6 +77,22 @@ describe('resolveRetryPrompt', () => {
     expect(resolveRetryPrompt(message, [message])).toBe('prompt');
   });
 
+  it('returns the synthetic queued prompt text for a user row whose only text part is synthetic', () => {
+    const message = userMessage('m1b');
+    message.parts = [
+      {
+        id: 'm1b-prompt',
+        sessionID: 'ses_1',
+        messageID: 'm1b',
+        type: 'text',
+        text: 'prompt',
+        synthetic: true,
+      },
+    ] as typeof message.parts;
+
+    expect(resolveRetryPrompt(message, [message])).toBe('prompt');
+  });
+
   it('returns null for a file-only user row', () => {
     const message = userMessage('m2');
     message.parts = [

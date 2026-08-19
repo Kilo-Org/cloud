@@ -16,6 +16,7 @@ import {
 } from '@/lib/ai-gateway/providers/openai';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
+import { GLM_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import {
   CLAUDE_FABLE_LATEST_MODEL_ALIAS,
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
@@ -26,6 +27,7 @@ import {
   GEMINI_PRO_LATEST_MODEL_ALIAS,
   GPT_LATEST_MODEL_ALIAS,
   GPT_MINI_LATEST_MODEL_ALIAS,
+  GLM_LATEST_MODEL_ALIAS,
   GROK_LATEST_MODEL_ALIAS,
   KIMI_LATEST_MODEL_ALIAS,
 } from '@/lib/ai-gateway/latest-model-aliases';
@@ -41,6 +43,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   [GEMINI_PRO_LATEST_MODEL_ALIAS]: GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
   [GEMINI_FLASH_LATEST_MODEL_ALIAS]: GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
   [GROK_LATEST_MODEL_ALIAS]: GROK_CURRENT_VERCEL_MODEL_ID,
+  [GLM_LATEST_MODEL_ALIAS]: GLM_CURRENT_VERCEL_MODEL_ID,
   [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS]: 'deepseek/deepseek-v4-flash-0731',
   'inclusionai/ling-3.0-flash:free': 'inclusionai/ling-3.0-flash-free',
   'mistralai/codestral-2508': 'mistral/codestral',

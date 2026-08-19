@@ -262,28 +262,30 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
 
   return (
     <View className="gap-2">
-      <TextInput
-        key={resetKey}
-        ref={inputRef}
-        defaultValue={bodyRef.current}
-        editable={!reply.isPending}
-        placeholder={REPLY_PLACEHOLDER}
-        placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Reply body"
-        onChangeText={value => {
-          bodyRef.current = value;
-          if (userId) {
-            saveDraft(userId, replyDraftKey, value);
-          }
-          if (inlineError) {
-            setInlineError(null);
-            setInlineErrorKind(null);
-          }
-        }}
-        multiline
-        textAlignVertical="top"
-        className="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
-      />
+      {draft.settled ? (
+        <TextInput
+          key={resetKey}
+          ref={inputRef}
+          defaultValue={bodyRef.current}
+          editable={!reply.isPending}
+          placeholder={REPLY_PLACEHOLDER}
+          placeholderTextColor={colors.mutedForeground}
+          accessibilityLabel="Reply body"
+          onChangeText={value => {
+            bodyRef.current = value;
+            if (userId) {
+              saveDraft(userId, replyDraftKey, value);
+            }
+            if (inlineError) {
+              setInlineError(null);
+              setInlineErrorKind(null);
+            }
+          }}
+          multiline
+          textAlignVertical="top"
+          className="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
+        />
+      ) : null}
       {inlineError && inlineErrorKind !== 'reconnect' ? (
         <Text className="text-xs text-destructive">{inlineError}</Text>
       ) : null}
@@ -294,6 +296,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           variant="outline"
           loading={reply.isPending}
           disabled={
+            !draft.settled ||
             reply.isPending ||
             inlineErrorKind === 'bad-request' ||
             inlineErrorKind === 'forbidden' ||

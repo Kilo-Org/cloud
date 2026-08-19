@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive suite for the Terms gate, reply draft clear, and settle-gate contracts */
 // Four-state coverage for the UGC Terms gate (`ensureTermsAcceptedOutcome`).
 //
 //   - happy:          accept succeeds → `accepted`.
@@ -19,10 +20,11 @@ import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-r
 type AlertButton = { text?: string; onPress?: () => void };
 type AlertCall = { title: string; message: string; buttons: AlertButton[] };
 
-const { alertCalls, getTermsStatusMock, acceptTermsMock } = vi.hoisted(() => ({
+const { alertCalls, getTermsStatusMock, acceptTermsMock, draftLoadMock } = vi.hoisted(() => ({
   alertCalls: [] as AlertCall[],
   getTermsStatusMock: vi.fn(),
   acceptTermsMock: vi.fn(),
+  draftLoadMock: vi.fn(() => ({ settled: true, value: null })),
 }));
 
 vi.mock('react-native', () => ({
@@ -78,7 +80,7 @@ vi.mock('@/lib/persist/drafts', () => ({
 }));
 
 vi.mock('@/lib/persist/use-draft-load', () => ({
-  useFencedDraftLoad: () => ({ settled: true, value: null }),
+  useFencedDraftLoad: () => draftLoadMock(),
 }));
 
 vi.mock('@/lib/persist/use-draft-flush', () => ({
@@ -357,5 +359,55 @@ describe('ReplyInput draft clear on submit', () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(clearDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReplyInput gates input on draft settle', () => {
+  it('hides the input and disables submit until the draft settles', () => {
+    draftLoadMock.mockReturnValue({ settled: false, value: null });
+    // eslint-disable-next-line new-cap
+    const hidden = ReplyInput({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 42,
+      reply: makeReply(vi.fn()),
+    });
+    expect(
+      findElement({
+        node: hidden,
+        type: 'TextInput',
+        prop: 'accessibilityLabel',
+        value: 'Reply body',
+      })
+    ).toBeNull();
+    const button = findElement({
+      node: hidden,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Submit reply',
+    });
+    if (!button) {
+      throw new Error('Submit reply Button not found');
+    }
+    expect((button.props as { disabled?: boolean }).disabled).toBe(true);
+
+    draftLoadMock.mockReturnValue({ settled: true, value: null });
+    // eslint-disable-next-line new-cap
+    const shown = ReplyInput({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 42,
+      reply: makeReply(vi.fn()),
+    });
+    expect(
+      findElement({
+        node: shown,
+        type: 'TextInput',
+        prop: 'accessibilityLabel',
+        value: 'Reply body',
+      })
+    ).not.toBeNull();
   });
 });

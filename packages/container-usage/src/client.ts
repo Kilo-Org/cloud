@@ -105,14 +105,17 @@ export class ContainerUsageClient {
   async recordStartV2(input: ClientRecordStartInput): Promise<RecordStartV2Result> {
     // A deployed Worker RPC proxy may expose an absent method as callable and reject only
     // when invoked. Keep this check for direct bindings; either failure mode remains fail-closed.
-    const recordStartV2 = this.binding.recordStartV2;
-    if (!recordStartV2) {
+    const binding = this.binding;
+    if (!binding.recordStartV2) {
       throw new Error('Container usage meter does not support recordStartV2');
     }
     const request = this.startRequest(input);
-    return await this.withRetry(async () =>
-      recordStartV2ResultSchema.parse(await recordStartV2.call(this.binding, request))
-    );
+    return await this.withRetry(async () => {
+      if (!binding.recordStartV2) {
+        throw new Error('Container usage meter does not support recordStartV2');
+      }
+      return recordStartV2ResultSchema.parse(await binding.recordStartV2(request));
+    });
   }
 
   async recordHeartbeat(input: ClientRecordHeartbeatInput): Promise<HeartbeatAck> {

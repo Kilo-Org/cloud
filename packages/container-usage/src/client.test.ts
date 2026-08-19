@@ -204,6 +204,33 @@ describe('ContainerUsageClient', () => {
     );
   });
 
+  it('invokes versioned admission as a binding method for RPC proxies', async () => {
+    const recordStartV2 = new Proxy(
+      vi.fn<NonNullable<ContainerUsageRpcMethods['recordStartV2']>>(),
+      {
+        apply: async () => ({
+          success: true as const,
+          ack: { intervalId: 'instance-1:123', durable: 'pg' as const, dedup: false },
+          billingMode: 'paid' as const,
+          remainingMicrodollars: 10_000_001,
+        }),
+        get: (target, property, receiver) => {
+          if (property === 'call')
+            throw new Error('RPC method proxies do not support Function.call');
+          return Reflect.get(target, property, receiver);
+        },
+      }
+    );
+    const client = new ContainerUsageClient(binding({ recordStartV2 }), {
+      service: 'cloud-agent-next-sandbox',
+    });
+
+    await expect(client.recordStartV2({ ...context, startEpochMs: 123 })).resolves.toMatchObject({
+      success: true,
+      billingMode: 'paid',
+    });
+  });
+
   it('reports unavailable versioned admission support explicitly', async () => {
     const client = new ContainerUsageClient(binding({ recordStartV2: undefined }), {
       service: 'cloud-agent-next-sandbox',

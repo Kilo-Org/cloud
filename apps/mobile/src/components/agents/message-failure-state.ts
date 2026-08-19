@@ -26,11 +26,22 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
  * Fixed, safe copy for a known assistant error name. Unknown names fall back
  * to the generic line. Never surfaces `error.data` or provider message text.
  */
-const ASSISTANT_DETAIL_BY_ERROR_NAME = {
-  ProviderAuthError: 'The provider rejected the request.',
-  MessageAbortedError: 'The response was stopped.',
-  ContextOverflowError: 'The conversation is too long for the model.',
-} as const satisfies Record<string, string>;
+function assistantDetail(errorName: string): string {
+  switch (errorName) {
+    case 'ProviderAuthError': {
+      return 'The provider rejected the request.';
+    }
+    case 'MessageAbortedError': {
+      return 'The response was stopped.';
+    }
+    case 'ContextOverflowError': {
+      return 'The conversation is too long for the model.';
+    }
+    default: {
+      return 'The response failed.';
+    }
+  }
+}
 
 export type MessageFailure = {
   kind: 'delivery' | 'assistant';
@@ -61,7 +72,7 @@ export function selectMessageFailure(input: {
     return {
       kind: 'assistant',
       title: 'Response failed',
-      detail: ASSISTANT_DETAIL_BY_ERROR_NAME[errorName] ?? 'The response failed.',
+      detail: assistantDetail(errorName),
       canRetry: !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
       canCopy: false,
     };

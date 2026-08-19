@@ -9,6 +9,7 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm';
+import type Stripe from 'stripe';
 import { kilo_pass_org_agreements, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import { KiloPassOrgPurchaseChannel, KiloPassPaymentProvider } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
@@ -69,14 +70,31 @@ export async function retrieveStripeSubscriptionSnapshot(
   subscriptionId: string
 ): Promise<StripeSubscriptionSnapshot | null> {
   try {
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['items.data.price'],
-    });
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const items: Stripe.SubscriptionItem[] = [];
+    let startingAfter: string | undefined;
+    for (;;) {
+      const page = await stripe.subscriptionItems.list({
+        subscription: subscriptionId,
+        limit: 100,
+        expand: ['data.price'],
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      items.push(...page.data);
+      if (!page.has_more) break;
+      const cursor = page.data.at(-1)?.id;
+      if (!cursor) {
+        throw new Error(
+          `Stripe subscription ${subscriptionId} item page is marked has_more without a cursor`
+        );
+      }
+      startingAfter = cursor;
+    }
     return {
       id: subscription.id,
       status: subscription.status,
       metadata: subscription.metadata ?? {},
-      items: subscription.items.data.map(item => ({
+      items: items.map(item => ({
         id: item.id,
         priceId: item.price?.id ?? null,
         productId: productIdFromPrice(item.price?.product),

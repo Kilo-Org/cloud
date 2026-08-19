@@ -1,5 +1,6 @@
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { type MobileRouter } from '@kilocode/trpc/mobile';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -111,7 +112,11 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
   }
 
   try {
-    await trpcClient.user.registerPushToken.mutate({ token, platform: getPlatform() });
+    await trpcClient.user.registerPushToken.mutate({
+      token,
+      platform: getPlatform(),
+      appVersion: Application.nativeApplicationVersion ?? undefined,
+    });
   } catch {
     return { kind: 'register-failed' };
   }

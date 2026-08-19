@@ -6,6 +6,7 @@ import {
   kilocode_users,
   magic_link_tokens,
   user_notification_preferences,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -602,6 +603,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
@@ -631,6 +633,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: false,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
@@ -648,6 +651,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -690,6 +694,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -702,6 +707,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -738,6 +744,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -757,6 +764,39 @@ describe('user router - notification preferences', () => {
     expect(row?.security_findings_enabled).toBe(true);
   });
 
+  it('writes only notificationPreviews and leaves the category columns untouched', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({
+      notificationPreviews: 'full',
+    });
+
+    expect(result.notificationPreviews).toBe('full');
+    // All category columns stay at their DB default (true) because only the
+    // notificationPreviews key was supplied.
+    expect(result.chatMessages).toBe(true);
+    expect(result.agentAttention).toBe(true);
+    expect(result.agentUpdates).toBe(true);
+    expect(result.sessionStatus).toBe(true);
+    expect(result.kiloclawActivity).toBe(true);
+    expect(result.balanceAlerts).toBe(true);
+    expect(result.securityFindings).toBe(true);
+    expect(result.agentPushEnabled).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.notification_previews).toBe('full');
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+  });
+
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
@@ -769,6 +809,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -790,6 +831,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: false,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -831,6 +873,72 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+});
+
+describe('user router - register push token', () => {
+  let tokenUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'push-token-register@example.com',
+      google_user_name: 'Push Token Register',
+    });
+  });
+
+  afterEach(async () => {
+    await db.delete(user_push_tokens).where(eq(user_push_tokens.user_id, tokenUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, tokenUser.id));
+  });
+
+  it('stores the app version when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-with-version]',
+      platform: 'android',
+      appVersion: '1.0.4',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBe('1.0.4');
+    expect(row?.platform).toBe('android');
+  });
+
+  it('stores a null app version when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-without-version]',
+      platform: 'android',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBeNull();
+  });
+
+  it('updates the app version on re-registration of the same token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-re-register]';
+
+    await caller.user.registerPushToken({ token, platform: 'android' });
+    await caller.user.registerPushToken({ token, platform: 'android', appVersion: '1.0.4' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.app_version).toBe('1.0.4');
   });
 });
 

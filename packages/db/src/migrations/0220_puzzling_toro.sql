@@ -1,0 +1,1 @@
+ALTER TABLE "user_notification_preferences" ADD COLUMN "notification_previews" text DEFAULT 'generic' NOT NULL;

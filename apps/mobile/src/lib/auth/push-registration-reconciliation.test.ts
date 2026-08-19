@@ -46,6 +46,9 @@ vi.mock('@/lib/query-client', () => ({
 vi.mock('expo-notifications', () => ({
   addPushTokenListener: expoNotificationsMock.addPushTokenListener,
 }));
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
@@ -113,6 +116,7 @@ describe('attemptPushRegistrationReconciliation', () => {
     expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledWith({
       token: 'push-1',
       platform: 'ios',
+      appVersion: '1.0.4',
     });
     expect(queryClientMock.invalidateQueries).toHaveBeenCalledTimes(1);
   });
@@ -318,6 +322,7 @@ describe('subscribeToPushTokenRotation', () => {
       expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledWith({
         token: 'push-1',
         platform: 'ios',
+        appVersion: '1.0.4',
       });
     });
 

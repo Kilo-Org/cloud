@@ -1010,6 +1010,7 @@ export const userRouter = createTRPCRouter({
       z.object({
         token: z.string().min(1),
         platform: z.enum(['ios', 'android']),
+        appVersion: z.string().max(64).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1019,10 +1020,16 @@ export const userRouter = createTRPCRouter({
           user_id: ctx.user.id,
           token: input.token,
           platform: input.platform,
+          app_version: input.appVersion ?? null,
         })
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
-          set: { user_id: ctx.user.id, platform: input.platform, updated_at: sql`now()` },
+          set: {
+            user_id: ctx.user.id,
+            platform: input.platform,
+            app_version: input.appVersion ?? null,
+            updated_at: sql`now()`,
+          },
         });
       return { success: true };
     }),
@@ -1064,6 +1071,7 @@ export const userRouter = createTRPCRouter({
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
         balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
         security_findings_enabled: user_notification_preferences.security_findings_enabled,
+        notification_previews: user_notification_preferences.notification_previews,
       })
       .from(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -1079,6 +1087,7 @@ export const userRouter = createTRPCRouter({
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
       balanceAlerts: row?.balance_alerts_enabled ?? true,
       securityFindings: row?.security_findings_enabled ?? true,
+      notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
     };
   }),
@@ -1093,6 +1102,7 @@ export const userRouter = createTRPCRouter({
         kiloclawActivity: z.boolean().optional(),
         balanceAlerts: z.boolean().optional(),
         securityFindings: z.boolean().optional(),
+        notificationPreviews: z.enum(['generic', 'full']).optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
         agentPushEnabled: z.boolean().optional(),
       })
@@ -1106,8 +1116,8 @@ export const userRouter = createTRPCRouter({
       // include a column in the upsert when the caller actually provided it, so
       // omitted columns keep their DB default on insert and are left untouched
       // on update.
-      const set: Record<string, boolean> = {};
-      const values: Record<string, boolean> = {};
+      const set: Record<string, boolean | string> = {};
+      const values: Record<string, boolean | string> = {};
       if (input.chatMessages !== undefined) {
         set.chat_messages_enabled = input.chatMessages;
         values.chat_messages_enabled = input.chatMessages;
@@ -1131,6 +1141,10 @@ export const userRouter = createTRPCRouter({
       if (input.securityFindings !== undefined) {
         set.security_findings_enabled = input.securityFindings;
         values.security_findings_enabled = input.securityFindings;
+      }
+      if (input.notificationPreviews !== undefined) {
+        set.notification_previews = input.notificationPreviews;
+        values.notification_previews = input.notificationPreviews;
       }
       if (agentPush !== undefined) {
         set.agent_push_enabled = agentPush;
@@ -1158,6 +1172,7 @@ export const userRouter = createTRPCRouter({
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
           balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
           security_findings_enabled: user_notification_preferences.security_findings_enabled,
+          notification_previews: user_notification_preferences.notification_previews,
         })
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -1171,6 +1186,7 @@ export const userRouter = createTRPCRouter({
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
         balanceAlerts: row?.balance_alerts_enabled ?? true,
         securityFindings: row?.security_findings_enabled ?? true,
+        notificationPreviews: row?.notification_previews ?? 'generic',
         agentPushEnabled: effectiveAgentPush,
       };
     }),

@@ -57,6 +57,7 @@ import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission
 import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
 import {
   checkInitialNotification,
+  ensureAndroidNotificationChannels,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
@@ -160,6 +161,7 @@ function preloadStartupFonts(): void {
 }
 
 void SplashScreen.preventAutoHideAsync();
+void ensureAndroidNotificationChannels();
 setupNotificationHandler();
 checkInitialNotification();
 captureLaunchDeepLink();

@@ -4,7 +4,8 @@ import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
-import { type PushData, pushDataSchema } from '@kilocode/notifications';
+import * as Sentry from '@sentry/react-native';
+import { ANDROID_NOTIFICATION_CHANNELS, type PushData, pushDataSchema } from '@kilocode/notifications';
 
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -108,7 +109,45 @@ export function checkInitialNotification(): void {
   Notifications.clearLastNotificationResponse();
 }
 
+// Single-flight promise so concurrent callers share one channel-creation pass.
+// The promise never rejects: a per-channel failure is reported to Sentry and
+// the remaining channels still get created.
+let androidChannelsPromise: Promise<void> | null = null;
+
+async function createAndroidNotificationChannels(): Promise<void> {
+  for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
+      await Notifications.setNotificationChannelAsync(channel.id, {
+        name: channel.name,
+        importance:
+          channel.importance === 'high'
+            ? Notifications.AndroidImportance.HIGH
+            : Notifications.AndroidImportance.DEFAULT,
+      });
+    } catch (error) {
+      Sentry.captureException(error);
+    }
+  }
+}
+
+/**
+ * Create the Android notification channels once. No-op on iOS. Idempotent and
+ * single-flight: every call returns the same module-level promise, and a
+ * per-channel failure never rejects it (reported to Sentry instead).
+ */
+// eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
+export function ensureAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return Promise.resolve();
+  }
+  androidChannelsPromise ??= createAndroidNotificationChannels();
+  return androidChannelsPromise;
+}
+
 export async function registerForPushNotifications(): Promise<string | null> {
+  await ensureAndroidNotificationChannels();
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
   let finalStatus = existingStatus;
@@ -135,6 +174,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
  * treat a failed lookup.
  */
 export async function getDevicePushToken(): Promise<string | null> {
+  await ensureAndroidNotificationChannels();
+
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== Notifications.PermissionStatus.GRANTED) {
     return null;

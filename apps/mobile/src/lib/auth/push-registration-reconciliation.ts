@@ -20,7 +20,7 @@ const trpcOptions = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, q
  * to `active` while authenticated, the signed-in user owns the device's Expo
  * push token. A token rotation event defers to the same attempt.
  *
- * The attempt is single-flight with a 60 s minimum spacing, epoch-fenced, and
+ * The attempt is single-flight with a per-user 60 s minimum spacing, epoch-fenced, and
  * never throws: a transient failure retries on the next foreground without
  * waiting for a remount, and a sign-out or sign-in mid-attempt drops the
  * result instead of registering for a stale user.
@@ -30,6 +30,7 @@ const MIN_ATTEMPT_SPACING_MS = 60_000;
 
 let attemptInFlight: Promise<PushRegistrationOutcome> | null = null;
 let lastAttemptAtMs = 0;
+let lastAttemptUserId: string | null = null;
 
 export type PushRegistrationOutcome =
   | { kind: 'in-flight' }
@@ -44,12 +45,14 @@ export type PushRegistrationOutcome =
 export function resetPushRegistrationReconciliationForTests(): void {
   attemptInFlight = null;
   lastAttemptAtMs = 0;
+  lastAttemptUserId = null;
 }
 
 /**
- * Single-flight, minimum-60s-spaced reconciliation attempt for `userId`.
- * Returns the in-flight outcome when an attempt is already running, and skips
- * without any network call when one ran within the spacing window.
+ * Single-flight, per-user minimum-60s-spaced reconciliation attempt for
+ * `userId`. Returns the in-flight outcome when an attempt is already running,
+ * and skips without any network call when the SAME user ran one within the
+ * spacing window.
  */
 export async function attemptPushRegistrationReconciliation(
   userId: string
@@ -68,10 +71,11 @@ export async function attemptPushRegistrationReconciliation(
     return { kind: 'in-flight' };
   }
   const now = Date.now();
-  if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS) {
+  if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS && lastAttemptUserId === userId) {
     return { kind: 'spacing-skipped' };
   }
   lastAttemptAtMs = now;
+  lastAttemptUserId = userId;
   attemptInFlight = runReconciliation();
   try {
     return await attemptInFlight;

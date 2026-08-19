@@ -182,7 +182,14 @@ export function useNewSessionCreator({
       // successful key for a retry.
       rotateKey();
       await removeOutboxRow(intentFingerprint);
-      await markAttachmentsSent({ organizationId, keys: uploaded.keys });
+      // A ledger-mark failure after a successful create must stay silent: the
+      // session already exists, so it must not report the create as failed or
+      // invite a duplicate retry.
+      try {
+        await markAttachmentsSent({ organizationId, keys: uploaded.keys });
+      } catch {
+        // The session exists; a ledger-mark failure is silent.
+      }
 
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.

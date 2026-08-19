@@ -164,6 +164,24 @@ describe('attemptPushRegistrationReconciliation', () => {
     expect(second).toEqual({ kind: 'spacing-skipped' });
   });
 
+  it('does not spacing-skip a different user within the 60 s window', async () => {
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+
+    const first = await attemptPushRegistrationReconciliation('u1');
+    const second = await attemptPushRegistrationReconciliation('u2');
+
+    expect(first.kind).toBe('registered');
+    // A sign-out then sign-in of a different user within the window must still
+    // register: the spacing is per-user, so B's token is never skipped.
+    expect(second.kind).toBe('registered');
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledTimes(2);
+  });
+
   it('single-flights concurrent attempts', async () => {
     const gate = { release: null as (() => void) | null };
     const readGate = new Promise<void>(resolve => {

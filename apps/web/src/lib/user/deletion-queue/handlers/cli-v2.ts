@@ -124,7 +124,9 @@ function withProgress(
   outcome: DeletionHandlerOutcome,
   progress: UserDeletionTaskProgress
 ): DeletionHandlerOutcome {
-  if (outcome.kind === 'not_applicable') return outcome;
+  if (outcome.kind === 'not_applicable' || outcome.kind === 'manual_action_required') {
+    return outcome;
+  }
   return { ...outcome, progress };
 }
 

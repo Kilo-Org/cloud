@@ -7,6 +7,8 @@
 // `isSecuritySyncRetryable` + `mapSecuritySyncOperationError`) runs inside
 // `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React ref
 // state that needs a mounted renderer).
+/* eslint-disable max-lines -- cohesive suite for sync wiring, retryability matrix, and the reconcile-first outbox path */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake outbox factories settle without await because they resolve immediately */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +20,7 @@ import {
   mapSecuritySyncOperationError,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   securitySyncIntentFingerprint,
+  useSaveSecurityAgentConfig,
   useTriggerSecuritySync,
 } from './use-security-agent-mutations';
 
@@ -34,6 +37,16 @@ vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
+
+const outboxMock = vi.hoisted(() => ({
+  writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => row.operationKey),
+  remove: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
 
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
@@ -53,7 +66,12 @@ type MutationOptions = {
 let lastCapturedOptions: MutationOptions | null = null;
 const personalTriggerSyncMutateMock = vi.fn();
 const orgTriggerSyncMutateMock = vi.fn();
+const personalSaveConfigMutateMock = vi.fn();
+const orgSaveConfigMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
+const getQueryDataMock = vi.fn();
+const setQueryDataMock = vi.fn();
+const cancelQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 const trackCommandMock = vi.hoisted(() => vi.fn());
 
@@ -66,20 +84,30 @@ vi.mock('@tanstack/react-query', () => ({
     invalidateQueries: (...args: unknown[]) => {
       invalidateQueriesMock(...args);
     },
+    getQueryData: (...args: unknown[]) => getQueryDataMock(...args),
+    setQueryData: (...args: unknown[]) => setQueryDataMock(...args),
+    cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
   }),
 }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     securityAgent: { getConfig: { queryKey: () => ['securityAgent', 'getConfig'] } },
+    organizations: {
+      securityAgent: {
+        getConfig: { queryKey: () => ['organizations', 'securityAgent', 'getConfig'] },
+      },
+    },
   }),
   trpcClient: {
     securityAgent: {
       triggerSync: { mutate: (vars: unknown) => personalTriggerSyncMutateMock(vars) },
+      saveConfig: { mutate: (vars: unknown) => personalSaveConfigMutateMock(vars) },
     },
     organizations: {
       securityAgent: {
         triggerSync: { mutate: (vars: unknown) => orgTriggerSyncMutateMock(vars) },
+        saveConfig: { mutate: (vars: unknown) => orgSaveConfigMutateMock(vars) },
       },
     },
   },
@@ -100,11 +128,24 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     lastCapturedOptions = null;
     personalTriggerSyncMutateMock.mockReset();
     orgTriggerSyncMutateMock.mockReset();
+    personalSaveConfigMutateMock.mockReset();
+    orgSaveConfigMutateMock.mockReset();
     invalidateQueriesMock.mockReset();
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
     toastErrorMock.mockReset();
     trackCommandMock.mockClear();
     hoistedKeys.getKey.mockClear();
     hoistedKeys.rotateKey.mockClear();
+    outboxMock.writeReconcileFirst.mockReset();
+    outboxMock.writeReconcileFirst.mockImplementation(
+      async (row: { operationKey: string }) => row.operationKey
+    );
+    outboxMock.remove.mockReset();
+    outboxMock.remove.mockResolvedValue(undefined);
+    outboxMock.whenLoaded.mockReset();
+    outboxMock.whenLoaded.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -194,6 +235,110 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
       { repoFullName: 'kilo/repo' }
     );
     expect(trackCommandMock).toHaveBeenCalled();
+  });
+
+  it('persists a reconcile-first row before POSTing and removes it on success', async () => {
+    personalTriggerSyncMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useTriggerSecuritySync('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' });
+
+    expect(outboxMock.writeReconcileFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: 'hoisted-op-key',
+        fingerprint: expect.any(String),
+        scope: 'personal',
+      })
+    );
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+    // The row is written before the mutate fires.
+    expect(outboxMock.writeReconcileFirst.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      personalTriggerSyncMutateMock.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('awaits the outbox load before writing the reconcile-first row (no key-reuse race)', async () => {
+    const order: string[] = [];
+    outboxMock.whenLoaded.mockImplementation(async () => {
+      order.push('whenLoaded');
+      await Promise.resolve();
+      return true;
+    });
+    outboxMock.writeReconcileFirst.mockImplementation(async (row: { operationKey: string }) => {
+      order.push('writeReconcileFirst');
+      return row.operationKey;
+    });
+    personalTriggerSyncMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useTriggerSecuritySync('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' });
+
+    expect(order).toEqual(['whenLoaded', 'writeReconcileFirst']);
+  });
+
+  it('keeps the reconcile-first row on a retryable (ambiguous) failure', async () => {
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({
+      message: 'A security sync is already in progress. Please try again.',
+    });
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes the reconcile-first row on a terminal failure', async () => {
+    const replayFailed = new Error('This action did not complete. Please try again.');
+    Object.assign(replayFailed, { data: { code: 'BAD_REQUEST' } });
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(replayFailed);
+    useTriggerSecuritySync('personal');
+
+    await expect(
+      lastCapturedOptions?.mutationFn?.({ repoFullName: 'kilo/repo' })
+    ).rejects.toMatchObject({ message: 'This action did not complete. Please try again.' });
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-POSTs with a supplied operationKey on a reconcile retry instead of minting a fresh key', async () => {
+    personalTriggerSyncMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useTriggerSecuritySync('personal');
+
+    await lastCapturedOptions?.mutationFn?.({
+      repoFullName: 'kilo/repo',
+      operationKey: 'stored-op-key',
+    });
+
+    expect(hoistedKeys.getKey).not.toHaveBeenCalled();
+    expect(personalTriggerSyncMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullName: 'kilo/repo', operationKey: 'stored-op-key' })
+    );
+  });
+});
+
+describe('useSaveSecurityAgentConfig (expectedRevision)', () => {
+  it('sends expectedRevision from the last getConfig on a personal save', async () => {
+    getQueryDataMock.mockReturnValue({ configRevision: 7 });
+    personalSaveConfigMutateMock.mockResolvedValueOnce({});
+    useSaveSecurityAgentConfig('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ slaEnabled: true });
+
+    expect(personalSaveConfigMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 7 })
+    );
+  });
+
+  it('sends expectedRevision null when no config is cached', async () => {
+    getQueryDataMock.mockReturnValue(undefined);
+    personalSaveConfigMutateMock.mockResolvedValueOnce({});
+    useSaveSecurityAgentConfig('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ slaEnabled: true });
+
+    expect(personalSaveConfigMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: null })
+    );
   });
 });
 

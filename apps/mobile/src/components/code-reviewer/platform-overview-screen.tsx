@@ -4,6 +4,7 @@ import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
+import { getCodeReviewActionRequiredCopy } from '@kilocode/app-shared/code-reviews';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import {
   buildOverviewRows,
@@ -160,6 +161,11 @@ export function PlatformOverviewScreen({
           },
         });
 
+  const actionRequiredCopy =
+    data?.actionRequired != null
+      ? getCodeReviewActionRequiredCopy(data.actionRequired.reason)
+      : null;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
@@ -218,6 +224,18 @@ export function PlatformOverviewScreen({
                     ) : null}
                     <Text>Retry</Text>
                   </Button>
+                </View>
+              )}
+
+              {actionRequiredCopy != null && (
+                <View className="rounded-lg bg-warn-tile-bg p-4">
+                  <Text className="text-sm font-medium">{actionRequiredCopy.title}</Text>
+                  <Text variant="muted" className="text-xs">
+                    {actionRequiredCopy.description}
+                  </Text>
+                  <Text className="mt-1 text-xs font-medium">
+                    {actionRequiredCopy.recoveryLabel}
+                  </Text>
                 </View>
               )}
 

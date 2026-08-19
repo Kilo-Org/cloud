@@ -2,6 +2,7 @@ import {
   type CodeReviewPlatform,
   type RepositoryModelOverrideInput,
 } from '@kilocode/app-shared/code-review';
+import { type CodeReviewActionRequiredState } from '@kilocode/app-shared/code-reviews';
 
 import { parseParam } from '@/lib/route-params';
 
@@ -97,6 +98,7 @@ export type ReviewConfigData = {
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
+  actionRequired: CodeReviewActionRequiredState | null;
 };
 
 export type ConfigPatch = Partial<{

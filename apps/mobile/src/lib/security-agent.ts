@@ -10,6 +10,14 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type SecurityAgentConfig = RouterOutputs['securityAgent']['getConfig'];
 export type SecurityAgentConfigPatch = RouterInputs['securityAgent']['saveConfig'];
+/**
+ * Flattened form of the discriminated-union config. `getConfig` returns a
+ * union on `hasConfig`/`configRevision`; optimistic-update spreads and
+ * dirty-state refs need a single object shape, so this collapses the union.
+ */
+export type FlattenedSecurityAgentConfig = {
+  [K in keyof SecurityAgentConfig]: SecurityAgentConfig[K];
+};
 export type SecurityFinding = RouterOutputs['securityAgent']['getFinding'];
 export type SecurityAnalysis = RouterOutputs['securityAgent']['getAnalysis'];
 export type SecurityCommand = NonNullable<RouterOutputs['securityAgent']['getCommandStatus']>;

@@ -33,7 +33,7 @@ import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
-import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
@@ -60,7 +60,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -75,7 +75,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     setSelectedIds(config.data.selectedRepositoryIds);
   }, [config.data]);
 
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
+  // The repositories screen stays reachable while the agent is disabled so a
+  // user with integration repos but no effective selection can pick repos and
+  // then enable (the overview's "Select repositories" CTA lands here). Opt out
+  // of the disabled-state redirect; every other sub-screen keeps it.
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, true);
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
@@ -102,9 +106,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }
   if (config.isLoading || !config.data) {
     return <RepositorySettingsSkeleton />;
-  }
-  if (!config.data.isEnabled) {
-    return null;
   }
 
   const setModeOption = (option: RepositorySelectionMode) => {

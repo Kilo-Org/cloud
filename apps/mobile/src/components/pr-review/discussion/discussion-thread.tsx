@@ -63,6 +63,8 @@ type DiscussionThreadProps = {
   /** Controlled by the Discussion tab (keyed by threadId). */
   readonly expanded: boolean;
   readonly onToggleExpand: () => void;
+  /** The viewer's GitHub login, passed to comment rows for self-target gating. */
+  readonly viewerLogin?: string | null;
 };
 
 export function DiscussionThread({
@@ -72,6 +74,7 @@ export function DiscussionThread({
   thread,
   expanded,
   onToggleExpand,
+  viewerLogin = null,
 }: Readonly<DiscussionThreadProps>) {
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
@@ -139,6 +142,7 @@ export function DiscussionThread({
               <CommentRow
                 comment={comment}
                 reactionsDisabled={isReacting}
+                viewerLogin={viewerLogin}
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
                 }}

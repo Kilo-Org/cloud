@@ -11,9 +11,9 @@ const mockedPrimaryTransaction = jest.mocked(db.transaction);
 const mockedReplicaTransaction = jest.mocked(readDb.transaction);
 
 describe('getOrganizationGroupPolicyContext', () => {
-  it('opens its repeatable-read snapshot on the read replica', async () => {
+  it('opens its repeatable-read snapshot on the primary database', async () => {
     const transactionError = new Error('stop after selecting the transaction client');
-    mockedReplicaTransaction.mockRejectedValueOnce(transactionError);
+    mockedPrimaryTransaction.mockRejectedValueOnce(transactionError);
 
     await expect(
       getOrganizationGroupPolicyContext({
@@ -22,10 +22,10 @@ describe('getOrganizationGroupPolicyContext', () => {
       })
     ).rejects.toBe(transactionError);
 
-    expect(mockedReplicaTransaction).toHaveBeenCalledWith(expect.any(Function), {
+    expect(mockedPrimaryTransaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'repeatable read',
       accessMode: 'read only',
     });
-    expect(mockedPrimaryTransaction).not.toHaveBeenCalled();
+    expect(mockedReplicaTransaction).not.toHaveBeenCalled();
   });
 });

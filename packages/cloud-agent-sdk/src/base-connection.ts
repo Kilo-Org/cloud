@@ -116,7 +116,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         return;
       }
       authRefreshAttempted = true;
-      connectInternal(0, expectedGeneration);
+      connectInternal(0, expectedGeneration, true);
     } catch (err) {
       console.error('[Connection] Failed to refresh auth:', err);
       if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
@@ -141,7 +141,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         }
         if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
       }
-      connectInternal(0, expectedGeneration);
+      connectInternal(0, expectedGeneration, true);
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;
@@ -167,12 +167,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }, delay);
   }
 
-  function connectInternal(attempt = 0, expectedGeneration = generation) {
+  function connectInternal(attempt = 0, expectedGeneration = generation, skipAuthRefresh = false) {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     if (
       config.refreshAuth &&
       (config.shouldRefreshAuthBeforeConnect?.() ?? false) &&
+      !skipAuthRefresh &&
       !preconnectAuthRefreshAttempted
     ) {
       void refreshAndConnect(expectedGeneration);

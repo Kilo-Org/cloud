@@ -3,7 +3,8 @@
 // the tab; this file only renders the virtualized list.
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { type RefObject } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { type RefObject, useMemo } from 'react';
 import { View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
@@ -15,6 +16,7 @@ import {
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
+import { useTRPC } from '@/lib/trpc';
 
 const DISCUSSION_LIST_CONTENT_STYLE = { paddingTop: 12 };
 const noopReactionToggle = () => {
@@ -54,10 +56,51 @@ export function PrReviewDiscussionList({
   onLoadMore,
   onRetryLoadMore,
 }: Readonly<PrReviewDiscussionListProps>) {
+  const trpc = useTRPC();
+  // Account-local hidden users (blocked + muted GitHub logins) filter rows.
+  const hiddenUsers = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
+  // Viewer login for self-target gating on the comment overflow menu.
+  const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
+  const viewerLogin = pr.data?.repo.viewerLogin ?? null;
+
+  const hiddenLogins = useMemo(() => {
+    const set = new Set<string>();
+    for (const login of hiddenUsers.data?.blockedLogins ?? []) {
+      set.add(login.toLowerCase());
+    }
+    for (const login of hiddenUsers.data?.mutedLogins ?? []) {
+      set.add(login.toLowerCase());
+    }
+    return set;
+  }, [hiddenUsers.data]);
+
+  // Hide rows whose author is hidden. Conversation comments drop whole; a
+  // mixed-author thread keeps its visible comments and drops only when empty.
+  const visibleItems = useMemo(() => {
+    const result: DiscussionListItem[] = [];
+    for (const item of listItems) {
+      if (item.kind === 'comment') {
+        const login = item.comment.author?.login;
+        if (login == null || !hiddenLogins.has(login.toLowerCase())) {
+          result.push(item);
+        }
+      } else {
+        const visibleComments = item.thread.comments.filter(
+          comment =>
+            comment.author?.login == null || !hiddenLogins.has(comment.author.login.toLowerCase())
+        );
+        if (visibleComments.length > 0) {
+          result.push({ kind: 'thread', thread: { ...item.thread, comments: visibleComments } });
+        }
+      }
+    }
+    return result;
+  }, [listItems, hiddenLogins]);
+
   return (
     <FlashList
       ref={listRef}
-      data={listItems}
+      data={visibleItems}
       extraData={expansion}
       keyExtractor={keyForItem}
       getItemType={item => item.kind}
@@ -70,7 +113,12 @@ export function PrReviewDiscussionList({
           return (
             <View className="px-4 pb-3">
               <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
-                <CommentRow comment={item.comment} readOnly onToggleReaction={noopReactionToggle} />
+                <CommentRow
+                  comment={item.comment}
+                  readOnly
+                  viewerLogin={viewerLogin}
+                  onToggleReaction={noopReactionToggle}
+                />
               </View>
             </View>
           );
@@ -83,6 +131,7 @@ export function PrReviewDiscussionList({
               repo={repo}
               number={number}
               thread={thread}
+              viewerLogin={viewerLogin}
               expanded={expandedForThread(expansion, thread.threadId, thread.isResolved)}
               onToggleExpand={() => {
                 onToggleExpand(thread, index);

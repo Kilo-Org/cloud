@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -16,6 +16,7 @@ import {
   isSecuritySyncRetryable,
   SECURITY_CONFIGURATION_COPY,
 } from '@/lib/hooks/use-security-agent-mutations';
+import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -31,6 +32,10 @@ const DISMISS_REASONS = [
 ] as const;
 
 type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
+
+function isDismissReason(value: string): value is DismissReason {
+  return DISMISS_REASONS.some(reason => reason.value === value);
+}
 
 type DismissFindingScreenProps = {
   scope: string;
@@ -58,22 +63,71 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const [reason, setReason] = useState<DismissReason | null>(null);
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
+  const dismissDraft = useSecurityDismissDraft(scope, findingId);
+
+  // Restore the reason and comment from the stored draft once, so a retry
+  // reopens the form with the user's last intent. The form renders only after
+  // hydration, so the first render already carries the restored values.
+  const prefillAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!dismissDraft.hydrated || prefillAppliedRef.current) {
+      return;
+    }
+    prefillAppliedRef.current = true;
+    const draft = dismissDraft.draft;
+    if (draft) {
+      if (isDismissReason(draft.reason)) {
+        setReason(draft.reason);
+      }
+      commentRef.current = draft.comment;
+    }
+  }, [dismissDraft.hydrated, dismissDraft.draft]);
 
   const onSubmit = () => {
     if (!reason) {
       return;
     }
     const comment = commentRef.current.trim();
+    // Record the intent before the request so a pre-accept failure (no
+    // command id) leaves a durable draft the retry card can restore.
+    dismissDraft.persist({ reason, comment, lastError: null, retryable: null });
     dismissFinding.mutate(
       { findingId, reason, comment: comment || undefined },
       {
         // Pop only once the command is accepted — the scope command observer
         // reports the terminal (success/failure) toast once it resolves.
         onSuccess: () => {
+          // Authoritative accept: the intent is recorded server-side, so the
+          // durable draft is no longer needed.
+          dismissDraft.clear();
           router.back();
+        },
+        onError: error => {
+          dismissDraft.persist({
+            reason,
+            comment,
+            lastError: isSecurityConfigurationError(error)
+              ? SECURITY_CONFIGURATION_COPY
+              : error.message,
+            retryable: isSecuritySyncRetryable(error),
+          });
         },
       }
     );
+  };
+
+  // Persist the reason and comment as the user types (debounced by the drafts
+  // module), so a typed draft survives leave and reopen without a submit. The
+  // existing `lastError`/`retryable` are preserved: editing an unresolved
+  // failure must not clear the retry card until the user re-submits.
+  const persistOnType = (nextReason: DismissReason | null, nextComment: string) => {
+    const existing = dismissDraft.draft;
+    dismissDraft.persist({
+      reason: nextReason ?? '',
+      comment: nextComment,
+      lastError: existing?.lastError ?? null,
+      retryable: existing?.retryable ?? null,
+    });
   };
 
   // Load the finding (and the manage capability it depends on) before the
@@ -123,7 +177,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
-  if (findingQuery.isLoading || !findingQuery.data || capability.isLoading) {
+  if (
+    findingQuery.isLoading ||
+    !findingQuery.data ||
+    capability.isLoading ||
+    !dismissDraft.hydrated
+  ) {
     return <DismissFindingSkeleton />;
   }
 
@@ -175,7 +234,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           options={DISMISS_REASONS}
           value={reason}
           disabled={false}
-          onChange={setReason}
+          onChange={value => {
+            setReason(value);
+            persistOnType(value, commentRef.current);
+          }}
         />
 
         <View className="gap-3">
@@ -189,8 +251,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             textAlignVertical="top"
             placeholder="Add context for this dismissal…"
             placeholderTextColor={colors.mutedForeground}
+            defaultValue={dismissDraft.draft?.comment ?? ''}
             onChangeText={value => {
               commentRef.current = value;
+              persistOnType(reason, value);
             }}
           />
         </View>

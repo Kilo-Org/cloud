@@ -26,9 +26,14 @@ import {
 import { fromMicrodollars } from '@/lib/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+  closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('Organizations', () => {
@@ -407,6 +412,7 @@ describe('Organizations', () => {
   describe('removeUserFromOrganization', () => {
     beforeEach(() => {
       jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      jest.mocked(closeCloudAgentOrgStreams).mockClear();
     });
 
     test('should remove user from organization', async () => {
@@ -457,6 +463,43 @@ describe('Organizations', () => {
       const memberOrgs = await getUserOrganizationsWithSeats(member.id);
       expect(memberOrgs).toHaveLength(0);
       expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(member.id, organization.id);
+    });
+
+    test('closes Cloud Agent org streams when a member is removed', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('Test Org', owner.id);
+      await addUserToOrganization(organization.id, member.id, 'member');
+
+      await removeUserFromOrganization(organization.id, member.id);
+
+      expect(closeCloudAgentOrgStreams).toHaveBeenCalledWith(member.id, organization.id);
+    });
+
+    test('does not close Cloud Agent org streams when no membership was removed', async () => {
+      const owner = await insertTestUser();
+      const nonMember = await insertTestUser();
+      const organization = await createOrganization('Test Org', owner.id);
+
+      await removeUserFromOrganization(organization.id, nonMember.id);
+
+      expect(closeCloudAgentOrgStreams).not.toHaveBeenCalled();
+    });
+
+    test('completes removal when Cloud Agent stream close fails', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('Test Org', owner.id);
+      await addUserToOrganization(organization.id, member.id, 'member');
+      jest
+        .mocked(closeCloudAgentOrgStreams)
+        .mockRejectedValueOnce(new Error('stream close unavailable'));
+
+      await expect(removeUserFromOrganization(organization.id, member.id)).resolves.toBeDefined();
+
+      const memberOrgs = await getUserOrganizationsWithSeats(member.id);
+      expect(memberOrgs).toHaveLength(0);
+      expect(closeCloudAgentOrgStreams).toHaveBeenCalledWith(member.id, organization.id);
     });
 
     test('should remove specific user without affecting others', async () => {

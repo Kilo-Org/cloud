@@ -7,6 +7,7 @@ import { verifyKiloToken } from './kilo-token';
 
 export type KiloBearerAuthResult = {
   userId: string;
+  botId?: string;
 };
 
 export type KiloSecretBinding = {
@@ -38,43 +39,67 @@ export async function findKiloUserPepper(
   return { pepper: row.api_token_pepper ?? null, blockedReason: row.blocked_reason };
 }
 
+/**
+ * Verify a Kilo bearer against the account's current pepper and active state.
+ *
+ * Returns null only for a credential the caller must not retry: malformed,
+ * expired, wrong env, unknown user, blocked user, or a stale pepper.
+ * A dependency failure (secret store, database) throws, so a caller can map an
+ * outage to a retryable 503 instead of reporting it as an invalid token.
+ */
 export async function verifyKiloBearerAgainstCurrentPepper(params: {
   token: string | null;
-  nextAuthSecret: KiloSecretBinding;
-  workerEnv: string;
+  nextAuthSecret: KiloSecretBinding | string;
+  workerEnv?: string;
   connectionString: string;
   getUserPepper?: GetKiloUserPepper;
+  audience?: string;
+  allowBlocked?: boolean;
 }): Promise<KiloBearerAuthResult | null> {
   if (!params.token) return null;
 
   const getUserPepper = params.getUserPepper ?? findKiloUserPepper;
 
+  const secret =
+    typeof params.nextAuthSecret === 'string'
+      ? params.nextAuthSecret
+      : await getCachedSecret(params.nextAuthSecret, 'NEXTAUTH_SECRET');
+
+  let payload: Awaited<ReturnType<typeof verifyKiloToken>>;
   try {
-    const secret = await getCachedSecret(params.nextAuthSecret, 'NEXTAUTH_SECRET');
-    const payload = await verifyKiloToken(params.token, secret);
-    if (payload.env !== params.workerEnv) {
-      return null;
-    }
-
-    const result = await getUserPepper(params.connectionString, payload.kiloUserId);
-    if (!result) {
-      return null;
-    }
-
-    // This shared helper intentionally normalizes legacy tokens without a
-    // pepper to null. Session-ingest has a separate internal-token class and
-    // must not reuse this normalization for its admission boundary.
-    const tokenPepper = payload.apiTokenPepper ?? null;
-    if (result.pepper !== tokenPepper) {
-      return null;
-    }
-
-    if (result.blockedReason !== null) {
-      return null;
-    }
-
-    return { userId: payload.kiloUserId };
+    payload = await verifyKiloToken(
+      params.token,
+      secret,
+      params.audience ? { audience: params.audience } : undefined
+    );
   } catch {
     return null;
   }
+
+  // Env check is skipped only when the caller does not pass a workerEnv.
+  // When workerEnv is set, a token without env (or with a mismatched env) fails.
+  if (params.workerEnv && payload.env !== params.workerEnv) {
+    return null;
+  }
+
+  const result = await getUserPepper(params.connectionString, payload.kiloUserId);
+  if (!result) {
+    return null;
+  }
+
+  if (result.blockedReason !== null && !params.allowBlocked) {
+    return null;
+  }
+
+  // Pepper equality is skipped only when the claim is absent (internal
+  // service tokens). A present claim — string or null — is always compared.
+  if (payload.apiTokenPepper !== undefined && result.pepper !== payload.apiTokenPepper) {
+    return null;
+  }
+
+  const authResult: KiloBearerAuthResult = { userId: payload.kiloUserId };
+  if (payload.botId) {
+    authResult.botId = payload.botId;
+  }
+  return authResult;
 }

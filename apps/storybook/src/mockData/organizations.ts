@@ -43,6 +43,7 @@ function generateMember(): OrganizationMember {
     inviteId: randomId(rng, 'invite'),
     status: 'invited',
     inviteUrl: `https://app.example.com/invite/${Math.floor(rng() * 36 ** 16).toString(36)}`,
+    emailStatus: 'pending',
     dailyUsageLimitUsd,
     currentDailyUsageUsd,
   };

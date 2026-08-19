@@ -9,15 +9,15 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, Pressable, ScrollView, type TextInput, View } from 'react-native';
+import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
   PrFormSheetHeader,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
+import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import {
@@ -32,11 +32,15 @@ import {
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import {
+  ensureTermsAcceptedOutcome,
+  TERMS_CHECK_RETRY_COPY,
+  TERMS_OUTDATED_COPY,
+} from '@/components/pr-review/discussion/reply-input';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
-import { cn } from '@/lib/utils';
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 
@@ -49,12 +53,6 @@ type PrReviewSubmitProps = Readonly<{
   eyebrow: string;
   onDismiss: () => void;
 }>;
-
-const EVENT_OPTIONS: readonly { value: ReviewEvent; label: string }[] = [
-  { value: 'COMMENT', label: 'Comment' },
-  { value: 'REQUEST_CHANGES', label: 'Request changes' },
-  { value: 'APPROVE', label: 'Approve' },
-];
 
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { owner, repo, number, headSha, title, eyebrow, onDismiss } = props;
@@ -85,6 +83,25 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   useEffect(() => {
     if (submitReview.error) {
       const classification = classifyPrReviewMutationError(submitReview.error);
+      if (classification.kind === 'terms-required') {
+        void (async () => {
+          const outcome = await ensureTermsAcceptedOutcome();
+          if (outcome.kind === 'accepted') {
+            setInlineError(null);
+            setInlineErrorKind(null);
+          } else if (outcome.kind === 'outdated') {
+            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineErrorKind('bad-request');
+          } else if (outcome.kind === 'unknown') {
+            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineErrorKind('retryable');
+          } else {
+            setInlineError('You must accept the Terms of Service to post.');
+            setInlineErrorKind(null);
+          }
+        })();
+        return;
+      }
       const display = mutationErrorDisplay('submit', classification, submitReview.error);
       setInlineError(display.message);
       setInlineErrorKind(display.kind);
@@ -113,6 +130,15 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   async function handleSubmit() {
     setInlineError(null);
     setInlineErrorKind(null);
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      return;
+    }
+    if (outcome.kind === 'dismissed') {
+      return;
+    }
     try {
       const body = bodyRef.current.trim();
       await submitReview.mutateAsync(
@@ -294,51 +320,5 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         </PrFormSheetFooter>
       </ScrollView>
     </>
-  );
-}
-
-/** Horizontal event chips — vertical PillGroup is too tall for half-detent. */
-function ReviewEventChips(props: {
-  value: ReviewEvent;
-  disabled: boolean;
-  onChange: (next: ReviewEvent) => void;
-}) {
-  return (
-    <View className="gap-1.5">
-      <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Review event
-      </Text>
-      <RadioGroup label="Review event" className="flex-row flex-wrap gap-1.5">
-        {EVENT_OPTIONS.map(option => {
-          const active = props.value === option.value;
-          return (
-            <Pressable
-              key={option.value}
-              disabled={props.disabled}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                props.onChange(option.value);
-              }}
-              {...radioItemA11y({ label: option.label, checked: active, disabled: props.disabled })}
-              className={cn(
-                'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
-                active ? 'border-primary bg-primary' : 'bg-secondary',
-                !active && (props.disabled ? 'border-hair-soft' : 'border-border')
-              )}
-            >
-              <Text
-                className={cn(
-                  'text-xs font-medium',
-                  active ? 'text-primary-foreground' : 'text-foreground',
-                  !active && props.disabled && 'text-muted-foreground'
-                )}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </RadioGroup>
-    </View>
   );
 }

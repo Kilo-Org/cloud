@@ -16,7 +16,7 @@ describe('OpenRouter Models Config', () => {
       CLAUDE_SONNET_CURRENT_MODEL_ID,
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,
-      'z-ai/glm-5.2',
+      'z-ai/glm-5.3',
       tencent_hy3_free_model.public_id,
     ];
 

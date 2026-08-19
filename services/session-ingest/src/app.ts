@@ -4,11 +4,12 @@ import { createMiddleware } from 'hono/factory';
 import type { Env } from './env';
 import { z } from 'zod';
 
-import { kiloJwtAuthMiddleware, USER_AUTH_CACHE_KEY_PREFIX } from './middleware/kilo-jwt-auth';
+import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
 import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -17,9 +18,6 @@ const sessionIdSchema = z.string().startsWith('ses_').length(30);
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),
-});
-const invalidateUserAuthSchema = z.object({
-  kiloUserId: z.string().min(1),
 });
 
 async function hasValidInternalSecret(c: {
@@ -45,7 +43,7 @@ async function hasValidInternalSecret(c: {
 
 const requireValidInternalSecret = createMiddleware<{
   Bindings: Env;
-  Variables: { user_id: string };
+  Variables: { user_id: string; deletionAudience?: boolean };
 }>(async (c, next) => {
   let isValid: boolean;
   try {
@@ -68,6 +66,7 @@ export const app = new Hono<{
   Bindings: Env;
   Variables: {
     user_id: string;
+    deletionAudience?: boolean;
   };
 }>();
 
@@ -138,16 +137,8 @@ app.post('/internal/session-access/invalidate', requireValidInternalSecret, asyn
     'SessionAccessCacheDO.invalidateOrganization'
   );
 
-  return c.body(null, 204);
-});
+  await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
 
-app.post('/internal/user-auth/invalidate', requireValidInternalSecret, async c => {
-  const parsed = invalidateUserAuthSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
-  }
-
-  await c.env.USER_EXISTS_CACHE.delete(`${USER_AUTH_CACHE_KEY_PREFIX}${parsed.data.kiloUserId}`);
   return c.body(null, 204);
 });
 

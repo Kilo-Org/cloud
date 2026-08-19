@@ -78,7 +78,22 @@ import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
-import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
+import {
+  getAllMobileStoreKiloPassProducts,
+  getMobileStoreKiloPassProductByAppleProductId,
+} from '@/lib/kilo-pass/mobile-store-products';
+import {
+  buildPurchasePresentation,
+  getPurchasePresentationForUser,
+} from '@/lib/kilo-pass/purchase-presentation';
+import {
+  PURCHASE_PLATFORMS,
+  PURCHASE_PRESENTATION_KINDS,
+  PURCHASE_PRODUCTS,
+  PURCHASE_STATUS_CLASSES,
+  PURCHASE_STOREFRONTS,
+  isNativeIapMutationAllowed,
+} from '@kilocode/app-shared/commerce';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
@@ -283,6 +298,12 @@ function assertAppStoreAccountTokenMatchesUser(params: {
 
 function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   if (error instanceof TRPCError) {
+    if (error.code === 'CONFLICT') {
+      return new TRPCError({
+        code: 'CONFLICT',
+        message: 'Purchase is still being processed — try again in a moment.',
+      });
+    }
     return error;
   }
 
@@ -1000,9 +1021,66 @@ const CREDIT_ENROLLMENT_DISPOSITIONS = {
   },
 } satisfies Record<CreditEnrollmentErrorReason, CreditEnrollmentDisposition>;
 
+const PurchasePlatformSchema = z.enum(PURCHASE_PLATFORMS);
+const PurchaseStorefrontSchema = z.enum(PURCHASE_STOREFRONTS);
+const PurchaseProductSchema = z.enum(PURCHASE_PRODUCTS);
+
+const GetPurchasePresentationInputSchema = z.object({
+  platform: PurchasePlatformSchema.nullable().optional(),
+  storefront: PurchaseStorefrontSchema.nullable().optional(),
+  product: PurchaseProductSchema,
+  program: z.string().max(64).nullable().optional(),
+});
+
+const PreflightPurchaseInputSchema = z.object({
+  platform: PurchasePlatformSchema,
+  storefront: PurchaseStorefrontSchema,
+  product: PurchaseProductSchema,
+  program: z.string().max(64).nullable().optional(),
+  appleProductId: z.string().min(1),
+});
+
+const PurchasePresentationCtaOutputSchema = z.object({
+  label: z.string().nullable(),
+  action: z.enum(['none', 'open_web', 'open_native']),
+});
+
+const GetPurchasePresentationOutputSchema = z.object({
+  kind: z.enum(PURCHASE_PRESENTATION_KINDS),
+  statusClass: z.enum(PURCHASE_STATUS_CLASSES),
+  reason: z
+    .enum([
+      'credits_not_sold_on_ios',
+      'kilo_pass_not_available_on_android',
+      'unsupported_combination',
+    ])
+    .nullable(),
+  cta: PurchasePresentationCtaOutputSchema,
+  webUrl: z.string().nullable(),
+  program: z.string().nullable(),
+});
+
+const PreflightPurchaseOutputSchema = z.object({
+  allowed: z.boolean(),
+  statusClass: z.enum(PURCHASE_STATUS_CLASSES),
+  reason: z
+    .enum([
+      'credits_not_sold_on_ios',
+      'kilo_pass_not_available_on_android',
+      'unsupported_combination',
+      'unknown_product',
+      'already_subscribed',
+    ])
+    .nullable(),
+});
+
 const CreateCheckoutSessionInputSchema = z.object({
   tier: KiloPassTierSchema,
   cadence: KiloPassCadenceSchema,
+  platform: PurchasePlatformSchema.nullable().optional(),
+  storefront: PurchaseStorefrontSchema.nullable().optional(),
+  product: PurchaseProductSchema.nullable().optional(),
+  program: z.string().max(64).nullable().optional(),
 });
 
 const CreateCheckoutSessionOutputSchema = z.object({
@@ -1122,10 +1200,81 @@ export const kiloPassRouter = createTRPCRouter({
     products: getAllMobileStoreKiloPassProducts(),
   })),
 
+  getPurchasePresentation: baseProcedure
+    .input(GetPurchasePresentationInputSchema)
+    .output(GetPurchasePresentationOutputSchema)
+    .query(async ({ ctx, input }) => {
+      return getPurchasePresentationForUser(readDb, ctx.user.id, {
+        platform: input.platform,
+        storefront: input.storefront,
+        product: input.product,
+        program: input.program,
+      });
+    }),
+
+  preflightPurchase: baseProcedure
+    .input(PreflightPurchaseInputSchema)
+    .output(PreflightPurchaseOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      const presentation = buildPurchasePresentation({
+        subscription,
+        input: {
+          platform: input.platform,
+          storefront: input.storefront,
+          product: input.product,
+          program: input.program,
+        },
+      });
+
+      if (presentation.kind !== 'native_iap') {
+        return {
+          allowed: false,
+          statusClass: presentation.statusClass,
+          reason: presentation.reason,
+        };
+      }
+
+      if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
+        return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
+      }
+
+      const hasLiveOtherProviderSub =
+        subscription != null &&
+        !isStripeSubscriptionEnded(subscription.status) &&
+        subscription.paymentProvider !== KiloPassPaymentProvider.AppStore;
+
+      if (hasLiveOtherProviderSub) {
+        return { allowed: false, statusClass: 'terminal', reason: 'already_subscribed' };
+      }
+
+      return { allowed: true, statusClass: 'healthy', reason: null };
+    }),
+
   completeAppStorePurchase: baseProcedure
-    .input(z.object({ signedTransactionJws: z.string().min(1) }))
+    .input(
+      z.object({
+        signedTransactionJws: z.string().min(1),
+        platform: PurchasePlatformSchema,
+        storefront: PurchaseStorefrontSchema,
+        product: PurchaseProductSchema,
+        program: z.string().max(64).nullable().optional(),
+      })
+    )
     .output(CompleteStorePurchaseOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (
+        !isNativeIapMutationAllowed({
+          platform: input.platform,
+          storefront: input.storefront,
+          product: input.product,
+        })
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'commerce_not_available',
+        });
+      }
       try {
         const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
         assertAppStoreAccountTokenMatchesUser({
@@ -2454,6 +2603,13 @@ export const kiloPassRouter = createTRPCRouter({
     .input(CreateCheckoutSessionInputSchema)
     .output(CreateCheckoutSessionOutputSchema)
     .mutation(async ({ input, ctx }) => {
+      if (input.platform === 'ios' || input.platform === 'android') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'commerce_not_available',
+        });
+      }
+
       const { tier, cadence } = input;
 
       const existing = await getKiloPassStateForUser(db, ctx.user.id);

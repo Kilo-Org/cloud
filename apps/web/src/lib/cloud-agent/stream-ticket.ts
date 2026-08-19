@@ -16,6 +16,7 @@ export function signStreamTicket(
   expiresInSeconds = 60
 ): { ticket: string; expiresAt: number } {
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  const audience = payload.purpose === 'terminal' ? 'cloud-agent-terminal' : 'cloud-agent-stream';
 
   const ticket = jwt.sign(
     {
@@ -27,6 +28,7 @@ export function signStreamTicket(
     {
       algorithm: 'HS256',
       expiresIn: expiresInSeconds,
+      audience,
     }
   );
 

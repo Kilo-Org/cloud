@@ -31,6 +31,7 @@ import {
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
+  resetCodeReviewForRetry,
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
@@ -1742,5 +1743,79 @@ describe('getSessionUsageFromBilling', () => {
       cachedTokens: 700,
       totalCostMusd: 100,
     });
+  });
+});
+
+describe('resetCodeReviewForRetry', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(status: string, overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        status,
+        ...overrides,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  it('resets a failed review and returns 1', async () => {
+    const reviewId = await insertReview('failed', {
+      session_id: 'agent-first',
+      error_message: 'Container shutdown: SIGTERM',
+      terminal_reason: 'sandbox_error',
+    });
+
+    const count = await resetCodeReviewForRetry(reviewId);
+
+    expect(count).toBe(1);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.status).toBe('pending');
+    expect(stored?.session_id).toBeNull();
+    expect(stored?.error_message).toBeNull();
+  });
+
+  it('returns 0 for a review that is not in a retriggable terminal state', async () => {
+    const reviewId = await insertReview('pending');
+
+    const count = await resetCodeReviewForRetry(reviewId);
+
+    expect(count).toBe(0);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.status).toBe('pending');
   });
 });

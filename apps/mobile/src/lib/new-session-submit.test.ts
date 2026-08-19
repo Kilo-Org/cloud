@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
   resolveNewSessionSubmitEnabled,
 } from './new-session-submit';
@@ -120,5 +121,27 @@ describe('resolveNewSessionSubmitDisabled', () => {
     for (const sample of samples) {
       expect(resolveNewSessionSubmitDisabled(sample)).toBe(!resolveNewSessionSubmitEnabled(sample));
     }
+  });
+});
+
+describe('resolveNewSessionStartDisabled', () => {
+  function startInput(
+    overrides: Partial<Parameters<typeof resolveNewSessionStartDisabled>[0]> = {}
+  ) {
+    return {
+      ...validInput(),
+      isProfileLoading: false,
+      ...overrides,
+    };
+  }
+
+  it('is enabled when every precondition is satisfied and the profile is settled', () => {
+    // A failed profile query must not disable Start: the form shows an inline
+    // error + Retry and submits with no effective profile id.
+    expect(resolveNewSessionStartDisabled(startInput())).toBe(false);
+  });
+
+  it('blocks Start while the profile query is loading', () => {
+    expect(resolveNewSessionStartDisabled(startInput({ isProfileLoading: true }))).toBe(true);
   });
 });

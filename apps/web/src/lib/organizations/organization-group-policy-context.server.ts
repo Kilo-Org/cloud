@@ -15,7 +15,7 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
-import { readDb, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type OrganizationPolicySubject =
   | {
@@ -106,7 +106,7 @@ export async function getOrganizationGroupPolicyContext(params: {
   tx?: DrizzleTransaction;
 }): Promise<OrganizationGroupPolicyContext> {
   if (!params.tx) {
-    return await readDb.transaction(
+    return await db.transaction(
       async tx => await getOrganizationGroupPolicyContext({ ...params, tx }),
       { isolationLevel: 'repeatable read', accessMode: 'read only' }
     );

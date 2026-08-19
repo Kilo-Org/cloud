@@ -120,6 +120,20 @@ describe('builder ephemeral deployment Postgres repository', () => {
     ).resolves.toEqual({ created: false, reason: 'owner_unavailable' });
   });
 
+  it('rejects a deletion-in-progress owner as owner_unavailable', async () => {
+    const deletingOwner = await insertOwner({
+      blocked_reason: 'deletion-in-progress at 2026-06-03T11:00:00.000Z',
+    });
+
+    await expect(
+      createPendingEphemeralDeployment(db, {
+        ownedByUserId: deletingOwner.id,
+        internalWorkerName: fixtureName('qdpl'),
+        pendingCleanupAt: minutesAfter(now, 10),
+      })
+    ).resolves.toEqual({ created: false, reason: 'owner_unavailable' });
+  });
+
   it('waits for a retained-owner lock and rejects provisioning after soft-delete commits', async () => {
     const owner = await insertOwner();
     const ownerLocked = deferred();

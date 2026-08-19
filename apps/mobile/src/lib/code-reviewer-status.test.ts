@@ -65,6 +65,21 @@ describe('classifyProviderState', () => {
     }
   });
 
+  it('regression: a query error never renders Connect (never disconnected)', () => {
+    // A failed connect-state query must surface as an error, not fall through
+    // to `disconnected`, which is the state that renders the Connect card.
+    const result = classifyProviderState({
+      isLoading: false,
+      isError: true,
+      isFetching: false,
+      connected: false,
+      hasData: false,
+      refetch: vi.fn(),
+    });
+    expect(result.status).toBe('error');
+    expect(result.status).not.toBe('disconnected');
+  });
+
   it('does not error when a refetch fails but stale data is still present', () => {
     expect(
       classifyProviderState({
@@ -102,6 +117,23 @@ describe('classifyProviderState', () => {
         refetch: vi.fn(),
       })
     ).toEqual({ status: 'disconnected' });
+  });
+
+  it('is loading (not disconnected) when the query is paused with no data yet', () => {
+    // A paused query (offline/unknown connectivity, empty cache) is pending
+    // but not fetching, so isLoading is false while data is still undefined.
+    // It must not fall through to disconnected (which renders the Connect
+    // card) on a cold launch.
+    expect(
+      classifyProviderState({
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        connected: undefined,
+        hasData: false,
+        refetch: vi.fn(),
+      })
+    ).toEqual({ status: 'loading' });
   });
 });
 

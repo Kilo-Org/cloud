@@ -21,7 +21,7 @@ import {
   useSecurityAgentConfig,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
-import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
 
 type MinSeverity = SecurityAgentConfig['autoAnalysisMinSeverity'];
 type ConfidenceThreshold = SecurityAgentConfig['autoDismissConfidenceThreshold'];
@@ -70,7 +70,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<ConfidenceThreshold>('high');
   const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber

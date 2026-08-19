@@ -152,6 +152,10 @@ function createUserWebConnection(
   let retainCount = 0;
   let commandRetainCount = 0;
   let legacyRetained = false;
+  // True once the current base connection's socket has opened (i.e. the one-use
+  // ingest ticket was consumed at the upgrade). Drives the pre-connect auth
+  // refresh so only reconnects mint a fresh ticket, not the initial connect.
+  let hasEverOpened = false;
   let pingInterval: ReturnType<typeof setInterval> | null = null;
   let pongTimeout: ReturnType<typeof setTimeout> | null = null;
   let initialAuthRetryTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -416,7 +420,7 @@ function createUserWebConnection(
 
   function buildUrl(): string {
     const url = new URL(config.websocketUrl);
-    url.searchParams.set('token', token);
+    url.searchParams.set('ticket', token);
     url.searchParams.set('connectionId', connectionId);
     return url.toString();
   }
@@ -424,6 +428,7 @@ function createUserWebConnection(
   function ensureBaseConnection(): void {
     if (baseConnection) return;
     removePreSocketLifecycleListeners();
+    hasEverOpened = false;
     baseConnection = createBaseConnection({
       lifecycleHooks: createLifecycleHooks(),
       buildUrl,
@@ -440,6 +445,7 @@ function createUserWebConnection(
       },
       onEvent: handleInboundMessage,
       onOpen: ws => {
+        hasEverOpened = true;
         if (!hasLifetime()) return;
         currentWs = ws;
         resolveOpenWaiters(ws);
@@ -468,6 +474,12 @@ function createUserWebConnection(
       },
       onError: config.onError,
       isAuthFailure: event => event.code === 4001 || event.code === 1008,
+      // The ingest ticket is one-use (consumed at the `/api/user/web` upgrade).
+      // Refresh it before a reconnect so a non-auth-failure close (e.g. 1006)
+      // does not retry with an already-consumed ticket and loop forever. The
+      // initial connect already mints a fresh ticket in `startConnection`, so
+      // `hasEverOpened` (set on first `onOpen`) scopes the refresh to reconnects.
+      shouldRefreshAuthBeforeConnect: () => hasEverOpened,
       refreshAuth: async () => {
         token = await config.getAuthToken();
       },

@@ -13,11 +13,15 @@ export type DiscussionTabViewKind =
   | 'empty'
   | 'happy';
 
+export type DiscussionTabView = {
+  kind: DiscussionTabViewKind;
+};
+
 export function selectDiscussionTabView(args: {
   firstPageErrorState: { kind: 'permission' | 'not-found' | 'reconnect' | 'retryable' } | null;
   isPending: boolean;
   isEmpty: boolean;
-}): { kind: DiscussionTabViewKind } {
+}): DiscussionTabView {
   const { firstPageErrorState, isPending, isEmpty } = args;
 
   if (firstPageErrorState) {

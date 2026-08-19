@@ -55,7 +55,9 @@ function parseRecents(raw: string | null): RecentPr[] {
       }
       // Legacy entries predate `lastResult`; read a missing field as 'ok'
       // so an installed app's existing recents survive the upgrade.
-      return [{ ...result.data, lastResult: result.data.lastResult === 'failed' ? 'failed' : 'ok' }];
+      return [
+        { ...result.data, lastResult: result.data.lastResult === 'failed' ? 'failed' : 'ok' },
+      ];
     });
   } catch {
     return [];

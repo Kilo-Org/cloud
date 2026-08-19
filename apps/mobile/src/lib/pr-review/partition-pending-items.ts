@@ -7,10 +7,15 @@ import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider'
  * overview has not loaded yet) makes every item fresh — do not invent
  * staleness before the head is known.
  */
+export type PendingItemPartition = {
+  fresh: PendingReviewItem[];
+  stale: PendingReviewItem[];
+};
+
 export function partitionPendingItems(
   items: readonly PendingReviewItem[],
   headSha: string
-): { fresh: PendingReviewItem[]; stale: PendingReviewItem[] } {
+): PendingItemPartition {
   if (headSha === '') {
     return { fresh: [...items], stale: [] };
   }

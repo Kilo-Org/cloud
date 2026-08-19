@@ -71,6 +71,12 @@ export const REASONING_VARIANTS_NONE_LOW_HIGH_MAX = {
   max: { reasoning: { enabled: true, effort: 'max' } },
 } as const;
 
+export const REASONING_VARIANTS_LOW_HIGH_MAX = {
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  max: { reasoning: { enabled: true, effort: 'max' } },
+} as const;
+
 const REASONING_VARIANTS_CLAUDE = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -107,7 +113,7 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
   if (isKimiModel(model)) {
-    return REASONING_VARIANTS_NONE_LOW_HIGH_MAX;
+    return REASONING_VARIANTS_LOW_HIGH_MAX;
   }
   if (isLongCatModel(model)) {
     return REASONING_VARIANTS_BINARY;

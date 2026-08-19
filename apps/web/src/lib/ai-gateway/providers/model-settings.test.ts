@@ -13,6 +13,12 @@ describe('getOpenRouterDerivedModelVariants', () => {
           endpoints: [],
           reasoning: { mandatory: false, supported_efforts: supportedEfforts },
         },
+        'moonshotai/kimi-k3': {
+          id: 'moonshotai/kimi-k3',
+          name: 'Kimi K3',
+          endpoints: [],
+          reasoning: { mandatory: false, supported_efforts: supportedEfforts },
+        },
       })),
     }));
     const { getOpenRouterDerivedModelVariants } =
@@ -29,5 +35,8 @@ describe('getOpenRouterDerivedModelVariants', () => {
       'max',
     ]);
     expect(supportedEfforts).toEqual(['max', 'high', 'medium', 'low', 'minimal']);
+
+    const kimiVariants = await getOpenRouterDerivedModelVariants('moonshotai/kimi-k3');
+    expect(Object.keys(kimiVariants ?? {})).toEqual(['minimal', 'low', 'medium', 'high', 'max']);
   });
 });

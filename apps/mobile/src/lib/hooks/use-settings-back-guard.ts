@@ -3,6 +3,7 @@ import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Alert, type AlertButton } from 'react-native';
 
+import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL = {
@@ -38,7 +39,7 @@ export function useSecurityAgentSettingsRedirect(
 
 /**
  * Shared dirty-screen back handling for Security Agent settings screens.
- * Registers a single `beforeRemove` listener via React Navigation, which
+ * Registers a predictive-Back-safe guard via `usePreventRemove`, which
  * fires for every way a screen can be removed — header back, Android
  * hardware back, and the iOS swipe-back gesture — so all three paths get
  * the same confirmation instead of only the header button.
@@ -57,9 +58,10 @@ export function useSettingsBackGuard({
   onSave: () => Promise<void>;
 }>) {
   const navigation = useNavigation();
-  // Keep the latest onSave in a ref so the effect below doesn't depend on it
-  // directly — onSave is a fresh closure every render, which would otherwise
-  // tear down and re-register the beforeRemove listener on every render.
+  // Keep the latest onSave in a ref so the callback below doesn't depend on it
+  // directly — onSave is a fresh closure every render. usePreventRemove keeps
+  // the callback itself fresh via useLatestCallback, but the ref keeps onSave
+  // stable without re-registering.
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
 
@@ -72,51 +74,44 @@ export function useSettingsBackGuard({
   // save a second time.
   const skipNextGuardRef = useRef(false);
 
-  useEffect(
-    () =>
-      navigation.addListener('beforeRemove', event => {
-        if (skipNextGuardRef.current) {
-          skipNextGuardRef.current = false;
-          return;
-        }
-        if (!dirty) {
-          return;
-        }
-        event.preventDefault();
-        const action = event.data.action;
-        const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
-        const buttons: AlertButton[] = options.map(option => {
-          if (option === 'keep-editing') {
-            return { text: BUTTON_LABEL[option], style: 'cancel' };
-          }
-          if (option === 'discard') {
-            return {
-              text: BUTTON_LABEL[option],
-              style: 'destructive',
-              onPress: () => {
-                navigation.dispatch(action);
-              },
-            };
-          }
-          return {
-            text: BUTTON_LABEL[option],
-            onPress: () => {
-              void (async () => {
-                try {
-                  await onSaveRef.current();
-                  navigation.dispatch(action);
-                } catch {
-                  // The save mutation's centralized onError already toasted —
-                  // stay on the screen so the user can retry or discard.
-                }
-              })();
-            },
-          };
-        });
-        Alert.alert('Unsaved changes', 'Save your changes before leaving this screen?', buttons);
-      }),
-    [navigation, dirty, valid]
-  );
+  usePreventRemove(dirty, ({ data }) => {
+    if (skipNextGuardRef.current) {
+      skipNextGuardRef.current = false;
+      navigation.dispatch(data.action);
+      return;
+    }
+    const action = data.action;
+    const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
+    const buttons: AlertButton[] = options.map(option => {
+      if (option === 'keep-editing') {
+        return { text: BUTTON_LABEL[option], style: 'cancel' };
+      }
+      if (option === 'discard') {
+        return {
+          text: BUTTON_LABEL[option],
+          style: 'destructive',
+          onPress: () => {
+            navigation.dispatch(action);
+          },
+        };
+      }
+      return {
+        text: BUTTON_LABEL[option],
+        onPress: () => {
+          void (async () => {
+            try {
+              await onSaveRef.current();
+              navigation.dispatch(action);
+            } catch {
+              // The save mutation's centralized onError already toasted —
+              // stay on the screen so the user can retry or discard.
+            }
+          })();
+        },
+      };
+    });
+    Alert.alert('Unsaved changes', 'Save your changes before leaving this screen?', buttons);
+  });
 
   return {
     onBack: () => {

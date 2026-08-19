@@ -10,6 +10,8 @@ import { formatAge, formatBytes, humanizeToken } from './data-export-format';
 const summaryFixture = {
   asOf: '2026-08-09T12:00:00.000Z',
   active: 7,
+  ready: 11,
+  expired: 13,
   needsAttention: 3,
   staleLeases: 2,
   pendingDispatches: 5,
@@ -98,7 +100,7 @@ const degradedRow: DataExportListRow = {
 };
 
 describe('DataExportsSummaryStrip', () => {
-  it('renders all six workload metrics with counts and hints', () => {
+  it('renders all eight workload and status metrics with counts and hints', () => {
     const html = renderToStaticMarkup(
       React.createElement(DataExportsSummaryStrip, {
         summary: summaryFixture,
@@ -108,6 +110,10 @@ describe('DataExportsSummaryStrip', () => {
 
     expect(html).toContain('Needs attention');
     expect(html).toContain('Active exports');
+    expect(html).toContain('Ready exports');
+    expect(html).toContain('Available to download');
+    expect(html).toContain('Expired exports');
+    expect(html).toContain('No longer downloadable');
     expect(html).toContain('Pending dispatches');
     expect(html).toContain('Stale leases');
     expect(html).toContain('Cleanup due');

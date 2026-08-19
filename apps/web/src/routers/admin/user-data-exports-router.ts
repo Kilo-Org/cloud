@@ -396,6 +396,8 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     const result = await readDb.execute<{
       as_of: string;
       active: number | string;
+      ready: number | string;
+      expired: number | string;
       needs_attention: number | string;
       stale_leases: number | string;
       pending_dispatches: number | string;
@@ -406,6 +408,8 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     }>(sql`
       SELECT now() AS as_of,
         count(*) FILTER (WHERE e.status IN ('queued', 'processing', 'finalizing'))::text AS active,
+        count(*) FILTER (WHERE e.status = 'ready')::text AS ready,
+        count(*) FILTER (WHERE e.status = 'expired')::text AS expired,
         count(*) FILTER (WHERE ${needsAttentionSql})::text AS needs_attention,
         count(*) FILTER (
           WHERE e.status IN ('processing', 'finalizing') AND e.lease_expires_at < now()
@@ -450,6 +454,8 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     return {
       asOf: row ? iso(row.as_of) : new Date().toISOString(),
       active: number(row?.active ?? 0) ?? 0,
+      ready: number(row?.ready ?? 0) ?? 0,
+      expired: number(row?.expired ?? 0) ?? 0,
       needsAttention: number(row?.needs_attention ?? 0) ?? 0,
       staleLeases: number(row?.stale_leases ?? 0) ?? 0,
       pendingDispatches: number(row?.pending_dispatches ?? 0) ?? 0,

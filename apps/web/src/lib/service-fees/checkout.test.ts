@@ -222,6 +222,46 @@ describe('prepareTopUpCheckoutFee', () => {
     });
   });
 
+  test('repeated decision failure falls back to a terminal missed assessment', async () => {
+    const store = createMemoryAssessmentStore();
+    const findEffectiveExemption = jest.fn(async () => {
+      throw new Error('exemption lookup unavailable');
+    });
+    const prepared = await prepareTopUpCheckoutFee({
+      flow: 'organization_top_up',
+      principalMinor: 10_000,
+      kiloUserId: 'user_1',
+      organizationId: 'org_1',
+      deps: deps(store, { findEffectiveExemption }),
+    });
+
+    expect(prepared).toMatchObject({
+      outcome: 'missed',
+      expectedFeeMinor: 500,
+      failureCode: SERVICE_FEE_FAILURE_APPLICATION,
+    });
+
+    await createTopUpCheckoutSession({
+      prepared,
+      buildSessionParams: feeLine => ({
+        mode: 'payment',
+        line_items: feeLine ? [{ quantity: 1 }, feeLine] : [{ quantity: 1 }],
+      }),
+      createSession: async () => ({
+        id: 'cs_double_failure',
+        created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+      }),
+      deps: deps(store),
+    });
+
+    expect(await store.findByAssessmentKey(prepared.assessmentKey)).toMatchObject({
+      outcome: 'missed',
+      expectedFeeMinor: 500,
+      failureCode: SERVICE_FEE_FAILURE_APPLICATION,
+    });
+    expect(findEffectiveExemption).toHaveBeenCalledTimes(2);
+  });
+
   test('injected approved tax builds a positive fee line', async () => {
     const store = createMemoryAssessmentStore();
     const prepared = await prepareTopUpCheckoutFee({

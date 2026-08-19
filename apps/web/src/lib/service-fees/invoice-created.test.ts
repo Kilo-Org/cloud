@@ -457,6 +457,40 @@ describe('handleKiloPassInvoiceCreated', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  test('catch-all alert preserves organization flow from available metadata', async () => {
+    const store = createMemoryAssessmentStore();
+    const sendAlert: NonNullable<KiloPassInvoiceCreatedDependencies['sendAlert']> = jest.fn(
+      async () => undefined
+    );
+    const metadata: Stripe.Metadata = {
+      type: 'kilo-pass-org',
+      organizationId: 'org_1',
+      kiloUserId: 'user_1',
+      tier: 'tier_49',
+      cadence: 'monthly',
+    };
+
+    const result = await handleKiloPassInvoiceCreated({
+      invoice: draftInvoice({ metadata, has_more: true }),
+      stripe: stripeClient({
+        listLineItems: async () => {
+          throw new Error('Stripe line listing unavailable');
+        },
+      }),
+      store,
+      deps: deps({ sendAlert }),
+    });
+
+    expect(result.status).toBe('skipped');
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flow: 'organization_kilo_pass',
+        organizationId: 'org_1',
+        kiloUserId: 'user_1',
+      })
+    );
+  });
+
   test('tax resolution failure persists missed, alerts, and returns normally', async () => {
     const store = createMemoryAssessmentStore();
     const sendAlert: NonNullable<KiloPassInvoiceCreatedDependencies['sendAlert']> = jest.fn(

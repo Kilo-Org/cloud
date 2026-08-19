@@ -23,7 +23,12 @@ import {
 } from '@/lib/ai-gateway/providers/moonshotai';
 import { FRIENDLI_GLM_PUBLIC_ID, isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
+import {
+  ReasoningDetailsTransform,
+  type BYOKResult,
+  type Provider,
+  type ProviderId,
+} from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
@@ -143,7 +148,7 @@ export function applyAnthropicThinkingDefault(
 }
 
 /**
- * Inverse of the `mapReasoningContentToDetails` response transform: folds
+ * Inverse of the reasoning-content response transform: folds
  * client-supplied `reasoning_details` back into the `reasoning_content` string
  * the upstream speaks, so reasoning survives the round trip.
  */
@@ -153,7 +158,7 @@ export function applyReasoningDetailsTransform(
 ) {
   if (
     requestToMutate.kind === 'chat_completions' &&
-    provider.responseTransforms?.mapReasoningContentToDetails
+    provider.responseTransforms === ReasoningDetailsTransform.ReasoningContent
   ) {
     mapReasoningDetailsToReasoningContent(requestToMutate.body);
   }

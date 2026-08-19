@@ -1,9 +1,12 @@
 import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
+import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type { CustomLlmApiConfig } from '@kilocode/db';
-import type {
-  GatewayChatApiKind,
-  Provider,
-  TransformRequestContext,
+import {
+  ReasoningDetailsTransform,
+  type GatewayChatApiKind,
+  type Provider,
+  type TransformRequestContext,
 } from '@/lib/ai-gateway/providers/types';
 
 /**
@@ -21,7 +24,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function mapGeminiThoughtSignatures(context: TransformRequestContext) {
+function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
+  const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
+  const google = isRecord(extraContent.google) ? extraContent.google : {};
+  value.extra_content = {
+    ...extraContent,
+    google: {
+      ...google,
+      thought_signature: signature,
+    },
+  };
+}
+
+function mapGeminiReasoningDetails(context: TransformRequestContext) {
   if (context.request.kind !== 'chat_completions') {
     return;
   }
@@ -33,30 +48,36 @@ function mapGeminiThoughtSignatures(context: TransformRequestContext) {
 
     delete message.thoughtSignature;
 
-    if (!Array.isArray(message.tool_calls)) {
+    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    for (const toolCall of toolCalls) {
+      const legacySignature = toolCall.thoughtSignature;
+      delete toolCall.thoughtSignature;
+      if (typeof legacySignature === 'string') {
+        setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+    }
+
+    const reasoningDetails = message.reasoning_details;
+    delete message.reasoning_details;
+    if (!Array.isArray(reasoningDetails)) {
       continue;
     }
 
-    for (const toolCall of message.tool_calls) {
-      if (!isRecord(toolCall)) {
+    for (const detail of reasoningDetails) {
+      if (
+        !isRecord(detail) ||
+        detail.type !== ReasoningDetailType.Encrypted ||
+        typeof detail.data !== 'string' ||
+        detail.format !== ReasoningFormat.GoogleGeminiV1
+      ) {
         continue;
       }
 
-      const signature = toolCall.thoughtSignature;
-      delete toolCall.thoughtSignature;
-      if (typeof signature !== 'string') {
-        continue;
-      }
-
-      const extraContent = isRecord(toolCall.extra_content) ? toolCall.extra_content : {};
-      const google = isRecord(extraContent.google) ? extraContent.google : {};
-      toolCall.extra_content = {
-        ...extraContent,
-        google: {
-          ...google,
-          thought_signature: signature,
-        },
-      };
+      const toolCall =
+        typeof detail.id === 'string'
+          ? toolCalls.find(candidate => candidate.id === detail.id)
+          : toolCalls[0];
+      setGeminiThoughtSignature(toolCall ?? message, detail.data);
     }
   }
 }
@@ -80,7 +101,7 @@ function applyGeminiReasoningTransform(context: TransformRequestContext, reasoni
     };
   }
 
-  mapGeminiThoughtSignatures(context);
+  mapGeminiReasoningDetails(context);
 }
 
 function renameJsonRefProperties(value: unknown): boolean {
@@ -161,7 +182,7 @@ export function buildDirectProvider(
     apiKey: upstream.api_key,
     supportedChatApis,
     responseTransforms: upstream.use_gemini_reasoning_transform
-      ? { mapGeminiThoughtContent: true, mapReasoningContentToDetails: false }
+      ? ReasoningDetailsTransform.GeminiThought
       : null,
     async transformRequest(context) {
       const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);

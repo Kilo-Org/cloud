@@ -1,5 +1,6 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import {
+  type ReasoningDetailEncrypted,
   type ReasoningDetailText,
   ReasoningDetailType,
 } from '@/lib/ai-gateway/custom-llm/reasoning-details';
@@ -7,7 +8,11 @@ import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
+import {
+  type ProviderId,
+  type ProviderResponseTransforms,
+  ReasoningDetailsTransform,
+} from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -408,22 +413,90 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isGeminiThoughtDelta(delta: Record<string, unknown>) {
-  const extraContent = delta.extra_content;
+function getGoogleExtraContent(value: Record<string, unknown>) {
+  const extraContent = value.extra_content;
   if (!isRecord(extraContent)) {
-    return false;
+    return null;
   }
   const google = extraContent.google;
-  return isRecord(google) && google.thought === true;
+  return isRecord(google) ? google : null;
 }
 
-function rewriteGeminiThoughtContent(delta: unknown) {
-  if (!isRecord(delta) || typeof delta.content !== 'string' || !isGeminiThoughtDelta(delta)) {
+function deleteGoogleExtraContentProperty(value: Record<string, unknown>, property: string) {
+  const extraContent = value.extra_content;
+  const google = getGoogleExtraContent(value);
+  if (!isRecord(extraContent) || !google) {
     return;
   }
 
-  delta.reasoning_content = delta.content;
-  delete delta.content;
+  delete google[property];
+  if (Object.keys(google).length === 0) {
+    delete extraContent.google;
+  }
+  if (Object.keys(extraContent).length === 0) {
+    delete value.extra_content;
+  }
+}
+
+/**
+ * Normalizes Google's OpenAI-compatible thought fields to OpenRouter reasoning
+ * details so clients can retain opaque Gemini signatures between tool calls.
+ */
+function rewriteGeminiThoughtToReasoningDetails(delta: unknown) {
+  if (!isRecord(delta)) {
+    return;
+  }
+
+  const details: Array<ReasoningDetailText | ReasoningDetailEncrypted> = [];
+  const google = getGoogleExtraContent(delta);
+  if (typeof delta.content === 'string' && google?.thought === true) {
+    details.push({
+      type: ReasoningDetailType.Text,
+      text: delta.content,
+      index: 0,
+      format: ReasoningFormat.GoogleGeminiV1,
+    });
+    delete delta.content;
+    deleteGoogleExtraContentProperty(delta, 'thought');
+  }
+
+  if (typeof google?.thought_signature === 'string') {
+    details.push({
+      type: ReasoningDetailType.Encrypted,
+      data: google.thought_signature,
+      index: 0,
+      format: ReasoningFormat.GoogleGeminiV1,
+    });
+    deleteGoogleExtraContentProperty(delta, 'thought_signature');
+  }
+
+  if (Array.isArray(delta.tool_calls)) {
+    for (const toolCall of delta.tool_calls) {
+      if (!isRecord(toolCall)) {
+        continue;
+      }
+
+      const signature = getGoogleExtraContent(toolCall)?.thought_signature;
+      if (typeof signature !== 'string') {
+        continue;
+      }
+
+      details.push({
+        type: ReasoningDetailType.Encrypted,
+        data: signature,
+        id: typeof toolCall.id === 'string' ? toolCall.id : undefined,
+        index: 0,
+        format: ReasoningFormat.GoogleGeminiV1,
+      });
+      deleteGoogleExtraContentProperty(toolCall, 'thought_signature');
+    }
+  }
+
+  if (details.length > 0) {
+    delta.reasoning_details = Array.isArray(delta.reasoning_details)
+      ? [...delta.reasoning_details, ...details]
+      : details;
+  }
 }
 
 /**
@@ -486,7 +559,12 @@ export async function rewriteModelResponse_ChatCompletions({
     if (usage) {
       rewriteUsage(usage, removeCost);
     }
-    if (responseTransforms?.mapReasoningContentToDetails) {
+    if (responseTransforms === ReasoningDetailsTransform.GeminiThought) {
+      for (const choice of json.choices ?? []) {
+        rewriteGeminiThoughtToReasoningDetails(choice.message);
+      }
+    }
+    if (responseTransforms === ReasoningDetailsTransform.ReasoningContent) {
       for (const choice of json.choices ?? []) {
         rewriteReasoningContentToReasoningDetails(choice.message);
       }
@@ -546,10 +624,10 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.role === null) {
               delete delta.role;
             }
-            if (responseTransforms?.mapGeminiThoughtContent) {
-              rewriteGeminiThoughtContent(delta);
+            if (responseTransforms === ReasoningDetailsTransform.GeminiThought) {
+              rewriteGeminiThoughtToReasoningDetails(delta);
             }
-            if (responseTransforms?.mapReasoningContentToDetails) {
+            if (responseTransforms === ReasoningDetailsTransform.ReasoningContent) {
               rewriteReasoningContentToReasoningDetails(delta);
             }
           }

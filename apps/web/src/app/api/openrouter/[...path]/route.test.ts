@@ -12,7 +12,7 @@ import {
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
@@ -368,10 +368,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
-    const responseTransforms = {
-      mapGeminiThoughtContent: true,
-      mapReasoningContentToDetails: false,
-    };
+    const responseTransforms = ReasoningDetailsTransform.GeminiThought;
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider: { ...provider, responseTransforms },

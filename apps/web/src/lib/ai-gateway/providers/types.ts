@@ -40,10 +40,12 @@ export type GatewayChatApiKind = GatewayRequest['kind'];
 
 export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind, string>>>;
 
-export type ProviderResponseTransforms = {
-  mapGeminiThoughtContent: boolean;
-  mapReasoningContentToDetails: boolean;
-};
+export enum ReasoningDetailsTransform {
+  GeminiThought = 'gemini-thought',
+  ReasoningContent = 'reasoning-content',
+}
+
+export type ProviderResponseTransforms = ReasoningDetailsTransform;
 
 export type Provider = {
   id: ProviderId;

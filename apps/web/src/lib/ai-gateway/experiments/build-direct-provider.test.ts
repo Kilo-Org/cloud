@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { CustomLlmApiConfigSchema } from '@kilocode/db';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 import { buildDirectProvider } from './build-direct-provider';
 
 type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' }>;
@@ -46,27 +47,32 @@ function makeRequest(): ChatCompletionRequest {
     content: 'result',
     tool_call_id: 'call-1',
   };
+  const assistantMessage = {
+    role: 'assistant' as const,
+    content: null,
+    tool_calls: [toolCall],
+  };
+  Object.assign(assistantMessage, {
+    reasoning_details: [
+      {
+        type: 'reasoning.encrypted' as const,
+        data: 'assistant-signature',
+        id: 'call-1',
+        index: 0,
+        format: 'google-gemini-v1' as const,
+      },
+    ],
+  });
   const request: ChatCompletionRequest = {
     kind: 'chat_completions',
     body: {
       model: 'public-model',
       stream: false,
-      messages: [
-        {
-          role: 'assistant',
-          content: null,
-          tool_calls: [toolCall],
-        },
-        toolMessage,
-      ],
+      messages: [assistantMessage, toolMessage],
     },
   };
 
-  Object.assign(toolCall, {
-    thoughtSignature: 'assistant-signature',
-    extra_content: { trace_id: 'trace-1' },
-  });
-  Object.assign(toolMessage, { thoughtSignature: 'tool-signature' });
+  Object.assign(toolCall, { extra_content: { trace_id: 'trace-1' } });
 
   return request;
 }
@@ -96,10 +102,7 @@ describe('buildDirectProvider response transforms', () => {
       use_gemini_reasoning_transform: true,
     });
 
-    expect(provider.responseTransforms).toEqual({
-      mapGeminiThoughtContent: true,
-      mapReasoningContentToDetails: false,
-    });
+    expect(provider.responseTransforms).toBe(ReasoningDetailsTransform.GeminiThought);
   });
 
   it('sets response transforms to null when the transform is not enabled', () => {
@@ -114,7 +117,7 @@ describe('buildDirectProvider response transforms', () => {
 });
 
 describe('buildDirectProvider Gemini reasoning transform', () => {
-  it('maps assistant tool-call signatures and removes camel-case transport fields', async () => {
+  it('maps encrypted reasoning details to native tool-call signatures', async () => {
     const request = makeRequest();
 
     await transformRequest(request, {
@@ -144,6 +147,65 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
         tool_call_id: 'call-1',
       },
     ]);
+  });
+
+  it('maps a message-level encrypted detail to a native signature', async () => {
+    const request: ChatCompletionRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'public-model',
+        messages: [{ role: 'assistant', content: 'answer' }],
+      },
+    };
+    Object.assign(request.body.messages[0], {
+      reasoning_details: [
+        {
+          type: 'reasoning.encrypted',
+          data: 'root-signature',
+          format: 'google-gemini-v1',
+        },
+      ],
+    });
+
+    await transformRequest(request, { use_gemini_reasoning_transform: true });
+
+    expect(request.body.messages[0]).toEqual({
+      role: 'assistant',
+      content: 'answer',
+      extra_content: { google: { thought_signature: 'root-signature' } },
+    });
+  });
+
+  it('does not map encrypted details from other reasoning formats', async () => {
+    const request = makeRequest();
+    const assistant = request.body.messages[0] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [
+      {
+        type: 'reasoning.encrypted',
+        data: 'anthropic-signature',
+        format: 'anthropic-claude-v1',
+      },
+    ];
+
+    await transformRequest(request, { use_gemini_reasoning_transform: true });
+
+    expect(request.body.messages[0]).not.toHaveProperty('reasoning_details');
+    expect(request.body.messages[0]).not.toHaveProperty('extra_content.google.thought_signature');
+  });
+
+  it('continues mapping legacy tool-call signatures', async () => {
+    const request = makeRequest();
+    const assistant = request.body.messages[0] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    Object.assign(assistant.tool_calls as object[], [{ thoughtSignature: 'legacy-signature' }]);
+
+    await transformRequest(request, { use_gemini_reasoning_transform: true });
+
+    expect(request.body.messages[0]).toHaveProperty(
+      'tool_calls.0.extra_content.google.thought_signature',
+      'legacy-signature'
+    );
+    expect(request.body.messages[0]).not.toHaveProperty('tool_calls.0.thoughtSignature');
   });
 
   it('moves reasoning_effort into google.thinking_config and keeps extra_body', async () => {
@@ -200,16 +262,22 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
     expect(request.body).not.toHaveProperty('reasoning_effort');
   });
 
-  it('preserves signatures when the transform is not enabled', async () => {
+  it('preserves reasoning details when the transform is not enabled', async () => {
     const request = makeRequest();
 
     await transformRequest(request);
 
     expect(request.body.messages).toMatchObject([
       {
-        tool_calls: [{ thoughtSignature: 'assistant-signature' }],
+        reasoning_details: [
+          {
+            type: 'reasoning.encrypted',
+            data: 'assistant-signature',
+            id: 'call-1',
+          },
+        ],
       },
-      { thoughtSignature: 'tool-signature' },
+      { role: 'tool' },
     ]);
   });
 });

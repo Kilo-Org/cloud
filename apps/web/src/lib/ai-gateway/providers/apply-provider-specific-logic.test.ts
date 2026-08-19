@@ -7,7 +7,11 @@ import {
   applyReasoningDetailsTransform,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
+import {
+  ReasoningDetailsTransform,
+  type Provider,
+  type ProviderId,
+} from '@/lib/ai-gateway/providers/types';
 import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
@@ -120,7 +124,7 @@ describe('applyReasoningDetailsTransform', () => {
     const request = makeReasoningRequest();
 
     applyReasoningDetailsTransform(
-      makeProvider({ mapGeminiThoughtContent: false, mapReasoningContentToDetails: true }),
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
       request
     );
 
@@ -129,7 +133,7 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
-  it.each([null, { mapGeminiThoughtContent: false, mapReasoningContentToDetails: false }])(
+  it.each([null, ReasoningDetailsTransform.GeminiThought])(
     'leaves reasoning_details untouched with transforms %p',
     responseTransforms => {
       const request = makeReasoningRequest();
@@ -146,7 +150,7 @@ describe('applyReasoningDetailsTransform', () => {
     const request = makeMessagesRequest('vendor/model');
 
     applyReasoningDetailsTransform(
-      makeProvider({ mapGeminiThoughtContent: false, mapReasoningContentToDetails: true }),
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
       request
     );
 

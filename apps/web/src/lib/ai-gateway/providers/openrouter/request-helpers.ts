@@ -295,7 +295,7 @@ export function removeChatCompletionsToolNames(request: OpenRouterChatCompletion
 }
 
 /**
- * Inverse of the `mapReasoningContentToDetails` response transform: folds
+ * Inverse of the reasoning-content response transform: folds
  * OpenRouter-style `reasoning_details` back into the DeepSeek-style
  * `reasoning_content` string that upstreams like Friendli and Perplexity
  * expect on chat completions messages.

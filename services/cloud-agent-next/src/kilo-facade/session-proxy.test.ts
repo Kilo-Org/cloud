@@ -67,7 +67,14 @@ describe('resolveLiveWrapperTarget billing admission', () => {
         userId: 'user_facade',
         cloudAgentSessionId: 'agent_facade',
       })
-    ).resolves.toBeNull();
+    ).resolves.toEqual({
+      kind: 'billing-rejected',
+      admission: {
+        success: false,
+        code: 'insufficient_credits',
+        message: 'Low balance',
+      },
+    });
     expect(ensureBillingAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         sandboxId: 'ses-facade',
@@ -93,7 +100,7 @@ describe('resolveLiveWrapperTarget billing admission', () => {
         userId: 'user_facade',
         cloudAgentSessionId: 'agent_facade',
       })
-    ).resolves.toMatchObject({ port: 5000 });
+    ).resolves.toMatchObject({ kind: 'available', target: { port: 5000 } });
   });
 
   it('allows shadow acquisition when the callable billing block proxy rejects', async () => {
@@ -112,7 +119,7 @@ describe('resolveLiveWrapperTarget billing admission', () => {
         userId: 'user_facade',
         cloudAgentSessionId: 'agent_facade',
       })
-    ).resolves.toMatchObject({ port: 5000 });
+    ).resolves.toMatchObject({ kind: 'available', target: { port: 5000 } });
   });
 
   it('fails enforced acquisition closed when the callable billing block proxy rejects', async () => {
@@ -136,7 +143,10 @@ describe('resolveLiveWrapperTarget billing admission', () => {
         userId: 'user_facade',
         cloudAgentSessionId: 'agent_facade',
       })
-    ).resolves.toBeNull();
+    ).resolves.toMatchObject({
+      kind: 'billing-rejected',
+      admission: { code: 'meter_unavailable' },
+    });
     expect(ensureBillingAdmission).toHaveBeenCalledOnce();
     expect(mocks.findWrapperForSession).not.toHaveBeenCalled();
   });

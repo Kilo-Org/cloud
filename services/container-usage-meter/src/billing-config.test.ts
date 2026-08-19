@@ -83,6 +83,61 @@ describe('container billing configuration', () => {
     );
   });
 
+  it('allows the Cloud Agent family token for current and future service classes only', () => {
+    const config = billingConfigFromEnv(
+      env({
+        CONTAINER_BILLING_SERVICES: 'gastown,cloud-agent-next',
+        CONTAINER_BILLING_USER_IDS: 'gastown-user',
+        CONTAINER_BILLING_ORG_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: 'cloud-agent-user',
+        CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: '',
+        CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+      })
+    );
+
+    expect(
+      billingModeFor(config, 'cloud-agent-next-sandbox', { type: 'user', id: 'cloud-agent-user' })
+    ).toBe('paid');
+    expect(
+      billingModeFor(config, 'cloud-agent-next-future-class', {
+        type: 'user',
+        id: 'cloud-agent-user',
+      })
+    ).toBe('paid');
+    expect(
+      billingModeFor(config, 'cloud-agent-next', { type: 'user', id: 'cloud-agent-user' })
+    ).toBe('shadow');
+    expect(
+      billingModeFor(config, 'cloud-agent-other-sandbox', {
+        type: 'user',
+        id: 'cloud-agent-user',
+      })
+    ).toBe('shadow');
+  });
+
+  it('keeps exact Cloud Agent class tokens available for per-class rollout', () => {
+    const config = billingConfigFromEnv(
+      env({
+        CONTAINER_BILLING_SERVICES: 'cloud-agent-next-sandbox',
+        CONTAINER_BILLING_USER_IDS: '',
+        CONTAINER_BILLING_ORG_IDS: '',
+        CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: 'cloud-agent-user',
+        CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: '',
+        CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS: '10000000',
+      })
+    );
+
+    expect(
+      billingModeFor(config, 'cloud-agent-next-sandbox', { type: 'user', id: 'cloud-agent-user' })
+    ).toBe('paid');
+    expect(
+      billingModeFor(config, 'cloud-agent-next-future-class', {
+        type: 'user',
+        id: 'cloud-agent-user',
+      })
+    ).toBe('shadow');
+  });
+
   it('requires Cloud Agent service names as well as Cloud Agent payer lists', () => {
     const config = billingConfigFromEnv(
       env({

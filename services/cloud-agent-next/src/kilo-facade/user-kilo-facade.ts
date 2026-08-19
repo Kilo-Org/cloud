@@ -42,7 +42,7 @@ import {
   buildWrapperKiloProxyUrl,
   decideSessionKiloFacadeRoute,
   resolveLiveWrapperTarget,
-  type LiveWrapperTarget,
+  type LiveWrapperResolution,
   type SessionKiloFacadeDecision,
   type SessionKiloFacadePolicyInput,
 } from './session-proxy.js';
@@ -115,7 +115,7 @@ export type KiloFacadeRequestDeps = {
     env: Env;
     userId: string;
     cloudAgentSessionId: string;
-  }) => Promise<LiveWrapperTarget | null>;
+  }) => Promise<LiveWrapperResolution | null>;
   admitPrompt?: (params: {
     env: Env;
     userId: string;
@@ -142,8 +142,50 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function facadeError(status: number, code: string, message: string): Response {
-  return Response.json({ error: code, message }, { status });
+function facadeError(
+  status: number,
+  code: string,
+  message: string,
+  details?: Record<string, number>
+): Response {
+  return Response.json({ error: code, message, ...details }, { status });
+}
+
+function billingAdmissionRejectedResponse(
+  admission: Extract<LiveWrapperResolution, { kind: 'billing-rejected' }>['admission']
+): Response {
+  const details = {
+    ...(admission.remainingMicrodollars === undefined
+      ? {}
+      : { remainingMicrodollars: admission.remainingMicrodollars }),
+    ...(admission.minimumRequiredMicrodollars === undefined
+      ? {}
+      : { minimumRequiredMicrodollars: admission.minimumRequiredMicrodollars }),
+  };
+  switch (admission.code) {
+    case 'insufficient_credits':
+      return facadeError(
+        402,
+        'KILO_BILLING_PAYMENT_REQUIRED',
+        'Container billing requires additional credits',
+        details
+      );
+    case 'stopping':
+      return facadeError(
+        409,
+        'KILO_BILLING_BLOCKED',
+        'Container billing is unavailable while the session is stopping',
+        details
+      );
+    case 'meter_unavailable':
+    case 'configuration_mismatch':
+      return facadeError(
+        503,
+        'KILO_BILLING_UNAVAILABLE',
+        'Container billing is temporarily unavailable',
+        details
+      );
+  }
 }
 
 function kiloRelativePath(pathname: string): string {
@@ -1099,7 +1141,7 @@ async function proxyOwnedKiloSessionRequest(params: {
         })
       : null;
 
-  let liveWrapper: LiveWrapperTarget | null;
+  let liveWrapper: LiveWrapperResolution | null;
   try {
     liveWrapper = await (deps?.resolveLiveWrapper ?? resolveLiveWrapperTarget)({
       env,
@@ -1111,7 +1153,13 @@ async function proxyOwnedKiloSessionRequest(params: {
     if (fallback) return fallback;
     throw error;
   }
-  if (!liveWrapper) {
+  if (liveWrapper === null) {
+    liveWrapper = { kind: 'unavailable' };
+  }
+  if (liveWrapper.kind === 'billing-rejected') {
+    return billingAdmissionRejectedResponse(liveWrapper.admission);
+  }
+  if (liveWrapper.kind === 'unavailable') {
     const fallback = persistedFallback();
     if (fallback) return fallback;
     return facadeError(
@@ -1121,18 +1169,20 @@ async function proxyOwnedKiloSessionRequest(params: {
     );
   }
 
+  const target = liveWrapper.target;
+
   const upstreamSearchParams = new URLSearchParams(url.searchParams);
   upstreamSearchParams.delete('directory');
   const upstreamSearch = upstreamSearchParams.size > 0 ? `?${upstreamSearchParams.toString()}` : '';
   const targetUrl = buildWrapperKiloProxyUrl({
-    wrapperPort: liveWrapper.port,
+    wrapperPort: target.port,
     kiloRelativePath: kiloPath,
     search: upstreamSearch,
   });
   const proxyRequest = createProxyRequest(request, targetUrl);
   let response: Response;
   try {
-    response = await liveWrapper.sandbox.containerFetch(proxyRequest, liveWrapper.port);
+    response = await target.sandbox.containerFetch(proxyRequest, target.port);
   } catch (error) {
     const fallback = persistedFallback();
     if (fallback) return fallback;

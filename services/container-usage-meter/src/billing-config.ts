@@ -93,8 +93,12 @@ export function billingModeFor(
   service: string,
   subject: { type: 'user' | 'org'; id: string }
 ): 'shadow' | 'paid' {
-  if (!config.enabled || !config.services.has(service)) return 'shadow';
-  const payerIds = service.startsWith(CLOUD_AGENT_SERVICE_PREFIX)
+  const isCloudAgentService = service.startsWith(CLOUD_AGENT_SERVICE_PREFIX);
+  const serviceEnabled =
+    config.services.has(service) ||
+    (isCloudAgentService && config.services.has('cloud-agent-next'));
+  if (!config.enabled || !serviceEnabled) return 'shadow';
+  const payerIds = isCloudAgentService
     ? subject.type === 'user'
       ? config.cloudAgentUserIds
       : config.cloudAgentOrgIds

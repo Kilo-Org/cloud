@@ -19,7 +19,19 @@ describe('getChildSessionSheetState', () => {
   });
 
   it('shows an empty state after successful hydration with no messages', () => {
-    expect(getChildSessionSheetState({ status: 'ready' }, 0)).toBe('empty');
+    expect(
+      getChildSessionSheetState(
+        {
+          status: 'ready',
+          cursor: null,
+          hasOlder: false,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        },
+        0
+      )
+    ).toBe('empty');
   });
 
   it('shows an error after failed hydration with no messages', () => {

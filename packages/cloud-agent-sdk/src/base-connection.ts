@@ -140,6 +140,14 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
           // Continue with existing auth — the old ticket might still work
         }
         if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+        // The async refresh gap can let the in-flight socket finish its
+        // handshake and receive its first message. If it did, there is nothing
+        // to replace — reconnecting would close a healthy socket and open a
+        // duplicate (the two-socket `/stream` open). This is the NetInfo
+        // `unknown → online` race: handleOnline decides to reconnect while the
+        // socket is still CONNECTING, but the socket establishes before the
+        // refresh resolves.
+        if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
       }
       connectInternal(0, expectedGeneration, true);
     } finally {

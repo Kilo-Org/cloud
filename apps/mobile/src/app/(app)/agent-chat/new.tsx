@@ -106,7 +106,7 @@ function NewSessionScreenBody() {
   // settles.
   const initialPrompt = resolvePrefillOverDraft(
     sharePrefillText,
-    draftState.settled ? draftState.text : null
+    draftState.settled ? draftState.value : null
   );
 
   // Save the new-session draft debounced on every text change, and flush the

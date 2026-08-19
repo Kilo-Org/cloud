@@ -25,7 +25,34 @@ import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-q
 import { flattenFilePages } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
 import { getViewedFiles, toggleViewedFile } from '@/lib/pr-review/viewed-files';
+import { withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
+
+/**
+ * Build the file-list infinite-query options. Kept as a pure builder so the
+ * retention bound is testable without mounting the hook.
+ */
+export function buildPrReviewFileListQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  args: { owner: string; repo: string; number: number; enabled: boolean }
+) {
+  const { owner, repo, number, enabled } = args;
+  return withInfiniteRetention(
+    trpc.githubPrReview.listFiles.infiniteQueryOptions(
+      { owner, repo, number },
+      {
+        staleTime: 30_000,
+        enabled,
+        getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
+      }
+    ),
+    // Cap at the server's page ceiling so we never request page 61.
+    // 60 pages × 100/page = 6,000 files, which is well above the
+    // 3,000 truncation banner so fetch-to-completion still has
+    // headroom to actually finish.
+    PR_REVIEW_MAX_PAGES
+  );
+}
 
 export function usePrReviewFileListQuery(args: {
   owner: string;
@@ -36,19 +63,7 @@ export function usePrReviewFileListQuery(args: {
   const { owner, repo, number, enabled } = args;
   const trpc = useTRPC();
   const query = useInfiniteQuery(
-    trpc.githubPrReview.listFiles.infiniteQueryOptions(
-      { owner, repo, number },
-      {
-        staleTime: 30_000,
-        enabled,
-        getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
-        // Cap at the server's page ceiling so we never request page 61.
-        // 60 pages × 100/page = 6,000 files, which is well above the
-        // 3,000 truncation banner so fetch-to-completion still has
-        // headroom to actually finish.
-        maxPages: PR_REVIEW_MAX_PAGES,
-      }
-    )
+    buildPrReviewFileListQueryOptions(trpc, { owner, repo, number, enabled })
   );
 
   const errorState = query.error ? classifyPrReviewQueryState(query.error) : null;

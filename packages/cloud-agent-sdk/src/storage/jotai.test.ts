@@ -258,6 +258,86 @@ describe('createJotaiStorage', () => {
     });
   });
 
+  describe('delta coalescing', () => {
+    test('three deltas produce one publication after one flush', () => {
+      let flush: (() => void) | null = null;
+      const coalesced = createJotaiStorage(store, {
+        schedule: cb => {
+          flush = cb;
+        },
+      });
+
+      coalesced.upsertPart('msg-1', makePart('p-1', 'msg-1', ''));
+
+      const revCb = jest.fn();
+      store.sub(coalesced.atoms.partsRevision, revCb);
+      const partsCb = jest.fn();
+      coalesced.subscribe('parts:msg-1', partsCb);
+
+      coalesced.applyPartDelta('msg-1', 'p-1', 'text', 'a');
+      coalesced.applyPartDelta('msg-1', 'p-1', 'text', 'b');
+      coalesced.applyPartDelta('msg-1', 'p-1', 'text', 'c');
+
+      // State write is immediate; publication is deferred.
+      expect((coalesced.getParts('msg-1')[0] as Part & { text: string }).text).toBe('abc');
+      expect(revCb).not.toHaveBeenCalled();
+      expect(partsCb).not.toHaveBeenCalled();
+      expect(flush).not.toBeNull();
+
+      flush!();
+
+      expect(revCb).toHaveBeenCalledTimes(1);
+      expect(partsCb).toHaveBeenCalledTimes(1);
+    });
+
+    test('applyPartDelta then upsertPart publishes the delta before the structural publish', () => {
+      const coalesced = createJotaiStorage(store, {
+        schedule: () => {
+          // Defer the flush so the pending delta is still unflushed when
+          // `upsertPart` runs and must flush it first.
+        },
+      });
+
+      coalesced.upsertPart('msg-1', makePart('p-1', 'msg-1', ''));
+
+      const snapshots: string[] = [];
+      coalesced.subscribe('parts:msg-1', () => {
+        snapshots.push(
+          coalesced
+            .getParts('msg-1')
+            .map(p => (p as Part & { text?: string }).text ?? '')
+            .join(',')
+        );
+      });
+
+      coalesced.applyPartDelta('msg-1', 'p-1', 'text', 'a');
+      coalesced.upsertPart('msg-1', makePart('p-2', 'msg-1', 'second'));
+
+      // The pending delta publication runs first (p-1 = 'a'), then the
+      // structural publish (p-1 = 'a', p-2 = 'second').
+      expect(snapshots).toEqual(['a', 'a,second']);
+    });
+
+    test('getParts returns new parts after a delta write even with a pending flush', () => {
+      const coalesced = createJotaiStorage(store, {
+        schedule: () => {
+          // Defer the flush so the delta stays unflushed.
+        },
+      });
+
+      coalesced.upsertPart('msg-1', makePart('p-1', 'msg-1', 'hel'));
+      // Cache a snapshot for msg-1.
+      expect((coalesced.getParts('msg-1')[0] as Part & { text: string }).text).toBe('hel');
+
+      // Delta write with a pending (deferred) flush.
+      coalesced.applyPartDelta('msg-1', 'p-1', 'text', 'lo');
+
+      // getParts must rebuild from the freshly written parts, not the stale
+      // cached snapshot, even though the flush has not run yet.
+      expect((coalesced.getParts('msg-1')[0] as Part & { text: string }).text).toBe('hello');
+    });
+  });
+
   describe('clear', () => {
     test('resets all state', () => {
       s.upsertMessage(makeMsg('msg-1'));
@@ -330,12 +410,15 @@ describe('createJotaiStorage', () => {
       expect(first).not.toBe(second);
     });
 
-    test('parts atom gets new Map reference on each mutation', () => {
+    test('parts atom keeps one Map reference and bumps partsRevision', () => {
       s.upsertPart('msg-1', makePart('p-1', 'msg-1'));
       const first = store.get(s.atoms.parts);
+      const firstRev = store.get(s.atoms.partsRevision);
       s.upsertPart('msg-1', makePart('p-2', 'msg-1'));
       const second = store.get(s.atoms.parts);
-      expect(first).not.toBe(second);
+      const secondRev = store.get(s.atoms.partsRevision);
+      expect(first).toBe(second);
+      expect(secondRev).toBe(firstRev + 1);
     });
 
     test('clear resets all atoms', () => {

@@ -13,6 +13,7 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
   type UserDeletionManualEvidence,
+  type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
@@ -291,7 +292,10 @@ async function persistTaskDispositionTx(
         requestId: request.id,
         stepKey,
         eventType: 'continue',
-        details: { processed_count: outcome.progress?.processed_count },
+        details: {
+          processed_count: outcome.progress?.processed_count,
+          scanned_count: outcome.progress?.scanned_count,
+        },
       });
       break;
     case 'retry': {
@@ -306,6 +310,7 @@ async function persistTaskDispositionTx(
           errorCode: outcome.errorCode,
           windowAttempt: nextWindow,
           lifetimeAttempt: nextLifetime,
+          progress: outcome.progress,
         });
         break;
       }
@@ -321,6 +326,7 @@ async function persistTaskDispositionTx(
           lifetime_attempt_count: nextLifetime,
           last_error_code: outcome.errorCode,
           rate_limited_since: null,
+          progress_json: outcome.progress ?? step.progress_json,
         })
         .where(eq(user_deletion_steps.id, step.id));
       await writeDeletionActivity(tx, {
@@ -350,6 +356,7 @@ async function persistTaskDispositionTx(
           windowAttempt: step.window_attempt_count,
           lifetimeAttempt: step.lifetime_attempt_count,
           rateLimitedSince: step.rate_limited_since,
+          progress: outcome.progress,
         });
         break;
       }
@@ -366,6 +373,7 @@ async function persistTaskDispositionTx(
           claimed_until: null,
           last_error_code: 'rate_limited',
           rate_limited_since: step.rate_limited_since ?? now,
+          progress_json: outcome.progress ?? step.progress_json,
         })
         .where(eq(user_deletion_steps.id, step.id));
       await writeDeletionActivity(tx, {
@@ -389,6 +397,7 @@ async function persistTaskDispositionTx(
         resourceHmac: outcome.resourceHmac,
         windowAttempt: step.window_attempt_count,
         lifetimeAttempt: step.lifetime_attempt_count,
+        progress: outcome.progress,
       });
       break;
     case 'manual_action_required':
@@ -451,6 +460,7 @@ async function persistTaskDispositionTx(
         details: {
           processed_count:
             outcome.kind === 'succeeded' ? outcome.progress?.processed_count : undefined,
+          scanned_count: outcome.kind === 'succeeded' ? outcome.progress?.scanned_count : undefined,
         },
       });
       break;
@@ -765,6 +775,7 @@ async function moveToAttention(
     windowAttempt: number;
     lifetimeAttempt: number;
     rateLimitedSince?: string | null;
+    progress?: UserDeletionTaskProgress;
   }
 ): Promise<void> {
   await tx
@@ -777,6 +788,7 @@ async function moveToAttention(
       lifetime_attempt_count: params.lifetimeAttempt,
       last_error_code: params.errorCode,
       rate_limited_since: params.rateLimitedSince ?? null,
+      ...(params.progress ? { progress_json: params.progress } : {}),
     })
     .where(eq(user_deletion_steps.id, params.stepId));
   await writeDeletionAudit(tx, {

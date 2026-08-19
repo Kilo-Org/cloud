@@ -39,6 +39,8 @@ import { deletionAttentionHint } from '@/lib/user/deletion-queue/deletion-hints'
 import {
   deletionStepDescription,
   deletionStepLabel,
+  deletionStepProgressLabel,
+  formatActivityDetail,
   formatAge,
   formatTimestamp,
   humanizeToken,
@@ -304,9 +306,7 @@ export function DeletionQueueDetailContent({
                     </span>
                   </div>
                   <p className="text-muted-foreground font-mono text-xs">
-                    {[item.stepKey, item.details.errorCode, item.details.httpStatusClass]
-                      .filter(Boolean)
-                      .join(' · ') || '—'}
+                    {formatActivityDetail(item)}
                   </p>
                 </div>
               ))
@@ -369,7 +369,6 @@ function CompactDeletionDetail({
 }) {
   const request = detail.request;
   const ticket = request.pylonTicket ? `#${request.pylonTicket.replace(/^#/, '')}` : null;
-  const currentTask = detail.tasks.find(task => !isFinishedTask(task.status));
   const stuckTask = detail.tasks.find(
     task => task.status === 'needs_attention' || task.status === 'manual_action_required'
   );
@@ -457,6 +456,7 @@ function CompactDeletionDetail({
               return task ? [task] : [];
             });
             if (tasks.length === 0) return null;
+            const unlocked = isProgressGroupUnlocked(detail.tasks, groupIndex);
             return (
               <div key={group.label} className="flex flex-col gap-2">
                 {groupIndex > 0 ? (
@@ -479,7 +479,7 @@ function CompactDeletionDetail({
                     <ProgressStepTile
                       key={task.stepKey}
                       task={task}
-                      current={currentTask?.stepKey === task.stepKey}
+                      current={unlocked && isOpenTask(task.status)}
                     />
                   ))}
                 </div>
@@ -506,11 +506,7 @@ function CompactDeletionDetail({
                     <span className="font-medium">{humanizeToken(item.eventType)}</span>
                     <span className="text-muted-foreground">{formatTimestamp(item.createdAt)}</span>
                   </div>
-                  <p className="text-muted-foreground font-mono">
-                    {[item.stepKey ? deletionStepLabel(item.stepKey) : null, item.details.errorCode]
-                      .filter(Boolean)
-                      .join(' · ') || '—'}
-                  </p>
+                  <p className="text-muted-foreground font-mono">{formatActivityDetail(item)}</p>
                 </div>
               ))
             )}
@@ -598,9 +594,39 @@ function isFinishedTask(status: string): boolean {
   return status === 'succeeded' || status === 'not_applicable' || status === 'manually_verified';
 }
 
+function isStuckTask(status: string): boolean {
+  return status === 'needs_attention' || status === 'manual_action_required';
+}
+
+function isOpenTask(status: string): boolean {
+  return !isFinishedTask(status) && !isStuckTask(status);
+}
+
+function isProgressGroupUnlocked(tasks: Task[], groupIndex: number): boolean {
+  return PROGRESS_GROUPS.slice(0, groupIndex).every(group =>
+    group.stepKeys.every(stepKey => {
+      const task = tasks.find(item => item.stepKey === stepKey);
+      return !task || isFinishedTask(task.status);
+    })
+  );
+}
+
 function ProgressStepTile({ task, current }: { task: Task; current: boolean }) {
   const finished = isFinishedTask(task.status);
-  const stuck = task.status === 'needs_attention' || task.status === 'manual_action_required';
+  const stuck = isStuckTask(task.status);
+  const countLabel = deletionStepProgressLabel(
+    task.stepKey,
+    task.processedCount,
+    task.scannedCount
+  );
+  const description =
+    stuck && task.lastErrorCode
+      ? task.lastErrorCode
+      : current && countLabel
+        ? `${countLabel} so far`
+        : finished && countLabel
+          ? countLabel
+          : deletionStepDescription(task.stepKey);
   return (
     <div
       className={cn(
@@ -609,19 +635,17 @@ function ProgressStepTile({ task, current }: { task: Task; current: boolean }) {
           ? 'border-status-success-border bg-status-success-surface'
           : stuck
             ? 'border-status-warning-border bg-status-warning-surface'
-            : current && !finished
+            : current
               ? 'border-status-info-border bg-status-info-surface'
               : 'border-border bg-card text-muted-foreground'
       )}
     >
       <span className="shrink-0 font-semibold">
-        {finished ? <Check className="size-3.5" /> : current && !finished ? '▸' : '·'}
+        {finished ? <Check className="size-3.5" /> : current ? '▸' : '·'}
       </span>
       <div className="min-w-0">
         <p className="text-foreground font-medium">{deletionStepLabel(task.stepKey)}</p>
-        <p className="text-muted-foreground mt-0.5">
-          {stuck && task.lastErrorCode ? task.lastErrorCode : deletionStepDescription(task.stepKey)}
-        </p>
+        <p className="text-muted-foreground mt-0.5">{description}</p>
       </div>
     </div>
   );

@@ -21,7 +21,10 @@ export default {
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
-    supportedChatApis: ['chat_completions', 'responses'],
+    supportedChatApis: [
+      'chat_completions',
+      // 'responses', // supported, not tested
+    ],
     responseTransforms: null,
     async transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
@@ -32,7 +35,10 @@ export default {
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
-    supportedChatApis: ['chat_completions', 'responses'],
+    supportedChatApis: [
+      'chat_completions',
+      // 'responses', // supported, not tested
+    ],
     responseTransforms: null,
     async transformRequest(context) {
       if (!isReasoningExplicitlyDisabled(context.request)) {
@@ -90,19 +96,31 @@ export default {
     apiUrl: 'https://api.friendli.ai/serverless/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('FRIENDLI_API_KEY'),
-    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    supportedChatApis: [
+      'chat_completions',
+      // 'messages', // supported, not tested
+      // 'responses', // supported, not tested
+    ],
     responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
-      if (context.request.kind === 'chat_completions') {
-        context.request.body.reasoning_effort = isReasoningExplicitlyDisabled(context.request)
-          ? 'none'
-          : (context.request.body.reasoning?.effort ??
-            context.request.body.reasoning_effort ??
-            undefined);
-        delete context.request.body.reasoning;
-      }
       delete context.request.body.provider;
+
+      if (context.request.kind === 'chat_completions') {
+        const requestBody = context.request.body;
+        if (isReasoningExplicitlyDisabled(context.request)) {
+          requestBody.chat_template_kwargs = { enable_thinking: false };
+          delete requestBody.reasoning;
+          delete requestBody.reasoning_effort;
+        } else {
+          requestBody.chat_template_kwargs = { enable_thinking: true };
+          requestBody.reasoning_effort =
+            requestBody.reasoning?.effort ?? requestBody.reasoning_effort ?? undefined;
+          requestBody.parse_reasoning = true;
+          requestBody.include_reasoning = true;
+          delete requestBody.reasoning;
+        }
+      }
     },
   },
   PERPLEXITY_KIMI: {
@@ -110,7 +128,11 @@ export default {
     apiUrl: 'https://api.perplexity.ai/router/v1',
     apiUrlOverrides: {},
     apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
-    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    supportedChatApis: [
+      'chat_completions',
+      // 'messages', // supported, not tested
+      // 'responses', // supported, not tested
+    ],
     responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';

@@ -25,28 +25,28 @@ import {
   type PrBadgeIconKind,
 } from './session-pr-badge-model';
 
-const ICON_BY_KIND: Readonly<Record<PrBadgeIconKind, LucideIcon>> = {
+const ICON_BY_KIND = {
   check: CircleCheck,
   x: CircleX,
   'pull-request': GitPullRequest,
   draft: GitPullRequestDraft,
   merge: GitMerge,
   closed: GitPullRequestClosed,
-};
+} satisfies Readonly<Record<PrBadgeIconKind, LucideIcon>>;
 
-const ACCENT_TEXT_CLASS: Readonly<Record<PrBadgeAccent, string>> = {
+const ACCENT_TEXT_CLASS = {
   good: 'text-good',
   warn: 'text-warn',
   muted: 'text-muted-foreground',
   destructive: 'text-destructive',
-};
+} satisfies Readonly<Record<PrBadgeAccent, string>>;
 
-const ACCENT_COLOR_KEY: Readonly<Record<PrBadgeAccent, keyof ThemeColors>> = {
+const ACCENT_COLOR_KEY = {
   good: 'good',
   warn: 'warn',
   muted: 'mutedForeground',
   destructive: 'destructive',
-};
+} satisfies Readonly<Record<PrBadgeAccent, keyof ThemeColors>>;
 
 export type SessionPrBadgeProps = Readonly<{
   pr: AssociatedPrData | null;

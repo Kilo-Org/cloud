@@ -171,12 +171,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // hidden by the toggle, an invalid day count can't block saving. If a
   // field is invalid at the moment it's hidden, fall back to its last
   // persisted value instead of sending an invalid one.
-  const daysValid: Record<SlaSeverity, boolean> = {
+  const daysValid = {
     critical: isValidDayCount(slaDays.critical),
     high: isValidDayCount(slaDays.high),
     medium: isValidDayCount(slaDays.medium),
     low: isValidDayCount(slaDays.low),
-  };
+  } satisfies Record<SlaSeverity, boolean>;
   const valid = !slaEnabled || Object.values(daysValid).every(Boolean);
   const patch = {
     slaEnabled,

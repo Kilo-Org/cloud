@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
+import type { ChangeEvent, JSX, KeyboardEvent, ReactNode } from 'react';
 
 export const AgentsComposer = ({
   canSend,
@@ -7,6 +7,7 @@ export const AgentsComposer = ({
   isStreaming,
   isReadOnly,
   isLoading,
+  modelPicker,
   onSend,
   onStop,
 }: {
@@ -15,6 +16,8 @@ export const AgentsComposer = ({
   isStreaming: boolean;
   isReadOnly: boolean;
   isLoading: boolean;
+  /** Model control row; omitted when the session has no pickable catalog. */
+  modelPicker?: ReactNode;
   onSend: (text: string) => void | Promise<void>;
   onStop: () => void;
 }): JSX.Element => {
@@ -95,6 +98,7 @@ export const AgentsComposer = ({
         placeholder="Send a message…"
         value={draft}
       />
+      {modelPicker === undefined ? null : <div className="mt-2 flex gap-2">{modelPicker}</div>}
       <div className="mt-2 flex gap-2">
         <button
           className={`type-label h-9 ${isStreaming ? 'flex-1' : 'w-full'} rounded-md border border-transparent bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle`}

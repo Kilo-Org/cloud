@@ -43,8 +43,26 @@ import {
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
-function providerIcon(_provider: string) {
-  return KeyRound;
+const PROVIDER_LABELS = {
+  anaconda: 'Anaconda',
+  apple: 'Apple',
+  discord: 'Discord',
+  email: 'Email',
+  'fake-login': 'Test Account',
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  google: 'Google',
+  linkedin: 'LinkedIn',
+  workos: 'Enterprise SSO',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
+function providerLabel(provider: string) {
+  return lookup(PROVIDER_LABELS, provider) ?? provider;
 }
 
 export function ProfileScreen() {
@@ -244,24 +262,17 @@ export function ProfileScreen() {
               />
             )}
 
-            {data?.providers.map(p => {
-              const Icon = providerIcon(p.provider);
-              return (
-                <Animated.View
-                  key={`${p.provider}-${p.email}`}
-                  className="flex-row items-start gap-3 rounded-lg bg-secondary p-3"
-                  entering={FadeIn.duration(200)}
-                >
-                  <Icon size={18} color={colors.secondaryForeground} />
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-sm font-medium capitalize">{p.provider}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {p.email}
-                    </Text>
-                  </View>
-                </Animated.View>
-              );
-            })}
+            {data?.providers.map((p, index) => (
+              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+                <ConfigureRow
+                  icon={KeyRound}
+                  title={providerLabel(p.provider)}
+                  subtitle={p.email}
+                  className="rounded-lg bg-secondary px-3"
+                  last={index === data.providers.length - 1}
+                />
+              </Animated.View>
+            ))}
           </View>
         )}
 

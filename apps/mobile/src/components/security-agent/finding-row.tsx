@@ -19,12 +19,17 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { capitalize, cn } from '@/lib/utils';
 
-const SEVERITY_TEXT_CLASS: Record<string, string> = {
+const SEVERITY_TEXT_CLASS = {
   critical: 'text-destructive',
   high: 'text-warn',
   medium: 'text-muted-foreground',
   low: 'text-muted-foreground',
-};
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 // Clearest next action for this finding, mirroring the priority order in
 // apps/web/src/components/security-agent/SecurityFindingRow.tsx — but as a
@@ -183,7 +188,7 @@ export function FindingRow({
         <Text
           className={cn(
             'font-mono-medium text-[11px] uppercase tracking-[0.6px]',
-            SEVERITY_TEXT_CLASS[finding.severity] ?? 'text-muted-foreground'
+            lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? 'text-muted-foreground'
           )}
         >
           {capitalize(finding.severity)}

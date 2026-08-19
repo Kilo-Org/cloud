@@ -84,8 +84,12 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
     // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
     reasoning?: OpenRouterReasoningConfig;
 
-    // https://platform.minimax.io/docs/api-reference/text-openai-api#4-important-note
-    reasoning_split?: boolean;
+    // https://friendli.ai/docs/guides/reasoning
+    chat_template_kwargs?: {
+      enable_thinking: boolean;
+    };
+    parse_reasoning?: boolean;
+    include_reasoning?: boolean;
   };
 
 export type MessageWithReasoning = {

@@ -64,7 +64,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const user = matches[0];
     if (!user || isSoftDeletedBlockedReason(user.blocked_reason)) {
       emit({ outcome: 'not_found', targetUserId: user?.id });
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'User not found', code: 'USER_NOT_FOUND' },
+        { status: 404 }
+      );
     }
 
     emit({ outcome: 'found', targetUserId: user.id });

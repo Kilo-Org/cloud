@@ -139,13 +139,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
 // Discriminated capability state for consumers (e.g. audit-report access)
 // that must distinguish "still loading"/"failed to load" from "resolved:
 // no access" instead of treating an undefined role as permission-denied.
-export function useSecurityAgentCapability(scope: string): {
-  canManage: boolean;
-  isLoading: boolean;
-  isError: boolean;
-  isFetching: boolean;
-  refetch: () => unknown;
-} {
+export function useSecurityAgentCapability(scope: string) {
   const { role, isLoading, isError, isFetching, refetch } = useSecurityAgentOrgRoleQuery(scope);
   return {
     canManage: canManageSecurityAgent(scope, role),
@@ -161,13 +155,7 @@ export function useSecurityAgentCapability(scope: string): {
 // `isLoading`/`isError` are exposed alongside the counts so callers can tell
 // "still loading" and "failed to load" apart from "loaded: capacity full" —
 // all three previously collapsed into the same undefined counts.
-export function useSecurityAnalysisCapacity(scope: string): {
-  runningCount: number | undefined;
-  concurrencyLimit: number | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  refetch: () => unknown;
-} {
+export function useSecurityAnalysisCapacity(scope: string) {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
   const personal = useQuery({

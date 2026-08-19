@@ -147,10 +147,10 @@ type SessionDetailContentProps = {
   spawnedMode?: string;
 };
 
-const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
+const COMPOSER_PLACEHOLDERS = {
   preparing: 'Setting up environment...',
   finalizing: 'Wrapping up...',
-};
+} satisfies Partial<Record<CloudStatus['type'], string>>;
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
@@ -979,7 +979,9 @@ export function SessionDetailContent({
     hasModel: Boolean(pinned.model ?? currentModel),
   });
   const composerPlaceholder =
-    (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
+    (cloudStatus &&
+      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
+    'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(

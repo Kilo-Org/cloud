@@ -20,7 +20,7 @@ import {
   type PrOverviewRepoSettings,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
-const BLOCKED_REASON_ICON: Record<MergeBlockedReasonId, LucideIcon> = {
+const BLOCKED_REASON_ICON = {
   conflicts: XCircle,
   'required-reviews': ShieldAlert,
   'failing-checks': AlertTriangle,
@@ -28,7 +28,7 @@ const BLOCKED_REASON_ICON: Record<MergeBlockedReasonId, LucideIcon> = {
   'unstable-checks': AlertTriangle,
   draft: GitPullRequest,
   'unknown-state': AlertTriangle,
-};
+} satisfies Record<MergeBlockedReasonId, LucideIcon>;
 
 export function mergeBlockedReasonIcon(kind: MergeBlockedReasonId): LucideIcon {
   return BLOCKED_REASON_ICON[kind];

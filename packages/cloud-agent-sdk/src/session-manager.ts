@@ -1715,6 +1715,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
 
+          // Compact/summarize turns (and stripped oversized `message.updated`
+          // frames) are not picker-authoritative: they omit `agent`/`variant`
+          // or mark `summary: true`, and writing those through would reset
+          // mode/reasoning to empty/"unknown" values.
+          if (event.info.summary === true || !event.info.agent) {
+            return;
+          }
+
           if (canApplyMessageObservation) {
             const selection = toModelSelection(
               { providerID: event.info.providerID, modelID: event.info.modelID },

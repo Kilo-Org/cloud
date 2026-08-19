@@ -16,17 +16,7 @@ export type ReviewerPlatform = CodeReviewPlatform;
 
 export const PERSONAL_SCOPE = 'personal';
 
-export const PLATFORM_CAPABILITIES: Record<
-  ReviewerPlatform,
-  {
-    scopes: 'all' | 'org';
-    selectionModePicker: boolean;
-    gateRow: boolean;
-    reviewMd: boolean;
-    manualReview: boolean;
-    label: string;
-  }
-> = {
+export const PLATFORM_CAPABILITIES = {
   github: {
     scopes: 'all',
     selectionModePicker: true,
@@ -51,7 +41,17 @@ export const PLATFORM_CAPABILITIES: Record<
     manualReview: false,
     label: 'Bitbucket',
   },
-};
+} satisfies Record<
+  ReviewerPlatform,
+  {
+    scopes: 'all' | 'org';
+    selectionModePicker: boolean;
+    gateRow: boolean;
+    reviewMd: boolean;
+    manualReview: boolean;
+    label: string;
+  }
+>;
 
 const REVIEWER_PLATFORMS = Object.keys(PLATFORM_CAPABILITIES) as ReviewerPlatform[];
 

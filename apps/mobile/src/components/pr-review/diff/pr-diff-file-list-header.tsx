@@ -166,10 +166,7 @@ function ViewModeButton({
  * mode plus a setter. Default is `unified`. The toggle is local state
  * (not persisted) per the S6c spec.
  */
-export function useDiffViewMode(): {
-  viewMode: DiffViewMode;
-  setViewMode: (mode: DiffViewMode) => void;
-} {
+export function useDiffViewMode() {
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   return { viewMode, setViewMode };
 }

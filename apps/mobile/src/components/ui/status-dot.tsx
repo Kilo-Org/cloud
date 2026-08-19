@@ -24,12 +24,12 @@ type StatusDotProps = {
 // Solid inner-dot and outer-halo classes per tone. The halo uses the
 // pre-tinted Focus tile tokens because `/opacity` does not work with our
 // CSS-variable theme tokens.
-const TONE: Record<StatusDotTone, { dot: string; halo: string }> = {
+const TONE = {
   good: { dot: 'bg-good', halo: 'bg-good-tile-bg' },
   warn: { dot: 'bg-warn', halo: 'bg-warn-tile-bg' },
   danger: { dot: 'bg-destructive', halo: 'bg-danger-tile-bg' },
   muted: { dot: 'bg-muted-soft', halo: 'bg-neutral-500/20' },
-};
+} satisfies Record<StatusDotTone, { dot: string; halo: string }>;
 
 // Soft breathe range and cadence. Mirrors the provisioning-step pulse
 // pattern: 1.0 (fully visible) down to ~0.45 (faded), reversed, looping.

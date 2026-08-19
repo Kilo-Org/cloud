@@ -3,8 +3,12 @@
 
 import { createElement as h, StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import type { StandalonePermission, StandaloneQuestion } from '@kilocode/cloud-agent-sdk';
+import type { StoredAuth } from '@/src/shared/auth';
+import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { AgentsBlockingCards } from './agents-blocking-cards';
 import { AgentsComposer } from './agents-composer';
 import { AgentsMessageList } from './agents-message-list';
@@ -71,6 +75,55 @@ describe('agents composer rendering', () => {
       })
     );
     expect(container.textContent).toContain('Send message');
+  });
+
+  it('renders the model picker slot when provided', () => {
+    const { container } = render(
+      h(AgentsComposer, {
+        canSend: true,
+        canInterrupt: true,
+        isStreaming: false,
+        isReadOnly: false,
+        isLoading: false,
+        modelPicker: h('button', { type: 'button' }, 'Model slot'),
+        onSend: () => {},
+        onStop: () => {},
+      })
+    );
+    expect(container.textContent).toContain('Model slot');
+  });
+
+  it('omits the model picker slot when not provided', () => {
+    const { container } = render(
+      h(AgentsComposer, {
+        canSend: true,
+        canInterrupt: true,
+        isStreaming: false,
+        isReadOnly: false,
+        isLoading: false,
+        onSend: () => {},
+        onStop: () => {},
+      })
+    );
+    expect(container.textContent).not.toContain('Model slot');
+    expect(container.textContent).toContain('Send message');
+  });
+
+  it('drops the model picker slot in the read-only state', () => {
+    const { container } = render(
+      h(AgentsComposer, {
+        canSend: false,
+        canInterrupt: false,
+        isStreaming: false,
+        isReadOnly: true,
+        isLoading: false,
+        modelPicker: h('button', { type: 'button' }, 'Model slot'),
+        onSend: () => {},
+        onStop: () => {},
+      })
+    );
+    expect(container.textContent).toContain('This session is read-only');
+    expect(container.textContent).not.toContain('Model slot');
   });
 
   it('renders Stop button when isStreaming is true', () => {
@@ -496,6 +549,12 @@ const mockAtoms = {
   hasOlderMessages: createAtom('hasOlderMessages'),
   isLoadingOlderMessages: createAtom('isLoadingOlderMessages'),
   olderMessagesError: createAtom('olderMessagesError'),
+  contextUsage: createAtom('contextUsage'),
+  totalCost: createAtom('totalCost'),
+  activeSessionType: createAtom('activeSessionType'),
+  remoteModelState: createAtom('remoteModelState'),
+  remoteModelOverride: createAtom('remoteModelOverride'),
+  cloudAgentModelOverride: createAtom('cloudAgentModelOverride'),
 };
 
 const mockManager = {
@@ -509,21 +568,71 @@ const mockManager = {
   respondToPermission: vi.fn(),
   loadOlderMessages: vi.fn(),
   destroy: vi.fn(),
+  setRemoteModelOverride: vi.fn(),
+  setCloudAgentModelOverride: vi.fn(),
 };
+
+const mockSetLastSelected = vi.fn();
+const mockTrpcClient = {
+  modelPreferences: { setLastSelected: { mutate: mockSetLastSelected } },
+};
+
+/* The view reads stored auth and the gateway catalog through react-query. */
+const withQueryClient = (node: ReactElement): ReactElement =>
+  h(
+    QueryClientProvider,
+    { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+    node
+  );
+
+let storedAuth: StoredAuth | null = null;
+let storedModelOptions: KiloGatewayModelOption[] = [];
 
 let storedAtomValues: Record<string, unknown> = {};
 let storedOrganizationId: string | null = null;
 
 const mockGetKiloApiBaseUrl = vi.fn(() => 'https://app.kilocode.com');
 
+// A promise-returning stub the mock factories share, so no factory resolves inline.
+function resolved<Value>(value?: Value): Promise<Value | undefined> {
+  return Promise.resolve(value);
+}
+
 // eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
 vi.mock('@/src/shared/auth', () => ({
   getKiloApiBaseUrl: () => mockGetKiloApiBaseUrl(),
+  loadStoredAuth: () => resolved(storedAuth),
+}));
+
+// eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
+vi.mock('./use-gateway-models', () => ({
+  useGatewayModels: () => ({
+    isLoading: false,
+    modelLoadError: undefined,
+    modelOptions: storedModelOptions,
+    refetchModels: () => resolved(),
+  }),
+}));
+
+// The embedded picker's favorites query would otherwise hit the network.
+// eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
+vi.mock('./use-model-preferences', () => ({
+  useModelPreferences: () => ({
+    favorites: new Set<string>(),
+    refetch: () => resolved(),
+    status: 'ready',
+    toggleError: false,
+    toggleFavorite: () => {},
+  }),
 }));
 
 // eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
 vi.mock('./agents-provider', () => ({
-  useExtensionAgents: () => ({ manager: mockManager, organizationId: storedOrganizationId }),
+  useExtensionAgents: () => ({
+    manager: mockManager,
+    organizationId: storedOrganizationId,
+    trpcClient: mockTrpcClient,
+  }),
 }));
 
 // eslint-disable-next-line jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- mock type inference is sufficient; dynamic import changes factory signature
@@ -562,7 +671,15 @@ describe('agents session view integration', () => {
       hasOlderMessages: false,
       isLoadingOlderMessages: false,
       olderMessagesError: null,
+      contextUsage: undefined,
+      totalCost: 0,
+      activeSessionType: null,
+      remoteModelState: { ownerConnectionId: null, protocol: 'unknown', refresh: 'idle' },
+      remoteModelOverride: null,
+      cloudAgentModelOverride: null,
     };
+    storedAuth = null;
+    storedModelOptions = [];
     /* eslint-disable unicorn/no-useless-undefined -- void-returning mock placValue */
     mockManager.switchSession.mockResolvedValue(undefined);
     mockManager.send.mockResolvedValue(true);
@@ -574,7 +691,9 @@ describe('agents session view integration', () => {
 
   async function renderView() {
     const { AgentsSessionView } = await import('./agents-session-view');
-    return render(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }));
+    return render(
+      withQueryClient(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }))
+    );
   }
 
   // ---- Status indicator error Retry ----
@@ -1117,7 +1236,9 @@ describe('agents session view integration', () => {
     // A new failed prompt arrives — banner should reappear
     storedAtomValues['failedPrompt'] = 'another failure';
     const { AgentsSessionView } = await import('./agents-session-view');
-    rerender(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }));
+    rerender(
+      withQueryClient(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }))
+    );
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Message failed to send');
     });
@@ -1426,7 +1547,11 @@ describe('agents session view integration', () => {
     // This simulates the production/dev StrictMode cycle where:
     //   mount → effect (switchSession) → cleanup (defer destroy) → remount → effect (cancel + switchSession)
     const { unmount } = render(
-      h(StrictMode, {}, h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }))
+      h(
+        StrictMode,
+        {},
+        withQueryClient(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }))
+      )
     );
 
     // StrictMode causes double mount: switchSession fires twice within the same component instance.
@@ -1446,5 +1571,158 @@ describe('agents session view integration', () => {
     expect(mockManager.destroy).toHaveBeenCalledOnce();
 
     vi.useRealTimers();
+  });
+
+  // ---- Context usage + session cost indicator ----
+
+  const usageAtom = { contextTokens: 12_000, modelID: 'a/b', providerID: 'kilo' };
+  const gatewayModel: KiloGatewayModelOption = {
+    contextLength: 200_000,
+    id: 'a/b',
+    isPreferred: false,
+    name: 'A B',
+    variants: [],
+  };
+
+  it('hides the context indicator and reserves its slot before the first assistant reply', async () => {
+    const { container } = await renderView();
+
+    expect(container.querySelector('[aria-label^="Context usage"]')).toBeNull();
+    expect(container.querySelector('span[aria-hidden="true"].size-8')).not.toBeNull();
+  });
+
+  it('hides the context indicator while the session is loading', async () => {
+    storedAtomValues['isLoading'] = true;
+    storedAtomValues['contextUsage'] = usageAtom;
+    const { container } = await renderView();
+
+    expect(container.querySelector('[aria-label^="Context usage"]')).toBeNull();
+  });
+
+  it('shows the context percentage when the gateway catalog knows the window', async () => {
+    storedAtomValues['contextUsage'] = usageAtom;
+    storedModelOptions = [gatewayModel];
+    const { container } = await renderView();
+
+    const summary = container.querySelector('[aria-label^="Context usage"]');
+    expect(summary?.getAttribute('aria-label')).toBe('Context usage: 12,000 / 200,000 tokens (6%)');
+  });
+
+  it('shows tokens only when the context window is unknown', async () => {
+    storedAtomValues['contextUsage'] = { ...usageAtom, providerID: 'anthropic' };
+    storedModelOptions = [gatewayModel];
+    const { container } = await renderView();
+
+    const summary = container.querySelector('[aria-label^="Context usage"]');
+    expect(summary?.getAttribute('aria-label')).toBe('Context usage: 12,000 tokens');
+  });
+
+  it('shows the larger of the persisted and live session cost, with compaction disabled', async () => {
+    storedAtomValues['contextUsage'] = usageAtom;
+    storedAtomValues['totalCost'] = 1.5;
+    storedAtomValues['fetchedSessionData'] = { title: 'T', totalCostMicrodollars: 2_500_000 };
+    const { container } = await renderView();
+
+    expect(container.textContent).toContain('Session cost $2.5000');
+    const compactBtn = [...container.querySelectorAll('button')].find(
+      b => b.textContent === 'Compact now'
+    );
+    expect(compactBtn?.getAttribute('disabled')).not.toBeNull();
+  });
+
+  // ---- In-session model picker ----
+
+  async function renderWithPicker(sessionType: string, protocol: string) {
+    // Jsdom has no scrollIntoView; the picker scrolls its selected row into view.
+    Element.prototype.scrollIntoView = () => {};
+    storedAuth = { token: 'token-1', userEmail: undefined };
+    storedModelOptions = [gatewayModel, { ...gatewayModel, id: 'c/d', name: 'C D' }];
+    storedAtomValues['activeSessionType'] = sessionType;
+    storedAtomValues['remoteModelState'] = {
+      ownerConnectionId: null,
+      protocol,
+      refresh: 'idle',
+    };
+    storedAtomValues['canSend'] = true;
+    const view = await renderView();
+    return view;
+  }
+
+  it('shows the session model in the composer picker for a cloud-agent session', async () => {
+    storedAtomValues['sessionConfig'] = { mode: 'code', model: 'a/b' };
+    const { container } = await renderWithPicker('cloud-agent', 'unknown');
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[aria-label="Model"]')).not.toBeNull();
+    });
+    expect(container.querySelector<HTMLElement>('[aria-label="Model"]')?.dataset['modelId']).toBe(
+      'a/b'
+    );
+  });
+
+  it('shows the in-session override instead of the session model', async () => {
+    storedAtomValues['sessionConfig'] = { mode: 'code', model: 'a/b' };
+    storedAtomValues['cloudAgentModelOverride'] = { model: 'c/d' };
+    const { container } = await renderWithPicker('cloud-agent', 'unknown');
+
+    await vi.waitFor(() => {
+      expect(container.querySelector<HTMLElement>('[aria-label="Model"]')?.dataset['modelId']).toBe(
+        'c/d'
+      );
+    });
+  });
+
+  it('applies a pick to the cloud-agent override and persists it', async () => {
+    storedAtomValues['sessionConfig'] = { mode: 'code', model: 'a/b' };
+    const { container } = await renderWithPicker('cloud-agent', 'unknown');
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[aria-label="Model"]')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('[aria-label="Model"]')!);
+    fireEvent.click(container.querySelector('[aria-label="C D"]')!);
+
+    expect(mockManager.setCloudAgentModelOverride).toHaveBeenCalledWith({ model: 'c/d' });
+    expect(mockManager.setRemoteModelOverride).not.toHaveBeenCalled();
+    // The tRPC call runs inside the mutation, one microtask after the click.
+    await vi.waitFor(() => {
+      expect(mockSetLastSelected).toHaveBeenCalledWith({ model: 'c/d' });
+    });
+  });
+
+  it('applies a pick to the legacy remote override', async () => {
+    const { container } = await renderWithPicker('remote', 'legacy');
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[aria-label="Model"]')).not.toBeNull();
+    });
+    fireEvent.click(container.querySelector('[aria-label="Model"]')!);
+    fireEvent.click(container.querySelector('[aria-label="C D"]')!);
+
+    expect(mockManager.setRemoteModelOverride).toHaveBeenCalledWith({
+      selection: { model: { modelID: 'c/d', providerID: 'kilo' } },
+      source: 'legacy-gateway',
+    });
+    expect(mockManager.setCloudAgentModelOverride).not.toHaveBeenCalled();
+  });
+
+  it('omits the picker for a remote session whose CLI owns the catalog', async () => {
+    const { container } = await renderWithPicker('remote', 'v1');
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Send message');
+    });
+    expect(container.querySelector('[aria-label="Model"]')).toBeNull();
+  });
+
+  it('omits the picker until stored auth resolves', async () => {
+    storedAtomValues['activeSessionType'] = 'cloud-agent';
+    storedAtomValues['canSend'] = true;
+    const { container } = await renderView();
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Send message');
+    });
+    expect(container.querySelector('[aria-label="Model"]')).toBeNull();
   });
 });

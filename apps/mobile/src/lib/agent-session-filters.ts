@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { type AgentSessionSortBy, parseAgentSessionSortBy } from './agent-session-sort';
 
 /**
@@ -19,16 +21,28 @@ export function createDefaultAgentSessionFilters(): AgentSessionFilters {
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+/** Zod's validation `.catch()` fallback, not a Promise catch. */
+function tolerant<T>(schema: z.ZodType<T>, fallback: T): z.ZodType<T> {
+  // oxlint-disable-next-line promise/prefer-await-to-then -- zod schema fallback, not a Promise
+  return schema.catch(fallback);
 }
 
-function readStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((item): item is string => typeof item === 'string');
+const stringItemSchema = z.string();
+
+function isStringItem(item: unknown): item is string {
+  return stringItemSchema.safeParse(item).success;
 }
+
+/** Keeps only string entries; a non-array or wholly-bad value collapses to `[]`. */
+const tolerantStringArraySchema = tolerant(z.array(z.unknown()), []).transform(items =>
+  items.filter((item): item is string => isStringItem(item))
+);
+
+const storedAgentSessionFiltersSchema = z.object({
+  platformFilter: tolerantStringArraySchema,
+  projectFilter: tolerantStringArraySchema,
+  sortBy: z.unknown().optional(),
+});
 
 /**
  * Parse the raw SecureStore JSON for the agent-session filter record. Returns
@@ -42,21 +56,22 @@ export function parseStoredAgentSessionFilters(raw: string | null): AgentSession
     return null;
   }
 
-  let parsed: unknown = null;
+  let parsed = null;
   try {
     parsed = JSON.parse(raw);
   } catch {
     return null;
   }
 
-  if (!isRecord(parsed)) {
+  const result = storedAgentSessionFiltersSchema.safeParse(parsed);
+  if (!result.success) {
     return null;
   }
 
   return {
-    platformFilter: readStringArray(parsed.platformFilter),
-    projectFilter: readStringArray(parsed.projectFilter),
-    sortBy: parseAgentSessionSortBy(parsed.sortBy),
+    platformFilter: result.data.platformFilter,
+    projectFilter: result.data.projectFilter,
+    sortBy: parseAgentSessionSortBy(result.data.sortBy),
   };
 }
 

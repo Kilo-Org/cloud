@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data']>[number];
 
-const DEPLOY_HINTS: Record<string, { label: string; bgClass: string; textClass: string }> = {
+const DEPLOY_HINTS = {
   redeploy_suggested: {
     label: 'Redeploy suggested',
     bgClass: 'bg-info-tile-bg',
@@ -26,7 +26,7 @@ const DEPLOY_HINTS: Record<string, { label: string; bgClass: string; textClass: 
     bgClass: 'bg-danger-tile-bg',
     textClass: 'text-destructive',
   },
-};
+} satisfies Record<string, { label: string; bgClass: string; textClass: string }>;
 
 export function ChangelogList({
   entries,

@@ -428,7 +428,7 @@ export class KiloClawInternalClient {
   async destroy(
     userId: string,
     instanceId?: string,
-    options?: { reason?: KiloclawDestroyReason }
+    options?: { reason?: KiloclawDestroyReason; signal?: AbortSignal }
   ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
@@ -439,6 +439,7 @@ export class KiloClawInternalClient {
           userId,
           ...(options?.reason ? { reason: options.reason } : {}),
         }),
+        ...(options?.signal ? { signal: options.signal } : {}),
       },
       { userId }
     );

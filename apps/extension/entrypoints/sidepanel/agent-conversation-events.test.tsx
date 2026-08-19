@@ -187,6 +187,43 @@ describe('workflow tool exchange rendering', () => {
   });
 });
 
+describe('web MCP tool exchange rendering', () => {
+  it('renders the tool name as the title and the origin as the subtitle', () => {
+    const toolCall = {
+      arguments: { query: 'kilo' },
+      definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+      documentId: 'doc-1',
+      id: 'tc-webmcp-1',
+      name: 'search',
+      providerToolCallId: 'call_webmcp_1',
+      tabId: 7,
+      type: 'tool-call' as const,
+      webMcpOrigin: 'https://example.com',
+    };
+    const result = {
+      id: 'tr-webmcp-1',
+      ok: true,
+      toolCallId: 'tc-webmcp-1',
+      type: 'tool-result' as const,
+      value: { hits: 2 },
+    };
+    const item: GroupedConversationItem = {
+      result,
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    expect(container.textContent).toContain('search');
+    expect(container.textContent).toContain('https://example.com');
+    expect(container.textContent).toContain('completed');
+    expect(container.textContent).toContain('Arguments');
+    expect(container.textContent).toContain('query');
+    expect(container.textContent).not.toContain('tab 7');
+  });
+});
+
 describe('agent tool exchange rendering', () => {
   it('renders a completed agent tool with its title, arguments, and result', () => {
     const toolCall = {

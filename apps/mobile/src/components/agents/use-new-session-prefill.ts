@@ -50,10 +50,7 @@ export type UseNewSessionPrefillTargetsInput = {
  * pattern in `agent-chat/new.tsx` — a same-component render-phase update
  * guarded by a ref.
  */
-export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsInput): {
-  selectedRepo: string;
-  setSelectedRepo: (value: string) => void;
-} {
+export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsInput) {
   const { repositories, reposSettled, models, modelsSettled } = input;
   const prefill = useNewSessionPrefill();
   const [selectedRepo, setSelectedRepo] = useState('');

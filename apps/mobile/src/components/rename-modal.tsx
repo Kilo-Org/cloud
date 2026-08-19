@@ -9,25 +9,25 @@ import { cn } from '@/lib/utils';
 
 const SAVE_UI_DEADLINE_MS = 15_000;
 
-type RenameModalProps = {
+type RenameModalProps<TSaveResult> = {
   title: string;
   placeholder: string;
   initialValue: string;
-  onSave: (name: string) => Promise<unknown>;
+  onSave: (name: string) => Promise<TSaveResult>;
   onClose: () => void;
   maxLength?: number;
 };
 
 // Mount this component only while the modal should be open (e.g. `{visible && <RenameModal ... />}`)
 // so each open gets fresh state: current initialValue, a reset canSave, and a re-armed Android autofocus.
-export function RenameModal({
+export function RenameModal<TSaveResult>({
   title,
   placeholder,
   initialValue,
   onSave,
   onClose,
   maxLength = 50,
-}: Readonly<RenameModalProps>) {
+}: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const nameRef = useRef(initialValue);
   const inputRef = useRef<TextInput>(null);

@@ -6,8 +6,10 @@ export type SidePanelMode = 'browser' | 'agents';
 
 const sidePanelModeSchema = z.enum(['browser', 'agents']);
 
+type MaybePromise<Value> = Promise<Value> | Value;
+
 export interface SidePanelModeStorageArea {
-  getItem(key: typeof SIDE_PANEL_MODE_STORAGE_KEY): unknown;
+  getItem(key: typeof SIDE_PANEL_MODE_STORAGE_KEY): MaybePromise<unknown>;
   setItem(key: typeof SIDE_PANEL_MODE_STORAGE_KEY, value: SidePanelMode): Promise<void> | void;
   removeItem(key: typeof SIDE_PANEL_MODE_STORAGE_KEY): Promise<void> | void;
 }

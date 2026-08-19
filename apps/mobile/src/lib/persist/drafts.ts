@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { utf8ByteLength } from '@/lib/utf8-utils';
@@ -46,9 +47,11 @@ export function draftScope(userId: string): string {
   return `${DRAFT_SCOPE_PREFIX}${userId}`;
 }
 
+const stringDraftSchema = z.string();
+
 /** Runtime shape guard for a composer text draft (a JSON string). */
 export function isStringDraft(value: unknown): value is string {
-  return typeof value === 'string';
+  return stringDraftSchema.safeParse(value).success;
 }
 
 /** Shape validator for one loaded draft value, supplied by the caller. */

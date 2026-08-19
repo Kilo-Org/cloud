@@ -54,14 +54,7 @@ export type RemoteInstanceSpawnStatus =
  *
  * Explicit `opts.orgId` on `spawn()` still wins when the caller sets it.
  */
-export function useRemoteInstanceSpawn(organizationId?: string | null): {
-  status: RemoteInstanceSpawnStatus;
-  spawn: (
-    connectionId: string,
-    opts?: CreateRemoteSessionInput,
-    options?: CreateSessionSpawnOptions
-  ) => Promise<CreateSessionOutcome>;
-} {
+export function useRemoteInstanceSpawn(organizationId?: string | null) {
   const connection = useUserWebConnection();
   const { organizationId: contextOrganizationId } = useOrganization();
   const resolvedOrganizationId = resolveSpawnOrganizationId(organizationId, contextOrganizationId);

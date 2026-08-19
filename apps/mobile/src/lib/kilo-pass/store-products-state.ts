@@ -5,11 +5,7 @@ export function getStoreKiloPassProductsState(params: {
   isError: boolean;
   storeErrorMessage: string | null;
   queryErrorMessage: string | null;
-}): {
-  products: readonly AppStoreKiloPassProduct[];
-  isError: boolean;
-  errorMessage: string | null;
-} {
+}) {
   const isError = params.storeErrorMessage !== null || params.isError;
 
   return {

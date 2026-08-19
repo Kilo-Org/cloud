@@ -5,7 +5,9 @@
 // trims the indented match rows; glob drops the trailing `---` separator and
 // folds the `[N files truncated]` marker into the model's flag; list is one
 // plain row per line. All kinds lift a leading `Found N ...` summary into a
-// muted caption.
+// muted caption. Glob and grep lift `No files found` into the caption and
+// drop a whole-line parenthetical note (`^\(.*\)$`); a dropped note that
+// contains `truncated` (any case) sets the flag.
 //
 // Task rows (D8): the task array comes from `state.metadata.todos`, then
 // `state.input.todos`, then a JSON parse of `state.output`. Unknown status
@@ -17,6 +19,7 @@
 // per-render computations, so the tool-card bodies call them without a hook.
 
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 /** Rows kept per result output. Longer outputs flag `truncated`. */
 export const RESULT_ROW_CAP = 500;
@@ -47,6 +50,8 @@ export type ResultRowsKind = 'grep' | 'glob' | 'list';
 
 const CAPTION_PATTERN = /^Found \d+/;
 const TRUNCATED_LINE_PATTERN = /^\[\d+ files truncated\]$/;
+const EMPTY_RESULT_LINE = 'No files found';
+const STATUS_NOTE_PATTERN = /^\(.*\)$/;
 
 /**
  * Convert a tool output string into display rows. Every line becomes at most
@@ -73,7 +78,19 @@ export function buildResultRowsModel(output: string, kind: ResultRowsKind): Resu
       truncated = true;
     }
 
-    if (!isGlobSeparator && !isGlobTruncation) {
+    const isLiveKind = kind === 'glob' || kind === 'grep';
+    const isEmptyResult = isLiveKind && line === EMPTY_RESULT_LINE;
+    const isStatusNote = isLiveKind && STATUS_NOTE_PATTERN.test(line);
+
+    if (isEmptyResult && caption === undefined) {
+      caption = line.slice(0, RESULT_ROW_CHARACTER_CAP);
+    }
+
+    if (isStatusNote && line.toLowerCase().includes('truncated')) {
+      truncated = true;
+    }
+
+    if (!isGlobSeparator && !isGlobTruncation && !isEmptyResult && !isStatusNote) {
       if (rows.length >= RESULT_ROW_CAP) {
         truncated = true;
         break;
@@ -107,19 +124,12 @@ export type TodoListModel = {
   truncated: boolean;
 };
 
-const TODO_STATUS: Record<string, TodoTask['status']> = {
-  pending: 'pending',
-  in_progress: 'in_progress',
-  completed: 'completed',
-  cancelled: 'cancelled',
-};
+const todoStatusSchema = z.enum(['pending', 'in_progress', 'completed', 'cancelled']);
+const todoItemSchema = z.object({ content: z.string(), status: z.unknown().optional() });
 
 function mapTodoStatus(status: unknown): TodoTask['status'] {
-  return typeof status === 'string' ? (TODO_STATUS[status] ?? 'pending') : 'pending';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  const result = todoStatusSchema.safeParse(status);
+  return result.success ? result.data : 'pending';
 }
 
 /**
@@ -138,18 +148,19 @@ export function buildTodoListModel(part: ToolPart): TodoListModel | null {
   let truncated = false;
   const tasks: TodoTask[] = [];
   for (const item of todos) {
-    if (isRecord(item) && typeof item.content === 'string' && item.content.trim().length > 0) {
+    const parsedItem = todoItemSchema.safeParse(item);
+    if (parsedItem.success && parsedItem.data.content.trim().length > 0) {
       if (tasks.length >= TODO_TASK_CAP) {
         truncated = true;
         break;
       }
 
-      let content = item.content;
+      let content = parsedItem.data.content;
       if (content.length > TODO_CONTENT_CHARACTER_CAP) {
         content = content.slice(0, TODO_CONTENT_CHARACTER_CAP);
         truncated = true;
       }
-      tasks.push({ content, status: mapTodoStatus(item.status) });
+      tasks.push({ content, status: mapTodoStatus(parsedItem.data.status) });
     }
   }
 

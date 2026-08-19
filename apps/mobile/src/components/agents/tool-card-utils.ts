@@ -1,3 +1,7 @@
+import { z } from 'zod';
+
+const optionalStringSchema = z.string().optional();
+
 export function getFilename(filePath: string): string {
   return filePath.split('/').pop() ?? filePath;
 }
@@ -24,8 +28,8 @@ export function getGenericToolTitle(
     return title;
   }
   if (tool === 'mcp') {
-    const serverName = typeof input.server_name === 'string' ? input.server_name.trim() : '';
-    const toolName = typeof input.tool_name === 'string' ? input.tool_name.trim() : '';
+    const serverName = (optionalStringSchema.safeParse(input.server_name).data ?? '').trim();
+    const toolName = (optionalStringSchema.safeParse(input.tool_name).data ?? '').trim();
     if (serverName && toolName) {
       return `${serverName}/${toolName}`;
     }

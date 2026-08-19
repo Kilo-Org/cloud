@@ -2,7 +2,7 @@ import { type Part } from '@kilocode/cloud-agent-sdk';
 
 import { isSnapshotProgressPart } from './part-types';
 
-const toolStatusMap: Record<string, string> = {
+const toolStatusMap = {
   read: 'Exploring',
   grep: 'Searching the codebase',
   glob: 'Searching the codebase',
@@ -17,14 +17,16 @@ const toolStatusMap: Record<string, string> = {
   todoread: 'Planning next steps',
   task: 'Delegating work',
   question: 'Asking a question',
-};
+} satisfies Record<string, string>;
 
 /** Matches CLI PROGRESS_INITIALIZING typography (U+2026 ellipsis). */
 export const SNAPSHOT_PROGRESS_STATUS = 'Initializing snapshot…';
 
 export function computeStatus(part: Part): string {
   if (part.type === 'tool') {
-    return toolStatusMap[part.tool] ?? 'Considering next steps';
+    return Object.hasOwn(toolStatusMap, part.tool)
+      ? toolStatusMap[part.tool as keyof typeof toolStatusMap]
+      : 'Considering next steps';
   }
   if (part.type === 'reasoning') {
     return 'Thinking';

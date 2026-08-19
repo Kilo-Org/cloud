@@ -1,18 +1,50 @@
+/* eslint-disable import/max-dependencies */
 /* eslint-disable max-lines -- Cohesive single view component; splitting would reduce clarity */
+import { storage } from '#imports';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { AlertTriangle, ArrowLeft, GitPullRequest } from 'lucide-react';
-import { getKiloApiBaseUrl } from '@/src/shared/auth';
+import type { StoredAuth } from '@/src/shared/auth';
+import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
+import { isGatewayModelId } from '@/src/shared/model-picker-rows';
 import { displayRepoName } from './agents-format';
 import { useExtensionAgents } from './agents-provider';
 import { AgentsMessageList } from './agents-message-list';
 import { AgentsComposer } from './agents-composer';
 import { AgentsBlockingCards } from './agents-blocking-cards';
+import { ContextDonut } from './context-donut';
+import { ModelPicker } from './model-picker';
+import { useGatewayModels } from './use-gateway-models';
+import {
+  findCliCatalogModelRef,
+  resolveSessionContextWindow,
+  selectSessionCostUsd,
+  selectSessionModelPicker,
+  shouldShowContextMetrics,
+} from './agents-session-controls';
 
 const CREDITS_KEYWORDS =
   /(?:insufficient\s*credits|add\s*(?:at\s*least\s*)?\$\d|payment\s*required)/i;
+
+/*
+ * Same query key and fetcher as the new-session form's own stored-auth query,
+ * so both views share one cache entry and one read of extension storage.
+ */
+const storedAuthQueryKey = ['side-panel', 'stored-auth'] as const;
+
+const useStoredAuth = (): StoredAuth | undefined => {
+  const query = useQuery({
+    queryFn: async () => (await loadStoredAuth(storage)) ?? null,
+    queryKey: storedAuthQueryKey,
+    select: data => data ?? undefined,
+    staleTime: Infinity,
+  });
+
+  return query.data ?? undefined;
+};
 
 const statusIndicatorClass = (type: string): string => {
   if (type === 'error') {
@@ -35,7 +67,7 @@ export const AgentsSessionView = ({
   /** Prompt to auto-send once the session accepts messages (CLI spawn flow). */
   initialPrompt?: string | undefined;
 }): JSX.Element => {
-  const { manager, organizationId } = useExtensionAgents();
+  const { manager, organizationId, trpcClient } = useExtensionAgents();
   const { atoms } = manager;
   const messages = useAtomValue(atoms.messagesList);
   const isLoading = useAtomValue(atoms.isLoading);
@@ -53,6 +85,13 @@ export const AgentsSessionView = ({
   const hasOlderMessages = useAtomValue(atoms.hasOlderMessages);
   const isLoadingOlderMessages = useAtomValue(atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(atoms.olderMessagesError);
+  const contextUsage = useAtomValue(atoms.contextUsage);
+  const liveCostUsd = useAtomValue(atoms.totalCost);
+  const activeSessionType = useAtomValue(atoms.activeSessionType);
+  const remoteModelState = useAtomValue(atoms.remoteModelState);
+  const remoteModelOverride = useAtomValue(atoms.remoteModelOverride);
+  const observedModel = useAtomValue(atoms.observedModel);
+  const cloudAgentModelOverride = useAtomValue(atoms.cloudAgentModelOverride);
 
   const [retryingPrompt, setRetryingPrompt] = useState(false);
   const [retryingSwitch, setRetryingSwitch] = useState(false);
@@ -232,6 +271,103 @@ export const AgentsSessionView = ({
     void manager.loadOlderMessages();
   }, [manager]);
 
+  // ---- Context usage + session cost (header indicator) ----
+  const auth = useStoredAuth();
+  const { modelOptions } = useGatewayModels({
+    auth: auth ?? { token: '', userEmail: undefined },
+    organizationId: organizationId ?? undefined,
+  });
+  const contextWindow = useMemo(
+    () => resolveSessionContextWindow(contextUsage, modelOptions),
+    [contextUsage, modelOptions]
+  );
+  const sessionCostUsd = selectSessionCostUsd(
+    fetchedSessionData?.totalCostMicrodollars,
+    liveCostUsd
+  );
+  const showContextMetrics = shouldShowContextMetrics(isLoading, contextUsage);
+
+  // ---- In-session model picker ----
+  const picker = useMemo(
+    () =>
+      selectSessionModelPicker({
+        activeSessionType,
+        cloudOverride: cloudAgentModelOverride,
+        gatewayModels: modelOptions,
+        observedModel,
+        remoteModelOverride,
+        remoteModelState,
+        sessionModel: sessionConfig?.model,
+      }),
+    [
+      activeSessionType,
+      cloudAgentModelOverride,
+      modelOptions,
+      observedModel,
+      remoteModelOverride,
+      remoteModelState,
+      sessionConfig?.model,
+    ]
+  );
+  const setLastSelectedMutation = useMutation({
+    mutationFn: (input: { model: string }) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- tRPC mutation input union
+      trpcClient.modelPreferences.setLastSelected.mutate(input as never),
+  });
+
+  const handleModelChange = useCallback(
+    (modelId: string) => {
+      if (picker.target === 'remote-cli') {
+        // The CLI owns this catalog: send its own provider/model, not a gateway id.
+        const modelRef = findCliCatalogModelRef(remoteModelState.catalog, modelId);
+        if (modelRef !== undefined) {
+          manager.setRemoteModelOverride({
+            selection: { model: modelRef },
+            source: 'cli-catalog',
+          });
+        }
+      } else if (picker.target === 'remote-legacy') {
+        manager.setRemoteModelOverride({
+          selection: { model: { modelID: modelId, providerID: 'kilo' } },
+          source: 'legacy-gateway',
+        });
+      } else {
+        // A model change drops the previous model's variant, as the new-session form does.
+        manager.setCloudAgentModelOverride({ model: modelId });
+      }
+      // Model preferences are keyed by gateway model id; a CLI id would poison them.
+      if (isGatewayModelId(modelId)) {
+        setLastSelectedMutation.mutate({ model: modelId });
+      }
+    },
+    [manager, picker.target, remoteModelState.catalog, setLastSelectedMutation]
+  );
+
+  // Memoized like the browser tab's own donut slot, so the composer sees a stable node.
+  const modelPicker = useMemo(() => {
+    if (picker.target === null || auth === undefined) {
+      return;
+    }
+
+    return (
+      <>
+        <ModelPicker
+          auth={auth}
+          disabled={isReadOnly || picker.options.length === 0}
+          model={picker.selectedId}
+          modelOptions={picker.options}
+          onModelChange={handleModelChange}
+          organizationId={organizationId ?? undefined}
+        />
+        {picker.disabledReason === undefined ? null : (
+          <span className="shrink-0 self-center type-label text-foreground-muted">
+            {picker.disabledReason}
+          </span>
+        )}
+      </>
+    );
+  }, [auth, handleModelChange, isReadOnly, organizationId, picker]);
+
   const rawTitle = fetchedSessionData?.title ?? '';
   const title = rawTitle === '' ? 'Session' : rawTitle;
   const rawRepository = fetchedSessionData?.repository ?? fetchedSessionData?.gitUrl;
@@ -264,6 +400,19 @@ export const AgentsSessionView = ({
               </p>
             ) : null}
           </div>
+          {/* The donut sits in the header here, so its popover opens downward. Agent
+              sessions never compact, so no compaction handler is passed. */}
+          {showContextMetrics ? (
+            <ContextDonut
+              contextLength={contextWindow}
+              placement="below"
+              promptTokens={contextUsage?.contextTokens ?? 0}
+              sessionCostUsd={sessionCostUsd}
+            />
+          ) : (
+            // Reserve the slot so the title does not reflow when the first reply lands.
+            <span aria-hidden="true" className="size-8 shrink-0" />
+          )}
           {associatedPr === null ? null : (
             <a
               aria-label={`Open pull request #${associatedPr.number}`}
@@ -472,6 +621,7 @@ export const AgentsSessionView = ({
             isStreaming={isStreaming}
             isLoading={false}
             isReadOnly={isReadOnly}
+            modelPicker={modelPicker}
             onSend={handleSend}
             onStop={handleStop}
           />

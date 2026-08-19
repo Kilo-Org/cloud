@@ -1,4 +1,5 @@
 import { getStepFinishRoutedModel } from '@kilocode/cloud-agent-sdk/part-utils';
+import { z } from 'zod';
 
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
@@ -12,6 +13,10 @@ import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
  */
 
 type ResolvedModel = { providerID: string; modelID: string };
+
+// Stored messages can predate `providerID`/`modelID` being required fields;
+// tolerate legacy records that are missing or blank them.
+const nonEmptyStringSchema = z.string().min(1);
 
 /**
  * Pick the (providerID, modelID) that should be displayed for an assistant
@@ -42,13 +47,9 @@ export function resolveMessageDisplayModel(message: StoredMessage): ResolvedMode
   }
 
   // Fall back to the info-level model the message was created with.
-  const { providerID, modelID } = message.info;
-  if (
-    typeof providerID === 'string' &&
-    providerID.length > 0 &&
-    typeof modelID === 'string' &&
-    modelID.length > 0
-  ) {
+  const providerID = nonEmptyStringSchema.safeParse(message.info.providerID).data;
+  const modelID = nonEmptyStringSchema.safeParse(message.info.modelID).data;
+  if (providerID && modelID) {
     return { providerID, modelID };
   }
   return null;

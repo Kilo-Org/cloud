@@ -25,10 +25,7 @@ export function isOperationInProgress(error: unknown): boolean {
  * changes, so an edited intent never replays the previous one's ledger result.
  * `rotateKey()` ends the intent after a success or a terminal failure.
  */
-export function useHoistedOperationKey(): {
-  getKey: (fingerprint: string) => string;
-  rotateKey: () => void;
-} {
+export function useHoistedOperationKey() {
   const keyRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const getKey = (fingerprint: string) => {
     if (keyRef.current !== null && keyRef.current.fingerprint !== fingerprint) {

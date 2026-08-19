@@ -23,6 +23,21 @@ export function useUpsertCustomLlm() {
   );
 }
 
+export function useCopyCustomLlm() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.admin.customLlm.copy.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.customLlm.list.queryKey(),
+        });
+      },
+    })
+  );
+}
+
 export function useDeleteCustomLlm() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

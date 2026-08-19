@@ -1,43 +1,27 @@
-type TextPartLike = { type: string; text: string; synthetic?: boolean };
-
-type ReasoningPartLike = { type: string; text: string };
-
-type ToolStateLike =
-  | { status: 'pending'; input: Record<string, unknown> }
-  | { status: 'running'; input: Record<string, unknown>; title?: string }
-  | { status: 'completed'; input: Record<string, unknown>; output: string; title: string }
-  | { status: 'error'; input: Record<string, unknown>; error: string };
-
-type ToolPartLike = {
-  type: string;
-  tool: string;
-  state: ToolStateLike;
-};
-
-type CopyablePart = TextPartLike | ReasoningPartLike | ToolPartLike | { type: string };
+import {
+  type Part,
+  type ReasoningPart,
+  type TextPart,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 
 type CopyableMessage = {
-  parts: readonly CopyablePart[];
+  parts: readonly Part[];
 };
 
-function isTextPartLike(part: CopyablePart): part is TextPartLike {
-  return part.type === 'text' && typeof (part as TextPartLike).text === 'string';
+function isTextPart(part: Part): part is TextPart {
+  return part.type === 'text';
 }
 
-function isReasoningPartLike(part: CopyablePart): part is ReasoningPartLike {
-  return part.type === 'reasoning' && typeof (part as ReasoningPartLike).text === 'string';
+function isReasoningPart(part: Part): part is ReasoningPart {
+  return part.type === 'reasoning';
 }
 
-function isToolPartLike(part: CopyablePart): part is ToolPartLike {
-  return (
-    part.type === 'tool' &&
-    typeof (part as ToolPartLike).tool === 'string' &&
-    typeof (part as ToolPartLike).state === 'object' &&
-    typeof (part as ToolPartLike).state.status === 'string'
-  );
+function isToolPart(part: Part): part is ToolPart {
+  return part.type === 'tool';
 }
 
-function isSnapshotProgressText(part: TextPartLike): boolean {
+function isSnapshotProgressText(part: TextPart): boolean {
   return part.synthetic === true && part.text.includes('Initializing snapshot');
 }
 
@@ -53,7 +37,7 @@ function formatToolInput(input: Record<string, unknown>): string {
   }
 }
 
-function collectToolPartText(part: ToolPartLike): string {
+function collectToolPartText(part: ToolPart): string {
   const payload: string[] = [];
   const inputText = formatToolInput(part.state.input);
   if (inputText) {
@@ -75,13 +59,13 @@ function collectToolPartText(part: ToolPartLike): string {
 export function collectCopyableText(message: CopyableMessage): string {
   return message.parts
     .map(part => {
-      if (isTextPartLike(part)) {
+      if (isTextPart(part)) {
         return isSnapshotProgressText(part) ? '' : part.text;
       }
-      if (isReasoningPartLike(part)) {
+      if (isReasoningPart(part)) {
         return part.text;
       }
-      if (isToolPartLike(part)) {
+      if (isToolPart(part)) {
         return collectToolPartText(part);
       }
       return '';

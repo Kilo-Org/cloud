@@ -6,13 +6,7 @@ type UseCurrentUserIdOptions = {
   readonly enabled?: boolean;
 };
 
-export function useCurrentUserId(options: UseCurrentUserIdOptions = {}): {
-  userId: string | undefined;
-  email: string | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  refetch: () => void;
-} {
+export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   const trpc = useTRPC();
   const { data, isLoading, isError, refetch } = useQuery({
     ...trpc.user.getMe.queryOptions(),

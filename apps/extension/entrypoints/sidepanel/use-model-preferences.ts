@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryObserverResult, RefetchOptions } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -28,7 +29,9 @@ const queryKeyFingerprint = (queryKey: readonly string[]): string => queryKey.jo
 
 export interface UseModelPreferencesResult {
   readonly favorites: ReadonlySet<string>;
-  readonly refetch: () => Promise<unknown>;
+  readonly refetch: (
+    options?: RefetchOptions
+  ) => Promise<QueryObserverResult<{ favorites: string[]; lastSelected: unknown }>>;
   readonly status: ModelPreferencesStatus;
   readonly toggleError: boolean;
   readonly toggleFavorite: (model: KiloGatewayModelOption) => void;

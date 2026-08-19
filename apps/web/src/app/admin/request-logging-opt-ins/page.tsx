@@ -148,9 +148,7 @@ export default function RequestLoggingOptInsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Active opt-ins</CardTitle>
-            <CardDescription>
-              Hardcoded Kilo organization and email-domain opt-ins are not listed here.
-            </CardDescription>
+            <CardDescription>Hardcoded email-domain opt-ins are not listed here.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>

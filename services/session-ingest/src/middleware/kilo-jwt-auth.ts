@@ -1,14 +1,24 @@
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
+import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 
 import type { Env } from '../env';
 
+export type KiloJwtAuthVariables = {
+  user_id: string;
+  deletionAudience?: boolean;
+};
+
+const SESSION_LEAF_DELETE_PATH = /^\/api\/session\/[^/]+$/;
+
+function isSessionLeafDelete(method: string, path: string): boolean {
+  return method === 'DELETE' && SESSION_LEAF_DELETE_PATH.test(path);
+}
+
 export const kiloJwtAuthMiddleware = createMiddleware<{
   Bindings: Env;
-  Variables: {
-    user_id: string;
-  };
+  Variables: KiloJwtAuthVariables;
 }>(async (c, next) => {
   // One-use web ticket path. The /api/user/web websocket upgrade consumes an
   // opaque ticket minted by POST /api/user/web-ticket. This branch runs before
@@ -40,12 +50,31 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   let auth;
+  let deletionAudience = false;
   try {
-    auth = await verifyKiloBearerAgainstCurrentPepper({
+    const deletionAuth = await verifyKiloBearerAgainstCurrentPepper({
       token,
       nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
       connectionString: c.env.HYPERDRIVE.connectionString,
+      audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
+      allowBlocked: true,
     });
+    if (deletionAuth) {
+      if (!isSessionLeafDelete(c.req.method, c.req.path)) {
+        return c.json(
+          { success: false, error: 'Deletion token cannot be used for this request' },
+          403
+        );
+      }
+      auth = deletionAuth;
+      deletionAudience = true;
+    } else {
+      auth = await verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+        connectionString: c.env.HYPERDRIVE.connectionString,
+      });
+    }
   } catch (error) {
     // Secret-store or database failure. Stay retryable: a 401 here would tell
     // the client its credential is bad and stop it from retrying.
@@ -62,5 +91,6 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   c.set('user_id', auth.userId);
+  c.set('deletionAudience', deletionAudience);
   return next();
 });

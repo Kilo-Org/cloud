@@ -18,13 +18,7 @@ type VoiceInputButtonProps = {
 
 // Visual class and hitSlop travel as a coupled pair so the effective touch
 // target stays >=44pt (visual size + 2 * hitSlop per side) at every size.
-const SIZE_STYLES: Record<
-  VoiceInputButtonSize,
-  {
-    className: string;
-    hitSlop: { top: number; bottom: number; left: number; right: number };
-  }
-> = {
+const SIZE_STYLES = {
   sm: {
     className: 'h-8 w-8 rounded-full',
     hitSlop: { top: 6, bottom: 6, left: 6, right: 6 },
@@ -33,7 +27,13 @@ const SIZE_STYLES: Record<
     className: 'h-9 w-9 rounded-full',
     hitSlop: { top: 4, bottom: 4, left: 4, right: 4 },
   },
-};
+} satisfies Record<
+  VoiceInputButtonSize,
+  {
+    className: string;
+    hitSlop: { top: number; bottom: number; left: number; right: number };
+  }
+>;
 
 // Default (no prop) preserves the original kilo-chat look.
 const DEFAULT_STYLE = {

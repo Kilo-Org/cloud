@@ -12,7 +12,6 @@ import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@/lib/drizzle';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
 import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
@@ -77,9 +76,9 @@ async function isLoggingEnabledForUser(
   user: User | null,
   organizationId: string | null
 ): Promise<boolean> {
-  if (user?.google_user_email.endsWith('@kilo.ai')) return true;
+  // Hardcoded opt-ins mainly for local testing
+  if (user?.google_user_email.endsWith('@anaconda.com')) return true;
   if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
-  if (organizationId === KILO_ORGANIZATION_ID) return true;
   return isDynamicallyOptedIntoRequestLogging({
     accountId: user?.id ?? null,
     organizationId,

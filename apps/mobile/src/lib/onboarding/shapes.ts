@@ -21,7 +21,7 @@ export type BotIdentity = {
 
 export type OnboardingStep = 'identity' | 'channels' | 'provisioning' | 'done';
 
-export function execPresetToConfig(preset: ExecPreset): { security: string; ask: string } {
+export function execPresetToConfig(preset: ExecPreset) {
   if (preset === 'never-ask') {
     return { security: 'full', ask: 'off' };
   }

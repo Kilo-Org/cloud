@@ -128,7 +128,7 @@ export function useDiffRenderItem({
               language={item.language}
               keyId={item.lineKeyId}
               onTap={
-                isSelectable && typeof lineNumber === 'number' && hunk
+                isSelectable && lineNumber !== undefined && hunk
                   ? () => {
                       onLineTap({
                         filePath: item.filePath,
@@ -145,7 +145,7 @@ export function useDiffRenderItem({
                 selection !== null &&
                 selection.filePath === item.filePath &&
                 selection.side === side &&
-                typeof lineNumber === 'number' &&
+                lineNumber !== undefined &&
                 lineNumber >= selection.startLine &&
                 lineNumber <= selection.line
               }

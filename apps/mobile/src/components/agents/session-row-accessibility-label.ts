@@ -25,14 +25,14 @@ export function formatSpokenTimeAgo(timestamp: string): string {
   }
   const n = Number(match[1]);
   const unit = match[2];
-  const singular: Record<string, string> = {
+  const singular = {
     m: 'minute',
     h: 'hour',
     d: 'day',
     mo: 'month',
     y: 'year',
-  };
-  const word = unit ? singular[unit] : undefined;
+  } satisfies Record<string, string>;
+  const word = unit ? singular[unit as keyof typeof singular] : undefined;
   if (!word) {
     // Unrecognized unit — pass through so a future `timeAgo` unit added
     // without updating this helper doesn't get silently mangled.

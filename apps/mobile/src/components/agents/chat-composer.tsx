@@ -269,7 +269,7 @@ export function ChatComposer({
   // and writes through it during settle. The adapter routes every read and
   // write through the SubmitLock above, so the helper participates in the
   // same admission gate without introducing a second, racing authority.
-  const submissionLockRef: { current: boolean } = {
+  const submissionLockRef = {
     get current() {
       return sendLockRef.current.isLocked();
     },
@@ -280,7 +280,7 @@ export function ChatComposer({
         sendLockRef.current.release();
       }
     },
-  };
+  } satisfies { current: boolean };
   const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({

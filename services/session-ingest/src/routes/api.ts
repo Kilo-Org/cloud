@@ -27,6 +27,7 @@ export type ApiContext = {
   Bindings: Env;
   Variables: {
     user_id: string;
+    deletionAudience?: boolean;
   };
 };
 
@@ -69,6 +70,138 @@ function notifyUserSessionEventFromContext(
     return;
   }
   notifyUserSessionEvent(c.env, kiloUserId, event);
+}
+
+type SessionDeleteRow = typeof cli_sessions_v2.$inferSelect;
+
+async function clearSessionLocalState(
+  env: Env,
+  kiloUserId: string,
+  sessionId: string
+): Promise<void> {
+  await withDORetry(
+    () => getSessionAccessCacheDO(env, { kiloUserId }),
+    sessionCache => sessionCache.remove(sessionId),
+    'SessionAccessCacheDO.remove'
+  );
+  await withDORetry(
+    () => getSessionIngestDO(env, { kiloUserId, sessionId }),
+    stub => stub.clear(),
+    'SessionIngestDO.clear'
+  );
+}
+
+function notifySessionDeleted(
+  c: Context<ApiContext>,
+  kiloUserId: string,
+  row: Pick<
+    SessionDeleteRow,
+    | 'session_id'
+    | 'parent_session_id'
+    | 'organization_id'
+    | 'git_url'
+    | 'git_branch'
+    | 'created_on_platform'
+  >,
+  deletedAt: string
+): void {
+  notifyUserSessionEventFromContext(c, kiloUserId, {
+    type: 'session.deleted',
+    data: {
+      source: 'v2',
+      sessionId: row.session_id,
+      parentSessionId: row.parent_session_id,
+      organizationId: row.organization_id,
+      gitUrl: row.git_url,
+      gitBranch: row.git_branch,
+      createdOnPlatform: row.created_on_platform,
+      deletedAt,
+    },
+  });
+}
+
+async function deleteOwnedLeafSession(
+  c: Context<ApiContext>,
+  kiloUserId: string,
+  sessionId: string
+) {
+  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  const existingRows = await db
+    .select()
+    .from(cli_sessions_v2)
+    .where(
+      and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+    )
+    .limit(1);
+  const existing = existingRows[0];
+
+  if (!existing) {
+    await clearSessionLocalState(c.env, kiloUserId, sessionId);
+    return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
+  }
+
+  const outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
+    if (existing.cloud_agent_session_scope_id) {
+      await tx
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
+        )
+        .limit(1)
+        .for('update');
+    }
+
+    const lockedRows = await tx
+      .select()
+      .from(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+      )
+      .limit(1)
+      .for('update');
+    if (!lockedRows[0]) {
+      return 'gone';
+    }
+
+    const childRows = await tx
+      .select({ session_id: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.parent_session_id, sessionId),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1);
+    if (childRows[0]) {
+      return 'not_leaf';
+    }
+
+    await tx
+      .delete(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+      );
+    return 'deleted';
+  });
+
+  if (outcome === 'not_leaf') {
+    return c.json({ success: false, error: 'session_not_leaf' }, 409);
+  }
+
+  if (outcome === 'gone') {
+    await clearSessionLocalState(c.env, kiloUserId, sessionId);
+    return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
+  }
+
+  notifySessionDeleted(c, kiloUserId, existing, new Date().toISOString());
+  await clearSessionLocalState(c.env, kiloUserId, sessionId);
+  return c.json({ success: true }, 200);
 }
 
 const createSessionSchema = z.object({
@@ -161,13 +294,31 @@ api.delete('/session/:sessionId', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
+  if (c.get('deletionAudience')) {
+    return deleteOwnedLeafSession(c, kiloUserId, parsed.data);
+  }
+
   const accessibleSession = await resolveAccessibleKiloSession(c.env, {
     kiloUserId,
     kiloSessionId: parsed.data,
   });
 
   if (!accessibleSession) {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
+    const existingRows = await db
+      .select({ session_id: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1);
+    if (existingRows[0]) {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+    await clearSessionLocalState(c.env, kiloUserId, parsed.data);
+    return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
   }
 
   // Delete children first (FK is RESTRICT/NO ACTION).
@@ -264,32 +415,11 @@ api.delete('/session/:sessionId', async c => {
     if (!row) {
       continue;
     }
-    notifyUserSessionEventFromContext(c, kiloUserId, {
-      type: 'session.deleted',
-      data: {
-        source: 'v2',
-        sessionId: row.session_id,
-        parentSessionId: row.parent_session_id,
-        organizationId: row.organization_id,
-        gitUrl: row.git_url,
-        gitBranch: row.git_branch,
-        createdOnPlatform: row.created_on_platform,
-        deletedAt,
-      },
-    });
+    notifySessionDeleted(c, kiloUserId, row, deletedAt);
   }
 
   for (const sessionId of orderedSessionIds) {
-    await withDORetry(
-      () => getSessionAccessCacheDO(c.env, { kiloUserId }),
-      sessionCache => sessionCache.remove(sessionId),
-      'SessionAccessCacheDO.remove'
-    );
-    await withDORetry(
-      () => getSessionIngestDO(c.env, { kiloUserId, sessionId }),
-      stub => stub.clear(),
-      'SessionIngestDO.clear'
-    );
+    await clearSessionLocalState(c.env, kiloUserId, sessionId);
   }
 
   return c.json({ success: true }, 200);

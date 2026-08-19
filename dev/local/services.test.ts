@@ -14,6 +14,7 @@ import {
   portOffset,
   readPersistedPortOffset,
   resolveGroups,
+  resolveDeletionMockSessionEnv,
   resolveSessionNextAuthUrl,
   resolveTargets,
   writePersistedPortOffset,
@@ -259,6 +260,72 @@ test('starts Storybook with Storybook v10 port flags', () => {
   const service = getService('storybook');
 
   assert.deepEqual(service.command, ['pnpm', 'run', 'storybook', '-p', String(service.port)]);
+});
+
+test('registers deletion-mock as an opt-in loopback process', () => {
+  const service = getService('deletion-mock');
+
+  assert.equal(service.group, 'deletion-mock');
+  assert.equal(service.type, 'process');
+  assert.equal(service.dir, 'dev/local/scripts');
+  assert.equal(service.port, 4010 + portOffset);
+  assert.deepEqual(service.command, [
+    'env',
+    `PORT=${service.port}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'deletion-provider-mock.ts',
+  ]);
+
+  const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
+  assert.ok(!alwaysOn.includes('deletion-mock'));
+  assert.deepEqual(
+    resolveTargets(['deletion-mock']).filter(name => name === 'deletion-mock'),
+    ['deletion-mock']
+  );
+});
+
+test('injects deletion-mock host overrides only when the service is selected', () => {
+  assert.equal(
+    resolveDeletionMockSessionEnv({
+      serviceNames: ['nextjs'],
+      mockPort: 4010,
+      env: {},
+    }),
+    undefined
+  );
+
+  const env = resolveDeletionMockSessionEnv({
+    serviceNames: ['nextjs', 'deletion-mock'],
+    mockPort: 5210,
+    env: {},
+  });
+  assert.deepEqual(env, {
+    POSTHOG_HOST: 'http://127.0.0.1:5210',
+    PYLON_HOST: 'http://127.0.0.1:5210',
+    SUBSTACK_PUBLICATION_URL: 'http://127.0.0.1:5210',
+    CUSTOMERIO_TRACK_BASE: 'http://127.0.0.1:5210',
+    PYLON_API_KEY: 'deletion-mock',
+    POSTHOG_PERSONAL_API_KEY: 'deletion-mock',
+    POSTHOG_ENVIRONMENT_ID: 'deletion-mock',
+  });
+});
+
+test('keeps existing deletion provider keys when injecting deletion-mock hosts', () => {
+  const env = resolveDeletionMockSessionEnv({
+    serviceNames: ['deletion-mock'],
+    mockPort: 4010,
+    env: {
+      PYLON_API_KEY: 'real-pylon',
+      POSTHOG_PERSONAL_API_KEY: 'real-posthog',
+      POSTHOG_ENVIRONMENT_ID: 'proj-1',
+    },
+  });
+  assert.equal(env?.PYLON_API_KEY, undefined);
+  assert.equal(env?.POSTHOG_PERSONAL_API_KEY, undefined);
+  assert.equal(env?.POSTHOG_ENVIRONMENT_ID, undefined);
+  assert.equal(env?.POSTHOG_HOST, 'http://127.0.0.1:4010');
 });
 
 test('preserves auto routing backend auth secret name', () => {

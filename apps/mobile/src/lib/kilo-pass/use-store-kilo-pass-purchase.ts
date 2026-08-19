@@ -31,9 +31,15 @@ const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
 const RESTORE_PURCHASES_ERROR_MESSAGE = 'Failed to restore purchases. Try again.';
 
 export type AppStoreKiloPassPurchaseActionsDeps = {
+  // The real implementations (expo-iap's mutateAsync, the tRPC mutation) each
+  // resolve to their own concrete result; this module never reads it, only
+  // awaits it, so `Promise<void>` can't stand in here — `Promise<X>` requires
+  // its real `X` to be assignable to `void`, which none of the callers' true
+  // return types are.
   requestPurchase: (params: {
     request: { apple: { appAccountToken: string; sku: string } };
     type: 'subs';
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- see comment above: the resolved value is intentionally unused and varies per real implementation
   }) => Promise<unknown>;
   getAvailablePurchases: () => Promise<Purchase[]>;
   restorePurchases: () => Promise<void>;
@@ -42,6 +48,7 @@ export type AppStoreKiloPassPurchaseActionsDeps = {
     platform: 'ios';
     storefront: 'app_store';
     product: 'kilo_pass';
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- see comment above requestPurchase: the resolved value is intentionally unused and varies per real implementation
   }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   enabledAppleProductIds: readonly string[];

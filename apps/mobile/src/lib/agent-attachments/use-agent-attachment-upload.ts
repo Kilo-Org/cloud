@@ -394,6 +394,10 @@ export function useAgentAttachmentUpload(
   );
 
   const deleteLocalFile = useCallback((uri: string) => {
+    // A picker-provided URI is not owned by the app and is never deleted.
+    if (!uri.startsWith(Paths.cache.uri)) {
+      return;
+    }
     try {
       const file = new File(uri);
       if (file.exists) {

@@ -34,6 +34,7 @@ const hoisted = vi.hoisted(() => {
     measureLocalSize: vi.fn(),
     cancelAsync: vi.fn(),
     fileDelete: vi.fn(),
+    deletedUris: new Set<string>(),
   };
 });
 
@@ -63,7 +64,15 @@ vi.mock('expo-file-system', () => {
     constructor(uri: string) {
       this.uri = uri;
     }
+    get exists() {
+      return !hoisted.deletedUris.has(this.uri);
+    }
     delete() {
+      if (hoisted.deletedUris.has(this.uri)) {
+        // already deleted — idempotent, matching production
+        return;
+      }
+      hoisted.deletedUris.add(this.uri);
       hoisted.fileDelete(this.uri);
     }
   }
@@ -483,6 +492,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     hoisted.measureLocalSize.mockReset();
     hoisted.cancelAsync.mockReset();
     hoisted.fileDelete.mockReset();
+    hoisted.deletedUris.clear();
     hoisted.measureLocalSize.mockResolvedValue(1024);
     resolveUpload = undefined;
     rejectUpload = undefined;
@@ -707,6 +717,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -739,6 +755,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     if (!id) {
       throw new Error('attachment id missing');
     }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
 
     await act(async () => {
       hookApi().removeAttachment(id);
@@ -782,6 +804,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -808,6 +836,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -829,6 +863,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -843,6 +883,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
       hookApi().reset();
       await settle();
     });
@@ -855,6 +901,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   it('cancels every in-flight upload on unmount with no toast and no state flip', async () => {
     const renderer = await mountHook();
     await addDocument();
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
 
     await act(async () => {
       renderer.unmount();
@@ -882,6 +934,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     if (!id) {
       throw new Error('attachment id missing');
     }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
 
     await act(async () => {
       hookApi().removeAttachment(id);

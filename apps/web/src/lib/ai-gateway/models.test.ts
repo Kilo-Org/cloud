@@ -81,13 +81,11 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test('registers Tencent Hy3 as free without adding it to Auto Free', () => {
+    test('registers Tencent Hy3 as an Auto Free model', () => {
       expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
       expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
       expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
-        tencent_hy3_free_model.public_id
-      );
+      expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
     });
 
     test('retains the disabled LongCat 2.0 configuration for later enablement', async () => {
@@ -189,19 +187,19 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
+        'tencent/hy3:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights non-Laguna auto-free models higher than Laguna', () => {
-      const lagunaModel = autoFreeModels.find(({ model }) => model.includes('laguna'));
-      expect(lagunaModel?.weight).toBe(1);
-
-      for (const candidate of autoFreeModels) {
-        if (!candidate.model.includes('laguna')) {
-          expect(candidate.weight).toBe(9);
-        }
-      }
+    test('weights Auto Free models at 80% StepFun, 10% Hy3, and 10% Laguna', () => {
+      expect(
+        Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
+      ).toEqual({
+        'stepfun/step-3.7-flash:free': 8,
+        'tencent/hy3:free': 1,
+        'poolside/laguna-s-2.1:free': 1,
+      });
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

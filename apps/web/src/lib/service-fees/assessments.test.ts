@@ -215,7 +215,11 @@ describe('upsertServiceFeeAssessment', () => {
     await expect(
       upsertServiceFeeAssessment({
         store,
-        decision: { ...decision, eligibleSubtotalMinor: 20_000, expectedFeeMinor: 1_000 },
+        decision: {
+          ...decision,
+          eligibleSubtotalMinor: 20_000,
+          expectedFeeMinor: 1_000,
+        },
       })
     ).rejects.toMatchObject({ reason: 'eligible_subtotal' });
 
@@ -487,11 +491,9 @@ describe('refunds and disputes', () => {
     const withdrawn = await observeServiceFeeAssessmentDispute({
       store,
       assessmentKey: pending.assessmentKey,
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
     });
     expect(withdrawn).toMatchObject({
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
       outcome: 'charged',
       refundedFeeMinor: 200,
@@ -500,11 +502,9 @@ describe('refunds and disputes', () => {
     const won = await observeServiceFeeAssessmentDispute({
       store,
       assessmentKey: pending.assessmentKey,
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
     });
     expect(won).toMatchObject({
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
       outcome: 'charged',
       refundedProductMinor: 4_000,

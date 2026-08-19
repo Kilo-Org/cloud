@@ -101,7 +101,10 @@ describe('drizzle service fee assessment store', () => {
       upsertServiceFeeAssessment({
         store: assessments,
         decision: await prepareServiceFeeAssessmentDecision(
-          personalInput(user.id, { assessmentKey, kiloUserId: (await insertTestUser()).id })
+          personalInput(user.id, {
+            assessmentKey,
+            kiloUserId: (await insertTestUser()).id,
+          })
         ),
       })
     ).rejects.toMatchObject({ reason: 'owner', field: 'kiloUserId' });
@@ -144,7 +147,6 @@ describe('drizzle service fee assessment store', () => {
     const disputed = await observeServiceFeeAssessmentDispute({
       store: assessments,
       assessmentKey,
-      disputedProductMinor: 1_000,
       disputedFeeMinor: 50,
     });
 
@@ -155,7 +157,6 @@ describe('drizzle service fee assessment store', () => {
       outcome: 'charged',
     });
     expect(disputed).toMatchObject({
-      disputedProductMinor: 1_000,
       disputedFeeMinor: 50,
       outcome: 'charged',
     });
@@ -206,7 +207,9 @@ describe('drizzle service fee assessment store', () => {
       store: assessments,
       assessmentKey: discountedKey,
       chargedFeeMinor: 196,
-      stripeIds: { stripeCheckoutFeeLineItemId: `li_fee_${crypto.randomUUID()}` },
+      stripeIds: {
+        stripeCheckoutFeeLineItemId: `li_fee_${crypto.randomUUID()}`,
+      },
     });
     expect(charged.expectedFeeMinor).toBe(500);
     expect(charged.chargedFeeMinor).toBe(196);
@@ -222,7 +225,9 @@ describe('drizzle service fee assessment store', () => {
     const missedPending = await upsertServiceFeeAssessment({
       store: assessments,
       decision: await prepareServiceFeeAssessmentDecision(
-        personalInput(user.id, { assessmentKey: `checkout:${crypto.randomUUID()}` })
+        personalInput(user.id, {
+          assessmentKey: `checkout:${crypto.randomUUID()}`,
+        })
       ),
     });
     const missed = await markServiceFeeAssessmentMissed({
@@ -347,9 +352,18 @@ describe('drizzle organization service fee exemption store', () => {
       organizationId: parent.id,
       at: new Date('2026-10-01T00:00:00.000Z'),
     });
-    expect(childAtGrant).toMatchObject({ isExempt: true, reason: 'child historical grant' });
-    expect(childAtRevoke).toMatchObject({ isExempt: false, reason: 'child exemption revoked' });
-    expect(parentNow).toMatchObject({ isExempt: true, reason: 'parent nonprofit grant' });
+    expect(childAtGrant).toMatchObject({
+      isExempt: true,
+      reason: 'child historical grant',
+    });
+    expect(childAtRevoke).toMatchObject({
+      isExempt: false,
+      reason: 'child exemption revoked',
+    });
+    expect(parentNow).toMatchObject({
+      isExempt: true,
+      reason: 'parent nonprofit grant',
+    });
 
     const sibling = await createOrganization(`Sibling ${crypto.randomUUID()}`, admin.id);
     await db

@@ -35,9 +35,9 @@ Kilo with `auto_advance: false` and paid directly, while renewals and prorations
 Stripe from a draft state. These require different fee-attachment points, and both emit
 `invoice.created`.
 
-Fee revenue must also be reportable separately from product revenue, must survive Stripe webhook
-retries and out-of-order delivery, and must never block an underlying payment when fee processing
-fails.
+Fee revenue must also be reportable separately from the existing credit-revenue series, must survive
+Stripe webhook retries and out-of-order delivery, and must never block an underlying payment when
+fee processing fails.
 
 ## Decision
 
@@ -68,8 +68,12 @@ additional rows or additional fee revenue. The assessment records the calculatio
 and exemption decisions, the expected and charged fee, settlement, refunds, disputes, and the
 related Stripe identities.
 
-The assessment is the source for fee reporting, reconciliation, and refund calculation. Stripe
-remains the source for the actual customer charge and for invoice presentation.
+The assessment is a sidecar to the existing credit and Stripe flows, not a product or payment
+ledger. It is the source for fee reporting, reconciliation, and refund calculation. Product values
+are retained only when they are inputs to fee calculation, reconciliation, or refunds.
+`credit_transactions` remains the record of credits granted and the source of the existing paid,
+free, multiplied, and unmultiplied dashboard series. Stripe remains the source for actual payments,
+invoices, refunds, disputes, and invoice presentation.
 
 A single `outcome` column carries the fee decision. Settlement, refund, and dispute state are
 separate columns, because they answer different questions and move on different schedules.
@@ -132,9 +136,10 @@ resolve a Price's tax behavior, never blocks a customer payment.
 The fee is refundable in proportion to the eligible product principal refunded, using cumulative
 proportional rounding so that a fully refunded purchase returns exactly the original fee.
 
-A chargeback also reduces collected fee revenue, because the money leaves the account. Disputes are
-tracked in columns separate from refunds: refunds accumulate monotonically, while a dispute resolved
-in Kilo's favor restores the funds and must be reversible without violating that invariant.
+A chargeback also reduces collected fee revenue, because the money leaves the account. Its fee
+consequence is tracked separately from refunds: refunds accumulate monotonically, while a dispute
+resolved in Kilo's favor restores the fee and must be reversible without violating that invariant.
+The assessment does not track a disputed product balance.
 
 ### Organization exemptions are exact, internal, and time-resolved
 
@@ -159,7 +164,7 @@ instant, not against current state at webhook delivery. The exemption log is not
    constraint requiring the charged fee to equal the expected fee; on discounted Checkout purchases
    it legitimately does not.
 6. Fee-domain failure never fails a payment closed, and a missed fee is never collected later.
-7. Refund columns are monotonic. Dispute columns are not.
+7. Refund columns are monotonic. The dispute fee is reversible and is not monotonic.
 8. Eligibility is resolved at the billing object's creation instant, never at webhook-delivery time.
 9. Kilo Pass reported amounts for affiliate purposes exclude the fee. This required amending rule 17
    of `.specs/impact-affiliate-tracking.md`, which previously mandated the settled invoice paid
@@ -207,13 +212,15 @@ post-settlement credit math hides an incorrect charge instead of charging correc
 
 ## Consequences
 
-Fee revenue, missed fee value, and exempted fee value become separately reportable and reconcilable
-against Stripe, because a durable assessment exists for every commercial billing event.
+Fee revenue, missed fee value, exempted fee value, and disputed fee value become separately
+reportable and reconcilable against Stripe because a durable assessment exists for every commercial
+billing event.
 
-Two reporting discontinuities are introduced and must be labelled rather than presented as a
-continuous trend. Refund and dispute adjustment applies only to assessment-backed rows, so legacy
-revenue remains gross. Kilo Pass product revenue is newly visible, because it previously created no
-credit transaction and was absent from the revenue query entirely.
+The existing credit-revenue dashboard semantics remain unchanged, including their current lack of
+refund and dispute adjustment. Assessment-backed top-ups stay in those credit series. The fee series
+is grouped separately by settlement date in UTC and must not be added to credit figures to claim
+authoritative gross revenue. Kilo Pass product revenue remains outside the dashboard; filling that
+gap requires separate product and accounting work.
 
 A product-restricted Stripe coupon would discount an eligible product without discounting the fee
 line, causing the customer to pay more than the published 5%. This cannot be prevented in code: the

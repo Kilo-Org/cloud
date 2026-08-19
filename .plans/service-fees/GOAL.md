@@ -149,7 +149,7 @@ An assessment must retain enough information to explain and reconcile the decisi
 - Cumulative principal and fee refunds
 - Operational failure reason where applicable
 
-The assessment is the source for fee reporting, reconciliation, and refund calculations. Stripe remains the source for the actual customer charge and invoice presentation.
+The assessment is a service-fee sidecar, not a product or payment ledger. It is the source for fee reporting, reconciliation, and refund calculations. Product values are retained only as inputs to fee calculation, fee reconciliation, and fee refunds. `credit_transactions` remains the record of credits granted and the source of the existing credit-revenue series. Stripe remains the source for actual charges, invoices, refunds, disputes, and invoice presentation.
 
 ## Failure behavior
 
@@ -187,7 +187,7 @@ The service fee is refundable in proportion to the eligible product principal re
 
 This work does not add a general partial-refund Admin UI. Existing Kilo-initiated full-refund paths must include the full gross payment, including the fee. Operators issuing partial refunds directly in Stripe must include the proportional fee according to the operator runbook. Stripe refund events update the durable assessment with observed refund amounts.
 
-A chargeback reverses the fee in the same way a refund does, because the money leaves the account. A dispute later resolved in Kilo's favor restores it. Disputed amounts are tracked separately from refunds, since a dispute outcome can move in either direction.
+A chargeback reverses the fee in the same way a refund does, because the money leaves the account. A dispute later resolved in Kilo's favor restores it. The disputed fee is tracked separately from refunds because a dispute outcome can move in either direction; the assessment does not track disputed product revenue.
 
 The system must not automatically issue a second refund when an operator's Stripe partial refund appears not to include a proportional fee because the operator's intended gross-versus-principal amount cannot be inferred safely.
 
@@ -203,16 +203,15 @@ Service-fee revenue is separate from product revenue.
 - Settled refunds and withdrawn chargebacks reduce collected fee revenue.
 - Collected fee revenue is measured from the fee Stripe actually settled, not the fee Kilo requested. On discounted interactive purchases these differ.
 
-The Admin revenue dashboard must report separately:
+The Admin revenue dashboard keeps its existing paid, free, multiplied, and unmultiplied credit-transaction semantics, including their current limitations. Assessment-backed top-ups remain in those series. Separately, settled assessments report:
 
-- Eligible product revenue
 - Collected service-fee revenue
-- Gross revenue
-- Expected but missed fee value for settled payments
-- Exempted fee value for settled payments
-- Corresponding settled event counts
+- Expected but missed fee value
+- Exempted fee value
+- Disputed fee value
+- Charged, missed, and exempt assessment counts
 
-Unpaid and abandoned assessments remain available for audit but do not count as revenue or revenue leakage.
+The fee series does not make the dashboard a complete Stripe product-revenue report and must not be added to credit revenue to claim authoritative gross revenue. Kilo Pass product revenue remains outside the current query and requires separate product and accounting work. Unpaid and abandoned assessments remain available for audit but do not count as fee revenue or leakage.
 
 ## Customer communications
 
@@ -329,7 +328,7 @@ The implementation plan must provide verification for at least these cases:
 10. One assessment across related Checkout, invoice, PaymentIntent, and charge objects.
 11. Idempotent settlement and reporting across webhook retries.
 12. Fail-open payment behavior, durable missed-fee records, and a repeated Admin Slack alert on every retry.
-13. Collected, missed, and exempted dashboard values use settled payments only.
+13. Existing credit-revenue semantics remain unchanged, while collected, missed, exempted, and disputed fee values use settled assessments only.
 14. Affiliate amounts exclude fees while gross fraud telemetry can include them.
 15. Full and cumulative partial-refund calculations return no more or less than the original fee.
 16. Fee-bearing top-up emails itemize Credits added, `Service fee (5%)`, and Total paid; fee-free emails omit the fee row.

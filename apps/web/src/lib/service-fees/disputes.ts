@@ -28,14 +28,13 @@ export type ServiceFeeDisputeObservationStatus = 'ignored' | 'withdrawn' | 'clea
 export type ServiceFeeDisputeObservationResult = {
   status: ServiceFeeDisputeObservationStatus;
   assessment: ServiceFeeAssessmentRecord | null;
-  disputedProductMinor: number;
   disputedFeeMinor: number;
 };
 
 /**
- * Observe `charge.dispute.funds_withdrawn`. A dispute reverses the whole
- * charge, so disputed product/fee are set to the full settled/charged amounts.
- * Outcome and refund columns are not touched.
+ * Observe `charge.dispute.funds_withdrawn`. A dispute withdraws the whole
+ * charge, so the service-fee consequence is the full charged fee. Outcome and
+ * refund columns are not touched.
  */
 export async function observeServiceFeeDisputeFundsWithdrawn(params: {
   store: ServiceFeeDisputeAssessmentStore;
@@ -50,14 +49,10 @@ export async function observeServiceFeeDisputeFundsWithdrawn(params: {
     throw new ServiceFeeObservationNotReadyError(assessment.assessmentKey);
   }
 
-  if (
-    assessment.disputedProductMinor === assessment.settledProductMinor &&
-    assessment.disputedFeeMinor === assessment.chargedFeeMinor
-  ) {
+  if (assessment.disputedFeeMinor === assessment.chargedFeeMinor) {
     return {
       status: 'unchanged',
       assessment,
-      disputedProductMinor: assessment.disputedProductMinor,
       disputedFeeMinor: assessment.disputedFeeMinor,
     };
   }
@@ -65,23 +60,21 @@ export async function observeServiceFeeDisputeFundsWithdrawn(params: {
   const updated = await observeServiceFeeAssessmentDispute({
     store: params.store,
     assessmentKey: assessment.assessmentKey,
-    disputedProductMinor: assessment.settledProductMinor,
     disputedFeeMinor: assessment.chargedFeeMinor,
     now: params.now,
   });
 
   return {
-    status: 'withdrawn',
+    status: assessment.chargedFeeMinor === 0 ? 'unchanged' : 'withdrawn',
     assessment: updated,
-    disputedProductMinor: updated.disputedProductMinor,
     disputedFeeMinor: updated.disputedFeeMinor,
   };
 }
 
 /**
- * Observe `charge.dispute.closed`. A won outcome clears dispute columns. Lost
- * and other closed statuses leave funds-withdrawn amounts in place. Outcome
- * and refund columns are not touched.
+ * Observe `charge.dispute.closed`. A won outcome clears the fee consequence.
+ * Lost and other closed statuses leave it in place. Outcome and refund columns
+ * are not touched.
  */
 export async function observeServiceFeeDisputeClosed(params: {
   store: ServiceFeeDisputeAssessmentStore;
@@ -100,16 +93,14 @@ export async function observeServiceFeeDisputeClosed(params: {
     return {
       status: 'unchanged',
       assessment,
-      disputedProductMinor: assessment.disputedProductMinor,
       disputedFeeMinor: assessment.disputedFeeMinor,
     };
   }
 
-  if (assessment.disputedProductMinor === 0 && assessment.disputedFeeMinor === 0) {
+  if (assessment.disputedFeeMinor === 0) {
     return {
       status: 'unchanged',
       assessment,
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
     };
   }
@@ -117,7 +108,6 @@ export async function observeServiceFeeDisputeClosed(params: {
   const updated = await observeServiceFeeAssessmentDispute({
     store: params.store,
     assessmentKey: assessment.assessmentKey,
-    disputedProductMinor: 0,
     disputedFeeMinor: 0,
     now: params.now,
   });
@@ -125,7 +115,6 @@ export async function observeServiceFeeDisputeClosed(params: {
   return {
     status: 'cleared',
     assessment: updated,
-    disputedProductMinor: updated.disputedProductMinor,
     disputedFeeMinor: updated.disputedFeeMinor,
   };
 }
@@ -147,7 +136,6 @@ function ignoredDispute(
   return {
     status: 'ignored',
     assessment,
-    disputedProductMinor: assessment?.disputedProductMinor ?? 0,
     disputedFeeMinor: assessment?.disputedFeeMinor ?? 0,
   };
 }

@@ -447,7 +447,7 @@ SELECT assessment_key, flow, outcome,
        eligible_subtotal_minor, expected_fee_minor, charged_fee_minor,
        settled_product_minor, gross_paid_minor,
        refunded_product_minor, refunded_fee_minor,
-       disputed_product_minor, disputed_fee_minor,
+       disputed_fee_minor,
        stripe_checkout_session_id, stripe_invoice_id,
        stripe_payment_intent_id, stripe_charge_id,
        failure_code, settled_at, exemption_id
@@ -611,7 +611,7 @@ failures.
 | V23 | Fee-positive top-up email | Credits added, fee, total paid |
 | V24 | Fee-free top-up email | Fee row omitted |
 | V25 | Billing history vs Stripe invoice | Kilo shows gross; Stripe itemizes fee |
-| V26 | Admin revenue dashboard | Product, collected fee, gross, leakage |
+| V26 | Admin revenue dashboard | Existing credit series plus separate settled service-fee metrics |
 | V27 | Admin cancel-and-refund Kilo Pass | Full product + fee refunded |
 | V28 | Operator partial refund in Stripe | Assessment follows runbook; no auto-correcting refund |
 | V29 | Chargeback then win | Dispute columns set then cleared; outcome stays `charged` |
@@ -1373,17 +1373,17 @@ context)
 1. Open `/admin/revenue`.
 2. Set the range to include today. If the dashboard excludes today by default
    ("ends yesterday"), use Custom and include the validation day.
-3. Read product revenue, collected service fee, gross, missed, exempted,
-   disputed, and counts.
+3. Read the existing credit-revenue figures and the separate collected,
+   missed, exempted, and disputed service-fee figures and counts.
 4. Export CSV if the button exists.
 
 **UI expect**
 
-- Product revenue and collected fee are separate.
-- Gross ≈ product + collected fee.
+- Existing paid/free/multiplied/unmultiplied credit figures keep their old semantics.
+- Assessment-backed V1/V2 top-ups remain in paid credit totals and contribute $5.00 each to the separate collected-fee total.
 - V17 contributes to exempted fee ($5.00) and not to collected fee.
-- V1/V2 contribute $5.00 each to collected fee and $100.00 each to product.
-- Abandoned / unpaid Checkouts from a cancelled attempt do not appear.
+- No product or gross assessment revenue is shown; Kilo Pass product revenue remains outside this dashboard.
+- Abandoned / unpaid Checkouts from a cancelled attempt do not appear in fee metrics.
 - Empty-state does not crash if you pick a date range with no data. Check that
   by switching to a future-empty custom range, then switch back.
 
@@ -1391,17 +1391,17 @@ context)
 
 ```sql
 SELECT
-  sum(settled_product_minor - refunded_product_minor - disputed_product_minor)
-    AS product_minor,
-  sum(charged_fee_minor - refunded_fee_minor - disputed_fee_minor)
+  sum(greatest(charged_fee_minor - refunded_fee_minor - disputed_fee_minor, 0))
     AS collected_fee_minor,
   sum(CASE WHEN outcome = 'missed' THEN expected_fee_minor ELSE 0 END)
     AS missed_fee_minor,
   sum(CASE WHEN outcome = 'exempt' THEN expected_fee_minor ELSE 0 END)
-    AS exempt_fee_minor
+    AS exempt_fee_minor,
+  sum(disputed_fee_minor) AS disputed_fee_minor,
+  count(*) FILTER (WHERE outcome = 'charged') AS charged_count
 FROM stripe_service_fee_assessments
 WHERE settled_at IS NOT NULL
-  AND settled_at::date = CURRENT_DATE;
+  AND (settled_at AT TIME ZONE 'UTC')::date = CURRENT_DATE;
 ```
 
 Unpaid rows must not be in those sums.
@@ -1409,8 +1409,8 @@ Unpaid rows must not be in those sums.
 **Video** (`video-evidence`, one clip)
 
 - label: `V26 admin revenue dashboard`
-- claim: The dashboard shows separate product, collected fee, gross, and
-  leakage values for the validation day, and an empty range does not crash.
+- claim: The dashboard preserves the existing credit series, shows separate
+  fee collection and leakage values for the validation day, and an empty range does not crash.
 - limits: Does not prove SQL arithmetic beyond what is on screen.
 
 ---
@@ -1508,12 +1508,9 @@ blocked (V27 Nuke Pass). Record the charge id, assessment key, and whether
 4. Reload revenue.
 
 **UI expect:** customer credits are not silently increased by the fee. Revenue
-collected-fee drops after withdrawal and returns after the win. Product
-revenue follows the same pattern.
+collected-fee drops after withdrawal and returns after the win. Existing credit-revenue figures do not change because of the dispute.
 
-**Database expect:** after withdrawal, `disputed_product_minor = 10000`,
-`disputed_fee_minor = 500`, `outcome = charged`, refund columns unchanged.
-After a win, both dispute columns are `0`.
+**Database expect:** after withdrawal, `disputed_fee_minor = 500`, `outcome = charged`, and refund columns are unchanged. After a win, `disputed_fee_minor = 0`.
 
 **Video** (`video-evidence`, two or three clips; do not record Stripe helper
 setup in the Kilo clip)

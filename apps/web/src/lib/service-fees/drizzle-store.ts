@@ -102,7 +102,9 @@ export function createServiceFeeAssessmentStore(
       const [row] = await dbOrTx
         .insert(stripe_service_fee_assessments)
         .values(toAssessmentInsert(record))
-        .onConflictDoNothing({ target: stripe_service_fee_assessments.assessment_key })
+        .onConflictDoNothing({
+          target: stripe_service_fee_assessments.assessment_key,
+        })
         .returning();
 
       if (!row) {
@@ -285,7 +287,6 @@ function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessme
     refundedProductMinor: row.refunded_product_minor,
     refundedFeeMinor: row.refunded_fee_minor,
     refundedGrossMinor: row.refunded_gross_minor,
-    disputedProductMinor: row.disputed_product_minor,
     disputedFeeMinor: row.disputed_fee_minor,
     exemptionId: row.exemption_id,
     failureCode: row.failure_code,
@@ -322,7 +323,6 @@ function toAssessmentInsert(record: ServiceFeeAssessmentRecord): NewStripeServic
     refunded_product_minor: record.refundedProductMinor,
     refunded_fee_minor: record.refundedFeeMinor,
     refunded_gross_minor: record.refundedGrossMinor,
-    disputed_product_minor: record.disputedProductMinor,
     disputed_fee_minor: record.disputedFeeMinor,
     exemption_id: nullableText(record.exemptionId),
     failure_code: nullableText(record.failureCode),
@@ -387,9 +387,6 @@ function toAssessmentUpdate(
   }
   if (patch.refundedFeeMinor !== undefined) set.refunded_fee_minor = patch.refundedFeeMinor;
   if (patch.refundedGrossMinor !== undefined) set.refunded_gross_minor = patch.refundedGrossMinor;
-  if (patch.disputedProductMinor !== undefined) {
-    set.disputed_product_minor = patch.disputedProductMinor;
-  }
   if (patch.disputedFeeMinor !== undefined) set.disputed_fee_minor = patch.disputedFeeMinor;
   if (patch.exemptionId !== undefined) {
     set.exemption_id = nullableText(patch.exemptionId);

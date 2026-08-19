@@ -30,10 +30,15 @@ vi.mock('./dos/SessionAccessCacheDO', () => ({
   getSessionAccessCacheDO: vi.fn(),
 }));
 
+vi.mock('./dos/UserConnectionDO', () => ({
+  getUserConnectionDO: vi.fn(),
+}));
+
 import { app } from './index';
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { signSessionShareToken } from './services/session-share-token';
 
 type TestBindings = {
@@ -103,6 +108,7 @@ describe('session access invalidation route', () => {
 
     expect(res.status).toBe(401);
     expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
   });
 
   it.each(['wrong-secretxxx', 'wrong'])(
@@ -132,6 +138,7 @@ describe('session access invalidation route', () => {
       expect(res.status).toBe(401);
       expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
       expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+      expect(getUserConnectionDO).not.toHaveBeenCalled();
     }
   );
 
@@ -140,6 +147,9 @@ describe('session access invalidation route', () => {
     vi.mocked(getSessionAccessCacheDO).mockReturnValue(
       cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
     );
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeViewerSockets: vi.fn(async () => 0),
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
 
     const res = await app.request(
       '/internal/session-access/invalidate',
@@ -164,6 +174,96 @@ describe('session access invalidation route', () => {
     expect(cache.invalidateOrganization).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111'
     );
+  });
+
+  it('closes the removed member viewer sockets', async () => {
+    const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const closeViewerSockets = vi.fn(async () => 1);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeViewerSockets,
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
+
+    const res = await app.request(
+      '/internal/session-access/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(204);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: 'usr_removed',
+    });
+    expect(closeViewerSockets).toHaveBeenCalled();
+    expect(cache.invalidateOrganization).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111'
+    );
+  });
+});
+
+describe('internal-secret middleware', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('protects the session export route with the shared internal-secret middleware', async () => {
+    const res = await app.request(
+      '/internal/session/ses_12345678901234567890123456/export',
+      { method: 'GET' },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 503 when the Secrets Store cannot resolve the internal secret', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const suppliedSecret = 'caller-supplied-secret';
+
+    const res = await app.request(
+      '/internal/session/ses_12345678901234567890123456/export',
+      {
+        method: 'GET',
+        headers: {
+          'X-Internal-Secret': suppliedSecret,
+        },
+      },
+      {
+        ...defaultEnv,
+        INTERNAL_API_SECRET_PROD: {
+          get: async () => {
+            throw new Error('secret store unavailable');
+          },
+        },
+      }
+    );
+
+    const body = await res.json();
+    expect(res.status).toBe(503);
+    expect(body).toEqual({ success: false, error: 'Service temporarily unavailable' });
+    expect(JSON.stringify(body)).not.toContain('secret store unavailable');
+    expect(JSON.stringify(body)).not.toContain(suppliedSecret);
+    expect(error).toHaveBeenCalledWith(
+      'Auth infrastructure failure',
+      expect.objectContaining({
+        operation: 'internal-api-secret-get',
+        errorClass: 'Error',
+      })
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(suppliedSecret);
+    error.mockRestore();
   });
 });
 

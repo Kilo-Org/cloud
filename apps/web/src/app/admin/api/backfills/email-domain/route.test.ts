@@ -52,6 +52,20 @@ describe('emailDomainBackfillCandidates', () => {
     expect(rows.map(r => r.id)).not.toContain(user.id);
   });
 
+  it('excludes deletion-in-progress users so backfill does not race with deletion', async () => {
+    const user = await insertTestUser({
+      email_domain: null,
+      blocked_reason: 'deletion-in-progress at 2026-08-11T12:00:00.000Z',
+    });
+
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(emailDomainBackfillCandidates);
+
+    expect(rows.map(r => r.id)).not.toContain(user.id);
+  });
+
   it('still includes users blocked for other reasons', async () => {
     const user = await insertTestUser({
       email_domain: null,

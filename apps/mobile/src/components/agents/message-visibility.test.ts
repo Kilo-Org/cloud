@@ -88,6 +88,11 @@ describe('partRendersContent', () => {
     expect(partRendersContent(textPart({ text: '' }))).toBe(false);
   });
 
+  it('returns false for a whitespace-only text part', () => {
+    expect(partRendersContent(textPart({ text: '\n\n' }))).toBe(false);
+    expect(partRendersContent(textPart({ text: '   ' }))).toBe(false);
+  });
+
   it('returns true for a bash tool part', () => {
     expect(partRendersContent(toolPart('bash'))).toBe(true);
   });

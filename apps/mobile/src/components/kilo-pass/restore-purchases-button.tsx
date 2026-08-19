@@ -1,14 +1,12 @@
 import * as Haptics from 'expo-haptics';
-import { ActivityIndicator, Platform } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  type StoreKiloPassRestorePurchasesResult,
-  useStoreKiloPassPurchase,
-} from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { type StoreKiloPassRestorePurchasesResult } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
 
 type RestorePurchasesButtonProps = {
   /** Called with the outcome instead of the default toast — for callers that render feedback inline. */
@@ -17,11 +15,7 @@ type RestorePurchasesButtonProps = {
 
 export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesButtonProps> = {}) {
   const colors = useThemeColors();
-  const { isPending, isRestoringPurchases, restorePurchases } = useStoreKiloPassPurchase();
-
-  if (Platform.OS !== 'ios') {
-    return null;
-  }
+  const { isPending, isRestoringPurchases, restorePurchases } = useKiloPassNativeIap();
 
   const disabled = isPending || isRestoringPurchases;
 

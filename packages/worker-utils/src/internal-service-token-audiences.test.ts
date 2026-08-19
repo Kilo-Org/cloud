@@ -6,6 +6,7 @@ import {
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from './internal-service-token-audiences.js';
 
 describe('internal service token audiences', () => {
@@ -30,5 +31,9 @@ describe('internal service token audiences', () => {
   it('exports one purpose-bound GitLab credential broker audience', () => {
     expect(GITLAB_CREDENTIAL_BROKER_AUDIENCE).toBe('git-token-service:gitlab-credentials');
     expect(RootGitLabCredentialBrokerAudience).toBe(GITLAB_CREDENTIAL_BROKER_AUDIENCE);
+  });
+
+  it('exports one purpose-bound session-ingest user-deletion audience', () => {
+    expect(SESSION_INGEST_USER_DELETION_AUDIENCE).toBe('session-ingest:user-deletion');
   });
 });

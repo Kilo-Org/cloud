@@ -9,6 +9,7 @@ import { api } from './routes/api';
 import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -42,9 +43,20 @@ async function hasValidInternalSecret(c: {
 
 const requireValidInternalSecret = createMiddleware<{
   Bindings: Env;
-  Variables: { user_id: string };
+  Variables: { user_id: string; deletionAudience?: boolean };
 }>(async (c, next) => {
-  if (!(await hasValidInternalSecret(c))) {
+  let isValid: boolean;
+  try {
+    isValid = await hasValidInternalSecret(c);
+  } catch (error) {
+    console.error('Auth infrastructure failure', {
+      operation: 'internal-api-secret-get',
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
+  if (!isValid) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   return next();
@@ -54,6 +66,7 @@ export const app = new Hono<{
   Bindings: Env;
   Variables: {
     user_id: string;
+    deletionAudience?: boolean;
   };
 }>();
 
@@ -112,11 +125,7 @@ app.get('/session/:shareToken/metadata', async c => {
   );
 });
 
-app.post('/internal/session-access/invalidate', async c => {
-  if (!(await hasValidInternalSecret(c))) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
-  }
-
+app.post('/internal/session-access/invalidate', requireValidInternalSecret, async c => {
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
@@ -128,15 +137,13 @@ app.post('/internal/session-access/invalidate', async c => {
     'SessionAccessCacheDO.invalidateOrganization'
   );
 
+  await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
+
   return c.body(null, 204);
 });
 
 // Internal route for service-binding HTTP fetch (secret-protected)
-app.get('/internal/session/:sessionId/export', async c => {
-  if (!(await hasValidInternalSecret(c))) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
-  }
-
+app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async c => {
   const kiloUserId = c.req.header('X-Kilo-User-Id');
   if (!kiloUserId) return c.json({ success: false, error: 'Missing X-Kilo-User-Id' }, 400);
 

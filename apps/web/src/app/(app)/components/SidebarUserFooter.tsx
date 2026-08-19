@@ -18,7 +18,6 @@ type User = {
   google_user_name: string;
   google_user_email: string;
   google_user_image_url: string;
-  is_admin: boolean;
 };
 
 type SidebarUserFooterProps = {
@@ -86,12 +85,10 @@ export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooter
               <UserCog className="h-4 w-4" />
               Connected Accounts
             </DropdownMenuItem>
-            {user.is_admin && (
-              <DropdownMenuItem onClick={() => router.push('/data-exports')}>
-                <FileDown className="h-4 w-4" />
-                Request data export
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem onClick={() => router.push('/data-exports')}>
+              <FileDown className="h-4 w-4" />
+              Request data export
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/install')}>
               <Download className="h-4 w-4" />
               Install

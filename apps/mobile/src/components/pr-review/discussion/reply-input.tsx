@@ -3,11 +3,15 @@
 // (non-optimistic) reply mutation and re-fetches the list on settle.
 
 import { useEffect, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Alert, TextInput, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+
+import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
@@ -15,8 +19,125 @@ import {
   isPrOperationPersistenceFailed,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { trpcClient } from '@/lib/trpc';
 
 const REPLY_PLACEHOLDER = 'Reply…';
+
+const TERMS_COPY = 'You must be 13 or older to post.';
+const TERMS_ACCEPT_RETRY_COPY = "Couldn't accept the Terms. Check your connection and try again.";
+export const TERMS_OUTDATED_COPY =
+  'The Terms of Service changed. Reopen this screen to accept the latest version.';
+export const TERMS_CHECK_RETRY_COPY =
+  "Couldn't check the Terms of Service. Check your connection and try again.";
+
+/**
+ * Outcome of the UGC Terms gate. `accepted` means the current version is
+ * already accepted or the user accepted now (the caller may post).
+ * `dismissed` means the user cancelled the gate. `outdated` means the accept
+ * was rejected because the version is stale — terminal, the caller must not
+ * post. `unknown` means the Terms status could not be read, so acceptance is
+ * unconfirmed.
+ */
+export type TermsGateOutcome =
+  | { kind: 'accepted' }
+  | { kind: 'dismissed' }
+  | { kind: 'outdated' }
+  | { kind: 'unknown' };
+
+/**
+ * Best-effort UGC Terms gate. Returns `accepted` when the current version is
+ * already accepted, or when the user accepts now. A transient accept failure
+ * re-prompts with a Retry CTA; an outdated-version reject returns `outdated`
+ * (terminal). A `getTermsStatus` failure returns `unknown`: the write may still
+ * be attempted (the server enforces Terms), but a pending Terms error must stay
+ * visible instead of being cleared as if acceptance was confirmed.
+ */
+export async function ensureTermsAcceptedOutcome(): Promise<TermsGateOutcome> {
+  try {
+    const status = await trpcClient.moderation.getTermsStatus.query();
+    if (status.accepted) {
+      return { kind: 'accepted' };
+    }
+    return await promptTermsAcceptance(status.currentVersion);
+  } catch {
+    return { kind: 'unknown' };
+  }
+}
+
+async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome> {
+  const outcome = await new Promise<TermsGateOutcome>(resolve => {
+    async function accept() {
+      try {
+        await trpcClient.moderation.acceptTerms.mutate({
+          version,
+          agePosture: UGC_AGE_POSTURE,
+        });
+        resolve({ kind: 'accepted' });
+      } catch (error) {
+        // A BAD_REQUEST reject is the server's stale-version marker: terminal.
+        // Anything else (network, 5xx) is transient and re-prompts with Retry.
+        if (classifyPrReviewMutationError(error).kind === 'bad-request') {
+          resolve({ kind: 'outdated' });
+        } else {
+          showRetry();
+        }
+      }
+    }
+    function showRetry() {
+      Alert.alert(
+        'Terms of Service',
+        TERMS_ACCEPT_RETRY_COPY,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              resolve({ kind: 'dismissed' });
+            },
+          },
+          {
+            text: 'Retry',
+            onPress: () => {
+              void accept();
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    }
+    const show = () => {
+      Alert.alert(
+        'Terms of Service',
+        TERMS_COPY,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              resolve({ kind: 'dismissed' });
+            },
+          },
+          {
+            text: 'View terms',
+            onPress: () => {
+              void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
+              show();
+            },
+          },
+          {
+            text: 'Accept',
+            onPress: () => {
+              void accept();
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    };
+    show();
+  });
+  return outcome;
+}
 
 type ReplyInputProps = {
   readonly owner: string;
@@ -49,7 +170,24 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         return;
       }
       const classification = classifyPrReviewMutationError(reply.error);
-      if (classification.kind === 'bad-request') {
+      if (classification.kind === 'terms-required') {
+        void (async () => {
+          const outcome = await ensureTermsAcceptedOutcome();
+          if (outcome.kind === 'accepted') {
+            setInlineError(null);
+            setInlineErrorKind(null);
+          } else if (outcome.kind === 'outdated') {
+            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineErrorKind('bad-request');
+          } else if (outcome.kind === 'unknown') {
+            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineErrorKind('retryable');
+          } else {
+            setInlineError(TERMS_COPY);
+            setInlineErrorKind(null);
+          }
+        })();
+      } else if (classification.kind === 'bad-request') {
         setInlineError("This reply can't be posted. The thread may have changed.");
         setInlineErrorKind('bad-request');
       } else if (classification.kind === 'forbidden') {
@@ -66,13 +204,22 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
     }
   }, [reply.error]);
 
-  const submit = () => {
+  const submit = async () => {
     const body = bodyRef.current.trim();
     if (!body || reply.isPending) {
       return;
     }
     setInlineError(null);
     setInlineErrorKind(null);
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      return;
+    }
+    if (outcome.kind === 'dismissed') {
+      return;
+    }
     reply.mutate(
       { owner, repo, number, commentId, body },
       {
@@ -120,7 +267,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
             inlineErrorKind === 'forbidden' ||
             inlineErrorKind === 'reconnect'
           }
-          onPress={submit}
+          onPress={() => {
+            void submit();
+          }}
           accessibilityLabel="Submit reply"
         >
           <Text>Reply</Text>

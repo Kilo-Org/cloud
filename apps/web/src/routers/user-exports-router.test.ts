@@ -129,9 +129,13 @@ describe('user exports router guards and serialization', () => {
     expect(() => __test__.requireWebSession(false)).not.toThrow();
   });
 
-  it('rejects non-admin users', async () => {
+  it('allows non-admin users to access their personal exports', async () => {
     const caller = await createCallerForUser(stranger.id);
-    await expect(caller.userExports.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.userExports.list()).resolves.toEqual({ exports: [], nextCursor: null });
+    await expect(caller.userExports.request()).resolves.toMatchObject({
+      subjectType: 'user',
+      status: 'queued',
+    });
   });
 
   it('normalizes database timestamp text into strict UTC ISO strings', () => {

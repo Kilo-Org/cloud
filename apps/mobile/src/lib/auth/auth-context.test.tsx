@@ -94,6 +94,7 @@ vi.mock('expo-secure-store', () => ({
   setItem: hoisted.secureStore.setItem,
   setItemAsync: hoisted.secureStore.setItemAsync,
   deleteItemAsync: hoisted.secureStore.deleteItemAsync,
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -322,7 +323,10 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'auth-token',
+      expect.anything()
+    );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
@@ -1070,7 +1074,10 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     expect(hoisted.posthog.discardPostHog).toHaveBeenCalledTimes(1);
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'auth-token',
+      expect.anything()
+    );
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(false);
 
@@ -1087,7 +1094,10 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
     // Cleanup still ran, the deletion batch still ran, and auth state reset.
     expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalledTimes(1);
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'auth-token',
+      expect.anything()
+    );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
@@ -1116,7 +1126,10 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     expect(currentAuthEpoch()).toBeGreaterThan(before);
     const tokenOwner = await import('@/lib/auth/token-owner');
     expect(tokenOwner.getActiveToken()).toBeNull();
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'auth-token',
+      expect.anything()
+    );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
@@ -1136,7 +1149,10 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     });
 
     // All independent batch members still ran despite the one rejection.
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'auth-token',
+      expect.anything()
+    );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');

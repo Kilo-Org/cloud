@@ -96,6 +96,10 @@ export async function signKiloToken(params: {
  * Checks: signature, expiration (built into jose), version === 3, and that
  * kiloUserId is a non-empty string.
  *
+ * When `options.audience` is set, the token must have that exact audience.
+ * When omitted, tokens that include an audience are rejected so a
+ * purpose-bound service token cannot be replayed as a general user token.
+ *
  * @throws if the token is invalid, expired, or fails schema validation.
  */
 export async function verifyKiloToken(

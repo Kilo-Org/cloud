@@ -622,7 +622,12 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   try {
     await db
       .update(cloud_agent_code_reviews)
-      .set({ agent_version: 'v2' })
+      .set({
+        agent_version: 'v2',
+        ...(typeof dispatchPayload.sessionInput.model === 'string'
+          ? { model: dispatchPayload.sessionInput.model }
+          : {}),
+      })
       .where(eq(cloud_agent_code_reviews.id, review.id));
   } catch (error) {
     errorExceptInTest('[dispatchReview] Failed to persist agent version after dispatch', {

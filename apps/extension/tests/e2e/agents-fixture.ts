@@ -281,7 +281,10 @@ export const mockAgentsApi = async (
 
   // ---- /api/cloud-agent-next/sessions/stream-ticket ----
   await context.route('https://app.kilo.ai/api/cloud-agent-next/sessions/stream-ticket', route =>
-    route.fulfill({ json: { ticket: 'mock-stream-ticket' }, status: 200 })
+    route.fulfill({
+      json: { expiresAt: Math.floor(Date.now() / 1000) + 3600, ticket: 'mock-stream-ticket' },
+      status: 200,
+    })
   );
 
   // ---- tRPC batch dispatcher ----
@@ -518,8 +521,10 @@ export const mockAgentsApi = async (
         return { result: { data: { favorites: [], lastSelected: null } } };
       }
 
-      if (proc === 'activeSessions.getToken') {
-        return { result: { data: { token: 'mock-ingest-token' } } };
+      if (proc === 'activeSessions.createWebTicket' || proc === 'activeSessions.getToken') {
+        return {
+          result: { data: { expiresAt: 1_700_000_000, token: 'mock-ingest-token' } },
+        };
       }
 
       if (

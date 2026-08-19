@@ -28,7 +28,8 @@ import {
   type StripeDisputeCaseStatus as DisputeCaseStatus,
   type StripeDisputeOwnerClassification as OwnerClassification,
 } from '@kilocode/db/schema-types';
-import { and, desc, eq, inArray, isNotNull, isNull, like, lt, not, or, sql } from 'drizzle-orm';
+import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
+import { and, desc, eq, inArray, isNotNull, isNull, lt, not, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
@@ -203,7 +204,7 @@ async function resolveOwner(
         eq(kilocode_users.stripe_customer_id, customerId),
         or(
           isNull(kilocode_users.blocked_reason),
-          not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+          not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
         )
       )
     )

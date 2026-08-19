@@ -73,6 +73,12 @@ import {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  UserDeletionRequestStatus,
+  UserDeletionStepStatus,
+  UserDeletionStepKey,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionAuditEventType,
+  UserDeletionProviderScope,
   ImpactReferralProduct,
   ImpactAdvocateProgramKey,
   ImpactAttributionTouchType,
@@ -116,6 +122,10 @@ import {
   MCPGatewayAuditOutcome,
 } from './schema-types';
 import type {
+  UserDeletionTaskProgress,
+  UserDeletionManualEvidence,
+  UserDeletionAuditDetails,
+  UserDeletionActivityDetails,
   CustomLlmDefinition,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
@@ -235,6 +245,12 @@ export const SCHEMA_CHECK_ENUMS = {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  UserDeletionRequestStatus,
+  UserDeletionStepStatus,
+  UserDeletionStepKey,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionAuditEventType,
+  UserDeletionProviderScope,
   ImpactReferralProduct,
   ImpactAdvocateProgramKey,
   ImpactAttributionTouchType,
@@ -747,6 +763,215 @@ export const user_data_export_outbox = pgTable(
 );
 
 export type UserDataExportOutbox = typeof user_data_export_outbox.$inferSelect;
+
+export const user_deletion_requests = pgTable(
+  'user_deletion_requests',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    status: text()
+      .$type<UserDeletionRequestStatus>()
+      .notNull()
+      .default(UserDeletionRequestStatus.Pending),
+    catalog_version: integer().notNull().default(1),
+    requested_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    target_email: text(),
+    target_email_hmac: text().notNull(),
+    pylon_ticket_ref: text(),
+    cloud_subject_resolution: text().$type<UserDeletionCloudSubjectResolution>().notNull(),
+    cloud_subject_proof_ref: text(),
+    preflight_attention_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_progress_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    anonymized_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancelled_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_user_deletion_requests_active_email_hmac')
+      .on(table.target_email_hmac)
+      .where(sql`${table.status} IN ('pending', 'in_progress', 'finalizing')`),
+    uniqueIndex('UQ_user_deletion_requests_active_user_id')
+      .on(table.user_id)
+      .where(
+        sql`${table.user_id} IS NOT NULL AND ${table.status} IN ('pending', 'in_progress', 'finalizing')`
+      ),
+    uniqueIndex('UQ_user_deletion_requests_active_pylon_ticket')
+      .on(sql`regexp_replace(${table.pylon_ticket_ref}, '^#', '')`)
+      .where(
+        sql`${table.pylon_ticket_ref} IS NOT NULL AND ${table.status} IN ('pending', 'in_progress', 'finalizing')`
+      ),
+    index('IDX_user_deletion_requests_fairness')
+      .on(table.last_progress_at, table.created_at, table.id)
+      .where(sql`${table.status} IN ('pending', 'in_progress', 'finalizing')`),
+    index('IDX_user_deletion_requests_email_hmac').on(table.target_email_hmac),
+    index('IDX_user_deletion_requests_user_id').on(table.user_id),
+    enumCheck('user_deletion_requests_status_check', table.status, UserDeletionRequestStatus),
+    enumCheck(
+      'user_deletion_requests_cloud_subject_resolution_check',
+      table.cloud_subject_resolution,
+      UserDeletionCloudSubjectResolution
+    ),
+    check('user_deletion_requests_catalog_version_positive', sql`${table.catalog_version} >= 1`),
+    check(
+      'user_deletion_requests_completed_at_check',
+      sql`(${table.status} = 'completed') = (${table.completed_at} IS NOT NULL)`
+    ),
+    check(
+      'user_deletion_requests_cancelled_at_check',
+      sql`(${table.status} = 'cancelled') = (${table.cancelled_at} IS NOT NULL)`
+    ),
+    check(
+      'user_deletion_requests_active_email_check',
+      sql`(${table.status} IN ('pending', 'in_progress', 'finalizing')) = (${table.target_email} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type UserDeletionRequest = typeof user_deletion_requests.$inferSelect;
+export type NewUserDeletionRequest = typeof user_deletion_requests.$inferInsert;
+
+export const user_deletion_steps = pgTable(
+  'user_deletion_steps',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_id: uuid()
+      .notNull()
+      .references(() => user_deletion_requests.id, { onDelete: 'cascade' }),
+    step_key: text().$type<UserDeletionStepKey>().notNull(),
+    status: text()
+      .$type<UserDeletionStepStatus>()
+      .notNull()
+      .default(UserDeletionStepStatus.Pending),
+    available_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claim_token: uuid(),
+    claimed_until: timestamp({ withTimezone: true, mode: 'string' }),
+    window_attempt_count: integer().notNull().default(0),
+    lifetime_attempt_count: integer().notNull().default(0),
+    progress_json: jsonb().$type<UserDeletionTaskProgress>().notNull().default({}),
+    last_error_code: text(),
+    rate_limited_since: timestamp({ withTimezone: true, mode: 'string' }),
+    manual_evidence_json: jsonb().$type<UserDeletionManualEvidence>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_user_deletion_steps_request_step').on(table.request_id, table.step_key),
+    index('IDX_user_deletion_steps_due')
+      .on(table.status, table.available_at, table.id)
+      .where(sql`${table.status} IN ('pending', 'retry_wait', 'running')`),
+    index('IDX_user_deletion_steps_request_id').on(table.request_id),
+    enumCheck('user_deletion_steps_step_key_check', table.step_key, UserDeletionStepKey),
+    enumCheck('user_deletion_steps_status_check', table.status, UserDeletionStepStatus),
+    check(
+      'user_deletion_steps_window_attempt_count_nonnegative',
+      sql`${table.window_attempt_count} >= 0`
+    ),
+    check(
+      'user_deletion_steps_lifetime_attempt_count_nonnegative',
+      sql`${table.lifetime_attempt_count} >= 0`
+    ),
+    check(
+      'user_deletion_steps_claim_fields_check',
+      sql`(${table.claim_token} IS NULL) = (${table.claimed_until} IS NULL)`
+    ),
+    check(
+      'user_deletion_steps_manual_evidence_check',
+      sql`(${table.status} = 'manually_verified') = (${table.manual_evidence_json} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type UserDeletionStep = typeof user_deletion_steps.$inferSelect;
+export type NewUserDeletionStep = typeof user_deletion_steps.$inferInsert;
+
+export const user_deletion_audit_events = pgTable(
+  'user_deletion_audit_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_id: uuid().references(() => user_deletion_requests.id, { onDelete: 'cascade' }),
+    event_type: text().$type<UserDeletionAuditEventType>().notNull(),
+    actor_kilo_user_id: text(),
+    target_email_hmac: text().notNull(),
+    subject_key: text().notNull(),
+    details_json: jsonb().$type<UserDeletionAuditDetails>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_deletion_audit_events_idempotent')
+      .on(table.request_id, table.event_type, table.subject_key)
+      .where(sql`${table.request_id} IS NOT NULL`),
+    index('IDX_user_deletion_audit_events_request_id').on(table.request_id),
+    index('IDX_user_deletion_audit_events_hmac').on(table.target_email_hmac),
+    enumCheck(
+      'user_deletion_audit_events_event_type_check',
+      table.event_type,
+      UserDeletionAuditEventType
+    ),
+  ]
+);
+
+export type UserDeletionAuditEvent = typeof user_deletion_audit_events.$inferSelect;
+export type NewUserDeletionAuditEvent = typeof user_deletion_audit_events.$inferInsert;
+
+export const user_deletion_activity = pgTable(
+  'user_deletion_activity',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_id: uuid()
+      .notNull()
+      .references(() => user_deletion_requests.id, { onDelete: 'cascade' }),
+    step_key: text().$type<UserDeletionStepKey>(),
+    event_type: text().notNull(),
+    details_json: jsonb().$type<UserDeletionActivityDetails>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_user_deletion_activity_request_created').on(table.request_id, table.created_at),
+  ]
+);
+
+export type UserDeletionActivity = typeof user_deletion_activity.$inferSelect;
+export type NewUserDeletionActivity = typeof user_deletion_activity.$inferInsert;
+
+export const user_deletion_provider_credentials = pgTable(
+  'user_deletion_provider_credentials',
+  {
+    provider_scope: text().$type<UserDeletionProviderScope>().primaryKey().notNull(),
+    encrypted_material: text().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    updated_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+  },
+  table => [
+    enumCheck(
+      'user_deletion_provider_credentials_scope_check',
+      table.provider_scope,
+      UserDeletionProviderScope
+    ),
+  ]
+);
+
+export type UserDeletionProviderCredential = typeof user_deletion_provider_credentials.$inferSelect;
+export type NewUserDeletionProviderCredential =
+  typeof user_deletion_provider_credentials.$inferInsert;
 
 export const user_affiliate_attributions = pgTable(
   'user_affiliate_attributions',
@@ -4531,6 +4756,9 @@ export const agent_configs = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+
+    // Optimistic concurrency revision for compare-and-set config saves.
+    config_revision: integer().notNull().default(1),
   },
   table => [
     // Unique constraints for org and user ownership
@@ -4561,6 +4789,7 @@ export const agent_configs = pgTable(
       'agent_configs_agent_type_check',
       sql`${table.agent_type} IN ('code_review', 'auto_triage', 'auto_fix', 'security_scan')`
     ),
+    check('agent_configs_config_revision_check', sql`${table.config_revision} >= 1`),
   ]
 );
 
@@ -6358,6 +6587,7 @@ export const security_analysis_queue = pgTable(
     }),
     queue_status: text().notNull(),
     severity_rank: smallint().notNull(),
+    admitted_config_revision: integer(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_by_job_id: text(),
@@ -10481,6 +10711,56 @@ export const analytics_event_outbox = pgTable(
 export type AnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferSelect;
 export type NewAnalyticsEventOutboxRow = typeof analytics_event_outbox.$inferInsert;
 
+/**
+ * Durable outbox for live side effects that must be written atomically with
+ * the primary write (P2-B-11). The only operation today is the organization
+ * invite email, which the invite mutation enqueues instead of sending inline.
+ * The cron drainer claims due `pending` rows, sends the mail, and marks
+ * `delivered`; on error it backs off and retries, failing a row after 8
+ * attempts. `sending` claims older than 5 minutes are reclaimed. A unique
+ * `invitation_id` prevents a retry from enqueueing the same invite twice.
+ */
+export type ExternalSideEffectOutboxPayload = {
+  invitationId: string;
+  to: string;
+  organizationName: string;
+  inviterName: string;
+  acceptInviteUrl: string;
+};
+
+export const external_side_effect_outbox = pgTable(
+  'external_side_effect_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    operation: text().$type<'send_org_invite_email'>().notNull().default('send_org_invite_email'),
+    invitation_id: uuid().notNull(),
+    payload: jsonb().$type<ExternalSideEffectOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_external_side_effect_outbox_invitation_id').on(table.invitation_id),
+    index('IDX_external_side_effect_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+  ]
+);
+
+export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
+export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
+
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 
 // Immutable metered-infrastructure debit ledger, partitioned monthly on the
@@ -10525,3 +10805,108 @@ export const compute_usage_charge = pgTable(
 
 export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
 export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
+
+// Content moderation reports. `context_json` holds only minimized metadata
+// (surface, ids, model id, platform) — never a message or comment body.
+export const content_moderation_reports = pgTable(
+  'content_moderation_reports',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text().notNull(),
+    surface: text().notNull(),
+    target_kind: text().notNull(),
+    target_id: text().notNull(),
+    model_id: text(),
+    session_id: text(),
+    reason: text().notNull(),
+    context_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    receipt_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .notNull()
+      .unique(),
+    triage_status: text().notNull().default('received'),
+    appeal_status: text().notNull().default('none'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_content_moderation_reports_user_created').on(table.kilo_user_id, table.created_at),
+    index('IDX_content_moderation_reports_target').on(table.target_kind, table.target_id),
+  ]
+);
+
+export type ContentModerationReport = typeof content_moderation_reports.$inferSelect;
+export type NewContentModerationReport = typeof content_moderation_reports.$inferInsert;
+
+export const user_moderation_blocks = pgTable(
+  'user_moderation_blocks',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    blocker_user_id: text().notNull(),
+    blocked_github_login: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_moderation_blocks_blocker_login').on(
+      table.blocker_user_id,
+      table.blocked_github_login
+    ),
+  ]
+);
+
+export type UserModerationBlock = typeof user_moderation_blocks.$inferSelect;
+export type NewUserModerationBlock = typeof user_moderation_blocks.$inferInsert;
+
+export const user_moderation_mutes = pgTable(
+  'user_moderation_mutes',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    blocker_user_id: text().notNull(),
+    muted_github_login: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_moderation_mutes_blocker_login').on(
+      table.blocker_user_id,
+      table.muted_github_login
+    ),
+  ]
+);
+
+export type UserModerationMute = typeof user_moderation_mutes.$inferSelect;
+export type NewUserModerationMute = typeof user_moderation_mutes.$inferInsert;
+
+export const user_terms_acceptances = pgTable(
+  'user_terms_acceptances',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text().notNull(),
+    terms_version: text().notNull(),
+    age_posture: text().notNull().default('13_plus'),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_user_terms_acceptances_user_version').on(
+      table.kilo_user_id,
+      table.terms_version
+    ),
+  ]
+);
+
+export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
+export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;

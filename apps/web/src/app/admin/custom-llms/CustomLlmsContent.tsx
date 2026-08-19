@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -22,6 +23,7 @@ import {
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
   useCustomLlms,
+  useCopyCustomLlm,
   useUpsertCustomLlm,
   useDeleteCustomLlm,
 } from '@/app/admin/api/custom-llms/hooks';
@@ -31,7 +33,7 @@ import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
-import { Plus, Pencil } from 'lucide-react';
+import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
@@ -44,6 +46,16 @@ type EditorState = {
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
+};
+
+type CopyState = {
+  sourcePublicId: string;
+  publicId: string;
+  displayName: string;
+  validationError: {
+    field: 'publicId' | 'displayName' | null;
+    message: string;
+  } | null;
 };
 
 const INITIAL_DEFINITION: CustomLlmDefinition = {
@@ -73,8 +85,10 @@ const initialEditorState: EditorState = {
 export function CustomLlmsContent() {
   const { data, isLoading } = useCustomLlms();
   const upsertMutation = useUpsertCustomLlm();
+  const copyMutation = useCopyCustomLlm();
   const deleteMutation = useDeleteCustomLlm();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
+  const [copy, setCopy] = useState<CopyState | null>(null);
 
   const openCreate = useCallback(() => {
     setEditor({
@@ -101,6 +115,84 @@ export function CustomLlmsContent() {
   const closeEditor = useCallback(() => {
     setEditor(initialEditorState);
   }, []);
+
+  const openCopy = useCallback((sourcePublicId: string, sourceDisplayName: string) => {
+    setCopy({
+      sourcePublicId,
+      publicId: sourcePublicId,
+      displayName: sourceDisplayName,
+      validationError: null,
+    });
+  }, []);
+
+  const closeCopy = useCallback(() => {
+    setCopy(null);
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    if (!copy) return;
+
+    const publicId = copy.publicId.trim();
+    const displayName = copy.displayName.trim();
+
+    if (!publicId) {
+      setCopy(prev =>
+        prev
+          ? {
+              ...prev,
+              validationError: { field: 'publicId', message: 'New public ID is required' },
+            }
+          : prev
+      );
+      return;
+    }
+
+    if (!publicId.startsWith(CUSTOM_LLM_PREFIX)) {
+      setCopy(prev =>
+        prev
+          ? {
+              ...prev,
+              validationError: {
+                field: 'publicId',
+                message: `New public ID must start with "${CUSTOM_LLM_PREFIX}"`,
+              },
+            }
+          : prev
+      );
+      return;
+    }
+
+    if (!displayName) {
+      setCopy(prev =>
+        prev
+          ? {
+              ...prev,
+              validationError: { field: 'displayName', message: 'New display name is required' },
+            }
+          : prev
+      );
+      return;
+    }
+
+    try {
+      await copyMutation.mutateAsync({
+        source_public_id: copy.sourcePublicId,
+        public_id: publicId,
+        display_name: displayName,
+      });
+      toast.success('Custom LLM copied');
+      closeCopy();
+    } catch (error) {
+      setCopy(prev =>
+        prev
+          ? {
+              ...prev,
+              validationError: { field: null, message: formatZodError(error) },
+            }
+          : prev
+      );
+    }
+  }, [copy, copyMutation, closeCopy]);
 
   const handleSave = useCallback(async () => {
     const trimmedPublicId = editor.publicId.trim();
@@ -235,8 +327,19 @@ export function CustomLlmsContent() {
                       variant="outline"
                       size="sm"
                       onClick={() => openEdit(item.public_id, item.definition)}
+                      aria-label={`Edit ${item.public_id}`}
+                      title="Edit custom LLM"
                     >
                       <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openCopy(item.public_id, item.definition.display_name)}
+                      aria-label={`Copy ${item.public_id}`}
+                      title="Copy custom LLM"
+                    >
+                      <CopyIcon className="h-3 w-3" />
                     </Button>
                     <InlineDeleteConfirmation
                       onDelete={() => handleDelete(item.public_id)}
@@ -358,6 +461,86 @@ export function CustomLlmsContent() {
             </Button>
             <Button onClick={handleSave} disabled={upsertMutation.isPending}>
               {upsertMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={copy !== null}
+        onOpenChange={open => {
+          if (!open && !copyMutation.isPending) closeCopy();
+        }}
+      >
+        <DialogContent showCloseButton={!copyMutation.isPending}>
+          <DialogHeader>
+            <DialogTitle>Copy Custom LLM</DialogTitle>
+            <DialogDescription>
+              Copy the definition and encrypted credentials from{' '}
+              <code className="font-mono">{copy?.sourcePublicId}</code>. Enter a new public ID and
+              display name for the copy.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <Label htmlFor="copy-public-id">New Public ID</Label>
+              <Input
+                id="copy-public-id"
+                value={copy?.publicId ?? ''}
+                onChange={event =>
+                  setCopy(prev =>
+                    prev ? { ...prev, publicId: event.target.value, validationError: null } : prev
+                  )
+                }
+                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-copied-model`}
+                className="font-mono"
+                aria-invalid={copy?.validationError?.field === 'publicId'}
+                aria-describedby={
+                  copy?.validationError?.field === 'publicId' ? 'copy-validation-error' : undefined
+                }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="copy-display-name">New Display Name</Label>
+              <Input
+                id="copy-display-name"
+                value={copy?.displayName ?? ''}
+                onChange={event =>
+                  setCopy(prev =>
+                    prev
+                      ? { ...prev, displayName: event.target.value, validationError: null }
+                      : prev
+                  )
+                }
+                placeholder="e.g. My copied model"
+                aria-invalid={copy?.validationError?.field === 'displayName'}
+                aria-describedby={
+                  copy?.validationError?.field === 'displayName'
+                    ? 'copy-validation-error'
+                    : undefined
+                }
+              />
+            </div>
+
+            {copy?.validationError && (
+              <p
+                id="copy-validation-error"
+                className="bg-destructive/10 text-destructive rounded-md p-3 text-sm"
+                role="alert"
+              >
+                {copy.validationError.message}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeCopy} disabled={copyMutation.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={handleCopy} disabled={copyMutation.isPending}>
+              {copyMutation.isPending ? 'Copying...' : 'Copy Custom LLM'}
             </Button>
           </DialogFooter>
         </DialogContent>

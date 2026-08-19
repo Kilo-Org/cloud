@@ -1,4 +1,5 @@
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type ModeOption } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 export type ModelPickerSelection = {
@@ -37,6 +38,7 @@ export function areModelPickerSelectionScopesEqual(
 type ModePickerBridge = {
   currentValue: AgentMode;
   onSelect: (mode: AgentMode) => void;
+  customOptions?: ModeOption[];
 };
 
 export type RepoOption = {

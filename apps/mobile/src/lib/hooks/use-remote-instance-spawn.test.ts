@@ -144,6 +144,10 @@ describe('buildCreateRemoteSessionInput', () => {
     expect(buildCreateRemoteSessionInput({ mode: 'code' })).toEqual({ agent: 'code' });
   });
 
+  it('maps a custom mode slug to agent unchanged', () => {
+    expect(buildCreateRemoteSessionInput({ mode: 'reviewer' })).toEqual({ agent: 'reviewer' });
+  });
+
   it('emits a kilo selection without a variant when the selection has none', () => {
     expect(
       buildCreateRemoteSessionInput({

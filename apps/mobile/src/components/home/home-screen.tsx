@@ -30,6 +30,7 @@ export function HomeScreen() {
     isLoading: sessionsLoading,
     storedIsError,
     storedIsSuccess,
+    activeIsError,
     refetch: refetchSessions,
   } = useAgentSessions({
     organizationId,
@@ -81,6 +82,7 @@ export function HomeScreen() {
                 organizationId,
                 sessionsError: storedIsError,
                 sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
+                activeIsError,
                 handleRetrySessions: () => void refetchSessions(),
               })}
 
@@ -102,6 +104,7 @@ function renderSessionsOrPromo(params: {
   organizationId: string | null;
   sessionsError: boolean;
   sessionsLoadedEmpty: boolean;
+  activeIsError: boolean;
   handleRetrySessions: () => void;
 }) {
   // Stale stored history always wins over an error (e.g. a live-poll blip
@@ -116,6 +119,17 @@ function renderSessionsOrPromo(params: {
       <QueryError
         placement="top"
         title="Couldn't load sessions"
+        onRetry={params.handleRetrySessions}
+      />
+    );
+  }
+  // Cold active-only failure: the stored query succeeded empty but the active
+  // poll failed before any data loaded. Retryable, so never claim first-use.
+  if (params.activeIsError) {
+    return (
+      <QueryError
+        placement="top"
+        title="Couldn't load active sessions"
         onRetry={params.handleRetrySessions}
       />
     );

@@ -81,6 +81,14 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/dispatch-invite-email-outbox",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/process-user-deletions",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/dispatch-pending-code-reviews",
       "schedule": "*/10 * * * *"
     },

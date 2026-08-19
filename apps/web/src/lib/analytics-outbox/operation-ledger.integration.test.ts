@@ -86,6 +86,37 @@ describe('operation ledger (integration)', () => {
     expect(settled.row.settled_at).not.toBeNull();
   });
 
+  it('admits and settles a purchase-domain operation', async () => {
+    const admitted = await admitOperation(db, {
+      userId: 'purchase-user',
+      domain: 'purchase',
+      intent: 'complete_store_purchase',
+      operationKey: randomUUID(),
+      resourceKey: 'app_store:tx-1',
+      taxonomy: 'reconcile-first',
+      leaseSeconds: 120,
+    });
+    expect(admitted.admission).toBe('admitted');
+    if (admitted.admission !== 'admitted') return;
+
+    const settled = await settleOperation(db, {
+      rowId: admitted.row.id,
+      status: 'completed',
+      outcomeCode: 'ok',
+      canonicalResult: {
+        subscriptionId: 'sub-1',
+        tier: 'tier_49',
+        cadence: 'monthly',
+        alreadyProcessed: false,
+        purchaseKind: 'initial',
+      },
+    });
+    expect(settled.settled).toBe(true);
+    if (!settled.settled) return;
+    expect(settled.row.status).toBe('completed');
+    expect(settled.row.domain).toBe('purchase');
+  });
+
   it('produces exactly one winner under concurrent same-key admits', async () => {
     const results = await Promise.all(
       Array.from({ length: 10 }, () =>

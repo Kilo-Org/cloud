@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
-import { PositionPicker, BugReportMenu } from '@/components/gastown/TerminalBar';
+import { PositionPicker } from '@/components/gastown/TerminalBar';
 
-// PositionPicker (Radix Popover) and BugReportMenu (Radix DropdownMenu) are the
-// gastown terminal-bar overlays. Each renders its own trigger; the stories open
-// the overlay via a play function so the screenshot captures the open state.
+// PositionPicker renders its own trigger; the story opens the overlay via a play
+// function so the screenshot captures the open state.
 
 const meta: Meta = {
   title: 'Overlays/Popovers/TerminalBarPickers',
@@ -43,19 +42,6 @@ export const Position: Story = {
   play: async () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     openByPointer(document.querySelector('button[aria-label="Change terminal position"]'));
-    await new Promise(resolve => setTimeout(resolve, 150));
-  },
-};
-
-export const BugReport: Story = {
-  render: () => (
-    <TerminalControlStrip>
-      <BugReportMenu />
-    </TerminalControlStrip>
-  ),
-  play: async () => {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    openByPointer(document.querySelector('button[aria-label="Report a bug"]'));
     await new Promise(resolve => setTimeout(resolve, 150));
   },
 };

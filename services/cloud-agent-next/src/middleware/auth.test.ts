@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as AuthModule from '../auth.js';
+import type * as ValidateKiloTokenModule from '../validate-kilo-token.js';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
 
-vi.mock('../auth.js', async () => {
-  const actual = await vi.importActual<typeof AuthModule>('../auth.js');
+vi.mock('../validate-kilo-token.js', async () => {
+  const actual = await vi.importActual<typeof ValidateKiloTokenModule>('../validate-kilo-token.js');
   return {
     ...actual,
     validateKiloToken: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('../logger.js', () => {
 });
 
 const { authMiddleware } = await import('./auth.js');
-const { validateKiloToken } = await import('../auth.js');
+const { validateKiloToken } = await import('../validate-kilo-token.js');
 
 describe('authMiddleware', () => {
   beforeEach(() => {
@@ -51,7 +51,7 @@ describe('authMiddleware', () => {
 
     const response = await app.fetch(
       new Request('https://worker.test/trpc/send', { method: 'POST' }),
-      { NEXTAUTH_SECRET: 'secret' } as Env
+      { NEXTAUTH_SECRET: 'secret', HYPERDRIVE: { connectionString: 'postgres://test' } } as Env
     );
     const body: any = await response.json();
 
@@ -83,11 +83,17 @@ describe('authMiddleware', () => {
         method: 'POST',
         headers: { Authorization: 'Bearer token-1' },
       }),
-      { NEXTAUTH_SECRET: secretBinding } as unknown as Env
+      {
+        NEXTAUTH_SECRET: secretBinding,
+        HYPERDRIVE: { connectionString: 'postgres://test' },
+      } as unknown as Env
     );
 
     expect(response.status).toBe(200);
     expect(secretBinding.get).toHaveBeenCalledOnce();
-    expect(validateKiloToken).toHaveBeenCalledWith('Bearer token-1', 'secret-from-store');
+    expect(validateKiloToken).toHaveBeenCalledWith('Bearer token-1', {
+      secret: 'secret-from-store',
+      connectionString: 'postgres://test',
+    });
   });
 });

@@ -57,6 +57,10 @@ type TestBindings = {
     sendSessionReadyNotification: ReturnType<typeof vi.fn>;
     sendCloudAgentSessionNotification: ReturnType<typeof vi.fn>;
   };
+  CONNECTION_TICKET_DO: {
+    get: ReturnType<typeof vi.fn>;
+    idFromName: ReturnType<typeof vi.fn>;
+  };
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
   DIRECT_INGEST_MAX_BYTES: string;
@@ -76,6 +80,10 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
       sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })),
       sendCloudAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
     },
+    CONNECTION_TICKET_DO: {
+      get: vi.fn(),
+      idFromName: vi.fn(),
+    },
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
     DIRECT_INGEST_MAX_BYTES: '4194304',
@@ -87,10 +95,14 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
   };
 }
 
-function makeApiApp() {
-  const app = new Hono<{ Bindings: TestBindings; Variables: { user_id: string } }>();
+function makeApiApp(options?: { deletionAudience?: boolean }) {
+  const app = new Hono<{
+    Bindings: TestBindings;
+    Variables: { user_id: string; deletionAudience?: boolean };
+  }>();
   app.use('*', async (c, next) => {
     c.set('user_id', 'usr_test');
+    c.set('deletionAudience', options?.deletionAudience === true);
     await next();
   });
   app.route('/', api);
@@ -290,6 +302,7 @@ describe('api routes', () => {
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -327,7 +340,6 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       expect.anything(),
       'usr_test',
@@ -341,6 +353,7 @@ describe('api routes', () => {
   it('POST /session does not emit created when row already exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
 
     const sessionCache = {
@@ -364,7 +377,6 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     expect(env.NOTIFICATIONS.sendSessionReadyNotification).not.toHaveBeenCalled();
   });
@@ -372,6 +384,7 @@ describe('api routes', () => {
   it('POST /session caches a newly created personal session', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -423,6 +436,7 @@ describe('api routes', () => {
   it('POST /session succeeds when cache warming is unavailable during rollout', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -458,6 +472,46 @@ describe('api routes', () => {
     expect(putValidated).toHaveBeenCalled();
     consoleWarn.mockRestore();
     consoleError.mockRestore();
+  });
+
+  it('POST /session returns 403 and does not insert when blocked_reason is set', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: 'tos' }]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('POST /session returns 403 and does not insert when the user is missing', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
   });
 
   it('POST /session/:sessionId/ingest streams to R2 after access is resolved', async () => {
@@ -543,10 +597,7 @@ describe('api routes', () => {
     expect(env.SESSION_INGEST_R2.delete).toHaveBeenCalledWith(r2Key);
   });
 
-  it.each([
-    ['DELETE', '/session/ses_12345678901234567890123456'],
-    ['POST', '/session/ses_12345678901234567890123456/unshare'],
-  ])('%s %s denies a removed organization member before mutations', async (method, path) => {
+  it('POST /session/:sessionId/unshare denies a removed organization member before mutations', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     fns.selectResult.mockResolvedValue([
@@ -558,7 +609,9 @@ describe('api routes', () => {
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce(null);
 
     const res = await makeApiApp().fetch(
-      new Request(`http://local${path}`, { method }),
+      new Request('http://local/session/ses_12345678901234567890123456/unshare', {
+        method: 'POST',
+      }),
       makeTestEnv()
     );
 
@@ -567,6 +620,36 @@ describe('api routes', () => {
     expect(fns.executeResult).not.toHaveBeenCalled();
     expect(fns.update).not.toHaveBeenCalled();
     expect(fns.delete).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /session/:sessionId denies a removed organization member without clearing state', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce(null);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp().fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
+    expect(fns.select).toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).not.toHaveBeenCalled();
+    expect(ingestStub.clear).not.toHaveBeenCalled();
   });
 
   it('POST /session/:sessionId/ingest denies a removed organization member before side effects', async () => {
@@ -1487,6 +1570,219 @@ describe('api routes', () => {
     expect(fns.transaction).not.toHaveBeenCalled();
   });
 
+  it('DELETE /session/:sessionId clears DO/cache when the owned row is already gone', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue(null);
+    fns.selectResult.mockResolvedValue([]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const env = makeTestEnv();
+    const res = await makeApiApp().fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      env
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'session_not_found',
+      cleanup: 'done',
+    });
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(sessionCache.remove).toHaveBeenCalledWith(sessionId);
+    expect(getSessionIngestDO).toHaveBeenCalledWith(env, {
+      kiloUserId: 'usr_test',
+      sessionId,
+    });
+    expect(ingestStub.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('DELETE /session/:sessionId service audience deletes an org session without membership', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue(null);
+    const orgSession = {
+      session_id: sessionId,
+      parent_session_id: null,
+      organization_id: '11111111-1111-4111-8111-111111111111',
+      git_url: null,
+      git_branch: null,
+      created_on_platform: null,
+      cloud_agent_session_scope_id: null,
+    };
+    fns.selectResult
+      .mockResolvedValueOnce([orgSession])
+      .mockResolvedValueOnce([orgSession])
+      .mockResolvedValueOnce([]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const env = makeTestEnv();
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(resolveAccessibleKiloSession).not.toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(fns.deleteWhere).toHaveBeenCalledTimes(1);
+    const dialect = new PgDialect();
+    const deletePredicate = fns.deleteWhere.mock.calls[0]?.[0];
+    if (!(deletePredicate instanceof SQL)) {
+      throw new Error('Expected delete predicate');
+    }
+    expect(dialect.sqlToQuery(deletePredicate).params).toEqual([sessionId, 'usr_test']);
+    expect(sessionCache.remove).toHaveBeenCalledWith(sessionId);
+    expect(ingestStub.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('DELETE /session/:sessionId service audience returns 409 when the row is not a leaf', async () => {
+    const parentSessionId = 'ses_12345678901234567890123456';
+    const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const parentRow = {
+      session_id: parentSessionId,
+      parent_session_id: null,
+      organization_id: null,
+      git_url: null,
+      git_branch: null,
+      created_on_platform: null,
+      cloud_agent_session_scope_id: null,
+    };
+    fns.selectResult
+      .mockResolvedValueOnce([parentRow])
+      .mockResolvedValueOnce([parentRow])
+      .mockResolvedValueOnce([{ session_id: childSessionId }]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${parentSessionId}`, { method: 'DELETE' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'session_not_leaf' });
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).not.toHaveBeenCalled();
+    expect(ingestStub.clear).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /session/:sessionId service audience deletes only the selected leaf', async () => {
+    const parentSessionId = 'ses_12345678901234567890123456';
+    const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const childRow = {
+      session_id: childSessionId,
+      parent_session_id: parentSessionId,
+      organization_id: null,
+      git_url: null,
+      git_branch: null,
+      created_on_platform: null,
+      cloud_agent_session_scope_id: null,
+    };
+    fns.selectResult
+      .mockResolvedValueOnce([childRow])
+      .mockResolvedValueOnce([childRow])
+      .mockResolvedValueOnce([]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const env = makeTestEnv();
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${childSessionId}`, { method: 'DELETE' }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(fns.executeResult).not.toHaveBeenCalled();
+    expect(fns.deleteWhere).toHaveBeenCalledTimes(1);
+    const dialect = new PgDialect();
+    const deletePredicate = fns.deleteWhere.mock.calls[0]?.[0];
+    if (!(deletePredicate instanceof SQL)) {
+      throw new Error('Expected delete predicate');
+    }
+    expect(dialect.sqlToQuery(deletePredicate).params).toEqual([childSessionId, 'usr_test']);
+    expect(sessionCache.remove).toHaveBeenCalledTimes(1);
+    expect(sessionCache.remove).toHaveBeenCalledWith(childSessionId);
+    expect(getSessionIngestDO).toHaveBeenCalledTimes(1);
+    expect(getSessionIngestDO).toHaveBeenCalledWith(env, {
+      kiloUserId: 'usr_test',
+      sessionId: childSessionId,
+    });
+  });
+
+  it('DELETE /session/:sessionId service audience clears DO/cache when the row is already gone', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const env = makeTestEnv();
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      env
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'session_not_found',
+      cleanup: 'done',
+    });
+    expect(resolveAccessibleKiloSession).not.toHaveBeenCalled();
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).toHaveBeenCalledWith(sessionId);
+    expect(ingestStub.clear).toHaveBeenCalledTimes(1);
+  });
+
   it('POST /session/:sessionId/share returns a JWT for an existing generation', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -1925,6 +2221,35 @@ describe('api routes', () => {
     const forwardedUrl = new URL(forwardedReq.url);
     expect(forwardedUrl.pathname).toBe('/web');
     expect(forwardedUrl.searchParams.get('connectionId')).toBe('viewer-1');
+  });
+
+  it('POST /user/web-ticket mints seconds for the body and milliseconds for the DO store', async () => {
+    const mint = vi.fn(async () => undefined);
+    const ticketStub = { mint };
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.idFromName.mockReturnValue('ticket-do-id');
+    env.CONNECTION_TICKET_DO.get.mockReturnValue(ticketStub);
+
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+    now.mockRestore();
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ticket: string; expiresAt: number };
+    expect(body).toEqual({
+      ticket: expect.any(String),
+      expiresAt: 1_700_000_060,
+    });
+    expect(Number.isInteger(body.expiresAt)).toBe(true);
+    expect(mint).toHaveBeenCalledWith({
+      userId: 'usr_test',
+      expiresAt: 1_700_000_060_000,
+    });
   });
 
   // -------------------------------------------------------------------------

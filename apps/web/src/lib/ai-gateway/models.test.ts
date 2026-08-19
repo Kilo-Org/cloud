@@ -81,13 +81,11 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test('registers Tencent Hy3 as free without adding it to Auto Free', () => {
+    test('registers Tencent Hy3 as an Auto Free model', () => {
       expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
       expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
       expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
-        tencent_hy3_free_model.public_id
-      );
+      expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
     });
 
     test('retains the disabled LongCat 2.0 configuration for later enablement', async () => {
@@ -122,7 +120,7 @@ describe('isFreeModel', () => {
       expect(gpt_5_6_sol_stealth_model.internal_id).toBe('openai/gpt-5.6-sol:optimized');
       expect(gpt_5_6_sol_stealth_model.gateway).toBe('martian');
       expect(getInferenceProvider(gpt_5_6_sol_stealth_model)?.slug).toBe('stealth');
-      expect(gpt_5_6_sol_stealth_model.pricing).toEqual([
+      expect(gpt_5_6_sol_stealth_model.pricing?.tiers).toEqual([
         {
           start_context_length: 0,
           pricing: {
@@ -147,9 +145,9 @@ describe('isFreeModel', () => {
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
       for (const model of kiloExclusiveModels) {
         if (model.pricing) {
-          expect(model.pricing[0].start_context_length).toBe(0);
+          expect(model.pricing.tiers[0].start_context_length).toBe(0);
           let previousStartContextLength = -1;
-          for (const tier of model.pricing) {
+          for (const tier of model.pricing.tiers) {
             expect(typeof tier.pricing.prompt_per_million).toBe('number');
             expect(typeof tier.pricing.completion_per_million).toBe('number');
             expect(tier.start_context_length).toBeGreaterThan(previousStartContextLength);
@@ -189,19 +187,19 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
+        'tencent/hy3:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights non-Laguna auto-free models higher than Laguna', () => {
-      const lagunaModel = autoFreeModels.find(({ model }) => model.includes('laguna'));
-      expect(lagunaModel?.weight).toBe(1);
-
-      for (const candidate of autoFreeModels) {
-        if (!candidate.model.includes('laguna')) {
-          expect(candidate.weight).toBe(9);
-        }
-      }
+    test('weights Auto Free models at 80% StepFun, 10% Hy3, and 10% Laguna', () => {
+      expect(
+        Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
+      ).toEqual({
+        'stepfun/step-3.7-flash:free': 8,
+        'tencent/hy3:free': 1,
+        'poolside/laguna-s-2.1:free': 1,
+      });
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

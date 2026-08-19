@@ -35,6 +35,7 @@ import {
   modelRetainsPrompts,
   modelTrains,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type Props = {
@@ -273,6 +274,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         m => m.endpoint && normalizeModelId(m.slug) === infoModel.modelId
       );
       if (!model || !model.endpoint) continue;
+      const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
 
       offerings.push({
         providerSlug: provider.slug,
@@ -280,8 +282,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
-        promptPrice: model.endpoint.pricing.prompt,
-        completionPrice: model.endpoint.pricing.completion,
+        promptPrice: pricing.prompt,
+        completionPrice: pricing.completion,
       });
     }
 
@@ -417,13 +419,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       if (!model.endpoint) continue;
       const normalizedModelId = normalizeModelId(model.slug);
       const sourceIndex = rows.length;
+      const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
       rows.push({
         modelId: normalizedModelId,
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        promptPrice: model.endpoint.pricing.prompt,
-        completionPrice: model.endpoint.pricing.completion,
+        promptPrice: pricing.prompt,
+        completionPrice: pricing.completion,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });

@@ -649,7 +649,9 @@ export function createExtensionAgentSessionManager({
       }),
 
     // ---- getTicket ----
-    getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
+    getTicket: async (
+      sessionId: CloudAgentSessionId
+    ): Promise<{ ticket: string; expiresAt: number }> => {
       const token = getToken();
       const body: Record<string, string> = { cloudAgentSessionId: sessionId };
       if (organizationId !== null) {
@@ -664,14 +666,21 @@ export function createExtensionAgentSessionManager({
         method: 'POST',
       });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fetch json is untyped
-      const data = (await response.json()) as { ticket?: string; error?: string };
+      const data = (await response.json()) as {
+        ticket?: string;
+        expiresAt?: number;
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(data.error ?? 'Failed to get stream ticket');
       }
       if (data.ticket === undefined) {
         throw new Error('Missing ticket in stream-ticket response');
       }
-      return data.ticket;
+      if (data.expiresAt === undefined) {
+        throw new Error('Missing expiresAt in stream-ticket response');
+      }
+      return { expiresAt: data.expiresAt, ticket: data.ticket };
     },
 
     // ---- initiate ----

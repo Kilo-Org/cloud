@@ -61,6 +61,7 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: secureStoreMock.getItemAsync,
   setItemAsync: secureStoreMock.setItemAsync,
   deleteItemAsync: secureStoreMock.deleteItemAsync,
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
 
 vi.mock('@/lib/config', () => ({

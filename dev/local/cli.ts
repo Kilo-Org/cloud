@@ -16,6 +16,7 @@ import {
   portOffset,
   writePersistedPortOffset,
   resolveSessionNextAuthUrl,
+  resolveDeletionMockSessionEnv,
   services,
 } from './services';
 import { acquireProcessLock, withProcessLockAsync } from './process-lock';
@@ -551,6 +552,11 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   ) {
     sessionEnv.NEXT_PUBLIC_POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   }
+  const deletionMockEnv = resolveDeletionMockSessionEnv({
+    serviceNames,
+    mockPort: getService('deletion-mock').port,
+  });
+  if (deletionMockEnv) Object.assign(sessionEnv, deletionMockEnv);
   createSession(sessionName, sessionEnv);
 
   // --- Start each service in its own tmux window ---

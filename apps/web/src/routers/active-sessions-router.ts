@@ -66,6 +66,15 @@ const connectedInstancesResponseSchema = z.object({
 });
 
 /**
+ * Session Ingest `/api/user/web-ticket` mint response. Parsed at runtime so a
+ * malformed 200 fails the mutation instead of returning undefined fields.
+ */
+const webTicketResponseSchema = z.object({
+  ticket: z.string().min(1),
+  expiresAt: z.number(),
+});
+
+/**
  * A live session as this router returns it: the worker's wire row plus the
  * fields enriched from `cli_sessions_v2`.
  */
@@ -219,11 +228,73 @@ function throwOrgContextFailure(error: unknown): never {
   });
 }
 
+/**
+ * Mint a one-use web ticket from Session Ingest for the given user. The
+ * returned `token` is the opaque ticket; `expiresAt` is the Unix-seconds
+ * expiry from the worker body. A missing worker URL or a non-2xx mint
+ * response fails fast with PRECONDITION_FAILED rather than hanging.
+ */
+async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Session ingest is not configured',
+    });
+  }
+
+  const token = generateInternalServiceToken(userId);
+  const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Session ingest is not configured',
+      cause: error,
+    });
+  }
+
+  if (!response.ok) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Session ingest is not configured',
+    });
+  }
+
+  const raw = await response.json();
+  const parsed = webTicketResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Invalid ticket response from session ingest',
+      cause: parsed.error,
+    });
+  }
+  return { token: parsed.data.ticket, expiresAt: parsed.data.expiresAt };
+}
+
 export const activeSessionsRouter = createTRPCRouter({
-  getToken: baseProcedure.query(async ({ ctx }) => {
-    const token = generateInternalServiceToken(ctx.user.id);
-    return { token };
-  }),
+  /**
+   * Mint a web ticket. This is the path forward: minting is not idempotent,
+   * so it belongs on a mutation.
+   */
+  createWebTicket: baseProcedure.mutation(({ ctx }) => mintWebTicket(ctx.user.id)),
+
+  /**
+   * TODO: remove once no shipped client calls this. Superseded by
+   * `createWebTicket`. Store builds and installed extensions cannot update in
+   * step with the server, so the procedure has to stay a query: tRPC answers a
+   * query-shaped call to a mutation with 405, and fails the whole batch with
+   * 400 "Cannot mix procedure types in call" when it is batched beside a query.
+   * Drop it when the mobile and extension releases that call `createWebTicket`
+   * have rolled out and the getToken traffic in Axiom reaches zero.
+   */
+  getToken: baseProcedure.query(({ ctx }) => mintWebTicket(ctx.user.id)),
 
   list: baseProcedure.input(listInputSchema).query(async ({ ctx, input }) => {
     const organizationId = input?.organizationId;

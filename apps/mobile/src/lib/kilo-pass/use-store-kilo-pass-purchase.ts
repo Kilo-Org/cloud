@@ -1,38 +1,11 @@
 /* eslint-disable max-lines */
 
-import {
-  createContext,
-  createElement,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ErrorCode,
-  getAvailablePurchases as getAvailableIapPurchases,
-  type Purchase,
-  useIAP,
-} from 'expo-iap';
-import { Platform } from 'react-native';
+import { useEffect } from 'react';
+import { ErrorCode, type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
-import {
-  captureEvent,
-  KILO_PASS_PURCHASE_FAILED_EVENT,
-  KILO_PASS_PURCHASE_STARTED_EVENT,
-} from '@/lib/analytics/posthog';
-import { useTRPC } from '@/lib/trpc';
 import { type AppStoreKiloPassProduct } from './store-products';
-import {
-  type AppStoreKiloPassOwnershipPreflight,
-  getAppStoreKiloPassOwnershipPreflight,
-} from './subscription-card-state';
 
 const userCancelledPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.UserCancelled),
@@ -57,14 +30,19 @@ const APP_STORE_PURCHASE_NOT_LINKED_USER_MESSAGE =
 const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
 const RESTORE_PURCHASES_ERROR_MESSAGE = 'Failed to restore purchases. Try again.';
 
-type AppStoreKiloPassPurchaseActionsDeps = {
+export type AppStoreKiloPassPurchaseActionsDeps = {
   requestPurchase: (params: {
     request: { apple: { appAccountToken: string; sku: string } };
     type: 'subs';
   }) => Promise<unknown>;
   getAvailablePurchases: () => Promise<Purchase[]>;
   restorePurchases: () => Promise<void>;
-  completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<unknown>;
+  completeAppStorePurchase: (input: {
+    signedTransactionJws: string;
+    platform: 'ios';
+    storefront: 'app_store';
+    product: 'kilo_pass';
+  }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   enabledAppleProductIds: readonly string[];
   loadEnabledAppleProductIds?: () => Promise<readonly string[]>;
@@ -79,37 +57,6 @@ type StoreKiloPassPurchaseOptions = {
 };
 
 export type StoreKiloPassRestorePurchasesResult = 'restored' | 'empty' | 'failed';
-
-type StoreKiloPassPurchaseContextValue = {
-  appStoreOwnershipPreflight: AppStoreKiloPassOwnershipPreflight;
-  purchase: (
-    product: AppStoreKiloPassProduct,
-    options?: StoreKiloPassPurchaseOptions
-  ) => Promise<void>;
-  restorePurchases: () => Promise<StoreKiloPassRestorePurchasesResult>;
-  isPending: boolean;
-  isRestoringPurchases: boolean;
-  /** Last purchase/restore failure message, for screens that render it inline. */
-  errorMessage: string | null;
-  clearError: () => void;
-};
-
-const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextValue | null>(null);
-
-const androidStoreKiloPassPurchaseValue: StoreKiloPassPurchaseContextValue = {
-  appStoreOwnershipPreflight: null,
-  purchase: async () => {
-    await Promise.resolve();
-  },
-  restorePurchases: async () => {
-    await Promise.resolve();
-    return 'failed';
-  },
-  isPending: false,
-  isRestoringPurchases: false,
-  errorMessage: null,
-  clearError: () => undefined,
-};
 
 type PurchaseCompletionResult =
   | { completed: true; errorMessage?: never }
@@ -154,7 +101,7 @@ type RecoverPurchasesOptions = PurchaseCompletionOptions & {
   enabledAppleProductIds?: readonly string[];
 };
 
-function isRecoverableKiloPassPurchase(
+export function isRecoverableKiloPassPurchase(
   purchase: Purchase,
   enabledAppleProductIds: readonly string[]
 ): boolean {
@@ -187,7 +134,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return errorMessageSchema.safeParse(error).data?.message ?? fallback;
 }
 
-function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): string | null {
+export function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): string | null {
   if (isUserCancelledPurchaseError(error)) {
     return null;
   }
@@ -207,7 +154,7 @@ function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): stri
   return message;
 }
 
-function showDedupedPurchaseError(message: string) {
+export function showDedupedPurchaseError(message: string) {
   if (inlineErrorOwnerCount > 0) {
     return;
   }
@@ -224,7 +171,7 @@ function showDedupedPurchaseError(message: string) {
   toast.error(message);
 }
 
-function getPurchaseCompletionId(purchase: Purchase): string {
+export function getPurchaseCompletionId(purchase: Purchase): string {
   return purchase.transactionId ?? purchase.id;
 }
 
@@ -235,7 +182,12 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
   ): Promise<PurchaseCompletionResult> {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
-      await deps.completeAppStorePurchase({ signedTransactionJws });
+      await deps.completeAppStorePurchase({
+        signedTransactionJws,
+        platform: 'ios',
+        storefront: 'app_store',
+        product: 'kilo_pass',
+      });
       if (options.invalidateAfterCompletion ?? true) {
         await deps.invalidateAfterCompletion();
       }
@@ -378,269 +330,4 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       }
     },
   };
-}
-
-export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNode }) {
-  if (Platform.OS !== 'ios') {
-    return createElement(
-      StoreKiloPassPurchaseContext.Provider,
-      { value: androidStoreKiloPassPurchaseValue },
-      children
-    );
-  }
-
-  return createElement(IosStoreKiloPassPurchaseProvider, null, children);
-}
-
-function IosStoreKiloPassPurchaseProvider({ children }: { children: ReactNode }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);
-  const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const clearError = useCallback(() => {
-    setErrorMessage(null);
-  }, []);
-  const recoveredPurchaseIdsRef = useRef(new Set<string>());
-  const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
-  const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
-  const pendingPurchaseCompletedCallbackRef = useRef<(() => void) | null>(null);
-  const completeAppStorePurchase = useMutation(
-    trpc.kiloPass.completeAppStorePurchase.mutationOptions()
-  );
-  const mobileStoreProductsQuery = useQuery({
-    ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
-    enabled: Platform.OS === 'ios',
-  });
-  const { refetch: refetchMobileStoreProducts } = mobileStoreProductsQuery;
-  const enabledAppleProductIds = useMemo(
-    () => mobileStoreProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
-    [mobileStoreProductsQuery.data]
-  );
-  const invalidateAfterCompletion = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
-      queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
-    ]);
-  }, [queryClient, trpc]);
-
-  const releasePurchaseRequest = useCallback(() => {
-    activePurchaseRequestRef.current = null;
-    pendingPurchaseCompletedCallbackRef.current = null;
-    setIsRequestingPurchase(false);
-  }, []);
-
-  const actionsRef = useIAP({
-    onPurchaseError: error => {
-      pendingPurchaseCompletedCallbackRef.current = null;
-      releasePurchaseRequest();
-      // A null message means the user cancelled — not a failure.
-      const message = getKiloPassPurchaseErrorMessage(error, error.message);
-      if (message) {
-        captureEvent(KILO_PASS_PURCHASE_FAILED_EVENT);
-        showDedupedPurchaseError(message);
-        setErrorMessage(message);
-      }
-    },
-    onPurchaseSuccess: purchase => {
-      if (!isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)) {
-        releasePurchaseRequest();
-        return;
-      }
-
-      if (activePurchaseRequestRef.current?.sku !== purchase.productId) {
-        return;
-      }
-
-      void (async () => {
-        try {
-          await actions.handlePurchaseSuccess(purchase);
-        } finally {
-          releasePurchaseRequest();
-        }
-      })();
-    },
-  });
-  const {
-    availablePurchases,
-    connected,
-    finishTransaction,
-    getAvailablePurchases,
-    requestPurchase,
-    restorePurchases: restoreStorePurchases,
-  } = actionsRef;
-  const appStoreOwnershipPreflight = useMemo(
-    () =>
-      getAppStoreKiloPassOwnershipPreflight({
-        availablePurchases,
-        currentAppAccountToken: mobileStoreProductsQuery.data?.appAccountToken,
-        enabledAppleProductIds,
-        platformOS: Platform.OS,
-      }),
-    [availablePurchases, enabledAppleProductIds, mobileStoreProductsQuery.data?.appAccountToken]
-  );
-
-  const actions = useMemo(
-    () =>
-      createAppStoreKiloPassPurchaseActions({
-        requestPurchase,
-        getAvailablePurchases: getAvailableIapPurchases,
-        restorePurchases: restoreStorePurchases,
-        completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
-        enabledAppleProductIds,
-        loadEnabledAppleProductIds: async () => {
-          const result = await refetchMobileStoreProducts();
-          return result.data?.products.map(product => product.appleProductId) ?? [];
-        },
-        finishTransaction,
-        invalidateAfterCompletion,
-        onPurchaseCompleted: () => {
-          // Completed is emitted server-side by completeAppStorePurchase — do not
-          // re-add a client capture (double counting).
-          setErrorMessage(null);
-          const onCompleted = pendingPurchaseCompletedCallbackRef.current;
-          pendingPurchaseCompletedCallbackRef.current = null;
-          onCompleted?.();
-        },
-        setPendingPurchaseCompletedCallback: onCompleted => {
-          pendingPurchaseCompletedCallbackRef.current = onCompleted;
-        },
-        showError: message => {
-          showDedupedPurchaseError(message);
-          setErrorMessage(message);
-        },
-      }),
-    [
-      completeAppStorePurchase.mutateAsync,
-      enabledAppleProductIds,
-      finishTransaction,
-      invalidateAfterCompletion,
-      refetchMobileStoreProducts,
-      requestPurchase,
-      restoreStorePurchases,
-    ]
-  );
-
-  const startPurchase = useCallback(
-    async (product: AppStoreKiloPassProduct, options: StoreKiloPassPurchaseOptions = {}) => {
-      if (activePurchaseRequestRef.current || completeAppStorePurchase.isPending) {
-        return;
-      }
-
-      activePurchaseRequestRef.current = { sku: product.appleProductId };
-      setIsRequestingPurchase(true);
-      setErrorMessage(null);
-      captureEvent(KILO_PASS_PURCHASE_STARTED_EVENT);
-      try {
-        const requestStarted = await actions.purchase(product, options);
-        if (!requestStarted) {
-          releasePurchaseRequest();
-        }
-      } catch (error) {
-        releasePurchaseRequest();
-        throw error;
-      }
-    },
-    [actions, completeAppStorePurchase.isPending, releasePurchaseRequest]
-  );
-
-  const restorePurchases = useCallback(async (): Promise<StoreKiloPassRestorePurchasesResult> => {
-    if (
-      activePurchaseRequestRef.current ||
-      isRestoringPurchases ||
-      completeAppStorePurchase.isPending
-    ) {
-      return 'failed';
-    }
-
-    setIsRestoringPurchases(true);
-    setErrorMessage(null);
-    try {
-      return await actions.restorePurchases();
-    } finally {
-      setIsRestoringPurchases(false);
-    }
-  }, [actions, completeAppStorePurchase.isPending, isRestoringPurchases]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios' || !connected) {
-      return;
-    }
-
-    void getAvailablePurchases();
-  }, [connected, getAvailablePurchases]);
-
-  useEffect(() => {
-    if (
-      Platform.OS !== 'ios' ||
-      availablePurchases.length === 0 ||
-      enabledAppleProductIds.length === 0
-    ) {
-      return;
-    }
-
-    const unrecoveredPurchases = availablePurchases.filter(availablePurchase => {
-      const id = getPurchaseCompletionId(availablePurchase);
-      if (
-        recoveredPurchaseIdsRef.current.has(id) ||
-        recoveryInFlightPurchaseIdsRef.current.has(id)
-      ) {
-        return false;
-      }
-      recoveryInFlightPurchaseIdsRef.current.add(id);
-      return true;
-    });
-
-    if (unrecoveredPurchases.length > 0) {
-      void (async () => {
-        try {
-          const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
-          for (const recoveredPurchase of recoveredPurchases) {
-            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
-          }
-        } finally {
-          for (const unrecoveredPurchase of unrecoveredPurchases) {
-            recoveryInFlightPurchaseIdsRef.current.delete(
-              getPurchaseCompletionId(unrecoveredPurchase)
-            );
-          }
-        }
-      })();
-    }
-  }, [actions, availablePurchases, enabledAppleProductIds.length]);
-
-  const value = useMemo(
-    () => ({
-      appStoreOwnershipPreflight,
-      purchase: startPurchase,
-      restorePurchases,
-      isPending: isRequestingPurchase || completeAppStorePurchase.isPending || isRestoringPurchases,
-      isRestoringPurchases,
-      errorMessage,
-      clearError,
-    }),
-    [
-      appStoreOwnershipPreflight,
-      clearError,
-      completeAppStorePurchase.isPending,
-      errorMessage,
-      isRequestingPurchase,
-      isRestoringPurchases,
-      restorePurchases,
-      startPurchase,
-    ]
-  );
-
-  return createElement(StoreKiloPassPurchaseContext.Provider, { value }, children);
-}
-
-export function useStoreKiloPassPurchase() {
-  const context = useContext(StoreKiloPassPurchaseContext);
-  if (!context) {
-    throw new Error('useStoreKiloPassPurchase must be used within StoreKiloPassPurchaseProvider.');
-  }
-
-  return context;
 }

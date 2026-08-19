@@ -21,6 +21,7 @@ import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
+  IOS_BEARER_SECURE_STORE_OPTIONS,
   performRefresh,
   persistSignInCredentialsAtEpoch,
   REFRESH_MARGIN_MS,
@@ -256,9 +257,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // deletion are members of the same always-attempted batch.
           await Promise.allSettled([
             writeCredentials(async () => {
-              await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
-              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-              await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
+              await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+              await SecureStore.deleteItemAsync(
+                TOKEN_EXPIRES_AT_KEY,
+                IOS_BEARER_SECURE_STORE_OPTIONS
+              );
               await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),

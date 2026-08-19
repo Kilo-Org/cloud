@@ -13,6 +13,7 @@ import {
   organization_invitations,
   kilocode_users,
   organizations,
+  external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
@@ -24,7 +25,10 @@ import {
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
-import { sendOrganizationInviteEmail } from '@/lib/email';
+import {
+  enqueueInviteEmail,
+  resetInviteEmailForResend,
+} from '@kilocode/db/external-side-effect-outbox';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
@@ -34,6 +38,7 @@ import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import {
   OrganizationRoleSchema,
   PublicOrganizationMembersSchema,
@@ -58,6 +63,10 @@ const InviteMemberSchema = OrganizationIdInputSchema.extend({
 });
 
 const DeleteInviteSchema = OrganizationIdInputSchema.extend({
+  inviteId: z.string(),
+});
+
+const ResendInviteSchema = OrganizationIdInputSchema.extend({
   inviteId: z.string(),
 });
 
@@ -242,24 +251,27 @@ export const organizationsMembersRouter = createTRPCRouter({
       );
       assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
 
-      const result = await updateUserRoleInOrganization(organizationId, memberId, role);
       const updatedUser = await findUserById(memberId);
       const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
-      await createAuditLog({
-        action: 'organization.member.change_role',
-        actor_email: user.google_user_email,
-        actor_id: user.id,
-        actor_name: user.google_user_name,
-        message: `Changed role for user ${updatedUserEmail} from ${targetMember.role} to ${role}`,
-        organization_id: organizationId,
-      });
 
-      if (!result.success) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Failed to update user role',
+      await db.transaction(async tx => {
+        const updateResult = await updateUserRoleInOrganization(organizationId, memberId, role, tx);
+        if (!updateResult.success) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Failed to update user role',
+          });
+        }
+        await createAuditLog({
+          action: 'organization.member.change_role',
+          actor_email: user.google_user_email,
+          actor_id: user.id,
+          actor_name: user.google_user_name,
+          message: `Changed role for user ${updatedUserEmail} from ${targetMember.role} to ${role}`,
+          organization_id: organizationId,
+          tx,
         });
-      }
+      });
 
       if (dailyUsageLimitUsd !== undefined) {
         await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
@@ -357,9 +369,9 @@ export const organizationsMembersRouter = createTRPCRouter({
       for (const childOrganizationId of childOrganizationIds) {
         if (existingMembershipsByOrganizationId.has(childOrganizationId)) continue;
 
-        const wasAdded = await addUserToOrganization(childOrganizationId, memberId, 'member');
-        if (wasAdded) {
-          added.push(childOrganizationId);
+        const wasAdded = await db.transaction(async tx => {
+          const addedNow = await addUserToOrganization(childOrganizationId, memberId, 'member', tx);
+          if (!addedNow) return false;
           await createAuditLog({
             action: 'organization.member.admin_add',
             actor_email: user.google_user_email,
@@ -367,21 +379,28 @@ export const organizationsMembersRouter = createTRPCRouter({
             actor_name: user.google_user_name,
             message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
             organization_id: childOrganizationId,
+            tx,
           });
+          return true;
+        });
+
+        if (wasAdded) {
+          added.push(childOrganizationId);
         }
       }
 
       for (const membership of existingMemberships) {
         if (selectedChildOrganizationIds.has(membership.organizationId)) continue;
 
-        const result = await removeUserFromOrganization(
-          membership.organizationId,
-          memberId,
-          user.id
-        );
-        if ((result.rowCount ?? 0) > 0) {
-          removed.push(membership.organizationId);
-          await revokeGatewayStateForOrganizationMember(db, membership.organizationId, memberId);
+        const wasRemoved = await db.transaction(async tx => {
+          const result = await removeUserFromOrganization(
+            membership.organizationId,
+            memberId,
+            user.id,
+            tx
+          );
+          if ((result.rowCount ?? 0) === 0) return false;
+          await revokeGatewayStateForOrganizationMember(tx, membership.organizationId, memberId);
           await createAuditLog({
             action: 'organization.member.remove',
             actor_email: user.google_user_email,
@@ -389,7 +408,20 @@ export const organizationsMembersRouter = createTRPCRouter({
             actor_name: user.google_user_name,
             message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
             organization_id: membership.organizationId,
+            tx,
           });
+          return true;
+        });
+
+        if (wasRemoved) {
+          removed.push(membership.organizationId);
+          // Best-effort session access invalidation after the transaction commits.
+          try {
+            await invalidateOrganizationSessionAccess(memberId, membership.organizationId);
+          } catch {
+            // A removed member loses cached access within the cache TTL even
+            // when this call fails.
+          }
         }
       }
 
@@ -485,9 +517,42 @@ export const organizationsMembersRouter = createTRPCRouter({
       }
 
       // Owners and Kilo admins can invite any role. Billing managers can invite members only.
-      let invitation;
       try {
-        invitation = await inviteUserToOrganization(organizationId, user.id, email, role);
+        const result = await db.transaction(async tx => {
+          const invitation = await inviteUserToOrganization(
+            organizationId,
+            user.id,
+            email,
+            role,
+            tx
+          );
+          const acceptInviteUrl = getAcceptInviteUrl(invitation.token);
+
+          await createAuditLog({
+            action: 'organization.user.send_invite',
+            actor_email: user.google_user_email,
+            actor_id: user.id,
+            actor_name: user.google_user_name,
+            message: `Invited ${email} as ${role}`,
+            organization_id: organization.id,
+            tx,
+          });
+
+          await enqueueInviteEmail(tx, {
+            invitationId: invitation.id,
+            payload: {
+              invitationId: invitation.id,
+              to: email,
+              organizationName: organization.name,
+              inviterName: user.google_user_name,
+              acceptInviteUrl,
+            },
+          });
+
+          return { acceptInviteUrl, invitationId: invitation.id };
+        });
+
+        return { ...result, emailStatus: 'pending' as const };
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === 'User already has a pending invitation') {
@@ -523,40 +588,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         }
         throw error;
       }
-      const acceptInviteUrl = getAcceptInviteUrl(invitation.token);
-
-      const emailResult = await sendOrganizationInviteEmail({
-        to: email,
-        organizationName: organization.name,
-        inviterName: user.google_user_name,
-        acceptInviteUrl,
-      });
-
-      if (!emailResult.sent) {
-        // Expire the invitation so it doesn't block future invites to the same email
-        await db
-          .update(organization_invitations)
-          .set({ expires_at: sql`NOW()` })
-          .where(eq(organization_invitations.id, invitation.id));
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message:
-            'Unable to deliver the invitation email to this address. Please use a different email.',
-        });
-      }
-
-      await createAuditLog({
-        action: 'organization.user.send_invite',
-        actor_email: user.google_user_email,
-        actor_id: user.id,
-        actor_name: user.google_user_name,
-        message: `Invited ${email} as ${role}`,
-        organization_id: organization.id,
-      });
-
-      return {
-        acceptInviteUrl,
-      };
     }),
   deleteInvite: organizationAdminMutationProcedure
     .input(DeleteInviteSchema)
@@ -591,20 +622,102 @@ export const organizationsMembersRouter = createTRPCRouter({
       );
       assertOwnerAuthority(actorRole, { currentRole: invitation.role });
 
-      // Expire the invitation by setting expires_at to NOW
-      await db
-        .update(organization_invitations)
-        .set({ expires_at: sql`NOW()` })
-        .where(eq(organization_invitations.id, inviteId));
+      // Expire the invitation by setting expires_at to NOW, atomically with the audit.
+      await db.transaction(async tx => {
+        await tx
+          .update(organization_invitations)
+          .set({ expires_at: sql`NOW()` })
+          .where(eq(organization_invitations.id, inviteId));
 
-      await createAuditLog({
-        action: 'organization.user.revoke_invite',
-        actor_email: ctx.user.google_user_email,
-        actor_id: ctx.user.id,
-        actor_name: ctx.user.google_user_name,
-        message: `Revoked invitation for ${invitation.email}`,
-        organization_id: organizationId,
+        // A revoked invitation must never produce a later invite email. Mark the
+        // outbox row terminal so the cron drain skips it; the invitation row
+        // stays expired.
+        await tx
+          .update(external_side_effect_outbox)
+          .set({
+            status: 'failed',
+            claimed_at: null,
+            next_attempt_at: null,
+            last_error: 'revoked',
+          })
+          .where(eq(external_side_effect_outbox.invitation_id, inviteId));
+
+        await createAuditLog({
+          action: 'organization.user.revoke_invite',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `Revoked invitation for ${invitation.email}`,
+          organization_id: organizationId,
+          tx,
+        });
       });
+
+      return successResult({
+        updated: inviteId,
+      });
+    }),
+  resendInvite: organizationAdminMutationProcedure
+    .input(ResendInviteSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, inviteId } = input;
+
+      // Find the invitation
+      const [invitation] = await db
+        .select()
+        .from(organization_invitations)
+        .where(
+          and(
+            eq(organization_invitations.id, inviteId),
+            eq(organization_invitations.organization_id, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!invitation) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Invitation not found',
+        });
+      }
+
+      // A revoked (expired) or already-accepted invitation must never be
+      // resendable: resetting the outbox row would re-arm a terminal
+      // invitation and let cron send mail for it. Refuse before touching the
+      // outbox.
+      if (new Date(invitation.expires_at).getTime() <= Date.now()) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This invitation has expired',
+        });
+      }
+      if (invitation.accepted_at != null) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This invitation has already been accepted',
+        });
+      }
+
+      // Owners can resend any invitation; admins cannot resend an owner invite,
+      // which is a pending grant of owner authority.
+      const actorRole = await ensureOrganizationAccess(
+        ctx,
+        organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
+      assertOwnerAuthority(actorRole, { currentRole: invitation.role });
+
+      // Reset the existing outbox row rather than inserting a second one. The
+      // reset fences on the invitation still being valid, so a concurrent
+      // revoke (or a missing row) matches zero rows — refuse rather than
+      // report a queued resend that never happened.
+      const reset = await resetInviteEmailForResend(db, inviteId);
+      if (reset === null) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This invitation can no longer be resent',
+        });
+      }
 
       return successResult({
         updated: inviteId,

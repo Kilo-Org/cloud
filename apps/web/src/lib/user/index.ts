@@ -104,9 +104,14 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
   user_data_exports,
+  content_moderation_reports,
+  user_moderation_blocks,
+  user_moderation_mutes,
+  user_terms_acceptances,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -125,6 +130,7 @@ import {
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@/lib/utils';
+import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -141,6 +147,10 @@ import {
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
+import {
+  USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
+  USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
+} from '@/lib/user/deletion-queue/deletion-constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -732,6 +742,15 @@ export async function createOrUpdateUser(
       const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
       if (!dedupResult.success) return dedupResult;
 
+      if (
+        !(await authPassesDeletionFence({
+          email: args.google_user_email,
+          executor: tx,
+        }))
+      ) {
+        return failureResult('SYSTEM_ERROR');
+      }
+
       const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
       assert(inserted, 'Failed to save new user');
 
@@ -816,6 +835,15 @@ export async function linkAccountToExistingUser(
   const existingUser = await findUserById(existingKiloUserId);
   if (!existingUser) return failureResult('USER-NOT-FOUND');
 
+  if (
+    !(await authPassesDeletionFence({
+      email: authProviderData.google_user_email,
+      userId: existingKiloUserId,
+    }))
+  ) {
+    return failureResult('SYSTEM_ERROR');
+  }
+
   // Link the new auth provider to the existing user
   const linkResult = await linkAuthProviderToUser({
     kilo_user_id: existingKiloUserId,
@@ -881,7 +909,7 @@ export class SoftDeletePreconditionError extends Error {
 
 type SoftDeleteExecutor = typeof db | DrizzleTransaction;
 
-async function assertNoLiveSubscriptionsForSoftDelete(
+export async function assertNoLiveSubscriptionsForSoftDelete(
   userId: string,
   executor: SoftDeleteExecutor
 ): Promise<void> {
@@ -964,6 +992,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
+ * - Usage prompt prefixes are scrubbed by the `usage_prompt_prefixes` queue step
+ *   (or by the synchronous page helper on the `softDeleteUser` path)
  * - user_auth_provider (auth links with email/avatar)
  * - enrichment_data (GitHub/LinkedIn/Clay PII)
  * - user_admin_notes
@@ -1017,644 +1047,762 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   actor — since their email and any reason text they wrote is their PII
  *   regardless of which instance the override targeted)
  */
-export async function softDeleteUser(userId: string) {
-  const user = await findUserById(userId);
-  if (!user) return; // Nothing to do for non-existent user
+export async function anonymizeCloudUserData(
+  tx: DrizzleTransaction,
+  userId: string
+): Promise<void> {
+  const [user] = await tx
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .for('update')
+    .limit(1);
+  if (!user) return;
 
-  // Grab the original email before we anonymize — needed for cleanup of
-  // magic_link_tokens and organization_invitations addressed to this user.
   const originalEmail = user.google_user_email;
   const originalAppStoreAccountToken = user.app_store_account_token;
 
-  await db.transaction(async tx => {
-    // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
-    await assertNoLiveSubscriptionsForSoftDelete(userId, tx);
+  // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
+  await assertNoLiveSubscriptionsForSoftDelete(userId, tx);
 
-    const activeClawInstances = await tx
-      .select({ id: kiloclaw_instances.id })
-      .from(kiloclaw_instances)
-      .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
-      .limit(1);
+  const activeClawInstances = await tx
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+    .limit(1);
 
-    if (activeClawInstances.length > 0) {
-      throw new SoftDeletePreconditionError(
-        `User ${userId} still has an active KiloClaw instance. Destroy the instance before deleting the account.`
-      );
-    }
-
-    // Pre-0090 users can have NULL normalized_email but a real google_user_email.
-    // Fall back to google_user_email so the tombstone hash still gets recorded
-    // before the row below anonymizes both columns; otherwise a previously
-    // deleted user could re-register and qualify as a referee.
-    await createDeletedUserEmailTombstone({
-      database: tx,
-      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
-    });
-
-    // ── Gateway cleanup ───────────────────────────────────────────────────
-    await revokeGatewayStateForUser(tx, userId);
-
-    // Remove recipient-addressed Security Agent notifications before user
-    // anonymization and org membership removal. Org-owned findings can remain.
-    await tx
-      .delete(security_finding_notifications)
-      .where(eq(security_finding_notifications.recipient_user_id, userId));
-
-    // ── 0b. Operation ledger and analytics outbox ────────────────────────
-    // Outbox rows are keyed by distinct_id: the user's email, or the user id
-    // when the writer's email lookup failed. Delete both identities.
-    await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
-    await tx
-      .delete(analytics_event_outbox)
-      .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
-
-    // ── 1. Anonymize the user row ────────────────────────────────────────
-    await tx
-      .update(kilocode_users)
-      .set({
-        google_user_email: `deleted+${userId}@deleted.invalid`,
-        normalized_email: null,
-        email_domain: null,
-        google_user_name: 'Deleted User',
-        google_user_image_url: '',
-        hosted_domain: null,
-        linkedin_url: null,
-        github_url: null,
-        discord_server_membership_verified_at: null,
-        api_token_pepper: randomUUID(),
-        web_session_pepper: randomUUID(),
-        app_store_account_token: randomUUID(),
-        default_model: null,
-        blocked_reason: createSoftDeletedBlockedReason(),
-        blocked_at: null,
-        blocked_by_kilo_user_id: null,
-        auto_top_up_enabled: false,
-        completed_welcome_form: false,
-        cohorts: {},
-        is_admin: false,
-        is_super_admin: false,
-        can_view_sessions: false,
-        can_manage_credits: false,
-        customer_source: null,
-        signup_ip: null,
-      })
-      .where(eq(kilocode_users.id, userId));
-
-    // ── 2. Hard-delete PII tables ────────────────────────────────────────
-    await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
-    await tx.execute(sql`
-      INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
-      SELECT COALESCE(r2_object_key, 'exports/' || id::text || '/kilo-data-export.jsonl.gz'),
-        multipart_upload_id,
-        CASE
-          WHEN lease_expires_at > now() THEN lease_expires_at
-          ELSE now()
-        END
-      FROM user_data_exports
-      WHERE kilo_user_id = ${userId}
-      ON CONFLICT (object_key) DO UPDATE
-      SET multipart_upload_id = COALESCE(
-        EXCLUDED.multipart_upload_id,
-        user_data_export_object_deletions.multipart_upload_id
-      ), available_at = GREATEST(
-        user_data_export_object_deletions.available_at,
-        EXCLUDED.available_at
-      ), updated_at = now()
-    `);
-    await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
-    await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
-    await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
-    await tx
-      .delete(user_affiliate_attributions)
-      .where(eq(user_affiliate_attributions.user_id, userId));
-    await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
-    await tx
-      .delete(impact_attribution_touches)
-      .where(eq(impact_attribution_touches.user_id, userId));
-    await tx
-      .delete(impact_advocate_participants)
-      .where(eq(impact_advocate_participants.user_id, userId));
-    await tx
-      .delete(impact_referral_reward_applications)
-      .where(eq(impact_referral_reward_applications.beneficiary_user_id, userId));
-    await tx
-      .delete(impact_advocate_reward_redemptions)
-      .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
-    await tx
-      .delete(impact_referral_rewards)
-      .where(eq(impact_referral_rewards.beneficiary_user_id, userId));
-    await tx
-      .delete(impact_referral_reward_decisions)
-      .where(eq(impact_referral_reward_decisions.beneficiary_user_id, userId));
-    await tx.delete(impact_conversion_reports).where(
-      sql`${impact_conversion_reports.conversion_id} IN (
-          SELECT c.id FROM ${impact_referral_conversions} c
-          WHERE c.referee_user_id = ${userId} OR c.referrer_user_id = ${userId}
-        )`
+  if (activeClawInstances.length > 0) {
+    throw new SoftDeletePreconditionError(
+      `User ${userId} still has an active KiloClaw instance. Destroy the instance before deleting the account.`
     );
-    await tx
-      .delete(impact_referral_conversions)
-      .where(
-        or(
-          eq(impact_referral_conversions.referee_user_id, userId),
-          eq(impact_referral_conversions.referrer_user_id, userId)
-        )
-      );
-    await tx
-      .delete(impact_referrals)
-      .where(
-        or(
-          eq(impact_referrals.referee_user_id, userId),
-          eq(impact_referrals.referrer_user_id, userId)
-        )
-      );
-    await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
-    await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+  }
 
-    // Remove from organizations
-    await tx
-      .delete(organization_memberships)
-      .where(eq(organization_memberships.kilo_user_id, userId));
-    // Remove membership removal tombstones for this user
-    await tx
-      .delete(organization_membership_removals)
-      .where(eq(organization_membership_removals.kilo_user_id, userId));
-    await tx
-      .update(kilocode_users)
-      .set({ blocked_by_kilo_user_id: null })
-      .where(eq(kilocode_users.blocked_by_kilo_user_id, userId));
-    // Anonymize removed_by references where this user removed others
-    await tx
-      .update(organization_membership_removals)
-      .set({ removed_by: null })
-      .where(eq(organization_membership_removals.removed_by, userId));
-    await tx
-      .update(organization_recommendation_dismissals)
-      .set({ dismissed_by_user_id: null })
-      .where(eq(organization_recommendation_dismissals.dismissed_by_user_id, userId));
-    // Delete invitations sent BY this user and invitations sent TO this user's email
-    await tx
-      .delete(organization_invitations)
-      .where(eq(organization_invitations.invited_by, userId));
-    await tx
-      .delete(organization_invitations)
-      .where(eq(organization_invitations.email, originalEmail));
-    await tx
-      .delete(organization_user_limits)
-      .where(eq(organization_user_limits.kilo_user_id, userId));
-    await tx
-      .delete(organization_user_usage)
-      .where(eq(organization_user_usage.kilo_user_id, userId));
+  // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+  // Fall back to google_user_email so the tombstone hash still gets recorded
+  // before the row below anonymizes both columns; otherwise a previously
+  // deleted user could re-register and qualify as a referee.
+  await createDeletedUserEmailTombstone({
+    database: tx,
+    normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
+  });
 
-    // User-owned resources (these would have been CASCADE-deleted if we
-    // deleted the user row, but since we keep it, we delete them explicitly)
+  // ── Gateway cleanup ───────────────────────────────────────────────────
+  await revokeGatewayStateForUser(tx, userId);
 
-    // cloud_agent_webhook_triggers has RESTRICT FK on agent_environment_profiles,
-    // so delete triggers before profiles
-    await tx
-      .delete(cloud_agent_webhook_triggers)
-      .where(eq(cloud_agent_webhook_triggers.user_id, userId));
-    await tx
-      .delete(agent_environment_profiles)
-      .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+  // Remove recipient-addressed Security Agent notifications before user
+  // anonymization and org membership removal. Org-owned findings can remain.
+  await tx
+    .delete(security_finding_notifications)
+    .where(eq(security_finding_notifications.recipient_user_id, userId));
 
-    const authorizedOAuthIntegrationIds = tx
-      .select({ id: platform_oauth_credentials.platform_integration_id })
-      .from(platform_oauth_credentials)
-      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
-    await tx
-      .update(platform_integrations)
-      .set({
-        integration_status: 'suspended',
-        auth_invalid_at: new Date().toISOString(),
-        auth_invalid_reason: 'authorizing_user_deleted',
-      })
-      .where(inArray(platform_integrations.id, authorizedOAuthIntegrationIds));
-    await tx
-      .delete(platform_oauth_credentials)
-      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+  // ── 0b. Operation ledger and analytics outbox ────────────────────────
+  // Outbox rows are keyed by distinct_id: the user's email, or the user id
+  // when the writer's email lookup failed. Delete both identities.
+  await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
+  await tx
+    .delete(analytics_event_outbox)
+    .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
 
-    const authorizedGitLabPatIntegrationIds = tx
-      .select({ id: platform_access_token_credentials.platform_integration_id })
-      .from(platform_access_token_credentials)
-      .innerJoin(
-        platform_integrations,
-        eq(platform_integrations.id, platform_access_token_credentials.platform_integration_id)
+  // ── 1. Anonymize the user row ────────────────────────────────────────
+  await tx
+    .update(kilocode_users)
+    .set({
+      google_user_email: `deleted+${userId}@deleted.invalid`,
+      normalized_email: null,
+      email_domain: null,
+      google_user_name: 'Deleted User',
+      google_user_image_url: '',
+      hosted_domain: null,
+      linkedin_url: null,
+      github_url: null,
+      discord_server_membership_verified_at: null,
+      api_token_pepper: randomUUID(),
+      web_session_pepper: randomUUID(),
+      app_store_account_token: randomUUID(),
+      default_model: null,
+      blocked_reason: createSoftDeletedBlockedReason(),
+      blocked_at: null,
+      blocked_by_kilo_user_id: null,
+      auto_top_up_enabled: false,
+      completed_welcome_form: false,
+      cohorts: {},
+      is_admin: false,
+      is_super_admin: false,
+      can_view_sessions: false,
+      can_manage_credits: false,
+      customer_source: null,
+      signup_ip: null,
+    })
+    .where(eq(kilocode_users.id, userId));
+
+  // ── 2. Hard-delete PII tables ────────────────────────────────────────
+  await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+  await tx.execute(sql`
+    INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
+    SELECT COALESCE(r2_object_key, 'exports/' || id::text || '/kilo-data-export.jsonl.gz'),
+      multipart_upload_id,
+      CASE
+        WHEN lease_expires_at > now() THEN lease_expires_at
+        ELSE now()
+      END
+    FROM user_data_exports
+    WHERE kilo_user_id = ${userId}
+    ON CONFLICT (object_key) DO UPDATE
+    SET multipart_upload_id = COALESCE(
+      EXCLUDED.multipart_upload_id,
+      user_data_export_object_deletions.multipart_upload_id
+    ), available_at = GREATEST(
+      user_data_export_object_deletions.available_at,
+      EXCLUDED.available_at
+    ), updated_at = now()
+  `);
+  await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
+  await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
+  await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
+  await tx
+    .delete(user_affiliate_attributions)
+    .where(eq(user_affiliate_attributions.user_id, userId));
+  await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
+  await tx.delete(impact_attribution_touches).where(eq(impact_attribution_touches.user_id, userId));
+  await tx
+    .delete(impact_advocate_participants)
+    .where(eq(impact_advocate_participants.user_id, userId));
+  await tx
+    .delete(impact_referral_reward_applications)
+    .where(eq(impact_referral_reward_applications.beneficiary_user_id, userId));
+  await tx
+    .delete(impact_advocate_reward_redemptions)
+    .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
+  await tx
+    .delete(impact_referral_rewards)
+    .where(eq(impact_referral_rewards.beneficiary_user_id, userId));
+  await tx
+    .delete(impact_referral_reward_decisions)
+    .where(eq(impact_referral_reward_decisions.beneficiary_user_id, userId));
+  await tx.delete(impact_conversion_reports).where(
+    sql`${impact_conversion_reports.conversion_id} IN (
+        SELECT c.id FROM ${impact_referral_conversions} c
+        WHERE c.referee_user_id = ${userId} OR c.referrer_user_id = ${userId}
+      )`
+  );
+  await tx
+    .delete(impact_referral_conversions)
+    .where(
+      or(
+        eq(impact_referral_conversions.referee_user_id, userId),
+        eq(impact_referral_conversions.referrer_user_id, userId)
       )
-      .where(
-        and(
-          eq(platform_integrations.platform, 'gitlab'),
-          eq(platform_access_token_credentials.provider_credential_type, 'personal_access_token'),
-          eq(platform_access_token_credentials.authorized_by_user_id, userId),
-          isNull(platform_access_token_credentials.provider_resource_id)
-        )
-      );
-    await tx
-      .update(platform_integrations)
-      .set({
-        integration_status: 'suspended',
-        auth_invalid_at: new Date().toISOString(),
-        auth_invalid_reason: 'authorizing_user_deleted',
-      })
-      .where(inArray(platform_integrations.id, authorizedGitLabPatIntegrationIds));
-    await tx
-      .delete(platform_access_token_credentials)
-      .where(
-        and(
-          inArray(
-            platform_access_token_credentials.platform_integration_id,
-            tx
-              .select({ id: platform_integrations.id })
-              .from(platform_integrations)
-              .where(eq(platform_integrations.platform, 'gitlab'))
-          ),
-          eq(platform_access_token_credentials.provider_credential_type, 'personal_access_token'),
-          eq(platform_access_token_credentials.authorized_by_user_id, userId),
-          isNull(platform_access_token_credentials.provider_resource_id)
-        )
-      );
-
-    await tx
-      .delete(platform_integrations)
-      .where(eq(platform_integrations.owned_by_user_id, userId));
-    await tx.execute(sql`
-       UPDATE coding_plan_key_inventory
-       SET status = 'revocation_pending',
-           encrypted_api_key = NULL,
-           assigned_to_user_id = NULL,
-           revocation_requested_at = now(),
-          last_revocation_error = NULL,
-          updated_at = now()
-      WHERE id IN (
-        SELECT key_inventory_id
-        FROM coding_plan_subscriptions
-        WHERE user_id = ${userId}
-          AND status IN ('active', 'past_due')
-          AND key_inventory_id IS NOT NULL
+    );
+  await tx
+    .delete(impact_referrals)
+    .where(
+      or(
+        eq(impact_referrals.referee_user_id, userId),
+        eq(impact_referrals.referrer_user_id, userId)
       )
-    `);
-    await tx
-      .update(coding_plan_subscriptions)
-      .set({
-        status: 'canceled',
-        canceled_at: sql`now()`,
-        cancellation_reason: 'account_deleted',
-        installed_byok_key_id: null,
-        cancel_at_period_end: false,
-        past_due_started_at: null,
-        payment_grace_expires_at: null,
-        auto_top_up_attempted_for_due: null,
-      })
-      .where(
-        and(
-          eq(coding_plan_subscriptions.user_id, userId),
-          inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
-        )
-      );
-    await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
-    await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
-    await tx
-      .delete(coding_plan_availability_intents)
-      .where(eq(coding_plan_availability_intents.user_id, userId));
-    await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
-    await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
-    await tx
-      .delete(security_analysis_owner_state)
-      .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
-    await tx
-      .delete(security_agent_commands)
-      .where(eq(security_agent_commands.owned_by_user_id, userId));
-    await tx
-      .delete(security_agent_repository_sync_state)
-      .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
-    await tx
-      .update(security_remediation_attempts)
-      .set({
-        requested_by_user_id: null,
-        cancellation_requested_by_user_id: null,
-      })
-      .where(
-        or(
-          eq(security_remediation_attempts.requested_by_user_id, userId),
-          eq(security_remediation_attempts.cancellation_requested_by_user_id, userId)
-        )
-      );
-    await tx
-      .delete(security_remediations)
-      .where(eq(security_remediations.owned_by_user_id, userId));
-    await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
-    await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
-    await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
-    await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
-    await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
-    await tx
-      .delete(cloud_agent_code_reviews)
-      .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
-    await tx
-      .delete(code_review_memory_proposals)
-      .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
-    await tx
-      .delete(code_review_feedback_events)
-      .where(eq(code_review_feedback_events.owned_by_user_id, userId));
-    await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
-    // device_sessions cascade deletes device_refresh_tokens via FK
-    await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
-    await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, userId));
-    // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
-    await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
-    await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
-    await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
-    await tx
-      .update(kiloclaw_cli_runs)
-      .set({ initiated_by_admin_id: null })
-      .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
-    await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
-    // Remove stored Google OAuth credentials for all instances owned by this user.
-    await tx
-      .delete(kiloclaw_google_oauth_connections)
-      .where(
+    );
+  await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
+  await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+
+  // Remove from organizations
+  await tx
+    .delete(organization_memberships)
+    .where(eq(organization_memberships.kilo_user_id, userId));
+  // Remove membership removal tombstones for this user
+  await tx
+    .delete(organization_membership_removals)
+    .where(eq(organization_membership_removals.kilo_user_id, userId));
+  await tx
+    .update(kilocode_users)
+    .set({ blocked_by_kilo_user_id: null })
+    .where(eq(kilocode_users.blocked_by_kilo_user_id, userId));
+  // Anonymize removed_by references where this user removed others
+  await tx
+    .update(organization_membership_removals)
+    .set({ removed_by: null })
+    .where(eq(organization_membership_removals.removed_by, userId));
+  await tx
+    .update(organization_recommendation_dismissals)
+    .set({ dismissed_by_user_id: null })
+    .where(eq(organization_recommendation_dismissals.dismissed_by_user_id, userId));
+  // Delete pending/sending invite-email outbox rows for invitations sent BY
+  // this user or addressed TO this user's email. Runs before the invitation
+  // rows are deleted below so the subquery can still resolve them.
+  await tx.delete(external_side_effect_outbox).where(
+    and(
+      inArray(external_side_effect_outbox.status, ['pending', 'sending']),
+      inArray(
+        external_side_effect_outbox.invitation_id,
+        tx
+          .select({ id: organization_invitations.id })
+          .from(organization_invitations)
+          .where(
+            or(
+              eq(organization_invitations.invited_by, userId),
+              eq(organization_invitations.email, originalEmail)
+            )
+          )
+      )
+    )
+  );
+  // Delete invitations sent BY this user and invitations sent TO this user's email
+  await tx.delete(organization_invitations).where(eq(organization_invitations.invited_by, userId));
+  await tx
+    .delete(organization_invitations)
+    .where(eq(organization_invitations.email, originalEmail));
+  await tx
+    .delete(organization_user_limits)
+    .where(eq(organization_user_limits.kilo_user_id, userId));
+  await tx.delete(organization_user_usage).where(eq(organization_user_usage.kilo_user_id, userId));
+
+  // User-owned resources (these would have been CASCADE-deleted if we
+  // deleted the user row, but since we keep it, we delete them explicitly)
+
+  // cloud_agent_webhook_triggers has RESTRICT FK on agent_environment_profiles,
+  // so delete triggers before profiles
+  await tx
+    .delete(cloud_agent_webhook_triggers)
+    .where(eq(cloud_agent_webhook_triggers.user_id, userId));
+  await tx
+    .delete(agent_environment_profiles)
+    .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+
+  const authorizedOAuthIntegrationIds = tx
+    .select({ id: platform_oauth_credentials.platform_integration_id })
+    .from(platform_oauth_credentials)
+    .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+  await tx
+    .update(platform_integrations)
+    .set({
+      integration_status: 'suspended',
+      auth_invalid_at: new Date().toISOString(),
+      auth_invalid_reason: 'authorizing_user_deleted',
+    })
+    .where(inArray(platform_integrations.id, authorizedOAuthIntegrationIds));
+  await tx
+    .delete(platform_oauth_credentials)
+    .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+
+  const authorizedGitLabPatIntegrationIds = tx
+    .select({ id: platform_access_token_credentials.platform_integration_id })
+    .from(platform_access_token_credentials)
+    .innerJoin(
+      platform_integrations,
+      eq(platform_integrations.id, platform_access_token_credentials.platform_integration_id)
+    )
+    .where(
+      and(
+        eq(platform_integrations.platform, 'gitlab'),
+        eq(platform_access_token_credentials.provider_credential_type, 'personal_access_token'),
+        eq(platform_access_token_credentials.authorized_by_user_id, userId),
+        isNull(platform_access_token_credentials.provider_resource_id)
+      )
+    );
+  await tx
+    .update(platform_integrations)
+    .set({
+      integration_status: 'suspended',
+      auth_invalid_at: new Date().toISOString(),
+      auth_invalid_reason: 'authorizing_user_deleted',
+    })
+    .where(inArray(platform_integrations.id, authorizedGitLabPatIntegrationIds));
+  await tx
+    .delete(platform_access_token_credentials)
+    .where(
+      and(
         inArray(
-          kiloclaw_google_oauth_connections.instance_id,
+          platform_access_token_credentials.platform_integration_id,
           tx
-            .select({ id: kiloclaw_instances.id })
-            .from(kiloclaw_instances)
-            .where(eq(kiloclaw_instances.user_id, userId))
-        )
-      );
-    await tx
-      .delete(kiloclaw_inbound_email_aliases)
-      .where(
-        inArray(
-          kiloclaw_inbound_email_aliases.instance_id,
-          tx
-            .select({ id: kiloclaw_instances.id })
-            .from(kiloclaw_instances)
-            .where(eq(kiloclaw_instances.user_id, userId))
-        )
-      );
-    await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
-    await tx
-      .delete(user_notification_preferences)
-      .where(eq(user_notification_preferences.user_id, userId));
-    await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
-    await tx
-      .delete(kilo_pass_scheduled_changes)
-      .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
-    await tx
-      .delete(github_branch_pull_requests)
-      .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
+            .select({ id: platform_integrations.id })
+            .from(platform_integrations)
+            .where(eq(platform_integrations.platform, 'gitlab'))
+        ),
+        eq(platform_access_token_credentials.provider_credential_type, 'personal_access_token'),
+        eq(platform_access_token_credentials.authorized_by_user_id, userId),
+        isNull(platform_access_token_credentials.provider_resource_id)
+      )
+    );
 
-    // Code indexing data
-    await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
-    await tx.delete(code_indexing_search).where(eq(code_indexing_search.kilo_user_id, userId));
-    await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
+  await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
+  await tx.execute(sql`
+     UPDATE coding_plan_key_inventory
+     SET status = 'revocation_pending',
+         encrypted_api_key = NULL,
+         assigned_to_user_id = NULL,
+         revocation_requested_at = now(),
+        last_revocation_error = NULL,
+        updated_at = now()
+    WHERE id IN (
+      SELECT key_inventory_id
+      FROM coding_plan_subscriptions
+      WHERE user_id = ${userId}
+        AND status IN ('active', 'past_due')
+        AND key_inventory_id IS NOT NULL
+    )
+  `);
+  await tx
+    .update(coding_plan_subscriptions)
+    .set({
+      status: 'canceled',
+      canceled_at: sql`now()`,
+      cancellation_reason: 'account_deleted',
+      installed_byok_key_id: null,
+      cancel_at_period_end: false,
+      past_due_started_at: null,
+      payment_grace_expires_at: null,
+      auto_top_up_attempted_for_due: null,
+    })
+    .where(
+      and(
+        eq(coding_plan_subscriptions.user_id, userId),
+        inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
+      )
+    );
+  await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
+  await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+  await tx
+    .delete(coding_plan_availability_intents)
+    .where(eq(coding_plan_availability_intents.user_id, userId));
+  await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
+  await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
+  await tx
+    .delete(security_analysis_owner_state)
+    .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
+  await tx
+    .delete(security_agent_commands)
+    .where(eq(security_agent_commands.owned_by_user_id, userId));
+  await tx
+    .delete(security_agent_repository_sync_state)
+    .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
+  await tx
+    .update(security_remediation_attempts)
+    .set({
+      requested_by_user_id: null,
+      cancellation_requested_by_user_id: null,
+    })
+    .where(
+      or(
+        eq(security_remediation_attempts.requested_by_user_id, userId),
+        eq(security_remediation_attempts.cancellation_requested_by_user_id, userId)
+      )
+    );
+  await tx.delete(security_remediations).where(eq(security_remediations.owned_by_user_id, userId));
+  await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
+  await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
+  await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
+  await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
+  await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
+  await tx
+    .delete(cloud_agent_code_reviews)
+    .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+  await tx
+    .delete(code_review_memory_proposals)
+    .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
+  await tx
+    .delete(code_review_feedback_events)
+    .where(eq(code_review_feedback_events.owned_by_user_id, userId));
+  await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
+  // device_sessions cascade deletes device_refresh_tokens via FK
+  await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
+  await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, userId));
+  // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
+  await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
+  await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
+  await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
+  await tx
+    .update(kiloclaw_cli_runs)
+    .set({ initiated_by_admin_id: null })
+    .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
+  await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+  // Remove stored Google OAuth credentials for all instances owned by this user.
+  await tx
+    .delete(kiloclaw_google_oauth_connections)
+    .where(
+      inArray(
+        kiloclaw_google_oauth_connections.instance_id,
+        tx
+          .select({ id: kiloclaw_instances.id })
+          .from(kiloclaw_instances)
+          .where(eq(kiloclaw_instances.user_id, userId))
+      )
+    );
+  await tx
+    .delete(kiloclaw_inbound_email_aliases)
+    .where(
+      inArray(
+        kiloclaw_inbound_email_aliases.instance_id,
+        tx
+          .select({ id: kiloclaw_instances.id })
+          .from(kiloclaw_instances)
+          .where(eq(kiloclaw_instances.user_id, userId))
+      )
+    );
+  await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
+  await tx
+    .delete(user_notification_preferences)
+    .where(eq(user_notification_preferences.user_id, userId));
+  await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
+  await tx
+    .delete(kilo_pass_scheduled_changes)
+    .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
+  await tx
+    .delete(github_branch_pull_requests)
+    .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
 
-    // ── 3. Anonymize PII in retained tables ──────────────────────────────
+  // Moderation data. Blocks/mutes key on the blocker's Kilo user id; the
+  // other column is a GitHub login, so only the blocker side is deleted.
+  await tx
+    .delete(content_moderation_reports)
+    .where(eq(content_moderation_reports.kilo_user_id, userId));
+  await tx.delete(user_moderation_blocks).where(eq(user_moderation_blocks.blocker_user_id, userId));
+  await tx.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, userId));
+  await tx.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, userId));
 
-    const storePurchases = await tx
-      .select({
-        id: kilo_pass_store_purchases.id,
-        rawPayloadJson: kilo_pass_store_purchases.raw_payload_json,
-      })
-      .from(kilo_pass_store_purchases)
-      .where(eq(kilo_pass_store_purchases.kilo_user_id, userId));
+  // Code indexing data
+  await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
+  await tx.delete(code_indexing_search).where(eq(code_indexing_search.kilo_user_id, userId));
+  await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
 
-    for (const purchase of storePurchases) {
-      await tx
-        .update(kilo_pass_store_purchases)
-        .set({
-          app_account_token: null,
-          purchase_token: null,
-          raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayloadJson),
-        })
-        .where(eq(kilo_pass_store_purchases.id, purchase.id));
-    }
+  // ── 3. Anonymize PII in retained tables ──────────────────────────────
 
-    const storeEvents = await tx
-      .select({
-        id: kilo_pass_store_events.id,
-        payloadJson: kilo_pass_store_events.payload_json,
-      })
-      .from(kilo_pass_store_events)
-      .where(eq(kilo_pass_store_events.app_account_token, originalAppStoreAccountToken));
+  const storePurchases = await tx
+    .select({
+      id: kilo_pass_store_purchases.id,
+      rawPayloadJson: kilo_pass_store_purchases.raw_payload_json,
+    })
+    .from(kilo_pass_store_purchases)
+    .where(eq(kilo_pass_store_purchases.kilo_user_id, userId));
 
-    for (const event of storeEvents) {
-      await tx
-        .update(kilo_pass_store_events)
-        .set({
-          app_account_token: null,
-          payload_json: redactStoreAccountLinkedJson(event.payloadJson),
-        })
-        .where(eq(kilo_pass_store_events.id, event.id));
-    }
-
-    // kiloclaw_instances.admin_size_override JSONB carries actorEmail (an
-    // admin's address) and a free-form reason (often referencing a ticket
-    // or the customer scenario). Clear it on:
-    //   (a) this user's retained destroyed instances — keeping the user's
-    //       deletion clean of any reason text written about their incident;
-    //   (b) ANY instance where this user was the admin actor — their email
-    //       and reason text are their PII regardless of whose instance it
-    //       targeted, so they need to be scrubbed when the actor is deleted.
-    // The denormalized read-cache loses the audit trail, but the canonical
-    // record lives in `kiloclaw_admin_audit_logs` (whose actor PII is
-    // anonymized below by the same flow).
+  for (const purchase of storePurchases) {
     await tx
-      .update(kiloclaw_instances)
-      .set({ admin_size_override: null })
-      .where(
-        or(
-          eq(kiloclaw_instances.user_id, userId),
-          sql`${kiloclaw_instances.admin_size_override}->>'actorId' = ${userId}`
-        )
-      );
-
-    // Organization audit logs: keep the log entries, strip actor PII
-    await tx
-      .update(organization_audit_logs)
-      .set({ actor_email: null, actor_name: null })
-      .where(eq(organization_audit_logs.actor_id, userId));
-
-    await tx
-      .update(organization_groups)
-      .set({ created_by_kilo_user_id: null })
-      .where(eq(organization_groups.created_by_kilo_user_id, userId));
-    await tx
-      .update(organization_group_memberships)
-      .set({ assigned_by_kilo_user_id: null })
-      .where(eq(organization_group_memberships.assigned_by_kilo_user_id, userId));
-    await tx
-      .update(organization_group_policy_settings)
-      .set({ updated_by_kilo_user_id: null })
-      .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
-
-    // Security audit logs: keep org-owned entries, strip actor PII
-    // (user-owned entries are cascade-deleted via owned_by_user_id FK)
-    await tx
-      .update(security_audit_log)
-      .set({ actor_email: null, actor_name: null })
-      .where(eq(security_audit_log.actor_id, userId));
-
-    // KiloClaw admin audit logs: strip PII where user is the actor
-    await tx
-      .update(kiloclaw_admin_audit_logs)
-      .set({ actor_email: null, actor_name: null })
-      .where(eq(kiloclaw_admin_audit_logs.actor_id, userId));
-
-    // KiloClaw admin audit logs: strip PII where user is the target
-    await tx
-      .update(kiloclaw_admin_audit_logs)
-      .set({ target_user_id: 'deleted-user' })
-      .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
-
-    await tx
-      .update(model_eval_ingestions)
-      .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
-      .where(sql`lower(${model_eval_ingestions.promoted_by_email}) = lower(${originalEmail})`);
-
-    // Credit campaigns: strip the creator-admin reference. The campaigns
-    // themselves are retained (they represent ongoing marketing relationships
-    // and audit of granted credits), but the link back to the deleted user
-    // is anonymized to match the other actor-column patterns above.
-    await tx
-      .update(credit_campaigns)
-      .set({ created_by_kilo_user_id: 'deleted-user' })
-      .where(eq(credit_campaigns.created_by_kilo_user_id, userId));
-
-    // Payment methods: soft-delete and strip address/name/IP fields
-    await tx
-      .update(payment_methods)
+      .update(kilo_pass_store_purchases)
       .set({
-        deleted_at: sql`now()`,
-        name: null,
-        address_line1: null,
-        address_line2: null,
-        address_city: null,
-        address_state: null,
-        address_zip: null,
-        address_country: null,
-        http_x_forwarded_for: null,
-        http_x_vercel_ip_city: null,
-        http_x_vercel_ip_country: null,
-        http_x_vercel_ip_latitude: null,
-        http_x_vercel_ip_longitude: null,
-        http_x_vercel_ja4_digest: null,
+        app_account_token: null,
+        purchase_token: null,
+        raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayloadJson),
       })
-      .where(eq(payment_methods.user_id, userId));
+      .where(eq(kilo_pass_store_purchases.id, purchase.id));
+  }
 
-    // Contributor champions: anonymize email PII and nullify user link
-    // Clear events linked through membership
+  const storeEvents = await tx
+    .select({
+      id: kilo_pass_store_events.id,
+      payloadJson: kilo_pass_store_events.payload_json,
+    })
+    .from(kilo_pass_store_events)
+    .where(eq(kilo_pass_store_events.app_account_token, originalAppStoreAccountToken));
+
+  for (const event of storeEvents) {
     await tx
-      .update(contributor_champion_events)
-      .set({ github_author_email: null })
-      .where(
-        sql`${contributor_champion_events.contributor_id} IN (
+      .update(kilo_pass_store_events)
+      .set({
+        app_account_token: null,
+        payload_json: redactStoreAccountLinkedJson(event.payloadJson),
+      })
+      .where(eq(kilo_pass_store_events.id, event.id));
+  }
+
+  // kiloclaw_instances.admin_size_override JSONB carries actorEmail (an
+  // admin's address) and a free-form reason (often referencing a ticket
+  // or the customer scenario). Clear it on:
+  //   (a) this user's retained destroyed instances — keeping the user's
+  //       deletion clean of any reason text written about their incident;
+  //   (b) ANY instance where this user was the admin actor — their email
+  //       and reason text are their PII regardless of whose instance it
+  //       targeted, so they need to be scrubbed when the actor is deleted.
+  // The denormalized read-cache loses the audit trail, but the canonical
+  // record lives in `kiloclaw_admin_audit_logs` (whose actor PII is
+  // anonymized below by the same flow).
+  await tx
+    .update(kiloclaw_instances)
+    .set({ admin_size_override: null })
+    .where(
+      or(
+        eq(kiloclaw_instances.user_id, userId),
+        sql`${kiloclaw_instances.admin_size_override}->>'actorId' = ${userId}`
+      )
+    );
+
+  // Organization audit logs: keep the log entries, strip actor PII
+  await tx
+    .update(organization_audit_logs)
+    .set({ actor_email: null, actor_name: null })
+    .where(eq(organization_audit_logs.actor_id, userId));
+
+  await tx
+    .update(organization_groups)
+    .set({ created_by_kilo_user_id: null })
+    .where(eq(organization_groups.created_by_kilo_user_id, userId));
+  await tx
+    .update(organization_group_memberships)
+    .set({ assigned_by_kilo_user_id: null })
+    .where(eq(organization_group_memberships.assigned_by_kilo_user_id, userId));
+  await tx
+    .update(organization_group_policy_settings)
+    .set({ updated_by_kilo_user_id: null })
+    .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
+
+  // Security audit logs: keep org-owned entries, strip actor PII
+  // (user-owned entries are cascade-deleted via owned_by_user_id FK)
+  await tx
+    .update(security_audit_log)
+    .set({ actor_email: null, actor_name: null })
+    .where(eq(security_audit_log.actor_id, userId));
+
+  // KiloClaw admin audit logs: strip PII where user is the actor
+  await tx
+    .update(kiloclaw_admin_audit_logs)
+    .set({ actor_email: null, actor_name: null })
+    .where(eq(kiloclaw_admin_audit_logs.actor_id, userId));
+
+  // KiloClaw admin audit logs: strip PII where user is the target
+  await tx
+    .update(kiloclaw_admin_audit_logs)
+    .set({ target_user_id: 'deleted-user' })
+    .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
+
+  await tx
+    .update(model_eval_ingestions)
+    .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
+    .where(sql`lower(${model_eval_ingestions.promoted_by_email}) = lower(${originalEmail})`);
+
+  // Credit campaigns: strip the creator-admin reference. The campaigns
+  // themselves are retained (they represent ongoing marketing relationships
+  // and audit of granted credits), but the link back to the deleted user
+  // is anonymized to match the other actor-column patterns above.
+  await tx
+    .update(credit_campaigns)
+    .set({ created_by_kilo_user_id: 'deleted-user' })
+    .where(eq(credit_campaigns.created_by_kilo_user_id, userId));
+
+  // Payment methods: soft-delete and strip address/name/IP fields
+  await tx
+    .update(payment_methods)
+    .set({
+      deleted_at: sql`now()`,
+      name: null,
+      address_line1: null,
+      address_line2: null,
+      address_city: null,
+      address_state: null,
+      address_zip: null,
+      address_country: null,
+      http_x_forwarded_for: null,
+      http_x_vercel_ip_city: null,
+      http_x_vercel_ip_country: null,
+      http_x_vercel_ip_latitude: null,
+      http_x_vercel_ip_longitude: null,
+      http_x_vercel_ja4_digest: null,
+    })
+    .where(eq(payment_methods.user_id, userId));
+
+  // Contributor champions: anonymize email PII and nullify user link
+  // Clear events linked through membership
+  await tx
+    .update(contributor_champion_events)
+    .set({ github_author_email: null })
+    .where(
+      sql`${contributor_champion_events.contributor_id} IN (
+        SELECT m.contributor_id FROM contributor_champion_memberships m
+        WHERE m.linked_kilo_user_id = ${userId}
+      )`
+    );
+  // Also clear events matched by email directly (covers un-enrolled contributors).
+  // Use originalEmail captured before the user row was anonymized — the subquery
+  // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
+  await tx
+    .update(contributor_champion_events)
+    .set({ github_author_email: null })
+    .where(
+      sql`lower(${contributor_champion_events.github_author_email}) = lower(${originalEmail})`
+    );
+  await tx
+    .update(contributor_champion_memberships)
+    .set({ linked_kilo_user_id: null })
+    .where(eq(contributor_champion_memberships.linked_kilo_user_id, userId));
+  // Clear manual_email for manually-enrolled contributors linked to this user
+  // (either by exact email match OR via membership link)
+  await tx
+    .update(contributor_champion_contributors)
+    .set({ manual_email: null })
+    .where(
+      or(
+        sql`lower(${contributor_champion_contributors.manual_email}) = lower(${originalEmail})`,
+        sql`${contributor_champion_contributors.id} IN (
           SELECT m.contributor_id FROM contributor_champion_memberships m
           WHERE m.linked_kilo_user_id = ${userId}
         )`
-      );
-    // Also clear events matched by email directly (covers un-enrolled contributors).
-    // Use originalEmail captured before the user row was anonymized — the subquery
-    // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
-    await tx
-      .update(contributor_champion_events)
-      .set({ github_author_email: null })
-      .where(
-        sql`lower(${contributor_champion_events.github_author_email}) = lower(${originalEmail})`
-      );
-    await tx
-      .update(contributor_champion_memberships)
-      .set({ linked_kilo_user_id: null })
-      .where(eq(contributor_champion_memberships.linked_kilo_user_id, userId));
-    // Clear manual_email for manually-enrolled contributors linked to this user
-    // (either by exact email match OR via membership link)
-    await tx
-      .update(contributor_champion_contributors)
-      .set({ manual_email: null })
-      .where(
+      )
+    );
+
+  // Microdollar usage metadata: strip user-authored prompt prefix and system prompt reference
+  await tx.execute(sql`
+    UPDATE ${microdollar_usage_metadata}
+    SET user_prompt_prefix = NULL,
+        system_prompt_prefix_id = NULL
+    WHERE id IN (
+      SELECT id FROM ${microdollar_usage}
+      WHERE kilo_user_id = ${userId}
+    )
+    AND (user_prompt_prefix IS NOT NULL OR system_prompt_prefix_id IS NOT NULL)
+  `);
+
+  // ── 4. Nullify FK references ─────────────────────────────────────────
+  await tx
+    .update(user_feedback)
+    .set({ kilo_user_id: null })
+    .where(eq(user_feedback.kilo_user_id, userId));
+  await tx
+    .update(app_builder_feedback)
+    .set({ kilo_user_id: null })
+    .where(eq(app_builder_feedback.kilo_user_id, userId));
+  await tx
+    .update(cloud_agent_feedback)
+    .set({ kilo_user_id: null })
+    .where(eq(cloud_agent_feedback.kilo_user_id, userId));
+  await tx
+    .update(free_model_usage)
+    .set({ kilo_user_id: null })
+    .where(eq(free_model_usage.kilo_user_id, userId));
+  await tx
+    .update(stripe_early_fraud_warning_cases)
+    .set({ kilo_user_id: null })
+    .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
+  await tx.execute(sql`
+    UPDATE ${stripe_dispute_actions}
+    SET target_key = replace(${stripe_dispute_actions.target_key}, ${userId}, 'deleted_user'),
+        result_reference_id = CASE
+          WHEN ${stripe_dispute_actions.result_reference_id} = ${userId} THEN NULL
+          ELSE ${stripe_dispute_actions.result_reference_id}
+        END,
+        updated_at = now()
+    WHERE case_id IN (
+      SELECT id FROM ${stripe_dispute_cases}
+      WHERE kilo_user_id = ${userId}
+        OR accepted_by_kilo_user_id = ${userId}
+    )
+    AND (
+      position(${userId} in ${stripe_dispute_actions.target_key}) > 0
+      OR ${stripe_dispute_actions.result_reference_id} = ${userId}
+    )
+  `);
+  await tx
+    .update(stripe_dispute_cases)
+    .set({ kilo_user_id: null })
+    .where(eq(stripe_dispute_cases.kilo_user_id, userId));
+  await tx
+    .update(stripe_dispute_cases)
+    .set({ accepted_by_kilo_user_id: null })
+    .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
+  await tx
+    .update(deployments_ephemeral)
+    .set({
+      owned_by_user_id: null,
+      status: 'cleanup_retry',
+      next_cleanup_at: sql`now()`,
+      cleanup_claim_token: null,
+      cleanup_claimed_until: null,
+      updated_at: sql`now()`,
+    })
+    .where(eq(deployments_ephemeral.owned_by_user_id, userId));
+  await tx
+    .update(security_advisor_scans)
+    .set({ kilo_user_id: 'deleted', public_ip: null })
+    .where(eq(security_advisor_scans.kilo_user_id, userId));
+}
+
+export type UsagePromptPrefixCursor = {
+  createdAt: string;
+  id: string;
+};
+
+export type UsagePromptPrefixPage = {
+  pageSize: number;
+  updatedCount: number;
+  lastCursor: UsagePromptPrefixCursor | null;
+};
+
+/**
+ * Scrub one bounded page of usage metadata for a user.
+ *
+ * The caller owns the transaction and any queue claim/checkpoint fencing. The
+ * cursor advances over usage rows considered, rather than only rows changed,
+ * so pages that are already scrubbed cannot stall the scan.
+ */
+export async function scrubUsagePromptPrefixesPage(
+  tx: DrizzleTransaction,
+  userId: string,
+  cursor: UsagePromptPrefixCursor | null,
+  limit: number
+): Promise<UsagePromptPrefixPage> {
+  const usageRows = await tx
+    .select({ id: microdollar_usage.id, created_at: microdollar_usage.created_at })
+    .from(microdollar_usage)
+    .where(
+      cursor
+        ? and(
+            eq(microdollar_usage.kilo_user_id, userId),
+            sql`(${microdollar_usage.created_at}, ${microdollar_usage.id}) > (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`
+          )
+        : eq(microdollar_usage.kilo_user_id, userId)
+    )
+    .orderBy(microdollar_usage.created_at, microdollar_usage.id)
+    .limit(limit);
+
+  const lastUsageRow = usageRows.at(-1);
+  if (!lastUsageRow) {
+    return { pageSize: 0, updatedCount: 0, lastCursor: null };
+  }
+
+  const updatedRows = await tx
+    .update(microdollar_usage_metadata)
+    .set({ user_prompt_prefix: null, system_prompt_prefix_id: null })
+    .where(
+      and(
+        inArray(
+          microdollar_usage_metadata.id,
+          usageRows.map(row => row.id)
+        ),
         or(
-          sql`lower(${contributor_champion_contributors.manual_email}) = lower(${originalEmail})`,
-          sql`${contributor_champion_contributors.id} IN (
-            SELECT m.contributor_id FROM contributor_champion_memberships m
-            WHERE m.linked_kilo_user_id = ${userId}
-          )`
+          isNotNull(microdollar_usage_metadata.user_prompt_prefix),
+          isNotNull(microdollar_usage_metadata.system_prompt_prefix_id)
         )
+      )
+    )
+    .returning({ id: microdollar_usage_metadata.id });
+
+  return {
+    pageSize: usageRows.length,
+    updatedCount: updatedRows.length,
+    lastCursor: { createdAt: lastUsageRow.created_at, id: lastUsageRow.id },
+  };
+}
+
+export async function softDeleteUser(userId: string) {
+  const user = await findUserById(userId);
+  if (!user) return;
+
+  await assertUserCanBeSoftDeleted(userId);
+
+  let cursor: UsagePromptPrefixCursor | null = null;
+  while (true) {
+    const page = await db.transaction(async tx => {
+      await tx.execute(
+        sql.raw(`SET LOCAL statement_timeout = ${USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS}`)
       );
+      return scrubUsagePromptPrefixesPage(
+        tx,
+        userId,
+        cursor,
+        USER_DELETION_USAGE_PREFIX_BATCH_SIZE
+      );
+    });
+    if (page.pageSize < USER_DELETION_USAGE_PREFIX_BATCH_SIZE || !page.lastCursor) break;
+    cursor = page.lastCursor;
+  }
 
-    // Microdollar usage metadata: strip user-authored prompt prefix and system prompt reference
-    await tx.execute(sql`
-      UPDATE ${microdollar_usage_metadata}
-      SET user_prompt_prefix = NULL,
-          system_prompt_prefix_id = NULL
-      WHERE id IN (
-        SELECT id FROM ${microdollar_usage}
-        WHERE kilo_user_id = ${userId}
-      )
-      AND (user_prompt_prefix IS NOT NULL OR system_prompt_prefix_id IS NOT NULL)
-    `);
-
-    // ── 4. Nullify FK references ─────────────────────────────────────────
-    await tx
-      .update(user_feedback)
-      .set({ kilo_user_id: null })
-      .where(eq(user_feedback.kilo_user_id, userId));
-    await tx
-      .update(app_builder_feedback)
-      .set({ kilo_user_id: null })
-      .where(eq(app_builder_feedback.kilo_user_id, userId));
-    await tx
-      .update(cloud_agent_feedback)
-      .set({ kilo_user_id: null })
-      .where(eq(cloud_agent_feedback.kilo_user_id, userId));
-    await tx
-      .update(free_model_usage)
-      .set({ kilo_user_id: null })
-      .where(eq(free_model_usage.kilo_user_id, userId));
-    await tx
-      .update(stripe_early_fraud_warning_cases)
-      .set({ kilo_user_id: null })
-      .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
-    await tx.execute(sql`
-      UPDATE ${stripe_dispute_actions}
-      SET target_key = replace(${stripe_dispute_actions.target_key}, ${userId}, 'deleted_user'),
-          result_reference_id = CASE
-            WHEN ${stripe_dispute_actions.result_reference_id} = ${userId} THEN NULL
-            ELSE ${stripe_dispute_actions.result_reference_id}
-          END,
-          updated_at = now()
-      WHERE case_id IN (
-        SELECT id FROM ${stripe_dispute_cases}
-        WHERE kilo_user_id = ${userId}
-          OR accepted_by_kilo_user_id = ${userId}
-      )
-      AND (
-        position(${userId} in ${stripe_dispute_actions.target_key}) > 0
-        OR ${stripe_dispute_actions.result_reference_id} = ${userId}
-      )
-    `);
-    await tx
-      .update(stripe_dispute_cases)
-      .set({ kilo_user_id: null })
-      .where(eq(stripe_dispute_cases.kilo_user_id, userId));
-    await tx
-      .update(stripe_dispute_cases)
-      .set({ accepted_by_kilo_user_id: null })
-      .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
-    await tx
-      .update(deployments_ephemeral)
-      .set({
-        owned_by_user_id: null,
-        status: 'cleanup_retry',
-        next_cleanup_at: sql`now()`,
-        cleanup_claim_token: null,
-        cleanup_claimed_until: null,
-        updated_at: sql`now()`,
-      })
-      .where(eq(deployments_ephemeral.owned_by_user_id, userId));
-    await tx
-      .update(security_advisor_scans)
-      .set({ kilo_user_id: 'deleted', public_ip: null })
-      .where(eq(security_advisor_scans.kilo_user_id, userId));
+  await db.transaction(async tx => {
+    await anonymizeCloudUserData(tx, userId);
   });
 
   void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });

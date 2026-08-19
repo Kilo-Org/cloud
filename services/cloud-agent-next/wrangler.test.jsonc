@@ -12,6 +12,10 @@
         "name": "CLOUD_AGENT_SESSION",
       },
       {
+        "class_name": "StreamTicketNonceDO",
+        "name": "STREAM_TICKET_NONCE_DO",
+      },
+      {
         "class_name": "UserKiloFacade",
         "name": "USER_KILO_FACADE",
       },
@@ -25,6 +29,10 @@
     {
       "new_sqlite_classes": ["UserKiloFacade"],
       "tag": "v5",
+    },
+    {
+      "new_sqlite_classes": ["StreamTicketNonceDO"],
+      "tag": "v8",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

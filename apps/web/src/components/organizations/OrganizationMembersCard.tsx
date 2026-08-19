@@ -43,8 +43,9 @@ import {
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { invitedEmailStatusLabel } from './members/invited-email-status';
 import {
   canManageOrganization,
   canManageOrganizationOwners,
@@ -56,17 +57,6 @@ const formatDate = (dateString: string) => {
     month: 'short',
     day: 'numeric',
   });
-};
-
-const getStatusBadgeVariant = (status: string) => {
-  switch (status) {
-    case 'active':
-      return 'default';
-    case 'invited':
-      return 'secondary';
-    default:
-      return 'outline';
-  }
 };
 
 type DailyUsageLimitDisplayProps = {
@@ -218,6 +208,14 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
     return null;
   }
 
+  const label = invitedEmailStatusLabel(member.emailStatus);
+  if (label === null) {
+    return null; // delivered → no badge
+  }
+
+  const isFailed = member.emailStatus === 'failed';
+  const variant = isFailed ? 'destructive' : 'secondary';
+
   const canCopy = canManageMembers(currentUserRole, isKiloAdmin);
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -232,21 +230,77 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
     }
   };
 
-  if (!canCopy) {
-    return <Badge variant={getStatusBadgeVariant(member.status)}>{member.status}</Badge>;
+  if (!canCopy || isFailed) {
+    return <Badge variant={variant}>{label}</Badge>;
   }
 
   return (
     <Badge
-      variant={getStatusBadgeVariant(member.status)}
+      variant={variant}
       className="group hover:bg-secondary/80 relative cursor-pointer transition-colors"
       onClick={handleCopy}
     >
-      {member.status}
+      {label}
       <span title="Copy invite URL to clipboard">
         <Copy className="ml-1 hidden h-3 w-3 transition-all group-hover:inline" />
       </span>
     </Badge>
+  );
+}
+
+type ResendInvitationButtonProps = {
+  organizationId: string;
+  member: OrganizationMember;
+};
+
+function ResendInvitationButton({ organizationId, member }: ResendInvitationButtonProps) {
+  const currentUserRole = useUserOrganizationRole();
+  const isKiloAdmin = useIsKiloAdmin();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const resendInvitation = useMutation(
+    trpc.organizations.members.resendInvite.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
+        });
+      },
+    })
+  );
+
+  if (member.status !== 'invited' || member.emailStatus !== 'failed') {
+    return null;
+  }
+
+  // An admin cannot resend an owner invitation, so don't offer the control.
+  const canResend =
+    canManageMembers(currentUserRole, isKiloAdmin) &&
+    canActOnMemberRole(currentUserRole, isKiloAdmin, member.role);
+
+  if (!canResend) {
+    return null;
+  }
+
+  const handleResend = async () => {
+    try {
+      await resendInvitation.mutateAsync({ organizationId, inviteId: member.inviteId });
+      toast.success('Invite queued for resend');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to resend invitation');
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 px-2 text-xs"
+      onClick={handleResend}
+      disabled={resendInvitation.isPending}
+    >
+      {resendInvitation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+      Resend
+    </Button>
   );
 }
 
@@ -628,6 +682,10 @@ export function OrganizationAdminMembers({
                               </span>
                             )}
                             <InvitedBadge member={member} />
+                            <ResendInvitationButton
+                              organizationId={organizationId}
+                              member={member}
+                            />
                           </div>
                           <p className="text-muted-foreground text-sm">{member.email}</p>
                           {member.status === 'active' && groupsQuery.data?.access === 'manager' && (

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   _resetDeepLinkLaunchForTests,
@@ -11,10 +11,12 @@ import {
 describe('deep-link-launch', () => {
   beforeEach(() => {
     _resetDeepLinkLaunchForTests();
+    vi.stubGlobal('__DEV__', true);
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
+    vi.unstubAllGlobals();
   });
 
   describe('pending slot', () => {

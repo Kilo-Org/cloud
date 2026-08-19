@@ -1,5 +1,7 @@
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
+import { takeDevSessionFromUrl } from './dev-session-inject';
+
 type DeepLinkSource = 'universal-link' | 'notification';
 
 type GetLinkingURL = () => string | null;
@@ -74,6 +76,7 @@ export function captureLaunchDeepLink(): void {
   if (!url) {
     return;
   }
+  takeDevSessionFromUrl(url);
   const href = resolveIncomingUrl(url);
   if (href) {
     setPendingDeepLink(href, 'universal-link');

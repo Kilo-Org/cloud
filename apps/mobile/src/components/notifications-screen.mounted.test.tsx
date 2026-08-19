@@ -142,7 +142,9 @@ function previewRetry(root: I): I[] {
 }
 
 function activityIndicators(root: I): I[] {
-  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator');
+  return root.findAll(
+    n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator'
+  );
 }
 
 function skeletonCount(root: I): number {
@@ -208,9 +210,9 @@ describe('NotificationsScreen message-previews row', () => {
       previewSwitchOnValueChange(renderer.root)?.(true);
     });
     // pending
-expect(activityIndicators(renderer.root).length).toBe(1);
+    expect(activityIndicators(renderer.root).length).toBe(1);
     // settled
-await waitFor(() => activityIndicators(renderer.root).length === 0);
+    await waitFor(() => activityIndicators(renderer.root).length === 0);
 
     // The switch re-renders from the unchanged server value (still generic).
     expect(previewSwitches(renderer.root)[0]?.props.value).toBe(false);
@@ -231,9 +233,9 @@ await waitFor(() => activityIndicators(renderer.root).length === 0);
       previewSwitchOnValueChange(renderer.root)?.(true);
     });
     // pending
-expect(activityIndicators(renderer.root).length).toBe(1);
+    expect(activityIndicators(renderer.root).length).toBe(1);
     // settled
-await waitFor(() => activityIndicators(renderer.root).length === 0);
+    await waitFor(() => activityIndicators(renderer.root).length === 0);
 
     expect(previewSwitches(renderer.root)[0]?.props.disabled).toBe(true);
     expect(previewRetry(renderer.root).length).toBe(0);
@@ -242,7 +244,7 @@ await waitFor(() => activityIndicators(renderer.root).length === 0);
 
   it('empty: an unresolved preference query renders a skeleton and no control', async () => {
     // never resolves
-prefsQueryFn.mockReturnValue(new Promise(() => undefined));
+    prefsQueryFn.mockReturnValue(new Promise(() => undefined));
     const { renderer } = await renderScreen();
 
     expect(previewSwitches(renderer.root).length).toBe(0);

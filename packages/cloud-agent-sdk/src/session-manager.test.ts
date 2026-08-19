@@ -23,7 +23,7 @@ import type {
   CloudAgentSessionDismissSuggestionInput,
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
-import type { AssistantMessage, UserMessage } from '@kilocode/app-shared/opencode';
+import type { AssistantMessage, UserMessage, TextPart } from '@kilocode/app-shared/opencode';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
   CloudStatus,
@@ -2215,6 +2215,153 @@ describe('createSessionManager', () => {
       );
 
       expect(childMessages('child-1')).toEqual([childOneFirst, childOneSecond]);
+    });
+  });
+
+  describe('StoredMessage memoization', () => {
+    it('completed rows keep object identity across a delta on another row', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const completed = createStoredMessage('msg-completed', 'ses-root', 'assistant');
+      const streaming = createStoredMessage('msg-streaming', 'ses-root', 'assistant');
+      const completedPart = stubTextPart({
+        id: 'part-completed',
+        sessionID: 'ses-root',
+        messageID: completed.info.id,
+        text: 'done',
+      });
+      const streamingPart = stubTextPart({
+        id: 'part-streaming',
+        sessionID: 'ses-root',
+        messageID: streaming.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(completed.info);
+      latestStorage.upsertMessage(streaming.info);
+      latestStorage.upsertPart(completed.info.id, completedPart);
+      latestStorage.upsertPart(streaming.info.id, streamingPart);
+
+      const before = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const completedBefore = before.find(m => m.info.id === completed.info.id);
+      expect(completedBefore).toBeDefined();
+      const streamingBefore = before.find(m => m.info.id === streaming.info.id);
+      expect(streamingBefore).toBeDefined();
+
+      // A delta on the streaming row must not rebuild the completed row.
+      latestStorage.applyPartDelta(streaming.info.id, streamingPart.id, 'text', 'lo');
+
+      const after = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const completedAfter = after.find(m => m.info.id === completed.info.id);
+      expect(completedAfter).toBeDefined();
+      expect(completedAfter).toBe(completedBefore);
+
+      // The streaming row must rebuild (new object, updated text). This proves
+      // `partsRevision` drove the recompute: `applyPartDelta` changes neither
+      // `messageIds`, `messages`, nor the `parts` map reference, so without
+      // reading `partsRevision` the atom would return the stale array and this
+      // assertion would fail.
+      const streamingAfter = after.find(m => m.info.id === streaming.info.id);
+      expect(streamingAfter).toBeDefined();
+      expect(streamingAfter).not.toBe(streamingBefore);
+      expect((streamingAfter?.parts[0] as TextPart | undefined)?.text).toBe('hello');
+    });
+
+    it('a no-parts row keeps object identity across a delta on another row', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const noParts = createStoredMessage('msg-no-parts', 'ses-root', 'assistant');
+      const withParts = createStoredMessage('msg-with-parts', 'ses-root', 'assistant');
+      const withPartsPart = stubTextPart({
+        id: 'part-with-parts',
+        sessionID: 'ses-root',
+        messageID: withParts.info.id,
+        text: 'hel',
+      });
+
+      // The no-parts row gets a message but no parts entry, so the memo must
+      // fall back to the shared EMPTY_PARTS sentinel.
+      latestStorage.upsertMessage(noParts.info);
+      latestStorage.upsertMessage(withParts.info);
+      latestStorage.upsertPart(withParts.info.id, withPartsPart);
+
+      const before = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const noPartsBefore = before.find(m => m.info.id === noParts.info.id);
+      expect(noPartsBefore).toBeDefined();
+
+      // A delta on the other row bumps `partsRevision` and recomputes the list.
+      latestStorage.applyPartDelta(withParts.info.id, withPartsPart.id, 'text', 'lo');
+
+      const after = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const noPartsAfter = after.find(m => m.info.id === noParts.info.id);
+      expect(noPartsAfter).toBeDefined();
+
+      // The no-parts row must keep object identity. If EMPTY_PARTS were a
+      // fresh `[]` per recompute, `cached.parts === parts` would fail and this
+      // row would rebuild a new StoredMessage on every partsRevision bump.
+      expect(noPartsAfter).toBe(noPartsBefore);
+    });
+
+    it('childMessagesAtom recomputes after a child-row part delta', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child',
+        sessionID: 'child-1',
+        messageID: child.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(child.info);
+      latestStorage.upsertPart(child.info.id, childPart);
+
+      const childMessagesBefore = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect((childMessagesBefore('child-1')[0]?.parts[0] as TextPart | undefined)?.text).toBe(
+        'hel'
+      );
+
+      latestStorage.applyPartDelta(child.info.id, childPart.id, 'text', 'lo');
+
+      const childMessagesAfter = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+
+      // The atom must emit a new function so subscribers re-render (the
+      // live-sheet freeze path). Without reading `partsRevision`, the cached
+      // function reference is returned and this assertion fails.
+      expect(childMessagesAfter).not.toBe(childMessagesBefore);
+      expect((childMessagesAfter('child-1')[0]?.parts[0] as TextPart | undefined)?.text).toBe(
+        'hello'
+      );
     });
   });
 

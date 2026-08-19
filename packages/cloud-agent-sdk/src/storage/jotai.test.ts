@@ -330,12 +330,15 @@ describe('createJotaiStorage', () => {
       expect(first).not.toBe(second);
     });
 
-    test('parts atom gets new Map reference on each mutation', () => {
+    test('parts atom keeps one Map reference and bumps partsRevision', () => {
       s.upsertPart('msg-1', makePart('p-1', 'msg-1'));
       const first = store.get(s.atoms.parts);
+      const firstRev = store.get(s.atoms.partsRevision);
       s.upsertPart('msg-1', makePart('p-2', 'msg-1'));
       const second = store.get(s.atoms.parts);
-      expect(first).not.toBe(second);
+      const secondRev = store.get(s.atoms.partsRevision);
+      expect(first).toBe(second);
+      expect(secondRev).toBe(firstRev + 1);
     });
 
     test('clear resets all atoms', () => {

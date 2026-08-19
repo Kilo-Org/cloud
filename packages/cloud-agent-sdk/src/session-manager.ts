@@ -138,6 +138,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are still on this session';
 
 /**
+ * Shared empty-parts sentinel. `memoizedStoredMessage` compares `cached.parts
+ * === parts`; `partsMap.get(id) ?? []` would allocate a fresh array on every
+ * `partsRevision` bump, defeating the memo for rows that have no parts entry.
+ */
+const EMPTY_PARTS: Part[] = [];
+
+/**
  * Flatten a `ModelSelection` into the Decision 5 create_session model object.
  * `variant` is nested only when present (no second top-level field).
  */
@@ -604,6 +611,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
 
+  // Memoized per-row StoredMessage objects. Reused while both `info` and the
+  // parts array keep the same reference, so unchanged rows keep object identity
+  // across a delta on another row (React.memo relies on this).
+  const storedMessageMemo = new Map<string, StoredMessage>();
+
+  function memoizedStoredMessage(id: string, info: MessageInfo, parts: Part[]): StoredMessage {
+    const cached = storedMessageMemo.get(id);
+    if (cached !== undefined && cached.info === info && cached.parts === parts) {
+      return cached;
+    }
+    const next: StoredMessage = { info, parts };
+    storedMessageMemo.set(id, next);
+    return next;
+  }
+
+  function pruneStoredMessageMemo(ids: readonly string[]): void {
+    const idSet = new Set(ids);
+    for (const id of storedMessageMemo.keys()) {
+      if (!idSet.has(id)) storedMessageMemo.delete(id);
+    }
+  }
+
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
     const storage = get(sessionStorageAtom);
@@ -611,14 +640,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
+    get(storage.atoms.partsRevision);
     const rootSessionId = get(rootSessionIdAtom);
     const out: StoredMessage[] = [];
     for (const id of ids) {
       const info = msgMap.get(id);
       if (!info) continue;
       if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
-      out.push({ info, parts: partsMap.get(id) ?? [] });
+      out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
     }
+    pruneStoredMessageMemo(ids);
     return out;
   });
 
@@ -641,11 +672,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
+    get(storage.atoms.partsRevision);
+    pruneStoredMessageMemo(ids);
     return (childSessionId: string): StoredMessage[] => {
       const out: StoredMessage[] = [];
       for (const id of ids) {
         const info = msgMap.get(id);
-        if (info?.sessionID === childSessionId) out.push({ info, parts: partsMap.get(id) ?? [] });
+        if (info?.sessionID === childSessionId)
+          out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
       }
       return out;
     };
@@ -733,6 +767,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   function clearAllAtoms(): void {
     store.set(sessionStorageAtom, null);
+    storedMessageMemo.clear();
     store.set(rootSessionIdAtom, null);
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);

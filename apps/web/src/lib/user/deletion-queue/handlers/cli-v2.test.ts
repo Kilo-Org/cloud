@@ -169,6 +169,39 @@ describe('handleCliV2Sessions', () => {
     expect(await remainingSessionIds(user.id)).toHaveLength(1);
   });
 
+  it('keeps processed progress when a later batch fails', async () => {
+    const user = await insertTestUser();
+    const count = USER_DELETION_RESOURCE_BATCH_SIZE + 1;
+    for (let index = 0; index < count; index += 1) {
+      await insertSession(user.id, newSessionId(`f${index}`));
+    }
+
+    let deleted = 0;
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const sessionId = sessionIdFromUrl(input);
+      if (deleted >= USER_DELETION_RESOURCE_BATCH_SIZE) {
+        return new Response('unavailable', { status: 500 });
+      }
+      deleted += 1;
+      await deleteSessionRow(user.id, sessionId);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({
+      kind: 'retry',
+      errorCode: 'http_500',
+      httpStatusClass: '5xx',
+      progress: { processed_count: USER_DELETION_RESOURCE_BATCH_SIZE },
+    });
+    expect(await remainingSessionIds(user.id)).toHaveLength(1);
+  });
+
   it('treats a successful DELETE that leaves the row as an identity mismatch', async () => {
     const user = await insertTestUser();
     const sessionId = newSessionId('stuck');

@@ -121,6 +121,12 @@ const getToolResultValue = (body: unknown): unknown => {
   return JSON.parse(content) as unknown;
 };
 
+const getToolDescription = (tool: Record<string, unknown> | undefined): unknown => {
+  const fn = tool?.['function'];
+
+  return isRecord(fn) ? fn['description'] : undefined;
+};
+
 test('safe mode omits the page double tool when WebMCP in safe mode is off', async () => {
   const fixture = await startFixtureServer({ bodyHtml: webMcpPageHtml });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -219,8 +225,7 @@ test('safe mode exposes and executes the page double tool when WebMCP in safe mo
       type: 'function',
     });
     // Chrome may omit the tool title; assert on the description text alone.
-    const doubleFunction = doubleTool?.['function'];
-    const description = isRecord(doubleFunction) ? doubleFunction['description'] : undefined;
+    const description = getToolDescription(doubleTool);
     expect(typeof description).toBe('string');
     expect(String(description)).toContain('Doubles a number.');
 

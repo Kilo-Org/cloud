@@ -2,18 +2,18 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';
+import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
+import { and, isNull, count, not, or, sql } from 'drizzle-orm';
 import { extractEmailDomain } from '@/lib/email-domain';
 
-// Exclude soft-deleted users: softDeleteUser anonymizes them to
-// `deleted+<id>@deleted.invalid` and sets `blocked_reason` to a string starting
-// with `soft-deleted at`. Filling email_domain for those rows would undo the
-// GDPR nulling invariant.
+// Skip soft-deleted and deletion-in-progress users. Soft-deleted emails are
+// already anonymized; in-progress emails are still real, but backfill must not
+// race with deletion.
 export const emailDomainBackfillCandidates = and(
   isNull(kilocode_users.email_domain),
   or(
     isNull(kilocode_users.blocked_reason),
-    not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+    not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
   )
 );
 

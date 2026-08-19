@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, count, inArray, isNotNull, isNull, like, not, sql } from 'drizzle-orm';
+import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
+import { and, count, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm';
 
 export const blockedAtBackfillCandidates = and(
   isNotNull(kilocode_users.blocked_reason),
   isNull(kilocode_users.blocked_at),
-  not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+  not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
 );
 
 export type BlockedAtCountsResponse = {

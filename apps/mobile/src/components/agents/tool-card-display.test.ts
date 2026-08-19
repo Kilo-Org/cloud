@@ -356,6 +356,58 @@ describe('getToolDisplay badge rules', () => {
   });
 });
 
+describe('getToolDisplay badge rules — live CLI shapes', () => {
+  it('omits the glob badge for No files found', () => {
+    expect(
+      getDisplay(makeToolPart('glob', completed({ pattern: '**/*.ts' }, 'No files found'))).badge
+    ).toBeUndefined();
+  });
+
+  it('badges a single glob path as 1 files', () => {
+    expect(
+      getDisplay(
+        makeToolPart('glob', completed({ pattern: '**/*.ts' }, '/repo/apps/mobile/AGENTS.md'))
+      ).badge
+    ).toBe('1 files');
+  });
+
+  it('does not count the opencode truncated note as a file', () => {
+    const output =
+      '/repo/a.ts\n/repo/b.ts\n\n(Results are truncated: showing first 100 results. Consider using a more specific path or pattern.)';
+    expect(getDisplay(makeToolPart('glob', completed({ pattern: '**/*.ts' }, output))).badge).toBe(
+      '2 files'
+    );
+  });
+
+  it('does not count the partial note as a file', () => {
+    const output = '/repo/a.ts\n/repo/b.ts\n\n(Some discovered files could not be read.)';
+    expect(getDisplay(makeToolPart('glob', completed({ pattern: '**/*.ts' }, output))).badge).toBe(
+      '2 files'
+    );
+  });
+
+  it('omits the grep badge for No files found', () => {
+    expect(
+      getDisplay(makeToolPart('grep', completed({ pattern: 'foo' }, 'No files found'))).badge
+    ).toBeUndefined();
+  });
+
+  it('badges the live grep hit as 2 matches', () => {
+    const output = 'Found 1 matches\n/repo/src/a.ts:\n  Line 1: hello';
+    expect(getDisplay(makeToolPart('grep', completed({ pattern: 'foo' }, output))).badge).toBe(
+      '2 matches'
+    );
+  });
+
+  it('does not count a parenthetical grep note as a match', () => {
+    const output =
+      'Found 1 matches\n/repo/src/a.ts:\n  Line 1: hello\n\n(Some paths were inaccessible.)';
+    expect(getDisplay(makeToolPart('grep', completed({ pattern: 'foo' }, output))).badge).toBe(
+      '2 matches'
+    );
+  });
+});
+
 describe('toolPartHasDetails', () => {
   it('returns false for suggest even with input', () => {
     expect(toolPartHasDetails(makeToolPart('suggest', completed({ prompt: 'hi' })))).toBe(false);

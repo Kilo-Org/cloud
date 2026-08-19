@@ -33,6 +33,10 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
+vi.mock('react-native', () => ({
+  InteractionManager: { runAfterInteractions: vi.fn() },
+}));
+
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };

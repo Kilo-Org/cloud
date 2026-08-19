@@ -1,12 +1,32 @@
-/* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test -- Retry fixtures need attempt-conditional fakes and raw promises. */
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test, consistent-type-imports, jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- Retry fixtures need attempt-conditional fakes and raw promises; the typed stream-client mock needs importOriginal. */
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createSafeToolCall, createUserMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { FetchLike } from './auth';
 import { maxAgentToolRounds } from './agent-tool-round-limit';
-import type { KiloGatewayToolCallRequest, KiloGatewayToolDefinition } from './kilo-api-client';
+import type {
+  KiloGatewayChatCompletion,
+  KiloGatewayToolCallRequest,
+  KiloGatewayToolDefinition,
+} from './kilo-api-client';
 import { runLlmTurn } from './agent-llm-turn-runner-core';
+
+const kiloApiClientMocks = vi.hoisted(() => ({
+  fetchKiloGatewayChatCompletionStream: vi.fn(),
+}));
+
+// Delegate to the real stream client by default so existing tests are unaffected; the prepareTools tests override per-call.
+vi.mock('./kilo-api-client', async importOriginal => {
+  const actual = await importOriginal<typeof import('./kilo-api-client')>();
+  kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(
+    actual.fetchKiloGatewayChatCompletionStream
+  );
+  return {
+    ...actual,
+    fetchKiloGatewayChatCompletionStream: kiloApiClientMocks.fetchKiloGatewayChatCompletionStream,
+  };
+});
 
 const stringBodySchema = z.string();
 
@@ -355,6 +375,166 @@ describe('agent LLM turn runner core', () => {
       expect(streamingCalls).toStrictEqual([]);
     }
   );
+});
+
+describe('prepareTools', () => {
+  const preparedTools: KiloGatewayToolDefinition[] = [
+    {
+      function: {
+        description: 'A tool supplied by prepareTools.',
+        name: 'get_page_snapshot',
+        parameters: { type: 'object' },
+      },
+      type: 'function',
+    },
+  ];
+
+  it('calls prepareTools before the gateway request and sends its returned tools', async () => {
+    const capturedTools: KiloGatewayToolDefinition[][] = [];
+    let prepareCallCount = 0;
+
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementationOnce(
+      (options: { tools: KiloGatewayToolDefinition[] }) => {
+        capturedTools.push(options.tools);
+        return {
+          content: 'Done.',
+          finishReason: 'stop',
+          toolCalls: [],
+        } satisfies KiloGatewayChatCompletion;
+      }
+    );
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: () => {},
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: {} }),
+      failureMessage: String,
+      fetch: () => Promise.resolve(new Response('', { status: 500 })),
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      prepareTools: () => {
+        prepareCallCount += 1;
+        return Promise.resolve(preparedTools);
+      },
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(prepareCallCount).toBe(1);
+    expect(capturedTools).toStrictEqual([preparedTools]);
+  });
+
+  it('awaits prepareTools on both attempts and sends each attempt its returned tools', async () => {
+    const capturedTools: KiloGatewayToolDefinition[][] = [];
+    let prepareCallCount = 0;
+    const firstList: KiloGatewayToolDefinition[] = [
+      {
+        function: {
+          description: 'First attempt tool list.',
+          name: 'get_page_snapshot',
+          parameters: { type: 'object' },
+        },
+        type: 'function',
+      },
+    ];
+    const secondList: KiloGatewayToolDefinition[] = [
+      {
+        function: {
+          description: 'Second attempt tool list.',
+          name: 'get_page_snapshot',
+          parameters: { type: 'object' },
+        },
+        type: 'function',
+      },
+    ];
+
+    // First attempt fails with a retriable network error; the retry succeeds.
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementationOnce(
+      (options: { tools: KiloGatewayToolDefinition[] }) => {
+        capturedTools.push(options.tools);
+        throw new TypeError('Failed to fetch');
+      }
+    );
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementationOnce(
+      (options: { tools: KiloGatewayToolDefinition[] }) => {
+        capturedTools.push(options.tools);
+        return {
+          content: 'Done.',
+          finishReason: 'stop',
+          toolCalls: [],
+        } satisfies KiloGatewayChatCompletion;
+      }
+    );
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: () => {},
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: {} }),
+      failureMessage: String,
+      fetch: () => Promise.resolve(new Response('', { status: 500 })),
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      prepareTools: () => {
+        prepareCallCount += 1;
+        return Promise.resolve(prepareCallCount === 1 ? firstList : secondList);
+      },
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(prepareCallCount).toBe(2);
+    expect(capturedTools).toStrictEqual([firstList, secondList]);
+  });
+
+  it('uses the fixed tools array when prepareTools is undefined', async () => {
+    const capturedTools: KiloGatewayToolDefinition[][] = [];
+
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementationOnce(
+      (options: { tools: KiloGatewayToolDefinition[] }) => {
+        capturedTools.push(options.tools);
+        return {
+          content: 'Done.',
+          finishReason: 'stop',
+          toolCalls: [],
+        } satisfies KiloGatewayChatCompletion;
+      }
+    );
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: () => {},
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: {} }),
+      failureMessage: String,
+      fetch: () => Promise.resolve(new Response('', { status: 500 })),
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(capturedTools).toStrictEqual([[getPageSnapshotTool]]);
+  });
 });
 
 describe('stream retry', () => {

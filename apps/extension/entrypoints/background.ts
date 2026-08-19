@@ -165,6 +165,7 @@ const handleTabDebuggerRequest = async ({
           ok: true,
           result: await executeWebMcpToolInTab({
             arguments: request.arguments,
+            definitionSignature: request.definitionSignature,
             documentId: request.documentId,
             scriptingApi,
             tabId: request.tabId,

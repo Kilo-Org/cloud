@@ -98,6 +98,28 @@ const createWebMcpScriptingApi = ({
   ],
 });
 
+// Rebuild the ordered definition signature exactly as the injected executor does, so tests pass a matching signature without hardcoding JSON.
+const webMcpDefinitionSignature = (tool: {
+  readonly description: string;
+  readonly inputSchema: unknown;
+  readonly name: string;
+  readonly origin: string;
+  readonly title: string;
+}): string => {
+  let schema = tool.inputSchema;
+  if (typeof schema === 'string') {
+    try {
+      schema = JSON.parse(schema) as unknown;
+    } catch {
+      schema = undefined;
+    }
+  }
+  const normalized =
+    typeof schema === 'object' && schema !== null && !Array.isArray(schema) ? schema : undefined;
+
+  return JSON.stringify([tool.name, tool.title, tool.description, tool.origin, normalized]);
+};
+
 describe('tab debugger helpers', () => {
   it('lists only normal inspectable page tabs', async () => {
     await expect(listInspectableTabs(createDebuggerApi())).resolves.toStrictEqual([
@@ -655,6 +677,13 @@ describe('tab debugger helpers', () => {
     await expect(
       executeWebMcpToolInTab({
         arguments: '{"value":21}',
+        definitionSignature: webMcpDefinitionSignature({
+          description: 'D',
+          inputSchema: '{}',
+          name: 'double',
+          origin: 'https://example.com',
+          title: 'Double',
+        }),
         documentId: 'doc-1',
         scriptingApi: createWebMcpScriptingApi(),
         tabId: 7,
@@ -688,6 +717,13 @@ describe('tab debugger helpers', () => {
     await expect(
       executeWebMcpToolInTab({
         arguments: '{}',
+        definitionSignature: webMcpDefinitionSignature({
+          description: 'D',
+          inputSchema: '{}',
+          name: 'double',
+          origin: 'https://example.com',
+          title: 'Double',
+        }),
         documentId: 'doc-1',
         scriptingApi,
         tabId: 7,
@@ -718,6 +754,13 @@ describe('tab debugger helpers', () => {
     await expect(
       executeWebMcpToolInTab({
         arguments: '{}',
+        definitionSignature: webMcpDefinitionSignature({
+          description: 'N',
+          inputSchema: '{}',
+          name: 'navigate',
+          origin: 'https://example.com',
+          title: 'Navigate',
+        }),
         documentId: 'doc-1',
         scriptingApi: createWebMcpScriptingApi(),
         tabId: 7,
@@ -734,6 +777,7 @@ describe('tab debugger helpers', () => {
     await expect(
       executeWebMcpToolInTab({
         arguments: '{}',
+        definitionSignature: 'stale',
         documentId: 'doc-1',
         scriptingApi,
         tabId: 7,
@@ -747,6 +791,7 @@ describe('tab debugger helpers', () => {
     expect(
       isTabDebuggerRequest({
         arguments: '{}',
+        definitionSignature: '["double","Double","D","https://example.com",{}]',
         documentId: 'doc-1',
         tabId: 7,
         toolName: 'double',
@@ -770,5 +815,121 @@ describe('tab debugger helpers', () => {
         type: WEB_MCP_EXECUTE_MESSAGE,
       })
     ).toBe(true);
+  });
+
+  it('passes the definition signature into the injected execute function', async () => {
+    const calls: Parameters<BrowserScriptingApi['executeScript']>[0][] = [];
+    setModelContext({
+      executeTool: () => resolved('{"ok":true}'),
+      getTools: () =>
+        resolved([
+          {
+            description: 'D',
+            inputSchema: '{}',
+            name: 'double',
+            origin: 'https://example.com',
+            title: 'Double',
+          },
+        ]),
+    });
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: async details => {
+        calls.push(details);
+        return [{ result: await details.func(...details.args) }];
+      },
+    };
+    const signature = webMcpDefinitionSignature({
+      description: 'D',
+      inputSchema: '{}',
+      name: 'double',
+      origin: 'https://example.com',
+      title: 'Double',
+    });
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature: signature,
+        documentId: 'doc-1',
+        scriptingApi,
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({ ok: true, value: '{"ok":true}' });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args).toStrictEqual(['double', '{}', signature]);
+  });
+
+  it('executes a tool when the definition signature matches', async () => {
+    setModelContext({
+      executeTool: () => resolved('{"doubled":42}'),
+      getTools: () =>
+        resolved([
+          {
+            description: 'D',
+            inputSchema: '{"type":"object"}',
+            name: 'double',
+            origin: 'https://example.com',
+            title: 'Double',
+          },
+        ]),
+    });
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature: webMcpDefinitionSignature({
+          description: 'D',
+          inputSchema: '{"type":"object"}',
+          name: 'double',
+          origin: 'https://example.com',
+          title: 'Double',
+        }),
+        documentId: 'doc-1',
+        scriptingApi: createWebMcpScriptingApi(),
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({ ok: true, value: '{"doubled":42}' });
+  });
+
+  it('returns a stale-tool error when the definition signature changed', async () => {
+    setModelContext({
+      executeTool: () => resolved('{"ok":true}'),
+      getTools: () =>
+        resolved([
+          {
+            description: 'D',
+            inputSchema: '{}',
+            name: 'double',
+            origin: 'https://example.com',
+            title: 'Double',
+          },
+        ]),
+    });
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: async details => {
+        try {
+          return [{ result: await details.func(...details.args) }];
+        } catch (error) {
+          return [{ error }];
+        }
+      },
+    };
+
+    await expect(
+      executeWebMcpToolInTab({
+        arguments: '{}',
+        definitionSignature: '["double","Double","D","https://example.com",{"type":"object"}]',
+        documentId: 'doc-1',
+        scriptingApi,
+        tabId: 7,
+        toolName: 'double',
+      })
+    ).resolves.toStrictEqual({
+      error: 'WebMCP tool execution failed: WebMCP tool "double" changed; refresh the page tools.',
+      ok: false,
+    });
   });
 });

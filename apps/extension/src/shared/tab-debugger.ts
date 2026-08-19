@@ -199,6 +199,7 @@ export type TabDebuggerRequest =
     }
   | {
       readonly arguments: string;
+      readonly definitionSignature: string;
       readonly documentId: string;
       readonly tabId: number;
       readonly toolName: string;
@@ -278,6 +279,7 @@ const tabDebuggerRequestSchema = z.union([
   }),
   z.object({
     arguments: z.string(),
+    definitionSignature: z.string(),
     documentId: z.string(),
     tabId: z.number(),
     toolName: z.string(),
@@ -903,7 +905,8 @@ const runInjectedWebMcpDiscover = async (): Promise<WebMcpToolDescriptor[]> => {
 
 const runInjectedWebMcpExecute = async (
   toolNameText: string,
-  argumentsText: string
+  argumentsText: string,
+  definitionSignatureText: string
 ): Promise<unknown> => {
   const { modelContext } = document as Document & {
     modelContext?: {
@@ -939,6 +942,28 @@ const runInjectedWebMcpExecute = async (
 
   if (tool === undefined) {
     throw new Error(`WebMCP tool "${toolNameText}" is not available.`);
+  }
+
+  // Rebuild the ordered definition signature identically to web-mcp-tools.ts and reject a changed registration as a stale tool.
+  const record = isToolRecord(tool) ? tool : {};
+  const name = typeof record['name'] === 'string' ? record['name'] : '';
+  const title = typeof record['title'] === 'string' ? record['title'] : '';
+  const description = typeof record['description'] === 'string' ? record['description'] : '';
+  const origin = typeof record['origin'] === 'string' ? record['origin'] : '';
+  let schema = record['inputSchema'];
+  if (typeof schema === 'string') {
+    try {
+      schema = JSON.parse(schema) as unknown;
+    } catch {
+      schema = undefined;
+    }
+  }
+  const normalizedSchema =
+    typeof schema === 'object' && schema !== null && !Array.isArray(schema) ? schema : undefined;
+  const definitionSignature = JSON.stringify([name, title, description, origin, normalizedSchema]);
+
+  if (definitionSignature !== definitionSignatureText) {
+    throw new Error(`WebMCP tool "${toolNameText}" changed; refresh the page tools.`);
   }
 
   const result = await modelContext.executeTool(tool, argumentsText);
@@ -1184,12 +1209,14 @@ export const discoverWebMcpToolsInTab = async ({
 
 export const executeWebMcpToolInTab = async ({
   arguments: argumentsText,
+  definitionSignature,
   documentId,
   scriptingApi,
   tabId,
   toolName,
 }: {
   readonly arguments: string;
+  readonly definitionSignature: string;
   readonly documentId: string;
   readonly scriptingApi: BrowserScriptingApi;
   readonly tabId: number;
@@ -1199,7 +1226,7 @@ export const executeWebMcpToolInTab = async ({
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
-          args: [toolName, argumentsText],
+          args: [toolName, argumentsText, definitionSignature],
           func: runInjectedWebMcpExecute,
           target: { documentIds: [documentId], tabId },
           world: 'MAIN',

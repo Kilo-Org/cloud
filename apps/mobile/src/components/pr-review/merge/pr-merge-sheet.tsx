@@ -99,7 +99,7 @@ type AutoMergeInput = {
  * input handlers live in `pr-merge-sheet-parts.tsx`; the proxy hooks the write
  * without touching that file.
  */
-function savingRef<T>(target: { current: T }, onWrite: () => void): { current: T } {
+function savingRef<T>(target: { current: T }, onWrite: () => void) {
   return new Proxy(target, {
     set(obj, prop, value) {
       if (prop === 'current') {

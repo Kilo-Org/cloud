@@ -100,13 +100,14 @@ export function prCommentDraftKey(
   return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
 }
 
+const mergeDraftSchema = z.object({
+  title: z.string(),
+  message: z.string(),
+});
+
 /** Runtime shape guard for a merge-sheet draft ({ title, message }). */
 export function isMergeDraft(value: unknown): value is { title: string; message: string } {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return typeof record.title === 'string' && typeof record.message === 'string';
+  return mergeDraftSchema.safeParse(value).success;
 }
 
 /** Security dismiss draft entity key, unique per scope and finding. */

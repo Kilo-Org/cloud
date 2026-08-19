@@ -6,11 +6,11 @@ import { type MessageDeliveryState, type MessageInfo } from '@kilocode/cloud-age
  */
 type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
 
-const DELIVERY_DETAIL_BY_REASON: Readonly<Record<DeliveryReason, string>> = {
+const DELIVERY_DETAIL_BY_REASON = {
   interrupted: 'You stopped this message.',
   exhausted: 'We could not deliver this message after several attempts.',
   execution: 'The agent could not run this message.',
-};
+} as const satisfies Record<DeliveryReason, string>;
 
 /**
  * Assistant error names that can never be retried. Pinned to the exact names
@@ -26,11 +26,11 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
  * Fixed, safe copy for a known assistant error name. Unknown names fall back
  * to the generic line. Never surfaces `error.data` or provider message text.
  */
-const ASSISTANT_DETAIL_BY_ERROR_NAME: Readonly<Record<string, string>> = {
+const ASSISTANT_DETAIL_BY_ERROR_NAME = {
   ProviderAuthError: 'The provider rejected the request.',
   MessageAbortedError: 'The response was stopped.',
   ContextOverflowError: 'The conversation is too long for the model.',
-};
+} as const satisfies Record<string, string>;
 
 export type MessageFailure = {
   kind: 'delivery' | 'assistant';

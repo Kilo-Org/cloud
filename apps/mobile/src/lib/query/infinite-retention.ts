@@ -1,5 +1,11 @@
 import { type QueryClient } from '@tanstack/react-query';
+import * as z from 'zod';
 import { InteractionManager } from 'react-native';
+
+const infiniteQueryDataSchema = z.looseObject({
+  pages: z.array(z.unknown()),
+  pageParams: z.array(z.unknown()),
+});
 
 /**
  * The default number of pages an infinite query keeps in memory.
@@ -43,11 +49,12 @@ export function reconcileFirstPage(
   queryKeyPrefix: readonly unknown[]
 ): void {
   queryClient.setQueriesData({ queryKey: queryKeyPrefix }, old => {
-    if (typeof old !== 'object' || old === null || !('pages' in old)) {
+    const parsed = infiniteQueryDataSchema.safeParse(old);
+    if (!parsed.success) {
       return old;
     }
     return {
-      ...old,
+      ...parsed.data,
       pages: [],
       pageParams: [],
     };

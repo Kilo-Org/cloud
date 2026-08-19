@@ -19,6 +19,7 @@ export type FrameCoalescer<T> = {
  * silently drops a pushed value.
  */
 const rafSchedule = (frame: () => void): void => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: node tests have no requestAnimationFrame
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(frame);
     return;

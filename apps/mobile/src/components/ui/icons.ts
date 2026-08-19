@@ -70,6 +70,7 @@ export { default as HelpCircle } from 'lucide-react-native/icons/circle-question
 export { default as History } from 'lucide-react-native/icons/history';
 export { default as House } from 'lucide-react-native/icons/house';
 export { default as ImageOff } from 'lucide-react-native/icons/image-off';
+export { default as Inbox } from 'lucide-react-native/icons/inbox';
 export { default as Info } from 'lucide-react-native/icons/info';
 export { default as KeyRound } from 'lucide-react-native/icons/key-round';
 export { default as LifeBuoy } from 'lucide-react-native/icons/life-buoy';

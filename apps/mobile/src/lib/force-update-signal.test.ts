@@ -1,90 +1,56 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import {
-  clearForceUpdateSignal,
-  getForceUpdateSignalSnapshot,
-  markClientUpdateRequired,
-  markClientUpToDate,
-  reportTrpcError,
-  subscribeToForceUpdateSignal,
-} from './force-update-signal';
+import { reportTrpcError, subscribeToForceUpdateRecheck } from './force-update-signal';
+
+function makeListener() {
+  const listener = vi.fn<() => void>();
+  const unsubscribe = subscribeToForceUpdateRecheck(listener);
+  return { listener, unsubscribe };
+}
 
 describe('force-update-signal', () => {
-  beforeEach(() => {
-    clearForceUpdateSignal();
-    markClientUpdateRequired();
-  });
-
-  it('starts false', () => {
-    expect(getForceUpdateSignalSnapshot()).toBe(false);
-  });
-
-  it('reportTrpcError flips on app_update_required via data', () => {
+  it('reportTrpcError notifies a recheck listener on app_update_required via data', () => {
+    const { listener } = makeListener();
     reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    expect(getForceUpdateSignalSnapshot()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('reportTrpcError flips on app_update_required via shape.data', () => {
+  it('reportTrpcError notifies via shape.data', () => {
+    const { listener } = makeListener();
     reportTrpcError({ shape: { data: { upstreamCode: 'app_update_required' } } });
-    expect(getForceUpdateSignalSnapshot()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('reportTrpcError ignores other errors', () => {
+    const { listener } = makeListener();
     reportTrpcError({ data: { upstreamCode: 'etag_mismatch' } });
     reportTrpcError({ data: { code: 'UNAUTHORIZED' } });
     reportTrpcError({ shape: { data: { code: 'FORBIDDEN' } } });
     reportTrpcError(new Error('network'));
     reportTrpcError(null);
-    expect(getForceUpdateSignalSnapshot()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('falls through to shape.data when data is not an object', () => {
+    const { listener } = makeListener();
     reportTrpcError({ data: 'nope', shape: { data: { upstreamCode: 'app_update_required' } } });
-    expect(getForceUpdateSignalSnapshot()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('reads data before a malformed shape', () => {
+    const { listener } = makeListener();
     reportTrpcError({ shape: null, data: { upstreamCode: 'app_update_required' } });
-    expect(getForceUpdateSignalSnapshot()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('subscribeToForceUpdateSignal notifies and unsubscribes', () => {
-    const listener = vi.fn<() => void>();
-    const unsubscribe = subscribeToForceUpdateSignal(listener);
+  it('subscribeToForceUpdateRecheck notifies and unsubscribes', () => {
+    const { listener, unsubscribe } = makeListener();
 
-    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    expect(listener).toHaveBeenCalledTimes(1);
-
-    // A second identical error is a no-op (already true).
     reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
     expect(listener).toHaveBeenCalledTimes(1);
 
     unsubscribe();
-    clearForceUpdateSignal();
+    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
     expect(listener).toHaveBeenCalledTimes(1);
-  });
-
-  it('clearForceUpdateSignal resets', () => {
-    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    expect(getForceUpdateSignalSnapshot()).toBe(true);
-
-    clearForceUpdateSignal();
-    expect(getForceUpdateSignalSnapshot()).toBe(false);
-  });
-
-  it('markClientUpToDate suppresses a subsequent reportTrpcError', () => {
-    markClientUpToDate();
-    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    expect(getForceUpdateSignalSnapshot()).toBe(false);
-  });
-
-  it('markClientUpdateRequired re-arms reportTrpcError', () => {
-    markClientUpToDate();
-    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    expect(getForceUpdateSignalSnapshot()).toBe(false);
-
-    markClientUpdateRequired();
-    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    expect(getForceUpdateSignalSnapshot()).toBe(true);
   });
 });

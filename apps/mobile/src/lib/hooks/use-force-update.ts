@@ -1,17 +1,11 @@
 import * as Application from 'expo-application';
 import { onlineManager } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { API_BASE_URL } from '@/lib/config';
 import { resolveForceUpdateState } from '@/lib/force-update-policy';
-import {
-  clearForceUpdateSignal,
-  getForceUpdateSignalSnapshot,
-  markClientUpdateRequired,
-  markClientUpToDate,
-  subscribeToForceUpdateSignal,
-} from '@/lib/force-update-signal';
+import { subscribeToForceUpdateRecheck } from '@/lib/force-update-signal';
 
 const CHECK_SPACING_MS = 30_000;
 const CHECK_TIMEOUT_MS = 5000;
@@ -22,13 +16,8 @@ export function useForceUpdate() {
   const lastCheckAtRef = useRef(0);
   const inFlightRef = useRef<AbortController | null>(null);
 
-  const signalRequired = useSyncExternalStore(
-    subscribeToForceUpdateSignal,
-    getForceUpdateSignalSnapshot
-  );
-
-  const check = useCallback(async () => {
-    if (Date.now() - lastCheckAtRef.current < CHECK_SPACING_MS) {
+  const check = useCallback(async (force = false) => {
+    if (!force && Date.now() - lastCheckAtRef.current < CHECK_SPACING_MS) {
       return;
     }
     // Single-flight: abort any in-flight check before starting a new one.
@@ -55,18 +44,15 @@ export function useForceUpdate() {
       );
 
       if (state.kind === 'update-required') {
-        markClientUpdateRequired();
         setPollRequired(true);
       } else if (state.kind === 'up-to-date') {
-        markClientUpToDate();
         setPollRequired(false);
-        clearForceUpdateSignal();
       }
-      // 'unknown' → fail-open: leave pollRequired and the signal unchanged.
+      // 'unknown' → fail-open: leave pollRequired unchanged.
       setIsChecking(false);
     } catch {
       // Fail open — the client fails open on its own network error; the server
-      // middleware (G1) is the fail-closed half. Do not clear the signal here.
+      // middleware (G1) is the fail-closed half.
       setIsChecking(false);
     } finally {
       clearTimeout(timeout);
@@ -101,6 +87,13 @@ export function useForceUpdate() {
     [check]
   );
 
-  const updateRequired = pollRequired || signalRequired;
-  return { updateRequired, isChecking };
+  useEffect(
+    () =>
+      subscribeToForceUpdateRecheck(() => {
+        void check(true);
+      }),
+    [check]
+  );
+
+  return { updateRequired: pollRequired, isChecking };
 }

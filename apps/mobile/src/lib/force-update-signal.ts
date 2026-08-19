@@ -1,10 +1,6 @@
 import * as z from 'zod';
 
-type Listener = () => void;
-
-const listeners = new Set<Listener>();
-let forceUpdateRequired = false;
-let clientUpToDate = false;
+const recheckListeners = new Set<() => void>();
 
 const upstreamCodePayloadSchema = z.object({ upstreamCode: z.string().optional() });
 
@@ -35,60 +31,25 @@ function readUpstreamCode(error: unknown): string | undefined {
   return shaped.success ? shaped.data.upstreamCode : undefined;
 }
 
-function notify(): void {
-  for (const listener of listeners) {
+/**
+ * Notifies every recheck listener when the error carries
+ * `upstreamCode === 'app_update_required'`. A refusal is authoritative at the
+ * moment it is issued, but the server's min-version read is cached, so the
+ * listener must re-check the uncached REST endpoint. Any other error is a
+ * no-op.
+ */
+export function reportTrpcError(error: unknown): void {
+  if (readUpstreamCode(error) !== 'app_update_required') {
+    return;
+  }
+  for (const listener of recheckListeners) {
     listener();
   }
 }
 
-/**
- * Flips the module-level flag to true (and notifies) when the error carries
- * `upstreamCode === 'app_update_required'`. Any other error is a no-op.
- */
-export function reportTrpcError(error: unknown): void {
-  if (readUpstreamCode(error) !== 'app_update_required' || forceUpdateRequired || clientUpToDate) {
-    return;
-  }
-  forceUpdateRequired = true;
-  notify();
-}
-
-/**
- * Marks the client's own check as authoritative `up-to-date`. Until
- * `markClientUpdateRequired` is called, a stale server `app_update_required`
- * refusal must not re-set the signal.
- */
-export function markClientUpToDate(): void {
-  clientUpToDate = true;
-}
-
-/**
- * Marks the client's own check as `update-required`, re-arming the signal so a
- * subsequent server refusal can set it again.
- */
-export function markClientUpdateRequired(): void {
-  clientUpToDate = false;
-}
-
-export function subscribeToForceUpdateSignal(listener: Listener): () => void {
-  listeners.add(listener);
+export function subscribeToForceUpdateRecheck(listener: () => void): () => void {
+  recheckListeners.add(listener);
   return () => {
-    listeners.delete(listener);
+    recheckListeners.delete(listener);
   };
-}
-
-export function getForceUpdateSignalSnapshot(): boolean {
-  return forceUpdateRequired;
-}
-
-/**
- * Resets the flag to false and notifies. Load-bearing: without it, lowering the
- * minimum can never clear the block.
- */
-export function clearForceUpdateSignal(): void {
-  if (!forceUpdateRequired) {
-    return;
-  }
-  forceUpdateRequired = false;
-  notify();
 }

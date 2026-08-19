@@ -3,11 +3,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  clearForceUpdateSignal,
-  markClientUpdateRequired,
-  reportTrpcError,
-} from '@/lib/force-update-signal';
+import { reportTrpcError } from '@/lib/force-update-signal';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 
 const fetchMock = vi.hoisted(() => vi.fn());
@@ -81,6 +77,8 @@ function textChildren(renderer: TestRenderer.ReactTestRenderer): string[] | null
   return json.children?.filter((child): child is string => typeof child === 'string') ?? null;
 }
 
+const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
+
 async function renderProbe(): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
@@ -93,6 +91,7 @@ async function renderProbe(): Promise<TestRenderer.ReactTestRenderer> {
   if (!renderer) {
     throw new Error('renderer was not created');
   }
+  mountedRenderers.push(renderer);
   return renderer;
 }
 
@@ -115,11 +114,15 @@ describe('useForceUpdate mounted', () => {
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockReset();
     application.nativeApplicationVersion = '1.0.4';
-    clearForceUpdateSignal();
-    markClientUpdateRequired();
   });
 
   afterEach(() => {
+    act(() => {
+      for (const renderer of mountedRenderers) {
+        renderer.unmount();
+      }
+    });
+    mountedRenderers.length = 0;
     appState.listeners.clear();
     online.listeners.clear();
     vi.restoreAllMocks();
@@ -210,13 +213,7 @@ describe('useForceUpdate mounted', () => {
     await flush();
     expect(textChildren(renderer)).toEqual(['true:false']);
 
-    // A tRPC refusal flips the signal immediately.
-    act(() => {
-      reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    });
-    expect(textChildren(renderer)).toEqual(['true:false']);
-
-    // A successful up-to-date check clears the previously-set signal.
+    // A successful up-to-date check clears the block.
     fetchMock.mockImplementation(() => okResponse({ ios: '1.0.0', android: '1.0.0' }));
     currentTime = BASE_TIME + 30_000;
     act(() => {
@@ -226,20 +223,30 @@ describe('useForceUpdate mounted', () => {
     expect(textChildren(renderer)).toEqual(['false:false']);
   });
 
-  it('does not re-set the signal on a stale refusal after an up-to-date check, then re-arms', async () => {
-    // Initial check is update-required, so the signal can be set.
+  it('a refusal triggers a recheck that routes on update-required', async () => {
+    fetchMock.mockResolvedValue(okResponse({ ios: '1.0.0', android: '1.0.0' }));
+    const renderer = await renderProbe();
+    await flush();
+    expect(textChildren(renderer)).toEqual(['false:false']);
+
+    // The server minimum was just raised; a fresh refusal must re-check and route.
+    fetchMock.mockResolvedValue(okResponse({ ios: '1.0.5', android: '1.0.5' }));
+    act(() => {
+      reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
+    });
+    await flush();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(textChildren(renderer)).toEqual(['true:false']);
+  });
+
+  it('a refusal triggers a recheck that stays clear on up-to-date', async () => {
     fetchMock.mockImplementation(() => okResponse({ ios: '1.0.5', android: '1.0.5' }));
     const renderer = await renderProbe();
     await flush();
     expect(textChildren(renderer)).toEqual(['true:false']);
 
-    // A tRPC refusal flips the signal.
-    act(() => {
-      reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    });
-    expect(textChildren(renderer)).toEqual(['true:false']);
-
-    // An up-to-date check clears the signal and marks the client authoritative.
+    // The minimum was lowered; an up-to-date check clears the block.
     fetchMock.mockImplementation(() => okResponse({ ios: '1.0.0', android: '1.0.0' }));
     currentTime = BASE_TIME + 30_000;
     act(() => {
@@ -248,36 +255,21 @@ describe('useForceUpdate mounted', () => {
     await flush();
     expect(textChildren(renderer)).toEqual(['false:false']);
 
-    // A stale server refusal must NOT re-set the signal.
+    // A stale refusal re-checks and confirms up-to-date, so it stays clear.
     act(() => {
       reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
     });
-    expect(textChildren(renderer)).toEqual(['false:false']);
-
-    // An update-required check re-arms the block.
-    fetchMock.mockImplementation(() => okResponse({ ios: '1.0.5', android: '1.0.5' }));
-    currentTime = BASE_TIME + 60_000;
-    act(() => {
-      appState.emit('active');
-    });
     await flush();
-    expect(textChildren(renderer)).toEqual(['true:false']);
+    expect(textChildren(renderer)).toEqual(['false:false']);
   });
 
-  it('keeps the block when a check fails while the signal is set', async () => {
-    // Initial check is update-required.
+  it('keeps the block when a check fails (fail-open)', async () => {
     fetchMock.mockResolvedValue(okResponse({ ios: '1.0.5', android: '1.0.5' }));
     const renderer = await renderProbe();
     await flush();
     expect(textChildren(renderer)).toEqual(['true:false']);
 
-    // A tRPC refusal flips the signal.
-    act(() => {
-      reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
-    });
-    expect(textChildren(renderer)).toEqual(['true:false']);
-
-    // A non-ok check must NOT clear the signal (fail-open).
+    // A non-ok check must NOT clear the block (fail-open).
     fetchMock.mockResolvedValue(new Response('{}', { status: 500 }));
     currentTime = BASE_TIME + 30_000;
     act(() => {

@@ -1,5 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN hooks under vitest (node env, no jsdom) */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- the SSO recovery and created-account announcement suites share one hook harness */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -62,6 +63,10 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 1 },
   digestStringAsync: vi.fn(),
@@ -107,6 +112,7 @@ const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
 const { toast } = await import('sonner-native');
+const { announcingToast } = await import('@/lib/a11y/announcing-toast');
 
 const mockGetAdmission = vi.mocked(getAdmission);
 
@@ -393,5 +399,70 @@ describe('useNativeAuth SSO recovery', () => {
     });
 
     expect(resultRef.current?.ssoRecovery).toBeNull();
+  });
+});
+
+// ── Created-account announcement ────────────────────────────────────────
+
+describe('useNativeAuth created-account announcement', () => {
+  beforeEach(() => {
+    // A prior resolveAdmission test sets a rejection that only clearAllMocks
+    // (not resetAllMocks) runs; reset it so admission resolves to undefined.
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('announces account creation when the token response has created: true', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: true },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to Kilo Code.');
+  });
+
+  it('stays silent when created is absent', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('stays silent when created is false', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: false },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).not.toHaveBeenCalled();
   });
 });

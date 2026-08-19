@@ -8,9 +8,7 @@ import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
-
-const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
+import { PRIVACY_URL } from '@/lib/config';
 
 type ConsentDetailsProps = {
   readonly mode?: ConsentMode;

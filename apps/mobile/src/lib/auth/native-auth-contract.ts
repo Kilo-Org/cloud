@@ -5,6 +5,7 @@ const tokenPairSchema = z.object({
   token: z.string().min(1),
   refreshToken: z.string().min(1).optional(),
   expiresIn: z.number().positive().optional(),
+  created: z.boolean().optional(),
 });
 const emailCodeResponseSchema = z.object({
   success: z.literal(true),
@@ -16,8 +17,8 @@ const errorResponseSchema = z.object({
 });
 
 export type TokenPair =
-  | { token: string; refreshToken: string; expiresIn: number }
-  | { token: string; refreshToken?: undefined; expiresIn?: undefined };
+  | { token: string; refreshToken: string; expiresIn: number; created?: boolean }
+  | { token: string; refreshToken?: undefined; expiresIn?: undefined; created?: boolean };
 
 export function parseTokenResponse(value: unknown): { token: string } | null {
   const result = tokenResponseSchema.safeParse(value);
@@ -29,11 +30,11 @@ export function parseTokenPair(value: unknown): TokenPair | null {
   if (!result.success) {
     return null;
   }
-  const { token, refreshToken, expiresIn } = result.data;
+  const { token, refreshToken, expiresIn, created } = result.data;
   if (refreshToken && expiresIn) {
-    return { token, refreshToken, expiresIn };
+    return { token, refreshToken, expiresIn, created };
   }
-  return { token };
+  return { token, created };
 }
 
 const deviceAuthTokenStatusSchema = z.enum(['pending', 'approved', 'denied', 'expired']);

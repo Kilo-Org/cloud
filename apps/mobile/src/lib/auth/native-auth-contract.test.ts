@@ -105,6 +105,23 @@ describe('parseTokenPair', () => {
     // expiresIn must be positive; zero is rejected by the schema
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 0 })).toBeNull();
   });
+
+  it('returns created on a complete token pair', () => {
+    expect(
+      parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 3600, created: true })
+    ).toEqual({ token: 'abc', refreshToken: 'ref', expiresIn: 3600, created: true });
+  });
+
+  it('returns created on a token-only response', () => {
+    expect(parseTokenPair({ token: 'abc', created: false })).toEqual({
+      token: 'abc',
+      created: false,
+    });
+  });
+
+  it('omits created when the server does not send it', () => {
+    expect(parseTokenPair({ token: 'abc' })).toEqual({ token: 'abc' });
+  });
 });
 
 // --- parseDeviceAuthTokenResponse ---

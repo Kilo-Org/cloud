@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DEFAULT_ERROR_MESSAGE, mapError } from '@/lib/auth/auth-error-messages';
 import { hasStringCode, postAuth } from '@/lib/auth/auth-fetch';
@@ -137,6 +138,9 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
+        if (parsed.created === true) {
+          announcingToast.success('Account created. Welcome to Kilo Code.');
+        }
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(credential.email ?? '', result.ssoOrganizationId);
       } else {
@@ -207,6 +211,9 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
+        if (parsed.created === true) {
+          announcingToast.success('Account created. Welcome to Kilo Code.');
+        }
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
       } else {
@@ -302,6 +309,9 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
+        if (parsed.created === true) {
+          announcingToast.success('Account created. Welcome to Kilo Code.');
+        }
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry

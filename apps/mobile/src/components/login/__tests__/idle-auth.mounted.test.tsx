@@ -3,6 +3,9 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { openBrowserAsync } from 'expo-web-browser';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
+
 import { IdleAuth } from '../idle-auth';
 
 type StartFn = (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void>;
@@ -52,6 +55,15 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
 
+vi.mock('expo-web-browser', () => ({
+  openBrowserAsync: vi.fn(),
+}));
+
+vi.mock('@/lib/config', () => ({
+  TERMS_URL: 'https://app.kilo.ai/terms-app',
+  PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
+}));
+
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
@@ -88,6 +100,17 @@ function findButton(root: I, label: string): I {
   return btn;
 }
 
+function findText(root: I, text: string): I {
+  const nodes = root.findAll(
+    n => typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === text
+  );
+  const node = nodes[0];
+  if (!node || nodes.length !== 1) {
+    throw new Error(`text "${text}" found ${nodes.length} times, expected once`);
+  }
+  return node;
+}
+
 describe('IdleAuth SSO recovery', () => {
   beforeEach(() => {
     ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
@@ -106,6 +129,56 @@ describe('IdleAuth SSO recovery', () => {
     });
 
     expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth sign-in-or-create copy', () => {
+  it('shows the sign-in-or-create heading and a Continue button', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    expect(texts(renderer.root)).toContain('Sign in or create an account');
+    expect(texts(renderer.root)).toContain('Continue');
+
+    const btn = findButton(renderer.root, 'Continue with email, sign in or create an account');
+    expect(btn).toBeTruthy();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the Terms and Privacy Policy line', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    expect(texts(renderer.root)).toContain('Terms');
+    expect(texts(renderer.root)).toContain('Privacy Policy');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens the browser for Terms and Privacy Policy', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    const terms = findText(renderer.root, 'Terms');
+    act(() => {
+      (terms.props.onPress as () => void)();
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+
+    const privacy = findText(renderer.root, 'Privacy Policy');
+    act(() => {
+      (privacy.props.onPress as () => void)();
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
 
     act(() => {
       renderer.unmount();

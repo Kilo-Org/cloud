@@ -7,6 +7,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, useColorScheme, View } from 'react-native';
 import { toast } from 'sonner-native';
+import * as WebBrowser from 'expo-web-browser';
 
 import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
 export function IdleAuth({
   start,
@@ -208,6 +210,7 @@ export function IdleAuth({
         </View>
       )}
 
+      <Text className="text-base font-semibold text-foreground">Sign in or create an account</Text>
       <FormField
         label="Email address"
         placeholder="you@example.com"
@@ -217,7 +220,7 @@ export function IdleAuth({
         autoComplete="email"
         textContentType="emailAddress"
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
-        // the same way the "Send code" button does, instead of only
+        // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
         returnKeyType="go"
         onSubmitEditing={() => {
@@ -234,11 +237,28 @@ export function IdleAuth({
         className="flex-row gap-2"
         disabled={authBusy}
         onPress={() => void handleSendCode()}
-        accessibilityLabel="Send sign-in code"
+        accessibilityLabel="Continue with email, sign in or create an account"
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text>Send code</Text>
+        <Text>Continue</Text>
       </Button>
+      <Text className="text-xs text-muted-foreground">
+        By continuing you agree to our{' '}
+        <Text
+          className="text-xs text-primary underline"
+          onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
+        >
+          Terms
+        </Text>{' '}
+        and{' '}
+        <Text
+          className="text-xs text-primary underline"
+          onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
+        >
+          Privacy Policy
+        </Text>
+        .
+      </Text>
       <Button
         variant="ghost"
         disabled={authBusy}

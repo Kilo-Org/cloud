@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   parseAuthError,
-  parseAuthErrorCode,
   parseDeviceAuthCodeResponse,
   parseDeviceAuthTokenResponse,
   parseEmailCodeResponse,
@@ -224,18 +223,6 @@ describe('parseEmailCodeResponse', () => {
 
   it('rejects invalid challengeId format', () => {
     expect(parseEmailCodeResponse({ success: true, challengeId: 'not-a-uuid' })).toBeNull();
-  });
-});
-
-// --- parseAuthErrorCode ---
-
-describe('parseAuthErrorCode', () => {
-  it('parses an error', () => {
-    expect(parseAuthErrorCode({ error: 'BLOCKED' })).toBe('BLOCKED');
-  });
-
-  it('returns undefined for non-object', () => {
-    expect(parseAuthErrorCode(null)).toBeUndefined();
   });
 });
 

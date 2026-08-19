@@ -126,10 +126,6 @@ export function parseAuthError(
   return { code: result.data.error, ssoOrganizationId: result.data.ssoOrganizationId };
 }
 
-export function parseAuthErrorCode(value: unknown): string | undefined {
-  return parseAuthError(value)?.code;
-}
-
 export type ChallengeEntry = { email: string; challengeId: string };
 
 export function buildChallengeEntry(

@@ -49,7 +49,7 @@ export type AgentAttachmentCandidate = {
 /**
  * Delete a cache-owned file after its upload is cancelled or its chip is
  * removed. A picker-provided URI is not owned by the app and is never deleted.
- * Best-effort: a failed delete is swallowed so it can never surface as an
+ * Best-effort: a failed delete is reported to Sentry and never surfaces as an
  * upload error.
  */
 function deleteCacheOwnedFile(localUri: string): void {
@@ -57,9 +57,12 @@ function deleteCacheOwnedFile(localUri: string): void {
     return;
   }
   try {
-    new File(localUri).delete();
-  } catch {
-    // Best-effort cleanup.
+    const file = new File(localUri);
+    if (file.exists) {
+      file.delete();
+    }
+  } catch (error) {
+    Sentry.captureException(error);
   }
 }
 
@@ -96,10 +99,6 @@ type UseAgentAttachmentUploadReturn = {
   reset: () => void;
   isUploading: boolean;
   hasFailedAttachments: boolean;
-  /** Wire payload for the existing `chat-composer` send path. */
-  toWirePayload: () => AgentAttachmentWire | undefined;
-  /** The S2 submission payload. `undefined` when there are no uploads. */
-  toSubmissionPayload: () => AgentAttachmentSubmissionPayload | undefined;
   /** Upload every pending/retryable chip and return the payloads, or `{ ok: false }`. */
   uploadPending: () => Promise<UploadPendingResult>;
 };
@@ -393,32 +392,17 @@ export function useAgentAttachmentUpload(
     [attachments.length, commitAttachments]
   );
 
-  const deleteLocalFile = useCallback((uri: string) => {
-    // A picker-provided URI is not owned by the app and is never deleted.
-    if (!uri.startsWith(Paths.cache.uri)) {
-      return;
-    }
-    try {
-      const file = new File(uri);
-      if (file.exists) {
-        file.delete();
-      }
-    } catch (error) {
-      Sentry.captureException(error);
-    }
-  }, []);
-
   const removeAttachment = useCallback(
     (id: string) => {
       cancelUpload(id);
       liveIdsRef.current.delete(id);
       const chip = attachmentsRef.current.find(item => item.id === id);
       if (chip?.localFileOwned) {
-        deleteLocalFile(chip.localUri);
+        deleteCacheOwnedFile(chip.localUri);
       }
       commitAttachments(current => current.filter(item => item.id !== id));
     },
-    [cancelUpload, commitAttachments, deleteLocalFile]
+    [cancelUpload, commitAttachments]
   );
 
   const retryAttachment = useCallback(
@@ -445,24 +429,13 @@ export function useAgentAttachmentUpload(
     liveIdsRef.current.clear();
     for (const chip of attachmentsRef.current) {
       if (chip.localFileOwned) {
-        deleteLocalFile(chip.localUri);
+        deleteCacheOwnedFile(chip.localUri);
       }
     }
     commitAttachments(() => []);
     pathRef.current = Crypto.randomUUID();
     messageUuidRef.current = Crypto.randomUUID();
-  }, [cancelUpload, commitAttachments, deleteLocalFile]);
-
-  const toWirePayload = useCallback(
-    (): AgentAttachmentWire | undefined => buildWirePayload(attachments, pathRef.current),
-    [attachments]
-  );
-
-  const toSubmissionPayload = useCallback(
-    (): AgentAttachmentSubmissionPayload | undefined =>
-      buildSubmissionPayload(attachments, pathRef.current, messageUuidRef.current),
-    [attachments]
-  );
+  }, [cancelUpload, commitAttachments]);
 
   const uploadPending = useCallback(async (): Promise<UploadPendingResult> => {
     const chips = attachmentsRef.current;
@@ -532,8 +505,6 @@ export function useAgentAttachmentUpload(
       reset,
       isUploading,
       hasFailedAttachments,
-      toWirePayload,
-      toSubmissionPayload,
       uploadPending,
     }),
     [
@@ -544,8 +515,6 @@ export function useAgentAttachmentUpload(
       reset,
       isUploading,
       hasFailedAttachments,
-      toWirePayload,
-      toSubmissionPayload,
       uploadPending,
     ]
   );

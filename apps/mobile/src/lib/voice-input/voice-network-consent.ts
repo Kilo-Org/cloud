@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { chainSave } from '@/lib/hooks/save-chain';
-import { VOICE_NETWORK_CONSENT_KEY_PREFIX } from '@/lib/storage-keys';
+import { encodeStorageKey, VOICE_NETWORK_CONSENT_KEY_PREFIX } from '@/lib/storage-keys';
 
 /**
  * Per-user network-fallback consent for voice transcription (P1-I-68a). A
@@ -14,12 +14,8 @@ type VoiceNetworkConsentListener = (userId: string, value: VoiceNetworkConsent) 
 
 const listeners = new Set<VoiceNetworkConsentListener>();
 
-// Injective hex-encoding — reversible, alphanumeric, no collisions. Same
-// scheme as `src/lib/consent.ts` `keyFor`.
 function keyFor(userId: string): string {
-  return `${VOICE_NETWORK_CONSENT_KEY_PREFIX}${[...new TextEncoder().encode(userId)]
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')}`;
+  return encodeStorageKey(VOICE_NETWORK_CONSENT_KEY_PREFIX, userId);
 }
 
 function notifyVoiceNetworkConsent(userId: string, value: VoiceNetworkConsent): void {

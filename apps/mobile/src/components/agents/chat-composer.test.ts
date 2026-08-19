@@ -183,8 +183,6 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     reset: vi.fn(() => undefined),
     isUploading: false,
     hasFailedAttachments: false,
-    toWirePayload: () => undefined,
-    toSubmissionPayload: () => undefined,
     uploadPending: vi.fn(async () => ({
       ok: true,
       wire: undefined,

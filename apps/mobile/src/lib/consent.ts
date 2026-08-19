@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { chainSave } from '@/lib/hooks/save-chain';
-import { CONSENT_USER_KEY_PREFIX } from '@/lib/storage-keys';
+import { CONSENT_USER_KEY_PREFIX, encodeStorageKey } from '@/lib/storage-keys';
 
 export const CURRENT_CONSENT_VERSION = 2;
 
@@ -15,11 +15,8 @@ type ConsentChangeListener = (change: ConsentChange) => void;
 
 const listeners = new Set<ConsentChangeListener>();
 
-// Injective hex-encoding — reversible, alphanumeric, no collisions.
 function keyFor(userId: string): string {
-  return `${CONSENT_USER_KEY_PREFIX}${[...new TextEncoder().encode(userId)]
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')}`;
+  return encodeStorageKey(CONSENT_USER_KEY_PREFIX, userId);
 }
 
 // Legacy strip-based key — kept for migration only. Non-injective, so a hit

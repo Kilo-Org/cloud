@@ -26,7 +26,6 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // test mutates them before mounting to drive the ready vs empty cases.
 const uploadState = vi.hoisted(() => ({
   attachments: [] as { status?: string; remoteFilename?: string }[],
-  toWirePayload: (() => undefined) as () => unknown,
   uploadPending: (() => ({ ok: false })) as () => unknown,
   isUploading: false,
 }));
@@ -178,8 +177,6 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     reset: vi.fn(() => undefined),
     isUploading: uploadState.isUploading,
     hasFailedAttachments: false,
-    toWirePayload: uploadState.toWirePayload,
-    toSubmissionPayload: () => undefined,
     uploadPending: uploadState.uploadPending,
   }),
 }));
@@ -307,7 +304,6 @@ beforeEach(() => {
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
   uploadState.attachments = [];
-  uploadState.toWirePayload = () => undefined;
   uploadState.uploadPending = () => ({ ok: false });
   uploadState.isUploading = false;
 });

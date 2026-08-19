@@ -12,7 +12,6 @@ import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import {
   buildChallengeEntry,
   type ChallengeEntry,
-  parseAuthErrorCode,
   parseEmailCodeResponse,
   parseTokenPair,
   parseTokenResponse,
@@ -198,21 +197,6 @@ describe('native-auth-contract (used by use-native-auth)', () => {
     it('returns null for non-objects', () => {
       expect(parseTokenPair(null)).toBeNull();
       expect(parseTokenPair(undefined)).toBeNull();
-    });
-  });
-
-  describe('parseAuthErrorCode', () => {
-    it('extracts error code', () => {
-      expect(parseAuthErrorCode({ error: 'BLOCKED' })).toBe('BLOCKED');
-    });
-
-    it('returns undefined for non-error objects', () => {
-      expect(parseAuthErrorCode({ success: true })).toBeUndefined();
-    });
-
-    it('returns undefined for non-objects', () => {
-      expect(parseAuthErrorCode(null)).toBeUndefined();
-      expect(parseAuthErrorCode(undefined)).toBeUndefined();
     });
   });
 });

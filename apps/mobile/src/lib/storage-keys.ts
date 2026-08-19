@@ -58,3 +58,13 @@ export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
  * of the same account, matching `CONSENT_USER_KEY_PREFIX`.
  */
 export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
+
+/**
+ * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
+ * no collisions. Shared by the analytics and voice-network consent records.
+ */
+export function encodeStorageKey(prefix: string, userId: string): string {
+  return `${prefix}${[...new TextEncoder().encode(userId)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')}`;
+}

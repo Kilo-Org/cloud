@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the durable-slot, consume-once, and precedence suites share one owned test file */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();

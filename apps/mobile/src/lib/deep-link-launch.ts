@@ -68,26 +68,35 @@ function getSecureStore(): SecureStoreLike {
 // chain so a later delete (consume or sign-out) always lands after an earlier
 // persist. Each write stays fire-and-forget from the caller's view, but chains
 // onto the previous write so call order is preserved.
+// eslint-disable-next-line prefer-await-to-then -- Promise.resolve() is the empty-chain sentinel; there is no async context to await in
 let pendingDeepLinkWriteChain: Promise<void> = Promise.resolve();
 
 function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
-  pendingDeepLinkWriteChain = pendingDeepLinkWriteChain.then(write).catch(error => {
-    Sentry.captureException(error);
-  });
+  const previous = pendingDeepLinkWriteChain;
+  pendingDeepLinkWriteChain = (async () => {
+    try {
+      await previous;
+      await write();
+    } catch (error) {
+      Sentry.captureException(error);
+    }
+  })();
 }
 
 /** Fire-and-forget durable mirror. A failure is reported to Sentry; the
  *  in-memory slot still works for the live process. */
 function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
   const record: PendingDeepLinkRecord = { href, source, storedAt: Date.now() };
-  enqueuePendingDeepLinkWrite(() =>
-    getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record))
-  );
+  enqueuePendingDeepLinkWrite(async () => {
+    await getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record));
+  });
 }
 
 /** Fire-and-forget delete of the durable mirror. */
 function deletePersistedPendingDeepLink(): void {
-  enqueuePendingDeepLinkWrite(() => getSecureStore().deleteItemAsync(PENDING_DEEP_LINK_KEY));
+  enqueuePendingDeepLinkWrite(async () => {
+    await getSecureStore().deleteItemAsync(PENDING_DEEP_LINK_KEY);
+  });
 }
 
 /**
@@ -274,6 +283,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
+  // eslint-disable-next-line prefer-await-to-then -- reset the chain to the empty sentinel
   pendingDeepLinkWriteChain = Promise.resolve();
 }
 

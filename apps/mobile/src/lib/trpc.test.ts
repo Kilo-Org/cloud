@@ -82,6 +82,14 @@ vi.mock('@/lib/auth/auth-context', () => ({
   REFRESH_MARGIN_MS: 60_000,
 }));
 
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
 afterEach(() => {
   vi.resetModules();
   httpLinkMock.mockClear();
@@ -150,13 +158,13 @@ describe('getAuthHeaders', () => {
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
 
-    await expect(headers()).resolves.toEqual({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     // Cold path: one token read plus one expiry read.
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
 
     // The resolved expiry was published into the owner: a normal request
     // rereads neither key.
-    await expect(headers()).resolves.toEqual({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
   });
 
@@ -179,7 +187,7 @@ describe('getAuthHeaders', () => {
 
     // The request uses the newest owner token, not the cold-read token, and
     // the newer owner's expiry is not overwritten by the stale read.
-    await expect(pending).resolves.toEqual({ Authorization: 'Bearer newer-token' });
+    await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer newer-token' });
   });
 });
 

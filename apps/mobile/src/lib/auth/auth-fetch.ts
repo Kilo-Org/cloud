@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '@/lib/config';
 import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import { parseAuthError } from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 
 /**
  * Minimal fetch helper for auth endpoints. Returns success with parsed body
@@ -20,7 +21,7 @@ export async function postAuth(
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
       body: JSON.stringify(body),
     });
 

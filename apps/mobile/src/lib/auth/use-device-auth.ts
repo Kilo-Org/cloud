@@ -5,6 +5,7 @@ import { AppState, type AppStateStatus, Platform } from 'react-native';
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
 import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   type DeviceAuthState,
   errorDeviceAuthState,
@@ -152,7 +153,7 @@ export function useDeviceAuth(): DeviceAuthResult {
       try {
         const response = await fetch(`${API_BASE_URL}/api/device-auth/codes?app=1`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
           signal: startAbort.signal,
         });
         // The timeout guards ONLY the POST. This function stays suspended on

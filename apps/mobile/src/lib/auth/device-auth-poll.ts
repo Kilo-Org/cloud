@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { API_BASE_URL } from '@/lib/config';
 import { classifyPollResponse } from '@/lib/auth/poll-response';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
@@ -64,7 +65,7 @@ export function startDeviceAuthPoll(params: {
     try {
       const response = await fetch(`${API_BASE_URL}/api/device-auth/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
         body: JSON.stringify(buildDeviceAuthPollRequest(deviceCode)),
         signal,
       });

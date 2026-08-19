@@ -17,6 +17,10 @@ vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
 }));
 
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: vi.fn(),
   openAuthSessionAsync: vi.fn(),

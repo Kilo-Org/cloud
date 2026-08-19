@@ -31,6 +31,10 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
 // The admission module is imported for real (importOriginal), and these native
 // modules would pull in expo-modules-core, which needs a device runtime.
 vi.mock('@expo/app-integrity', () => ({

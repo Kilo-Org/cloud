@@ -7,6 +7,10 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
 }));
 
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
 vi.mock('expo-web-browser', () => ({
   dismissAuthSession: vi.fn(),
 }));

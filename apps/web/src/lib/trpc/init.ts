@@ -12,6 +12,12 @@ import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
+import {
+  appUpdateRequiredError,
+  enforceMinimumVersion,
+  getMinimumVersions,
+  isMobileClient,
+} from '@/lib/trpc/min-version';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -34,6 +40,8 @@ export type TRPCContext = {
   // to the exact procedure. Optional for the same reason as the fields above.
   trpcPath?: string;
   trpcType?: string;
+  // Populated by `createTRPCContext` and read by the min-version middleware.
+  headersList?: Headers;
 };
 
 /**
@@ -59,6 +67,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
     authViaToken: authViaTokenFromHeaders(headersList),
     tokenSource: tokenSource ?? null,
     ip: clientIpFromHeaders(headersList),
+    headersList,
   };
 };
 
@@ -115,13 +124,26 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
   next({ ctx: { trpcPath: path, trpcType: type } })
 );
 
+// Refuses a mobile client whose app version is below the configured minimum.
+// Web/CLI callers (and any caller without a `headersList`) short-circuit on
+// `isMobileClient` and pass without a DB read.
+const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!isMobileClient(ctx.headersList)) return next();
+  const minimums = await getMinimumVersions();
+  if (!minimums || !enforceMinimumVersion(ctx.headersList, minimums).pass) {
+    throw appUpdateRequiredError();
+  }
+  return next();
+});
+
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure
   .use(timingMiddleware)
   .use(sentryMiddleware)
-  .use(auditContextMiddleware);
+  .use(auditContextMiddleware)
+  .use(minimumVersionMiddleware);
 
 // Admin-only procedure. creditManager/superadmin/sessionViewer chain on this,
 // so emitting here covers the whole admin.* tRPC surface with a single event.

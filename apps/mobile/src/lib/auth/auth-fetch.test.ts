@@ -14,6 +14,14 @@ vi.mock('@/lib/auth/admission', () => ({
   clearAttestKeyOnRefusal: vi.fn(),
 }));
 
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
 describe('postAuth', () => {
   afterEach(() => {
     vi.restoreAllMocks();

@@ -4566,6 +4566,12 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
 
   beforeEach(async () => {
     KNOWN_SEAT_PRICE_IDS.add(seatPriceId);
+    jest.spyOn(client.invoiceItems, 'list').mockResolvedValue({
+      object: 'list',
+      data: [],
+      has_more: false,
+      url: '/v1/invoiceitems',
+    } as never);
     actor = await insertTestUser();
     const organization = await createOrganization(`Seat capacity fee ${Date.now()}`, actor.id);
     organizationId = organization.id;
@@ -4629,9 +4635,11 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
       expect.objectContaining({
         proration_date: prorationDate,
         proration_behavior: 'always_invoice',
+        expand: ['latest_invoice.lines'],
       }),
       expect.any(Object)
     );
+    expect(update.mock.calls[0]?.[1]).not.toHaveProperty('metadata');
     expect(createItem).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 150,

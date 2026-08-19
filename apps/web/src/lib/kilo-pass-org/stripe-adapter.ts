@@ -273,16 +273,6 @@ export async function attachOrganizationKiloPassServiceFeeToDraftInvoice(
   });
 }
 
-async function attachOrganizationKiloPassServiceFeeToDraftInvoiceSafely(
-  params: OrganizationKiloPassServiceFeeAttachment
-): Promise<KiloPassInvoiceCreatedResult | null> {
-  try {
-    return await attachOrganizationKiloPassServiceFeeToDraftInvoice(params);
-  } catch {
-    return null;
-  }
-}
-
 const SERVICE_FEE_FAILURE_INVOICE_NOT_DRAFT = 'invoice_not_draft' as const;
 
 export type OrganizationKiloPassSeatCapacityStripe = InvoiceLineItemListClient & {
@@ -297,6 +287,9 @@ export type OrganizationKiloPassSeatCapacityStripe = InvoiceLineItemListClient &
     create(
       params: Stripe.InvoiceItemCreateParams
     ): Promise<Pick<Stripe.InvoiceItem, 'id' | 'amount'>>;
+    list?(
+      params: Stripe.InvoiceItemListParams
+    ): Promise<Pick<Stripe.ApiList<Stripe.InvoiceItem>, 'data' | 'has_more'>>;
     del?(id: string): Promise<unknown>;
   };
   prices?: StripePriceTaxReader['prices'];
@@ -609,6 +602,12 @@ export async function attachPreparedOrganizationKiloPassServiceFee(input: {
       return line.metadata?.serviceFeeAssessmentKey === prepared.assessmentKey;
     });
     if (existingFeeLine) {
+      if (input.pendingInvoiceItemId) {
+        await discardStagedOrganizationKiloPassServiceFeeItem({
+          invoiceItemId: input.pendingInvoiceItemId,
+          stripe: input.stripe,
+        });
+      }
       return markServiceFeeAssessmentCharged({
         store,
         assessmentKey: prepared.assessmentKey,
@@ -690,8 +689,33 @@ export async function stagePreparedOrganizationKiloPassServiceFeeItem(input: {
 }): Promise<string | null> {
   const prepared = input.prepared;
   if (!prepared.shouldAttach || !prepared.feeInvoiceItem) return null;
-  const create =
-    input.stripe?.invoiceItems?.create ?? stripe.invoiceItems.create.bind(stripe.invoiceItems);
+  const invoiceItems = input.stripe?.invoiceItems ?? stripe.invoiceItems;
+  const list = invoiceItems.list?.bind(invoiceItems);
+  const customer = prepared.feeInvoiceItem.customer;
+  if (list && typeof customer === 'string') {
+    try {
+      let startingAfter: string | undefined;
+      for (;;) {
+        const page = await list({
+          customer,
+          pending: true,
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {}),
+        });
+        const existing = page.data.find(
+          item => item.metadata?.serviceFeeAssessmentKey === prepared.assessmentKey
+        );
+        if (existing) return existing.id;
+        if (!page.has_more) break;
+        const cursor = page.data.at(-1)?.id;
+        if (!cursor) return null;
+        startingAfter = cursor;
+      }
+    } catch {
+      return null;
+    }
+  }
+  const create = invoiceItems.create.bind(invoiceItems);
   try {
     const item = await create(prepared.feeInvoiceItem);
     return item.id;
@@ -1124,7 +1148,6 @@ export async function createOrganizationKiloPassCheckout(input: {
         kiloUserId: input.actorUserId,
         tier: input.tier,
         cadence,
-        ...(prepared.assessment ? (prepared.commercialMetadata ?? {}) : {}),
       },
       expand: ['latest_invoice.confirmation_secret', 'latest_invoice.lines'],
     });
@@ -1154,18 +1177,6 @@ export async function createOrganizationKiloPassCheckout(input: {
       deps: input.serviceFee?.deps,
       pendingInvoiceItemId: pendingFeeItemId,
     });
-  } else if (invoice && !prepared.assessment) {
-    const attached = await attachOrganizationKiloPassServiceFeeToDraftInvoiceSafely({
-      invoice,
-      subscription: updated,
-      stripe: input.serviceFee?.stripe,
-      store: input.serviceFee?.store,
-      deps: {
-        getOrganizationPurchaseChannel: async () => 'self_serve',
-        ...input.serviceFee?.deps,
-      },
-    });
-    feeResult = attached?.assessment ?? null;
   }
   if (
     invoice?.status === 'paid' ||

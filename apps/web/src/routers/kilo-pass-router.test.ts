@@ -5246,16 +5246,13 @@ describe('kiloPassRouter', () => {
           line_items: [{ price: 'price_test_kilo_pass', quantity: 1 }],
           success_url: expect.stringContaining('/payments/kilo-pass/awarding'),
           subscription_data: {
-            metadata: expect.objectContaining({
+            metadata: {
               type: 'kilo-pass',
               kiloUserId: user.id,
               tier: 'tier_49',
               cadence: 'yearly',
               affiliateTrackingId: '',
-              serviceFeeFlow: 'personal_kilo_pass',
-              serviceFeePrincipalMinor: '4900',
-              serviceFeeVersion: SERVICE_FEE_VERSION,
-            }),
+            },
           },
           metadata: expect.objectContaining({
             type: 'kilo-pass',
@@ -5298,14 +5295,13 @@ describe('kiloPassRouter', () => {
         expect.objectContaining({
           allow_promotion_codes: true,
           subscription_data: {
-            metadata: expect.objectContaining({
+            metadata: {
               type: 'kilo-pass',
               kiloUserId: user.id,
               tier: 'tier_49',
               cadence: 'yearly',
               affiliateTrackingId: 'impact-click-123',
-              serviceFeeFlow: 'personal_kilo_pass',
-            }),
+            },
           },
           metadata: expect.objectContaining({
             type: 'kilo-pass',
@@ -5472,15 +5468,13 @@ describe('kiloPassRouter', () => {
           serviceFeePrincipalMinor: '4900',
         })
       );
-      expect(createParams?.subscription_data?.metadata).toEqual(
-        expect.objectContaining({
-          type: 'kilo-pass',
-          kiloUserId: 'user_kilo_pass',
-          affiliateTrackingId: 'impact-click-123',
-          serviceFeeAssessmentKey: assessmentKey,
-          serviceFeeFlow: 'personal_kilo_pass',
-        })
-      );
+      expect(createParams?.subscription_data?.metadata).toEqual({
+        type: 'kilo-pass',
+        kiloUserId: 'user_kilo_pass',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        affiliateTrackingId: 'impact-click-123',
+      });
 
       const record = await store.findByAssessmentKey(assessmentKey);
       expect(record).toMatchObject({

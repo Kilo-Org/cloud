@@ -71,7 +71,7 @@ export type AgentAttachmentSubmissionPayload = {
  * be retried. Anything else the upload task throws (network, timeout,
  * 408/429/5xx, generic PUT failure) is retryable.
  */
-export function classifyUploadFailure(error: unknown): { retryable: boolean; reason: string } {
+export function classifyUploadFailure(error: unknown) {
   // The mutation throws `TRPCClientError<AppRouterException>` for
   // BAD_REQUEST / FORBIDDEN / UNPROCESSABLE_CONTENT — those are TERMINAL.
   // Any other thrown object (network, timeout, expiry, etc.) is RETRYABLE.

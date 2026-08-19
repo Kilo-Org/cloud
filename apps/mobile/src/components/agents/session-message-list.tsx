@@ -1,4 +1,4 @@
-import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -143,10 +143,6 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = nextNewestKey;
   }, [items, keyExtractor]);
 
-  // Defensive: the structural list ref is required by the hook but
-  // downstream types may infer it as nullable.
-  const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<T>>;
-
   // When the optional `contentBottomInset` is omitted we return the
   // original module-level `listContentContainerStyle` reference so the
   // default-prop path is behavior-identical (no allocation, no value
@@ -163,7 +159,7 @@ export function SessionMessageList<T>({
   return (
     <View className="flex-1">
       <FlashList<T>
-        ref={listRefSafe}
+        ref={listRef}
         style={listStyle}
         contentContainerStyle={resolvedContentContainerStyle}
         data={items}

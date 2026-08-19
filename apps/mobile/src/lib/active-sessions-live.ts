@@ -182,20 +182,17 @@ type PreservedFields = {
 
 function readEnrichment(current: CachedActiveSession | undefined): PreservedFields {
   return {
-    createdOnPlatform:
-      typeof current?.createdOnPlatform === 'string' ? current.createdOnPlatform : undefined,
-    createdAt: typeof current?.createdAt === 'string' ? current.createdAt : undefined,
-    updatedAt: typeof current?.updatedAt === 'string' ? current.updatedAt : undefined,
-    lastActivityAt:
-      typeof current?.lastActivityAt === 'string' ? current.lastActivityAt : undefined,
-    // Pass through as-is: `null` means "the server said personal". Do not
-    // collapse with a `typeof === 'string'` guard — that would hide every
-    // personal row from the personal tray (see filter helper).
+    // Every field here is already `T | undefined` on ActiveSession (the
+    // router declares them `.optional()`), so a direct optional-chain read
+    // is the field's exact contract — no narrowing needed. `organizationId`
+    // is the one exception worth calling out: `null` means "the server said
+    // personal" and must pass through as-is, never collapsed to undefined.
+    createdOnPlatform: current?.createdOnPlatform,
+    createdAt: current?.createdAt,
+    updatedAt: current?.updatedAt,
+    lastActivityAt: current?.lastActivityAt,
     organizationId: current?.organizationId,
-    totalCostMicrodollars:
-      typeof current?.totalCostMicrodollars === 'number'
-        ? current.totalCostMicrodollars
-        : undefined,
+    totalCostMicrodollars: current?.totalCostMicrodollars,
   };
 }
 
@@ -386,7 +383,7 @@ export function removeActiveSessionsForConnection(
  * never carry it, and the enrichment-retry cadence must not shift.
  */
 export function isEnriched(row: CachedActiveSession): boolean {
-  return ENRICHMENT_FIELDS.some(field => typeof row[field] === 'string');
+  return ENRICHMENT_FIELDS.some(field => row[field] !== undefined);
 }
 
 export function hasUnenrichedLiveId(rows: readonly CachedActiveSession[]): boolean {

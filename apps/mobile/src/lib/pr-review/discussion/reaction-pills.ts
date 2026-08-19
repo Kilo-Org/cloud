@@ -9,7 +9,7 @@ import {
   type ReviewReactionContent,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 
-export const REACTION_EMOJI: Record<ReviewReactionContent, string> = {
+export const REACTION_EMOJI = {
   THUMBS_UP: '👍',
   THUMBS_DOWN: '👎',
   LAUGH: '😄',
@@ -18,9 +18,9 @@ export const REACTION_EMOJI: Record<ReviewReactionContent, string> = {
   HEART: '❤️',
   ROCKET: '🚀',
   EYES: '👀',
-};
+} satisfies Record<ReviewReactionContent, string>;
 
-export const REACTION_LABEL: Record<ReviewReactionContent, string> = {
+export const REACTION_LABEL = {
   THUMBS_UP: 'Thumbs up',
   THUMBS_DOWN: 'Thumbs down',
   LAUGH: 'Laugh',
@@ -29,7 +29,7 @@ export const REACTION_LABEL: Record<ReviewReactionContent, string> = {
   HEART: 'Heart',
   ROCKET: 'Rocket',
   EYES: 'Eyes',
-};
+} satisfies Record<ReviewReactionContent, string>;
 
 const KNOWN_CONTENTS = new Set<string>(REVIEW_REACTION_CONTENTS);
 

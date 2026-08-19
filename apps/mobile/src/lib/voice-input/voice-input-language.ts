@@ -116,6 +116,9 @@ export async function resolveVoiceInputStartLanguageTag(): Promise<string> {
   const locales = getLocales();
   const deviceTags = locales
     .map(l => l.languageTag)
+    // `getLocales()` types `languageTag` as a non-optional string, but the native
+    // module can still hand back a missing/empty value at runtime.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: guards against a real-device value diverging from expo-localization's static type.
     .filter((t): t is string => typeof t === 'string' && t.length > 0);
   const rawTag = resolveVoiceInputLanguageTag(locales);
 

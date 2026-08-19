@@ -2,6 +2,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { AlertCircle, ImageOff } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { z } from 'zod';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { Image } from '@/components/ui/image';
@@ -16,6 +17,8 @@ import {
 } from './tool-card-attachments';
 import { useToolCardImageUri } from './tool-card-image-cache';
 import { getFilename } from './tool-card-utils';
+
+const toolInputFilePathSchema = z.object({ filePath: z.string() });
 
 function UnavailableRow({
   icon: Icon,
@@ -104,7 +107,7 @@ export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>)
   // entries would show the same cached bytes instead of their own content.
   // Prefer the first attachment's filename; fall back to tool input filePath.
   const attachmentFilename = attachments[0]?.filename;
-  const filePath = typeof part.state.input.filePath === 'string' ? part.state.input.filePath : '';
+  const filePath = toolInputFilePathSchema.safeParse(part.state.input).data?.filePath ?? '';
   const label = attachmentFilename ?? getFilename(filePath === '' ? part.tool : filePath);
 
   return (

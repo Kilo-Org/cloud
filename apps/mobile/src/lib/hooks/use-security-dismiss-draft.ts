@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { z } from 'zod';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -19,25 +20,18 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
  * mutation failed before the server accepted a command id, so no command
  * observer will ever reconcile it — the retry card must.
  */
-export type SecurityDismissDraft = {
-  reason: string;
-  comment: string;
-  lastError: string | null;
-  retryable: boolean | null;
-};
+const SecurityDismissDraftSchema = z.object({
+  reason: z.string(),
+  comment: z.string(),
+  lastError: z.string().nullable(),
+  retryable: z.boolean().nullable(),
+});
+
+export type SecurityDismissDraft = z.infer<typeof SecurityDismissDraftSchema>;
 
 /** Runtime shape guard for a persisted dismiss draft, passed to `loadDraft`. */
 export function isSecurityDismissDraft(value: unknown): value is SecurityDismissDraft {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.reason === 'string' &&
-    typeof record.comment === 'string' &&
-    (record.lastError === null || typeof record.lastError === 'string') &&
-    (record.retryable === null || typeof record.retryable === 'boolean')
-  );
+  return SecurityDismissDraftSchema.safeParse(value).success;
 }
 
 type SecurityDismissDraftController = {
@@ -160,11 +154,7 @@ export async function listSecurityDismissFailures(
  * empty list until the read settles, so the dashboard never flashes a card
  * before the store answers.
  */
-export function useSecurityDismissFailures(scope: string): {
-  failures: SecurityDismissFailure[];
-  clear: (findingId: string) => void;
-  refresh: () => void;
-} {
+export function useSecurityDismissFailures(scope: string) {
   const { userId } = useCurrentUserId();
   const [failures, setFailures] = useState<SecurityDismissFailure[]>([]);
   const generationRef = useRef(0);

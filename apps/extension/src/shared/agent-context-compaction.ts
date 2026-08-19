@@ -23,12 +23,17 @@ const SUMMARY_SYSTEM_PROMPT =
 const isUserMessage = (event: AgentConversationEvent): boolean =>
   event.type === 'message' && event.role === 'user';
 
+interface CompactionSplit {
+  readonly toKeep: AgentConversationEvent[];
+  readonly toSummarize: AgentConversationEvent[];
+}
+
 // Keep complete exchanges only: cut just before the Nth-from-last user message so kept
 // Events always begin at a user turn and no tool-call/tool-result pair is split.
 export const splitEventsForCompaction = (
   events: AgentConversationEvent[],
   keepRecentExchanges: number = KEEP_RECENT_EXCHANGES
-): { toKeep: AgentConversationEvent[]; toSummarize: AgentConversationEvent[] } => {
+): CompactionSplit => {
   const userIndexes = events
     .map((event, index) => (isUserMessage(event) ? index : -1))
     .filter(index => index !== -1);
@@ -63,6 +68,7 @@ const truncateToolText = (text: string): string =>
     : `${text.slice(0, MAX_TOOL_TEXT_CHARS)}… [truncated ${text.length - MAX_TOOL_TEXT_CHARS} chars]`;
 
 const stringifyToolValue = (value: unknown): string => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic tool-value stringifier; value is an already-typed conversation event field that can hold any tool payload shape
   if (typeof value === 'string') {
     return value;
   }

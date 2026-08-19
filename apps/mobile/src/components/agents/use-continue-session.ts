@@ -44,15 +44,7 @@ export function useContinueSession(args: {
   manager: ReturnType<typeof useSessionManager>;
   models: SessionModelOption[];
   modelsLoading: boolean;
-}): {
-  continueSession: (input: {
-    gitUrl: string | null | undefined;
-    mode: string;
-    model: string;
-    variant: string;
-  }) => Promise<void>;
-  isContinuing: boolean;
-} {
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();

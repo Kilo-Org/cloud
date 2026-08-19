@@ -1,22 +1,22 @@
 import { type BadgeCountRow } from '@kilocode/notifications';
 
-type ReconcileHydratedBadgeCountInput = {
+type ReconcileHydratedBadgeCountInput<TSetBadgeCountResult> = {
   badgeRows: BadgeCountRow[];
   startBadgeFreshnessEpoch: number;
   currentBadgeFreshnessEpoch: number;
-  setBadgeCount: (badgeCount: number) => Promise<unknown>;
+  setBadgeCount: (badgeCount: number) => Promise<TSetBadgeCountResult>;
 };
 
 export function totalBadgeCount(badgeRows: BadgeCountRow[]): number {
   return badgeRows.reduce((total, row) => total + row.badgeCount, 0);
 }
 
-export function reconcileHydratedBadgeCount({
+export function reconcileHydratedBadgeCount<TSetBadgeCountResult>({
   badgeRows,
   startBadgeFreshnessEpoch,
   currentBadgeFreshnessEpoch,
   setBadgeCount,
-}: ReconcileHydratedBadgeCountInput): boolean {
+}: ReconcileHydratedBadgeCountInput<TSetBadgeCountResult>): boolean {
   if (currentBadgeFreshnessEpoch !== startBadgeFreshnessEpoch) {
     return false;
   }

@@ -1,4 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import {
@@ -20,6 +21,35 @@ function countResultRows(output: string, kind: 'grep' | 'glob'): number {
   return buildResultRowsModel(output, kind).rows.length;
 }
 
+/** Zod's validation `.catch()` fallback, not a Promise catch. */
+function tolerant<T>(schema: z.ZodType<T>, fallback: T): z.ZodType<T> {
+  // oxlint-disable-next-line promise/prefer-await-to-then -- zod schema fallback, not a Promise
+  return schema.catch(fallback);
+}
+
+const optionalString = tolerant(z.string().optional(), undefined);
+const optionalNumber = tolerant(z.number().optional(), undefined);
+
+/**
+ * Tool input arrives as arbitrary, tool-defined JSON. Each field below is
+ * independently tolerant: a wrong-typed or missing value falls back to
+ * `undefined` rather than rejecting the whole payload.
+ */
+const toolInputSchema = z.object({
+  filePath: optionalString,
+  path: optionalString,
+  offset: optionalNumber,
+  limit: optionalNumber,
+  command: optionalString,
+  description: optionalString,
+  pattern: optionalString,
+  include: optionalString,
+  patchText: optionalString,
+  query: optionalString,
+  url: optionalString,
+  prompt: optionalString,
+});
+
 /**
  * Pure row projection for a tool part. The strings and badge rules are copied
  * verbatim from the tool-card bodies so the fixed row renders exactly what the
@@ -28,12 +58,13 @@ function countResultRows(output: string, kind: 'grep' | 'glob'): number {
 export function getToolDisplay(part: ToolPart): ToolDisplay {
   const input = part.state.input;
   const status = part.state.status;
+  const fields = toolInputSchema.parse(input);
 
   switch (part.tool) {
     case 'read': {
-      const filePath = typeof input.filePath === 'string' ? input.filePath : '';
-      const offset = typeof input.offset === 'number' ? input.offset : undefined;
-      const limit = typeof input.limit === 'number' ? input.limit : undefined;
+      const filePath = fields.filePath ?? '';
+      const offset = fields.offset;
+      const limit = fields.limit;
 
       const badgeParts: string[] = [];
       if (offset !== undefined) {
@@ -47,29 +78,29 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return { title: 'read', subtitle: filePath ? getFilename(filePath) : 'read', badge };
     }
     case 'edit': {
-      const filePath = typeof input.filePath === 'string' ? input.filePath : '';
+      const filePath = fields.filePath ?? '';
       return { title: 'edit', subtitle: filePath ? getFilename(filePath) : 'edit' };
     }
     case 'write': {
-      const filePath = typeof input.filePath === 'string' ? input.filePath : '';
+      const filePath = fields.filePath ?? '';
       return { title: 'write', subtitle: filePath ? getFilename(filePath) : 'write' };
     }
     case 'bash': {
-      const command = typeof input.command === 'string' ? input.command : '';
-      const description = typeof input.description === 'string' ? input.description : undefined;
+      const command = fields.command ?? '';
+      const description = fields.description;
       const subtitle = description ?? (command ? truncateText(command, 60) : 'bash');
       return { title: 'bash', subtitle };
     }
     case 'glob': {
-      const pattern = typeof input.pattern === 'string' ? input.pattern : '';
+      const pattern = fields.pattern ?? '';
       const output = status === 'completed' ? part.state.output : undefined;
       const matchCount = output ? countResultRows(output, 'glob') : undefined;
       const badge = matchCount !== undefined && matchCount > 0 ? `${matchCount} files` : undefined;
       return { title: 'glob', subtitle: pattern || 'glob', badge };
     }
     case 'grep': {
-      const pattern = typeof input.pattern === 'string' ? input.pattern : '';
-      const include = typeof input.include === 'string' ? input.include : undefined;
+      const pattern = fields.pattern ?? '';
+      const include = fields.include;
       let subtitle = pattern || 'grep';
       if (include) {
         subtitle += ` (${include})`;
@@ -81,14 +112,14 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return { title: 'grep', subtitle, badge };
     }
     case 'list': {
-      const filePath = typeof input.filePath === 'string' ? input.filePath : undefined;
-      const path = typeof input.path === 'string' ? input.path : undefined;
+      const filePath = fields.filePath;
+      const path = fields.path;
       const resolvedPath = filePath ?? path ?? '';
       return { title: 'list', subtitle: resolvedPath ? getDirectoryName(resolvedPath) : 'list' };
     }
     case 'patch':
     case 'apply_patch': {
-      const patchText = typeof input.patchText === 'string' ? input.patchText : '';
+      const patchText = fields.patchText ?? '';
       const files = patchText ? listPatchFilePaths(patchText) : [];
       let subtitle = 'patch';
       if (files.length === 1) {
@@ -101,8 +132,8 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     case 'websearch':
     case 'codesearch':
     case 'webfetch': {
-      const query = typeof input.query === 'string' ? input.query : undefined;
-      const url = typeof input.url === 'string' ? input.url : undefined;
+      const query = fields.query;
+      const url = fields.url;
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty query must fall back to url; ?? would skip ''
       const search = query || url;
       return { title: part.tool, subtitle: search ? truncateText(search, 60) : part.tool };
@@ -114,8 +145,8 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return { title: part.tool, subtitle: 'Update todos' };
     }
     case 'task': {
-      const description = typeof input.description === 'string' ? input.description : undefined;
-      const prompt = typeof input.prompt === 'string' ? input.prompt : undefined;
+      const description = fields.description;
+      const prompt = fields.prompt;
       const subtitle = description ?? (prompt ? truncateText(prompt, 60) : 'task');
       return { title: 'task', subtitle };
     }

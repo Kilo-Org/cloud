@@ -17,7 +17,7 @@ const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 export const getCloudAgentWsUrl = (): string => {
   const configuredUrl = import.meta.env.VITE_CLOUD_AGENT_WS_URL;
 
-  if (typeof configuredUrl === 'string' && configuredUrl.trim().length > 0) {
+  if (configuredUrl !== undefined && configuredUrl.trim().length > 0) {
     return trimTrailingSlash(configuredUrl.trim());
   }
 
@@ -31,7 +31,7 @@ export const getCloudAgentWsUrl = (): string => {
 export const getSessionIngestWsUrl = (): string => {
   const configuredUrl = import.meta.env.VITE_SESSION_INGEST_WS_URL;
 
-  if (typeof configuredUrl === 'string' && configuredUrl.trim().length > 0) {
+  if (configuredUrl !== undefined && configuredUrl.trim().length > 0) {
     return trimTrailingSlash(configuredUrl.trim());
   }
 

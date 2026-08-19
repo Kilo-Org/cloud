@@ -25,10 +25,7 @@ export function isSessionListAtBottom({
  * to the latest message, so the floating "scroll to bottom" button
  * must never be visible until the user has actually scrolled away.
  */
-export function getInitialSessionListAutoScrollVisibility(): {
-  shouldAutoScroll: boolean;
-  isAtBottom: boolean;
-} {
+export function getInitialSessionListAutoScrollVisibility() {
   return { shouldAutoScroll: true, isAtBottom: true };
 }
 

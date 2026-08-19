@@ -251,12 +251,16 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         // still be a real edit and could clobber stored values.
         const narrowedSelectedRepositoryIds =
           rawSelectedRepositoryIds !== undefined
-            ? rawSelectedRepositoryIds.filter((id): id is number => typeof id === 'number')
+            ? rawSelectedRepositoryIds.filter(
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing a number id from a string id in a mixed primitive union has no non-typeof narrowing
+                (id): id is number => typeof id === 'number'
+              )
             : undefined;
         const narrowedRepositoryModelOverrides =
           rawRepositoryModelOverrides !== undefined
             ? rawRepositoryModelOverrides.filter(
                 (override): override is typeof override & { repositoryId: number } =>
+                  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing a number id from a string id in a mixed primitive union has no non-typeof narrowing
                   typeof override.repositoryId === 'number'
               )
             : undefined;

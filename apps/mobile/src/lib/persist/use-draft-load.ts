@@ -96,9 +96,7 @@ type UseRemoteSpawnDraftCleanupInput = {
  * user who abandons the screen after a failed attempt loses the prompt, the
  * same as if the attempt had succeeded.
  */
-export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanupInput): {
-  markRemoteSpawnAttempted: () => void;
-} {
+export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanupInput) {
   const spawnAttemptedRef = useRef(false);
   const markRemoteSpawnAttempted = useCallback(() => {
     spawnAttemptedRef.current = true;

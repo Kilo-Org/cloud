@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { KiloGatewayToolDefinition, WebMcpGatewayToolName } from './kilo-gateway-chat-client';
 import type { WebMcpToolDescriptor } from './tab-debugger';
 
@@ -34,23 +35,28 @@ const RESERVED_GATEWAY_TOOL_NAMES = new Set([
   'web_search',
 ]);
 
-const normalizeString = (value: unknown): string => (typeof value === 'string' ? value : '');
+const stringSchema = z.string();
+const jsonRecordSchema = z.record(z.string(), z.unknown());
 
-const isRecordObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+const normalizeString = (value: unknown): string => {
+  const result = stringSchema.safeParse(value);
+  return result.success ? result.data : '';
+};
 
 const normalizeInputSchema = (inputSchema: unknown): Record<string, unknown> | undefined => {
-  let schema = inputSchema;
+  let schema: unknown = inputSchema;
 
-  if (typeof schema === 'string') {
+  const asString = stringSchema.safeParse(schema);
+  if (asString.success) {
     try {
-      schema = JSON.parse(schema) as unknown;
+      schema = JSON.parse(asString.data) as unknown;
     } catch {
       return undefined;
     }
   }
 
-  return isRecordObject(schema) ? schema : undefined;
+  const asRecord = jsonRecordSchema.safeParse(schema);
+  return asRecord.success ? asRecord.data : undefined;
 };
 
 const isReservedName = (name: string): boolean =>

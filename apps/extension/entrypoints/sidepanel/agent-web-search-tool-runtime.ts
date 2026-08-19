@@ -61,9 +61,14 @@ const postSearch = async (query: string, context: WebSearchContext): Promise<Fet
   }
 };
 
-const readJson = async (response: Response): Promise<unknown> => {
+const readJson = async <Value>(
+  response: Response,
+  schema: z.ZodType<Value>
+): Promise<Value | undefined> => {
   try {
-    return await response.json();
+    const raw: unknown = await response.json();
+    const parsed = schema.safeParse(raw);
+    return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
   }
@@ -71,7 +76,9 @@ const readJson = async (response: Response): Promise<unknown> => {
 
 const toResultEntry = (result: z.infer<typeof exaResponseSchema>['results'][number]) => ({
   ...(result.publishedDate === undefined ? {} : { publishedDate: result.publishedDate }),
-  ...(typeof result.title === 'string' && result.title !== '' ? { title: result.title } : {}),
+  ...(result.title !== undefined && result.title !== null && result.title !== ''
+    ? { title: result.title }
+    : {}),
   ...(result.text === undefined ? {} : { text: result.text.slice(0, MAX_SNIPPET_CHARS) }),
   url: result.url,
 });
@@ -99,25 +106,24 @@ export const executeWebSearchToolCall = async (
   }
 
   const { response } = outcome;
-  const body = await readJson(response);
 
   if (!response.ok) {
     // The proxy explains allowance and balance failures in its error body; pass that through so the model can tell the user why.
-    const errorBody = errorBodySchema.safeParse(body);
-    const detail = errorBody.success ? ` ${errorBody.data.error}` : '';
+    const errorBody = await readJson(response, errorBodySchema);
+    const detail = errorBody === undefined ? '' : ` ${errorBody.error}`;
     return {
       error: `Web search failed with status ${String(response.status)}.${detail}`,
       ok: false,
     };
   }
 
-  const parsed = exaResponseSchema.safeParse(body);
+  const parsed = await readJson(response, exaResponseSchema);
 
-  if (!parsed.success) {
+  if (parsed === undefined) {
     return { error: 'Web search returned an invalid response.', ok: false };
   }
 
-  const results = parsed.data.results.slice(0, MAX_RESULTS).map(result => toResultEntry(result));
+  const results = parsed.results.slice(0, MAX_RESULTS).map(result => toResultEntry(result));
 
   return {
     ok: true,

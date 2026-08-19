@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { z } from 'zod';
 
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_RECENTS_KEY } from '@/lib/storage-keys';
@@ -10,6 +11,14 @@ export type RecentPr = {
   title: string;
   lastOpenedAt: number;
 };
+
+const recentPrSchema = z.object({
+  owner: z.string(),
+  repo: z.string(),
+  number: z.number(),
+  title: z.string(),
+  lastOpenedAt: z.number(),
+});
 
 const RECENT_PR_LIMIT = 10;
 
@@ -27,18 +36,8 @@ function parseRecents(raw: string | null): RecentPr[] {
       return [];
     }
     return parsed.flatMap((entry): RecentPr[] => {
-      if (
-        entry &&
-        typeof entry === 'object' &&
-        typeof (entry as Record<string, unknown>).owner === 'string' &&
-        typeof (entry as Record<string, unknown>).repo === 'string' &&
-        typeof (entry as Record<string, unknown>).number === 'number' &&
-        typeof (entry as Record<string, unknown>).title === 'string' &&
-        typeof (entry as Record<string, unknown>).lastOpenedAt === 'number'
-      ) {
-        return [entry as RecentPr];
-      }
-      return [];
+      const result = recentPrSchema.safeParse(entry);
+      return result.success ? [result.data] : [];
     });
   } catch {
     return [];

@@ -53,13 +53,16 @@ export function EmptyState({
         <Text variant="large" accessibilityRole={titleAccessibilityRole}>
           {title}
         </Text>
-        {typeof description === 'string' ? (
-          <Text variant="muted" className="text-center">
-            {description}
-          </Text>
-        ) : (
-          description
-        )}
+        {
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+          typeof description === 'string' ? (
+            <Text variant="muted" className="text-center">
+              {description}
+            </Text>
+          ) : (
+            description
+          )
+        }
       </View>
       {action}
     </View>

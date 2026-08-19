@@ -9,7 +9,7 @@ import {
   savePendingAgentMemoryDraft,
 } from '@/src/shared/agent-memories-storage';
 import type { AgentMemoriesStorageArea } from '@/src/shared/agent-memories-storage';
-import type { AgentWorkflowParam, PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
+import type { AgentWorkflowInput, PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
 import { hashWorkflowScript } from '@/src/shared/agent-workflows';
 import {
   addAgentWorkflow,
@@ -160,16 +160,7 @@ export const applyApprovalDecision = async (
   }
   const workflowDraft = draft;
   const approvedScriptHash = await hashWorkflowScript(workflowDraft.script);
-  const input: {
-    approvedScriptHash: string;
-    description: string;
-    name: string;
-    params?: AgentWorkflowParam[] | undefined;
-    pathPrefix?: string | undefined;
-    scopeOrigin: string;
-    script: string;
-    startUrl?: string | undefined;
-  } = {
+  const input: AgentWorkflowInput = {
     approvedScriptHash,
     description: workflowDraft.description,
     name: workflowDraft.name,

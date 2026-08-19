@@ -15,12 +15,12 @@ type Review = Extract<ReviewDetailData, { success: true }>['review'];
 type CouncilResult = NonNullable<Review['council_result']>;
 type CouncilFinding = CouncilResult['specialists'][number]['findings'][number];
 
-const SEVERITY_CLASS: Record<string, string> = {
+const SEVERITY_CLASS = {
   critical: 'text-destructive',
   warning: 'text-warn',
   suggestion: 'text-info',
   nitpick: 'text-muted-foreground',
-};
+} satisfies Record<string, string>;
 
 export function MetaRow({
   label,
@@ -44,7 +44,9 @@ export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) 
         <Text
           className={cn(
             'text-xs font-medium',
-            SEVERITY_CLASS[finding.severity] ?? 'text-muted-foreground'
+            Object.hasOwn(SEVERITY_CLASS, finding.severity)
+              ? SEVERITY_CLASS[finding.severity as keyof typeof SEVERITY_CLASS]
+              : 'text-muted-foreground'
           )}
         >
           {finding.severity}

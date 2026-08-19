@@ -1752,7 +1752,7 @@ describe('CloudflareAgentSandbox', () => {
     expect(listProcesses).toHaveBeenCalled();
   });
 
-  it('inspects a stopped container for stop reasons other than idle-timeout', async () => {
+  it('does not wake a confirmed stopped container for session deletion cleanup', async () => {
     const listProcesses = vi.fn().mockResolvedValue([]);
     const isContainerRunning = vi.fn().mockResolvedValue(false);
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
@@ -1766,8 +1766,8 @@ describe('CloudflareAgentSandbox', () => {
         reason: 'session-delete',
       })
     ).resolves.toEqual({ status: 'absent' });
-    expect(listProcesses).toHaveBeenCalled();
-    expect(isContainerRunning).not.toHaveBeenCalled();
+    expect(isContainerRunning).toHaveBeenCalledOnce();
+    expect(listProcesses).not.toHaveBeenCalled();
   });
 
   it('falls back to inspection when the sandbox cannot report container state', async () => {

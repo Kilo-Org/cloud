@@ -852,12 +852,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     // process, and a process cannot outlive its container (activity expiry SIGTERMs the
     // whole container), so a stopped container cannot be hiding a leaked wrapper.
     //
-    // Scoped to idle-timeout: that sweep already established via DO state that no wrapper
-    // runtime or pending work remains, and it is the path that was waking cold containers
-    // for nothing. Every other stop reason keeps inspecting, which preserves the leaked
-    // wrapper recovery those paths were built for.
-    const skipsInspection =
-      request.reason === 'idle-timeout' && (await isSandboxContainerRunning(sandbox)) === false;
+    // A stopped container cannot hide a leaked wrapper, regardless of why cleanup was
+    // requested. Unknown remains inspectable so recovery paths keep their existing fence.
+    const skipsInspection = (await isSandboxContainerRunning(sandbox)) === false;
     const initial: StopInspection = skipsInspection
       ? { status: 'absent-no-container' }
       : await this.observeTarget(request.target);

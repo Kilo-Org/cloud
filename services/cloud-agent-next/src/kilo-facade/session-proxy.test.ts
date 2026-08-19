@@ -78,4 +78,66 @@ describe('resolveLiveWrapperTarget billing admission', () => {
     );
     expect(mocks.findWrapperForSession).not.toHaveBeenCalled();
   });
+
+  it('allows shadow acquisition when the billing block method is unavailable', async () => {
+    mocks.getSandbox.mockReturnValue({});
+    mocks.findWrapperForSession.mockResolvedValue({ port: 5000 });
+
+    await expect(
+      resolveLiveWrapperTarget({
+        env: {
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
+          CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
+          CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: '',
+        } as Env,
+        userId: 'user_facade',
+        cloudAgentSessionId: 'agent_facade',
+      })
+    ).resolves.toMatchObject({ port: 5000 });
+  });
+
+  it('allows shadow acquisition when the callable billing block proxy rejects', async () => {
+    mocks.getSandbox.mockReturnValue({
+      isBillingBlocked: vi.fn().mockRejectedValue(new Error('RPC unavailable')),
+    });
+    mocks.findWrapperForSession.mockResolvedValue({ port: 5000 });
+
+    await expect(
+      resolveLiveWrapperTarget({
+        env: {
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
+          CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
+          CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: '',
+        } as Env,
+        userId: 'user_facade',
+        cloudAgentSessionId: 'agent_facade',
+      })
+    ).resolves.toMatchObject({ port: 5000 });
+  });
+
+  it('fails enforced acquisition closed when the callable billing block proxy rejects', async () => {
+    const ensureBillingAdmission = vi.fn().mockResolvedValue({
+      success: false,
+      code: 'meter_unavailable',
+      message: 'Container billing admission is unavailable',
+    });
+    mocks.getSandbox.mockReturnValue({
+      isBillingBlocked: vi.fn().mockRejectedValue(new Error('RPC unavailable')),
+      ensureBillingAdmission,
+    });
+
+    await expect(
+      resolveLiveWrapperTarget({
+        env: {
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+          CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
+          CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_facade',
+        } as Env,
+        userId: 'user_facade',
+        cloudAgentSessionId: 'agent_facade',
+      })
+    ).resolves.toBeNull();
+    expect(ensureBillingAdmission).toHaveBeenCalledOnce();
+    expect(mocks.findWrapperForSession).not.toHaveBeenCalled();
+  });
 });

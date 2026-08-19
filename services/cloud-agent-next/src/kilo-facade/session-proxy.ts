@@ -97,7 +97,7 @@ export async function resolveLiveWrapperTarget(params: {
     sandboxId,
     isCloudAgentContainerBillingEnabled(env, metadata.identity)
   );
-  const billingBlocked = await isSandboxBillingBlocked(sandbox);
+  const billingBlocked = await isSandboxBillingBlocked(sandbox, billingInput.enforcementRequested);
   if (billingInput.enforcementRequested || billingBlocked) {
     const admission = await ensureSandboxBillingAdmissionInput(sandbox, billingInput);
     if (!admission.success) return null;

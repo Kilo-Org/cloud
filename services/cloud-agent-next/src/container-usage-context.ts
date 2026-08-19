@@ -226,10 +226,20 @@ export async function ensureSandboxBillingAdmissionInput(
   }
 }
 
-export async function isSandboxBillingBlocked(sandbox: SandboxInstance): Promise<boolean> {
+export async function isSandboxBillingBlocked(
+  sandbox: SandboxInstance,
+  enforcementRequested = false
+): Promise<boolean> {
   const isBillingBlocked = (sandbox as Partial<MeteredSandboxInstance>).isBillingBlocked;
   if (typeof isBillingBlocked !== 'function') return false;
-  return await (sandbox as MeteredSandboxInstance).isBillingBlocked();
+  try {
+    return await (sandbox as MeteredSandboxInstance).isBillingBlocked();
+  } catch (error) {
+    logger
+      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .warn('Container billing block check failed');
+    return enforcementRequested;
+  }
 }
 
 /**

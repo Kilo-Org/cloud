@@ -4,6 +4,7 @@ import {
   getBillingContext,
   installBillingHeartbeat,
   setBillingContext,
+  updateBillingContext,
   usageContextFromBillingContext,
   type BillingContext,
   type BillingHeartbeatController,
@@ -494,9 +495,26 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   }
 
   override async destroy(): Promise<void> {
+    const context = await getBillingContext(this.ctx.storage);
     const block = await this.getBillingBlock();
+    const startAcknowledgement = await this.ctx.storage.get<string>(
+      START_ACK_GENERATION_STORAGE_KEY
+    );
+    const pendingStopReason = context
+      ? await this.getPendingStopReason(context.generation)
+      : undefined;
     await super.destroy();
+    if (context) await updateBillingContext(this.ctx.storage, context);
     if (block) await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
+    if (context && startAcknowledgement === context.generation) {
+      await this.ctx.storage.put(START_ACK_GENERATION_STORAGE_KEY, startAcknowledgement);
+    }
+    if (pendingStopReason) {
+      await this.ctx.storage.put(PENDING_STOP_REASON_STORAGE_KEY, {
+        generation: context?.generation,
+        reason: pendingStopReason,
+      });
+    }
   }
 
   private schedulePendingGenerationIfRunning(): void {

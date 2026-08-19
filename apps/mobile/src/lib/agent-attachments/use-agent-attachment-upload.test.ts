@@ -649,21 +649,18 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   });
 
   it('does not start an upload task when removed during the presign window', async () => {
-    let capturedOnTask: ((task: { cancelAsync: () => Promise<void> }) => void) | undefined =
-      undefined;
-    let capturedIsCancelled: (() => boolean) | undefined = undefined;
     let createTaskAfterPresign = 0;
+    let cancelledAfterPresign = false;
     hoisted.uploadOne.mockImplementation(
       async (args: {
         onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
         isCancelled?: () => boolean;
       }) => {
-        capturedOnTask = args.onTask;
-        capturedIsCancelled = args.isCancelled;
         const result = await new Promise<{ key: string }>(resolve => {
           resolveUpload = resolve;
         });
         if (args.isCancelled?.()) {
+          cancelledAfterPresign = true;
           throw new Error('Upload cancelled');
         }
         createTaskAfterPresign += 1;
@@ -688,8 +685,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    expect(capturedOnTask).toBeDefined();
-    expect(capturedIsCancelled?.()).toBe(true);
+    expect(cancelledAfterPresign).toBe(true);
     expect(createTaskAfterPresign).toBe(0);
     expect(hoisted.cancelAsync).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);

@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   INFINITE_QUERY_MAX_PAGES,
-  patchInfiniteEntity,
   reconcileFirstPage,
   scheduleCacheMaintenance,
   withInfiniteRetention,
@@ -39,60 +38,6 @@ describe('withInfiniteRetention', () => {
     const result = withInfiniteRetention({ staleTime: 1000 }, 10);
 
     expect(result.maxPages).toBe(10);
-  });
-});
-
-describe('patchInfiniteEntity', () => {
-  it('replaces only matching entities and keeps non-matching references', () => {
-    const queryClient = new QueryClient();
-    const key = ['sessions', 'list'];
-    const target = { id: 'a', title: 'old' };
-    const other = { id: 'b', title: 'other' };
-    const secondPage = page([{ id: 'c', title: 'c' }]);
-    const firstPage = page([target, other]);
-
-    queryClient.setQueryData(key, {
-      pages: [firstPage, secondPage],
-      pageParams: [0, 1],
-    });
-
-    patchInfiniteEntity<Page, Item>({
-      queryClient,
-      queryKey: key,
-      selectItems: p => p.items,
-      replaceItems: (p, items) => ({ ...p, items }),
-      matches: e => e.id === 'a',
-      update: e => ({ ...e, title: 'new' }),
-    });
-
-    const data = queryClient.getQueryData(key) as { pages: Page[] };
-    expect(data.pages).toHaveLength(2);
-    expect(data.pages[0]?.items[0]?.title).toBe('new');
-    // Non-matching entity keeps its exact reference.
-    expect(data.pages[0]?.items[1]).toBe(other);
-    // A page with no match keeps its exact reference.
-    expect(data.pages[1]).toBe(secondPage);
-  });
-
-  it('returns the top-level data unchanged when nothing matches', () => {
-    const queryClient = new QueryClient();
-    const key = ['sessions', 'list'];
-    const data = {
-      pages: [page([{ id: 'a', title: 'a' }])],
-      pageParams: [0],
-    };
-    queryClient.setQueryData(key, data);
-
-    patchInfiniteEntity<Page, Item>({
-      queryClient,
-      queryKey: key,
-      selectItems: p => p.items,
-      replaceItems: (p, items) => ({ ...p, items }),
-      matches: () => false,
-      update: e => ({ ...e, title: 'changed' }),
-    });
-
-    expect(queryClient.getQueryData(key)).toBe(data);
   });
 });
 

@@ -1851,6 +1851,7 @@ export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
+  discount: z.number().optional(),
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;

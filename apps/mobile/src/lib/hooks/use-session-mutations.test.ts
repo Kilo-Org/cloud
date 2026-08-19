@@ -88,7 +88,7 @@ vi.mock('@/lib/agent-session-cache', () => ({
   },
 }));
 
-vi.mock('@/lib/query/infinite-retention', () => ({
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
   scheduleCacheMaintenance: (run: () => void) => {
     scheduleCacheMaintenanceMock(run);
   },

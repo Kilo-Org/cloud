@@ -10,7 +10,8 @@ import {
 } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { reconcileFirstPage, scheduleCacheMaintenance } from '@/lib/query/infinite-retention';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
   type FlattenedSecurityAgentConfig,
   type SecurityAgentConfig,

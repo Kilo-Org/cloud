@@ -4,7 +4,7 @@ import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { chainSave } from '@/lib/hooks/save-chain';
-import { scheduleCacheMaintenance } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
   mapStoredSessions,
   removeStoredSession,

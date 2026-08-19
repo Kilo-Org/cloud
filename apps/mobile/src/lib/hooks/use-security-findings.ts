@@ -12,11 +12,8 @@ import {
   mapSecurityDismissOperationError,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useHoistedOperationKey } from '@/lib/operation-key';
-import {
-  reconcileFirstPage,
-  scheduleCacheMaintenance,
-  withInfiniteRetention,
-} from '@/lib/query/infinite-retention';
+import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 

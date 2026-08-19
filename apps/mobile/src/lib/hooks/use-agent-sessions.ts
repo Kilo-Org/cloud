@@ -26,11 +26,8 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
-import {
-  reconcileFirstPage,
-  scheduleCacheMaintenance,
-  withInfiniteRetention,
-} from '@/lib/query/infinite-retention';
+import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 

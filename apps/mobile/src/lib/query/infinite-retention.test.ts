@@ -1,17 +1,11 @@
 import { QueryClient } from '@tanstack/react-query';
-import { InteractionManager } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   INFINITE_QUERY_MAX_PAGES,
   reconcileFirstPage,
-  scheduleCacheMaintenance,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
-
-vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
-}));
 
 type Item = {
   id: string;
@@ -116,16 +110,5 @@ describe('reconcileFirstPage', () => {
     // eslint-disable-next-line typescript-eslint/no-confusing-void-expression -- asserting the void return proves the call needs no await.
     const returned = reconcileFirstPage(queryClient, ['trpc', 'cliSessionsV2', 'list']);
     expect(returned).toBeUndefined();
-  });
-});
-
-describe('scheduleCacheMaintenance', () => {
-  it('runs the callback through InteractionManager.runAfterInteractions', () => {
-    const run = vi.fn<() => void>();
-
-    scheduleCacheMaintenance(run);
-
-    // eslint-disable-next-line typescript-eslint/unbound-method, typescript-eslint/no-deprecated -- the mock is a plain vi.fn() with no `this`, and runAfterInteractions is the documented deferral API.
-    expect(InteractionManager.runAfterInteractions).toHaveBeenCalledWith(run);
   });
 });

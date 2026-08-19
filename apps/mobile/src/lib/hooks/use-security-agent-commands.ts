@@ -11,7 +11,8 @@ import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { reconcileFirstPage, scheduleCacheMaintenance } from '@/lib/query/infinite-retention';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityCommand } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 

@@ -5,7 +5,7 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -63,6 +63,7 @@ import {
   retryMessageAndClear,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
+import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -459,10 +460,16 @@ export function SessionDetailContent({
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
   // decision gets one 4s follow-up refetch — no polling loop.
+  const store = useStore();
+  // The first focus on a session id is owned by `manager.switchSession`, which
+  // already fetches the session metadata (including `associatedPr`). Every
+  // later focus refetches; this ref tracks which id has been seeded.
+  const seededSessionIdRef = useRef<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const refetch = async (scheduleFollowUp: boolean) => {
         try {
@@ -485,15 +492,48 @@ export function SessionDetailContent({
         }
       };
 
-      void refetch(true);
+      // Check the current `fetchedSessionData` and, when a review decision is
+      // pending, schedule the one-shot 4s follow-up. Runs once against the
+      // current value and again on every later write until the session's data
+      // has landed (or the effect is cancelled).
+      const checkAndSchedule = () => {
+        if (cancelled) {
+          return;
+        }
+        const fetched = store.get(manager.atoms.fetchedSessionData);
+        if (fetched?.kiloSessionId !== sessionId) {
+          return;
+        }
+        unsubscribe?.();
+        unsubscribe = null;
+        if (fetched.associatedPr?.reviewDecisionPending) {
+          pendingTimeout = setTimeout(() => {
+            pendingTimeout = null;
+            void refetch(false);
+          }, 4000);
+        }
+      };
+
+      if (!shouldRefetchOnFocus(seededSessionIdRef.current, sessionId)) {
+        // First focus: `switchSession` owns the metadata read, so issue no
+        // request. Seed the ref and keep the pending-decision follow-up. The
+        // manager's fetch can land before this effect runs (switchSession
+        // writes first), so check the current value once before subscribing.
+        seededSessionIdRef.current = sessionId;
+        checkAndSchedule();
+        unsubscribe = store.sub(manager.atoms.fetchedSessionData, checkAndSchedule);
+      } else {
+        void refetch(true);
+      }
 
       return () => {
         cancelled = true;
+        unsubscribe?.();
         if (pendingTimeout !== null) {
           clearTimeout(pendingTimeout);
         }
       };
-    }, [manager, sessionId])
+    }, [manager, sessionId, store])
   );
 
   useEffect(() => {
@@ -1051,6 +1091,21 @@ export function SessionDetailContent({
     pendingMessageCount: inFlightMessageCount,
   });
 
+  // Child-sheet pagination fields live only on the `ready` hydration state.
+  // The sheet can render `content` before hydration reports ready (live child
+  // rows already exist), so default every non-ready state.
+  const openChildSessionId = childSessionSheet.sheet?.sessionId ?? null;
+  const openChildHydrationState =
+    openChildSessionId === null ? null : getChildSessionHydrationState(openChildSessionId);
+  const childHasOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.hasOlder : false;
+  const childIsLoadingOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.isLoadingOlder : false;
+  const childOlderMessagesError =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.olderError : null;
+  const childOlderMessagesOmittedItemCount =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.omittedItemCount : 0;
+
   return (
     <PartDetailSheetHost messages={messages}>
       <View className="flex-1 bg-background">
@@ -1121,6 +1176,15 @@ export function SessionDetailContent({
             getChildMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            hasOlderMessages={childHasOlderMessages}
+            isLoadingOlderMessages={childIsLoadingOlderMessages}
+            olderMessagesError={childOlderMessagesError}
+            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+            onLoadOlderMessages={() => {
+              if (openChildSessionId !== null) {
+                void manager.loadOlderChildMessages(openChildSessionId);
+              }
+            }}
             renderPart={props => <PartRenderer {...props} />}
             onOpenChildSession={handleOpenChildSession}
             onRetry={() => {

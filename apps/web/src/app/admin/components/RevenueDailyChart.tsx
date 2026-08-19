@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ComposedChart,
@@ -28,7 +29,6 @@ type ChartDataPoint = {
   multipliedRevenue: number;
   unmultipliedRevenue: number;
   paidPercentage: number;
-  productRevenue: number;
   serviceFee: number;
   missedFees: number;
   exemptedFees: number;
@@ -60,12 +60,11 @@ function RevenueTooltip({ active, payload, label }: CustomTooltipProps) {
       <p className="text-sm font-medium">{label}</p>
       <div className="mt-2 space-y-1">
         {[
-          ['Legacy Gross', data.paidRevenue],
+          ['Paid Revenue', data.paidRevenue],
           ['Free Credits', data.freeCredits],
-          ['Multiplied Legacy Gross', data.multipliedRevenue],
-          ['Unmultiplied Legacy Gross', data.unmultipliedRevenue],
-          ['Product Revenue (net)', data.productRevenue],
-          ['Service Fees (net)', data.serviceFee],
+          ['Multiplied Revenue', data.multipliedRevenue],
+          ['Unmultiplied Revenue', data.unmultipliedRevenue],
+          ['Collected Service Fees', data.serviceFee],
           ['Missed Fees', data.missedFees],
           ['Exempted Fees', data.exemptedFees],
           ['Disputed Fees', data.disputedFees],
@@ -122,7 +121,6 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
       multipliedRevenue: item.multiplied_total_dollars,
       unmultipliedRevenue: item.unmultiplied_total_dollars,
       paidPercentage: paidPercentage,
-      productRevenue: item.product_revenue_dollars,
       serviceFee: item.collected_service_fee_dollars,
       missedFees: item.missed_service_fee_dollars,
       exemptedFees: item.exempted_service_fee_dollars,
@@ -138,7 +136,7 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
             Math.max(
               d.paidRevenue,
               showFreeCredits ? d.freeCredits : 0,
-              d.productRevenue + d.serviceFee,
+              d.serviceFee,
               d.missedFees + d.exemptedFees + d.disputedFees
             )
           )
@@ -153,15 +151,11 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
           <div>
             <CardTitle>Daily Revenue Trend</CardTitle>
             <CardDescription>
-              Legacy gross by credit-transaction date; net assessment rows by settled date (UTC),
-              including New Kilo Pass revenue. Missed, exempted, and disputed fees are expected or
-              withdrawn fee amounts, shown as subdued series.
+              Credit revenue keeps its existing transaction-date semantics. Service fees are a
+              separate series grouped by settled date (UTC); Kilo Pass product revenue is not added.
             </CardDescription>
           </div>
-          <button
-            onClick={downloadData}
-            className="hover:bg-background inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
-          >
+          <Button onClick={downloadData} variant="outline" size="sm">
             <svg
               className="mr-2 h-4 w-4"
               fill="none"
@@ -177,7 +171,7 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
               />
             </svg>
             Download CSV
-          </button>
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -230,14 +224,14 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
                   dataKey="unmultipliedRevenue"
                   stackId="legacy"
                   fill="#16a34a"
-                  name="Legacy Gross Without Multipliers"
+                  name="Revenue Without Multipliers"
                 />
                 <Bar
                   yAxisId="left"
                   dataKey="multipliedRevenue"
                   stackId="legacy"
                   fill="#dc2626"
-                  name="Legacy Gross From Multipliers"
+                  name="Revenue From Multipliers"
                 />
                 {showFreeCredits && (
                   <Bar
@@ -249,17 +243,9 @@ export function RevenueDailyChart({ data, showFreeCredits }: ApiResponse) {
                 )}
                 <Bar
                   yAxisId="left"
-                  dataKey="productRevenue"
-                  stackId="assessment"
-                  fill="#475569"
-                  name="Product Revenue (Net Assessment Rows)"
-                />
-                <Bar
-                  yAxisId="left"
                   dataKey="serviceFee"
-                  stackId="assessment"
                   fill="#94a3b8"
-                  name="Service Fees (Net)"
+                  name="Collected Service Fees"
                 />
                 <Bar
                   yAxisId="left"

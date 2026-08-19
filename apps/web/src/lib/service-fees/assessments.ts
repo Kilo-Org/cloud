@@ -112,7 +112,6 @@ export type ServiceFeeAssessmentRecord = {
   refundedProductMinor: number;
   refundedFeeMinor: number;
   refundedGrossMinor: number;
-  disputedProductMinor: number;
   disputedFeeMinor: number;
   exemptionId: string | null;
   failureCode: string | null;
@@ -476,7 +475,6 @@ function buildNewAssessmentRecord(params: {
     refundedProductMinor: 0,
     refundedFeeMinor: 0,
     refundedGrossMinor: 0,
-    disputedProductMinor: 0,
     disputedFeeMinor: 0,
     exemptionId: params.decision.exemptionId,
     failureCode: null,
@@ -908,12 +906,10 @@ export async function observeServiceFeeAssessmentRefunds(params: {
 export async function observeServiceFeeAssessmentDispute(params: {
   store: ServiceFeeAssessmentStore;
   assessmentKey: string;
-  disputedProductMinor: number;
   disputedFeeMinor: number;
   now?: Date;
 }): Promise<ServiceFeeAssessmentRecord> {
   assertNonEmptyAssessmentKey(params.assessmentKey);
-  assertNonNegativeSafeInteger(params.disputedProductMinor, 'disputedProductMinor');
   assertNonNegativeSafeInteger(params.disputedFeeMinor, 'disputedFeeMinor');
   const nowIso = toServiceFeeTimestamp(params.now ?? new Date());
 
@@ -923,15 +919,6 @@ export async function observeServiceFeeAssessmentDispute(params: {
       await store.findByAssessmentKey(params.assessmentKey)
     );
 
-    if (params.disputedProductMinor > existing.settledProductMinor) {
-      throw new ServiceFeeAssessmentConflictError(
-        existing.assessmentKey,
-        'dispute_exceeds_settled',
-        'disputedProductMinor',
-        existing.settledProductMinor,
-        params.disputedProductMinor
-      );
-    }
     if (params.disputedFeeMinor > existing.chargedFeeMinor) {
       throw new ServiceFeeAssessmentConflictError(
         existing.assessmentKey,
@@ -943,7 +930,6 @@ export async function observeServiceFeeAssessmentDispute(params: {
     }
 
     return store.update(existing.assessmentKey, {
-      disputedProductMinor: params.disputedProductMinor,
       disputedFeeMinor: params.disputedFeeMinor,
       updatedAt: nowIso,
     });

@@ -18,7 +18,7 @@ Resolved during spec review on 2026-08-08. Each entry supersedes earlier drafts 
 |---|---|---|
 | D1 | The fee base follows **recognized product value**. Discounts reduce it; prepaid credit-balance consumption does not. | Preserves the invariant that collected fee equals 5% of product revenue, which is what makes the assessment table reconcilable. Kilo does not use Stripe Billing credit grants today, so this is a forward-looking guard. |
 | D2 | **Keep hosted promotion-code entry** for Personal Kilo Pass. Compute the fee from list price and accept that the fee line is discounted along with the product. | Proportional allocation makes the result arithmetically exact for unrestricted coupons, so `GOAL.md`'s proportional-reduction requirement is met without server-side discount knowledge. Avoids private-preview dependencies and avoids rewriting a live payments path. Cost: product-restricted coupons must be prevented operationally. |
-| D3 | Chargebacks **reverse the fee** on `charge.dispute.funds_withdrawn`, tracked in dedicated non-monotonic dispute columns. | The money left the account, so leaving it in collected revenue overstates the one number this subsystem exists to produce. Separate columns keep refund monotonicity intact, since a won dispute restores funds. |
+| D3 | Chargebacks **reverse the fee** on `charge.dispute.funds_withdrawn`, tracked in the dedicated non-monotonic fee-dispute column. | The money left the account, so leaving it in collected fee revenue overstates the one number this subsystem exists to produce. Keeping the fee consequence separate preserves refund monotonicity when a won dispute restores funds. |
 | D4 | On any failure to resolve or apply the confirmed mirrored tax treatment, **fail open in production** exactly as in non-production. | Applies the document's existing fail-open principle consistently. Not collecting a fee for that event is strictly better than mis-taxing customers or blocking payments. |
 
 Two defects were also corrected without requiring a decision: the Stripe wire API version was never pinned, and automatic top-up invoices had two competing fee-attachment paths. Both are addressed below.
@@ -241,7 +241,6 @@ One row per commercial billing event:
 | `refunded_product_minor` | integer | Not null, default 0, non-negative; monotonic |
 | `refunded_fee_minor` | integer | Not null, default 0, non-negative; monotonic |
 | `refunded_gross_minor` | integer | Not null, default 0, non-negative; monotonic |
-| `disputed_product_minor` | integer | Not null, default 0, non-negative; not monotonic |
 | `disputed_fee_minor` | integer | Not null, default 0, non-negative; not monotonic |
 | `exemption_id` | UUID nullable | FK to the exact exemption log row, `onDelete: restrict` |
 | `failure_code` | text nullable | Stable internal reason code, no secret or raw provider payload |
@@ -269,7 +268,7 @@ Owner check:
 Amount and state checks:
 
 - `refunded_fee_minor <= charged_fee_minor` and `refunded_product_minor <= settled_product_minor`. Both refund columns are monotonic.
-- `disputed_fee_minor <= charged_fee_minor` and `disputed_product_minor <= settled_product_minor`. Dispute columns are **not** monotonic; a dispute resolved in Kilo's favor clears them.
+- `disputed_fee_minor <= charged_fee_minor`. It is **not** monotonic; a dispute resolved in Kilo's favor clears it.
 - `outcome = pending` requires `charged_fee_minor = 0` and no settlement.
 - `outcome = charged` requires a settled or attached fee line. `charged_fee_minor` may be zero only when `settled_product_minor` is also zero, which is the fully discounted purchase case.
 - `outcome = missed` requires `expected_fee_minor > 0`, `charged_fee_minor = 0`, and a non-empty `failure_code`.
@@ -772,10 +771,10 @@ Extend the `charge.refunded` webhook branch. Fee refund observation must run bef
 
 A chargeback removes money from the account, so it must reduce collected fee revenue exactly as a refund does. The webhook plumbing already exists: `charge.dispute.created`, `.updated`, `.closed`, and `.funds_withdrawn` are handled at `apps/web/src/lib/stripe/index.ts:998, 1068-1069, 1354`, and disputes persist to `stripe_dispute_cases` with `amount_minor_units` (`packages/db/src/schema.ts:757-816`). Only the fee-revenue consequence is new.
 
-Use the dedicated `disputed_product_minor` and `disputed_fee_minor` columns, **not** the refund columns. Disputes are not monotonic: a dispute Kilo wins restores the funds, which would require decrementing `refunded_fee_minor` and breaking its monotonic invariant and tests.
+Use the dedicated `disputed_fee_minor` column, **not** the refund columns. It is not monotonic: a dispute Kilo wins restores the fee, which would require decrementing `refunded_fee_minor` and breaking its monotonic invariant and tests. Product dispute state remains owned by Stripe and the existing `stripe_dispute_cases` flow.
 
-1. On `charge.dispute.funds_withdrawn`, resolve the assessment by charge or PaymentIntent. Set `disputed_product_minor = settled_product_minor` and `disputed_fee_minor = charged_fee_minor`. A dispute reverses the whole charge, so no proportional allocation is needed.
-2. On `charge.dispute.closed` with an outcome in Kilo's favor, reset both dispute columns to zero.
+1. On `charge.dispute.funds_withdrawn`, resolve the assessment by charge or PaymentIntent. Set `disputed_fee_minor = charged_fee_minor`. A dispute reverses the whole charge, so the full fee is withdrawn even when an earlier partial refund overlaps it.
+2. On `charge.dispute.closed` with an outcome in Kilo's favor, reset `disputed_fee_minor` to zero.
 3. Reuse the refund arithmetic; do not add a second calculator.
 4. Dispute handling is idempotent and must not alter `outcome`. A disputed charge remains `charged`; the money movement is reported separately.
 
@@ -838,44 +837,25 @@ No Kilo Pass payment email is added.
 
 ### Query model
 
-Extend `RevenueKpiData` in `apps/web/src/lib/revenueKpi.ts` with daily minor-unit-derived dollar fields and counts:
+`RevenueKpiData` keeps its existing paid/free/multiplier fields and adds a separate settled-fee series:
 
-- `product_revenue_dollars`
 - `collected_service_fee_dollars`
-- `gross_revenue_dollars`
 - `missed_service_fee_dollars`
 - `exempted_service_fee_dollars`
 - `disputed_service_fee_dollars`
-- `service_fee_collected_count`
+- `service_fee_charged_count`
 - `service_fee_missed_count`
 - `service_fee_exempt_count`
 
-Retain existing paid/free/multiplier fields for current dashboard behavior.
+`credit_transactions` remains the sole source for the existing credit-revenue fields. Assessment-backed top-ups remain in those fields, and there is no join or anti-join between assessments and credit transactions.
 
-- Product revenue for service-fee assessments: `settled_product_minor - refunded_product_minor - disputed_product_minor`.
-- Collected fee revenue: `charged_fee_minor - refunded_fee_minor - disputed_fee_minor`.
-- Gross revenue: product plus collected fee. Taxes are not revenue in this metric.
+Calculate collected fee per assessment as `GREATEST(charged_fee_minor - refunded_fee_minor - disputed_fee_minor, 0)` before summing. Refund and dispute values can overlap when a dispute withdraws the whole charge after a partial refund; overlap must not make a row negative or reduce another row's collected fee.
 
-Only rows with `settled_at IS NOT NULL` contribute to collected, missed, exempt, or disputed values. Unpaid and abandoned assessments do not contribute. For missed and exempt amounts use `expected_fee_minor`; refunds or disputes of an exempt or missed event never create negative fee revenue.
+Only rows with `settled_at IS NOT NULL` contribute to collected, missed, exempt, or disputed fee values. For missed and exempt amounts use `expected_fee_minor`. The historical charged count includes every settled `outcome = charged` assessment even after refunds or disputes.
 
-#### Joining assessments to legacy credit transactions
+Group service-fee metrics by the UTC calendar date of `settled_at` and push the requested date range into that aggregate. Legacy metrics retain `created_at::date` and its existing session-time-zone semantics. A full outer date merge allows a Kilo Pass assessment to create a fee-only day with zero-valued credit fields, but the assessment does not contribute Kilo Pass product revenue.
 
-Top-up product revenue must not be counted twice. The link is not a foreign key: `credit_transactions.stripe_payment_id` (unique index, `packages/db/src/schema.ts:310,324`) holds a **charge or invoice** ID depending on the flow, so join on
-
-```text
-credit_transactions.stripe_payment_id IN (assessment.stripe_charge_id, assessment.stripe_invoice_id)
-```
-
-Where a settled assessment matches, it is authoritative for the product amount and the credit-transaction row must be excluded. Legacy payments without an assessment continue through the existing credit-transaction query.
-
-#### Two changes in dashboard meaning that must be stated, not discovered
-
-Today `apps/web/src/lib/revenueKpi.ts:95-110` derives all revenue from `credit_transactions` as a gross `SUM(amount_microdollars)` grouped by `created_at::date`, with **no refund or dispute adjustment of any kind**. This work introduces two inconsistencies on a single chart:
-
-1. **Refund and dispute adjustment applies only to assessment-backed rows.** New Kilo Pass and top-up revenue will be net; legacy rows stay gross. Label the adjusted series explicitly in the UI so the two are not read as one trend.
-2. **Kilo Pass product revenue is currently absent entirely**, because it never created a credit transaction. `product_revenue_dollars` is therefore not a restatement of the existing paid series and must not be presented as one.
-
-Group new service-fee metrics by the UTC calendar date of `settled_at`. Legacy metrics group by `created_at::date`. These do not reconcile row-for-row; document that in the component rather than silently mixing them.
+The two series have different coverage and date semantics. Do not add fee figures to credit figures to claim authoritative gross revenue. Kilo Pass product revenue remains outside this query and requires separate product and accounting work.
 
 ### Admin UI
 
@@ -885,7 +865,7 @@ Update:
 - `apps/web/src/app/admin/components/RevenueDailyChart.tsx`
 - CSV export through the extended response shape
 
-Show product revenue, collected service fees, gross revenue, missed fees, exempted fees, and disputed fees as separate values. Use tabular numbers and semantic tokens. Do not encode every concept as a competing bright chart series; product and fee revenue can be stacked, while missed, exempt, and disputed values belong in a separate leakage section or subdued series.
+Keep the existing credit table and chart series under their existing meaning. Show collected, missed, exempted, and disputed fees plus charged, missed, and exempt assessment counts in a clearly separate Service fees section labelled by settled date in UTC. State that these figures do not make the dashboard a complete Stripe product-revenue report and that Kilo Pass product revenue is not added. Use tabular numbers and semantic tokens; keep leakage series subdued.
 
 Fix two existing empty-data hazards while here:
 
@@ -900,7 +880,7 @@ Service fees are never commissionable. Update every eligible Kilo Pass affiliate
 
 > Kilo Pass SALE amounts MUST use the positive settled invoice paid amount, not catalog price or credit issuance value.
 
-That directly contradicts excluding the fee, because the settled paid amount now includes it. Amend rule 17 explicitly rather than relying on the new behavior to imply the change. The amended rule must say that Kilo Pass SALE amounts use the settled **eligible product** amount, excluding any service-fee line, and that this is the assessment's `settled_product_minor`.
+That directly contradicts excluding the fee, because the settled paid amount now includes it. Amend rule 17 explicitly rather than relying on the new behavior to imply the change. The amended rule must say that Kilo Pass SALE amounts use the settled **eligible product** amount calculated from eligible Stripe product lines, excluding any service-fee line. The same value may support fee settlement, but the assessment does not become an affiliate or product-revenue ledger.
 
 The implementation dependency is `enqueueKiloPassAffiliateSaleForInvoice()` (`apps/web/src/lib/kilo-pass/affiliate-sale.ts:137`), which currently reports `invoice.amount_paid / 100` at `:167` and gates on `invoice.amount_paid <= 0` at `:144`. Change it to accept an explicit product amount in minor units. Note that `getReportablePromoCode()` at `:123-135` reads `invoice.discounts` and is unaffected by fee changes.
 
@@ -1010,7 +990,7 @@ Exit condition: initial, renewal, upgrade, proration, and organization capacity 
 1. Add cumulative refund calculation integration and charge-refunded observation.
 2. Update full-refund assessment reconciliation.
 3. Add dispute fee reversal on `charge.dispute.funds_withdrawn` and restoration on a won `charge.dispute.closed`.
-4. Add service-fee revenue/leakage/dispute query fields and the credit-transaction join.
+4. Add fee-only revenue/leakage/dispute query fields without joining assessments to credit transactions.
 5. Update Admin revenue components and CSV, including the empty-data fixes and explicit labelling of adjusted versus legacy series.
 6. Add missed-fee Slack alerts; publish the response procedure in `kilo-org/on-call`.
 7. Add the read-only subscription classification audit script.
@@ -1069,13 +1049,13 @@ Cover:
 - A charged assessment tolerates `charged_fee_minor < expected_fee_minor` without violating a constraint, which is the discounted-Checkout case
 - Settlement idempotency
 - Monotonic refund updates
-- Dispute columns set on funds withdrawn and cleared on a won dispute, without altering `outcome` and without breaking refund monotonicity
+- Disputed fee set on funds withdrawn and cleared on a won dispute, without altering `outcome` and without breaking refund monotonicity
 - Exact organization exemption and no hierarchy inheritance
 - Grant/revoke history ordering and actor nulling semantics
 - Settled-only revenue recognition
 - Refunds and disputes reduce collected fee revenue
 - Unpaid missed/exempt rows do not enter dashboard totals
-- No double counting against linked credit transactions, joining on `stripe_payment_id IN (charge, invoice)`
+- Assessment-backed credit transactions retain the existing paid/free/multiplier semantics; fee metrics remain separate
 
 ### Checkout and webhook tests
 

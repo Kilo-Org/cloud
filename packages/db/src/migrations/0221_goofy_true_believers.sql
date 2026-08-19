@@ -33,7 +33,6 @@ CREATE TABLE "stripe_service_fee_assessments" (
 	"refunded_product_minor" integer DEFAULT 0 NOT NULL,
 	"refunded_fee_minor" integer DEFAULT 0 NOT NULL,
 	"refunded_gross_minor" integer DEFAULT 0 NOT NULL,
-	"disputed_product_minor" integer DEFAULT 0 NOT NULL,
 	"disputed_fee_minor" integer DEFAULT 0 NOT NULL,
 	"settled_at" timestamp with time zone,
 	"exemption_id" uuid,
@@ -60,12 +59,10 @@ CREATE TABLE "stripe_service_fee_assessments" (
         AND "stripe_service_fee_assessments"."refunded_product_minor" >= 0
         AND "stripe_service_fee_assessments"."refunded_fee_minor" >= 0
         AND "stripe_service_fee_assessments"."refunded_gross_minor" >= 0
-        AND "stripe_service_fee_assessments"."disputed_product_minor" >= 0
         AND "stripe_service_fee_assessments"."disputed_fee_minor" >= 0),
 	CONSTRAINT "stripe_service_fee_assessments_refund_fee_check" CHECK ("stripe_service_fee_assessments"."refunded_fee_minor" <= "stripe_service_fee_assessments"."charged_fee_minor"),
 	CONSTRAINT "stripe_service_fee_assessments_refund_product_check" CHECK ("stripe_service_fee_assessments"."refunded_product_minor" <= "stripe_service_fee_assessments"."settled_product_minor"),
 	CONSTRAINT "stripe_service_fee_assessments_disputed_fee_check" CHECK ("stripe_service_fee_assessments"."disputed_fee_minor" <= "stripe_service_fee_assessments"."charged_fee_minor"),
-	CONSTRAINT "stripe_service_fee_assessments_disputed_product_check" CHECK ("stripe_service_fee_assessments"."disputed_product_minor" <= "stripe_service_fee_assessments"."settled_product_minor"),
 	CONSTRAINT "stripe_service_fee_assessments_pending_check" CHECK ("stripe_service_fee_assessments"."outcome" <> 'pending'
         OR ("stripe_service_fee_assessments"."charged_fee_minor" = 0 AND "stripe_service_fee_assessments"."settled_at" IS NULL)),
 	CONSTRAINT "stripe_service_fee_assessments_charged_check" CHECK ("stripe_service_fee_assessments"."outcome" <> 'charged' OR (

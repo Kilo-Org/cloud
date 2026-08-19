@@ -228,6 +228,8 @@ export type StripeServiceFeeOutcome =
   (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
 
 export const SCHEMA_CHECK_ENUMS = {
+  StripeServiceFeeFlow,
+  StripeServiceFeeOutcome,
   KiloPassTier,
   KiloPassCadence,
   KiloPassPaymentProvider,
@@ -11005,7 +11007,6 @@ export const stripe_service_fee_assessments = pgTable(
     refunded_product_minor: integer().default(0).notNull(),
     refunded_fee_minor: integer().default(0).notNull(),
     refunded_gross_minor: integer().default(0).notNull(),
-    disputed_product_minor: integer().default(0).notNull(),
     disputed_fee_minor: integer().default(0).notNull(),
     settled_at: timestamp({ withTimezone: true, mode: 'string' }),
     exemption_id: uuid(),
@@ -11086,7 +11087,6 @@ export const stripe_service_fee_assessments = pgTable(
         AND ${table.refunded_product_minor} >= 0
         AND ${table.refunded_fee_minor} >= 0
         AND ${table.refunded_gross_minor} >= 0
-        AND ${table.disputed_product_minor} >= 0
         AND ${table.disputed_fee_minor} >= 0`
     ),
     check(
@@ -11100,10 +11100,6 @@ export const stripe_service_fee_assessments = pgTable(
     check(
       'stripe_service_fee_assessments_disputed_fee_check',
       sql`${table.disputed_fee_minor} <= ${table.charged_fee_minor}`
-    ),
-    check(
-      'stripe_service_fee_assessments_disputed_product_check',
-      sql`${table.disputed_product_minor} <= ${table.settled_product_minor}`
     ),
     check(
       'stripe_service_fee_assessments_pending_check',

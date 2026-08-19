@@ -17,8 +17,6 @@ beforeEach(async () => {
 });
 
 function dayKey(row: RevenueKpiData): string {
-  // node-pg parses `::date` columns into Date objects at runtime even though
-  // RevenueKpiData types transaction_day as a string.
   const value = row.transaction_day as unknown;
   return value instanceof Date ? format(value, 'yyyy-MM-dd') : String(value).slice(0, 10);
 }
@@ -40,7 +38,7 @@ function baseAssessment(
 }
 
 describe('getRevenueKpiData service fee reporting', () => {
-  test('counts settled assessments only, nets refunds and disputes, and does not double count matched credit transactions', async () => {
+  test('keeps credit revenue semantics and reports settled fee metrics separately', async () => {
     const user = await insertTestUser();
     const admin = await insertTestUser();
     const organization = await createOrganization(`Org ${crypto.randomUUID()}`, admin.id);
@@ -54,7 +52,6 @@ describe('getRevenueKpiData service fee reporting', () => {
       .returning();
 
     await db.insert(stripe_service_fee_assessments).values([
-      // Day 2025-01-10 (UTC): plain charged settlement.
       baseAssessment({
         kilo_user_id: user.id,
         stripe_charge_id: 'ch_matched',
@@ -63,8 +60,8 @@ describe('getRevenueKpiData service fee reporting', () => {
         settled_product_minor: 10000,
         settled_at: '2025-01-10T10:00:00.000Z',
       }),
-      // Day 2025-01-11 (UTC): partial refund, plus a fully disputed charge.
-      // 04:30 UTC is still 2025-01-10 in US timezones, pinning UTC grouping.
+      // Refund plus full-charge dispute overlap. Collected fee clamps at zero
+      // per assessment rather than allowing this row to subtract from another.
       baseAssessment({
         kilo_user_id: user.id,
         eligible_subtotal_minor: 20000,
@@ -74,6 +71,7 @@ describe('getRevenueKpiData service fee reporting', () => {
         settled_product_minor: 20000,
         refunded_product_minor: 4000,
         refunded_fee_minor: 200,
+        disputed_fee_minor: 1000,
         settled_at: '2025-01-11T04:30:00.000Z',
       }),
       baseAssessment({
@@ -83,11 +81,8 @@ describe('getRevenueKpiData service fee reporting', () => {
         charged_fee_minor: 250,
         gross_paid_minor: 5250,
         settled_product_minor: 5000,
-        disputed_product_minor: 5000,
-        disputed_fee_minor: 250,
         settled_at: '2025-01-11T06:00:00.000Z',
       }),
-      // Day 2025-01-12 (UTC): fee missed and fee exempt, but both payments settled.
       baseAssessment({
         kilo_user_id: user.id,
         outcome: 'missed',
@@ -108,7 +103,6 @@ describe('getRevenueKpiData service fee reporting', () => {
         gross_paid_minor: 5000,
         settled_at: '2025-01-12T01:00:00.000Z',
       }),
-      // Never settled: must not contribute anywhere.
       baseAssessment({
         kilo_user_id: user.id,
         eligibility_created_at: '2025-01-13T09:00:00.000Z',
@@ -118,9 +112,7 @@ describe('getRevenueKpiData service fee reporting', () => {
     ]);
 
     await db.insert(credit_transactions).values([
-      // Matches the settled assessment charge id: excluded from the legacy paid
-      // series because the assessment is authoritative for the product amount.
-      // Payment-intent matches are covered by a dedicated double-count test.
+      // Assessment-backed credits remain in every legacy credit series.
       {
         kilo_user_id: user.id,
         amount_microdollars: 100_000_000,
@@ -128,7 +120,6 @@ describe('getRevenueKpiData service fee reporting', () => {
         stripe_payment_id: 'ch_matched',
         created_at: '2025-01-10T10:05:00.000Z',
       },
-      // No settled assessment: stays in the legacy paid series.
       {
         kilo_user_id: user.id,
         amount_microdollars: 50_000_000,
@@ -142,88 +133,50 @@ describe('getRevenueKpiData service fee reporting', () => {
     const byDay = new Map(data.map(row => [dayKey(row), row]));
 
     expect([...byDay.keys()]).toEqual(['2025-01-10', '2025-01-11', '2025-01-12']);
-
-    const day10 = byDay.get('2025-01-10');
-    expect(day10).toMatchObject({
-      paid_transaction_count: 1,
-      paid_total_dollars: 50,
-      product_revenue_dollars: 100,
+    expect(byDay.get('2025-01-10')).toMatchObject({
+      paid_transaction_count: 2,
+      paid_total_dollars: 150,
       collected_service_fee_dollars: 5,
-      gross_revenue_dollars: 105,
-      missed_service_fee_dollars: 0,
-      exempted_service_fee_dollars: 0,
-      disputed_service_fee_dollars: 0,
-      service_fee_collected_count: 1,
-      service_fee_missed_count: 0,
-      service_fee_exempt_count: 0,
+      service_fee_charged_count: 1,
     });
-
-    const day11 = byDay.get('2025-01-11');
-    expect(day11).toMatchObject({
+    expect(byDay.get('2025-01-11')).toMatchObject({
       paid_transaction_count: 0,
-      paid_total_dollars: 0,
-      product_revenue_dollars: 160,
-      collected_service_fee_dollars: 8,
-      gross_revenue_dollars: 168,
-      disputed_service_fee_dollars: 2.5,
-      service_fee_collected_count: 2,
+      collected_service_fee_dollars: 2.5,
+      disputed_service_fee_dollars: 10,
+      service_fee_charged_count: 2,
     });
-
-    const day12 = byDay.get('2025-01-12');
-    expect(day12).toMatchObject({
-      product_revenue_dollars: 150,
+    expect(byDay.get('2025-01-12')).toMatchObject({
       collected_service_fee_dollars: 0,
-      gross_revenue_dollars: 150,
       missed_service_fee_dollars: 5,
       exempted_service_fee_dollars: 2.5,
-      service_fee_collected_count: 0,
+      service_fee_charged_count: 0,
       service_fee_missed_count: 1,
       service_fee_exempt_count: 1,
     });
   });
 
-  test('excludes a legacy credit transaction matched by settled assessment payment intent', async () => {
+  test('creates a fee-only UTC day without inventing product revenue', async () => {
     const user = await insertTestUser();
 
     await db.insert(stripe_service_fee_assessments).values(
       baseAssessment({
+        flow: 'personal_kilo_pass',
         kilo_user_id: user.id,
-        stripe_charge_id: 'ch_org_topup',
-        stripe_invoice_id: 'in_org_topup',
-        stripe_payment_intent_id: 'pi_org_topup',
-        charged_fee_minor: 500,
-        gross_paid_minor: 10500,
-        settled_product_minor: 10000,
-        settled_at: '2025-03-01T10:00:00.000Z',
+        charged_fee_minor: 245,
+        gross_paid_minor: 5145,
+        settled_product_minor: 4900,
+        settled_at: '2025-03-01T04:30:00.000Z',
       })
     );
-
-    await db.insert(credit_transactions).values([
-      {
-        kilo_user_id: user.id,
-        amount_microdollars: 100_000_000,
-        is_free: false,
-        stripe_payment_id: 'pi_org_topup',
-        created_at: '2025-03-01T10:05:00.000Z',
-      },
-      {
-        kilo_user_id: user.id,
-        amount_microdollars: 40_000_000,
-        is_free: false,
-        stripe_payment_id: 'pi_legacy_only',
-        created_at: '2025-03-01T12:00:00.000Z',
-      },
-    ]);
 
     const { data } = await getRevenueKpiData(false, '2025-03-01', '2025-03-01');
 
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({
-      paid_transaction_count: 1,
-      paid_total_dollars: 40,
-      product_revenue_dollars: 100,
-      collected_service_fee_dollars: 5,
-      gross_revenue_dollars: 105,
+      paid_transaction_count: 0,
+      paid_total_dollars: 0,
+      collected_service_fee_dollars: 2.45,
+      service_fee_charged_count: 1,
     });
   });
 
@@ -243,13 +196,11 @@ describe('getRevenueKpiData service fee reporting', () => {
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({
       paid_total_dollars: 25,
-      product_revenue_dollars: 0,
       collected_service_fee_dollars: 0,
-      gross_revenue_dollars: 0,
       missed_service_fee_dollars: 0,
       exempted_service_fee_dollars: 0,
       disputed_service_fee_dollars: 0,
-      service_fee_collected_count: 0,
+      service_fee_charged_count: 0,
       service_fee_missed_count: 0,
       service_fee_exempt_count: 0,
     });

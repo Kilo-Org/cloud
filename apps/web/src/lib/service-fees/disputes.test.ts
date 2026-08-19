@@ -128,19 +128,23 @@ async function persistSettled(store: ServiceFeeRefundAssessmentStore, chargeLink
 }
 
 describe('observeServiceFeeDisputeFundsWithdrawn', () => {
-  test('sets full settled product and charged fee without touching outcome or refunds', async () => {
+  test('sets the charged fee without touching outcome or refunds', async () => {
     const store = createMemoryStore();
     await persistSettled(store);
 
     const withdrawn = await observeServiceFeeDisputeFundsWithdrawn({
       store,
-      dispute: { id: 'dp_1', status: 'lost', charge: CHARGE_ID, payment_intent: PAYMENT_INTENT_ID },
+      dispute: {
+        id: 'dp_1',
+        status: 'lost',
+        charge: CHARGE_ID,
+        payment_intent: PAYMENT_INTENT_ID,
+      },
     });
 
     expect(withdrawn.status).toBe('withdrawn');
     expect(withdrawn.assessment).toMatchObject({
       outcome: 'charged',
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,
@@ -154,7 +158,6 @@ describe('observeServiceFeeDisputeFundsWithdrawn', () => {
     expect(again.status).toBe('unchanged');
     expect(again.assessment).toMatchObject({
       outcome: 'charged',
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,
@@ -176,7 +179,6 @@ describe('observeServiceFeeDisputeFundsWithdrawn', () => {
     );
     expect(await store.findByAssessmentKey(ASSESSMENT_KEY)).toMatchObject({
       settledAt: null,
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
     });
 
@@ -194,20 +196,58 @@ describe('observeServiceFeeDisputeFundsWithdrawn', () => {
       now: ACTIVATION,
     });
 
-    const withdrawn = await observeServiceFeeDisputeFundsWithdrawn({ store, dispute });
+    const withdrawn = await observeServiceFeeDisputeFundsWithdrawn({
+      store,
+      dispute,
+    });
     expect(withdrawn.status).toBe('withdrawn');
     expect(withdrawn.assessment).toMatchObject({
       outcome: 'charged',
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
     });
 
-    const again = await observeServiceFeeDisputeFundsWithdrawn({ store, dispute });
+    const again = await observeServiceFeeDisputeFundsWithdrawn({
+      store,
+      dispute,
+    });
     expect(again.status).toBe('unchanged');
     expect(again.assessment).toMatchObject({
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
     });
+  });
+
+  test('a settled zero-fee assessment has no persisted dispute consequence', async () => {
+    const store = createMemoryStore();
+    const decision = await prepareServiceFeeAssessmentDecision({
+      assessmentKey: 'checkout:zero-fee-dispute',
+      flow: 'personal_top_up',
+      currency: 'usd',
+      eligibilityCreatedAt: ACTIVATION,
+      eligibleSubtotalMinor: 0,
+      kiloUserId: 'user_zero_fee_dispute',
+    });
+    await upsertServiceFeeAssessment({
+      store,
+      decision,
+      stripeIds: { stripeChargeId: 'ch_zero_fee_dispute' },
+      now: ACTIVATION,
+    });
+    await settleServiceFeeAssessment({
+      store,
+      assessmentKey: decision.assessmentKey,
+      settledAt: ACTIVATION,
+      settledProductMinor: 0,
+      grossPaidMinor: 0,
+      now: ACTIVATION,
+    });
+
+    const withdrawn = await observeServiceFeeDisputeFundsWithdrawn({
+      store,
+      dispute: { id: 'dp_zero', charge: 'ch_zero_fee_dispute' },
+    });
+
+    expect(withdrawn.status).toBe('unchanged');
+    expect(withdrawn.disputedFeeMinor).toBe(0);
   });
 
   test('resolves the assessment by payment intent when the charge id is not linked', async () => {
@@ -230,7 +270,7 @@ describe('observeServiceFeeDisputeFundsWithdrawn', () => {
 });
 
 describe('observeServiceFeeDisputeClosed', () => {
-  test('clears dispute columns on won and leaves refunds and outcome untouched', async () => {
+  test('clears the dispute fee on won and leaves refunds and outcome untouched', async () => {
     const store = createMemoryStore();
     await persistSettled(store);
     await observeServiceFeeDisputeFundsWithdrawn({
@@ -245,7 +285,6 @@ describe('observeServiceFeeDisputeClosed', () => {
     expect(won.status).toBe('cleared');
     expect(won.assessment).toMatchObject({
       outcome: 'charged',
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,
@@ -258,13 +297,12 @@ describe('observeServiceFeeDisputeClosed', () => {
     expect(wonAgain.status).toBe('unchanged');
     expect(wonAgain.assessment).toMatchObject({
       outcome: 'charged',
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
       refundedProductMinor: 2_000,
     });
   });
 
-  test('does not clear dispute columns when the closed dispute is lost', async () => {
+  test('does not clear the dispute fee when the closed dispute is lost', async () => {
     const store = createMemoryStore();
     await persistSettled(store);
     await observeServiceFeeDisputeFundsWithdrawn({
@@ -279,7 +317,6 @@ describe('observeServiceFeeDisputeClosed', () => {
     expect(lost.status).toBe('unchanged');
     expect(lost.assessment).toMatchObject({
       outcome: 'charged',
-      disputedProductMinor: 10_000,
       disputedFeeMinor: 500,
       refundedFeeMinor: 100,
     });
@@ -294,7 +331,6 @@ describe('observeServiceFeeDisputeClosed', () => {
     expect(result).toEqual({
       status: 'ignored',
       assessment: null,
-      disputedProductMinor: 0,
       disputedFeeMinor: 0,
     });
   });

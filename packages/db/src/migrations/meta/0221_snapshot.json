@@ -1,5 +1,5 @@
 {
-  "id": "99e189ea-a17d-410e-8129-fb106f5edf55",
+  "id": "a6617c0d-9686-4e42-9775-b3c72443a2d0",
   "prevId": "0092dbfb-1da4-490e-bd4c-8421dc20cd5a",
   "version": "7",
   "dialect": "postgresql",
@@ -35289,13 +35289,6 @@
           "notNull": true,
           "default": 0
         },
-        "disputed_product_minor": {
-          "name": "disputed_product_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "disputed_fee_minor": {
           "name": "disputed_fee_minor",
           "type": "integer",
@@ -35519,7 +35512,7 @@
         },
         "stripe_service_fee_assessments_amounts_nonnegative_check": {
           "name": "stripe_service_fee_assessments_amounts_nonnegative_check",
-          "value": "\"stripe_service_fee_assessments\".\"eligible_subtotal_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"expected_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"charged_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"gross_paid_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"settled_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_gross_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"disputed_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"disputed_fee_minor\" >= 0"
+          "value": "\"stripe_service_fee_assessments\".\"eligible_subtotal_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"expected_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"charged_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"gross_paid_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"settled_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_product_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_fee_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"refunded_gross_minor\" >= 0\n        AND \"stripe_service_fee_assessments\".\"disputed_fee_minor\" >= 0"
         },
         "stripe_service_fee_assessments_refund_fee_check": {
           "name": "stripe_service_fee_assessments_refund_fee_check",
@@ -35532,10 +35525,6 @@
         "stripe_service_fee_assessments_disputed_fee_check": {
           "name": "stripe_service_fee_assessments_disputed_fee_check",
           "value": "\"stripe_service_fee_assessments\".\"disputed_fee_minor\" <= \"stripe_service_fee_assessments\".\"charged_fee_minor\""
-        },
-        "stripe_service_fee_assessments_disputed_product_check": {
-          "name": "stripe_service_fee_assessments_disputed_product_check",
-          "value": "\"stripe_service_fee_assessments\".\"disputed_product_minor\" <= \"stripe_service_fee_assessments\".\"settled_product_minor\""
         },
         "stripe_service_fee_assessments_pending_check": {
           "name": "stripe_service_fee_assessments_pending_check",

@@ -57,15 +57,19 @@ export function useFencedDraftLoad<T = string>({
   // settled value here, and a surface seeding from that stale value would
   // pin the old text to the new key.
   const identityChanged = prevDraftIdentity !== draftIdentity;
+  // Generation fence: a load applies only when its captured generation is
+  // still current. The identity-change render bumps the generation
+  // synchronously, so an in-flight load whose read already resolved can never
+  // publish the previous account's or entity's value before the effect
+  // cleanup runs. Cleanup (unmount or a superseding run) bumps it again, so a
+  // stale load can never publish after a newer run armed itself (refs dodge
+  // type-aware flow narrowing).
+  const draftLoadGenerationRef = useRef(0);
   if (identityChanged) {
     setPrevDraftIdentity(draftIdentity);
     setDraftState({ settled: false, value: null });
+    draftLoadGenerationRef.current += 1;
   }
-  // Generation fence: a load applies only when its captured generation is
-  // still current. Cleanup (unmount or a superseding run) bumps the
-  // generation, so a stale load can never publish after a newer run armed
-  // itself (refs dodge type-aware flow narrowing).
-  const draftLoadGenerationRef = useRef(0);
   useEffect(() => {
     draftLoadGenerationRef.current += 1;
     const generation = draftLoadGenerationRef.current;

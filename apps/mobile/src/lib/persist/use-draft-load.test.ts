@@ -237,4 +237,43 @@ describe('useFencedDraftLoad generic draft shape', () => {
     });
     expect(renders[0]).toEqual({ settled: false, value: null });
   });
+
+  it('does not publish a stale in-flight load after the identity changes', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    seedStoredValue('draft:u1', key, '{"title":"T","message":"M"}');
+
+    // Hold identity A's read open so its load is still in flight when the
+    // identity switches to B.
+    const readGate: { release: ((v: string | null) => void) | null } = { release: null };
+    const readHeld = new Promise<string | null>(resolve => {
+      readGate.release = resolve;
+    });
+    kvMock.getItem.mockImplementationOnce(async () => readHeld);
+
+    const renders: { settled: boolean; value: MergeDraft | null }[] = [];
+    const renderer = mountMergeHarness('u1', key, renders);
+    // A's load is pending on the deferred read.
+    expect(renders.at(-1)).toEqual({ settled: false, value: null });
+
+    // A's read resolves, then the identity switches before the load's
+    // generation check runs. The stale load must not publish A's value.
+    readGate.release?.('{"title":"T","message":"M"}');
+
+    act(() => {
+      renderer.update(
+        React.createElement(MergeDraftHarness, {
+          userId: 'u2',
+          entityKey: key,
+          onRender: state => {
+            renders.push(state);
+          },
+        })
+      );
+    });
+
+    await flushMicrotasks();
+
+    // B has no stored value. The stale A load must never publish A's value.
+    expect(renders.at(-1)).toEqual({ settled: true, value: null });
+  });
 });

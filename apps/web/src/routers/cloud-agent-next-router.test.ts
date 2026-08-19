@@ -52,12 +52,10 @@ const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
-const mockMarkCloudAgentAttachmentUploadsConsumed = jest.fn<
-  (input: { userId: string; attachments?: { path: string; files: string[] } }) => Promise<void>
->();
-
-const mockUpdateSet = jest.fn();
-const mockUpdateWhere = jest.fn();
+const mockMarkCloudAgentAttachmentUploadsConsumed =
+  jest.fn<
+    (input: { userId: string; attachments?: { path: string; files: string[] } }) => Promise<void>
+  >();
 
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,

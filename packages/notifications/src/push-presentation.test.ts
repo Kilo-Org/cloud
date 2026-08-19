@@ -36,12 +36,12 @@ describe('androidChannelIdForPushData', () => {
 
   it('maps each type to its expected channel', () => {
     const expected: Record<string, string> = {
-      'cloud_agent_session': 'agent',
+      cloud_agent_session: 'agent',
       'chat.message': 'chat',
       'instance-lifecycle': 'kiloclaw',
       'scheduled-action': 'kiloclaw',
-      'low_balance': 'balance',
-      'security_finding': 'security',
+      low_balance: 'balance',
+      security_finding: 'security',
     };
 
     for (const variant of variants) {

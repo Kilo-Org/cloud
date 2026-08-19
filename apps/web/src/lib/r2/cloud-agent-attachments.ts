@@ -174,9 +174,7 @@ export async function markCloudAgentAttachmentUploadsConsumed(params: {
   if (!attachments || attachments.files.length === 0) {
     return;
   }
-  const keys = attachments.files.map(
-    file => `${userId}/cloud-agent/${attachments.path}/${file}`
-  );
+  const keys = attachments.files.map(file => `${userId}/cloud-agent/${attachments.path}/${file}`);
   await db
     .update(cloud_agent_attachment_uploads)
     .set({ consumed_at: sql`now()` })

@@ -13,8 +13,7 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'security', name: 'Security findings', importance: 'high' },
 ] as const;
 
-export type AndroidNotificationChannelId =
-  (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
+export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
 
 /** Map a push payload to the Android channel that should carry it. */
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {

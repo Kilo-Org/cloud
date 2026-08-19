@@ -1,3 +1,4 @@
+/* eslint-disable drizzle/enforce-delete-with-where */
 import { NextRequest } from 'next/server';
 
 jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));

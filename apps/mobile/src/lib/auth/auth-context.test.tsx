@@ -180,6 +180,7 @@ vi.mock('@/lib/storage-keys', () => ({
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
+  PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',

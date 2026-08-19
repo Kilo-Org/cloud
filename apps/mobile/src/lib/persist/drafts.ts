@@ -67,6 +67,45 @@ export function prReviewDraftKey(owner: string, repo: string, number: number): s
   return `pr-review:${owner}/${repo}#${number}`;
 }
 
+/** Merge-sheet draft entity key, unique per pull request. */
+export function prMergeDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-merge:${owner}/${repo}#${number}`;
+}
+
+/** Reply draft entity key, unique per review comment thread. */
+// eslint-disable-next-line eslint/max-params -- the key encodes owner, repo, number, and comment id
+export function prReplyDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  commentId: number
+): string {
+  return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
+}
+
+/** Inline review-comment draft entity key, unique per diff position. */
+// eslint-disable-next-line eslint/max-params -- the key encodes the full diff position
+export function prCommentDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  path: string,
+  side: string,
+  line: number,
+  startLine?: number
+): string {
+  return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
+}
+
+/** Runtime shape guard for a merge-sheet draft ({ title, message }). */
+export function isMergeDraft(value: unknown): value is { title: string; message: string } {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return typeof record.title === 'string' && typeof record.message === 'string';
+}
+
 /** Security dismiss draft entity key, unique per scope and finding. */
 export function securityDismissDraftKey(scope: string, findingId: string): string {
   return `security-dismiss:${scope}:${findingId}`;

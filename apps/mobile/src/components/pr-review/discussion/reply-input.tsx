@@ -12,7 +12,11 @@ import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconn
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import {
@@ -157,6 +161,28 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
   >(null);
   const [resetKey, setResetKey] = useState(0);
 
+  // Durable reply draft, keyed by account and thread. Nothing is saved or
+  // restored while the user id is unknown.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const replyDraftKey = prReplyDraftKey(owner, repo, number, commentId);
+  const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: replyDraftKey });
+  useDraftFlushOnBackground(userId, replyDraftKey, true);
+
+  // Restore the stored draft into the input once the load settles for a new
+  // identity/thread, and reset the field so a reused instance never keeps the
+  // previous account's or thread's text (which it could then save under the
+  // new key).
+  const replySeedKey = `${userId ?? 'anonymous'}\u0000${replyDraftKey}`;
+  const seededKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft.settled || seededKeyRef.current === replySeedKey) {
+      return;
+    }
+    seededKeyRef.current = replySeedKey;
+    bodyRef.current = draft.value ?? '';
+    setResetKey(prev => prev + 1);
+  }, [draft.settled, draft.value, replySeedKey]);
+
   // Mirror mutation error into the inline box. Reply is NOT
   // optimistic, so the user can hit the inline error and retry
   // without waiting for a re-fetch.
@@ -225,6 +251,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       {
         onSuccess: () => {
           bodyRef.current = '';
+          if (userId) {
+            void clearDraft(userId, replyDraftKey);
+          }
           setResetKey(prev => prev + 1);
         },
       }
@@ -236,13 +265,16 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       <TextInput
         key={resetKey}
         ref={inputRef}
-        defaultValue=""
+        defaultValue={bodyRef.current}
         editable={!reply.isPending}
         placeholder={REPLY_PLACEHOLDER}
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel="Reply body"
         onChangeText={value => {
           bodyRef.current = value;
+          if (userId) {
+            saveDraft(userId, replyDraftKey, value);
+          }
           if (inlineError) {
             setInlineError(null);
             setInlineErrorKind(null);

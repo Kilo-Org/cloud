@@ -594,12 +594,17 @@ export async function createOrUpdateUser(
       existingProviders.length === 1 && existingProviders[0].provider === 'fake-login';
 
     // Link this new provider to the existing user if they don't already have it.
+    // WorkOS profile IDs can change when an organization's SSO connection is
+    // recreated, so a verified SSO callback may also replace a stale WorkOS ID.
     // fake-login is placeholder auth (dev-only) - always allow upgrading from it.
     // Callers pass autoLinkToExistingUser=true only when the credential proves
     // ownership of the email (consumed magic-link/code, or a provider-asserted
     // email_verified claim). Proof authorizes the link; without proof the
     // sign-in keeps the DIFFERENT-OAUTH refusal below.
-    const shouldLink = !hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser);
+    const shouldRelinkWorkOS =
+      args.provider === 'workos' && hasThisProvider && autoLinkToExistingUser;
+    const shouldLink =
+      (!hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser)) || shouldRelinkWorkOS;
 
     if (shouldLink) {
       let linkedUser = userByEmail;

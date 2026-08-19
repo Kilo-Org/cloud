@@ -160,6 +160,30 @@ export async function generateCloudAgentAttachmentUploadUrl({
 }
 
 /**
+ * Mark the caller's uploaded attachments as consumed by FULL R2 key, so the TTL
+ * reaper never deletes an object a sent message still references. This is the
+ * single place the `consumed_at` update runs. No-op when `keys` is empty.
+ */
+export async function markCloudAgentAttachmentUploadsConsumedByKeys(params: {
+  userId: string;
+  keys: string[];
+}): Promise<void> {
+  const { userId, keys } = params;
+  if (keys.length === 0) {
+    return;
+  }
+  await db
+    .update(cloud_agent_attachment_uploads)
+    .set({ consumed_at: sql`now()` })
+    .where(
+      and(
+        eq(cloud_agent_attachment_uploads.user_id, userId),
+        inArray(cloud_agent_attachment_uploads.r2_key, keys)
+      )
+    );
+}
+
+/**
  * Mark the caller's uploaded attachments as consumed server-side, so the TTL
  * reaper never deletes an object a sent message still references. Old clients
  * never call `markAttachmentsSent`, so the send mutations mark the rows for the
@@ -175,15 +199,7 @@ export async function markCloudAgentAttachmentUploadsConsumed(params: {
     return;
   }
   const keys = attachments.files.map(file => `${userId}/cloud-agent/${attachments.path}/${file}`);
-  await db
-    .update(cloud_agent_attachment_uploads)
-    .set({ consumed_at: sql`now()` })
-    .where(
-      and(
-        eq(cloud_agent_attachment_uploads.user_id, userId),
-        inArray(cloud_agent_attachment_uploads.r2_key, keys)
-      )
-    );
+  await markCloudAgentAttachmentUploadsConsumedByKeys({ userId, keys });
 }
 
 export type GenerateCloudAgentAttachmentDownloadUrlParams = {

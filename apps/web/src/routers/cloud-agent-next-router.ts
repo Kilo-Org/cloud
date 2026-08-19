@@ -45,10 +45,9 @@ import {
   generateCloudAgentAttachmentDownloadUrl,
   generateImageUploadUrl,
   markCloudAgentAttachmentUploadsConsumed,
+  markCloudAgentAttachmentUploadsConsumedByKeys,
 } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
-import { and, eq, inArray, sql } from 'drizzle-orm';
-import { cloud_agent_attachment_uploads } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { db } from '@/lib/drizzle';
@@ -408,15 +407,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
   markAttachmentsSent: baseProcedure
     .input(cloudAgentMarkAttachmentsSentSchema)
     .mutation(async ({ ctx, input }) => {
-      await db
-        .update(cloud_agent_attachment_uploads)
-        .set({ consumed_at: sql`now()` })
-        .where(
-          and(
-            eq(cloud_agent_attachment_uploads.user_id, ctx.user.id),
-            inArray(cloud_agent_attachment_uploads.r2_key, input.keys)
-          )
-        );
+      await markCloudAgentAttachmentUploadsConsumedByKeys({
+        userId: ctx.user.id,
+        keys: input.keys,
+      });
       return { success: true };
     }),
 

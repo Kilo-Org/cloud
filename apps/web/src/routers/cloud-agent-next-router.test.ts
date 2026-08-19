@@ -1,7 +1,6 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
-import { inspect } from 'util';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -58,18 +57,8 @@ const mockMarkCloudAgentAttachmentUploadsConsumed =
     (input: { userId: string; attachments?: { path: string; files: string[] } }) => Promise<void>
   >();
 
-// `markAttachmentsSent` is the only personal-router path that touches `db`
-// directly; every other db read/write goes through a mocked helper. Mock the
-// update chain so the test can assert the ownership-scoped predicate.
-const mockUpdateWhere = jest.fn();
-const mockUpdateSet = jest.fn(() => ({ where: mockUpdateWhere }));
-const mockUpdate = jest.fn(() => ({ set: mockUpdateSet }));
-
-jest.mock('@/lib/drizzle', () => ({
-  db: {
-    update: mockUpdate,
-  },
-}));
+const mockMarkCloudAgentAttachmentUploadsConsumedByKeys =
+  jest.fn<(input: { userId: string; keys: string[] }) => Promise<void>>();
 
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
@@ -154,6 +143,7 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl: mockGenerateCloudAgentAttachmentDownloadUrl,
   markCloudAgentAttachmentUploadsConsumed: mockMarkCloudAgentAttachmentUploadsConsumed,
+  markCloudAgentAttachmentUploadsConsumedByKeys: mockMarkCloudAgentAttachmentUploadsConsumedByKeys,
 }));
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({
@@ -680,24 +670,18 @@ describe('cloudAgentNextRouter.markAttachmentsSent', () => {
     jest.clearAllMocks();
   });
 
-  it('scopes the update to rows the caller owns, not just the matching keys', async () => {
+  it('marks the caller-owned rows via the shared keys helper with the full keys', async () => {
     const caller = createCaller({ user: { id: 'user-owner', is_admin: false } as User });
-    // A key that belongs to a different user: the `user_id` equality must still
+    // A key that belongs to a different user: the shared helper must still
     // scope the update to the caller, so another user's row is never marked.
     const foreignKey = 'user-other/cloud-agent/msg-1/file.pdf';
 
     await caller.markAttachmentsSent({ keys: [foreignKey] });
 
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
-    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
-    const whereArg = mockUpdateWhere.mock.calls[0][0];
-    const serialized = inspect(whereArg, { depth: 10 });
-    // The predicate must carry both the caller-scoped `user_id` equality and the
-    // `r2_key` membership. The caller id appears only in the equality (the key
-    // belongs to `user-other`), so a dropped `user_id` filter fails this test.
-    expect(serialized).toContain('user_id');
-    expect(serialized).toContain('user-owner');
-    expect(serialized).toContain('r2_key');
-    expect(serialized).toContain(foreignKey);
+    expect(mockMarkCloudAgentAttachmentUploadsConsumedByKeys).toHaveBeenCalledTimes(1);
+    expect(mockMarkCloudAgentAttachmentUploadsConsumedByKeys).toHaveBeenCalledWith({
+      userId: 'user-owner',
+      keys: [foreignKey],
+    });
   });
 });

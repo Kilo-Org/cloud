@@ -165,6 +165,7 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
   markCloudAgentAttachmentUploadsConsumed: mockMarkCloudAgentAttachmentUploadsConsumed,
+  markCloudAgentAttachmentUploadsConsumedByKeys: jest.fn(),
 }));
 
 jest.mock('@/routers/organizations/utils', () => {

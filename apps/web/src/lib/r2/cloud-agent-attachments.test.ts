@@ -1,8 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { inspect } from 'util';
 import type {
   generateCloudAgentAttachmentDownloadUrl as GenerateCloudAgentAttachmentDownloadUrl,
   generateCloudAgentAttachmentUploadUrl as GenerateCloudAgentAttachmentUploadUrl,
   generateImageUploadUrl as GenerateImageUploadUrl,
+  markCloudAgentAttachmentUploadsConsumed as MarkCloudAgentAttachmentUploadsConsumed,
+  markCloudAgentAttachmentUploadsConsumedByKeys as MarkCloudAgentAttachmentUploadsConsumedByKeys,
 } from './cloud-agent-attachments';
 
 jest.mock('./client', () => ({
@@ -25,6 +28,10 @@ jest.mock('@aws-sdk/client-s3', () => ({
 
 const mockInsertValues = jest.fn();
 
+const mockUpdateWhere = jest.fn();
+const mockUpdateSet = jest.fn(() => ({ where: mockUpdateWhere }));
+const mockUpdate = jest.fn(() => ({ set: mockUpdateSet }));
+
 jest.mock('@/lib/drizzle', () => ({
   db: {
     insert: () => ({
@@ -33,6 +40,7 @@ jest.mock('@/lib/drizzle', () => ({
         return { onConflictDoNothing: () => Promise.resolve() };
       },
     }),
+    update: mockUpdate,
   },
 }));
 
@@ -45,6 +53,8 @@ let mockGetSignedUrl: jest.Mock<
 let generateCloudAgentAttachmentDownloadUrl: typeof GenerateCloudAgentAttachmentDownloadUrl;
 let generateCloudAgentAttachmentUploadUrl: typeof GenerateCloudAgentAttachmentUploadUrl;
 let generateImageUploadUrl: typeof GenerateImageUploadUrl;
+let markCloudAgentAttachmentUploadsConsumed: typeof MarkCloudAgentAttachmentUploadsConsumed;
+let markCloudAgentAttachmentUploadsConsumedByKeys: typeof MarkCloudAgentAttachmentUploadsConsumedByKeys;
 
 describe('cloud-agent attachment upload URL signing', () => {
   beforeAll(async () => {
@@ -56,6 +66,9 @@ describe('cloud-agent attachment upload URL signing', () => {
     generateCloudAgentAttachmentDownloadUrl = attachments.generateCloudAgentAttachmentDownloadUrl;
     generateCloudAgentAttachmentUploadUrl = attachments.generateCloudAgentAttachmentUploadUrl;
     generateImageUploadUrl = attachments.generateImageUploadUrl;
+    markCloudAgentAttachmentUploadsConsumed = attachments.markCloudAgentAttachmentUploadsConsumed;
+    markCloudAgentAttachmentUploadsConsumedByKeys =
+      attachments.markCloudAgentAttachmentUploadsConsumedByKeys;
   });
 
   beforeEach(() => {
@@ -203,5 +216,60 @@ describe('cloud-agent attachment download URL signing', () => {
       })
     ).rejects.toThrow();
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloud-agent attachment consumed marking', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('no-ops on an empty key list without touching the db', async () => {
+    await markCloudAgentAttachmentUploadsConsumedByKeys({ userId: 'user-1', keys: [] });
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('marks rows by full key scoped to the caller', async () => {
+    const foreignKey = 'user-other/cloud-agent/msg-1/file.pdf';
+
+    await markCloudAgentAttachmentUploadsConsumedByKeys({
+      userId: 'user-owner',
+      keys: [foreignKey],
+    });
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    const whereArg = mockUpdateWhere.mock.calls[0][0];
+    const serialized = inspect(whereArg, { depth: 10 });
+    // The predicate must carry both the caller-scoped `user_id` equality and the
+    // `r2_key` membership. The caller id appears only in the equality (the key
+    // belongs to `user-other`), so a dropped `user_id` filter fails this test.
+    expect(serialized).toContain('user_id');
+    expect(serialized).toContain('user-owner');
+    expect(serialized).toContain('r2_key');
+    expect(serialized).toContain(foreignKey);
+  });
+
+  it('rebuilds full keys from the wire shape and marks them', async () => {
+    await markCloudAgentAttachmentUploadsConsumed({
+      userId: 'user-1',
+      attachments: { path: 'msg-1', files: ['a.pdf', 'b.pdf'] },
+    });
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    const whereArg = mockUpdateWhere.mock.calls[0][0];
+    const serialized = inspect(whereArg, { depth: 10 });
+    expect(serialized).toContain('user-1/cloud-agent/msg-1/a.pdf');
+    expect(serialized).toContain('user-1/cloud-agent/msg-1/b.pdf');
+  });
+
+  it('no-ops when the wire shape is absent or has no files', async () => {
+    await markCloudAgentAttachmentUploadsConsumed({ userId: 'user-1' });
+    await markCloudAgentAttachmentUploadsConsumed({
+      userId: 'user-1',
+      attachments: { path: 'msg-1', files: [] },
+    });
+
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

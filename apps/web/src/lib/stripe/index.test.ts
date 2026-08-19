@@ -3751,4 +3751,363 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       processTopUpMock.mockRestore();
     }
   });
+
+  test('invoice.paid dispatches zero-dollar KiloClaw invoices to settlement', async () => {
+    const handleKiloClawInvoicePaid = jest.fn<
+      Promise<void>,
+      [{ eventId: string; invoice: Stripe.Invoice }]
+    >();
+    handleKiloClawInvoicePaid.mockResolvedValue(undefined);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_zero_invoice_dispatch',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_zero_invoice_dispatch',
+          object: 'invoice',
+          amount_paid: 0,
+          charge: null,
+          currency: 'usd',
+          parent: {
+            subscription_details: {
+              subscription: 'sub_zero_invoice_dispatch',
+            },
+          },
+          lines: {
+            data: [
+              {
+                pricing: {
+                  price_details: {
+                    price: process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID,
+                  },
+                },
+                period: {
+                  start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                  end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+                },
+              },
+            ],
+          },
+        } as unknown as Stripe.Invoice,
+        previous_attributes: {},
+      },
+    };
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/kiloclaw/stripe-handlers', () => {
+        const actual = jest.requireActual<typeof kiloclawStripeHandlersModule>(
+          '@/lib/kiloclaw/stripe-handlers'
+        );
+        return {
+          __esModule: true,
+          ...actual,
+          handleKiloClawInvoicePaid,
+        };
+      });
+
+      await jest.isolateModulesAsync(async () => {
+        const { processStripePaymentEventHook: isolatedProcessStripePaymentEventHook } =
+          await import('@/lib/stripe');
+        await isolatedProcessStripePaymentEventHook(event);
+      });
+
+      expect(handleKiloClawInvoicePaid).toHaveBeenCalledWith({
+        eventId: 'evt_zero_invoice_dispatch',
+        invoice: event.data.object,
+      });
+    } finally {
+      jest.dontMock('@/lib/kiloclaw/stripe-handlers');
+      jest.resetModules();
+    }
+  });
+
+  test('invoice.paid dispatches metadata-resolved Kilo Pass invoices without price SKU lines', async () => {
+    const handleKiloPassInvoicePaid = jest.fn<
+      Promise<void>,
+      [{ eventId: string; invoice: Stripe.Invoice; stripe: Stripe }]
+    >();
+    handleKiloPassInvoicePaid.mockResolvedValue(undefined);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_kilo_pass_metadata_dispatch',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_kilo_pass_metadata_dispatch',
+          object: 'invoice',
+          amount_paid: 1900,
+          currency: 'usd',
+          parent: {
+            subscription_details: {
+              subscription: 'sub_kilo_pass_metadata_dispatch',
+              metadata: {
+                type: 'kilo-pass',
+                kiloUserId: 'user_kilo_pass_metadata_dispatch',
+                tier: KiloPassTier.Tier19,
+                cadence: KiloPassCadence.Monthly,
+              },
+            },
+          },
+          lines: {
+            data: [],
+          },
+        } as unknown as Stripe.Invoice,
+        previous_attributes: {},
+      },
+    };
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/kilo-pass/stripe-handlers', () => {
+        const actual = jest.requireActual<typeof kiloPassStripeHandlersModule>(
+          '@/lib/kilo-pass/stripe-handlers'
+        );
+        return {
+          __esModule: true,
+          ...actual,
+          handleKiloPassInvoicePaid,
+        };
+      });
+
+      await jest.isolateModulesAsync(async () => {
+        const { processStripePaymentEventHook: isolatedProcessStripePaymentEventHook } =
+          await import('@/lib/stripe');
+        await isolatedProcessStripePaymentEventHook(event);
+      });
+
+      expect(handleKiloPassInvoicePaid).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: 'evt_kilo_pass_metadata_dispatch',
+          invoice: event.data.object,
+        })
+      );
+    } finally {
+      jest.dontMock('@/lib/kilo-pass/stripe-handlers');
+      jest.resetModules();
+    }
+  });
+
+  test('routes an organization Kilo Pass invoice before the personal Kilo Pass handler', async () => {
+    const handleOrganizationKiloPassInvoicePaid = jest.fn().mockResolvedValue(undefined);
+    const handleKiloPassInvoicePaid = jest.fn().mockResolvedValue(undefined);
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_org_kilo_pass_first',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_org_kilo_pass_first',
+          object: 'invoice',
+          parent: {
+            subscription_details: {
+              subscription: 'sub_org_kilo_pass_first',
+              metadata: {
+                type: 'kilo-pass-org',
+                organizationId: 'org_1',
+                kiloUserId: 'user_1',
+                tier: 'tier_19',
+                cadence: 'monthly',
+              },
+            },
+          },
+          lines: {
+            data: [
+              { pricing: { price_details: { price: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID } } },
+            ],
+          },
+        } as unknown as Stripe.Invoice,
+        previous_attributes: {},
+      },
+    } as Stripe.Event;
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/kilo-pass-org/stripe-adapter', () => ({
+        endPendingOrganizationKiloPassForTerminalInvoice: jest.fn(),
+        handleOrganizationKiloPassInvoicePaid,
+        handleOrganizationKiloPassPaymentAdverseForInvoice: jest.fn(),
+        handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
+      }));
+      jest.doMock('@/lib/kilo-pass/stripe-handlers', () => {
+        const actual = jest.requireActual<typeof kiloPassStripeHandlersModule>(
+          '@/lib/kilo-pass/stripe-handlers'
+        );
+        return { __esModule: true, ...actual, handleKiloPassInvoicePaid };
+      });
+
+      await jest.isolateModulesAsync(async () => {
+        const { processStripePaymentEventHook: isolatedProcessStripePaymentEventHook } =
+          await import('@/lib/stripe');
+        await isolatedProcessStripePaymentEventHook(event);
+      });
+
+      expect(handleOrganizationKiloPassInvoicePaid).toHaveBeenCalledWith({
+        invoice: event.data.object,
+      });
+      expect(handleKiloPassInvoicePaid).not.toHaveBeenCalled();
+    } finally {
+      jest.dontMock('@/lib/kilo-pass-org/stripe-adapter');
+      jest.dontMock('@/lib/kilo-pass/stripe-handlers');
+      jest.resetModules();
+    }
+  });
+
+  test.each(['invoice.voided', 'invoice.marked_uncollectible'] as const)(
+    'ends a pending organization checkout for terminal event %s',
+    async type => {
+      const endPendingOrganizationKiloPassForTerminalInvoice = jest.fn().mockResolvedValue(true);
+      const invoice = {
+        id: 'in_org_terminal',
+        object: 'invoice',
+        parent: {
+          subscription_details: {
+            subscription: 'sub_org_terminal',
+            metadata: {
+              type: 'kilo-pass-org',
+              organizationId: 'org_1',
+              kiloUserId: 'user_1',
+              tier: 'tier_19',
+              cadence: 'monthly',
+            },
+          },
+        },
+        lines: { data: [] },
+      } as unknown as Stripe.Invoice;
+      try {
+        jest.resetModules();
+        jest.doMock('@/lib/kilo-pass-org/stripe-adapter', () => ({
+          endPendingOrganizationKiloPassForTerminalInvoice,
+          handleOrganizationKiloPassInvoicePaid: jest.fn(),
+          handleOrganizationKiloPassPaymentAdverseForInvoice: jest.fn(),
+          handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
+        }));
+        await jest.isolateModulesAsync(async () => {
+          const { processStripePaymentEventHook: dispatch } = await import('@/lib/stripe');
+          await dispatch({
+            ...baseStripeEvent(),
+            type,
+            data: { object: invoice, previous_attributes: {} },
+          } as Stripe.Event);
+        });
+        expect(endPendingOrganizationKiloPassForTerminalInvoice).toHaveBeenCalledWith(invoice);
+      } finally {
+        jest.dontMock('@/lib/kilo-pass-org/stripe-adapter');
+        jest.resetModules();
+      }
+    }
+  );
+
+  test.each([
+    'customer.subscription.created',
+    'customer.subscription.updated',
+    'customer.subscription.deleted',
+  ] as const)(
+    'dispatches %s organization lifecycle events to the organization adapter',
+    async type => {
+      const handleOrganizationKiloPassSubscriptionEvent = jest.fn().mockResolvedValue(undefined);
+      const subscription = {
+        id: 'sub_org_lifecycle_dispatch',
+        metadata: { type: 'kilo-pass-org' },
+      } as unknown as Stripe.Subscription;
+      try {
+        jest.resetModules();
+        jest.doMock('@/lib/kilo-pass-org/stripe-adapter', () => ({
+          endPendingOrganizationKiloPassForTerminalInvoice: jest.fn(),
+          handleOrganizationKiloPassInvoicePaid: jest.fn(),
+          handleOrganizationKiloPassPaymentAdverseForInvoice: jest.fn(),
+          handleOrganizationKiloPassSubscriptionEvent,
+        }));
+        jest.doMock('@/lib/organizations/organization-seats', () => ({
+          handleSubscriptionEvent: jest.fn().mockResolvedValue(undefined),
+        }));
+        await jest.isolateModulesAsync(async () => {
+          const { processStripePaymentEventHook: dispatch } = await import('@/lib/stripe');
+          await dispatch({
+            ...baseStripeEvent(),
+            type,
+            data: { object: subscription, previous_attributes: {} },
+          } as Stripe.Event);
+        });
+        expect(handleOrganizationKiloPassSubscriptionEvent).toHaveBeenCalledWith(subscription);
+      } finally {
+        jest.dontMock('@/lib/kilo-pass-org/stripe-adapter');
+        jest.dontMock('@/lib/organizations/organization-seats');
+        jest.resetModules();
+      }
+    }
+  );
+
+  test.each([
+    ['charge.refunded', { id: 'ch_org_adverse', amount_refunded: 1900 }],
+    [
+      'charge.dispute.created',
+      {
+        id: 'dp_org_adverse',
+        charge: 'ch_org_adverse',
+        amount: 1900,
+        currency: 'usd',
+        created: 1_767_225_600,
+      },
+    ],
+  ] as const)(
+    'suspends organization agreements for %s without affiliate context',
+    async (type, object) => {
+      const handleOrganizationKiloPassPaymentAdverseForInvoice = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      const invoice = {
+        id: 'in_org_adverse',
+        object: 'invoice',
+        parent: {
+          subscription_details: {
+            metadata: {
+              type: 'kilo-pass-org',
+              organizationId: 'org_1',
+              kiloUserId: 'user_1',
+              tier: 'tier_19',
+              cadence: 'monthly',
+            },
+          },
+        },
+        lines: { data: [] },
+      } as unknown as Stripe.Invoice;
+      try {
+        jest.resetModules();
+        jest.doMock('@/lib/kilo-pass-org/stripe-adapter', () => ({
+          endPendingOrganizationKiloPassForTerminalInvoice: jest.fn(),
+          handleOrganizationKiloPassInvoicePaid: jest.fn(),
+          handleOrganizationKiloPassPaymentAdverseForInvoice,
+          handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
+        }));
+        jest.doMock('@/lib/stripe-client', () => ({
+          client: {
+            charges: {
+              retrieve: jest.fn().mockResolvedValue({
+                id: 'ch_org_adverse',
+                invoice,
+              }),
+            },
+            invoices: { retrieve: jest.fn().mockResolvedValue(invoice) },
+          },
+        }));
+        await jest.isolateModulesAsync(async () => {
+          const { processStripePaymentEventHook: dispatch } = await import('@/lib/stripe');
+          await dispatch({
+            ...baseStripeEvent(),
+            type,
+            data: { object, previous_attributes: {} },
+          } as Stripe.Event);
+        });
+        expect(handleOrganizationKiloPassPaymentAdverseForInvoice).toHaveBeenCalledWith(invoice);
+      } finally {
+        jest.dontMock('@/lib/kilo-pass-org/stripe-adapter');
+        jest.dontMock('@/lib/stripe-client');
+        jest.resetModules();
+      }
+    }
+  );
 });

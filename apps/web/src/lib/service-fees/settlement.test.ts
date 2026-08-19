@@ -722,6 +722,30 @@ describe('settleKiloPassInvoiceServiceFee', () => {
     });
   });
 
+  test('pre-activation invoice without an assessment does not alert', async () => {
+    const store = createMemorySettlementStore();
+    const sendAlert: NonNullable<KiloPassServiceFeeSettlementDependencies['sendAlert']> = jest.fn(
+      async () => undefined
+    );
+    const result = await settleKiloPassInvoiceServiceFee({
+      invoice: paidInvoice([pricedLine(KILO_PASS_PRICE_ID, 4_900)], {
+        id: 'in_legacy',
+        amount_paid: 4_900,
+        created: ACTIVATION - 1,
+      }),
+      stripe: { invoices: { listLineItems: async () => ({ data: [], has_more: false }) } },
+      store,
+      deps: { sendAlert },
+    });
+
+    expect(result).toMatchObject({
+      status: 'ignored',
+      settledProductMinor: 4_900,
+      assessment: null,
+    });
+    expect(sendAlert).not.toHaveBeenCalled();
+  });
+
   test('missing assessment ignores fee revenue and returns product-only amount', async () => {
     const store = createMemorySettlementStore();
     const sendAlert: NonNullable<KiloPassServiceFeeSettlementDependencies['sendAlert']> = jest.fn(

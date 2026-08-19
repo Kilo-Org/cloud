@@ -383,3 +383,58 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
     expect(fetchAllRunMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {
+  beforeEach(() => {
+    fetchNextPageMock.mockReset();
+    fetchAllRunMock.mockReset();
+    rowRenders.length = 0;
+    flashListProps.current = null;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      isRunning: false,
+      loadedFiles: 0,
+      totalFiles: null,
+      error: null,
+    };
+  });
+
+  it('calls the latest viewed.toggle after the hook returns a new viewed object', async () => {
+    const toggleA = vi.fn(() => undefined);
+    viewedResult = { isViewed: () => false, toggle: toggleA, isLoading: false };
+
+    const { renderer } = await mountNavigator();
+
+    // The hook now returns a new `viewed` object (e.g. after a head-SHA change).
+    const toggleB = vi.fn(() => undefined);
+    viewedResult = { isViewed: () => false, toggle: toggleB, isLoading: false };
+    typeSearch(renderer, 'src');
+
+    // The cached row callback must call the latest toggle, not the stale one.
+    const firstRender = rowRenders[0];
+    if (!firstRender) {
+      throw new Error('expected a row render');
+    }
+    const onToggleViewed = firstRender.onToggleViewed;
+    act(() => {
+      onToggleViewed();
+    });
+
+    expect(toggleB).toHaveBeenCalledTimes(1);
+    expect(toggleA).not.toHaveBeenCalled();
+  });
+});

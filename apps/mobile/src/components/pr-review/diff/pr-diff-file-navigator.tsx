@@ -152,27 +152,31 @@ export function PrDiffFileNavigator({
   );
 
   // Cache per-path callbacks so `MemoNavigatorFileRow`'s memo hits across a
-  // search re-render. The handlers are `useCallback`-stable, so a cached
-  // callback never goes stale while the sheet is mounted.
+  // search re-render. The closures read the latest handlers through refs, so
+  // they stay identity-stable (memo keeps hitting) but never go stale when
+  // `handleSelectFile` / `handleToggleViewed` change identity (e.g. a head-SHA
+  // change swaps `viewed.toggle`).
+  const handleSelectFileRef = useRef(handleSelectFile);
+  handleSelectFileRef.current = handleSelectFile;
+  const handleToggleViewedRef = useRef(handleToggleViewed);
+  handleToggleViewedRef.current = handleToggleViewed;
+
   const rowCallbacksRef = useRef(new Map<string, RowCallbacks>());
-  const getRowCallbacks = useCallback(
-    (path: string) => {
-      let callbacks = rowCallbacksRef.current.get(path);
-      if (!callbacks) {
-        callbacks = {
-          handleSelect: () => {
-            handleSelectFile(path);
-          },
-          handleToggleViewed: () => {
-            handleToggleViewed(path);
-          },
-        };
-        rowCallbacksRef.current.set(path, callbacks);
-      }
-      return callbacks;
-    },
-    [handleSelectFile, handleToggleViewed]
-  );
+  const getRowCallbacks = useCallback((path: string) => {
+    let callbacks = rowCallbacksRef.current.get(path);
+    if (!callbacks) {
+      callbacks = {
+        handleSelect: () => {
+          handleSelectFileRef.current(path);
+        },
+        handleToggleViewed: () => {
+          handleToggleViewedRef.current(path);
+        },
+      };
+      rowCallbacksRef.current.set(path, callbacks);
+    }
+    return callbacks;
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: PrReviewFile }) => {

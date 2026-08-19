@@ -45,10 +45,10 @@ Create `apps/web/src/lib/service-fees/constants.ts` with these code-owned consta
 ```ts
 export const SERVICE_FEE_RATE_BASIS_POINTS = 500;
 export const SERVICE_FEE_RATE_DENOMINATOR = 10_000;
-export const SERVICE_FEE_ACTIVATION_UNIX_SECONDS = 1_788_220_800; // 2026-09-01T00:00:00Z
+export const SERVICE_FEE_ACTIVATION_UNIX_SECONDS = 1_793_491_200; // 2026-11-01T00:00:00Z
 export const SERVICE_FEE_DESCRIPTION = 'Service fee (5%)';
 export const SERVICE_FEE_METADATA_TYPE = 'kilo-service-fee';
-export const SERVICE_FEE_VERSION = '2026-09-01-v1';
+export const SERVICE_FEE_VERSION = '2026-11-01-v1';
 ```
 
 Do not add an environment variable, PostHog flag, database setting, or other runtime global switch. Rollback is the emergency off mechanism.
@@ -217,7 +217,7 @@ One row per commercial billing event:
 | Column | Type | Rules |
 |---|---|---|
 | `assessment_key` | text | Primary key; not null and immutable |
-| `version` | text | Not null; initial value `2026-09-01-v1` |
+| `version` | text | Not null; initial value `2026-11-01-v1` |
 | `flow` | text | Not null; checked against flow values |
 | `outcome` | text | Not null; `enumCheck` against outcome values |
 | `currency` | text | Not null, lowercase ISO code |
@@ -374,7 +374,7 @@ Every positive fee line must contain:
 ```ts
 {
   type: 'kilo-service-fee',
-  serviceFeeVersion: '2026-09-01-v1',
+  serviceFeeVersion: '2026-11-01-v1',
   serviceFeeAssessmentKey: assessmentKey,
   serviceFeeRateBasisPoints: '500',
 }

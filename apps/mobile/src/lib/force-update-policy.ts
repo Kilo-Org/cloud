@@ -1,18 +1,16 @@
+import * as z from 'zod';
+
 import { isVersionBelow } from '@kilocode/app-shared/app-version';
 
 export type ForceUpdateCheck = { ok: boolean; data: unknown };
 
 type MinVersionBody = { ios: string; android: string };
 
+const minVersionBodySchema = z.object({ ios: z.string(), android: z.string() });
+
 function parseMinVersionBody(data: unknown): MinVersionBody | undefined {
-  if (typeof data !== 'object' || data === null) {
-    return undefined;
-  }
-  const { ios, android } = data as { ios?: unknown; android?: unknown };
-  if (typeof ios !== 'string' || typeof android !== 'string') {
-    return undefined;
-  }
-  return { ios, android };
+  const result = minVersionBodySchema.safeParse(data);
+  return result.success ? result.data : undefined;
 }
 
 export type ForceUpdateState =

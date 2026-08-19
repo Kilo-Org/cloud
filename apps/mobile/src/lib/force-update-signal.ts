@@ -1,22 +1,38 @@
+import * as z from 'zod';
+
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
 let forceUpdateRequired = false;
 let clientUpToDate = false;
 
-function readUpstreamCode(error: unknown): unknown {
-  if (typeof error !== 'object' || error === null) {
+const upstreamCodePayloadSchema = z.object({ upstreamCode: z.string().optional() });
+
+// `data` and `shape` are opaque here: each is parsed independently so a
+// present-but-invalid `data` still falls through to `shape`, exactly as the
+// pre-Zod code did (read `data` first, then `shape.data`).
+const trpcErrorEnvelopeSchema = z.object({
+  data: z.unknown().optional(),
+  shape: z.unknown().optional(),
+});
+
+const shapeEnvelopeSchema = z.object({ data: z.unknown().optional() }).nullish();
+
+function readUpstreamCode(error: unknown): string | undefined {
+  const envelope = trpcErrorEnvelopeSchema.safeParse(error);
+  if (!envelope.success) {
     return undefined;
   }
-  const direct = (error as { data?: unknown }).data;
-  if (typeof direct === 'object' && direct !== null) {
-    return (direct as { upstreamCode?: unknown }).upstreamCode;
+  const direct = upstreamCodePayloadSchema.safeParse(envelope.data.data);
+  if (direct.success) {
+    return direct.data.upstreamCode;
   }
-  const shaped = (error as { shape?: { data?: unknown } }).shape?.data;
-  if (typeof shaped === 'object' && shaped !== null) {
-    return (shaped as { upstreamCode?: unknown }).upstreamCode;
+  const shape = shapeEnvelopeSchema.safeParse(envelope.data.shape);
+  if (!shape.success || shape.data == null) {
+    return undefined;
   }
-  return undefined;
+  const shaped = upstreamCodePayloadSchema.safeParse(shape.data.data);
+  return shaped.success ? shaped.data.upstreamCode : undefined;
 }
 
 function notify(): void {

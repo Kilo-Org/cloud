@@ -11,10 +11,12 @@ import { AppState, type AppStateStatus, Platform } from 'react-native';
  * (PR review, security-agent setup, provider connect) shares one
  * implementation of the launch sentinel + AppState listener.
  */
-export function useExternalAuthReturn(onReturn: () => void): {
+export type UseExternalAuthReturn = {
   markLaunched: () => void;
   clearLaunch: () => void;
-} {
+};
+
+export function useExternalAuthReturn(onReturn: () => void): UseExternalAuthReturn {
   const launchedAt = useRef<number | null>(null);
 
   useEffect(() => {

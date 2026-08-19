@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as z from 'zod';
 
 // Module-local key: this slice does not own storage-keys.ts, so the key is
 // declared here. It is deliberately NOT deleted on sign-out and needs no
@@ -80,18 +81,17 @@ export function _resetPendingExternalAuthForTests(): void {
   pendingExternalAuthWriteChain = undefined;
 }
 
+const pendingExternalAuthSchema = z.object({
+  deviceCode: z.string(),
+  userCode: z.string(),
+  verificationUrl: z.string(),
+  startedAt: z.number(),
+});
+
 function parsePendingExternalAuth(raw: string): PendingExternalAuth | null {
   try {
-    const value = JSON.parse(raw) as Partial<PendingExternalAuth>;
-    if (
-      typeof value.deviceCode !== 'string' ||
-      typeof value.userCode !== 'string' ||
-      typeof value.verificationUrl !== 'string' ||
-      typeof value.startedAt !== 'number'
-    ) {
-      return null;
-    }
-    return value as PendingExternalAuth;
+    const result = pendingExternalAuthSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : null;
   } catch {
     return null;
   }

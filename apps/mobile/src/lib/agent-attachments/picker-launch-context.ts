@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import * as z from 'zod';
 
 import { PICKER_LAUNCH_CONTEXT_KEY } from '@/lib/storage-keys';
 
@@ -14,6 +15,13 @@ export async function writePickerLaunchContext(context: PickerLaunchContext): Pr
   await SecureStore.setItemAsync(PICKER_LAUNCH_CONTEXT_KEY, JSON.stringify(context));
 }
 
+const pickerLaunchContextSchema = z.object({
+  userId: z.string(),
+  surface: z.enum(['agent-new', 'agent-chat']),
+  sessionId: z.string().nullable(),
+  launchedAt: z.number(),
+});
+
 /** Read and parse the stored context. Returns `null` on absence or a bad shape. */
 export async function readPickerLaunchContext(): Promise<PickerLaunchContext | null> {
   try {
@@ -21,16 +29,8 @@ export async function readPickerLaunchContext(): Promise<PickerLaunchContext | n
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as Partial<PickerLaunchContext>;
-    if (
-      typeof parsed.userId !== 'string' ||
-      (parsed.surface !== 'agent-new' && parsed.surface !== 'agent-chat') ||
-      (parsed.sessionId !== null && typeof parsed.sessionId !== 'string') ||
-      typeof parsed.launchedAt !== 'number'
-    ) {
-      return null;
-    }
-    return parsed as PickerLaunchContext;
+    const result = pickerLaunchContextSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : null;
   } catch {
     return null;
   }

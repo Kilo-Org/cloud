@@ -19,6 +19,11 @@ const POLL_BASE_INTERVAL_MS = 3000;
 const POLL_MAX_INTERVAL_MS = 15_000;
 const POLL_OVERALL_TIMEOUT_MS = 5 * 60 * 1000;
 
+export type DeviceAuthPollHandle = {
+  cleanup: () => void;
+  pollNow: () => void;
+};
+
 export function startDeviceAuthPoll(params: {
   code: string;
   deviceCode: string;
@@ -26,7 +31,7 @@ export function startDeviceAuthPoll(params: {
   setState: (updater: (prev: DeviceAuthState) => DeviceAuthState) => void;
   cleanup: () => void;
   startedAt?: number;
-}): { cleanup: () => void; pollNow: () => void } {
+}): DeviceAuthPollHandle {
   const { code, deviceCode, signal, setState, cleanup } = params;
 
   // A resumed transaction reuses the original start clock so its overall

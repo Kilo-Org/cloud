@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import * as z from 'zod';
 
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
@@ -211,25 +212,20 @@ async function readPersistedPendingDeepLink(): Promise<string | null> {
   }
 }
 
+const pendingDeepLinkRecordSchema = z.object({
+  href: z.string(),
+  source: z.enum(['universal-link', 'notification']),
+  storedAt: z.number(),
+});
+
 function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
   try {
     const parsed: unknown = JSON.parse(raw);
-    return isPendingDeepLinkRecord(parsed) ? parsed : null;
+    const result = pendingDeepLinkRecordSchema.safeParse(parsed);
+    return result.success ? result.data : null;
   } catch {
     return null;
   }
-}
-
-function isPendingDeepLinkRecord(value: unknown): value is PendingDeepLinkRecord {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.href === 'string' &&
-    (record.source === 'universal-link' || record.source === 'notification') &&
-    typeof record.storedAt === 'number'
-  );
 }
 
 function readLaunchUrl(): string | null {

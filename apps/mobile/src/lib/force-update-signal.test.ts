@@ -38,6 +38,16 @@ describe('force-update-signal', () => {
     expect(getForceUpdateSignalSnapshot()).toBe(false);
   });
 
+  it('falls through to shape.data when data is not an object', () => {
+    reportTrpcError({ data: 'nope', shape: { data: { upstreamCode: 'app_update_required' } } });
+    expect(getForceUpdateSignalSnapshot()).toBe(true);
+  });
+
+  it('reads data before a malformed shape', () => {
+    reportTrpcError({ shape: null, data: { upstreamCode: 'app_update_required' } });
+    expect(getForceUpdateSignalSnapshot()).toBe(true);
+  });
+
   it('subscribeToForceUpdateSignal notifies and unsubscribes', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribeToForceUpdateSignal(listener);

@@ -36,7 +36,7 @@ afterAll(() => {
 });
 
 function request(
-  kind: GatewayRequest['kind'] = 'messages',
+  kind: GatewayRequest['kind'] = 'chat_completions',
   provider?: GatewayRequest['body']['provider']
 ): GatewayRequest {
   if (kind === 'responses') {
@@ -84,12 +84,18 @@ describe('getPercentageRoutedPartnerProvider', () => {
     expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
   });
 
-  it.each(['chat_completions', 'messages', 'responses'] as const)('routes %s requests', kind => {
-    expect(selectPartner({ request: request(kind) })).toBe(PROVIDERS.FRIENDLI_GLM);
+  it('routes chat completions requests', () => {
+    expect(selectPartner()).toBe(PROVIDERS.FRIENDLI_GLM);
+  });
+
+  it.each(['messages', 'responses'] as const)('does not route untested %s requests', kind => {
+    expect(selectPartner({ request: request(kind) })).toBeNull();
   });
 
   it('allows an empty provider object', () => {
-    expect(selectPartner({ request: request('messages', {}) })).toBe(PROVIDERS.FRIENDLI_GLM);
+    expect(selectPartner({ request: request('chat_completions', {}) })).toBe(
+      PROVIDERS.FRIENDLI_GLM
+    );
   });
 
   it.each([
@@ -97,16 +103,25 @@ describe('getPercentageRoutedPartnerProvider', () => {
     [PERPLEXITY_KIMI_PUBLIC_ID, 'perplexity', PROVIDERS.PERPLEXITY_KIMI],
   ])('honors provider filters for %s', (requestedModel, providerId, expectedProvider) => {
     expect(
-      selectPartner({ requestedModel, request: request('messages', { only: [providerId] }) })
+      selectPartner({
+        requestedModel,
+        request: request('chat_completions', { only: [providerId] }),
+      })
     ).toBe(expectedProvider);
     expect(
-      selectPartner({ requestedModel, request: request('messages', { ignore: ['openai'] }) })
+      selectPartner({
+        requestedModel,
+        request: request('chat_completions', { ignore: ['openai'] }),
+      })
     ).toBe(expectedProvider);
     expect(
-      selectPartner({ requestedModel, request: request('messages', { only: ['openai'] }) })
+      selectPartner({ requestedModel, request: request('chat_completions', { only: ['openai'] }) })
     ).toBeNull();
     expect(
-      selectPartner({ requestedModel, request: request('messages', { ignore: [providerId] }) })
+      selectPartner({
+        requestedModel,
+        request: request('chat_completions', { ignore: [providerId] }),
+      })
     ).toBeNull();
   });
 
@@ -114,7 +129,7 @@ describe('getPercentageRoutedPartnerProvider', () => {
     [FRIENDLI_GLM_PUBLIC_ID, { data_collection: 'deny' } as const, PROVIDERS.FRIENDLI_GLM],
     [PERPLEXITY_KIMI_PUBLIC_ID, { zdr: true } as const, PROVIDERS.PERPLEXITY_KIMI],
   ])('routes ZDR model %s with data policy options', (requestedModel, provider, expected) => {
-    expect(selectPartner({ requestedModel, request: request('messages', provider) })).toBe(
+    expect(selectPartner({ requestedModel, request: request('chat_completions', provider) })).toBe(
       expected
     );
   });

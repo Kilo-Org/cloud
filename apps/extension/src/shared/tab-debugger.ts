@@ -157,10 +157,6 @@ export interface WebMcpDiscoveryResult {
   readonly tools: WebMcpToolDescriptor[];
 }
 
-export interface WebMcpExecutionResult {
-  readonly value: unknown;
-}
-
 export type EvalTabResult =
   | {
       readonly description?: string;

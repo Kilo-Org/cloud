@@ -119,9 +119,7 @@ describe('web MCP tool call events', () => {
   const route: WebMcpToolRoute = {
     definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
     documentId: 'doc-1',
-    gatewayToolName: 'search',
     origin: 'https://example.com',
-    pageToolName: 'search',
     tabId: 7,
   };
 

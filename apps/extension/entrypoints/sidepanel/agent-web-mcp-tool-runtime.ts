@@ -6,8 +6,7 @@ import {
   isTabDebuggerResponse,
 } from '@/src/shared/tab-debugger';
 import type { EvalTabResult, WebMcpDiscoveryResult } from '@/src/shared/tab-debugger';
-
-const MAX_WEB_MCP_RESULT_CHARS = 64 * 1024;
+import { capRemoteMcpToolResult } from '@/src/shared/remote-mcp-tools';
 
 /*
  * Chrome's eval returns a JSON string. Parse it into a structured value so the
@@ -24,20 +23,6 @@ const parseWebMcpResult = (value: unknown): unknown => {
   } catch {
     return value;
   }
-};
-
-// Mirror capRemoteMcpToolResult: keep a result under 64 KiB verbatim; truncate a longer one before it enters conversation state.
-const capWebMcpToolResult = (value: unknown): unknown => {
-  const serialized = JSON.stringify(value);
-
-  if (serialized === undefined || serialized.length <= MAX_WEB_MCP_RESULT_CHARS) {
-    return value;
-  }
-
-  return {
-    truncated: true,
-    value: serialized.slice(0, MAX_WEB_MCP_RESULT_CHARS),
-  };
 };
 
 const isRecordObject = (value: unknown): value is Record<string, unknown> =>
@@ -119,7 +104,7 @@ export const executeWebMcpToolCall = async (event: WebMcpToolCallEvent): Promise
       return response.result;
     }
 
-    return { ok: true, value: capWebMcpToolResult(parseWebMcpResult(response.result.value)) };
+    return { ok: true, value: capRemoteMcpToolResult(parseWebMcpResult(response.result.value)) };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to run WebMCP tool.',

@@ -39,9 +39,7 @@ describe('webMCP tools', () => {
     ]);
     expect(result.routes.get('search_page')).toMatchObject({
       documentId: 'doc-1',
-      gatewayToolName: 'search_page',
       origin: 'https://example.com',
-      pageToolName: 'search_page',
       tabId: 1,
     });
   });
@@ -168,9 +166,7 @@ describe('webMCP tools', () => {
         objectSchema,
       ]),
       documentId: 'doc-42',
-      gatewayToolName: 'search_page',
       origin: 'https://example.com',
-      pageToolName: 'search_page',
       tabId: 7,
     });
   });

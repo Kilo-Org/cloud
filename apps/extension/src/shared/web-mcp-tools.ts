@@ -2,8 +2,6 @@ import type { KiloGatewayToolDefinition, WebMcpGatewayToolName } from './kilo-ga
 import type { WebMcpToolDescriptor } from './tab-debugger';
 
 export interface WebMcpToolRoute {
-  readonly gatewayToolName: string;
-  readonly pageToolName: string;
   readonly tabId: number;
   readonly documentId: string;
   readonly origin: string;
@@ -116,9 +114,7 @@ export const buildWebMcpToolDefinitions = ({
       routes.set(name, {
         definitionSignature,
         documentId,
-        gatewayToolName: name,
         origin,
-        pageToolName: name,
         tabId,
       });
       gatewayTools.push({

@@ -32,6 +32,7 @@ const setQueriesDataMock = vi.fn();
 const setQueryDataMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const invalidateAgentSessionsMock = vi.fn();
+const scheduleCacheMaintenanceMock = vi.fn<(run: () => void) => void>();
 const toastErrorMock = vi.fn();
 const toastSuccessMock = vi.fn();
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -87,6 +88,12 @@ vi.mock('@/lib/agent-session-cache', () => ({
   },
 }));
 
+vi.mock('@/lib/query/infinite-retention', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    scheduleCacheMaintenanceMock(run);
+  },
+}));
+
 vi.mock('sonner-native', () => ({
   toast: { error: (msg: string) => toastErrorMock(msg) },
 }));
@@ -115,6 +122,7 @@ describe('useSessionMutations', () => {
     setQueryDataMock.mockReset();
     invalidateQueriesMock.mockReset();
     invalidateAgentSessionsMock.mockReset();
+    scheduleCacheMaintenanceMock.mockReset();
     toastErrorMock.mockReset();
     toastSuccessMock.mockReset();
     chainSaveMock.mockClear();
@@ -241,10 +249,17 @@ describe('useSessionMutations', () => {
       expect(toastErrorMock).toHaveBeenCalledWith('rename failed');
     });
 
-    it('onSettled still invalidates agent session queries', async () => {
+    it('onSettled still invalidates agent session queries', () => {
       useSessionMutations();
       const options = capturedOptions.rename;
-      await options?.onSettled?.();
+      options?.onSettled?.();
+
+      // The invalidation is deferred behind the interaction scheduler; drive
+      // the injected callback to run it in this turn.
+      const scheduled = scheduleCacheMaintenanceMock.mock.calls[0]?.[0];
+      expect(scheduled).toBeTypeOf('function');
+      scheduled?.();
+
       expect(invalidateAgentSessionsMock).toHaveBeenCalled();
     });
   });

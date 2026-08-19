@@ -21,6 +21,7 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
+import { scheduleCacheMaintenance, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 
@@ -100,17 +101,19 @@ export function buildStoredSessionsQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
   options?: UseAgentSessionsOptions
 ) {
-  return trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
-    staleTime: 30_000,
-    enabled: options?.enabled,
-    getNextPageParam: lastPage => lastPage.nextCursor,
-    // Native window-focus refetch stays on by default so Home and the Share
-    // Gate keep their OS-foreground refresh. The Agents list opts out: its
-    // screen runs an AppState 'active' callback through the wrapped refetch,
-    // so the native query lifecycle must not start a stored refetch that
-    // bypasses the operation coordinator shared with backfill and departure.
-    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
-  });
+  return withInfiniteRetention(
+    trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
+      staleTime: 30_000,
+      enabled: options?.enabled,
+      getNextPageParam: lastPage => lastPage.nextCursor,
+      // Native window-focus refetch stays on by default so Home and the Share
+      // Gate keep their OS-foreground refresh. The Agents list opts out: its
+      // screen runs an AppState 'active' callback through the wrapped refetch,
+      // so the native query lifecycle must not start a stored refetch that
+      // bypasses the operation coordinator shared with backfill and departure.
+      refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
+    })
+  );
 }
 
 function useStoredSessions(options?: UseAgentSessionsOptions) {
@@ -162,6 +165,25 @@ type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
 };
 
 /**
+ * Build the server-side session-search infinite-query options. Extracted as a
+ * pure builder (mirroring `buildStoredSessionsQueryOptions`) so the options
+ * are executable-tested without mounting the hook.
+ */
+export function buildAgentSessionSearchQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  options: UseAgentSessionSearchOptions
+) {
+  return withInfiniteRetention(
+    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
+      staleTime: 30_000,
+      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
+      placeholderData: keepPreviousData,
+      getNextPageParam: lastPage => lastPage.nextCursor,
+    })
+  );
+}
+
+/**
  * Server-side session search, now cursor-paginated for consistent
  * page size and dedupe across pages. Uses `useInfiniteQuery` with
  * `keepPreviousData` so stale rows stay visible during a search-text
@@ -171,14 +193,7 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const trpc = useTRPC();
   const sortBy = resolveSortBy(options.sortBy);
 
-  const query = useInfiniteQuery(
-    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
-      staleTime: 30_000,
-      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
-      placeholderData: keepPreviousData,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-    })
-  );
+  const query = useInfiniteQuery(buildAgentSessionSearchQueryOptions(trpc, options));
 
   const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
   const dateGroups = useMemo(() => groupAgentSessionsByDate(sessions, sortBy), [sessions, sortBy]);
@@ -286,7 +301,9 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
       }
     }
     if (departedId) {
-      void storedRefetch();
+      scheduleCacheMaintenance(() => {
+        void storedRefetch();
+      });
     }
   }, [activeSessionIds, storedRefetch]);
 

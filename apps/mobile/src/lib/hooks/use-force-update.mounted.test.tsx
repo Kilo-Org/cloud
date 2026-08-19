@@ -200,7 +200,7 @@ describe('useForceUpdate mounted', () => {
   });
 
   it('clears the block when the server lowers the minimum', async () => {
-    fetchMock.mockResolvedValue(okResponse({ ios: '1.0.0', android: '1.0.0' }));
+    fetchMock.mockImplementation(() => okResponse({ ios: '1.0.0', android: '1.0.0' }));
     const renderer = await renderProbe();
     await flush();
     expect(textChildren(renderer)).toEqual(['false:false']);
@@ -213,6 +213,38 @@ describe('useForceUpdate mounted', () => {
 
     // A successful up-to-date check clears the previously-set signal.
     currentTime = BASE_TIME + 30_000;
+    act(() => {
+      appState.emit('active');
+    });
+    await flush();
+    expect(textChildren(renderer)).toEqual(['false:false']);
+  });
+
+  it('keeps the block when a check fails while the signal is set', async () => {
+    // Initial check is up-to-date.
+    fetchMock.mockResolvedValue(okResponse({ ios: '1.0.0', android: '1.0.0' }));
+    const renderer = await renderProbe();
+    await flush();
+    expect(textChildren(renderer)).toEqual(['false:false']);
+
+    // A tRPC refusal flips the signal.
+    act(() => {
+      reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
+    });
+    expect(textChildren(renderer)).toEqual(['true:false']);
+
+    // A non-ok check must NOT clear the signal (fail-open).
+    fetchMock.mockResolvedValue(new Response('{}', { status: 500 }));
+    currentTime = BASE_TIME + 30_000;
+    act(() => {
+      appState.emit('active');
+    });
+    await flush();
+    expect(textChildren(renderer)).toEqual(['true:false']);
+
+    // A subsequent up-to-date check after the 30 s bound clears the block.
+    fetchMock.mockResolvedValue(okResponse({ ios: '1.0.0', android: '1.0.0' }));
+    currentTime = BASE_TIME + 60_000;
     act(() => {
       appState.emit('active');
     });

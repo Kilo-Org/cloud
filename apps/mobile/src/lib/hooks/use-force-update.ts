@@ -46,17 +46,20 @@ export function useForceUpdate() {
         headers: { Accept: 'application/json' },
       });
       const data = await response.json().catch(() => undefined);
-      const updateRequired = resolveForceUpdateState(
+      const state = resolveForceUpdateState(
         { ok: response.ok, data },
         Application.nativeApplicationVersion,
         Platform.OS === 'ios' ? 'ios' : 'android'
       );
 
-      setPollRequired(updateRequired);
-      setIsChecking(false);
-      if (!updateRequired) {
+      if (state.kind === 'update-required') {
+        setPollRequired(true);
+      } else if (state.kind === 'up-to-date') {
+        setPollRequired(false);
         clearForceUpdateSignal();
       }
+      // 'unknown' → fail-open: leave pollRequired and the signal unchanged.
+      setIsChecking(false);
     } catch {
       // Fail open — the client fails open on its own network error; the server
       // middleware (G1) is the fail-closed half. Do not clear the signal here.

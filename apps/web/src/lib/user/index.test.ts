@@ -64,6 +64,7 @@ import {
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_notification_preferences,
+  cloud_agent_attachment_uploads,
   user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
@@ -3902,6 +3903,25 @@ describe('User', () => {
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('should null user_id and consumed_at on cloud_agent_attachment_uploads', async () => {
+      const user = await insertTestUser();
+      await db.insert(cloud_agent_attachment_uploads).values({
+        user_id: user.id,
+        r2_key: `${user.id}/cloud-agent/msg-1/att-1.txt`,
+        consumed_at: '2026-01-01 00:00:00+00',
+      });
+
+      await softDeleteUser(user.id);
+
+      const rows = await db
+        .select()
+        .from(cloud_agent_attachment_uploads)
+        .where(eq(cloud_agent_attachment_uploads.r2_key, `${user.id}/cloud-agent/msg-1/att-1.txt`));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.user_id).toBeNull();
+      expect(rows[0]?.consumed_at).toBeNull();
     });
 
     it('should delete Coding Plan availability notification intents', async () => {

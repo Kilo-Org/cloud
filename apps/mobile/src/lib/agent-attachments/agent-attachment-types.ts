@@ -18,6 +18,8 @@ export type AgentAttachment = {
   filename: string;
   /** Basename of the server-side R2 key; set once the upload succeeds. */
   remoteFilename?: string;
+  /** Full server-side R2 key; set once the upload succeeds. `markAttachmentsSent` consumes it. */
+  remoteKey?: string;
   kind: AgentAttachmentKind;
   /** Normalized extension used for the R2 key suffix and MIME derivation. */
   extension: AgentAttachmentExtension;
@@ -29,6 +31,10 @@ export type AgentAttachment = {
    */
   size: number;
   localUri: string;
+  /** True when `localUri` is a cache file the app produced and must delete on remove/reset. */
+  localFileOwned?: boolean;
+  /** True when metadata stripping failed and the original file was kept. */
+  metadataStripFailed?: boolean;
   status: AgentAttachmentStatus;
   /** Human-readable error for retryable failures; the chip is the affordance. */
   error?: string;
@@ -159,9 +165,9 @@ export function buildSubmissionPayload(
   };
 }
 
-/** True when any chip is mid-flight (pending or uploading). */
+/** True when any chip is mid-flight (uploading only — `pending` is not an upload). */
 export function isAnyAttachmentUploading(attachments: AgentAttachment[]): boolean {
-  return attachments.some(item => item.status === 'pending' || item.status === 'uploading');
+  return attachments.some(item => item.status === 'uploading');
 }
 
 /** True when any chip is in a failed state (retryable or terminal). */

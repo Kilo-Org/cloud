@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent } from 'react';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
@@ -9,6 +10,7 @@ import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui
 import { Send, Square, Paperclip, Upload } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
+import { useTRPC } from '@/lib/trpc/utils';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
@@ -139,6 +141,26 @@ export function ChatInput({
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
+  const trpc = useTRPC();
+  const { mutateAsync: markAttachmentsSentPersonal } = useMutation(
+    trpc.cloudAgentNext.markAttachmentsSent.mutationOptions()
+  );
+  const { mutateAsync: markAttachmentsSentOrg } = useMutation(
+    trpc.organizations.cloudAgentNext.markAttachmentsSent.mutationOptions()
+  );
+  const markAttachmentsSent = useCallback(
+    async (keys: string[]) => {
+      if (keys.length === 0) return;
+      const organizationId = attachmentUploadOptions.organizationId;
+      if (organizationId) {
+        await markAttachmentsSentOrg({ keys, organizationId });
+      } else {
+        await markAttachmentsSentPersonal({ keys });
+      }
+    },
+    [attachmentUploadOptions.organizationId, markAttachmentsSentOrg, markAttachmentsSentPersonal]
+  );
+
   useEffect(() => {
     if (!attachmentsEnabled) {
       attachmentUpload.clearAttachments();
@@ -230,6 +252,11 @@ export function ChatInput({
 
         if (!accepted) return false;
 
+        const keys = submittedAttachments
+          .filter(a => a.status === 'complete' && Boolean(a.r2Key))
+          .map(a => a.r2Key as string);
+        if (keys.length > 0) await markAttachmentsSent(keys);
+
         acceptedSubmissionAttachmentIdsToRemove(submittedAttachments, accepted).forEach(
           attachmentUpload.removeAttachment
         );
@@ -249,6 +276,7 @@ export function ChatInput({
       attachmentUpload,
       attachmentsEnabled,
       disabled,
+      markAttachmentsSent,
       onSend,
       onSendCommand,
       setInputValue,

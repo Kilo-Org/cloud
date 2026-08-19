@@ -56,6 +56,7 @@ import {
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
+  PICKER_LAUNCH_CONTEXT_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -278,6 +279,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
+            deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that

@@ -63,6 +63,12 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ mockTrpc: true }),
 }));
 
+// `markAttachmentsSent` pulls `expo-file-system/legacy` (→ react-native) at
+// import time; mock the module boundary so the pure node test never loads RN.
+vi.mock('@/lib/agent-attachments/upload-task', () => ({
+  markAttachmentsSent: vi.fn(async () => undefined),
+}));
+
 vi.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
   generateMessageId: () => 'msg_test',
 }));
@@ -145,6 +151,12 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   hasFailedAttachments: false,
   toWirePayload: () => undefined,
   toSubmissionPayload: () => undefined,
+  uploadPending: vi.fn(async () => ({
+    ok: true as const,
+    wire: undefined,
+    submission: undefined,
+    keys: [],
+  })),
 };
 
 function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
@@ -302,10 +314,16 @@ function runCreator(args: {
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
     return useNewSessionCreator({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape, never read by the create path
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape; only `attachments` and `uploadPending` are read by the create path
       attachments: {
         attachments: [],
         toWirePayload: () => attachmentsWire,
+        uploadPending: async () => ({
+          ok: true as const,
+          wire: attachmentsWire,
+          submission: undefined,
+          keys: [] as string[],
+        }),
       } as never,
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',

@@ -58,9 +58,12 @@ import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
   type AgentAttachmentSubmissionPayload,
   type AgentAttachmentWire,
+  type UploadPendingResult,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { markAttachmentsSent } from '@/lib/agent-attachments/upload-task';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import {
   CLIPBOARD_PASTE_EMPTY_MESSAGE,
   useClipboardPaste,
@@ -162,6 +165,8 @@ type ChatComposerProps = {
    * text the user typed while identity and the draft were still loading.
    */
   initialDraft?: string;
+  /** Active session id, used to scope the Android picker launch context. */
+  sessionId?: string | null;
 };
 
 export function ChatComposer({
@@ -192,6 +197,7 @@ export function ChatComposer({
   autoSend,
   draftKey,
   initialDraft,
+  sessionId = null,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -374,6 +380,12 @@ export function ChatComposer({
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
 
+  useAndroidPendingPickerRecovery({
+    surface: 'agent-chat',
+    sessionId: sessionId ?? null,
+    addCandidates,
+  });
+
   useSharePrefill({
     shareId,
     inputRef,
@@ -407,8 +419,9 @@ export function ChatComposer({
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
-    readyAttachmentsCount: upload.attachments.filter(attachment => attachment.status === 'uploaded')
-      .length,
+    sendableAttachmentsCount: upload.attachments.filter(
+      attachment => !(attachment.status === 'error' && attachment.terminal === true)
+    ).length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
     hasText,
@@ -612,10 +625,6 @@ export function ChatComposer({
     if (!control.canSend) {
       return;
     }
-    if (upload.isUploading) {
-      toast.error('Wait for attachments to finish uploading.');
-      return;
-    }
     if (upload.hasFailedAttachments) {
       toast.error('Remove or retry failed attachments first.');
       return;
@@ -647,6 +656,19 @@ export function ChatComposer({
     // protect the entire asynchronous send.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
+      // Upload pending attachments on the prompt branch only. Slash commands
+      // and session controls never carry chips (`parseChatComposerSubmission`
+      // rejects attachments plus a slash command with `attachment-error`).
+      // `uploaded` is a plain object; `{ ok: false }` is truthy, so test `ok`.
+      let uploaded: Extract<UploadPendingResult, { ok: true }> | undefined = undefined;
+      if (submission.type === 'prompt') {
+        const result = await upload.uploadPending();
+        if (!result.ok) {
+          return;
+        }
+        uploaded = result;
+      }
+
       await executeChatComposerSubmission(
         submission,
         {
@@ -658,7 +680,7 @@ export function ChatComposer({
           },
           confirmExitSession: showRemoteSessionExitConfirmation,
           onSendPrompt: async prompt => {
-            await onSend(prompt, upload.toWirePayload(), upload.toSubmissionPayload());
+            await onSend(prompt, uploaded?.wire, uploaded?.submission);
           },
         },
         {
@@ -671,6 +693,9 @@ export function ChatComposer({
           },
         }
       );
+      if (uploaded) {
+        await markAttachmentsSent({ organizationId, keys: uploaded.keys });
+      }
     } catch {
       // Draft preserved; error already surfaced by the caller. The helper
       // will release the lock and clear pending state in its finally block.
@@ -778,8 +803,14 @@ export function ChatComposer({
     // Fire-and-forget: the upload hook owns its own progress + error toasts,
     // and the composer's send flow consults `upload.isUploading` /
     // `upload.hasFailedAttachments` to gate admission.
-    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
-  }, [addCandidates, showActionSheetWithOptions]);
+    void addCandidates(
+      await pickAgentAttachments(showActionSheetWithOptions, {
+        userId,
+        surface: 'agent-chat',
+        sessionId: sessionId ?? null,
+      })
+    );
+  }, [addCandidates, showActionSheetWithOptions, userId, sessionId]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,

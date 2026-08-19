@@ -21,6 +21,7 @@ import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session
 import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
@@ -378,9 +379,22 @@ function NewSessionScreenBody() {
   }, []);
 
   const { addCandidates, removeAttachment, retryAttachment } = attachments;
+
+  useAndroidPendingPickerRecovery({
+    surface: 'agent-new',
+    sessionId: null,
+    addCandidates,
+  });
+
   const handleAddAttachment = useCallback(async () => {
-    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
-  }, [addCandidates, showActionSheetWithOptions]);
+    void addCandidates(
+      await pickAgentAttachments(showActionSheetWithOptions, {
+        userId,
+        surface: 'agent-new',
+        sessionId: null,
+      })
+    );
+  }, [addCandidates, showActionSheetWithOptions, userId]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {

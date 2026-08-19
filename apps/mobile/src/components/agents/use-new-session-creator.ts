@@ -17,6 +17,7 @@ import {
   type AgentAttachmentWire,
   type useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { markAttachmentsSent } from '@/lib/agent-attachments/upload-task';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionCreatorInput = {
@@ -94,9 +95,18 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // Upload pending attachments now so the create body carries the real
+    // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
+    // test `ok`.
+    const uploaded = await attachments.uploadPending();
+    if (!uploaded.ok) {
+      setIsCreating(false);
+      return;
+    }
+
     // Computed once and reused for both the fingerprint and the create body, so
     // the two cannot disagree and a swapped attachment set is a fresh intent.
-    const attachmentWire = attachments.toWirePayload();
+    const attachmentWire = uploaded.wire;
     const intentFingerprint = JSON.stringify({
       prompt,
       mode,
@@ -172,6 +182,7 @@ export function useNewSessionCreator({
       // successful key for a retry.
       rotateKey();
       await removeOutboxRow(intentFingerprint);
+      await markAttachmentsSent({ organizationId, keys: uploaded.keys });
 
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.

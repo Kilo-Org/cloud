@@ -107,6 +107,10 @@
     {
       "path": "/api/cron/cleanup-review-memory",
       "schedule": "0 */12 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-orphan-agent-attachments",
+      "schedule": "0 4 * * *"
     }
   ],
   "build": {

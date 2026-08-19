@@ -31,6 +31,12 @@ vi.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: vi.fn(),
 }));
 
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
 const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
 
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];
@@ -47,7 +53,11 @@ async function pickWithSheetSelection(
   const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
     mock: { calls: [unknown, SheetButtonHandler][] };
   };
-  const resultPromise = pickAgentAttachments(showActionSheet);
+  const resultPromise = pickAgentAttachments(showActionSheet, {
+    userId: 'user-1',
+    surface: 'agent-chat',
+    sessionId: 'sess-1',
+  });
   const registered = showActionSheet.mock.calls[0]?.[1];
   expect(registered).toEqual(expect.any(Function));
   await Promise.resolve(registered?.(buttonIndex));
@@ -60,7 +70,11 @@ describe('agent attachment picker', () => {
       mock: { calls: unknown[][] };
     };
 
-    void pickAgentAttachments(showActionSheet);
+    void pickAgentAttachments(showActionSheet, {
+      userId: 'user-1',
+      surface: 'agent-chat',
+      sessionId: null,
+    });
 
     expect(showActionSheet).toHaveBeenCalledWith(
       {

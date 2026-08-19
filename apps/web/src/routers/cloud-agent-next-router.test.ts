@@ -52,6 +52,13 @@ const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
+const mockMarkCloudAgentAttachmentUploadsConsumed = jest.fn<
+  (input: { userId: string; attachments?: { path: string; files: string[] } }) => Promise<void>
+>();
+
+const mockUpdateSet = jest.fn();
+const mockUpdateWhere = jest.fn();
+
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
@@ -134,6 +141,7 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl: mockGenerateCloudAgentAttachmentDownloadUrl,
+  markCloudAgentAttachmentUploadsConsumed: mockMarkCloudAgentAttachmentUploadsConsumed,
 }));
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({

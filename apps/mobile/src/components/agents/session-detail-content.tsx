@@ -1194,6 +1194,7 @@ export function SessionDetailContent({
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
+                sessionId={sessionId}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

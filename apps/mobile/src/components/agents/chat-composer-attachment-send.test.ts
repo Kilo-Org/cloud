@@ -27,7 +27,10 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 const uploadState = vi.hoisted(() => ({
   attachments: [] as { status?: string; remoteFilename?: string }[],
   toWirePayload: (() => undefined) as () => unknown,
+  uploadPending: (() => ({ ok: false })) as () => unknown,
 }));
+
+const markAttachmentsSentMock = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -173,7 +176,16 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     hasFailedAttachments: false,
     toWirePayload: uploadState.toWirePayload,
     toSubmissionPayload: () => undefined,
+    uploadPending: uploadState.uploadPending,
   }),
+}));
+
+vi.mock('@/lib/agent-attachments/upload-task', () => ({
+  markAttachmentsSent: markAttachmentsSentMock,
+}));
+
+vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
+  useAndroidPendingPickerRecovery: () => undefined,
 }));
 
 vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
@@ -292,12 +304,18 @@ beforeEach(() => {
   refSlots.cursor = 0;
   uploadState.attachments = [];
   uploadState.toWirePayload = () => undefined;
+  uploadState.uploadPending = () => ({ ok: false });
 });
 
 describe('ChatComposer attachment-only send', () => {
-  it('sends an empty draft with a ready attachment, passing prompt and the wire payload', async () => {
+  it('sends an empty draft with a ready attachment, passing the returned payload and marking sent', async () => {
     uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
-    uploadState.toWirePayload = () => ({ path: 'path-1', files: ['file.png'] });
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+      keys: ['user-1/cloud-agent/path-1/file.png'],
+    });
 
     const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
 
@@ -306,6 +324,11 @@ describe('ChatComposer attachment-only send', () => {
 
     expect(onSendMock).toHaveBeenCalledTimes(1);
     expect(onSendMock).toHaveBeenCalledWith('', { path: 'path-1', files: ['file.png'] }, undefined);
+    expect(markAttachmentsSentMock).toHaveBeenCalledTimes(1);
+    expect(markAttachmentsSentMock).toHaveBeenCalledWith({
+      organizationId: undefined,
+      keys: ['user-1/cloud-agent/path-1/file.png'],
+    });
   });
 
   it('does not send an empty draft with no attachments', async () => {
@@ -315,5 +338,6 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).not.toHaveBeenCalled();
+    expect(markAttachmentsSentMock).not.toHaveBeenCalled();
   });
 });

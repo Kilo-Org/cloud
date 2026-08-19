@@ -79,6 +79,7 @@ import {
   kiloclaw_cli_runs,
   user_push_tokens,
   user_notification_preferences,
+  cloud_agent_attachment_uploads,
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
@@ -1013,6 +1014,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences)
+ * - cloud_agent_attachment_uploads (user_id and consumed_at nulled so the
+ *   TTL reaper deletes the orphaned R2 objects without leaking PII)
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
@@ -1418,6 +1421,10 @@ export async function softDeleteUser(userId: string) {
         )
       );
     await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
+    await tx
+      .update(cloud_agent_attachment_uploads)
+      .set({ user_id: null, consumed_at: null })
+      .where(eq(cloud_agent_attachment_uploads.user_id, userId));
     await tx
       .delete(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, userId));

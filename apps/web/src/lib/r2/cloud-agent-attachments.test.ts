@@ -23,6 +23,19 @@ jest.mock('@aws-sdk/client-s3', () => ({
     .mockImplementation((input: unknown) => ({ input, name: 'GetObjectCommand' })),
 }));
 
+const mockInsertValues = jest.fn();
+
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    insert: () => ({
+      values: (values: unknown) => {
+        mockInsertValues(values);
+        return { onConflictDoNothing: () => Promise.resolve() };
+      },
+    }),
+  },
+}));
+
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
 
@@ -82,6 +95,22 @@ describe('cloud-agent attachment upload URL signing', () => {
       expect(result.key).toBe(`user-1/cloud-agent/${MESSAGE_UUID}/${ATTACHMENT_ID}.${extension}`);
     }
   );
+
+  it('writes a ledger row on presign so the reaper can track the upload', async () => {
+    await generateCloudAgentAttachmentUploadUrl({
+      userId: 'user-1',
+      messageUuid: MESSAGE_UUID,
+      attachmentId: ATTACHMENT_ID,
+      contentType: 'text/markdown',
+      contentLength: 42,
+    });
+
+    expect(mockInsertValues).toHaveBeenCalledTimes(1);
+    expect(mockInsertValues).toHaveBeenCalledWith({
+      user_id: 'user-1',
+      r2_key: `user-1/cloud-agent/${MESSAGE_UUID}/${ATTACHMENT_ID}.md`,
+    });
+  });
 
   it('derives the R2 key suffix from a validated extension when extension is provided', async () => {
     const result = await generateCloudAgentAttachmentUploadUrl({

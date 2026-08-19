@@ -46,3 +46,9 @@ export const ATTEST_KEY_ID_KEY = 'auth-attest-key-id';
  * when the slot is consumed or on sign-out.
  */
 export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';
+/**
+ * Launch context for the Android image picker (P1-I-66b). Written right before
+ * a camera/library launch and read by the recovery hook after an Activity
+ * recreation. Deleted on sign-out: it carries a user id and a session id.
+ */
+export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';

@@ -195,6 +195,13 @@ export function PendingReviewProvider({
   }, []);
 
   const removeComments = useCallback((ids: readonly string[]) => {
+    // An empty id list is a true no-op. APPROVE with no fresh comments
+    // calls this before hydration; bumping the generation or marking
+    // hydrated would discard the in-flight load and let the empty-state
+    // persistence effect clear the stored draft.
+    if (ids.length === 0) {
+      return;
+    }
     const idSet = new Set(ids);
     setItems(previous => previous.filter(item => !idSet.has(item.id)));
     // Same guard `clear()` carries: invalidate any in-flight hydration so a

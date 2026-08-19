@@ -159,7 +159,7 @@ describe('viewed-files', () => {
     expect(getItemMock.mock.calls.length).toBe(callsBefore);
   });
 
-  it('clearViewedFiles drops the cache so the next read re-reads the store', async () => {
+  it('clearViewedFiles makes subsequent reads return empty without the prior paths', async () => {
     setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
     await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['a.ts']);
 
@@ -168,7 +168,28 @@ describe('viewed-files', () => {
     const getItemMock = vi.mocked(SecureStore.getItemAsync);
     const callsBefore = getItemMock.mock.calls.length;
     await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
-    expect(getItemMock.mock.calls.length).toBe(callsBefore + 1);
+    expect(getItemMock.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('a concurrent read during clear never returns the prior paths', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['a.ts']);
+
+    let releaseDelete: () => void = undefined as unknown as () => void;
+    const deleteGate = new Promise<void>(resolve => {
+      releaseDelete = resolve;
+    });
+    vi.mocked(SecureStore.deleteItemAsync).mockImplementationOnce(async () => {
+      await deleteGate;
+      store.delete('pr-review-viewed');
+    });
+
+    const clearPromise = clearViewedFiles();
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
+
+    releaseDelete();
+    await clearPromise;
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
   });
 
   it('a late first read does not overwrite a write', async () => {
@@ -219,10 +240,11 @@ describe('viewed-files', () => {
     );
     await expect(firstRead).resolves.toEqual([]);
 
-    // The cache must stay empty; the next read re-reads the now-empty store.
+    // The fence published an empty map; the next read must not return
+    // the prior paths and must not re-read the store.
     const getItemMock = vi.mocked(SecureStore.getItemAsync);
     const callsBefore = getItemMock.mock.calls.length;
     await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
-    expect(getItemMock.mock.calls.length).toBe(callsBefore + 1);
+    expect(getItemMock.mock.calls.length).toBe(callsBefore);
   });
 });

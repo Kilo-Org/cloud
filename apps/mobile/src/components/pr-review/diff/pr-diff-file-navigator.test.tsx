@@ -382,6 +382,21 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
 
     expect(fetchAllRunMock).toHaveBeenCalledTimes(1);
   });
+
+  it('shows the load-all retry when fetch-to-completion has an error', async () => {
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      isRunning: false,
+      loadedFiles: 1,
+      totalFiles: null,
+      error: new Error('page failed'),
+    };
+    const { renderer } = await mountNavigator();
+
+    expect(
+      renderer.root.findByProps({ accessibilityLabel: 'Retry loading all files' })
+    ).toBeTruthy();
+  });
 });
 
 describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {

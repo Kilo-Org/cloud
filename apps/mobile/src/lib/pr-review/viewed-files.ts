@@ -156,9 +156,12 @@ export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<vo
 }
 
 export async function clearViewedFiles(): Promise<void> {
-  await deleteAccountMetadata(PR_REVIEW_VIEWED_KEY);
-  cachedMap = null;
+  // Fence first: a concurrent getViewedFiles must not return the prior
+  // account's paths (or publish a SecureStore read of the not-yet-deleted
+  // value) while deletion is in flight.
+  cachedMap = {};
   generation += 1;
+  await deleteAccountMetadata(PR_REVIEW_VIEWED_KEY);
 }
 
 /**

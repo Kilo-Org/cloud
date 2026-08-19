@@ -132,7 +132,7 @@ export type EnsuredWrapper =
  */
 export type AgentSandbox = {
   ensureBillingAdmission(): Promise<SandboxBillingAdmissionResult>;
-  isBillingBlocked(): Promise<boolean>;
+  isBillingBlocked(enforcementRequested?: boolean): Promise<boolean>;
   ensureWrapper(request: EnsureWrapperRequest): Promise<EnsuredWrapper>;
   discoverSessionWrappers(): Promise<WrapperObservation>;
   /**

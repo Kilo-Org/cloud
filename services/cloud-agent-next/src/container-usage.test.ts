@@ -19,6 +19,7 @@ const sdk = vi.hoisted(() => {
     superActivityExpired = false;
     superStopCalled = false;
     superDestroyCalled = false;
+    destroyBarrier?: Promise<void>;
 
     constructor(ctx: SandboxDurableObjectState, env: unknown) {
       this.ctx = ctx;
@@ -64,6 +65,7 @@ const sdk = vi.hoisted(() => {
       this.superDestroyCalled = true;
       const storage = this.ctx.storage as unknown as MemoryStorage;
       if (storage.clearOnDestroy) storage.clear();
+      await this.destroyBarrier;
     }
   }
   return { StockSandbox };
@@ -129,6 +131,7 @@ type TestRuntime = MeteredSandbox & {
   superActivityExpired: boolean;
   superStopCalled: boolean;
   superDestroyCalled: boolean;
+  destroyBarrier?: Promise<void>;
   setPhysicalRunning(running: boolean): void;
   billingHeartbeatTick(generation?: string): Promise<void>;
 };
@@ -394,6 +397,57 @@ describe('MeteredSandbox', () => {
     await sandbox.billingForceStop(active.generation);
 
     expect(await sandbox.isBillingBlocked()).toBe(true);
+  });
+
+  it('does not rewind a newer billing context written while destroy is in flight', async () => {
+    const { sandbox, storage, flushShadowTasks } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const original = await getBillingContext(storage);
+    if (!original) throw new Error('Expected active billing context');
+
+    storage.clearOnDestroy = true;
+    let resumeDestroy: (() => void) | undefined;
+    sandbox.destroyBarrier = new Promise(resolve => {
+      resumeDestroy = resolve;
+    });
+    const destroying = sandbox.destroy();
+    await vi.waitFor(() => expect(sandbox.superDestroyCalled).toBe(true));
+    const newer = {
+      ...original,
+      generation: crypto.randomUUID(),
+      startEpochMs: original.startEpochMs + 1,
+    };
+    await updateBillingContext(storage, newer);
+    resumeDestroy?.();
+    await destroying;
+
+    expect(await getBillingContext(storage)).toEqual(newer);
+  });
+
+  it('does not resurrect a generation settled while destroy is in flight', async () => {
+    const { sandbox, storage, flushShadowTasks } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    await sandbox.onStart();
+    await flushShadowTasks();
+    expect(await getBillingContext(storage)).toBeDefined();
+
+    let resumeDestroy: (() => void) | undefined;
+    sandbox.destroyBarrier = new Promise(resolve => {
+      resumeDestroy = resolve;
+    });
+    const destroying = sandbox.destroy();
+    await vi.waitFor(() => expect(sandbox.superDestroyCalled).toBe(true));
+    sandbox.mockState = { status: 'stopped' };
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+    expect(await getBillingContext(storage)).toBeUndefined();
+
+    resumeDestroy?.();
+    await destroying;
+
+    expect(await getBillingContext(storage)).toBeUndefined();
   });
 
   it('restores the force-stopped generation so onStop settles it exactly once', async () => {

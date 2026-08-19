@@ -33,6 +33,7 @@ const START_ACK_GENERATION_STORAGE_KEY = 'container-usage:start-ack-generation:v
 const LAST_START_EPOCH_STORAGE_KEY = 'container-usage:last-start-epoch:v1';
 const START_ADMISSION_STORAGE_KEY = 'container-usage:start-admission:v1';
 const BILLING_BLOCK_STORAGE_KEY = 'container-usage:budget-block:v1';
+const DESTROY_RECOVERY_MARKER_STORAGE_KEY_PREFIX = 'container-usage:destroy-recovery-marker:v1:';
 const BILLING_FORCE_STOP_SECONDS = 120;
 const BILLING_FORCE_STOP_RETRY_SECONDS = 5;
 
@@ -503,15 +504,46 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     const pendingStopReason = context
       ? await this.getPendingStopReason(context.generation)
       : undefined;
+    const recoveryMarkerKey = `${DESTROY_RECOVERY_MARKER_STORAGE_KEY_PREFIX}${crypto.randomUUID()}`;
+    await this.ctx.storage.put(recoveryMarkerKey, true);
     await super.destroy();
-    if (context) await updateBillingContext(this.ctx.storage, context);
-    if (block) await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
-    if (context && startAcknowledgement === context.generation) {
+    const currentRecoveryMarker = await this.ctx.storage.get<boolean>(recoveryMarkerKey);
+    if (currentRecoveryMarker !== undefined) {
+      await this.ctx.storage.delete(recoveryMarkerKey);
+      return;
+    }
+    let currentContext = await getBillingContext(this.ctx.storage);
+    if (!currentContext && context) {
+      await updateBillingContext(this.ctx.storage, context);
+      currentContext = context;
+    }
+    const currentBlock = await this.getBillingBlock();
+    if (
+      !currentBlock &&
+      block &&
+      currentContext?.generation === block.generation &&
+      currentContext.startEpochMs === block.startEpochMs
+    ) {
+      await this.ctx.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
+    }
+    const currentStartAcknowledgement = await this.ctx.storage.get<string>(
+      START_ACK_GENERATION_STORAGE_KEY
+    );
+    if (
+      currentStartAcknowledgement === undefined &&
+      startAcknowledgement === currentContext?.generation
+    ) {
       await this.ctx.storage.put(START_ACK_GENERATION_STORAGE_KEY, startAcknowledgement);
     }
-    if (pendingStopReason) {
+    const currentPendingStopReason = await this.ctx.storage.get(PENDING_STOP_REASON_STORAGE_KEY);
+    if (
+      pendingStopReason &&
+      context &&
+      currentPendingStopReason === undefined &&
+      context.generation === currentContext?.generation
+    ) {
       await this.ctx.storage.put(PENDING_STOP_REASON_STORAGE_KEY, {
-        generation: context?.generation,
+        generation: context.generation,
         reason: pendingStopReason,
       });
     }

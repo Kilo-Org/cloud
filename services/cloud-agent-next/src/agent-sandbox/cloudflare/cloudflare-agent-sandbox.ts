@@ -280,9 +280,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     return this.ensureSandboxBillingAdmission(sandbox, input);
   }
 
-  async isBillingBlocked(): Promise<boolean> {
+  async isBillingBlocked(enforcementRequested = false): Promise<boolean> {
     const sandboxId = await this.resolveSandboxId();
-    return this.sandboxBillingBlocked(this.resolveSandbox(sandboxId));
+    return this.sandboxBillingBlocked(this.resolveSandbox(sandboxId), enforcementRequested);
   }
 
   private async getSandbox(options?: {

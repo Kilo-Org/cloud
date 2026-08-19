@@ -469,6 +469,16 @@ describe('CloudflareAgentSandbox', () => {
     });
   });
 
+  it('fails closed for a rejected billing block RPC when enforcement is requested', async () => {
+    const isBillingBlocked = vi.fn().mockRejectedValue(new Error('RPC unavailable'));
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata({ sandboxId: 'usr-shared' }), {
+      resolveSandbox: () => ({ isBillingBlocked }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.isBillingBlocked(true)).resolves.toBe(true);
+    await expect(sandbox.isBillingBlocked()).resolves.toBe(false);
+  });
+
   it('reports malformed worker URLs before degrading to a cold bootstrap', async () => {
     const request = ensureRequest({ cacheEligible: true });
     const bucket = { get: vi.fn(), put: vi.fn() };

@@ -772,7 +772,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const metadata = await this.getMetadata();
     if (!metadata || !isCloudAgentContainerBillingEnabled(this.env, metadata.identity))
       return false;
-    return createAgentSandbox(this.env, metadata).isBillingBlocked();
+    return createAgentSandbox(this.env, metadata).isBillingBlocked(true);
   }
 
   private getSandboxLifecycle(): AgentSandboxLifecycle {

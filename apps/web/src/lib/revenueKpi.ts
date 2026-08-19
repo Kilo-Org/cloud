@@ -84,10 +84,19 @@ export async function getRevenueKpiData(
         -- Settled assessments are authoritative for their product amount, so the
         -- matching credit transaction (linked by charge, invoice, or payment
         -- intent id, not a FK) must be excluded from the legacy paid series to
-        -- avoid double counting. Organization top-ups store the PaymentIntent id.
-        SELECT sa.stripe_charge_id, sa.stripe_invoice_id, sa.stripe_payment_intent_id
+        -- avoid double counting. A single id column lets PostgreSQL hash the
+        -- anti-join instead of scanning assessments once per paid transaction.
+        SELECT sa.stripe_charge_id AS stripe_payment_id
         FROM public.stripe_service_fee_assessments sa
-        WHERE sa.settled_at IS NOT NULL
+        WHERE sa.settled_at IS NOT NULL AND sa.stripe_charge_id IS NOT NULL
+        UNION ALL
+        SELECT sa.stripe_invoice_id AS stripe_payment_id
+        FROM public.stripe_service_fee_assessments sa
+        WHERE sa.settled_at IS NOT NULL AND sa.stripe_invoice_id IS NOT NULL
+        UNION ALL
+        SELECT sa.stripe_payment_intent_id AS stripe_payment_id
+        FROM public.stripe_service_fee_assessments sa
+        WHERE sa.settled_at IS NOT NULL AND sa.stripe_payment_intent_id IS NOT NULL
     ),
     ranked_paid_multiplier_transactions AS (
         SELECT
@@ -113,11 +122,7 @@ export async function getRevenueKpiData(
             AND NOT EXISTS (
                 SELECT 1
                 FROM settled_assessment_stripe_ids sasi
-                WHERE pt.stripe_payment_id IN (
-                    sasi.stripe_charge_id,
-                    sasi.stripe_invoice_id,
-                    sasi.stripe_payment_intent_id
-                )
+                WHERE sasi.stripe_payment_id = pt.stripe_payment_id
             )
     ),
     paid_but_multiplied_by_date AS (
@@ -139,11 +144,7 @@ export async function getRevenueKpiData(
             AND NOT EXISTS (
                 SELECT 1
                 FROM settled_assessment_stripe_ids sasi
-                WHERE pt.stripe_payment_id IN (
-                    sasi.stripe_charge_id,
-                    sasi.stripe_invoice_id,
-                    sasi.stripe_payment_intent_id
-                )
+                WHERE sasi.stripe_payment_id = pt.stripe_payment_id
             )
         GROUP BY transaction_day
     ),

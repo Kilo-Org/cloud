@@ -15,6 +15,9 @@ import {
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
 const AGENT_MEMORIES_KEY = 'kiloAgentMemories';
+const MEMORY_SETTINGS_KEY = 'kiloMemorySettings';
+
+const memorySettingsSchema = z.object({ autoApproveMemorySaves: z.boolean() });
 
 const EMPTY_MEMORIES_MESSAGE =
   'No memories yet. Highlight text on any page, right-click, and choose Add to memory.';
@@ -766,6 +769,47 @@ test('memory tools are available in dangerous mode', async () => {
       .locator('xpath=ancestor::details[1]');
     await expect(searchDetails.getByText('DangerMode unique memory preview text')).toBeVisible();
     await expect(sidePanel.getByText('Dangerous mode used search_memories.')).toBeVisible();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('memories settings auto-approve toggle starts off and persists', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+    const sidePanel = await openAuthenticatedSidePanel(context, extensionId);
+    await openSettingsMemories(sidePanel);
+
+    const toggle = sidePanel.getByRole('switch', { name: 'Auto-approve memory saves' });
+
+    // Default is the confirmation card: the setting ships off.
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    // Confirm through storage, not the DOM, that the setting was written.
+    await expect
+      .poll(async () => {
+        const stored = await readExtensionStorage(sidePanel, [MEMORY_SETTINGS_KEY]);
+        const settings = memorySettingsSchema.safeParse(stored[MEMORY_SETTINGS_KEY]);
+
+        return settings.success && settings.data.autoApproveMemorySaves;
+      })
+      .toBe(true);
+
+    // The choice survives a side panel reload.
+    await sidePanel.reload();
+    await openSettingsMemories(sidePanel);
+    await expect(
+      sidePanel.getByRole('switch', { name: 'Auto-approve memory saves' })
+    ).toHaveAttribute('aria-checked', 'true');
   } finally {
     await context.close();
     await fixture.close();

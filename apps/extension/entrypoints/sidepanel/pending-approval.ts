@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- Request, persistence, and auto-approve share one lock and one settle contract. */
 import { atom, getDefaultStore } from 'jotai';
 import type { PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
+import { loadMemorySettings } from '@/src/shared/agent-memory-settings';
+import type { AgentMemorySettingsStorageArea } from '@/src/shared/agent-memory-settings';
 import {
   addAgentMemory,
   clearPendingAgentMemoryDraft,
@@ -20,8 +22,8 @@ import type { AgentWorkflowsStorageArea } from '@/src/shared/agent-workflows-sto
 
 // ---------- types ----------
 
-// AutoApproved is true only for workflow saves applied without a card.
-// Enabled by the auto-approve setting. Every card approval reports false.
+/* AutoApproved is true only for saves applied without a card, enabled by the
+   per-kind auto-approve setting. Every card approval reports false. */
 export type ApprovalOutcome =
   | { status: 'approved'; savedId: string; autoApproved: boolean }
   | { status: 'rejected' }
@@ -54,8 +56,11 @@ export { pendingLockAtom };
 
 // ---------- shared storage type ----------
 
-// Unified storage area that satisfies both memory and workflow storage contracts.
-type UnifiedStorage = AgentMemoriesStorageArea & AgentWorkflowsStorageArea;
+/* Unified storage area that satisfies the memory, memory-settings, and
+   workflow storage contracts. */
+type UnifiedStorage = AgentMemoriesStorageArea &
+  AgentMemorySettingsStorageArea &
+  AgentWorkflowsStorageArea;
 
 // ---------- draft persistence helpers ----------
 
@@ -211,10 +216,12 @@ export const applyApprovalDecision = async (
  * Request user approval for a save. Persists the draft to storage FIRST, then sets the atom,
  * and returns a Promise that settles exactly once (first-wins).
  *
- * Workflow saves check the auto-approve setting before persisting the draft. When the
- * setting enables it, the save applies immediately without a card and returns approved
- * with autoApproved true. A failed settings read falls back to the approval card (the
- * cautious path, since auto-approve cannot be verified); a hash failure returns failed.
+ * Both kinds check their auto-approve setting before persisting the draft: a workflow
+ * save reads autoApproveWorkflowChanges, a memory save reads autoApproveMemorySaves.
+ * When the setting enables it, the save applies immediately without a card and returns
+ * approved with autoApproved true. A failed settings read falls back to the approval
+ * card (the cautious path, since auto-approve cannot be verified); a hash failure
+ * returns failed.
  *
  * Single-flight: if another approval is already pending, returns failed immediately.
  * Persist failure: returns failed without setting the atom — the card never shows.
@@ -237,34 +244,38 @@ export const requestApproval = async (
   }
   atomStore.set(pendingLockAtom, true);
 
-  if (kind === 'workflow') {
-    let autoApproveWorkflowChanges = false;
-    try {
-      ({ autoApproveWorkflowChanges } = await loadWorkflowSettings(storage));
-    } catch {
-      // A failed settings read must not block the save.
-      // Auto-approve cannot be verified, so fall through to the approval card.
-      autoApproveWorkflowChanges = false;
+  let autoApprove = false;
+  try {
+    if (kind === 'workflow') {
+      const workflowSettings = await loadWorkflowSettings(storage);
+      autoApprove = workflowSettings.autoApproveWorkflowChanges;
+    } else {
+      const memorySettings = await loadMemorySettings(storage);
+      autoApprove = memorySettings.autoApproveMemorySaves;
     }
+  } catch {
+    // A failed settings read must not block the save.
+    // Auto-approve cannot be verified, so fall through to the approval card.
+    autoApprove = false;
+  }
 
-    if (autoApproveWorkflowChanges) {
-      try {
-        if (signal.aborted) {
-          return { status: 'aborted' };
-        }
-        const outcome = await applyApprovalDecision(storage, kind, draft, true);
-        if (outcome.status === 'approved') {
-          return { autoApproved: true, savedId: outcome.savedId, status: 'approved' };
-        }
-        return outcome;
-      } catch (error) {
-        return {
-          reason: error instanceof Error ? error.message : 'Failed to save workflow.',
-          status: 'failed',
-        };
-      } finally {
-        atomStore.set(pendingLockAtom, false);
+  if (autoApprove) {
+    try {
+      if (signal.aborted) {
+        return { status: 'aborted' };
       }
+      const outcome = await applyApprovalDecision(storage, kind, draft, true);
+      if (outcome.status === 'approved') {
+        return { autoApproved: true, savedId: outcome.savedId, status: 'approved' };
+      }
+      return outcome;
+    } catch (error) {
+      return {
+        reason: error instanceof Error ? error.message : `Failed to save ${kind}.`,
+        status: 'failed',
+      };
+    } finally {
+      atomStore.set(pendingLockAtom, false);
     }
   }
 

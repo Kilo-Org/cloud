@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
 
+import { type ConversationComment } from './review-discussion-types';
 import {
   buildPrReviewDiscussionThreadsQueryOptions,
   retainConversation,
@@ -63,7 +64,7 @@ describe('retainConversation (retention-safe conversation)', () => {
 });
 
 describe('retainConversationAcrossMounts (remount survival)', () => {
-  const comment = { id: 'c1' };
+  const comment = { id: 'c1' } as unknown as ConversationComment;
 
   it('keeps the conversation after a remount over the trimmed cache', () => {
     const key = 'octocat/hello#1';

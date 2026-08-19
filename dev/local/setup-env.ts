@@ -28,6 +28,8 @@ const REQUIRED_KEYS: readonly string[] = [
   'POSTGRES_URL',
   'CALLBACK_TOKEN_SECRET',
   'BYOK_ENCRYPTION_KEY',
+  'USER_DELETION_AUDIT_HMAC_KEY',
+  'USER_DELETION_ENCRYPTION_KEY',
   'INTERNAL_API_SECRET',
   'STRIPE_SECRET_KEY',
   'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
@@ -38,6 +40,8 @@ const SECRET_KEYS = new Set<string>([
   'INTERNAL_API_SECRET',
   'CALLBACK_TOKEN_SECRET',
   'BYOK_ENCRYPTION_KEY',
+  'USER_DELETION_AUDIT_HMAC_KEY',
+  'USER_DELETION_ENCRYPTION_KEY',
 ]);
 
 const CI_PLACEHOLDER_VALUES: Record<string, string> = {
@@ -148,6 +152,8 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
     'Should match your local dev/docker-compose.yaml setup unless you are using a remote database',
   CALLBACK_TOKEN_SECRET: 'Secret used to sign webhook/callback tokens',
   BYOK_ENCRYPTION_KEY: 'Used for Bring-Your-Own-Key encryption of sensitive app data',
+  USER_DELETION_AUDIT_HMAC_KEY: 'HMAC key for user-deletion email hashes',
+  USER_DELETION_ENCRYPTION_KEY: 'AES key for user-deletion effect checkpoints and credentials',
   INTERNAL_API_SECRET: 'Internal API authentication secret',
   STRIPE_SECRET_KEY:
     'Stripe secret key — get test keys at https://dashboard.stripe.com/test/apikeys',

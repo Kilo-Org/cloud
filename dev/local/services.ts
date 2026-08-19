@@ -52,6 +52,7 @@ const groups: ServiceGroup[] = [
   { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
+  { id: 'deletion-mock', label: 'Deletion Mock', alwaysOn: false, sectionBreakBefore: true },
 ];
 
 type ServiceDef = {
@@ -255,6 +256,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
   mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
+  // deletion-mock
+  'deletion-mock': {
+    group: 'deletion-mock',
+    dependsOn: [],
+    dir: 'dev/local/scripts',
+  },
   // gastown
   'cloudflare-gastown': {
     group: 'gastown',
@@ -391,6 +398,32 @@ export function resolveSessionNextAuthUrl(args: {
   if (!serviceNames.includes('nextjs')) return undefined;
   if (serviceNames.includes('kiloclaw-tunnel')) return undefined;
   return `http://localhost:${nextjsPort}`;
+}
+
+const DELETION_MOCK_DUMMY = 'deletion-mock';
+
+export function resolveDeletionMockSessionEnv(args: {
+  serviceNames: string[];
+  mockPort: number;
+  env?: NodeJS.ProcessEnv;
+}): Record<string, string> | undefined {
+  if (!args.serviceNames.includes('deletion-mock')) return undefined;
+  const origin = `http://127.0.0.1:${args.mockPort}`;
+  const env = args.env ?? process.env;
+  const sessionEnv: Record<string, string> = {
+    POSTHOG_HOST: origin,
+    PYLON_HOST: origin,
+    SUBSTACK_PUBLICATION_URL: origin,
+    CUSTOMERIO_TRACK_BASE: origin,
+  };
+  if (!env.PYLON_API_KEY?.trim()) sessionEnv.PYLON_API_KEY = DELETION_MOCK_DUMMY;
+  if (!env.POSTHOG_PERSONAL_API_KEY?.trim()) {
+    sessionEnv.POSTHOG_PERSONAL_API_KEY = DELETION_MOCK_DUMMY;
+  }
+  if (!env.POSTHOG_ENVIRONMENT_ID?.trim()) {
+    sessionEnv.POSTHOG_ENVIRONMENT_ID = DELETION_MOCK_DUMMY;
+  }
+  return sessionEnv;
 }
 
 // ---------------------------------------------------------------------------
@@ -577,6 +610,27 @@ function buildServiceDefs(): ServiceDef[] {
         port: fakeLlmPort,
         dependsOn: meta.dependsOn,
         command: ['env', `PORT=${fakeLlmPort}`, 'pnpm', 'exec', 'tsx', 'fake-llm-server.ts'],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'deletion-mock') {
+      const deletionMockPort = 4010 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: deletionMockPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `PORT=${deletionMockPort}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'deletion-provider-mock.ts',
+        ],
         group: meta.group,
       });
       continue;

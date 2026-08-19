@@ -779,6 +779,10 @@ export const authOptions: NextAuthOptions = {
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
 
+        if (existingUser?.blocked_reason) {
+          return redirectUrlForCode('BLOCKED');
+        }
+
         // Block new signups from blocked TLDs (existing users can still sign in)
         if (!existingUser && isBlockedTLD(accountInfo.google_user_email)) {
           return redirectUrlForCode(`BLOCKED`);

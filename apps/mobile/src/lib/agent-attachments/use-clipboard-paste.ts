@@ -27,10 +27,14 @@ type UseClipboardPasteOptions = {
   /** Called when neither an image nor text could be used. `'empty'` means no
    *  image, no readable text, and no URL on the clipboard. `'unreadable'` means
    *  an image or URL was present but the read failed or was denied. A denied
-   *  text read is indistinguishable from empty and reports 'empty'. The caller
-   *  supplies its own toast copy to match that composer's existing pick-path
-   *  message. */
-  onFailure: (reason: 'empty' | 'unreadable') => void;
+   *  text read is indistinguishable from empty and reports 'empty'. `'too-large'`
+   *  means the clipboard image exceeds `maxBytes`; nothing was written to disk.
+   *  The caller supplies its own toast copy to match that composer's existing
+   *  pick-path message. */
+  onFailure: (reason: 'empty' | 'unreadable' | 'too-large') => void;
+  /** Reject a clipboard image whose decoded byte length exceeds this bound
+   *  before any file is written. Omit to skip the bound (kilo-chat). */
+  maxBytes?: number;
 };
 
 type UseClipboardPasteReturn = {
@@ -70,10 +74,12 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
   const addFileRef = useRef(options.addFile);
   const addTextRef = useRef(options.addText);
   const onFailureRef = useRef(options.onFailure);
+  const maxBytesRef = useRef(options.maxBytes);
   useEffect(() => {
     addFileRef.current = options.addFile;
     addTextRef.current = options.addText;
     onFailureRef.current = options.onFailure;
+    maxBytesRef.current = options.maxBytes;
   });
 
   const inFlightRef = useRef(false);
@@ -141,7 +147,14 @@ export function useClipboardPaste(options: UseClipboardPasteOptions): UseClipboa
         // path without the image read that would raise a second iOS 16 paste
         // prompt for content that is not there.
         const clipboardHasImage = await hasClipboardImage();
-        const file = clipboardHasImage ? await readClipboardImageFile() : null;
+        const file = clipboardHasImage ? await readClipboardImageFile(maxBytesRef.current) : null;
+        if (file === 'too-large') {
+          // Oversized clipboard image: nothing reached disk. Do not fall
+          // through to the text path, and leave `consumedRef` alone so the
+          // user can copy a smaller image and paste again.
+          onFailureRef.current('too-large');
+          return;
+        }
         if (!file) {
           // No readable image. A caller with an always-present paste control
           // accepts text, so a text clipboard pastes instead of toasting.

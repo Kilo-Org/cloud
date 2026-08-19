@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  decodedBase64ByteLength,
   hasClipboardImage,
   hasClipboardUrl,
   parseClipboardImageData,
@@ -110,6 +111,27 @@ describe('parseClipboardImageData', () => {
   });
 });
 
+describe('decodedBase64ByteLength', () => {
+  it('decodes an unpadded payload exactly', () => {
+    expect(decodedBase64ByteLength('TWFu')).toBe(3);
+    expect(decodedBase64ByteLength('AAAA')).toBe(3);
+  });
+
+  it('decodes a single-padded payload exactly', () => {
+    expect(decodedBase64ByteLength('TWE=')).toBe(2);
+    expect(decodedBase64ByteLength('iVBORw0KGgo=')).toBe(8);
+  });
+
+  it('decodes a double-padded payload exactly', () => {
+    expect(decodedBase64ByteLength('TQ==')).toBe(1);
+    expect(decodedBase64ByteLength('AA==')).toBe(1);
+  });
+
+  it('returns 0 for an empty payload', () => {
+    expect(decodedBase64ByteLength('')).toBe(0);
+  });
+});
+
 describe('hasClipboardImage', () => {
   it('returns true when hasImageAsync resolves true', async () => {
     clipboardMock.hasImageAsync.mockResolvedValue(true);
@@ -213,5 +235,49 @@ describe('readClipboardImageFile', () => {
 
     expect(result).toBeNull();
     expect(fileInstances[0]?.write).toHaveBeenCalled();
+  });
+
+  it("returns 'too-large' when maxBytes is set and the decoded payload exceeds it", async () => {
+    // 'iVBORw0KGgo=' decodes to 8 bytes.
+    clipboardMock.getImageAsync.mockResolvedValue({
+      data: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+
+    const result = await readClipboardImageFile(7);
+
+    expect(result).toBe('too-large');
+    // No directory is created and no bytes reach disk.
+    expect(expoFileSystemMock.Directory).not.toHaveBeenCalled();
+    expect(fileInstances).toHaveLength(0);
+  });
+
+  it('writes the file when the decoded payload is within maxBytes', async () => {
+    clipboardMock.getImageAsync.mockResolvedValue({
+      data: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+
+    const result = await readClipboardImageFile(8);
+
+    expect(result).toEqual({
+      uri: 'file:///cache/clipboard-images/pasted-image-uuid-1.png',
+      name: 'pasted-image.png',
+      mimeType: 'image/png',
+    });
+    expect(fileInstances).toHaveLength(1);
+  });
+
+  it('does not apply the bound when maxBytes is omitted', async () => {
+    clipboardMock.getImageAsync.mockResolvedValue({
+      data: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+
+    const result = await readClipboardImageFile();
+
+    expect(result).toEqual({
+      uri: 'file:///cache/clipboard-images/pasted-image-uuid-1.png',
+      name: 'pasted-image.png',
+      mimeType: 'image/png',
+    });
+    expect(fileInstances).toHaveLength(1);
   });
 });

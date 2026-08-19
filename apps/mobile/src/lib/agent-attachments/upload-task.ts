@@ -43,9 +43,18 @@ export async function uploadOne(args: {
   contentLength: number;
   localUri: string;
   onProgress: (progress: number | null) => void;
+  onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
 }): Promise<UploadOutcome> {
-  const { organizationId, attachmentId, path, contentType, contentLength, localUri, onProgress } =
-    args;
+  const {
+    organizationId,
+    attachmentId,
+    path,
+    contentType,
+    contentLength,
+    localUri,
+    onProgress,
+    onTask,
+  } = args;
   const baseInput = {
     messageUuid: path,
     attachmentId,
@@ -82,6 +91,7 @@ export async function uploadOne(args: {
       }
     }
   );
+  onTask?.(task);
   const uploadResult = await task.uploadAsync();
   if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
     throw new Error(`Upload failed with status ${uploadResult?.status ?? 'no response'}`);

@@ -32,6 +32,8 @@ const hoisted = vi.hoisted(() => {
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
+    cancelAsync: vi.fn(),
+    fileDelete: vi.fn(),
   };
 });
 
@@ -49,6 +51,21 @@ vi.mock('@/lib/agent-attachments/upload-task', () => ({
   describeTerminalReason: () => "This file can't be uploaded.",
   uploadOne: hoisted.uploadOne,
 }));
+vi.mock('expo-file-system', () => {
+  class FileMock {
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+    delete() {
+      hoisted.fileDelete(this.uri);
+    }
+  }
+  return {
+    File: FileMock,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
 
 function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
   return {
@@ -380,6 +397,8 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
+    hoisted.cancelAsync.mockReset();
+    hoisted.fileDelete.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
     resolveUpload = undefined;
     rejectUpload = undefined;
@@ -389,7 +408,15 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       resolveUpload = resolve;
       rejectUpload = reject;
     });
-    hoisted.uploadOne.mockReturnValue(controlled);
+    // The mock mirrors `uploadOne`'s real contract: it hands the created
+    // task's `cancelAsync` back through `onTask` before the upload settles.
+    hoisted.uploadOne.mockImplementation(
+      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        const result = await controlled;
+        return result;
+      }
+    );
   });
 
   it('announces success exactly once when the upload resolves', async () => {
@@ -562,6 +589,107 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('cancels the in-flight upload and deletes a cache-owned file on remove', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('does not delete a picker-provided URI on remove', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([{ name: 'doc.pdf', uri: 'file:///documents/picked.pdf' }]);
+    });
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('cancels every in-flight upload and deletes cache-owned files on reset', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('cancels every in-flight upload on unmount with no toast and no state flip', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      renderer.unmount();
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+
+    // The cancelled upload later rejects: unmount invalidated the live id, so
+    // the catch emits no toast and flips no state.
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+  });
+
+  it('a cancelled upload emits no toast and no state flip when it later rejects', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hookApi().attachments).toHaveLength(0);
     renderer.unmount();
   });
 });

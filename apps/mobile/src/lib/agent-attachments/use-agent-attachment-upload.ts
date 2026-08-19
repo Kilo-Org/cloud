@@ -1,4 +1,5 @@
 import * as Crypto from 'expo-crypto';
+import { File, Paths } from 'expo-file-system';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
@@ -38,6 +39,34 @@ export type AgentAttachmentCandidate = {
   size?: number;
 };
 
+/**
+ * Delete a clipboard-written cache file after its upload is cancelled. A
+ * picker-provided URI is not owned by the app and is never deleted. Best-effort:
+ * a failed delete is swallowed so it can never surface as an upload error.
+ */
+function deleteCacheOwnedFile(localUri: string): void {
+  if (!localUri.startsWith(Paths.cache.uri)) {
+    return;
+  }
+  try {
+    new File(localUri).delete();
+  } catch {
+    // Best-effort cleanup.
+  }
+}
+
+/**
+ * Run a cancel handle and swallow its rejection. Cancellation is best-effort
+ * and must never surface as an unhandled rejection.
+ */
+async function runCancellation(handle: () => Promise<void>): Promise<void> {
+  try {
+    await handle();
+  } catch {
+    // Best-effort cancellation.
+  }
+}
+
 type UseAgentAttachmentUploadOptions = {
   organizationId?: string;
 };
@@ -71,13 +100,37 @@ export function useAgentAttachmentUpload(
   // before ids exist: a reset while candidate measurement is in flight.
   const generationRef = useRef(0);
   const liveIdsRef = useRef<Set<string>>(new Set());
+  // Cancel handles for in-flight uploads, keyed by attachment id. Each handle
+  // cancels the upload task and deletes a cache-owned partial file. The entry
+  // is removed when the upload settles (in `startUpload`'s finally) or when a
+  // cancel runs.
+  const cancelHandlesRef = useRef(new Map<string, () => Promise<void>>());
+
+  const cancelUpload = useCallback((id: string) => {
+    const handle = cancelHandlesRef.current.get(id);
+    if (!handle) {
+      return;
+    }
+    cancelHandlesRef.current.delete(id);
+    void runCancellation(handle);
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
+    const handles = cancelHandlesRef.current;
+    const liveIds = liveIdsRef.current;
     return () => {
       isMountedRef.current = false;
+      // Invalidate the live ids before cancelling so a cancel-triggered
+      // rejection in `uploadOne` is suppressed by the catch's `liveIdsRef`
+      // guard: unmount must emit no toast and flip no state.
+      liveIds.clear();
+      // Cancel every in-flight upload on unmount.
+      for (const id of handles.keys()) {
+        cancelUpload(id);
+      }
     };
-  }, []);
+  }, [cancelUpload]);
 
   const updateAttachment = useCallback((id: string, patch: Partial<AgentAttachment>) => {
     if (!isMountedRef.current) {
@@ -113,6 +166,12 @@ export function useAgentAttachmentUpload(
             localUri: attachment.localUri,
             onProgress: progress => {
               updateAttachment(attachment.id, { progress });
+            },
+            onTask: task => {
+              cancelHandlesRef.current.set(attachment.id, async () => {
+                await task.cancelAsync();
+                deleteCacheOwnedFile(attachment.localUri);
+              });
             },
           });
           // Row 3.3 stale-outcome guard: a removed or reset upload must not
@@ -151,6 +210,10 @@ export function useAgentAttachmentUpload(
           announcingToast.error(
             retryable ? `Failed to upload file: ${reason}` : describeTerminalReason(reason)
           );
+        } finally {
+          // The upload settled (success or failure): drop the cancel handle so
+          // a later remove/reset does not try to cancel a finished task.
+          cancelHandlesRef.current.delete(attachment.id);
         }
       };
       void run();
@@ -227,10 +290,14 @@ export function useAgentAttachmentUpload(
     [attachments.length, startUpload]
   );
 
-  const removeAttachment = useCallback((id: string) => {
-    liveIdsRef.current.delete(id);
-    setAttachments(current => current.filter(item => item.id !== id));
-  }, []);
+  const removeAttachment = useCallback(
+    (id: string) => {
+      cancelUpload(id);
+      liveIdsRef.current.delete(id);
+      setAttachments(current => current.filter(item => item.id !== id));
+    },
+    [cancelUpload]
+  );
 
   const retryAttachment = useCallback(
     (id: string) => {
@@ -250,11 +317,14 @@ export function useAgentAttachmentUpload(
     // candidate-measurement continuation observes the new generation
     // and drops its candidates instead of adding them post-reset.
     generationRef.current += 1;
+    for (const id of liveIdsRef.current) {
+      cancelUpload(id);
+    }
     liveIdsRef.current.clear();
     setAttachments([]);
     pathRef.current = Crypto.randomUUID();
     messageUuidRef.current = Crypto.randomUUID();
-  }, []);
+  }, [cancelUpload]);
 
   const toWirePayload = useCallback(
     (): AgentAttachmentWire | undefined => buildWirePayload(attachments, pathRef.current),

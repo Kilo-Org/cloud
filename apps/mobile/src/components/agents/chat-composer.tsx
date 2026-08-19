@@ -62,7 +62,10 @@ import {
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { VoiceInputStatus } from '@/components/voice-input-control';
-import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
+import {
+  AGENT_ATTACHMENT_MAX_BYTES,
+  AGENT_ATTACHMENT_MAX_FILES,
+} from '@/lib/agent-attachments/constants';
 import {
   type AgentAttachmentSubmissionPayload,
   type AgentAttachmentWire,
@@ -491,11 +494,10 @@ export function ChatComposer({
     },
     onFailure: reason => {
       toast.error(
-        reason === 'empty'
-          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
-          : describeClassificationFailure('unreadable')
+        reason === 'empty' ? CLIPBOARD_PASTE_EMPTY_MESSAGE : describeClassificationFailure(reason)
       );
     },
+    maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
 
   const commandList = useMemo(

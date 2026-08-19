@@ -217,8 +217,8 @@ export function DataExportsClient() {
               >
                 Metabase’s security incident
               </a>{' '}
-              from your account creation date to Aug. 2 @ 20:40 UTC and can be linked to a user
-              or organization.
+              from your account creation date to Aug. 2 @ 20:40 UTC and can be linked to a user or
+              organization.
             </span>
             <span className="block">
               We are making this feature available as part of our commitment to transparency. We

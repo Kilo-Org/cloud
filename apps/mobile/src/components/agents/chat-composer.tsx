@@ -7,7 +7,15 @@ import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AppState,
   type GestureResponderEvent,
@@ -104,6 +112,11 @@ type AndroidDismissKeyboardGesture = {
   failed: boolean;
 };
 
+/** Imperative handle the host uses to set composer text (Retry / Copy to composer). */
+export type ChatComposerControl = {
+  setText: (text: string) => void;
+};
+
 type ChatComposerProps = {
   onSend: (
     text: string,
@@ -162,6 +175,8 @@ type ChatComposerProps = {
    * text the user typed while identity and the draft were still loading.
    */
   initialDraft?: string;
+  /** Imperative handle the host binds to call `setText`. */
+  controlRef?: Ref<ChatComposerControl>;
 };
 
 export function ChatComposer({
@@ -192,6 +207,7 @@ export function ChatComposer({
   autoSend,
   draftKey,
   initialDraft,
+  controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -351,6 +367,41 @@ export function ChatComposer({
   // send while the agent runs.
   const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
+
+  // One place text is written into the live input from an external caller
+  // (slash-command select, Retry / Copy to composer). Sets text, selection,
+  // hasText, slash-command state, and the measure node, then persists the
+  // durable draft exactly like a keystroke.
+  function applyComposerText(value: string) {
+    textRef.current = value;
+    measure.setText(value);
+    setHasText(value.trim().length > 0);
+    setSlashCommandInput(null);
+    inputRef.current?.setNativeProps({
+      text: value,
+      selection: { start: value.length, end: value.length },
+    });
+    selectionRef.current = { start: value.length, end: value.length };
+    inputRef.current?.focus();
+    if (draftKey && userId) {
+      saveDraft(userId, draftKey, value);
+    }
+  }
+
+  // Hold the latest applyComposerText so the imperative handle stays stable
+  // while the composer does not remount when identity resolves.
+  const applyComposerTextRef = useRef(applyComposerText);
+  applyComposerTextRef.current = applyComposerText;
+
+  useImperativeHandle(
+    controlRef,
+    () => ({
+      setText: (text: string) => {
+        applyComposerTextRef.current(text);
+      },
+    }),
+    []
+  );
 
   function handleChangeText(value: string) {
     textRef.current = value;
@@ -689,17 +740,7 @@ export function ChatComposer({
     if (sendLockRef.current.isLocked()) {
       return;
     }
-    const value = `/${command.name} `;
-    textRef.current = value;
-    measure.setText(value);
-    setHasText(true);
-    setSlashCommandInput(null);
-    inputRef.current?.setNativeProps({
-      text: value,
-      selection: { start: value.length, end: value.length },
-    });
-    selectionRef.current = { start: value.length, end: value.length };
-    inputRef.current?.focus();
+    applyComposerText(`/${command.name} `);
   }
 
   async function submit() {

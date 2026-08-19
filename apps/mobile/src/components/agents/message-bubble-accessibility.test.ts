@@ -53,6 +53,7 @@ vi.mock('./part-renderer', () => ({
 vi.mock('./part-types', () => ({
   isFilePart: () => false,
   isTextPart: () => false,
+  firstHumanText: () => '',
 }));
 vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),

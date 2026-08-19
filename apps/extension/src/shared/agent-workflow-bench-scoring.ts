@@ -10,6 +10,7 @@ import { ISO_DATE_RE, isoDateVariants } from './agent-workflow-bench-scenarios';
 import type { BenchScenario } from './agent-workflow-bench-scenarios';
 import { coerceWorkflowRunInput } from './agent-workflow-runner';
 import { hashWorkflowScript, matchesWorkflowScope } from './agent-workflows';
+import { z } from 'zod';
 
 export const BENCH_SPEED_LIMIT_SECONDS = 180;
 
@@ -133,6 +134,7 @@ export interface BenchToolCorrelation {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over untyped JSON-ish tool call data; distinguishes plain objects from arrays for arbitrary structural recursion.
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
@@ -144,8 +146,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const findStringValues = (value: unknown, excludeKeys?: ReadonlySet<string>): string[] => {
   const output: string[] = [];
   const walk = (entry: unknown): void => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over untyped JSON-ish tool call/result data; classifies each leaf to decide how to stringify it.
     if (typeof entry === 'string') {
       output.push(entry);
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- generic payload walker over untyped JSON-ish tool call/result data; classifies each leaf to decide how to stringify it.
     } else if (typeof entry === 'number' || typeof entry === 'boolean') {
       output.push(String(entry));
     } else if (Array.isArray(entry)) {
@@ -219,6 +223,7 @@ export const selectLastValidRun = (
 };
 
 const predicate = (pass: boolean, detail: string): BenchPredicate => ({ detail, pass });
+const workflowIdSchema = z.string();
 
 const scoreStoredWorkflowPredicates = async (
   scenario: BenchScenario,
@@ -231,7 +236,7 @@ const scoreStoredWorkflowPredicates = async (
     workflow !== undefined && matchesWorkflowScope(workflow, scenario.startUrl);
   const approvedHashValid =
     workflow !== undefined &&
-    typeof workflow.approvedScriptHash === 'string' &&
+    workflow.approvedScriptHash !== undefined &&
     workflow.approvedScriptHash === (await hashWorkflowScript(workflow.script));
 
   const params = workflow?.params ?? [];
@@ -312,6 +317,11 @@ interface RunOutcome {
   readonly resultPass: boolean;
 }
 
+interface ResolvedRunOutcome {
+  readonly outcome: RunOutcome;
+  readonly runPredicate: BenchPredicate;
+}
+
 const scoreEvidenceRun = ({
   evidence,
   followUpValues,
@@ -346,7 +356,7 @@ const scoreEvidenceRun = ({
 
   const lengthOk = resultLength >= scenario.minResultChars;
 
-  const extraPredicates: Record<string, BenchPredicate> = {
+  const extraPredicates = {
     resultContent: predicate(
       failedContent.length === 0,
       failedContent.length === 0
@@ -406,18 +416,20 @@ export const scoreWorkflowCorrectness = async (
    * valid run (dry-run-only with no id, or no run at all), fall back to the
    * newest saved workflow, never the oldest.
    */
-  const boundWorkflowId = (evidenceReal ?? evidenceDry)?.call.arguments['workflowId'];
+  const boundWorkflowId = workflowIdSchema.safeParse(
+    (evidenceReal ?? evidenceDry)?.call.arguments['workflowId']
+  );
   const workflow =
-    (typeof boundWorkflowId === 'string'
-      ? input.workflows.find(candidate => candidate.id === boundWorkflowId)
+    (boundWorkflowId.success
+      ? input.workflows.find(candidate => candidate.id === boundWorkflowId.data)
       : undefined) ?? input.workflows.at(-1);
   const predicates: Record<string, BenchPredicate> = await scoreStoredWorkflowPredicates(
     scenario,
     workflow
   );
 
-  const resolveOutcome = (): { outcome: RunOutcome; runPredicate: BenchPredicate } => {
-    const noRun = (detail: string): { outcome: RunOutcome; runPredicate: BenchPredicate } => ({
+  const resolveOutcome = (): ResolvedRunOutcome => {
+    const noRun = (detail: string): ResolvedRunOutcome => ({
       outcome: { extraPredicates: {}, resultCheck: 'none', resultPass: false },
       runPredicate: predicate(false, detail),
     });

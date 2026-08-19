@@ -28,6 +28,7 @@ import {
   modelsByProvider,
   api_request_log,
 } from '@kilocode/db/schema';
+import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
@@ -75,6 +76,7 @@ import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
+import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
@@ -657,6 +659,12 @@ export const adminRouter = createTRPCRouter({
               dbOrTx: tx,
             });
           } else {
+            if (isGoneOrDeletingBlockedReason(current?.blocked_reason ?? null)) {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Cannot unblock a user that is being deleted or already deleted',
+              });
+            }
             await tx
               .update(kilocode_users)
               .set({
@@ -2391,4 +2399,5 @@ export const adminRouter = createTRPCRouter({
   freeModelUsage: adminFreeModelUsageRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
+  userDeletionQueue: adminUserDeletionQueueRouter,
 });

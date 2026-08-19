@@ -27,12 +27,12 @@ export function groupConversationsByActivity(
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterdayStart = todayStart - DAY_MS;
   const weekStart = todayStart - 6 * DAY_MS;
-  const groups: Record<ConversationListGroupLabel, ConversationListItem[]> = {
-    Today: [],
-    Yesterday: [],
-    'This Week': [],
-    Older: [],
-  };
+  const groups = {
+    Today: [] as ConversationListItem[],
+    Yesterday: [] as ConversationListItem[],
+    'This Week': [] as ConversationListItem[],
+    Older: [] as ConversationListItem[],
+  } satisfies Record<ConversationListGroupLabel, ConversationListItem[]>;
 
   for (const conversation of conversations) {
     const timestamp = conversationTimestamp(conversation);

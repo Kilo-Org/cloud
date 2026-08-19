@@ -46,11 +46,44 @@
     "vitest/prefer-to-be-falsy": "off",
     "vitest/prefer-to-be-truthy": "off",
     "vitest/require-hook": "off",
-    "vitest/require-test-timeout": "off"
+    "vitest/require-test-timeout": "off",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "zod-utils/no-inline-zod-schema": "error"
   },
   "env": {
     "browser": true,
     "builtin": true,
     "node": true
-  }
+  },
+  "jsPlugins": [
+    {
+      "name": "anti-slop",
+      "specifier": "../../tools/oxlint/anti-slop/index.ts"
+    },
+    {
+      "name": "zod-utils",
+      "specifier": "../../tools/oxlint/zod-utils.mjs"
+    }
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "tests/**", "scripts/**"],
+      "rules": {
+        "anti-slop/no-chained-type-assertions": "off",
+        "anti-slop/no-known-value-widening": "off",
+        "anti-slop/no-object-parameters": "off",
+        "anti-slop/no-reflect-apply": "off",
+        "anti-slop/no-reflect-get": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-returns": "off",
+        "zod-utils/no-inline-zod-schema": "off"
+      }
+    }
+  ]
 }

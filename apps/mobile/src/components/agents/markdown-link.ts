@@ -16,7 +16,7 @@ export function resolveLinkAccessibilityLabel(
   if (title?.trim()) {
     return title.trim();
   }
-  if (typeof children === 'string' && children.trim()) {
+  if (!Array.isArray(children) && children.trim()) {
     return children.trim();
   }
   return getUrlHost(href) ?? href;

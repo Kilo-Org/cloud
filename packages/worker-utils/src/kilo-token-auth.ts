@@ -53,6 +53,8 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
   workerEnv?: string;
   connectionString: string;
   getUserPepper?: GetKiloUserPepper;
+  audience?: string;
+  allowBlocked?: boolean;
 }): Promise<KiloBearerAuthResult | null> {
   if (!params.token) return null;
 
@@ -65,7 +67,11 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
 
   let payload: Awaited<ReturnType<typeof verifyKiloToken>>;
   try {
-    payload = await verifyKiloToken(params.token, secret);
+    payload = await verifyKiloToken(
+      params.token,
+      secret,
+      params.audience ? { audience: params.audience } : undefined
+    );
   } catch {
     return null;
   }
@@ -81,7 +87,7 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
     return null;
   }
 
-  if (result.blockedReason !== null) {
+  if (result.blockedReason !== null && !params.allowBlocked) {
     return null;
   }
 

@@ -7,10 +7,7 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 
 const NO_SELECTION = { model: '', variant: '' };
 
-export function useAutoSelectModel(
-  models: ModelOption[],
-  organizationId: string | undefined
-): { model: string; variant: string } {
+export function useAutoSelectModel(models: ModelOption[], organizationId: string | undefined) {
   const { lastSelected, isLoading } = useModelPreferences(organizationId);
   const { defaultModel: orgDefaultModel, isLoading: orgDefaultIsLoading } =
     useOrgDefaultModel(organizationId);

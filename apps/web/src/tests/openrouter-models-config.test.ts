@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { deepseek_v4_pro_discounted_model } from '@/lib/ai-gateway/providers/deepseek';
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
+import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 
@@ -16,7 +16,7 @@ describe('OpenRouter Models Config', () => {
       CLAUDE_SONNET_CURRENT_MODEL_ID,
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,
-      'z-ai/glm-5.2',
+      'z-ai/glm-5.3',
       tencent_hy3_free_model.public_id,
     ];
 
@@ -37,13 +37,13 @@ describe('OpenRouter Models Config', () => {
       expect(preferredModels).not.toContain(model);
     });
 
-    if (gpt_5_6_sol_stealth_model.status === 'public') {
-      expect(preferredModels).toContain(gpt_5_6_sol_stealth_model.public_id);
+    if (gpt_5_6_sol_discounted_model.status === 'public') {
+      expect(preferredModels).toContain(gpt_5_6_sol_discounted_model.public_id);
       expect(preferredModels.indexOf(GPT_CURRENT_MODEL_ID)).toBeLessThan(
-        preferredModels.indexOf(gpt_5_6_sol_stealth_model.public_id)
+        preferredModels.indexOf(gpt_5_6_sol_discounted_model.public_id)
       );
     } else {
-      expect(preferredModels).not.toContain(gpt_5_6_sol_stealth_model.public_id);
+      expect(preferredModels).not.toContain(gpt_5_6_sol_discounted_model.public_id);
     }
   });
 });

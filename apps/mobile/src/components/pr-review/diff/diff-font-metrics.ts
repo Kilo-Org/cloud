@@ -75,7 +75,7 @@ export function computeBoundedDiffFontMetrics(
   // Treat invalid / negative / non-finite input as 1.0 (no scaling).
   // `useWindowDimensions().fontScale` can be 1.0 on platforms that report
   // no accessibility preference; we should never produce sub-1 sizes.
-  const raw = typeof fontScale === 'number' && Number.isFinite(fontScale) ? fontScale : 1;
+  const raw = fontScale != null && Number.isFinite(fontScale) ? fontScale : 1;
   const scale = Math.min(Math.max(raw, 1), DIFF_MAX_FONT_SCALE);
   return {
     scale,

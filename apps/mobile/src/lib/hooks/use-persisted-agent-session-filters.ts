@@ -72,14 +72,14 @@ export function usePersistedAgentSessionFilters() {
   }, [filters, hasLoaded]);
 
   const setFilters = useCallback((updater: FiltersUpdater) => {
-    setFiltersState(prev => (typeof updater === 'function' ? updater(prev) : updater));
+    setFiltersState(prev => ('sortBy' in updater ? updater : updater(prev)));
   }, []);
 
   const setPlatformFilter = useCallback(
     (updater: StringArrayUpdater) => {
       setFilters(prev => ({
         ...prev,
-        platformFilter: typeof updater === 'function' ? updater(prev.platformFilter) : updater,
+        platformFilter: Array.isArray(updater) ? updater : updater(prev.platformFilter),
       }));
     },
     [setFilters]
@@ -89,7 +89,7 @@ export function usePersistedAgentSessionFilters() {
     (updater: StringArrayUpdater) => {
       setFilters(prev => ({
         ...prev,
-        projectFilter: typeof updater === 'function' ? updater(prev.projectFilter) : updater,
+        projectFilter: Array.isArray(updater) ? updater : updater(prev.projectFilter),
       }));
     },
     [setFilters]

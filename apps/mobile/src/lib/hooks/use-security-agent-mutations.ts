@@ -88,17 +88,17 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
   return classifyPrReviewMutationError(error).kind === 'retryable';
 }
 
-function mapOperationInProgress(error: unknown, copy: string): unknown {
+function mapOperationInProgress(error: unknown, copy: string) {
   return isOperationInProgress(error) ? new Error(copy) : error;
 }
 
 /** Maps the raw in-progress marker onto retryable sync copy; others pass through. */
-export function mapSecuritySyncOperationError(error: unknown): unknown {
+export function mapSecuritySyncOperationError(error: unknown) {
   return mapOperationInProgress(error, SECURITY_SYNC_IN_PROGRESS_COPY);
 }
 
 /** Same marker, dismissal copy: the dismiss sheet must not talk about a sync. */
-export function mapSecurityDismissOperationError(error: unknown): unknown {
+export function mapSecurityDismissOperationError(error: unknown) {
   return mapOperationInProgress(error, SECURITY_DISMISS_IN_PROGRESS_COPY);
 }
 

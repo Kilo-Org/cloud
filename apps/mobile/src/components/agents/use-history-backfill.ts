@@ -15,6 +15,7 @@ type UseHistoryBackfillParams = {
    * intentionally discarded (fire-and-forget), and keeping this a prop lets
    * the mounted test drive it with a mock.
    */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- fire-and-forget callback; real callers pass a union of differently-shaped fetchNextPage functions (search vs. stored query), so a generic type param collapses to `void` at the call site instead of unifying.
   fetchNextPage: () => Promise<unknown>;
 };
 

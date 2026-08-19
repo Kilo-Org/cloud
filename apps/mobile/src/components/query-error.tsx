@@ -14,10 +14,7 @@ import { Text } from '@/components/ui/text';
 
 export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
-const VARIANT_META: Record<
-  QueryErrorVariant,
-  { icon: LucideIcon; title: string; description: string }
-> = {
+const VARIANT_META = {
   neutral: {
     icon: AlertCircle,
     title: 'Something went wrong',
@@ -43,7 +40,7 @@ const VARIANT_META: Record<
     title: 'Could not load',
     description: 'Something went wrong on our end. Please try again.',
   },
-};
+} satisfies Record<QueryErrorVariant, { icon: LucideIcon; title: string; description: string }>;
 
 type QueryErrorProps = {
   variant?: QueryErrorVariant;

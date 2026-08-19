@@ -18,6 +18,7 @@
     "./organization-export-access": "./src/organization-export-access.ts",
     "./user-data-export-file": "./src/user-data-export-file.ts",
     "./user-soft-delete": "./src/user-soft-delete.ts",
+    "./user-soft-delete-reasons": "./src/user-soft-delete-reasons.ts",
     "./operation-ledger": "./src/operation-ledger.ts",
     "./analytics-outbox": "./src/analytics-outbox.ts",
     "./external-side-effect-outbox": "./src/external-side-effect-outbox.ts"

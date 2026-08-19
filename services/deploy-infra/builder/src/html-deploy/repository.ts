@@ -1,6 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { deployments_ephemeral, kilocode_users } from '@kilocode/db/schema';
-import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
+import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 
 export type ClaimedEphemeralDeployment = {
@@ -38,7 +38,7 @@ export async function createPendingEphemeralDeployment(
       .for('update')
       .limit(1);
 
-    if (!owner || isSoftDeletedBlockedReason(owner.blockedReason)) {
+    if (!owner || isGoneOrDeletingBlockedReason(owner.blockedReason)) {
       return { created: false, reason: 'owner_unavailable' };
     }
 

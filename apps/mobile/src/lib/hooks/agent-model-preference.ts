@@ -1,7 +1,12 @@
+import { z } from 'zod';
+
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 
 export type ModelPreferenceEntry = { model: string; variant: string };
 export type StoredModelPreference = Record<string, ModelPreferenceEntry>;
+
+const modelPreferenceEntrySchema = z.object({ model: z.string(), variant: z.string() });
+const rawStoredModelPreferenceSchema = z.record(z.string(), z.unknown());
 
 export function contextKey(organizationId?: string): string {
   return organizationId ?? 'personal';
@@ -12,25 +17,17 @@ export function parseStoredModelPreference(raw: string | null): StoredModelPrefe
     return {};
   }
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== 'object' || parsed === null) {
+    const parsed: unknown = JSON.parse(raw);
+    const shape = rawStoredModelPreferenceSchema.safeParse(parsed);
+    if (!shape.success) {
       return {};
     }
-    const result: StoredModelPreference = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (
-        typeof value === 'object' &&
-        value !== null &&
-        typeof (value as ModelPreferenceEntry).model === 'string' &&
-        typeof (value as ModelPreferenceEntry).variant === 'string'
-      ) {
-        result[key] = {
-          model: (value as ModelPreferenceEntry).model,
-          variant: (value as ModelPreferenceEntry).variant,
-        };
-      }
-    }
-    return result;
+    return Object.fromEntries(
+      Object.entries(shape.data).flatMap<[string, ModelPreferenceEntry]>(([key, value]) => {
+        const entry = modelPreferenceEntrySchema.safeParse(value);
+        return entry.success ? [[key, entry.data]] : [];
+      })
+    );
   } catch {
     return {};
   }

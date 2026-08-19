@@ -52,7 +52,7 @@ export function resolveSessionConfigSelection({
   selectedModel,
   selectedVariant,
   cloudAgentModelOverride = null,
-}: ResolveSessionConfigSelectionOptions): { model: string; variant: string } {
+}: ResolveSessionConfigSelectionOptions) {
   if (activeSessionType === 'remote') {
     return { model: selectedModel, variant: selectedVariant };
   }

@@ -9,7 +9,7 @@ type NotificationHref = Extract<Href, string>;
 
 /** Widen string paths built from helpers into the typed-route string union. */
 function toNotificationHref(path: string): NotificationHref {
-  return path as unknown as NotificationHref;
+  return path;
 }
 
 export function notificationPathForData(data: PushData): NotificationHref {

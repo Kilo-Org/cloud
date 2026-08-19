@@ -21,7 +21,7 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 // Tone classes stay mobile-local; labels come from the shared
 // CODE_REVIEW_STATUS_LABELS map so they can't drift from web's copy.
-const STATUS_CLASSNAME: Record<CodeReviewStatus, string> = {
+const STATUS_CLASSNAME = {
   pending: 'text-muted-foreground',
   queued: 'text-muted-foreground',
   running: 'text-info',
@@ -29,12 +29,12 @@ const STATUS_CLASSNAME: Record<CodeReviewStatus, string> = {
   failed: 'text-destructive',
   cancelled: 'text-muted-foreground',
   interrupted: 'text-warn',
-};
+} satisfies Record<CodeReviewStatus, string>;
 
 type ReviewListData = NonNullable<ReturnType<typeof useReviewList>['data']>;
 type Review = Extract<ReviewListData, { success: true }>['reviews'][number];
 
-export function statusMeta(status: string): { label: string; className: string } {
+export function statusMeta(status: string) {
   if (!isCodeReviewStatus(status)) {
     return { label: status, className: 'text-muted-foreground' };
   }

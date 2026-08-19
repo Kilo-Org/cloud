@@ -24,6 +24,12 @@ const UpsertCustomLlmSchema = z.object({
   credentials: CustomLlmCredentialsSchema.optional(),
 });
 
+const CopyCustomLlmSchema = z.object({
+  source_public_id: publicIdSchema,
+  public_id: publicIdSchema,
+  display_name: z.string().trim().min(1, 'display_name is required'),
+});
+
 const DeleteCustomLlmSchema = z.object({
   public_id: publicIdSchema,
 });
@@ -91,6 +97,44 @@ export const adminCustomLlmRouter = createTRPCRouter({
         public_id: custom_llm2.public_id,
         definition: custom_llm2.definition,
       });
+
+    return inserted;
+  }),
+
+  copy: adminProcedure.input(CopyCustomLlmSchema).mutation(async ({ input }) => {
+    const source = await db.query.custom_llm2.findFirst({
+      where: eq(custom_llm2.public_id, input.source_public_id),
+    });
+
+    if (!source) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Custom LLM with public_id "${input.source_public_id}" not found`,
+      });
+    }
+
+    const [inserted] = await db
+      .insert(custom_llm2)
+      .values({
+        public_id: input.public_id,
+        definition: {
+          ...source.definition,
+          display_name: input.display_name,
+        },
+        encrypted_api_key: source.encrypted_api_key,
+      })
+      .onConflictDoNothing()
+      .returning({
+        public_id: custom_llm2.public_id,
+        definition: custom_llm2.definition,
+      });
+
+    if (!inserted) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: `Custom LLM with public_id "${input.public_id}" already exists`,
+      });
+    }
 
     return inserted;
   }),

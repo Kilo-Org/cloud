@@ -151,7 +151,7 @@ export function resolvePinnedAgentModel(input: {
   slug: string;
   profileAgents?: ProfileAgent[];
   runtimeAgents?: RuntimeAgent[];
-}): { model?: string; variant?: string; agentName?: string } {
+}) {
   const profileAgent = input.profileAgents?.find(a => a.slug === input.slug);
   const runtimeAgent = input.runtimeAgents?.find(a => a.slug === input.slug);
 

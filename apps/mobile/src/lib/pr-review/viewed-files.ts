@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { z } from 'zod';
 
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_VIEWED_KEY } from '@/lib/storage-keys';
@@ -9,6 +10,12 @@ type ViewedFileEntry = {
 };
 
 type ViewedFileMap = Record<string, ViewedFileEntry>;
+
+const viewedFileEntrySchema = z.object({
+  headSha: z.string(),
+  viewedPaths: z.array(z.string()),
+});
+const rawViewedFileMapSchema = z.record(z.string(), z.unknown());
 
 const VIEWED_FILES_PR_LIMIT = 20;
 
@@ -22,37 +29,25 @@ function viewedFilesKey(ref: ViewedFilePrRef): string {
   return `${ref.owner.toLowerCase()}/${ref.repo.toLowerCase()}#${ref.number}`;
 }
 
-function isValidEntry(value: unknown): value is ViewedFileEntry {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  const entry = value as Record<string, unknown>;
-  return (
-    typeof entry.headSha === 'string' &&
-    Array.isArray(entry.viewedPaths) &&
-    entry.viewedPaths.every(path => typeof path === 'string')
-  );
-}
-
 function parseMap(raw: string | null): ViewedFileMap {
   if (raw == null || raw.length === 0) {
     return {};
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const shape = rawViewedFileMapSchema.safeParse(parsed);
+    if (!shape.success) {
       return {};
     }
-    // Drop any structurally invalid entry rather than trusting the cast, so
+    // Drop any structurally invalid entry rather than trusting a cast, so
     // one corrupt record can't make getViewedFiles return a non-array or
     // make toggleViewedFile throw on `.includes`.
-    const result: ViewedFileMap = {};
-    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (isValidEntry(value)) {
-        result[key] = { headSha: value.headSha, viewedPaths: value.viewedPaths };
-      }
-    }
-    return result;
+    return Object.fromEntries(
+      Object.entries(shape.data).flatMap<[string, ViewedFileEntry]>(([key, value]) => {
+        const entry = viewedFileEntrySchema.safeParse(value);
+        return entry.success ? [[key, entry.data]] : [];
+      })
+    );
   } catch {
     return {};
   }

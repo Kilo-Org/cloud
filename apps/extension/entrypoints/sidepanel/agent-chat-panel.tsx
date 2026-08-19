@@ -65,6 +65,7 @@ import { createWorkflowToolDefinitions } from '@/src/shared/agent-llm-harness';
 import { formatAgentWorkflowIndex } from '@/src/shared/agent-workflows';
 import type { AgentWorkflow } from '@/src/shared/agent-workflows';
 import { loadWorkflowSettings } from '@/src/shared/agent-workflows-storage';
+import { loadWebMcpSettings } from '@/src/shared/web-mcp-settings';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
@@ -318,6 +319,7 @@ export const AgentChatPanel = ({
         onCompact={() => {
           void compactActiveConversation();
         }}
+        placement="above"
         promptTokens={activePromptTokens}
         sessionCostUsd={activeSessionCostUsd}
       />
@@ -656,6 +658,13 @@ export const AgentChatPanel = ({
         return;
       }
 
+      let allowWebMcpInSafeMode = false;
+      try {
+        ({ allowWebMcpInSafeMode } = await loadWebMcpSettings(storage));
+      } catch {
+        allowWebMcpInSafeMode = false;
+      }
+
       const { allowWorkflowsInSafeMode } = settings;
       const workflowTools = createWorkflowToolDefinitions({
         allowWorkflows: allowWorkflowsInSafeMode,
@@ -665,6 +674,7 @@ export const AgentChatPanel = ({
 
       captureEvent(MESSAGE_SENT_EVENT, { mode: runMode });
       await runTurn({
+        allowWebMcpInSafeMode,
         apiBaseUrl,
         appendEvents: runState.appendRunEvents,
         conversationEvents: conversationEventsForGateway,

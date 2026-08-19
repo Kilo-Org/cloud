@@ -22,7 +22,7 @@ export async function markReadConversation({
   return result;
 }
 
-type ApplyBadgeClearResultInput = {
+type ApplyBadgeClearResultInput<T> = {
   badgeClear: MarkConversationReadResponse['badgeClear'];
   startBadgeFreshnessEpoch: number;
   currentBadgeFreshnessEpoch: number;
@@ -31,7 +31,7 @@ type ApplyBadgeClearResultInput = {
     queryKey: readonly ['badges', string],
     updater: (badges: BadgeCountRow[] | undefined) => BadgeCountRow[] | undefined
   ) => void;
-  setBadgeCount: (badgeCount: number) => Promise<unknown>;
+  setBadgeCount: (badgeCount: number) => Promise<T>;
 };
 
 export function filterClearedBadgeBucket(
@@ -45,14 +45,14 @@ export function filterClearedBadgeBucket(
   return badges?.filter(row => row.badgeBucket !== badgeClear.badgeBucket);
 }
 
-export function applyBadgeClearResult({
+export function applyBadgeClearResult<T>({
   badgeClear,
   startBadgeFreshnessEpoch,
   currentBadgeFreshnessEpoch,
   userId,
   updateBadgeRows,
   setBadgeCount,
-}: ApplyBadgeClearResultInput): boolean {
+}: ApplyBadgeClearResultInput<T>): boolean {
   if (badgeClear === null) {
     return false;
   }

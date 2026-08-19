@@ -14,7 +14,7 @@ type PrBadgeDescriptor = Readonly<{
   accessibilityLabel: string;
 }>;
 
-const STATE_ARIA_LABELS: Readonly<Record<PrBadgeState, string>> = {
+const STATE_ARIA_LABELS = {
   open: 'open pull request',
   closed: 'closed pull request',
   merged: 'merged pull request',
@@ -22,7 +22,7 @@ const STATE_ARIA_LABELS: Readonly<Record<PrBadgeState, string>> = {
   // Mobile keeps `unknown` on the open presentation (never mapped to closed),
   // so it speaks as an open PR.
   unknown: 'open pull request',
-};
+} satisfies Readonly<Record<PrBadgeState, string>>;
 
 /**
  * Bucket a raw PR state string into a badge state. Unlike the web helper,

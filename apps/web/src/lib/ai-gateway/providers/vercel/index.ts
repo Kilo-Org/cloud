@@ -21,6 +21,7 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -266,9 +267,11 @@ export async function applyVercelSettings(
 
     const gatewayOptions = requestToMutate.body.providerOptions.gateway;
     const openAiApiKey = getEnvVariable('OPENAI_API_KEY');
+    // OpenAI BYOK must also be disabled in the Vercel GUI so this model uses Vercel's discounted endpoint.
     if (
       gatewayOptions &&
       openAiApiKey &&
+      requestedModel !== gpt_5_6_sol_discounted_model.public_id &&
       vercelInferenceProviders?.includes('openai') &&
       (!gatewayOptions.only || gatewayOptions.only.includes('openai'))
     ) {

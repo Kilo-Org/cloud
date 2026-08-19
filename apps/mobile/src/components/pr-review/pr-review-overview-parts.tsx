@@ -52,12 +52,12 @@ export function describePrState(args: {
 // `bg-good/10` don't work on them. The chip uses a flat muted background
 // and lets the foreground color carry the tone so it stays legible in
 // both themes without needing per-tone backgrounds.
-const TONE_FG_CLASS: Record<PrStateChipTone, string> = {
+const TONE_FG_CLASS = {
   good: 'text-good',
   warn: 'text-warn',
   destructive: 'text-destructive',
   muted: 'text-muted-foreground',
-};
+} satisfies Record<PrStateChipTone, string>;
 
 export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDescriptor }>) {
   const Icon = descriptor.icon;

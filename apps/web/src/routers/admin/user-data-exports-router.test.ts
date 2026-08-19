@@ -122,6 +122,14 @@ describe('adminUserDataExportsRouter', () => {
         },
         {
           kilo_user_id: owner.id,
+          status: 'expired',
+          snapshot_at: new Date(now - 172_800_000).toISOString(),
+          completed_at: new Date(now - 86_400_000).toISOString(),
+          expires_at: new Date(now - 60_000).toISOString(),
+          requested_at: new Date(now - 90_000_000).toISOString(),
+        },
+        {
+          kilo_user_id: owner.id,
           subject_type: 'organization',
           organization_id: subjectOrganization.id,
           status: 'processing',
@@ -236,6 +244,8 @@ describe('adminUserDataExportsRouter', () => {
 
     expect(result).toMatchObject({
       active: 2,
+      ready: 1,
+      expired: 1,
       needsAttention: 4,
       staleLeases: 1,
       pendingDispatches: 1,
@@ -260,7 +270,7 @@ describe('adminUserDataExportsRouter', () => {
     expect(all.rows.map(row => row.health.severity)).toEqual(
       expect.arrayContaining(['error', 'degraded'])
     );
-    expect(searched.pagination.total).toBe(3);
+    expect(searched.pagination.total).toBe(4);
     expect(searched.rows.every(row => row.user.id === owner.id)).toBe(true);
     expect(searched.rows.every(row => row.requestedAt.endsWith('Z'))).toBe(true);
     expect(searched.rows).toEqual(
@@ -301,7 +311,7 @@ describe('adminUserDataExportsRouter', () => {
       limit: 2,
     });
 
-    expect(result.pagination).toMatchObject({ page: 1, limit: 2, total: 4, totalPages: 2 });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 2, total: 5, totalPages: 3 });
     expect(result.rows).toHaveLength(2);
   });
 

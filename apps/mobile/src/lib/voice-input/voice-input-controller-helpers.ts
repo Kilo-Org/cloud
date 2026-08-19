@@ -8,10 +8,7 @@ type PermissionResult =
 
 const noopBooleanResolver = (_ok: boolean): void => undefined;
 
-function createBooleanResolver(): {
-  promise: Promise<boolean>;
-  resolve: (value: boolean) => void;
-} {
+function createBooleanResolver() {
   let resolveBoolean = noopBooleanResolver;
   const promise = new Promise<boolean>(resolve => {
     resolveBoolean = resolve;
@@ -26,23 +23,20 @@ export type PendingVoiceInputStart = {
   owner: string;
 };
 
-export function createVoiceInputStartQueue(): {
-  cancel: (owner?: string) => void;
-  run: (
-    request: PendingVoiceInputStart,
-    task: (request: PendingVoiceInputStart) => Promise<boolean>
-  ) => Promise<boolean>;
-} {
+export function createVoiceInputStartQueue() {
   let pending: PendingVoiceInputStart | null = null;
   let barrier: Promise<boolean> | null = null;
 
   return {
-    cancel: owner => {
+    cancel: (owner?: string) => {
       if (pending && (owner === undefined || pending.owner === owner)) {
         pending.cancelled = true;
       }
     },
-    run: async (request, task) => {
+    run: async (
+      request: PendingVoiceInputStart,
+      task: (request: PendingVoiceInputStart) => Promise<boolean>
+    ) => {
       if (pending) {
         pending.cancelled = true;
       }

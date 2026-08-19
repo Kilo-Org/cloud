@@ -46,16 +46,7 @@ export type OutboxRowInput = {
  * - `needsReconcile` surfaces the `reconcile-first` rows that must show a card
  *   instead of auto-POSTing. `remove` and `refresh` keep that list current.
  */
-export function useMutationOutbox(): {
-  getStoredOperationKey: (fingerprint: string) => string | null;
-  writeSafeRetry: (row: OutboxRowInput) => Promise<void>;
-  writeReconcileFirst: (row: OutboxRowInput & { scope: string }) => Promise<string>;
-  remove: (fingerprint: string) => Promise<void>;
-  needsReconcile: OutboxRow[];
-  loaded: boolean;
-  whenLoaded: () => Promise<boolean>;
-  refresh: () => void;
-} {
+export function useMutationOutbox() {
   const { userId, isLoading } = useCurrentUserId();
   const [rows, setRows] = useState<OutboxRow[]>([]);
   // Latest rows, readable without a stale closure: a submit that awaits the

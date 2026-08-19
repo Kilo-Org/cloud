@@ -1,3 +1,14 @@
+export type OrgDeepLinkResolution<T> = {
+  effectiveOrganizationId: string | null;
+  validatedOrg: T | undefined;
+  /** Key for data queries; `null` disables them. */
+  queryOrganizationId: string | null;
+  /** Param present and resolves to a membership — caller should persist. */
+  shouldPersistOverride: boolean;
+  /** Param present and the org list has not settled yet. */
+  isResolving: boolean;
+};
+
 /**
  * Pure reconcile for organization deep-links (e.g. low-balance push →
  * credit-activity with `?org=`). When an explicit org param is present it is
@@ -9,16 +20,7 @@ export function reconcileOrgDeepLink<T extends { organizationId: string }>(args:
   contextOrganizationId: string | null;
   /** `undefined` while the organizations.list query is still unsettled. */
   orgs: readonly T[] | undefined;
-}): {
-  effectiveOrganizationId: string | null;
-  validatedOrg: T | undefined;
-  /** Key for data queries; `null` disables them. */
-  queryOrganizationId: string | null;
-  /** Param present and resolves to a membership — caller should persist. */
-  shouldPersistOverride: boolean;
-  /** Param present and the org list has not settled yet. */
-  isResolving: boolean;
-} {
+}): OrgDeepLinkResolution<T> {
   const { orgParam, contextOrganizationId, orgs } = args;
 
   if (orgParam == null || orgParam === '') {

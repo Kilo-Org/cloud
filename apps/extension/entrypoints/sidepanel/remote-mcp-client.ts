@@ -25,7 +25,7 @@ import { createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 
 type FetchLike = typeof fetch;
 
-const buildAuthHeaders = (auth: RemoteMcpAuth): Record<string, string> => {
+const buildAuthHeaders = (auth: RemoteMcpAuth) => {
   if (auth.type === 'bearer' && auth.token !== undefined) {
     return { Authorization: `Bearer ${auth.token}` };
   }
@@ -61,7 +61,7 @@ const permissiveJsonSchemaValidator: jsonSchemaValidator = {
  * Transport parameter — the runtime object is identical.
  */
 const asTransport = (transport: StreamableHTTPClientTransport): Transport =>
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- exactOptionalPropertyTypes makes `sessionId?: string` incompatible with `string | undefined`; the runtime object is identical, only the optional-property strictness differs.
   transport as unknown as Transport;
 
 const makeAuthProvider = (

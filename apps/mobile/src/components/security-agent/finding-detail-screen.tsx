@@ -34,14 +34,14 @@ const TABS: { key: FindingTab; label: string }[] = [
 
 // Server-verified security_agent_ui_interaction enum values (schemas.ts:28-31)
 // — one per tab, matching web's handleTabChange in FindingDetailDialog.tsx.
-const TAB_INTERACTIONS: Record<
-  FindingTab,
-  'finding_triage_viewed' | 'finding_analysis_viewed' | 'finding_remediation_viewed'
-> = {
+const TAB_INTERACTIONS = {
   details: 'finding_triage_viewed',
   analysis: 'finding_analysis_viewed',
   remediation: 'finding_remediation_viewed',
-};
+} satisfies Record<
+  FindingTab,
+  'finding_triage_viewed' | 'finding_analysis_viewed' | 'finding_remediation_viewed'
+>;
 
 type FindingDetailScreenProps = {
   scope: string;

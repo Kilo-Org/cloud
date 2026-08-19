@@ -1,3 +1,4 @@
+import { hashKey } from '@tanstack/react-query';
 import { type PersistedClient } from '@tanstack/react-query-persist-client';
 
 /**
@@ -21,10 +22,24 @@ export function makePersistedClient(data: unknown, buster = ''): PersistedClient
       mutations: [],
       queries: [
         {
+          queryHash: hashKey(GET_ME_QUERY_KEY),
           queryKey: GET_ME_QUERY_KEY,
-          state: { status: 'success', data, dataUpdatedAt: Date.now() },
+          state: {
+            data,
+            dataUpdateCount: 0,
+            dataUpdatedAt: Date.now(),
+            error: null,
+            errorUpdateCount: 0,
+            errorUpdatedAt: 0,
+            fetchFailureCount: 0,
+            fetchFailureReason: null,
+            fetchMeta: null,
+            isInvalidated: false,
+            status: 'success',
+            fetchStatus: 'idle',
+          },
         },
       ],
     },
-  } as unknown as PersistedClient;
+  };
 }

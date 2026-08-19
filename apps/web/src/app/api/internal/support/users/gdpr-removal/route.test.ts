@@ -49,6 +49,7 @@ const ACTOR_EMAIL = 'alice@kilocode.ai';
 const CSA_REQUEST_ID = 'csa-req-del-1';
 const CLOUD_REQUEST_ID = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
+const LEGACY_OAUTH_USER_ID = 'oauth/google:103883072551006019454';
 
 function postRequest(body: unknown, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest('http://localhost:3000/api/internal/support/users/gdpr-removal', {
@@ -154,10 +155,10 @@ describe('/api/internal/support/users/gdpr-removal', () => {
         expect(mockedFindUserById).not.toHaveBeenCalled();
       });
 
-      test('returns 400 when userId is not a UUID', async () => {
+      test('returns 400 when userId is empty', async () => {
         const res = await POST(
           postRequest({
-            userId: 'not-a-uuid',
+            userId: '   ',
             email: 'customer@example.com',
             actorEmail: ACTOR_EMAIL,
             requestId: CSA_REQUEST_ID,
@@ -288,6 +289,29 @@ describe('/api/internal/support/users/gdpr-removal', () => {
           kind: 'support_service',
           outcome: 'enqueued',
           target: `user:${USER_ID}`,
+        });
+      });
+
+      test('accepts a kilocode_users.id in oauth/google form', async () => {
+        mockedFindUserById.mockResolvedValue(
+          defineTestUser({ id: LEGACY_OAUTH_USER_ID, google_user_email: 'customer@example.com' })
+        );
+        mockedEnqueueUserDeletionTargets.mockResolvedValue([
+          { status: 'enqueued', requestId: CLOUD_REQUEST_ID },
+        ]);
+        const res = await POST(
+          postRequest({
+            userId: LEGACY_OAUTH_USER_ID,
+            email: 'customer@example.com',
+            actorEmail: ACTOR_EMAIL,
+            requestId: CSA_REQUEST_ID,
+          })
+        );
+        expect(res.status).toBe(202);
+        expect(mockedFindUserById).toHaveBeenCalledWith(LEGACY_OAUTH_USER_ID);
+        expect(mockedEnqueueUserDeletionTargets).toHaveBeenCalledWith({
+          actor: { kiloUserId: null, email: ACTOR_EMAIL },
+          targets: [{ email: 'customer@example.com', trustedUserId: LEGACY_OAUTH_USER_ID }],
         });
       });
     });

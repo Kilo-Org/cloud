@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   isRemoteMcpToolName,
+  isWebMcpToolCallEvent,
   isWorkflowToolName,
   toDangerousToolCallEvents,
+  toWebMcpToolCallEvents,
   toWorkflowToolCallEvent,
   toWorkflowToolCallEvents,
 } from './agent-tool-call-events';
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
+import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
 
 describe('workflow tool call events', () => {
   it('recognizes the first three workflow tool names', () => {
@@ -109,5 +112,60 @@ describe('workflow tool call events', () => {
     expect(isRemoteMcpToolName('search_workflows')).toBe(false);
     expect(isRemoteMcpToolName('run_workflow')).toBe(false);
     expect(isRemoteMcpToolName('mcp_test_search_workflows')).toBe(true);
+  });
+});
+
+describe('web MCP tool call events', () => {
+  const route: WebMcpToolRoute = {
+    definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+    documentId: 'doc-1',
+    gatewayToolName: 'search',
+    origin: 'https://example.com',
+    pageToolName: 'search',
+    tabId: 7,
+  };
+
+  it('emits a WebMCP event for a routed name', () => {
+    const request = {
+      arguments: { query: 'kilo' },
+      id: 'call-1',
+      name: 'search',
+    };
+
+    const events = toWebMcpToolCallEvents([request], new Map([['search', route]]));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      arguments: { query: 'kilo' },
+      definitionSignature: route.definitionSignature,
+      documentId: 'doc-1',
+      name: 'search',
+      providerToolCallId: 'call-1',
+      tabId: 7,
+      type: 'tool-call',
+      webMcpOrigin: 'https://example.com',
+    });
+  });
+
+  it('skips an unrouted name', () => {
+    const request = {
+      arguments: { query: 'kilo' },
+      id: 'call-1',
+      name: 'unrouted',
+    };
+
+    const events = toWebMcpToolCallEvents([request], new Map([['search', route]]));
+
+    expect(events).toStrictEqual([]);
+  });
+
+  it('discriminates a WebMCP event by webMcpOrigin', () => {
+    const webMcpCall = { name: 'search', webMcpOrigin: 'https://example.com' };
+    const plainCall = { name: 'search' };
+    const workflowCall = { name: 'run_workflow' };
+
+    expect(isWebMcpToolCallEvent(webMcpCall)).toBe(true);
+    expect(isWebMcpToolCallEvent(plainCall)).toBe(false);
+    expect(isWebMcpToolCallEvent(workflowCall)).toBe(false);
   });
 });

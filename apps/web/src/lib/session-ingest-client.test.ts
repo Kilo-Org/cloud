@@ -508,6 +508,9 @@ describe('fetchSharedSessionMetadata', () => {
     await expect(fetchSharedSessionMetadata('share.jwt.token')).resolves.toEqual({
       title: 'Shared session',
       ownerName: 'Session owner',
+      gitUrl: null,
+      gitBranch: null,
+      createdAt: null,
     });
     expect(mockFetch).toHaveBeenCalledWith(
       'https://ingest.test.example.com/session/share.jwt.token/metadata',

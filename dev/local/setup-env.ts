@@ -216,6 +216,92 @@ async function promptForValue(
   });
 }
 
+// Prompts for a URL and validates it. On invalid input, offers a non-fatal
+// recovery menu: re-enter, use a suggested fix (when available), or use the
+// default / clear. Returns the validated URL string, or '' to mean
+// "use the default / clear" — callers map '' to the appropriate fallback.
+async function promptForUrl(args: {
+  key: string;
+  defaultValue: string;
+  description?: string;
+}): Promise<string> {
+  while (true) {
+    const raw = await promptForValue(args.key, args.defaultValue, args.description, false);
+    if (raw === '') return '';
+    const result = validateUrl(raw);
+    if (result.ok) return result.value;
+    if (result.suggestion) {
+      // Make sure the suggestion itself is valid before offering it.
+      const suggestionCheck = validateUrl(result.suggestion);
+      if (!suggestionCheck.ok) delete result.suggestion;
+    }
+    console.log(`  ${RED}✗ ${args.key}: ${result.error}${RESET}`);
+    if (result.suggestion) {
+      console.log(`  ${YELLOW}Suggested: ${result.suggestion}${RESET}`);
+    }
+    console.log('  Options:');
+    console.log('    [r] Re-enter');
+    if (result.suggestion) console.log('    [s] Use suggested');
+    console.log('    [d] Use default / clear');
+    const choice = await promptForUrlRecoveryChoice(Boolean(result.suggestion));
+    if (choice === 'r') continue;
+    if (choice === 's' && result.suggestion) return result.suggestion;
+    return '';
+  }
+}
+
+async function promptForUrlRecoveryChoice(hasSuggestion: boolean): Promise<'r' | 's' | 'd'> {
+  const hint = hasSuggestion ? '[r/s/d]' : '[r/d]';
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(resolve => {
+    rl.question(`  Choice ${hint} (default d) > `, answer => {
+      rl.close();
+      const a = answer.trim().toLowerCase();
+      if (a === 'r' || a === 're-enter') return resolve('r');
+      if (hasSuggestion && (a === 's' || a === 'suggested')) return resolve('s');
+      resolve('d');
+    });
+  });
+}
+
+type UrlValidation =
+  | { ok: true; value: string }
+  | { ok: false; error: string; suggestion?: string };
+
+// Validates a URL string for use as NEXTAUTH_URL / APP_URL_OVERRIDE:
+//   - no whitespace, quotes, or '#' (which would corrupt .env files)
+//   - parseable by the URL parser
+//   - http or https protocol
+//   - non-empty hostname
+// On failure, returns an error and (when possible) a suggested fix such as
+// prepending http:// for a protocol-less input.
+function validateUrl(raw: string): UrlValidation {
+  if (/[\s"'#\n\r]/.test(raw)) {
+    return {
+      ok: false,
+      error: 'must not contain whitespace, quotes, newlines, or "#" (reserved in .env files)',
+    };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    const suggestion = raw.includes('://') ? undefined : `http://${raw.replace(/^\/+/, '')}`;
+    return {
+      ok: false,
+      error: 'not a valid URL — include the protocol (e.g. http:// or https://)',
+      suggestion,
+    };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, error: `protocol must be http or https (got "${parsed.protocol}")` };
+  }
+  if (!parsed.hostname) {
+    return { ok: false, error: 'URL is missing a hostname' };
+  }
+  return { ok: true, value: raw };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -276,8 +362,37 @@ async function main(): Promise<void> {
 
   const collected = new Map<string, string>();
 
+  // Optional base URL. When provided, it becomes the default for the
+  // NEXTAUTH_URL prompt (which the user can still override) and is also
+  // written as APP_URL_OVERRIDE so auth and server-side redirects resolve
+  // at the same public origin (LAN IP, Cloudflare Access, etc.). Left
+  // empty in CI and when the user presses enter (or chooses to clear
+  // during the recovery menu for an invalid value).
+  const baseUrl = ciMode
+    ? ''
+    : await promptForUrl({
+        key: 'BASE_URL',
+        defaultValue: '',
+        description:
+          'Base URL — the URL you use to access the dev server. Sets NEXTAUTH_URL (as its default) and APP_URL_OVERRIDE so auth and server-side redirects resolve at the same origin. Press enter to leave unset.',
+      });
+
   for (const key of REQUIRED_KEYS) {
-    const defaultValue = exampleValues.get(key) ?? '';
+    if (key === 'NEXTAUTH_URL') {
+      const exampleDefault = exampleValues.get(key) ?? '';
+      const defaultValue = baseUrl || exampleDefault;
+      const answer = ciMode
+        ? collectCiValue(key, defaultValue, false)
+        : await promptForUrl({
+            key,
+            defaultValue,
+            description: buildDescription(key),
+          });
+      collected.set(key, answer === '' ? defaultValue : answer);
+      continue;
+    }
+    const exampleDefault = exampleValues.get(key) ?? '';
+    const defaultValue = exampleDefault;
     const description = buildDescription(key);
     const isSecret = SECRET_KEYS.has(key);
 
@@ -297,6 +412,10 @@ async function main(): Promise<void> {
     } else {
       collected.set(key, answer);
     }
+  }
+
+  if (baseUrl) {
+    collected.set('APP_URL_OVERRIDE', baseUrl);
   }
 
   // -----------------------------------------------------------------------

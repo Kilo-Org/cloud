@@ -124,6 +124,7 @@ test('points NEXTAUTH_URL at the offset port when the web app runs without a tun
     portOffset: 2900,
     serviceNames: ['nextjs', 'postgres', 'redis'],
     nextjsPort: 5900,
+    repoRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-')),
   });
   assert.equal(url, 'http://localhost:5900');
 });
@@ -133,6 +134,7 @@ test('leaves NEXTAUTH_URL to .env.local when there is no port offset', () => {
     portOffset: 0,
     serviceNames: ['nextjs'],
     nextjsPort: 3000,
+    repoRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-')),
   });
   assert.equal(url, undefined);
 });
@@ -142,6 +144,7 @@ test('does not override NEXTAUTH_URL when a tunnel rewrites it to a public origi
     portOffset: 2900,
     serviceNames: ['nextjs', 'kiloclaw-tunnel'],
     nextjsPort: 5900,
+    repoRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-')),
   });
   assert.equal(url, undefined);
 });
@@ -151,8 +154,151 @@ test('skips NEXTAUTH_URL when the web app is not being started', () => {
     portOffset: 2900,
     serviceNames: ['postgres', 'redis'],
     nextjsPort: 5900,
+    repoRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-')),
   });
   assert.equal(url, undefined);
+});
+
+test('uses the LAN host from .env.local and the offset port', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.local'),
+    'NEXTAUTH_URL=http://192.168.1.82:3000\n'
+  );
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://192.168.1.82:3100');
+});
+
+test('preserves 127.0.0.1 as the host and forces the offset port', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.local'),
+    'NEXTAUTH_URL=http://127.0.0.1:3000\n'
+  );
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://127.0.0.1:3100');
+});
+
+test('uses the LAN host from APP_URL_OVERRIDE in .env.development.local', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.development.local'),
+    'APP_URL_OVERRIDE=https://10.0.0.5:3000\n'
+  );
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'https://10.0.0.5:3100');
+});
+
+test('auto-corrects the loopback port when .env.local still pins the default :3000', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.local'),
+    'NEXTAUTH_URL=http://localhost:3000\n'
+  );
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://localhost:3100');
+});
+
+test('ignores malformed NEXTAUTH_URL entries and falls back to the offset port', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(path.join(repoRoot, '.env.local'), 'NEXTAUTH_URL=not-a-url\n');
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://localhost:3100');
+});
+
+test('preserves IPv6 loopback and keeps the brackets in the origin', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(path.join(repoRoot, '.env.local'), 'NEXTAUTH_URL=http://[::1]:3000\n');
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://[::1]:3100');
+});
+
+test('preserves a leftover tunnel hostname in .env.local as-is (tunnel cleanup tracked separately)', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.local'),
+    'NEXTAUTH_URL=https://abc-123.trycloudflare.com:3000\n'
+  );
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'https://abc-123.trycloudflare.com:3000');
+});
+
+test('preserves a public IP in .env.local without forcing the offset port', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(path.join(repoRoot, '.env.local'), 'NEXTAUTH_URL=http://8.8.8.8:3000\n');
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://8.8.8.8:3000');
+});
+
+test('preserves a public custom domain (e.g. Cloudflare Access) without a port', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(path.join(repoRoot, '.env.local'), 'NEXTAUTH_URL=https://clouddev.example.com\n');
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'https://clouddev.example.com');
+});
+
+test('prefers .env.development.local over .env.local per key, matching dev.sh', () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-env-'));
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.development.local'),
+    'NEXTAUTH_URL=http://10.0.0.5:3000\n'
+  );
+  fs.writeFileSync(
+    path.join(repoRoot, '.env.local'),
+    'NEXTAUTH_URL=http://192.168.1.82:3000\n'
+  );
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 100,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3100,
+    repoRoot,
+  });
+  assert.equal(url, 'http://10.0.0.5:3100');
 });
 
 test('keeps auto routing workers in their own opt-in group', () => {

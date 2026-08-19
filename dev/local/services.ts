@@ -1,6 +1,9 @@
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import { isIPv4, isIPv6 } from 'node:net';
 import * as path from 'node:path';
+
+import { readEnvFile } from './env-sync/parse';
 
 type ServiceType = 'infra' | 'nextjs' | 'worker' | 'process';
 
@@ -381,22 +384,81 @@ function getNextjsTargetPort(): number {
 
 let nextjsTargetPort = getNextjsTargetPort();
 
+// Returns true for hosts the user could plausibly be reaching on their own
+// machine: RFC1918 IPv4, IPv4 loopback, IPv6 loopback, and IPv6 unique-local
+// addresses. Hostnames (e.g. tunnel domains) and public IPs are not preserved
+// here so a leftover public NEXTAUTH_URL from a previous tunnel run doesn't
+// silently get re-injected with the offset port.
+function isPrivateOrLoopbackHost(hostname: string): boolean {
+  if (isIPv4(hostname)) {
+    const octets = hostname.split('.').map(Number);
+    if (octets[0] === 127) return true;
+    if (octets[0] === 10) return true;
+    if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
+    if (octets[0] === 192 && octets[1] === 168) return true;
+    return false;
+  }
+  // URL.hostname returns IPv6 with brackets (e.g. "[::1]"), which net.isIPv6
+  // rejects. Strip them, then check ::1 and the ULA block (fc00::/7 — first
+  // hextet starts with fc or fd).
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    const inner = hostname.slice(1, -1);
+    if (inner === '::1') return true;
+    return /^(fc|fd)[0-9a-f:]+$/i.test(inner) && isIPv6(inner);
+  }
+  return false;
+}
+
 // When a port offset is active the web app binds to a non-3000 port, but
 // .env.local still hardcodes NEXTAUTH_URL=http://localhost:3000, so NextAuth
-// sign-in/out redirects land on :3000. Return the offset-aware localhost URL so
-// the caller can inject it as a process env var (which overrides .env files).
-// Returns undefined — leaving .env.local authoritative — when there's no offset
-// (e.g. mobile/manual host overrides) or when a tunnel is running, since
-// start-tunnel rewrites NEXTAUTH_URL to the public origin.
+// sign-in/out redirects land on :3000. If the user has pointed NEXTAUTH_URL
+// / APP_URL_OVERRIDE at a private or loopback host (LAN IP, 127.0.0.0/8,
+// [::1], IPv6 ULA), keep that host and scheme and substitute the offset port
+// — the server is on this machine, so the offset port is what NextAuth
+// actually needs to reach. For public hostnames and public IPs, preserve the
+// URL as-is: the browser hits the public origin and the port in .env.local
+// is the public port, not the offset port. (The known exception is a
+// leftover tunnel origin in .env.local after a previous kiloclaw-tunnel
+// run — that is handled separately by the tunnel script.) `localhost` and
+// missing values fall through to the offset-port localhost default.
+// Precedence mirrors `scripts/dev.sh`'s `read_env_value`: .env.development.local
+// is checked before .env.local per key. Returns undefined when there is no
+// offset, when the web app isn't being started, or when a tunnel already
+// rewrites NEXTAUTH_URL to a public origin.
 export function resolveSessionNextAuthUrl(args: {
   portOffset: number;
   serviceNames: string[];
   nextjsPort: number;
+  repoRoot: string;
 }): string | undefined {
-  const { portOffset, serviceNames, nextjsPort } = args;
+  const { portOffset, serviceNames, nextjsPort, repoRoot } = args;
   if (portOffset <= 0) return undefined;
   if (!serviceNames.includes('nextjs')) return undefined;
   if (serviceNames.includes('kiloclaw-tunnel')) return undefined;
+
+  const envLocal = readEnvFile(path.join(repoRoot, '.env.local'));
+  const envDevLocal = readEnvFile(path.join(repoRoot, '.env.development.local'));
+  const candidateValues = [
+    envDevLocal.get('NEXTAUTH_URL'),
+    envLocal.get('NEXTAUTH_URL'),
+    envDevLocal.get('APP_URL_OVERRIDE'),
+    envLocal.get('APP_URL_OVERRIDE'),
+  ];
+  for (const value of candidateValues) {
+    if (!value) continue;
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      continue;
+    }
+    if (parsed.hostname === 'localhost') continue;
+    if (isPrivateOrLoopbackHost(parsed.hostname)) {
+      parsed.port = String(nextjsPort);
+    }
+    return parsed.origin;
+  }
+
   return `http://localhost:${nextjsPort}`;
 }
 

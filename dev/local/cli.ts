@@ -536,6 +536,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     portOffset,
     serviceNames,
     nextjsPort: getService('nextjs').port,
+    repoRoot,
   });
   if (sessionNextAuthUrl !== undefined) {
     sessionEnv.NEXTAUTH_URL = sessionNextAuthUrl;

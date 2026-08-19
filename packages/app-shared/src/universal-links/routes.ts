@@ -22,9 +22,12 @@ export type UniversalLinkRoute = {
 };
 
 export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
+  { webPath: '/home', appPath: '/(app)/(tabs)/(0_home)' },
   { webPath: '/profile', appPath: '/(app)/(tabs)/(3_profile)' },
+  { webPath: '/profile/preferences', appPath: '/(app)/(tabs)/(3_profile)/preferences' },
   { webPath: '/claw', appPath: '/(app)/(tabs)/(1_kiloclaw)' },
   { webPath: '/cloud/sessions', appPath: '/(app)/(tabs)/(2_agents)' },
+  { webPath: '/cloud/sessions/*', appPath: '/(app)/agent-chat/<1>' },
   {
     webPath: '/security-agent',
     appPath: '/(app)/(tabs)/(3_profile)/security-agent/personal',

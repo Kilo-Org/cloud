@@ -5,9 +5,12 @@
  * universal-link-paths.test.ts — keep the two in sync there, never silently.
  * @type {string[]} */
 export const UNIVERSAL_LINK_PATH_PATTERNS = [
+  '/home',
   '/profile',
+  '/profile/preferences',
   '/claw',
   '/cloud/sessions',
+  '/cloud/sessions/.*',
   '/security-agent',
   '/security-agent/findings',
   '/code-reviews',

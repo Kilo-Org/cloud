@@ -1,6 +1,12 @@
+import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearViewedFiles, getViewedFiles, toggleViewedFile } from './viewed-files';
+import {
+  clearViewedFiles,
+  getViewedFiles,
+  resetViewedFilesCacheForTests,
+  toggleViewedFile,
+} from './viewed-files';
 
 const store = new Map<string, string>();
 
@@ -25,6 +31,7 @@ vi.mock('@/lib/storage-keys', () => ({
 
 beforeEach(() => {
   store.clear();
+  resetViewedFilesCacheForTests();
 });
 
 const OWNER = 'octocat';
@@ -139,5 +146,79 @@ describe('viewed-files', () => {
     store.set('pr-review-viewed', 'placeholder');
     await clearViewedFiles();
     expect(store.has('pr-review-viewed')).toBe(false);
+  });
+
+  it('caches the map so a second read after a toggle does not re-read the store', async () => {
+    setStored({});
+    await toggleViewedFile({ ...REF, headSha: SHA1, path: 'src/index.ts' });
+
+    const getItemMock = vi.mocked(SecureStore.getItemAsync);
+    const callsBefore = getItemMock.mock.calls.length;
+
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['src/index.ts']);
+    expect(getItemMock.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('clearViewedFiles drops the cache so the next read re-reads the store', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['a.ts']);
+
+    await clearViewedFiles();
+
+    const getItemMock = vi.mocked(SecureStore.getItemAsync);
+    const callsBefore = getItemMock.mock.calls.length;
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
+    expect(getItemMock.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it('a late first read does not overwrite a write', async () => {
+    // Gate the first SecureStore read so it finishes after the write.
+    let releaseRead: (value: string | null) => void = () => {};
+    const readGate = new Promise<string | null>(resolve => {
+      releaseRead = resolve;
+    });
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => readGate);
+
+    // Start a first read while the cache is empty.
+    const firstRead = getViewedFiles(REF, SHA1);
+
+    // Write before the first read resolves.
+    await toggleViewedFile({ ...REF, headSha: SHA1, path: 'src/index.ts' });
+
+    // Release the stale first read (the store was empty when it started).
+    releaseRead(null);
+    await firstRead;
+
+    // The write must not be overwritten by the late read.
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['src/index.ts']);
+  });
+
+  it('a late first read does not fill the cache after a clear', async () => {
+    setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+
+    // Gate the first SecureStore read so it finishes after the clear.
+    let releaseRead: (value: string | null) => void = () => {};
+    const readGate = new Promise<string | null>(resolve => {
+      releaseRead = resolve;
+    });
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => readGate);
+
+    // Start a first read while the cache is empty but the store has content.
+    const firstRead = getViewedFiles(REF, SHA1);
+
+    // Sign-out clears the store and the cache.
+    await clearViewedFiles();
+
+    // Release the stale read with the pre-clear content.
+    releaseRead(
+      JSON.stringify({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } })
+    );
+    await firstRead;
+
+    // The cache must stay empty; the next read re-reads the now-empty store.
+    const getItemMock = vi.mocked(SecureStore.getItemAsync);
+    const callsBefore = getItemMock.mock.calls.length;
+    await expect(getViewedFiles(REF, SHA1)).resolves.toEqual([]);
+    expect(getItemMock.mock.calls.length).toBe(callsBefore + 1);
   });
 });

@@ -1568,11 +1568,14 @@ describe('organization Kilo Pass Stripe adapter', () => {
       'sub_1',
       expect.objectContaining({
         metadata: expect.objectContaining({
-          serviceFeeAssessmentKey: expect.stringMatching(/^org-checkout:/),
-          serviceFeeFlow: 'organization_kilo_pass',
+          type: 'kilo-pass-org',
+          organizationId: 'org_1',
+          kiloUserId: 'user_1',
         }),
       })
     );
+    expect(update.mock.calls[0]?.[1].metadata).not.toHaveProperty('serviceFeeAssessmentKey');
+    expect(update.mock.calls[0]?.[1].metadata).not.toHaveProperty('serviceFeeFlow');
   });
 
   test('stages the fee before update so a paid invoice can still charge', async () => {
@@ -1646,7 +1649,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     ).resolves.toEqual({ kind: 'completed' });
     expect(invoiceItemCreate).toHaveBeenCalledTimes(1);
     expect(invoiceItemCreate.mock.calls[0]?.[0].invoice).toBeUndefined();
-    expect(invoiceItemDel).not.toHaveBeenCalled();
+    expect(invoiceItemDel).toHaveBeenCalledWith('ii_fee');
     const assessmentKey = createdInvoiceItemAssessmentKey();
     expect(assessmentKey).toEqual(expect.stringMatching(/^org-checkout:/));
     expect(await store.findByAssessmentKey(assessmentKey ?? '')).toMatchObject({
@@ -1730,6 +1733,17 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await handleKiloPassInvoiceCreated({
       invoice: {
         ...draftInvoice,
+        lines: {
+          ...draftInvoice.lines,
+          data: [
+            ...draftInvoice.lines.data,
+            {
+              ...passInvoiceLine(245, { id: 'il_overlap_fee' }),
+              discountable: false,
+              metadata: buildServiceFeeLineMetadata(String(assessmentKey)),
+            } as Stripe.InvoiceLineItem,
+          ],
+        },
         parent: {
           type: 'subscription_details',
           quote_details: null,
@@ -1738,7 +1752,6 @@ describe('organization Kilo Pass Stripe adapter', () => {
               type: 'kilo-pass-org',
               organizationId: 'org_1',
               kiloUserId: 'user_1',
-              serviceFeeAssessmentKey: String(assessmentKey),
             },
             subscription: 'sub_1',
           },
@@ -2282,6 +2295,54 @@ describe('organization Kilo Pass seat-capacity fee preparation', () => {
     });
     expect(prepared.feeInvoiceItem).not.toHaveProperty('invoice');
     expect(create).not.toHaveBeenCalled();
+  });
+
+  test('reuses a pending staged item for the same assessment', async () => {
+    const {
+      prepareOrganizationKiloPassSeatCapacityFee,
+      stagePreparedOrganizationKiloPassServiceFeeItem,
+    } = await import('./stripe-adapter');
+    const pendingItems: Stripe.InvoiceItem[] = [];
+    const create = jest.fn(async (params: Stripe.InvoiceItemCreateParams) => {
+      const item = {
+        id: 'ii_pending_fee',
+        amount: params.amount ?? 0,
+        metadata: params.metadata ?? {},
+      } as Stripe.InvoiceItem;
+      pendingItems.push(item);
+      return item;
+    });
+    const list = jest.fn(async () => ({ data: pendingItems, has_more: false }));
+    const stripeClient = {
+      ...seatCapacityStripe({
+        previewLines: [seatInvoiceLine(8_000), passInvoiceLine(3_000)],
+        create,
+      }),
+      invoiceItems: { create, list },
+    };
+    const prepared = await prepareOrganizationKiloPassSeatCapacityFee({
+      subscription: subscription({ customer: 'cus_1' }),
+      paidSeatItemId: 'si_seat',
+      paidSeatQuantity: 10,
+      isIncreasingSeats: true,
+      prorationDate,
+      store: createMemoryAssessmentStore(),
+      stripe: stripeClient,
+      deps: {
+        now,
+        getOrganizationPurchaseChannel: async () => 'self_serve',
+        resolveTaxInput: async () => ({ source: 'inline_inherit' }),
+      },
+    });
+
+    await expect(
+      stagePreparedOrganizationKiloPassServiceFeeItem({ prepared, stripe: stripeClient })
+    ).resolves.toBe('ii_pending_fee');
+    await expect(
+      stagePreparedOrganizationKiloPassServiceFeeItem({ prepared, stripe: stripeClient })
+    ).resolves.toBe('ii_pending_fee');
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledTimes(2);
   });
 
   test('seat-only subscriptions skip preview and assessment', async () => {

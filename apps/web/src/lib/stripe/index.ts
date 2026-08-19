@@ -2267,15 +2267,7 @@ export async function handleUpdateSeatCount(
               ? [{ id: organizationPassItem.id, quantity: paidSeatQuantity }]
               : []),
           ],
-          ...(prepared.commercialMetadata
-            ? {
-                metadata: mergeServiceFeeCommercialMetadata(
-                  subscription.metadata,
-                  prepared.commercialMetadata
-                ),
-              }
-            : {}),
-          expand: ['latest_invoice'],
+          expand: ['latest_invoice.lines'],
         },
         {
           idempotencyKey,

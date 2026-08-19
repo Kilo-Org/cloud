@@ -1395,7 +1395,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
       success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
       subscription_data: {
-        metadata: sessionMetadata,
+        metadata: productMetadata,
       },
       metadata: sessionMetadata,
       expand: ['line_items.data.price.product'],

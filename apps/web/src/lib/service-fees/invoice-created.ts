@@ -259,11 +259,16 @@ export async function handleKiloPassInvoiceCreated(params: {
       });
     }
   } catch (error) {
+    const metadataSources = collectMetadata(params.invoice, null);
+    const organization = firstPresent(metadataSources, getOrganizationKiloPassMetadata);
+    const personal = firstPresent(metadataSources, getKiloPassMetadataFromStripeMetadata);
     await alertSafely({
       assessmentKey: params.invoice.id
         ? createInvoiceServiceFeeAssessmentKey(params.invoice.id)
         : 'invoice:unknown',
-      flow: 'personal_kilo_pass',
+      flow: organization ? 'organization_kilo_pass' : 'personal_kilo_pass',
+      kiloUserId: organization?.kiloUserId ?? personal?.kiloUserId,
+      organizationId: organization?.organizationId,
       stripeInvoiceId: params.invoice.id,
       eligibleSubtotalMinor: 0,
       expectedFeeMinor: 0,

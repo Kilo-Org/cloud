@@ -21,6 +21,7 @@ import {
   type ServiceFeeAssessmentStore,
   type ServiceFeeStripeIds,
 } from '@/lib/service-fees/assessments';
+import { calculateServiceFeeMinor } from '@/lib/service-fees/calculation';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_DESCRIPTION,
@@ -1117,18 +1118,23 @@ async function safePrepareDecision(params: {
       { findEffectiveExemption: params.findEffectiveExemption }
     );
   } catch {
+    const eligibleSubtotalMinor =
+      Number.isSafeInteger(params.principalMinor) && params.principalMinor >= 0
+        ? params.principalMinor
+        : 0;
+    const expectedFeeMinor = calculateServiceFeeMinor(eligibleSubtotalMinor);
     return {
       assessmentKey: params.assessmentKey,
       version: SERVICE_FEE_VERSION,
       flow: params.flow,
-      outcome: 'pending',
+      outcome: expectedFeeMinor > 0 ? 'pending' : 'zero_rounded',
       currency: SERVICE_FEE_SUPPORTED_CURRENCY,
       kiloUserId: params.kiloUserId ?? null,
       organizationId: params.organizationId ?? null,
       stripeCustomerId: params.stripeCustomerId ?? null,
       eligibilityCreatedAt: params.now.toISOString(),
-      eligibleSubtotalMinor: params.principalMinor,
-      expectedFeeMinor: 0,
+      eligibleSubtotalMinor,
+      expectedFeeMinor,
       chargedFeeMinor: 0,
       exemptionId: null,
       failureCode: null,

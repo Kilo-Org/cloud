@@ -20,6 +20,7 @@ import {
   calculateServiceFeeMinor,
   getNetPretaxLineAmountMinor,
 } from '@/lib/service-fees/calculation';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
 import { createInvoiceServiceFeeAssessmentKey } from '@/lib/service-fees/checkout';
 import { applyDeferredServiceFeeRefunds } from '@/lib/service-fees/refunds';
 import {
@@ -105,6 +106,15 @@ export async function settleKiloPassInvoiceServiceFee(params: {
     subscription,
   });
   if (!assessment) {
+    if (params.invoice.created < SERVICE_FEE_ACTIVATION_UNIX_SECONDS) {
+      return {
+        status: 'ignored',
+        settledProductMinor: productOnlyMinor,
+        chargedFeeMinor: 0,
+        grossPaidMinor: Math.max(0, params.invoice.amount_paid ?? 0),
+        assessment: null,
+      };
+    }
     await alertSafely({
       assessmentKey: createInvoiceServiceFeeAssessmentKey(invoiceId),
       flow: 'personal_kilo_pass',

@@ -539,7 +539,15 @@ export async function handleKiloPassInvoicePaid(params: {
           subscription,
         });
         settledProductMinor = productAmountFromServiceFeeSettlement(invoice, serviceFeeSettlement);
-      } catch {
+      } catch (error) {
+        captureException(error, {
+          tags: { source: 'kilo_pass_service_fee_settlement' },
+          extra: {
+            stripeEventId: eventId,
+            stripeInvoiceId: invoice.id,
+            stripeSubscriptionId: subscription.id,
+          },
+        });
         settledProductMinor = productOnlyKiloPassAnalyticsAmount(invoice);
       }
 

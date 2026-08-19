@@ -80,7 +80,21 @@ import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queu
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
-import { eq, and, ne, or, ilike, like, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  ne,
+  or,
+  ilike,
+  like,
+  desc,
+  asc,
+  sql,
+  isNull,
+  inArray,
+  count,
+  min,
+} from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
@@ -2118,13 +2132,18 @@ export const adminRouter = createTRPCRouter({
   }),
 
   apiRequestLog: createTRPCRouter({
-    getOldestEntry: adminProcedure.query(async () => {
-      const [oldest] = await db
-        .select({ created_at: api_request_log.created_at })
-        .from(api_request_log)
-        .orderBy(asc(api_request_log.created_at))
-        .limit(1);
-      return oldest ? { created_at: oldest.created_at } : null;
+    getSummary: adminProcedure.query(async () => {
+      const [summary] = await db
+        .select({
+          recordCount: count(),
+          sizeBytes: sql<number>`pg_total_relation_size('api_request_log'::regclass)`.mapWith(
+            Number
+          ),
+          oldestCreatedAt: min(api_request_log.created_at),
+        })
+        .from(api_request_log);
+
+      return summary;
     }),
   }),
 

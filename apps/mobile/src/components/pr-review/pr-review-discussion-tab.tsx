@@ -68,6 +68,7 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
+import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -200,33 +201,38 @@ export function PrReviewDiscussionTab({
   };
 
   // ── First-page error / terminal states ─────────────────────────────
-  if (firstPageErrorState) {
-    if (firstPageErrorState.kind === 'permission') {
-      return (
-        <QueryError
-          variant="permission"
-          title="Access denied"
-          message="You don't have permission to view this PR's discussion."
-        />
-      );
-    }
-    if (firstPageErrorState.kind === 'not-found') {
-      return (
-        <QueryError
-          variant="not-found"
-          title="Discussion unavailable"
-          message="This pull request may have been removed."
-        />
-      );
-    }
-    if (firstPageErrorState.kind === 'reconnect') {
-      return (
-        <View className="flex-1 items-center justify-center px-6 py-12">
-          <PrReviewReconnectNotice />
-        </View>
-      );
-    }
-    // retryable
+  const view = selectDiscussionTabView({
+    firstPageErrorState,
+    isPending: query.isPending,
+    isEmpty: isDiscussionEmpty(threads, conversation),
+  });
+
+  if (view.kind === 'permission') {
+    return (
+      <QueryError
+        variant="permission"
+        title="Access denied"
+        message="You don't have permission to view this PR's discussion."
+      />
+    );
+  }
+  if (view.kind === 'not-found') {
+    return (
+      <QueryError
+        variant="not-found"
+        title="Discussion unavailable"
+        message="This pull request may have been removed."
+      />
+    );
+  }
+  if (view.kind === 'reconnect') {
+    return (
+      <View className="flex-1 items-center justify-center px-6 py-12">
+        <PrReviewReconnectNotice />
+      </View>
+    );
+  }
+  if (view.kind === 'retryable') {
     return (
       <QueryError
         variant="server"
@@ -241,7 +247,7 @@ export function PrReviewDiscussionTab({
   }
 
   // ── Loading (first page in flight) ─────────────────────────────────
-  if (query.isPending) {
+  if (view.kind === 'loading') {
     return (
       <View accessibilityLabel="Loading discussion" className="flex-1 gap-3 px-4 pb-6 pt-3">
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
@@ -258,7 +264,7 @@ export function PrReviewDiscussionTab({
   }
 
   // ── Empty (neither threads nor conversation comments) ──────────────
-  if (isDiscussionEmpty(threads, conversation)) {
+  if (view.kind === 'empty') {
     return (
       <View className="flex-1 px-4 pb-6">
         <EmptyState

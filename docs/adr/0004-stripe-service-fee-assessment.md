@@ -15,7 +15,7 @@ directory is not tracked, so this ADR is the durable record.
 ## Context
 
 Kilo will charge a 5% service fee on eligible Stripe-funded credit purchases and Kilo Pass charges
-for billing objects created at or after `2026-09-01T00:00:00Z`. The fee is additional to the
+for billing objects created at or after `2026-11-01T00:00:00Z`. The fee is additional to the
 purchase price and never changes the credits or entitlement received.
 
 Three existing properties of the codebase shape the design.

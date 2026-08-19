@@ -93,12 +93,12 @@ BASE=http://localhost:<web-port>
 ### 1.2 Activation clock
 
 Fees apply only to billing objects created at or after
-`2026-09-01T00:00:00Z` (`SERVICE_FEE_ACTIVATION_UNIX_SECONDS`).
+`2026-11-01T00:00:00Z` (`SERVICE_FEE_ACTIVATION_UNIX_SECONDS`).
 
 | Wall clock | How to run this file |
 |---|---|
-| On or after 2026-09-01 UTC | Use the committed constant. Run V30 only if a pre-activation fixture still exists. |
-| Before 2026-09-01 UTC | Keep the committed constant for V30. For every "fee applies" journey, use a **local uncommitted** override of `SERVICE_FEE_ACTIVATION_UNIX_SECONDS` to `0`. Record the override in the run log. Revert it before any commit. |
+| On or after 2026-11-01 UTC | Use the committed constant. Run V30 only if a pre-activation fixture still exists. |
+| Before 2026-11-01 UTC | Keep the committed constant for V30. For every "fee applies" journey, use a **local uncommitted** override of `SERVICE_FEE_ACTIVATION_UNIX_SECONDS` to `0`. Record the override in the run log. Revert it before any commit. |
 
 There is no production runtime switch. The override is a validation-only local
 edit. If a journey is run before activation without the override, a
@@ -628,7 +628,7 @@ Acceptance-criteria map from `GOAL.md`:
 
 | Goal criterion | Journeys |
 |---|---|
-| 1 Activation boundary | V30, and any fee-applies journey after the override or after 2026-09-01 |
+| 1 Activation boundary | V30, and any fee-applies journey after the override or after 2026-11-01 |
 | 2 Eligible flows | V1–V7, V10 |
 | 3 Excluded flows | V12; V13 N/A; V14/V15 N/A |
 | 4 Mixed seat + Kilo Pass | V10, V11 |
@@ -1528,7 +1528,7 @@ setup in the Kilo clip)
 
 ### V30 — Pre-activation purchase
 
-**Invariant:** a billing object created before `2026-09-01T00:00:00Z` is
+**Invariant:** a billing object created before `2026-11-01T00:00:00Z` is
 fee-free even if it pays later.
 
 **How to run**

@@ -8,7 +8,7 @@ This file is the product requirements source. `SPEC.md` defines the technical de
 
 ## Goal
 
-Charge a 5% service fee on eligible Stripe-funded credit purchases for billing objects created at or after `2026-09-01T00:00:00Z`.
+Charge a 5% service fee on eligible Stripe-funded credit purchases for billing objects created at or after `2026-11-01T00:00:00Z`.
 
 The fee is an additional charge. It does not increase or reduce the credits or Kilo Pass entitlement received. Stripe must show a positive fee as a separate line item named `Service fee (5%)`.
 
@@ -60,7 +60,7 @@ When an invoice contains both seats and Kilo Pass for Organizations, only the ne
 
 Fee eligibility is fixed when the applicable Stripe billing object is created.
 
-- A billing object created at or after `2026-09-01T00:00:00Z` is eligible.
+- A billing object created at or after `2026-11-01T00:00:00Z` is eligible.
 - A billing object created before that instant remains fee-free even if payment settles later.
 - Interactive purchases use Checkout Session creation time.
 - The initial invoice produced by an interactive Checkout inherits the Checkout Session's fee decision.
@@ -339,7 +339,7 @@ The implementation plan must provide verification for at least these cases:
 
 - Finance/tax confirmed on 2026-08-11 that the fee receives the same Stripe tax treatment as the eligible product.
 - The schema, Admin exemption controls, assessment pipeline, reporting, and alerting are deployed before activation.
-- Platform admins enter and verify all approved historical organization exemptions before `2026-09-01T00:00:00Z`.
+- Platform admins enter and verify all approved historical organization exemptions before `2026-11-01T00:00:00Z`.
 - Operators have a documented procedure for proportional partial refunds in Stripe and for responding to missed-fee Slack alerts.
 - Rollout verification confirms that existing Personal Kilo Pass and self-service Kilo Pass for Organizations invoices created after activation receive the correct fee.
 

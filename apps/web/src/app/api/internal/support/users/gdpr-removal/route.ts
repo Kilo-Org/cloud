@@ -23,7 +23,7 @@ import {
 } from '../../_auth';
 
 const BodySchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().trim().min(1).max(256),
   email: z.string().trim().toLowerCase().email(),
   actorEmail: ActorEmailSchema,
   requestId: RequestIdSchema,

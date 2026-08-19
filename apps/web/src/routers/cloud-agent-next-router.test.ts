@@ -237,6 +237,10 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
+    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
+      userId: 'user-1',
+      attachments,
+    });
   });
 
   it('normalizes legacy image requests to canonical Worker attachments', async () => {
@@ -254,6 +258,10 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments: images }));
     expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
+      userId: 'user-1',
+      attachments: images,
+    });
   });
 
   it('routes free follow-up prompt models through the balance-skip client', async () => {
@@ -520,6 +528,10 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
     );
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
+      userId: 'user-1',
+      attachments: images,
+    });
   });
 
   it('rejects personal Bitbucket sessions before constructing a Cloud Agent client', async () => {

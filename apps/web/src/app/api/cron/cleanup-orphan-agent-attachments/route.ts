@@ -13,8 +13,9 @@ const BATCH_SIZE = 500;
  *
  * A presign writes a ledger row (`cloud_agent_attachment_uploads`); a sent
  * message marks it consumed. Rows still unconsumed after 24 hours are orphaned
- * uploads: delete the R2 object, then the row. Select on `r2_key` only — never
- * `user_id` — so the batch is keyed by the object identity and never leaks PII.
+ * uploads: delete the row (conditionally on still-unconsumed), then the R2
+ * object. Select on `r2_key` only — never `user_id` — so the batch is keyed by
+ * the object identity and never leaks PII.
  */
 export async function GET(request: Request) {
   if (!CRON_SECRET || request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {
@@ -34,24 +35,34 @@ export async function GET(request: Request) {
     )
     .limit(BATCH_SIZE);
 
-  let deletedObjects = 0;
-  for (const row of rows) {
-    await r2Client.send(
-      new DeleteObjectCommand({
-        Bucket: r2CloudAgentAttachmentsBucketName,
-        Key: row.r2_key,
-      })
-    );
-    deletedObjects += 1;
-  }
+  const keys = rows.map(row => row.r2_key);
 
+  let deletedObjects = 0;
   let deletedRows = 0;
-  if (rows.length > 0) {
-    const keys = rows.map(row => row.r2_key);
-    const result = await db
+  if (keys.length > 0) {
+    // Delete the rows conditionally on still-unconsumed, so a send that marks a
+    // row consumed between the select and the delete is never reaped. Return
+    // the keys actually deleted so only their objects are removed.
+    const deleted = await db
       .delete(cloud_agent_attachment_uploads)
-      .where(inArray(cloud_agent_attachment_uploads.r2_key, keys));
-    deletedRows = result.rowCount ?? 0;
+      .where(
+        and(
+          inArray(cloud_agent_attachment_uploads.r2_key, keys),
+          isNull(cloud_agent_attachment_uploads.consumed_at)
+        )
+      )
+      .returning({ r2_key: cloud_agent_attachment_uploads.r2_key });
+
+    for (const row of deleted) {
+      await r2Client.send(
+        new DeleteObjectCommand({
+          Bucket: r2CloudAgentAttachmentsBucketName,
+          Key: row.r2_key,
+        })
+      );
+      deletedObjects += 1;
+    }
+    deletedRows = deleted.length;
   }
 
   return NextResponse.json({

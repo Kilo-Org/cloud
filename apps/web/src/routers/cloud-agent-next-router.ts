@@ -180,8 +180,12 @@ export const cloudAgentNextRouter = createTRPCRouter({
         });
         // Old clients never call `markAttachmentsSent`; mark the caller's
         // attachment rows consumed here so the reaper cannot delete an object
-        // the prepared session references.
-        await markCloudAgentAttachmentUploadsConsumed({ userId: ctx.user.id, attachments });
+        // the prepared session references. Mark the same payload the Worker
+        // received (`attachments ?? images`).
+        await markCloudAgentAttachmentUploadsConsumed({
+          userId: ctx.user.id,
+          attachments: attachments ?? images,
+        });
         return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
@@ -268,8 +272,12 @@ export const cloudAgentNextRouter = createTRPCRouter({
         });
         // Old clients never call `markAttachmentsSent`; mark the caller's
         // attachment rows consumed here so the reaper cannot delete an object
-        // the sent message references.
-        await markCloudAgentAttachmentUploadsConsumed({ userId: ctx.user.id, attachments });
+        // the sent message references. Mark the same payload the Worker
+        // received (`attachments ?? images`).
+        await markCloudAgentAttachmentUploadsConsumed({
+          userId: ctx.user.id,
+          attachments: attachments ?? images,
+        });
         return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);

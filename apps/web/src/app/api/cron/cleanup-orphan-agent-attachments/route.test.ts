@@ -54,7 +54,9 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
       }),
     } as never);
     mockDelete.mockReturnValue({
-      where: () => Promise.resolve({ rowCount: selectedRows.length }),
+      where: () => ({
+        returning: () => Promise.resolve(selectedRows.map(row => ({ r2_key: row.r2_key }))),
+      }),
     } as never);
   });
 
@@ -66,7 +68,7 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
     expect(mockSelect).not.toHaveBeenCalled();
   });
 
-  it('deletes the object before the row for each unconsumed key', async () => {
+  it('deletes the row before the object for each unconsumed key', async () => {
     selectedRows = [
       { r2_key: 'user-1/cloud-agent/msg-1/file.pdf' },
       { r2_key: 'user-2/cloud-agent/msg-2/file.png' },
@@ -75,7 +77,13 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
     expect(response.status).toBe(200);
-    // One object delete per selected key, against the attachment bucket.
+    // The rows are deleted first, and only the keys actually deleted get their
+    // object removed (the delete is conditional on still-unconsumed).
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+    const deleteOrder = mockDelete.mock.invocationCallOrder[0];
+    const firstSendOrder = mockSend.mock.invocationCallOrder[0];
+    expect(deleteOrder).toBeLessThan(firstSendOrder);
+    // One object delete per deleted key, against the attachment bucket.
     expect(mockSend).toHaveBeenCalledTimes(2);
     expect(mockSend).toHaveBeenNthCalledWith(1, {
       input: { Bucket: 'attachment-bucket', Key: 'user-1/cloud-agent/msg-1/file.pdf' },
@@ -85,11 +93,6 @@ describe('GET /api/cron/cleanup-orphan-agent-attachments', () => {
       input: { Bucket: 'attachment-bucket', Key: 'user-2/cloud-agent/msg-2/file.png' },
       name: 'DeleteObjectCommand',
     });
-    // The rows are deleted only after every object delete.
-    expect(mockDelete).toHaveBeenCalledTimes(1);
-    const firstSendOrder = mockSend.mock.invocationCallOrder[0];
-    const deleteOrder = mockDelete.mock.invocationCallOrder[0];
-    expect(firstSendOrder).toBeLessThan(deleteOrder);
 
     const body = await response.json();
     expect(body.deletedObjects).toBe(2);

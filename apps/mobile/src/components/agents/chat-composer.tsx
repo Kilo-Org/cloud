@@ -664,6 +664,12 @@ export function ChatComposer({
       if (submission.type === 'prompt') {
         const result = await upload.uploadPending();
         if (!result.ok) {
+          // An in-flight retry blocks send; a terminal chip is already guarded
+          // by `hasFailedAttachments`, and an upload failure already toasted in
+          // `startUpload`.
+          if (upload.isUploading) {
+            toast.error('Wait for attachments to finish uploading.');
+          }
           return;
         }
         uploaded = result;

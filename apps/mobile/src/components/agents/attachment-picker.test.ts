@@ -37,6 +37,10 @@ vi.mock('expo-secure-store', () => ({
   deleteItemAsync: vi.fn(),
 }));
 
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
+}));
+
 const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
 
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];

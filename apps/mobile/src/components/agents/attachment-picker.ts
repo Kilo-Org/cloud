@@ -3,6 +3,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
@@ -139,12 +140,18 @@ export function pickAgentAttachments(
       // the launch when a real user id is present; an empty id would store a
       // context the recovery hook can never match.
       if ((source === 'camera' || source === 'library') && context.userId) {
-        await writePickerLaunchContext({
-          userId: context.userId,
-          surface: context.surface,
-          sessionId: context.sessionId,
-          launchedAt: Date.now(),
-        });
+        try {
+          await writePickerLaunchContext({
+            userId: context.userId,
+            surface: context.surface,
+            sessionId: context.sessionId,
+            launchedAt: Date.now(),
+          });
+        } catch (error) {
+          // A store write failure must not block the picker launch; the
+          // recovery hook simply finds no context and nothing is attached.
+          Sentry.captureException(error);
+        }
       }
       const result = await pickFromSource(source);
       settle(result);

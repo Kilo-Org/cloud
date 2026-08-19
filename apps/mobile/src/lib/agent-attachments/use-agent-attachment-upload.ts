@@ -162,11 +162,12 @@ export function useAgentAttachmentUpload(
         });
         // Register the cancel handle BEFORE the presign `await` so a
         // remove/reset/unmount during that window still deletes the
-        // cache-owned file. The PUT itself cannot be cancelled before the
-        // task exists (the task is created after the signed URL returns), but
-        // the cache file is the leak this handle closes.
+        // cache-owned file and blocks task creation after the signed URL
+        // returns.
+        let cancelled = false;
         let task: { cancelAsync: () => Promise<void> } | undefined = undefined;
         cancelHandlesRef.current.set(attachment.id, async () => {
+          cancelled = true;
           progressCoalescer.cancel();
           try {
             if (task) {
@@ -191,6 +192,7 @@ export function useAgentAttachmentUpload(
             onTask: t => {
               task = t;
             },
+            isCancelled: () => cancelled,
           });
           // Row 3.3 stale-outcome guard: a removed or reset upload must not
           // flip state or announce for the current composer. Ids are UUIDs, so

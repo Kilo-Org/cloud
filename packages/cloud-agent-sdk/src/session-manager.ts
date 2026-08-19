@@ -407,10 +407,11 @@ type SessionManager = {
   loadOlderMessages(): Promise<void>;
   /**
    * Drop the oldest loaded older-page(s) from local storage while the retained
-   * transcript exceeds `RETAINED_MESSAGE_WINDOW`. Pops the oldest stack entry,
-   * deletes its messages, restores the pre-page cursor, and re-arms
-   * `hasOlderMessages`. No-op below the window or with an empty stack. Never
-   * trims the initial bounded page (it is not on the stack).
+   * root transcript exceeds `RETAINED_MESSAGE_WINDOW`. Pops the oldest stack
+   * entry, deletes its messages, restores the pre-page cursor, and re-arms
+   * `hasOlderMessages`. Child rows in the shared storage do not count toward
+   * the window. No-op below the window or with an empty stack. Never trims
+   * the initial bounded page (it is not on the stack).
    */
   trimRetainedHistory(): void;
   /**
@@ -1420,6 +1421,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  function countRootTranscriptMessages(storage: JotaiSessionStorage): number {
+    const rootSessionId = store.get(rootSessionIdAtom);
+    let count = 0;
+    for (const id of storage.getMessageIds()) {
+      const info = storage.getMessageInfo(id);
+      if (!info) continue;
+      if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
+      count += 1;
+    }
+    return count;
+  }
+
   function trimRetainedHistory(): void {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return;
@@ -1427,10 +1440,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // last one popped. When two or more pages drop in one pass, overwriting
     // on every pop leaves the cursor pointing at the newest dropped page, so
     // `loadOlderMessages` could not re-fetch the oldest dropped page.
+    // Count only root-transcript rows. Child pages share this storage and
+    // must not push the window over the limit.
     let trimmedAny = false;
     let oldestCursorBefore: string | null = null;
     while (
-      storage.getMessageIds().length > RETAINED_MESSAGE_WINDOW &&
+      countRootTranscriptMessages(storage) > RETAINED_MESSAGE_WINDOW &&
       retainedHistoryStack.length > 0
     ) {
       const entry = retainedHistoryStack.shift();

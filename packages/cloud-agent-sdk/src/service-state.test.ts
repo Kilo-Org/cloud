@@ -1763,6 +1763,22 @@ describe('createServiceState', () => {
       const failed = (state: ReturnType<typeof createServiceState>, id: string) =>
         state.getPendingMessages().get(id);
 
+      it('a later queue.changed snapshot for the same id wins over a stale failed entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1'] });
+
+        expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      });
+
       it('a failed entry survives a non-empty queue.changed snapshot', () => {
         const state = createServiceState(makeConfig());
 

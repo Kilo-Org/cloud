@@ -6258,6 +6258,52 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(ids).toContain('oldA-0');
       expect(ids).not.toContain('oldB-0');
     });
+
+    it('does not evict a root older page when hydrated child rows push the shared store over the window', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === kiloId('child-1')) {
+          return makePage({
+            kiloSessionId: 'child-1',
+            messages: Array.from({ length: 150 }, (_, i) =>
+              makePageMessage(`child-${i}`, 'child-1', `child-${i}`)
+            ),
+            nextCursor: null,
+          });
+        }
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('init', 150),
+            nextCursor: 'cursor-A',
+          });
+        }
+        if (options.cursor === 'cursor-A') {
+          return makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('old', 40),
+            nextCursor: 'cursor-B',
+          });
+        }
+        return makePage({ kiloSessionId: 'ses-1', nextCursor: null });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+      await mgr.hydrateChildSession(kiloId('child-1'));
+
+      const before = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(before).toHaveLength(190);
+      expect(before.map(m => m.info.id)).toContain('old-0');
+
+      mgr.trimRetainedHistory();
+
+      const after = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(after).toHaveLength(190);
+      expect(after.map(m => m.info.id)).toContain('old-0');
+      expect(after.map(m => m.info.id)).toContain('init-0');
+    });
   });
 
   // -------------------------------------------------------------------------

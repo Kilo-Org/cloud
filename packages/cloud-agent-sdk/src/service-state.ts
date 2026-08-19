@@ -608,7 +608,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       // Preserve failed entries — a failed delivery row must survive a
       // reconciliation so its recovery affordance stays visible.
       const failed = [...pendingMessages.entries()].filter(
-        ([, state]) => state.status === 'failed'
+        ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
       );
       pendingMessages.clear();
       for (const [messageId, state] of failed) {
@@ -622,8 +622,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       next.set(messageId, { status: 'queued' });
     }
     // Preserve failed entries before the wholesale replace, then re-insert
-    // them after the queued entries are written.
-    const failed = [...pendingMessages.entries()].filter(([, state]) => state.status === 'failed');
+    // them after the queued entries are written. Skip any failed id that is
+    // also in this snapshot: the queue is authoritative for those ids.
+    const failed = [...pendingMessages.entries()].filter(
+      ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
+    );
     // Reuse the same Map identity where possible to avoid invalidating
     // existing subscribers that hold onto the previous reference.
     pendingMessages.clear();

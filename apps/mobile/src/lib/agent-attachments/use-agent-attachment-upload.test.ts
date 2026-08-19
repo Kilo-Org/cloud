@@ -648,6 +648,54 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     renderer.unmount();
   });
 
+  it('does not start an upload task when removed during the presign window', async () => {
+    let capturedOnTask: ((task: { cancelAsync: () => Promise<void> }) => void) | undefined =
+      undefined;
+    let capturedIsCancelled: (() => boolean) | undefined = undefined;
+    let createTaskAfterPresign = 0;
+    hoisted.uploadOne.mockImplementation(
+      async (args: {
+        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        isCancelled?: () => boolean;
+      }) => {
+        capturedOnTask = args.onTask;
+        capturedIsCancelled = args.isCancelled;
+        const result = await new Promise<{ key: string }>(resolve => {
+          resolveUpload = resolve;
+        });
+        if (args.isCancelled?.()) {
+          throw new Error('Upload cancelled');
+        }
+        createTaskAfterPresign += 1;
+        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        return result;
+      }
+    );
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(capturedOnTask).toBeDefined();
+    expect(capturedIsCancelled?.()).toBe(true);
+    expect(createTaskAfterPresign).toBe(0);
+    expect(hoisted.cancelAsync).not.toHaveBeenCalled();
+    expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('deletes the cache-owned file even when cancelAsync rejects', async () => {
     hoisted.cancelAsync.mockRejectedValue(new Error('cancel failed'));
     const renderer = await mountHook();

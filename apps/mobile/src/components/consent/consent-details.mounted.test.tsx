@@ -2,6 +2,7 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
 import { createElement } from 'react';
 import TestRenderer from 'react-test-renderer';
+import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
@@ -47,14 +48,22 @@ vi.mock('@/lib/config', () => ({
   PRIVACY_URL: 'https://kilo.ai/privacy-app',
 }));
 
-vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({
-    userId: 'u1',
+const useCurrentUserIdMock = vi.hoisted(() => ({
+  useCurrentUserId: vi.fn(() => ({
+    userId: 'u1' as string | undefined,
     email: 'a@b.c',
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
-  }),
+  })),
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: useCurrentUserIdMock.useCurrentUserId,
+}));
+
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn() },
 }));
 
 const voiceInputControllerMock = vi.hoisted(() => ({
@@ -232,6 +241,13 @@ describe('Voice transcription section', () => {
     vi.clearAllMocks();
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
     voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: 'u1',
+      email: 'a@b.c',
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
   });
 
   function mountVoiceControl(): TestRenderer.ReactTestRenderer {
@@ -282,5 +298,54 @@ describe('Voice transcription section', () => {
       throw new Error('expected a Switch');
     }
     expect((sw.props as { value?: boolean }).value).toBe(false);
+  });
+
+  it('rolls back the switch and toasts when the write fails', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    voiceNetworkConsentMock.writeVoiceNetworkConsent.mockRejectedValue(new Error('boom'));
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    const switches = findSwitches(renderer.root);
+    expect(switches.length).toBe(1);
+    const sw = switches[0];
+    if (!sw) {
+      throw new Error('expected a Switch');
+    }
+    expect((sw.props as { value?: boolean }).value).toBe(false);
+
+    await TestRenderer.act(async () => {
+      (sw.props.onValueChange as (v: boolean) => void)(true);
+      await flush();
+    });
+
+    // Rolled back to the prior value, no stuck optimistic state.
+    const switchesAfter = findSwitches(renderer.root);
+    expect(switchesAfter.length).toBe(1);
+    const swAfter = switchesAfter[0];
+    if (!swAfter) {
+      throw new Error('expected a Switch after rollback');
+    }
+    expect((swAfter.props as { value?: boolean }).value).toBe(false);
+    expect(findTextStrings(renderer.root)).toContain('Online, not allowed');
+    expect(toast.error).toHaveBeenCalledWith('Could not save your choice. Please try again.');
+    expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith('u1', 'granted');
+  });
+
+  it('shows a sign-in message and no switch when there is no user', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
+    useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
+      userId: undefined,
+      email: 'a@b.c',
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    expect(findTextStrings(renderer.root)).toContain('Sign in to manage online transcription.');
+    expect(findSwitches(renderer.root).length).toBe(0);
   });
 });

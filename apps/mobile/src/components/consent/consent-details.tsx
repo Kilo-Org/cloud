@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 import { Section } from '@/components/consent/section';
 import { type ConsentMode } from '@/components/consent/consent-mode';
@@ -56,16 +57,31 @@ export function VoiceTranscriptionControl() {
     return <Text className="mt-3 text-sm text-muted-foreground">On device</Text>;
   }
 
+  // No non-retryable unhappy state exists: `readVoiceNetworkConsent` never
+  // fails (an absent or corrupt value reads as 'unset'), and the control has no
+  // terminal failure mode — a write failure is always retryable.
+  if (!userId) {
+    return (
+      <Text className="mt-3 text-sm text-muted-foreground">
+        Sign in to manage online transcription.
+      </Text>
+    );
+  }
+
   const allowed = consent === 'granted';
   const label = allowed ? 'Online, allowed' : 'Online, not allowed';
 
-  const handleToggle = (next: boolean) => {
-    if (!userId) {
-      return;
-    }
+  const handleToggle = async (next: boolean) => {
     const value: 'granted' | 'declined' = next ? 'granted' : 'declined';
+    const previous = consent;
     setConsent(value);
-    void writeVoiceNetworkConsent(userId, value);
+    try {
+      await writeVoiceNetworkConsent(userId, value);
+    } catch {
+      // Roll back the optimistic flip so the switch reflects the stored value.
+      setConsent(previous);
+      toast.error('Could not save your choice. Please try again.');
+    }
   };
 
   return (

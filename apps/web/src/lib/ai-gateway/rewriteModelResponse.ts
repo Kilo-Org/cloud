@@ -1,18 +1,9 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import {
-  type ReasoningDetailEncrypted,
-  type ReasoningDetailText,
-  ReasoningDetailType,
-} from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  type ProviderId,
-  type ProviderResponseTransforms,
-  ReasoningDetailsTransform,
-} from '@/lib/ai-gateway/providers/types';
+import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -25,7 +16,7 @@ import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
-import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
+import { applyReasoningDetailsResponseTransform } from '@/lib/ai-gateway/reasoning-details-transform';
 
 /**
  * Handle passed to the response pipeline so the upstream response body can be
@@ -409,122 +400,6 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function getGoogleExtraContent(value: Record<string, unknown>) {
-  const extraContent = value.extra_content;
-  if (!isRecord(extraContent)) {
-    return null;
-  }
-  const google = extraContent.google;
-  return isRecord(google) ? google : null;
-}
-
-function deleteGoogleExtraContentProperty(value: Record<string, unknown>, property: string) {
-  const extraContent = value.extra_content;
-  const google = getGoogleExtraContent(value);
-  if (!isRecord(extraContent) || !google) {
-    return;
-  }
-
-  delete google[property];
-  if (Object.keys(google).length === 0) {
-    delete extraContent.google;
-  }
-  if (Object.keys(extraContent).length === 0) {
-    delete value.extra_content;
-  }
-}
-
-/**
- * Normalizes Google's OpenAI-compatible thought fields to OpenRouter reasoning
- * details so clients can retain opaque Gemini signatures between tool calls.
- */
-function rewriteGeminiThoughtToReasoningDetails(delta: unknown) {
-  if (!isRecord(delta)) {
-    return;
-  }
-
-  const details: Array<ReasoningDetailText | ReasoningDetailEncrypted> = [];
-  const google = getGoogleExtraContent(delta);
-  if (typeof delta.content === 'string' && google?.thought === true) {
-    details.push({
-      type: ReasoningDetailType.Text,
-      text: delta.content,
-      index: 0,
-      format: ReasoningFormat.GoogleGeminiV1,
-    });
-    delete delta.content;
-    deleteGoogleExtraContentProperty(delta, 'thought');
-  }
-
-  if (typeof google?.thought_signature === 'string') {
-    details.push({
-      type: ReasoningDetailType.Encrypted,
-      data: google.thought_signature,
-      index: 0,
-      format: ReasoningFormat.GoogleGeminiV1,
-    });
-    deleteGoogleExtraContentProperty(delta, 'thought_signature');
-  }
-
-  if (Array.isArray(delta.tool_calls)) {
-    for (const toolCall of delta.tool_calls) {
-      if (!isRecord(toolCall)) {
-        continue;
-      }
-
-      const signature = getGoogleExtraContent(toolCall)?.thought_signature;
-      if (typeof signature !== 'string') {
-        continue;
-      }
-
-      details.push({
-        type: ReasoningDetailType.Encrypted,
-        data: signature,
-        id: typeof toolCall.id === 'string' ? toolCall.id : undefined,
-        index: 0,
-        format: ReasoningFormat.GoogleGeminiV1,
-      });
-      deleteGoogleExtraContentProperty(toolCall, 'thought_signature');
-    }
-  }
-
-  if (details.length > 0) {
-    delta.reasoning_details = Array.isArray(delta.reasoning_details)
-      ? [...delta.reasoning_details, ...details]
-      : details;
-  }
-}
-
-/**
- * Converts the DeepSeek-style `reasoning_content` string into OpenRouter-style
- * `reasoning_details`, matching the shape produced by OpenRouter and consumed
- * by clients such as `@openrouter/ai-sdk-provider`. The flat string carries no
- * format or signature, so every chunk becomes a `reasoning.text` detail at
- * index 0; clients merge consecutive same-type deltas into a single block.
- */
-function rewriteReasoningContentToReasoningDetails(delta: unknown) {
-  if (
-    !isRecord(delta) ||
-    typeof delta.reasoning_content !== 'string' ||
-    typeof delta.reasoning_details !== 'undefined'
-  ) {
-    return;
-  }
-
-  const detail = {
-    type: ReasoningDetailType.Text,
-    text: delta.reasoning_content,
-    index: 0,
-    format: ReasoningFormat.Unknown,
-  } satisfies ReasoningDetailText;
-  delta.reasoning_details = [detail];
-  delete delta.reasoning_content;
-}
-
 export async function rewriteModelResponse_ChatCompletions({
   response,
   removeCost,
@@ -559,15 +434,8 @@ export async function rewriteModelResponse_ChatCompletions({
     if (usage) {
       rewriteUsage(usage, removeCost);
     }
-    if (responseTransforms === ReasoningDetailsTransform.GeminiThought) {
-      for (const choice of json.choices ?? []) {
-        rewriteGeminiThoughtToReasoningDetails(choice.message);
-      }
-    }
-    if (responseTransforms === ReasoningDetailsTransform.ReasoningContent) {
-      for (const choice of json.choices ?? []) {
-        rewriteReasoningContentToReasoningDetails(choice.message);
-      }
+    for (const choice of json.choices ?? []) {
+      applyReasoningDetailsResponseTransform(responseTransforms, choice.message);
     }
 
     return NextResponse.json(json, {
@@ -624,12 +492,7 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.role === null) {
               delete delta.role;
             }
-            if (responseTransforms === ReasoningDetailsTransform.GeminiThought) {
-              rewriteGeminiThoughtToReasoningDetails(delta);
-            }
-            if (responseTransforms === ReasoningDetailsTransform.ReasoningContent) {
-              rewriteReasoningContentToReasoningDetails(delta);
-            }
+            applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }
 
           if (!json.choices) {

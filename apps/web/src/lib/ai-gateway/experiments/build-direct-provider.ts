@@ -1,9 +1,6 @@
 import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
-import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type { CustomLlmApiConfig } from '@kilocode/db';
 import {
-  ReasoningDetailsTransform,
   type GatewayChatApiKind,
   type Provider,
   type TransformRequestContext,
@@ -22,86 +19,6 @@ export type ResolvedExperimentUpstream = CustomLlmApiConfig & { api_key: string 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
-  const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
-  const google = isRecord(extraContent.google) ? extraContent.google : {};
-  value.extra_content = {
-    ...extraContent,
-    google: {
-      ...google,
-      thought_signature: signature,
-    },
-  };
-}
-
-function mapGeminiReasoningDetails(context: TransformRequestContext) {
-  if (context.request.kind !== 'chat_completions') {
-    return;
-  }
-
-  for (const message of context.request.body.messages) {
-    if (!isRecord(message)) {
-      continue;
-    }
-
-    delete message.thoughtSignature;
-
-    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
-    for (const toolCall of toolCalls) {
-      const legacySignature = toolCall.thoughtSignature;
-      delete toolCall.thoughtSignature;
-      if (typeof legacySignature === 'string') {
-        setGeminiThoughtSignature(toolCall, legacySignature);
-      }
-    }
-
-    const reasoningDetails = message.reasoning_details;
-    delete message.reasoning_details;
-    if (!Array.isArray(reasoningDetails)) {
-      continue;
-    }
-
-    for (const detail of reasoningDetails) {
-      if (
-        !isRecord(detail) ||
-        detail.type !== ReasoningDetailType.Encrypted ||
-        typeof detail.data !== 'string' ||
-        detail.format !== ReasoningFormat.GoogleGeminiV1
-      ) {
-        continue;
-      }
-
-      const toolCall =
-        typeof detail.id === 'string'
-          ? toolCalls.find(candidate => candidate.id === detail.id)
-          : toolCalls[0];
-      setGeminiThoughtSignature(toolCall ?? message, detail.data);
-    }
-  }
-}
-
-function applyGeminiReasoningTransform(context: TransformRequestContext, reasoningEffort: unknown) {
-  if (context.request.kind !== 'chat_completions') {
-    return;
-  }
-
-  const extra = context.request.body as typeof context.request.body & { google?: unknown };
-  delete extra.reasoning_effort;
-
-  if (reasoningEffort !== 'none') {
-    const existingGoogle = isRecord(extra.google) ? extra.google : {};
-    extra.google = {
-      ...existingGoogle,
-      thinking_config: {
-        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
-        include_thoughts: true,
-      },
-    };
-  }
-
-  mapGeminiReasoningDetails(context);
 }
 
 function renameJsonRefProperties(value: unknown): boolean {
@@ -181,16 +98,8 @@ export function buildDirectProvider(
     apiUrlOverrides: {},
     apiKey: upstream.api_key,
     supportedChatApis,
-    responseTransforms: upstream.use_gemini_reasoning_transform
-      ? ReasoningDetailsTransform.GeminiThought
-      : null,
+    responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {
-      const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);
-      const reasoningEffort =
-        useGeminiReasoning && context.request.kind === 'chat_completions'
-          ? context.request.body.reasoning_effort
-          : undefined;
-
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;
         for (const key of upstream.remove_from_body) {
@@ -204,9 +113,6 @@ export function buildDirectProvider(
       context.request.body.model = upstream.internal_id;
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
-      }
-      if (useGeminiReasoning) {
-        applyGeminiReasoningTransform(context, reasoningEffort);
       }
       if (upstream.sanitize_ref_fields) {
         sanitizeJsonRefToolResults(context);

@@ -133,18 +133,64 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
-  it.each([null, ReasoningDetailsTransform.GeminiThought])(
-    'leaves reasoning_details untouched with transforms %p',
-    responseTransforms => {
-      const request = makeReasoningRequest();
+  it('leaves reasoning_details untouched without a transform', () => {
+    const request = makeReasoningRequest();
 
-      applyReasoningDetailsTransform(makeProvider(responseTransforms), request);
+    applyReasoningDetailsTransform(makeProvider(null), request);
 
-      const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
-      expect(assistant.reasoning_details).toBeDefined();
-      expect(assistant.reasoning_content).toBeUndefined();
-    }
-  );
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    expect(assistant.reasoning_details).toBeDefined();
+    expect(assistant.reasoning_content).toBeUndefined();
+  });
+
+  it('maps Gemini encrypted details to matching tool-call signatures', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        reasoning_effort: 'high',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'opaque-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body).toMatchObject({
+      google: { thinking_config: { thinking_level: 'high', include_thoughts: true } },
+      messages: [
+        {
+          tool_calls: [
+            {
+              id: 'call-1',
+              extra_content: { google: { thought_signature: 'opaque-signature' } },
+            },
+          ],
+        },
+      ],
+    });
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+    expect(request.body.messages[0]).not.toHaveProperty('reasoning_details');
+  });
 
   it('does not touch Messages requests', () => {
     const request = makeMessagesRequest('vendor/model');

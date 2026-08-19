@@ -1,20 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
-import { CustomLlmApiConfigSchema } from '@kilocode/db';
+import { CustomLlmApiConfigSchema, type CustomLlmApiConfig } from '@kilocode/db';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
+import { applyReasoningDetailsTransform } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { buildDirectProvider } from './build-direct-provider';
 
 type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' }>;
 
 async function transformRequest(
   request: GatewayRequest,
-  options: {
-    sanitize_ref_fields?: boolean;
-    use_gemini_reasoning_transform?: boolean;
-    extra_body?: Record<string, unknown>;
-    remove_from_body?: string[];
-  } = {}
+  options: Partial<Omit<CustomLlmApiConfig, 'internal_id' | 'base_url'>> = {}
 ) {
   const provider = buildDirectProvider('custom', ['chat_completions'], {
     internal_id: 'upstream-model',
@@ -34,6 +30,7 @@ async function transformRequest(
     organization_id: null,
     session_id: null,
   });
+  applyReasoningDetailsTransform(provider, request);
 }
 
 function makeRequest(): ChatCompletionRequest {
@@ -83,11 +80,17 @@ describe('custom LLM Gemini reasoning transform configuration', () => {
     base_url: 'https://llm.example.com/v1',
   };
 
-  it('accepts the Gemini reasoning transform flag', () => {
+  it('accepts reasoning detail transform enum values', () => {
     expect(
       CustomLlmApiConfigSchema.safeParse({
         ...config,
-        use_gemini_reasoning_transform: true,
+        reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
+      }).success
+    ).toBe(true);
+    expect(
+      CustomLlmApiConfigSchema.safeParse({
+        ...config,
+        reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
       }).success
     ).toBe(true);
   });
@@ -99,7 +102,7 @@ describe('buildDirectProvider response transforms', () => {
       internal_id: 'upstream-model',
       base_url: 'https://llm.example.com/v1',
       api_key: 'test-key',
-      use_gemini_reasoning_transform: true,
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
     });
 
     expect(provider.responseTransforms).toBe(ReasoningDetailsTransform.GeminiThought);
@@ -121,7 +124,7 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
     const request = makeRequest();
 
     await transformRequest(request, {
-      use_gemini_reasoning_transform: true,
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
     });
 
     expect(request.body.model).toBe('upstream-model');
@@ -167,7 +170,9 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
       ],
     });
 
-    await transformRequest(request, { use_gemini_reasoning_transform: true });
+    await transformRequest(request, {
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
+    });
 
     expect(request.body.messages[0]).toEqual({
       role: 'assistant',
@@ -187,7 +192,9 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
       },
     ];
 
-    await transformRequest(request, { use_gemini_reasoning_transform: true });
+    await transformRequest(request, {
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
+    });
 
     expect(request.body.messages[0]).not.toHaveProperty('reasoning_details');
     expect(request.body.messages[0]).not.toHaveProperty('extra_content.google.thought_signature');
@@ -199,7 +206,9 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
     delete assistant.reasoning_details;
     Object.assign(assistant.tool_calls as object[], [{ thoughtSignature: 'legacy-signature' }]);
 
-    await transformRequest(request, { use_gemini_reasoning_transform: true });
+    await transformRequest(request, {
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
+    });
 
     expect(request.body.messages[0]).toHaveProperty(
       'tool_calls.0.extra_content.google.thought_signature',
@@ -213,7 +222,7 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
     request.body.reasoning_effort = 'high';
 
     await transformRequest(request, {
-      use_gemini_reasoning_transform: true,
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
       extra_body: { temperature: 0.2, google: { existing: true } },
       remove_from_body: ['stream'],
     });
@@ -238,7 +247,7 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
     request.body.reasoning_effort = 'none';
 
     await transformRequest(request, {
-      use_gemini_reasoning_transform: true,
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
       extra_body: { google: { existing: true } },
     });
 
@@ -250,7 +259,9 @@ describe('buildDirectProvider Gemini reasoning transform', () => {
   it('still sets thinking_config when reasoning_effort is absent', async () => {
     const request = makeRequest();
 
-    await transformRequest(request, { use_gemini_reasoning_transform: true });
+    await transformRequest(request, {
+      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
+    });
 
     expect(request.body).toMatchObject({
       google: {

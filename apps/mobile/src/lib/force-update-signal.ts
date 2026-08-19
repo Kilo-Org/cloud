@@ -2,6 +2,7 @@ type Listener = () => void;
 
 const listeners = new Set<Listener>();
 let forceUpdateRequired = false;
+let clientUpToDate = false;
 
 function readUpstreamCode(error: unknown): unknown {
   if (typeof error !== 'object' || error === null) {
@@ -29,11 +30,28 @@ function notify(): void {
  * `upstreamCode === 'app_update_required'`. Any other error is a no-op.
  */
 export function reportTrpcError(error: unknown): void {
-  if (readUpstreamCode(error) !== 'app_update_required' || forceUpdateRequired) {
+  if (readUpstreamCode(error) !== 'app_update_required' || forceUpdateRequired || clientUpToDate) {
     return;
   }
   forceUpdateRequired = true;
   notify();
+}
+
+/**
+ * Marks the client's own check as authoritative `up-to-date`. Until
+ * `markClientUpdateRequired` is called, a stale server `app_update_required`
+ * refusal must not re-set the signal.
+ */
+export function markClientUpToDate(): void {
+  clientUpToDate = true;
+}
+
+/**
+ * Marks the client's own check as `update-required`, re-arming the signal so a
+ * subsequent server refusal can set it again.
+ */
+export function markClientUpdateRequired(): void {
+  clientUpToDate = false;
 }
 
 export function subscribeToForceUpdateSignal(listener: Listener): () => void {

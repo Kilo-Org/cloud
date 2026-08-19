@@ -8,6 +8,8 @@ import { resolveForceUpdateState } from '@/lib/force-update-policy';
 import {
   clearForceUpdateSignal,
   getForceUpdateSignalSnapshot,
+  markClientUpdateRequired,
+  markClientUpToDate,
   subscribeToForceUpdateSignal,
 } from '@/lib/force-update-signal';
 
@@ -53,8 +55,10 @@ export function useForceUpdate() {
       );
 
       if (state.kind === 'update-required') {
+        markClientUpdateRequired();
         setPollRequired(true);
       } else if (state.kind === 'up-to-date') {
+        markClientUpToDate();
         setPollRequired(false);
         clearForceUpdateSignal();
       }

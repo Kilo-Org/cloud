@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearForceUpdateSignal,
   getForceUpdateSignalSnapshot,
+  markClientUpdateRequired,
+  markClientUpToDate,
   reportTrpcError,
   subscribeToForceUpdateSignal,
 } from './force-update-signal';
@@ -10,6 +12,7 @@ import {
 describe('force-update-signal', () => {
   beforeEach(() => {
     clearForceUpdateSignal();
+    markClientUpdateRequired();
   });
 
   it('starts false', () => {
@@ -57,5 +60,21 @@ describe('force-update-signal', () => {
 
     clearForceUpdateSignal();
     expect(getForceUpdateSignalSnapshot()).toBe(false);
+  });
+
+  it('markClientUpToDate suppresses a subsequent reportTrpcError', () => {
+    markClientUpToDate();
+    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
+    expect(getForceUpdateSignalSnapshot()).toBe(false);
+  });
+
+  it('markClientUpdateRequired re-arms reportTrpcError', () => {
+    markClientUpToDate();
+    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
+    expect(getForceUpdateSignalSnapshot()).toBe(false);
+
+    markClientUpdateRequired();
+    reportTrpcError({ data: { upstreamCode: 'app_update_required' } });
+    expect(getForceUpdateSignalSnapshot()).toBe(true);
   });
 });

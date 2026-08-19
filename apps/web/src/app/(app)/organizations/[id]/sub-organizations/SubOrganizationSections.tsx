@@ -117,44 +117,50 @@ export function OverviewSection({
         )}
       </CardHeader>
       <CardContent className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Sub-organization</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead className="text-right">Members</TableHead>
-              <TableHead className="text-right">Seats</TableHead>
-              <TableHead className="text-right">Credit balance</TableHead>
-              <TableHead className="text-right">Spend (30 days)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.children.map(child => (
-              <TableRow key={child.id}>
-                <TableCell className="font-medium">
-                  <OrganizationLink id={child.id} name={child.name} />
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="capitalize">
-                    {child.plan}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{child.memberCount}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {child.requireSeats
-                    ? `${child.seatCount.used} / ${child.seatCount.total}`
-                    : 'Not required'}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMicrodollars(child.balanceMicrodollars)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMicrodollars(spendByOrganization.get(child.id) ?? 0)}
-                </TableCell>
+        {data.children.length === 0 ? (
+          <p className="text-muted-foreground py-6 text-center text-sm">
+            No sub-organizations yet. Create one to start managing it separately.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sub-organization</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead className="text-right">Members</TableHead>
+                <TableHead className="text-right">Seats</TableHead>
+                <TableHead className="text-right">Credit balance</TableHead>
+                <TableHead className="text-right">Spend (30 days)</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {data.children.map(child => (
+                <TableRow key={child.id}>
+                  <TableCell className="font-medium">
+                    <OrganizationLink id={child.id} name={child.name} />
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {child.plan}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{child.memberCount}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {child.requireSeats
+                      ? `${child.seatCount.used} / ${child.seatCount.total}`
+                      : 'Not required'}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMicrodollars(child.balanceMicrodollars)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMicrodollars(spendByOrganization.get(child.id) ?? 0)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );

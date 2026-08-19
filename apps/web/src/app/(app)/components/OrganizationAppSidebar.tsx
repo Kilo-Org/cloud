@@ -127,7 +127,7 @@ export default function OrganizationAppSidebar({
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
     },
-    ...(hasOwnerLevelAccess && (currentOrg?.childOrganizations.length ?? 0) > 0
+    ...(hasOwnerLevelAccess
       ? [
           {
             title: 'Sub-organizations',

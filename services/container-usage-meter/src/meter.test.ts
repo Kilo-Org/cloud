@@ -138,23 +138,7 @@ describe('ContainerUsageMeter', () => {
     );
   });
 
-  it('returns paid admission details from the versioned start RPC', async () => {
-    vi.mocked(applyStart).mockResolvedValue({
-      kind: 'applied',
-      dedup: false,
-      billingMode: 'paid',
-      remainingMicrodollars: 10_000_001,
-    });
-
-    await expect(createMeter().recordStartV2(validStart())).resolves.toEqual({
-      success: true,
-      ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'pg', dedup: false },
-      billingMode: 'paid',
-      remainingMicrodollars: 10_000_001,
-    });
-  });
-
-  it('returns detailed insufficient-credit rejections from the versioned start RPC', async () => {
+  it('returns detailed insufficient-credit rejections from recordStart', async () => {
     vi.mocked(applyStart).mockResolvedValue({
       kind: 'rejected',
       code: 'insufficient_credits',
@@ -163,19 +147,13 @@ describe('ContainerUsageMeter', () => {
       minimumRequiredMicrodollars: 5_000_000,
     });
 
-    await expect(createMeter().recordStartV2(validStart())).resolves.toMatchObject({
-      success: false,
-      error: {
-        code: 'insufficient_credits',
-        remainingMicrodollars: 5_000_000,
-        minimumRequiredMicrodollars: 5_000_000,
-      },
-    });
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({
       success: false,
       error: {
         code: 'insufficient_credits',
         message: 'Container billing requires at least $5.00 in remaining credits',
+        remainingMicrodollars: 5_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
       },
     });
   });

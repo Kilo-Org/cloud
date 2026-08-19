@@ -3,7 +3,6 @@ import {
   heartbeatAckSchema,
   recordAckSchema,
   recordStartResultSchema,
-  recordStartV2ResultSchema,
   startIdempotencyKey,
   stopIdempotencyKey,
   type ContainerUsageRpcMethods,
@@ -11,7 +10,6 @@ import {
   type RecordAck,
   type RecordHeartbeatInput,
   type RecordStartInput,
-  type RecordStartV2Result,
   type RecordStartFailureCode,
   type RecordStopInput,
   type UsageContext,
@@ -46,12 +44,21 @@ const DEFAULT_INITIAL_RETRY_DELAY_MS = 100;
 const DEFAULT_MAXIMUM_RETRY_DELAY_MS = 1_000;
 
 export class ContainerUsageAdmissionError extends Error {
+  readonly remainingMicrodollars: number | undefined;
+  readonly minimumRequiredMicrodollars: number | undefined;
+
   constructor(
     readonly code: RecordStartFailureCode,
-    message: string
+    message: string,
+    details?: {
+      remainingMicrodollars?: number;
+      minimumRequiredMicrodollars?: number;
+    }
   ) {
     super(message);
     this.name = 'ContainerUsageAdmissionError';
+    this.remainingMicrodollars = details?.remainingMicrodollars;
+    this.minimumRequiredMicrodollars = details?.minimumRequiredMicrodollars;
   }
 }
 
@@ -97,25 +104,18 @@ export class ContainerUsageClient {
       recordStartResultSchema.parse(await this.binding.recordStart(request))
     );
     if (!result.success) {
-      throw new ContainerUsageAdmissionError(result.error.code, result.error.message);
+      throw new ContainerUsageAdmissionError(
+        result.error.code,
+        result.error.message,
+        result.error.code === 'insufficient_credits'
+          ? {
+              remainingMicrodollars: result.error.remainingMicrodollars,
+              minimumRequiredMicrodollars: result.error.minimumRequiredMicrodollars,
+            }
+          : undefined
+      );
     }
     return result.ack;
-  }
-
-  async recordStartV2(input: ClientRecordStartInput): Promise<RecordStartV2Result> {
-    // A deployed Worker RPC proxy may expose an absent method as callable and reject only
-    // when invoked. Keep this check for direct bindings; either failure mode remains fail-closed.
-    const binding = this.binding;
-    if (!binding.recordStartV2) {
-      throw new Error('Container usage meter does not support recordStartV2');
-    }
-    const request = this.startRequest(input);
-    return await this.withRetry(async () => {
-      if (!binding.recordStartV2) {
-        throw new Error('Container usage meter does not support recordStartV2');
-      }
-      return recordStartV2ResultSchema.parse(await binding.recordStartV2(request));
-    });
   }
 
   async recordHeartbeat(input: ClientRecordHeartbeatInput): Promise<HeartbeatAck> {

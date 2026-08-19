@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ContainerUsageAdmissionError,
   getBillingContext,
   updateBillingContext,
   type ContainerUsageRpcMethods,
@@ -110,11 +111,6 @@ function createRpc(): ContainerUsageRpcMethods {
       success: true,
       ack: ack(),
     })),
-    recordStartV2: vi.fn<NonNullable<ContainerUsageRpcMethods['recordStartV2']>>(async () => ({
-      success: true,
-      ack: ack(),
-      billingMode: 'shadow',
-    })),
     recordHeartbeat: vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async () => ({
       ...ack(),
       budget: { verdict: 'continue' },
@@ -191,27 +187,17 @@ describe('MeteredSandbox', () => {
     vi.restoreAllMocks();
   });
 
-  it('requires a paid meter admission before a selected cold start', async () => {
+  it('accepts any successful meter admission before a selected cold start', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
-      success: true,
-      ack: ack(),
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
-    const { sandbox, flushShadowTasks } = createSandbox(rpc);
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
 
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toEqual({
-      success: true,
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
-    expect(rpc.recordStartV2).toHaveBeenCalledOnce();
+    ).resolves.toEqual({ success: true });
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
     expect(sandbox.schedules).toHaveLength(0);
     await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
-    expect(rpc.recordStartV2).toHaveBeenCalledOnce();
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
 
     await sandbox.onStart();
     await flushShadowTasks();
@@ -220,17 +206,14 @@ describe('MeteredSandbox', () => {
     ]);
   });
 
-  it('fails selected admission closed for low balance or a shadow meter mismatch', async () => {
+  it('fails selected admission closed for low balance and accepts shadow starts', async () => {
     const lowBalanceRpc = createRpc();
-    vi.mocked(lowBalanceRpc.recordStartV2!).mockResolvedValue({
-      success: false,
-      error: {
-        code: 'insufficient_credits',
-        message: 'Low balance',
+    vi.mocked(lowBalanceRpc.recordStart).mockRejectedValue(
+      new ContainerUsageAdmissionError('insufficient_credits', 'Low balance', {
         remainingMicrodollars: 5_000_000,
         minimumRequiredMicrodollars: 5_000_000,
-      },
-    });
+      })
+    );
     const { sandbox: lowBalance } = createSandbox(lowBalanceRpc);
     await expect(
       lowBalance.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
@@ -240,14 +223,13 @@ describe('MeteredSandbox', () => {
       remainingMicrodollars: 5_000_000,
     });
 
-    const shadowRpc = createRpc();
-    const { sandbox: mismatch } = createSandbox(shadowRpc);
+    const { sandbox: shadow } = createSandbox(createRpc());
     await expect(
-      mismatch.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toMatchObject({ success: false, code: 'configuration_mismatch' });
+      shadow.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
+    ).resolves.toEqual({ success: true });
   });
 
-  it('fails selected admission closed for an already-running shadow generation', async () => {
+  it('short-circuits selected admission for an already-running generation', async () => {
     const { sandbox, flushShadowTasks } = createSandbox(createRpc());
     await sandbox.configureBilling(billingInput);
     await sandbox.onStart();
@@ -255,17 +237,11 @@ describe('MeteredSandbox', () => {
 
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toMatchObject({ success: false, code: 'configuration_mismatch' });
+    ).resolves.toEqual({ success: true });
   });
 
   it('settles a graceful budget stop from physical onStop and resumes only after paid admission', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
-      success: true,
-      ack: ack(),
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
     vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
       ...ack(),
       budget: {
@@ -309,19 +285,13 @@ describe('MeteredSandbox', () => {
     vi.spyOn(Date, 'now').mockReturnValue(302_000);
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toMatchObject({ success: true, billingMode: 'paid' });
+    ).resolves.toEqual({ success: true });
     expect(await sandbox.isBillingBlocked()).toBe(false);
-    expect(rpc.recordStartV2).toHaveBeenCalledTimes(2);
+    expect(rpc.recordStart).toHaveBeenCalledTimes(2);
   });
 
   it('settles force-stop usage at the physical stop after the deadline', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
-      success: true,
-      ack: ack(),
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
     vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
       ...ack(),
       budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
@@ -374,12 +344,6 @@ describe('MeteredSandbox', () => {
 
   it('restores the durable billing block when destroy clears storage', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
-      success: true,
-      ack: ack(),
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
     vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
       ...ack(),
       budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
@@ -452,12 +416,6 @@ describe('MeteredSandbox', () => {
 
   it('restores the force-stopped generation so onStop settles it exactly once', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
-      success: true,
-      ack: ack(),
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
     vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
       ...ack(),
       budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
@@ -493,12 +451,6 @@ describe('MeteredSandbox', () => {
 
   it('reissues a failed durable force-destroy without clearing the billing block', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!).mockResolvedValue({
-      success: true,
-      ack: ack(),
-      billingMode: 'paid',
-      remainingMicrodollars: 20_000_000,
-    });
     vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
       ...ack(),
       budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
@@ -525,16 +477,8 @@ describe('MeteredSandbox', () => {
     expect(destroy).toHaveBeenCalledTimes(2);
   });
 
-  it('does not clear a budget block for a shadow admission', async () => {
+  it('clears a budget block after any successful admission', async () => {
     const rpc = createRpc();
-    vi.mocked(rpc.recordStartV2!)
-      .mockResolvedValueOnce({
-        success: true,
-        ack: ack(),
-        billingMode: 'paid',
-        remainingMicrodollars: 20_000_000,
-      })
-      .mockResolvedValueOnce({ success: true, ack: ack(), billingMode: 'shadow' });
     vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
       ...ack(),
       budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
@@ -550,9 +494,37 @@ describe('MeteredSandbox', () => {
     await sandbox.onStop({ reason: 'runtime_signal' });
     await flushShadowTasks();
 
+    await expect(sandbox.ensureBillingAdmission(billingInput)).resolves.toEqual({ success: true });
+    expect(await sandbox.isBillingBlocked()).toBe(false);
+  });
+
+  it('keeps a budget block when fresh admission fails', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
+      ...ack(),
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+    sandbox.mockState = { status: 'running' };
+    await sandbox.billingHeartbeatTick(active.generation);
+    expect(await sandbox.isBillingBlocked()).toBe(true);
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+    vi.mocked(rpc.recordStart)
+      .mockReset()
+      .mockResolvedValueOnce({
+        success: false,
+        error: { code: 'insufficient_credits', message: 'Low balance' },
+      });
+
     await expect(sandbox.ensureBillingAdmission(billingInput)).resolves.toMatchObject({
       success: false,
-      code: 'configuration_mismatch',
+      code: 'insufficient_credits',
     });
     expect(await sandbox.isBillingBlocked()).toBe(true);
   });

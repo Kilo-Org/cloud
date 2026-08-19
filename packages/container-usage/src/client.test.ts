@@ -12,16 +12,6 @@ function binding(overrides: Partial<ContainerUsageRpcMethods> = {}): ContainerUs
         dedup: false,
       },
     })),
-    recordStartV2: vi.fn(async input => ({
-      success: true as const,
-      ack: {
-        intervalId: `${input.instanceId}:${input.startEpochMs}`,
-        durable: 'pg' as const,
-        dedup: false,
-      },
-      billingMode: 'paid' as const,
-      remainingMicrodollars: 10_000_001,
-    })),
     recordHeartbeat: vi.fn(async input => ({
       intervalId: `${input.instanceId}:${input.startEpochMs}`,
       durable: 'pg' as const,
@@ -187,57 +177,25 @@ describe('ContainerUsageClient', () => {
     expect(recordStart).toHaveBeenCalledOnce();
   });
 
-  it('returns versioned paid admission details without changing v1 start behavior', async () => {
-    const rpc = binding();
-    const client = new ContainerUsageClient(rpc, { service: 'cloud-agent-next-sandbox' });
-
-    await expect(client.recordStartV2({ ...context, startEpochMs: 123 })).resolves.toMatchObject({
-      success: true,
-      billingMode: 'paid',
-      remainingMicrodollars: 10_000_001,
+  it('preserves insufficient-credit balance details without retrying', async () => {
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+      success: false,
+      error: {
+        code: 'insufficient_credits',
+        message: 'Insufficient credits',
+        remainingMicrodollars: 5_000_000,
+        minimumRequiredMicrodollars: 10_000_000,
+      },
     });
-    expect(rpc.recordStartV2).toHaveBeenCalledWith(
-      expect.objectContaining({
-        service: 'cloud-agent-next-sandbox',
-        idempotencyKey: 'v1:cloud-agent-next-sandbox:instance-1:123:start',
-      })
-    );
-  });
-
-  it('invokes versioned admission as a binding method for RPC proxies', async () => {
-    const recordStartV2 = new Proxy(
-      vi.fn<NonNullable<ContainerUsageRpcMethods['recordStartV2']>>(),
-      {
-        apply: async () => ({
-          success: true as const,
-          ack: { intervalId: 'instance-1:123', durable: 'pg' as const, dedup: false },
-          billingMode: 'paid' as const,
-          remainingMicrodollars: 10_000_001,
-        }),
-        get: (target, property, receiver) => {
-          if (property === 'call')
-            throw new Error('RPC method proxies do not support Function.call');
-          return Reflect.get(target, property, receiver);
-        },
-      }
-    );
-    const client = new ContainerUsageClient(binding({ recordStartV2 }), {
-      service: 'cloud-agent-next-sandbox',
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
     });
 
-    await expect(client.recordStartV2({ ...context, startEpochMs: 123 })).resolves.toMatchObject({
-      success: true,
-      billingMode: 'paid',
+    await expect(client.recordStart({ ...context, startEpochMs: 123 })).rejects.toMatchObject({
+      code: 'insufficient_credits',
+      remainingMicrodollars: 5_000_000,
+      minimumRequiredMicrodollars: 10_000_000,
     });
-  });
-
-  it('reports unavailable versioned admission support explicitly', async () => {
-    const client = new ContainerUsageClient(binding({ recordStartV2: undefined }), {
-      service: 'cloud-agent-next-sandbox',
-    });
-
-    await expect(client.recordStartV2({ ...context, startEpochMs: 123 })).rejects.toThrow(
-      'does not support recordStartV2'
-    );
+    expect(recordStart).toHaveBeenCalledOnce();
   });
 });

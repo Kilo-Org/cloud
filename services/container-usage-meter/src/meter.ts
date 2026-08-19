@@ -14,7 +14,6 @@ import {
   type RecordHeartbeatInput,
   type RecordStartInput,
   type RecordStartResult,
-  type RecordStartV2Result,
   type RecordStopInput,
   type UsageContext,
 } from '@kilocode/container-usage';
@@ -74,7 +73,19 @@ export class ContainerUsageMeter
   async recordStart(input: RecordStartInput): Promise<RecordStartResult> {
     const result = await this.applyStart(input);
     if (result.kind === 'rejected') {
-      return { success: false, error: { code: result.code, message: result.message } };
+      return {
+        success: false,
+        error: {
+          code: result.code,
+          message: result.message,
+          ...(result.code === 'insufficient_credits'
+            ? {
+                remainingMicrodollars: result.remainingMicrodollars,
+                minimumRequiredMicrodollars: result.minimumRequiredMicrodollars,
+              }
+            : {}),
+        },
+      };
     }
     return {
       success: true,
@@ -84,37 +95,6 @@ export class ContainerUsageMeter
         dedup: result.dedup,
       },
     };
-  }
-
-  async recordStartV2(input: RecordStartInput): Promise<RecordStartV2Result> {
-    const result = await this.applyStart(input);
-    if (result.kind === 'rejected') {
-      if (result.code === 'insufficient_credits') {
-        return {
-          success: false,
-          error: {
-            code: result.code,
-            message: result.message,
-            remainingMicrodollars: result.remainingMicrodollars,
-            minimumRequiredMicrodollars: result.minimumRequiredMicrodollars,
-          },
-        };
-      }
-      return { success: false, error: { code: result.code, message: result.message } };
-    }
-    const ack = {
-      intervalId: intervalId(input.service, input.instanceId, input.startEpochMs),
-      durable: 'pg' as const,
-      dedup: result.dedup,
-    };
-    return result.billingMode === 'paid'
-      ? {
-          success: true,
-          ack,
-          billingMode: 'paid',
-          remainingMicrodollars: result.remainingMicrodollars,
-        }
-      : { success: true, ack, billingMode: 'shadow' };
   }
 
   private async applyStart(

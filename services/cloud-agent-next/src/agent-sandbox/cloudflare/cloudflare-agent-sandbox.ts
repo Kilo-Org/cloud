@@ -275,7 +275,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     const input = this.billingInput(sandboxId);
     const blocked = await this.sandboxBillingBlocked(sandbox);
     if (!input.enforcementRequested && !blocked) {
-      return { success: true as const, billingMode: 'shadow' as const };
+      return { success: true as const };
     }
     return this.ensureSandboxBillingAdmission(sandbox, input);
   }

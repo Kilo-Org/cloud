@@ -178,7 +178,6 @@ function billingAdmissionRejectedResponse(
         details
       );
     case 'meter_unavailable':
-    case 'configuration_mismatch':
       return facadeError(
         503,
         'KILO_BILLING_UNAVAILABLE',

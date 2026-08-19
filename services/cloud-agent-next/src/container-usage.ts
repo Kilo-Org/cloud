@@ -24,6 +24,7 @@ import {
   type SandboxBillingInput,
   type SandboxBillingAdmissionResult,
   type SandboxClassName,
+  billingAdmissionFailureFromError,
 } from './container-usage-context.js';
 
 const SERVICE = 'cloud-agent-next';
@@ -31,7 +32,6 @@ const PENDING_ATTRIBUTION_STORAGE_KEY = 'container-usage:pending-attribution:v1'
 const PENDING_STOP_REASON_STORAGE_KEY = 'container-usage:pending-stop-reason:v1';
 const START_ACK_GENERATION_STORAGE_KEY = 'container-usage:start-ack-generation:v1';
 const LAST_START_EPOCH_STORAGE_KEY = 'container-usage:last-start-epoch:v1';
-const START_ADMISSION_STORAGE_KEY = 'container-usage:start-admission:v1';
 const BILLING_BLOCK_STORAGE_KEY = 'container-usage:budget-block:v1';
 const DESTROY_RECOVERY_MARKER_STORAGE_KEY_PREFIX = 'container-usage:destroy-recovery-marker:v1:';
 const BILLING_FORCE_STOP_SECONDS = 120;
@@ -52,14 +52,6 @@ const pendingStopReasonSchema = z
   .object({
     generation: z.uuid(),
     reason: z.literal('activity_expired'),
-  })
-  .strict();
-
-const startAdmissionSchema = z
-  .object({
-    generation: z.uuid(),
-    billingMode: z.enum(['shadow', 'paid']),
-    remainingMicrodollars: z.number().int().optional(),
   })
   .strict();
 
@@ -150,31 +142,14 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       let active = await getBillingContext(this.ctx.storage);
 
       if (!block && !parsed.enforcementRequested) {
-        return { success: true, billingMode: 'shadow' };
+        return { success: true };
       }
 
       if (active && !active.measurementStarted && !block) {
-        const admission = await this.getStartAdmission(active.generation);
-        if (admission) {
-          if (parsed.enforcementRequested && admission.billingMode !== 'paid') {
-            return {
-              success: false,
-              code: 'configuration_mismatch',
-              message: 'Container billing rollout is not enabled in the usage meter',
-            };
-          }
-          return {
-            success: true,
-            billingMode: admission.billingMode,
-            ...(admission.remainingMicrodollars === undefined
-              ? {}
-              : { remainingMicrodollars: admission.remainingMicrodollars }),
-          };
-        }
+        return { success: true };
       }
 
       if (active?.measurementStarted && this.ctx.container?.running === true) {
-        const admission = await this.getStartAdmission(active.generation);
         if (block) {
           return {
             success: false,
@@ -183,20 +158,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
             remainingMicrodollars: block.remainingMicrodollars,
           };
         }
-        if (parsed.enforcementRequested && admission?.billingMode !== 'paid') {
-          return {
-            success: false,
-            code: 'configuration_mismatch',
-            message: 'Container billing rollout is not enabled for the active usage generation',
-          };
-        }
-        return admission
-          ? {
-              success: true,
-              billingMode: admission.billingMode,
-              remainingMicrodollars: admission.remainingMicrodollars,
-            }
-          : { success: true, billingMode: 'shadow' };
+        return { success: true };
       }
 
       if (this.ctx.container?.running === true) {
@@ -214,7 +176,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
             active.stoppedObservedAtMs ?? Date.now()
           );
           await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
-          await this.ctx.storage.delete(START_ADMISSION_STORAGE_KEY);
         } catch (error) {
           return {
             success: false,
@@ -227,71 +188,15 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       }
 
       const context = await this.createBillingGeneration(parsed, 'attribution-adoption');
-      let result;
       try {
-        result = await this.usageClient.recordStartV2(startInputFromContext(context));
+        await this.usageClient.recordStart(startInputFromContext(context));
       } catch (error) {
         await clearBillingContext(this.ctx.storage);
-        return {
-          success: false,
-          code: 'meter_unavailable',
-          message:
-            error instanceof Error ? error.message : 'Container billing meter is unavailable',
-        };
-      }
-      if (!result.success) {
-        await clearBillingContext(this.ctx.storage);
-        return {
-          success: false,
-          code:
-            result.error.code === 'insufficient_credits'
-              ? 'insufficient_credits'
-              : 'configuration_mismatch',
-          message: result.error.message,
-          ...(result.error.code === 'insufficient_credits'
-            ? {
-                remainingMicrodollars: result.error.remainingMicrodollars,
-                minimumRequiredMicrodollars: result.error.minimumRequiredMicrodollars,
-              }
-            : {}),
-        };
-      }
-      if (parsed.enforcementRequested && result.billingMode !== 'paid') {
-        await clearBillingContext(this.ctx.storage);
-        return {
-          success: false,
-          code: 'configuration_mismatch',
-          message: 'Container billing rollout is not enabled in the usage meter',
-        };
-      }
-      if (block && result.billingMode !== 'paid') {
-        await clearBillingContext(this.ctx.storage);
-        return {
-          success: false,
-          code: 'configuration_mismatch',
-          message: 'Container billing remains stopped until funded paid admission succeeds',
-        };
+        return billingAdmissionFailureFromError(error);
       }
       await this.ctx.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
-      await this.ctx.storage.put(START_ADMISSION_STORAGE_KEY, {
-        generation: context.generation,
-        billingMode: result.billingMode,
-        ...(result.billingMode === 'paid'
-          ? { remainingMicrodollars: result.remainingMicrodollars }
-          : {}),
-      });
-      // A budget block is cleared only by a later paid admission. Shadow
-      // configuration must not resume work that was stopped for insufficient funds.
-      if (result.billingMode === 'paid') {
-        await this.ctx.storage.delete(BILLING_BLOCK_STORAGE_KEY);
-      }
-      return result.billingMode === 'paid'
-        ? {
-            success: true,
-            billingMode: 'paid',
-            remainingMicrodollars: result.remainingMicrodollars,
-          }
-        : { success: true, billingMode: 'shadow' };
+      await this.ctx.storage.delete(BILLING_BLOCK_STORAGE_KEY);
+      return { success: true };
     });
   }
 
@@ -618,13 +523,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       await this.usageClient.recordStart(startInputFromContext(context));
       await this.ctx.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
     }
-  }
-
-  private async getStartAdmission(generation: string) {
-    const stored = await this.ctx.storage.get(START_ADMISSION_STORAGE_KEY);
-    if (stored === undefined) return undefined;
-    const parsed = startAdmissionSchema.parse(stored);
-    return parsed.generation === generation ? parsed : undefined;
   }
 
   private async getBillingBlock() {

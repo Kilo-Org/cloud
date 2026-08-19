@@ -2,6 +2,7 @@ import {
   billingActorSchema,
   billingSubjectSchema,
   usageContextSchema,
+  ContainerUsageAdmissionError,
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
@@ -41,10 +42,10 @@ export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 
   enforcementRequested?: boolean;
 };
 export type SandboxBillingAdmissionResult =
-  | { success: true; billingMode: 'shadow' | 'paid'; remainingMicrodollars?: number }
+  | { success: true }
   | {
       success: false;
-      code: 'insufficient_credits' | 'meter_unavailable' | 'configuration_mismatch' | 'stopping';
+      code: 'insufficient_credits' | 'meter_unavailable' | 'stopping';
       message: string;
       remainingMicrodollars?: number;
       minimumRequiredMicrodollars?: number;
@@ -213,7 +214,7 @@ export async function ensureSandboxBillingAdmissionInput(
           code: 'meter_unavailable',
           message: 'Container billing admission is unavailable',
         }
-      : { success: true, billingMode: 'shadow' };
+      : { success: true };
   }
   try {
     return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
@@ -224,6 +225,29 @@ export async function ensureSandboxBillingAdmissionInput(
       message: error instanceof Error ? error.message : 'Container billing admission failed',
     };
   }
+}
+
+export function billingAdmissionFailureFromError(error: unknown): SandboxBillingAdmissionResult {
+  if (error instanceof ContainerUsageAdmissionError) {
+    if (error.code === 'insufficient_credits') {
+      return {
+        success: false,
+        code: 'insufficient_credits',
+        message: error.message,
+        ...(error.remainingMicrodollars === undefined
+          ? {}
+          : { remainingMicrodollars: error.remainingMicrodollars }),
+        ...(error.minimumRequiredMicrodollars === undefined
+          ? {}
+          : { minimumRequiredMicrodollars: error.minimumRequiredMicrodollars }),
+      };
+    }
+  }
+  return {
+    success: false,
+    code: 'meter_unavailable',
+    message: error instanceof Error ? error.message : 'Container billing meter is unavailable',
+  };
 }
 
 export async function isSandboxBillingBlocked(

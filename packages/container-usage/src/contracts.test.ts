@@ -3,7 +3,6 @@ import {
   intervalId,
   recordHeartbeatInputSchema,
   recordStartResultSchema,
-  recordStartV2ResultSchema,
   recordStopInputSchema,
   usageContextSchema,
 } from './contracts';
@@ -124,21 +123,14 @@ describe('container usage contracts', () => {
     );
   });
 
-  it('keeps v1 starts stable while v2 reports paid admission details', () => {
+  it('keeps successful starts minimal and preserves insufficient-credit details', () => {
     const v1 = {
       success: true,
       ack: { intervalId: 'interval-1', durable: 'pg', dedup: false },
     };
     expect(recordStartResultSchema.parse(v1)).toEqual(v1);
     expect(
-      recordStartV2ResultSchema.parse({
-        ...v1,
-        billingMode: 'paid',
-        remainingMicrodollars: 10_000_001,
-      })
-    ).toMatchObject({ success: true, billingMode: 'paid', remainingMicrodollars: 10_000_001 });
-    expect(
-      recordStartV2ResultSchema.parse({
+      recordStartResultSchema.parse({
         success: false,
         error: {
           code: 'insufficient_credits',
@@ -147,6 +139,6 @@ describe('container usage contracts', () => {
           minimumRequiredMicrodollars: 5_000_000,
         },
       })
-    ).toMatchObject({ success: false });
+    ).toMatchObject({ success: false, error: { code: 'insufficient_credits' } });
   });
 });

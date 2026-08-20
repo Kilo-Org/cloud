@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- The dedicated Notifications screen composes the master
  * OS-permission gate, the push-token registration flow, and 7 per-category toggles
- * with their optimistic-mutation + retry + loading patterns. Extracting subcomponents
- * would re-encode the same hooks. The screen stays a single rendered surface. */
+ * with their optimistic-mutation + retry + loading patterns. CATEGORY_META still
+ * has seven keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
+ * Extracting subcomponents would re-encode the same hooks. The screen stays a
+ * single rendered surface. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
@@ -41,6 +43,7 @@ import {
   rollbackAgentPushOptimistic,
 } from '@/lib/hooks/agent-push-preference';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
+import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getDevicePushToken,
@@ -199,6 +202,7 @@ export function NotificationsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const showKiloClawActivity = useKiloClawTabVisible();
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
 
@@ -477,6 +481,14 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
+  // Old form: CATEGORY_META always rendered kiloclawActivity. Keep the key in
+  // CATEGORY_META and in notification preferences. Hide the row when the user
+  // has no active instance. Remove this filter only when product deletes the
+  // kiloclawActivity preference.
+  const visibleCategoryMeta = CATEGORY_META.filter(
+    meta => meta.key !== 'kiloclawActivity' || showKiloClawActivity
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Notifications" />
@@ -587,7 +599,7 @@ export function NotificationsScreen() {
           </Text>
           {preferencesLoading && (
             <>
-              {CATEGORY_META.map(meta => (
+              {visibleCategoryMeta.map(meta => (
                 <View
                   key={meta.key}
                   className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
@@ -613,7 +625,7 @@ export function NotificationsScreen() {
           )}
           {preferences && (
             <>
-              {CATEGORY_META.map(meta => (
+              {visibleCategoryMeta.map(meta => (
                 <CategoryRow
                   key={meta.key}
                   meta={meta}

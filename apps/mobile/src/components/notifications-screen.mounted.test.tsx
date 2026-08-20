@@ -22,6 +22,11 @@ const getNotificationPermissionStatus = vi.hoisted(() => vi.fn());
 const getDevicePushToken = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 
+const useKiloClawTabVisible = vi.hoisted(() => vi.fn(() => true));
+vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
+  useKiloClawTabVisible,
+}));
+
 vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',
@@ -141,6 +146,24 @@ function previewRetry(root: I): I[] {
   );
 }
 
+function kiloclawSwitches(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Switch' &&
+      n.props.accessibilityLabel === 'KiloClaw activity'
+  );
+}
+
+function chatMessagesSwitches(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Switch' &&
+      n.props.accessibilityLabel === 'Chat messages'
+  );
+}
+
 function activityIndicators(root: I): I[] {
   return root.findAll(
     n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator'
@@ -156,6 +179,11 @@ function previewSwitchOnValueChange(root: I): ((value: boolean) => void) | undef
   return sw ? (sw.props as { onValueChange?: (value: boolean) => void }).onValueChange : undefined;
 }
 
+function kiloclawSwitchOnValueChange(root: I): ((value: boolean) => void) | undefined {
+  const sw = kiloclawSwitches(root)[0];
+  return sw ? (sw.props as { onValueChange?: (value: boolean) => void }).onValueChange : undefined;
+}
+
 // The preview switch renders as soon as the preference query resolves, but it
 // stays disabled until the master gate settles (the device-token query is
 // gated on the permission query, so it settles one cascade later). Wait for the
@@ -164,6 +192,18 @@ function previewSwitchOnValueChange(root: I): ((value: boolean) => void) | undef
 async function waitForEnabledPreviewSwitch(renderer: R): Promise<void> {
   await waitFor(() => {
     const sw = previewSwitches(renderer.root);
+    return sw.length === 1 && sw[0]?.props.disabled === false;
+  }, 200);
+}
+
+// The KiloClaw switch renders as soon as the preference query resolves, but it
+// stays disabled until the master gate settles (the device-token query is
+// gated on the permission query, so it settles one cascade later). Wait for the
+// switch to be enabled before driving a change, otherwise the disabled switch
+// swallows the onValueChange.
+async function waitForEnabledKiloClawSwitch(renderer: R): Promise<void> {
+  await waitFor(() => {
+    const sw = kiloclawSwitches(renderer.root);
     return sw.length === 1 && sw[0]?.props.disabled === false;
   }, 200);
 }
@@ -248,6 +288,67 @@ describe('NotificationsScreen message-previews row', () => {
     const { renderer } = await renderScreen();
 
     expect(previewSwitches(renderer.root).length).toBe(0);
+    expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
+  });
+});
+
+describe('NotificationsScreen KiloClaw activity row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('happy: instance present shows the row and a toggle persists', async () => {
+    useKiloClawTabVisible.mockReturnValue(true);
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer } = await renderScreen();
+
+    await waitForEnabledKiloClawSwitch(renderer);
+
+    act(() => {
+      kiloclawSwitchOnValueChange(renderer.root)?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ kiloclawActivity: false });
+  });
+
+  it('empty: no instance hides the KiloClaw row and keeps the Chat messages row', async () => {
+    useKiloClawTabVisible.mockReturnValue(false);
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer } = await renderScreen();
+
+    await waitFor(() => chatMessagesSwitches(renderer.root).length === 1);
+    expect(kiloclawSwitches(renderer.root).length).toBe(0);
+    expect(chatMessagesSwitches(renderer.root).length).toBe(1);
+  });
+
+  it('retryable unhappy: prefs error shows retry and no KiloClaw row', async () => {
+    useKiloClawTabVisible.mockReturnValue(false);
+    prefsQueryFn.mockRejectedValue(new Error('prefs boom'));
+    const { renderer } = await renderScreen();
+
+    await waitFor(
+      () =>
+        renderer.root.findAll(
+          n =>
+            typeof n.type === 'string' &&
+            (n.type as string) === 'Pressable' &&
+            n.props.accessibilityLabel === 'Retry loading notification categories'
+        ).length === 1
+    );
+    expect(kiloclawSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('empty loading: pending prefs shows skeletons and no KiloClaw switch', async () => {
+    useKiloClawTabVisible.mockReturnValue(false);
+    prefsQueryFn.mockReturnValue(new Promise(() => undefined));
+    const { renderer } = await renderScreen();
+
+    expect(kiloclawSwitches(renderer.root).length).toBe(0);
     expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
   });
 });

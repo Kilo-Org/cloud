@@ -6,6 +6,7 @@ import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
+import { DevSessionInjector } from '@/components/dev-session-injector';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -23,6 +24,7 @@ export function AppRootProviders({ children }: { readonly children: ReactNode })
         <QueryClientProvider client={queryClient}>
           <QueryClientNativeLifecycle />
           <AuthProvider>
+            {__DEV__ ? <DevSessionInjector /> : null}
             <OrganizationProvider>
               <ActionSheetProvider>
                 <>

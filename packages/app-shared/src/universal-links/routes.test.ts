@@ -11,11 +11,19 @@ import {
 
 const WEB = 'https://app.kilo.ai';
 
-/** Expected targets for the 11 table rows (concrete ids where wildcards). */
+/** Expected targets for the 14 table rows (concrete ids where wildcards). */
 const ROW_CASES = [
+  {
+    path: '/home',
+    app: '/(app)/(tabs)/(0_home)',
+  },
   {
     path: '/profile',
     app: '/(app)/(tabs)/(3_profile)',
+  },
+  {
+    path: '/profile/preferences',
+    app: '/(app)/(tabs)/(3_profile)/preferences',
   },
   {
     path: '/claw',
@@ -24,6 +32,10 @@ const ROW_CASES = [
   {
     path: '/cloud/sessions',
     app: '/(app)/(tabs)/(2_agents)',
+  },
+  {
+    path: '/cloud/sessions/ses_1',
+    app: '/(app)/agent-chat/ses_1',
   },
   {
     path: '/security-agent',
@@ -60,8 +72,8 @@ const ROW_CASES = [
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 11 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(11);
+  it('has exactly 14 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(14);
   });
 });
 
@@ -274,8 +286,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 13 entries (11 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(13);
+  it('returns 16 entries (14 rows + 2 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(16);
   });
 
   it('every entry has a "/" key', () => {
@@ -287,20 +299,20 @@ describe('aasaComponents', () => {
 
   it('emits exclusion immediately before row 7 (/code-reviews/*)', () => {
     const components = aasaComponents();
-    // Rows 1–6 are exact (indices 0–5). Row 7 exclusion then row 7 → indices 6–7.
-    expect(components[6]).toEqual({ '/': '/code-reviews/review-md', exclude: true });
-    expect(components[7]).toEqual({ '/': '/code-reviews/*' });
+    // Rows 1–9 are exact (indices 0–8). Row 10 exclusion then row 10 → indices 9–10.
+    expect(components[9]).toEqual({ '/': '/code-reviews/review-md', exclude: true });
+    expect(components[10]).toEqual({ '/': '/code-reviews/*' });
   });
 
-  it('emits exclusion immediately before row 11 (/organizations/*/code-reviews/*)', () => {
+  it('emits exclusion immediately before row 14 (/organizations/*/code-reviews/*)', () => {
     const components = aasaComponents();
-    // After row 7 pair: rows 8–10 (3 exact) → indices 8,9,10.
-    // Row 11 exclusion + row 11 → indices 11–12.
-    expect(components[11]).toEqual({
+    // After row 10 pair: rows 11–13 (3 exact) → indices 11,12,13.
+    // Row 14 exclusion + row 14 → indices 14–15.
+    expect(components[14]).toEqual({
       '/': '/organizations/*/code-reviews/review-md',
       exclude: true,
     });
-    expect(components[12]).toEqual({ '/': '/organizations/*/code-reviews/*' });
+    expect(components[15]).toEqual({ '/': '/organizations/*/code-reviews/*' });
   });
 
   it('keeps table * verbatim (Apple glob crosses /)', () => {
@@ -312,11 +324,14 @@ describe('aasaComponents', () => {
 });
 
 describe('androidPathPatterns', () => {
-  it('deep-equals the expected 11-string list', () => {
+  it('deep-equals the expected 14-string list', () => {
     expect(androidPathPatterns()).toEqual([
+      '/home',
       '/profile',
+      '/profile/preferences',
       '/claw',
       '/cloud/sessions',
+      '/cloud/sessions/.*',
       '/security-agent',
       '/security-agent/findings',
       '/code-reviews',

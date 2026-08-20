@@ -63,11 +63,13 @@ describe('deep-link-launch', () => {
     _setSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
+    vi.stubGlobal('__DEV__', true);
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
     store.clear();
+    vi.unstubAllGlobals();
   });
 
   describe('pending slot', () => {

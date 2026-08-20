@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
+import { takeDevSessionFromUrl } from './dev-session-inject';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 type DeepLinkSource = 'universal-link' | 'notification';
@@ -288,6 +289,7 @@ export function captureLaunchDeepLink(): void {
   if (!url) {
     return;
   }
+  takeDevSessionFromUrl(url);
   const href = resolveIncomingUrl(url);
   if (href) {
     setPendingDeepLink(href, 'universal-link');

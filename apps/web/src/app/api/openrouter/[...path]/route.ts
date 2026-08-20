@@ -647,20 +647,18 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     };
   }
 
-  const accessChecks = new Map<string, ReturnType<typeof resolveAccessCheck>>();
-  function getAccessCheck(modelId: string) {
-    const existing = accessChecks.get(modelId);
-    if (existing) return existing;
-    const accessCheck = resolveAccessCheck(modelId);
-    accessChecks.set(modelId, accessCheck);
-    return accessCheck;
+  function createAccessCheckResolver(modelId: string) {
+    let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
+    const get = () => (accessCheck ??= resolveAccessCheck(modelId));
+    return {
+      get,
+      getRoutingProviderConfig: isAnonymousContext(user)
+        ? undefined
+        : async () => (await get()).effectiveProviderConfig,
+    };
   }
 
-  function getRoutingProviderConfigFor(modelId: string) {
-    return isAnonymousContext(user)
-      ? undefined
-      : async () => (await getAccessCheck(modelId)).effectiveProviderConfig;
-  }
+  let accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
   // Resolve the initial provider before abuse enforcement because abuse needs
   // provider/BYOK context, and quarantine-3 may later rewrite these values.
@@ -672,7 +670,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId,
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
-    getRoutingProviderConfig: getRoutingProviderConfigFor(effectiveModelIdLowerCased),
+    getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
   if (initialProviderResultForAbuseService.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
@@ -788,6 +786,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     abuseDowngradedFrom = effectiveModelIdLowerCased;
     requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
     effectiveModelIdLowerCased = rulesEngineDecision.modelOverride;
+    accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
     const quarantineProviderResult = await getProvider({
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
@@ -796,7 +795,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       taskId,
       clientIp: ipAddress ?? null,
       machineId: machineIdHeader,
-      getRoutingProviderConfig: getRoutingProviderConfigFor(effectiveModelIdLowerCased),
+      getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
     });
     if (quarantineProviderResult.kind === 'not-found') {
       if (rulesEngineDecision.delayMs > 0) {
@@ -850,7 +849,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       modelRestrictionError,
       plan,
       settings,
-    } = await getAccessCheck(effectiveModelIdLowerCased);
+    } = await accessCheckResolver.get();
 
     if (
       balance <= 0 &&

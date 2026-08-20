@@ -174,11 +174,7 @@ describe('model access predicates', () => {
   });
 
   test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
-    const isAllowed = createAllowPredicateFromProviderAllowList(
-      undefined,
-      ['openai'],
-      lookup({})
-    );
+    const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
 
     await expect(isAllowed('openai/gpt-5.6-sol-discounted')).resolves.toBe(true);
     await expect(isAllowed('stealth/gpt-5.6-sol')).resolves.toBe(false);

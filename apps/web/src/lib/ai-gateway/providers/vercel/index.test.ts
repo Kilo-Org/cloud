@@ -162,22 +162,20 @@ describe('shouldRouteToVercel', () => {
   async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
     jest.resetModules();
     jest.doMock('@/lib/ai-gateway/providers/routing-config', () => ({
-      getRuntimeGatewayRoutingConfig: jest.fn().mockResolvedValue({
+      getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
         vercelPaid: 100,
         vercelFree: 100,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
         friendli: 0,
         perplexity: 0,
-      }),
+      })),
     }));
     jest.doMock('@/lib/ai-gateway/is-free-model', () => ({
-      isFreeModel: jest.fn().mockResolvedValue(false),
+      isFreeModel: jest.fn(async () => false),
     }));
     jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromRedis: jest
-        .fn()
-        .mockResolvedValue(new Set(['anthropic/claude-sonnet-4.5'])),
-      getCachedVercelInferenceProviderIdsForModel: jest.fn().mockResolvedValue(['anthropic']),
+      getVercelModelsFromRedis: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
     }));
     return (await import('@/lib/ai-gateway/providers/vercel')).shouldRouteToVercel;
   }

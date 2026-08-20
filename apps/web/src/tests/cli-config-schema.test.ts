@@ -196,7 +196,7 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.build).toBeDefined();
 
     const experimental = props.experimental as { properties: Record<string, unknown> };
-    expect(experimental.properties.codebase_search).toBeDefined();
+    expect(experimental.properties.codebase_search).toBeUndefined();
     expect(experimental.properties.batch_tool).toBeDefined();
     expect(config.additionalProperties).toBe(false);
     expect(out.properties).toBeUndefined();

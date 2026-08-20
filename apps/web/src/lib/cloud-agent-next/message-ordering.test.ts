@@ -1,7 +1,6 @@
-import type { SessionMessage } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from './message-ordering';
 
-function message(id: string, partIds: string[] = []): SessionMessage {
+function message(id: string, partIds: string[] = []) {
   return {
     info: { id },
     parts: partIds.map(partId => ({ id: partId })),

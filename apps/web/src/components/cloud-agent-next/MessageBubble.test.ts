@@ -5,6 +5,7 @@ import type { StoredMessage } from './types';
 
 jest.mock('./PartRenderer', () => ({ PartRenderer: () => null }));
 jest.mock('@/components/shared/TimeAgo', () => ({ TimeAgo: () => null }));
+jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
 
 import { MessageBubble } from './MessageBubble';
 
@@ -112,5 +113,33 @@ describe('MessageBubble', () => {
 
     expect(html).not.toContain('Failed');
     expect(html).not.toContain('Interrupted');
+  });
+
+  it('does not emit javascript hrefs from user-message autolinks', () => {
+    const message: StoredMessage = {
+      info: {
+        id: 'msg-user',
+        sessionID: 'ses-1',
+        role: 'user',
+        time: { created: 1 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      },
+      parts: [
+        {
+          id: 'p1',
+          sessionID: 'ses-1',
+          messageID: 'msg-user',
+          type: 'text',
+          text: 'see https://example.com and javascript:alert(1)',
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(React.createElement(MessageBubble, { message }));
+
+    expect(html).toContain('href="https://example.com"');
+    expect(html).not.toContain('href="javascript:');
+    expect(html).toContain('javascript:alert(1)');
   });
 });

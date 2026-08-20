@@ -1,4 +1,5 @@
 import { Globe } from 'lucide-react';
+import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
 
@@ -97,22 +98,29 @@ export function WebSearchToolCard({ toolPart }: WebSearchToolCardProps) {
       {/* Results list */}
       {results.length > 0 && (
         <div className="bg-background max-h-60 space-y-2 overflow-auto rounded-md p-2">
-          {results.map((result, idx) => (
-            <div key={idx} className="text-xs">
-              <a
-                href={result.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-blue-400 hover:underline"
-              >
-                {result.title}
-              </a>
-              <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-2">
-                {result.author && <span>{result.author}</span>}
-                {result.publishedDate && <span>{formatDate(result.publishedDate)}</span>}
+          {results.map((result, idx) => {
+            const safeHref = toSafeHttpUrl(result.url);
+            return (
+              <div key={idx} className="text-xs">
+                {safeHref ? (
+                  <a
+                    href={safeHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-400 hover:underline"
+                  >
+                    {result.title}
+                  </a>
+                ) : (
+                  <span className="font-medium">{result.title}</span>
+                )}
+                <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-2">
+                  {result.author && <span>{result.author}</span>}
+                  {result.publishedDate && <span>{formatDate(result.publishedDate)}</span>}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

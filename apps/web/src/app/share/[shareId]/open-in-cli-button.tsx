@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import type { ButtonVariantProps } from '@/components/ui/button-variants';
 import { Terminal } from 'lucide-react';
 
-export function OpenInCliButton({ command }: { command: string }) {
+export function OpenInCliButton({
+  command,
+  variant = 'outline',
+}: {
+  command: string;
+  variant?: ButtonVariantProps['variant'];
+}) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -25,20 +32,9 @@ export function OpenInCliButton({ command }: { command: string }) {
   };
 
   return (
-    <div className="relative">
-      <Button onClick={handleCopy} variant="outline" className="gap-2">
-        <Terminal className="h-4 w-4" />
-        Open in CLI
-      </Button>
-      {copied && (
-        <div
-          className="animate-in fade-in slide-in-from-bottom-2 absolute -top-10 right-0 rounded-md bg-green-600 px-3 py-1 text-sm font-medium text-white shadow-lg duration-200"
-          role="status"
-          aria-live="polite"
-        >
-          Copied!
-        </div>
-      )}
-    </div>
+    <Button onClick={handleCopy} variant={variant} className="gap-2" aria-live="polite">
+      <Terminal className="h-4 w-4" />
+      {copied ? 'Copied!' : 'Open in CLI'}
+    </Button>
   );
 }

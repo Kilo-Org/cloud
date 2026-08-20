@@ -420,6 +420,20 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
   });
 
+  it('skips group policy evaluation when organization policy denies the model', async () => {
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { model_deny_list: ['openai/gpt-4o'] },
+      plan: 'enterprise',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(403);
+    expect(mockedGetEffectiveModelDecision).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the OpenRouter model id is unknown', async () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(false);
 

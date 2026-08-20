@@ -609,6 +609,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       settings,
       organizationPlan: plan,
     });
+    if (modelRestrictionError) {
+      return {
+        balance,
+        effectiveProviderConfig: providerConfig,
+        groupModelAllowed: true,
+        groupProvidersAllowed: true,
+        modelRestrictionError,
+        plan,
+        settings,
+      };
+    }
     let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
     let groupProvidersAllowed = true;

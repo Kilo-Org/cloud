@@ -30,7 +30,7 @@ export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: bool
  * The tap (not long-press) action sheet for a GitHub PR link. The accepted
  * contract is exactly four options: Review PR, Open in browser, Share, Cancel.
  * This is intentionally distinct from the long-press sheet, which also
- * offers Copy and Share link.
+ * offers Copy link.
  */
 export function buildPrLinkTapActionSheet() {
   const actions: ChatLinkActionOption[] = [

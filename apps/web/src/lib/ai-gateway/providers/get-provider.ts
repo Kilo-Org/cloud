@@ -53,6 +53,8 @@ export type GetProviderProviderResult = {
   bypassAccessCheck: boolean;
   /** Present when this provider was resolved through a model experiment. */
   experiment?: ExperimentRouting;
+  /** Managed fallback used if the final provider allow-list cannot be served by Vercel. */
+  vercelFallbackProvider?: Provider;
 };
 
 /**
@@ -198,7 +200,7 @@ export type GetProviderInput = {
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+  const { requestedModel, user, organizationId, taskId, clientIp, machineId } = input;
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
@@ -267,22 +269,22 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
+  const fallbackProvider =
+    (kiloExclusiveModel && tryGetProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER;
 
-  if (
-    eligibleForVercelRouting &&
-    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
-  ) {
+  if (eligibleForVercelRouting && (await shouldRouteToVercel(requestedModel, taskId || user.id))) {
     return {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: null,
       bypassAccessCheck: false,
+      vercelFallbackProvider: fallbackProvider,
     };
   }
 
   return {
     kind: 'provider',
-    provider: (kiloExclusiveModel && tryGetProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER,
+    provider: fallbackProvider,
     userByok: null,
     bypassAccessCheck: false,
   };

@@ -33,6 +33,7 @@ import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/p
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@/lib/utils.server';
+import { hasAvailableVercelInferenceProvider } from '@/lib/ai-gateway/providers/vercel';
 
 jest.mock('next/server', () => {
   return {
@@ -70,6 +71,10 @@ jest.mock('@/lib/ai-gateway/abuse-service', () => {
 });
 jest.mock('@/lib/ai-gateway/providers/get-provider');
 jest.mock('@/lib/ai-gateway/providers/partner/routing');
+jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+  ...jest.requireActual('@/lib/ai-gateway/providers/vercel'),
+  hasAvailableVercelInferenceProvider: jest.fn(),
+}));
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
@@ -150,6 +155,7 @@ const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedGetPercentageRoutedPartnerProvider = jest.mocked(getPercentageRoutedPartnerProvider);
 const mockedWarnExceptInTest = jest.mocked(warnExceptInTest);
+const mockedHasAvailableVercelInferenceProvider = jest.mocked(hasAvailableVercelInferenceProvider);
 
 const provider = {
   id: 'openrouter',
@@ -393,6 +399,34 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
     expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toBe(readDb);
+  });
+
+  it('checks Vercel provider availability after applying the organization allow-list', async () => {
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['openai'] },
+      plan: 'enterprise',
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: vercelProvider,
+      userByok: null,
+      bypassAccessCheck: false,
+      vercelFallbackProvider: provider,
+    });
+    mockedHasAvailableVercelInferenceProvider.mockImplementation(async (_model, request) => {
+      expect(request.body.provider?.only).toEqual(['openai']);
+      return false;
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedHasAvailableVercelInferenceProvider).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: expect.objectContaining({ id: 'openrouter' }) })
+    );
   });
 
   it('returns 404 when the OpenRouter model id is unknown', async () => {

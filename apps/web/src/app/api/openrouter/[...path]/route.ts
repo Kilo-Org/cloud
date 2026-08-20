@@ -65,6 +65,7 @@ import {
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
+import { hasAvailableVercelInferenceProvider } from '@/lib/ai-gateway/providers/vercel';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -846,6 +847,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
+  }
+
+  if (
+    effectiveProviderContext.vercelFallbackProvider &&
+    !(await hasAvailableVercelInferenceProvider(effectiveModelIdLowerCased, requestBodyParsed))
+  ) {
+    effectiveProviderContext = {
+      ...effectiveProviderContext,
+      provider: effectiveProviderContext.vercelFallbackProvider,
+      vercelFallbackProvider: undefined,
+    };
   }
 
   const partnerProvider = await getPercentageRoutedPartnerProvider({

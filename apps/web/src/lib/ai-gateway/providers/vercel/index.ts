@@ -59,11 +59,7 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
   return optOutModels.has(requestedModel);
 }
 
-export async function shouldRouteToVercel(
-  requestedModel: string,
-  request: GatewayRequest,
-  randomSeed: string
-) {
+export async function shouldRouteToVercel(requestedModel: string, randomSeed: string) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
     console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
@@ -88,6 +84,14 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  return true;
+}
+
+export async function hasAvailableVercelInferenceProvider(
+  requestedModel: string,
+  request: GatewayRequest
+) {
+  const vercelModelId = mapModelIdToVercel(requestedModel);
   const provider = request.body.provider;
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;

@@ -1,10 +1,10 @@
 import {
   DirectUserByokInferenceProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
-  KnownVercelInferenceProviderIdSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
+  VercelInferenceProviderIdSchema,
   VercelNonUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from './inference-provider-id';
@@ -20,7 +20,7 @@ describe('inference provider ids', () => {
 
   test('direct BYOK provider ids do not overlap with known Vercel provider ids', () => {
     const overlappingProviderIds = DirectUserByokInferenceProviderIdSchema.options.filter(
-      providerId => KnownVercelInferenceProviderIdSchema.safeParse(providerId).success
+      providerId => VercelInferenceProviderIdSchema.safeParse(providerId).success
     );
 
     expect(overlappingProviderIds).toEqual([]);

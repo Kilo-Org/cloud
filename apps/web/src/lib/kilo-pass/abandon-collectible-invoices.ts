@@ -14,8 +14,12 @@ export type StripeCollectibleInvoiceClient = {
     list: (
       params: Stripe.InvoiceListParams
     ) => PromiseLike<Pick<Stripe.ApiList<Stripe.Invoice>, 'data' | 'has_more'>>;
+    update: (invoiceId: string, params: Stripe.InvoiceUpdateParams) => Promise<unknown>;
+    finalizeInvoice: (
+      invoiceId: string,
+      params?: Stripe.InvoiceFinalizeInvoiceParams
+    ) => Promise<unknown>;
     voidInvoice: (invoiceId: string) => Promise<unknown>;
-    del: (invoiceId: string) => Promise<unknown>;
     retrieve: (invoiceId: string) => PromiseLike<Pick<Stripe.Invoice, 'status'>>;
   };
 };
@@ -52,6 +56,15 @@ async function listInvoicesByStatus(params: {
   return invoices;
 }
 
+async function finalizeDraftThenVoid(params: {
+  stripe: StripeCollectibleInvoiceClient;
+  invoiceId: string;
+}): Promise<void> {
+  await params.stripe.invoices.update(params.invoiceId, { auto_advance: false });
+  await params.stripe.invoices.finalizeInvoice(params.invoiceId, { auto_advance: false });
+  await params.stripe.invoices.voidInvoice(params.invoiceId);
+}
+
 async function ignoreIfAlreadyAbandoned(params: {
   stripe: StripeCollectibleInvoiceClient;
   invoiceId: string;
@@ -72,6 +85,10 @@ async function ignoreIfAlreadyAbandoned(params: {
     await params.stripe.invoices.voidInvoice(params.invoiceId);
     return;
   }
+  if (status === 'draft') {
+    await finalizeDraftThenVoid({ stripe: params.stripe, invoiceId: params.invoiceId });
+    return;
+  }
   throw params.error;
 }
 
@@ -84,7 +101,7 @@ async function abandonInvoice(params: {
 
   try {
     if (params.invoice.status === 'draft') {
-      await params.stripe.invoices.del(invoiceId);
+      await finalizeDraftThenVoid({ stripe: params.stripe, invoiceId });
       return;
     }
     await params.stripe.invoices.voidInvoice(invoiceId);

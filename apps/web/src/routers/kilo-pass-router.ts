@@ -2068,13 +2068,13 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
-      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-        cancel_at_period_end: true,
-      });
-
       await abandonCollectibleInvoicesForStripeSubscription({
         stripe,
         stripeSubscriptionId: subscription.stripeSubscriptionId,
+      });
+
+      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        cancel_at_period_end: true,
       });
 
       const updated = await db

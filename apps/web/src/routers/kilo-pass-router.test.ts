@@ -90,8 +90,9 @@ type StripeMock = {
   };
   invoices: {
     list: ReturnType<typeof jest.fn>;
+    update: ReturnType<typeof jest.fn>;
+    finalizeInvoice: ReturnType<typeof jest.fn>;
     voidInvoice: ReturnType<typeof jest.fn>;
-    del: ReturnType<typeof jest.fn>;
     retrieve: ReturnType<typeof jest.fn>;
   };
 };
@@ -377,8 +378,9 @@ jest.mock('@/lib/stripe-client', () => {
     },
     invoices: {
       list: jest.fn(),
+      update: jest.fn(),
+      finalizeInvoice: jest.fn(),
       voidInvoice: jest.fn(),
-      del: jest.fn(),
       retrieve: jest.fn(),
     },
   };
@@ -497,8 +499,9 @@ function expectNoStripeManagementCalls(stripeMock: StripeMock): void {
   expect(stripeMock.subscriptionSchedules.update).not.toHaveBeenCalled();
   expect(stripeMock.subscriptionSchedules.release).not.toHaveBeenCalled();
   expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+  expect(stripeMock.invoices.update).not.toHaveBeenCalled();
+  expect(stripeMock.invoices.finalizeInvoice).not.toHaveBeenCalled();
   expect(stripeMock.invoices.voidInvoice).not.toHaveBeenCalled();
-  expect(stripeMock.invoices.del).not.toHaveBeenCalled();
   expect(stripeMock.invoices.retrieve).not.toHaveBeenCalled();
 }
 
@@ -694,8 +697,9 @@ describe('kiloPassRouter', () => {
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
     stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
+    stripeMock.invoices.update.mockReset();
+    stripeMock.invoices.finalizeInvoice.mockReset();
     stripeMock.invoices.voidInvoice.mockReset();
-    stripeMock.invoices.del.mockReset();
     stripeMock.invoices.retrieve.mockReset();
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
     getStoreCompletionMock().completeStoreKiloPassPurchase.mockReset();
@@ -3851,7 +3855,7 @@ describe('kiloPassRouter', () => {
       expect(updated?.cancel_at_period_end).toBe(true);
     });
 
-    it('voids open invoices and deletes draft invoices so Stripe stops collection', async () => {
+    it('voids open invoices and finalizes then voids draft invoices so Stripe stops collection', async () => {
       const stripeMock = getStripeMock();
       stripeMock.subscriptions.update.mockResolvedValue({});
       stripeMock.invoices.list.mockImplementation(async (params: { status?: string }) => {
@@ -3863,8 +3867,9 @@ describe('kiloPassRouter', () => {
         }
         return { data: [], has_more: false };
       });
+      stripeMock.invoices.update.mockResolvedValue({});
+      stripeMock.invoices.finalizeInvoice.mockResolvedValue({});
       stripeMock.invoices.voidInvoice.mockResolvedValue({});
-      stripeMock.invoices.del.mockResolvedValue({});
 
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-cancel-void-invoices@example.com',
@@ -3883,7 +3888,16 @@ describe('kiloPassRouter', () => {
 
       expect(result).toEqual({ success: true });
       expect(stripeMock.invoices.voidInvoice).toHaveBeenCalledWith('in_open_failed');
-      expect(stripeMock.invoices.del).toHaveBeenCalledWith('in_draft_pending');
+      expect(stripeMock.invoices.update).toHaveBeenCalledWith('in_draft_pending', {
+        auto_advance: false,
+      });
+      expect(stripeMock.invoices.finalizeInvoice).toHaveBeenCalledWith('in_draft_pending', {
+        auto_advance: false,
+      });
+      expect(stripeMock.invoices.voidInvoice).toHaveBeenCalledWith('in_draft_pending');
+      expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_test_cancel_void', {
+        cancel_at_period_end: true,
+      });
 
       const updated = await db.query.kilo_pass_subscriptions.findFirst({
         columns: { cancel_at_period_end: true },
@@ -3918,6 +3932,7 @@ describe('kiloPassRouter', () => {
 
       const caller = await createCallerForUser(user.id);
       await expect(caller.kiloPass.cancelSubscription()).rejects.toThrow('stripe void failed');
+      expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
 
       const updated = await db.query.kilo_pass_subscriptions.findFirst({
         columns: { cancel_at_period_end: true },

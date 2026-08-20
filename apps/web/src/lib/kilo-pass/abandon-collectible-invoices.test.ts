@@ -13,8 +13,11 @@ function createStripeInvoiceClient() {
       list: jest.fn<
         (params: { status?: string; starting_after?: string }) => Promise<InvoicePage>
       >(),
+      update:
+        jest.fn<(invoiceId: string, params: { auto_advance?: boolean }) => Promise<unknown>>(),
+      finalizeInvoice:
+        jest.fn<(invoiceId: string, params?: { auto_advance?: boolean }) => Promise<unknown>>(),
       voidInvoice: jest.fn<(invoiceId: string) => Promise<unknown>>(),
-      del: jest.fn<(invoiceId: string) => Promise<unknown>>(),
       retrieve:
         jest.fn<
           (invoiceId: string) => Promise<{ status: InvoicePage['data'][number]['status'] }>
@@ -24,7 +27,7 @@ function createStripeInvoiceClient() {
 }
 
 describe('abandonCollectibleInvoicesForStripeSubscription', () => {
-  it('voids open invoices and deletes draft invoices for the subscription', async () => {
+  it('voids open invoices and finalizes then voids draft invoices for the subscription', async () => {
     const stripe = createStripeInvoiceClient();
     stripe.invoices.list.mockImplementation(async (params: { status?: string }) => {
       if (params.status === 'open') {
@@ -44,8 +47,9 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
       }
       return { data: [], has_more: false } satisfies InvoicePage;
     });
+    stripe.invoices.update.mockResolvedValue({});
+    stripe.invoices.finalizeInvoice.mockResolvedValue({});
     stripe.invoices.voidInvoice.mockResolvedValue({});
-    stripe.invoices.del.mockResolvedValue({});
 
     await abandonCollectibleInvoicesForStripeSubscription({
       stripe,
@@ -64,7 +68,11 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
     });
     expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_open_1');
     expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_open_2');
-    expect(stripe.invoices.del).toHaveBeenCalledWith('in_draft_1');
+    expect(stripe.invoices.update).toHaveBeenCalledWith('in_draft_1', { auto_advance: false });
+    expect(stripe.invoices.finalizeInvoice).toHaveBeenCalledWith('in_draft_1', {
+      auto_advance: false,
+    });
+    expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_draft_1');
     expect(stripe.invoices.retrieve).not.toHaveBeenCalled();
   });
 

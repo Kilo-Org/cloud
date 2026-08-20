@@ -316,7 +316,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody()) as never);
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
       error_type: 'abuse_blocked',
       message: 'Request blocked by abuse prevention rules.',

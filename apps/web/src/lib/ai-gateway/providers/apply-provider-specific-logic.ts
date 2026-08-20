@@ -16,12 +16,12 @@ import {
   isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
+import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import {
-  applyMoonshotModelSettings,
-  isKimiModel,
+  FRIENDLI_GLM_PUBLIC_ID,
   PERPLEXITY_KIMI_PUBLIC_ID,
-} from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID, isGlmModel } from '@/lib/ai-gateway/providers/zai';
+} from '@/lib/ai-gateway/providers/partner/constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
   ReasoningDetailsTransform,

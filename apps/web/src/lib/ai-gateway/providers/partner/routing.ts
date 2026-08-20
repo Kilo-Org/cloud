@@ -1,13 +1,18 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import {
+  FRIENDLI_GLM_PUBLIC_ID,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/partner/constants';
+import {
+  FRIENDLI_GLM_PROVIDER,
+  PERPLEXITY_KIMI_PROVIDER,
+} from '@/lib/ai-gateway/providers/partner/providers';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import {
   passesRoutingPercentage,
   type RoutingCohort,
 } from '@/lib/ai-gateway/providers/routing-percentage';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
 type PartnerRoute = {
   provider: Provider;
@@ -24,11 +29,11 @@ export type PercentageRoutedPartnerInput = {
 
 const PARTNER_ROUTES: Readonly<Record<string, PartnerRoute>> = {
   [FRIENDLI_GLM_PUBLIC_ID]: {
-    provider: PROVIDERS.FRIENDLI_GLM,
+    provider: FRIENDLI_GLM_PROVIDER,
     cohort: 'friendli',
   },
   [PERPLEXITY_KIMI_PUBLIC_ID]: {
-    provider: PROVIDERS.PERPLEXITY_KIMI,
+    provider: PERPLEXITY_KIMI_PROVIDER,
     cohort: 'perplexity',
   },
 };

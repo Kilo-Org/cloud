@@ -12,8 +12,10 @@ import {
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+import {
+  FRIENDLI_GLM_PUBLIC_ID,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/partner/constants';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {

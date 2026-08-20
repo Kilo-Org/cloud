@@ -150,6 +150,47 @@ describe('dispatchInternalPushCore', () => {
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
+  it('low_balance reads only balanceAlertsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        chatMessagesEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        kiloclawActivityEnabled: false,
+        securityFindingsEnabled: false,
+        balanceAlertsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(
+      lowBalance({ recipientUserIds: ['user-a'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('security_finding reads only securityFindingsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        chatMessagesEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        kiloclawActivityEnabled: false,
+        balanceAlertsEnabled: false,
+        securityFindingsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(securityFinding(), deps);
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
   it('null prefs row is default-on and dispatches', async () => {
     const { deps, calls } = fakeDeps({ preferences: null });
     const result = await dispatchInternalPushCore(
@@ -168,6 +209,14 @@ describe('dispatchInternalPushCore', () => {
       lowBalance({ recipientUserIds: ['user-a'] }),
       deps
     );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('readPreferences throw (security_finding) → failed with zero dispatchPush calls', async () => {
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(securityFinding(), deps);
 
     expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
     expect(calls.dispatchPushInputs).toHaveLength(0);

@@ -35,6 +35,7 @@ export type NotificationPreferences = Readonly<{
   balanceAlerts: boolean;
   securityFindings: boolean;
   agentPushEnabled: boolean;
+  notificationPreviews?: 'generic' | 'full';
 }>;
 
 /** What the cache may hold — either the typed full row or the legacy `agentPushEnabled` snapshot. */

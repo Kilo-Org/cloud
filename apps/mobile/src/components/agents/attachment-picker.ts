@@ -3,9 +3,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
+import { writePickerLaunchContext } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
@@ -15,7 +17,7 @@ function showPermissionSettingsAlert({ message, title }: { message: string; titl
   ]);
 }
 
-function normalizeImageAsset(asset: {
+export function normalizeImageAsset(asset: {
   uri: string;
   fileName?: string | null;
   mimeType?: string | null;
@@ -111,7 +113,12 @@ async function pickFromSource(source: AttachmentSource): Promise<AgentAttachment
 }
 
 export function pickAgentAttachments(
-  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions']
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
+  context: {
+    userId: string | undefined;
+    surface: 'agent-new' | 'agent-chat';
+    sessionId: string | null;
+  }
 ): Promise<AgentAttachmentCandidate[]> {
   return new Promise(resolve => {
     let settled = false;
@@ -122,6 +129,30 @@ export function pickAgentAttachments(
       }
     };
     const handle = async (source: AttachmentSource) => {
+      // Record the launching composer + account before the camera/library
+      // launch so the recovery hook can match a pending result after an
+      // Activity recreation. NOT before the Files branch, which uses
+      // `startActivityForResult` and is unaffected by that bug.
+      // Record the launching composer + account before the camera/library
+      // launch so the recovery hook can match a pending result after an
+      // Activity recreation. NOT before the Files branch, which uses
+      // `startActivityForResult` and is unaffected by that bug. Only record
+      // the launch when a real user id is present; an empty id would store a
+      // context the recovery hook can never match.
+      if ((source === 'camera' || source === 'library') && context.userId) {
+        try {
+          await writePickerLaunchContext({
+            userId: context.userId,
+            surface: context.surface,
+            sessionId: context.sessionId,
+            launchedAt: Date.now(),
+          });
+        } catch (error) {
+          // A store write failure must not block the picker launch; the
+          // recovery hook simply finds no context and nothing is attached.
+          Sentry.captureException(error);
+        }
+      }
       const result = await pickFromSource(source);
       settle(result);
     };

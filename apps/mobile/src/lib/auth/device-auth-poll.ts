@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { API_BASE_URL } from '@/lib/config';
 import { classifyPollResponse } from '@/lib/auth/poll-response';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
@@ -18,18 +19,28 @@ const POLL_BASE_INTERVAL_MS = 3000;
 const POLL_MAX_INTERVAL_MS = 15_000;
 const POLL_OVERALL_TIMEOUT_MS = 5 * 60 * 1000;
 
+export type DeviceAuthPollHandle = {
+  cleanup: () => void;
+  pollNow: () => void;
+};
+
 export function startDeviceAuthPoll(params: {
   code: string;
   deviceCode: string;
   signal: AbortSignal;
   setState: (updater: (prev: DeviceAuthState) => DeviceAuthState) => void;
   cleanup: () => void;
-}) {
+  startedAt?: number;
+}): DeviceAuthPollHandle {
   const { code, deviceCode, signal, setState, cleanup } = params;
 
-  const startedAt = Date.now();
+  // A resumed transaction reuses the original start clock so its overall
+  // budget does not restart from `Date.now()` and outlive the server code.
+  const startedAt = params.startedAt ?? Date.now();
   let retryDelay = POLL_BASE_INTERVAL_MS;
   let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
+  let inFlight = false;
+  let lastTickStartedAt = 0;
 
   const scheduleNext = (delay: number) => {
     timeoutId = setTimeout(() => {
@@ -38,6 +49,16 @@ export function startDeviceAuthPoll(params: {
   };
 
   const tick = async () => {
+    inFlight = true;
+    lastTickStartedAt = Date.now();
+    try {
+      await runTick();
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  const runTick = async () => {
     if (Date.now() - startedAt > POLL_OVERALL_TIMEOUT_MS) {
       cleanup();
       setState(previous =>
@@ -49,7 +70,7 @@ export function startDeviceAuthPoll(params: {
     try {
       const response = await fetch(`${API_BASE_URL}/api/device-auth/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
         body: JSON.stringify(buildDeviceAuthPollRequest(deviceCode)),
         signal,
       });
@@ -143,10 +164,26 @@ export function startDeviceAuthPoll(params: {
 
   scheduleNext(retryDelay);
 
-  return () => {
+  const pollNow = () => {
+    // At most one extra poll per foreground transition: skip when a tick is
+    // already in flight or the last tick started under 1 second ago.
+    if (inFlight || Date.now() - lastTickStartedAt < 1000) {
+      return;
+    }
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = undefined;
     }
+    void tick();
+  };
+
+  return {
+    cleanup: () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+    },
+    pollNow,
   };
 }

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- the mocked hook surface and draft-restore contract require a long suite */
+/* eslint-disable max-lines -- the mocked hook surface, the draft-restore contract, and the attachment-send mocks require a long suite */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable new-cap -- ChatComposer is called as a plain function, matching repo test convention */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake hooks and handlers settle without await because they resolve immediately */
@@ -183,8 +183,11 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     reset: vi.fn(() => undefined),
     isUploading: false,
     hasFailedAttachments: false,
-    toWirePayload: () => undefined,
-    toSubmissionPayload: () => undefined,
+    uploadPending: vi.fn(async () => ({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+    })),
   }),
 }));
 
@@ -206,6 +209,10 @@ vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
 
 vi.mock('@/lib/agent-attachments/validate', () => ({
   describeClassificationFailure: vi.fn(),
+}));
+
+vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
+  useAndroidPendingPickerRecovery: () => undefined,
 }));
 
 vi.mock('@/lib/persist/drafts', () => ({

@@ -1314,6 +1314,7 @@ export function SessionDetailContent({
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                sessionId={sessionId}
                 controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>

@@ -43,6 +43,7 @@ export function LoginScreen() {
     expiresIn,
     error,
     verificationUrl,
+    resumed,
     start,
     cancel,
     openBrowser,
@@ -198,6 +199,11 @@ export function LoginScreen() {
 
             {status === 'pending' && code && (
               <View className="w-full items-center gap-4">
+                {resumed && (
+                  <Text variant="muted" className="text-center">
+                    Continuing your sign-in.
+                  </Text>
+                )}
                 <Text variant="muted" className="text-center">
                   Your sign-in code:
                 </Text>

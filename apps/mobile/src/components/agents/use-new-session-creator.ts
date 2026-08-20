@@ -108,9 +108,24 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // Warn (never block) when a chip kept its original image because
+    // metadata stripping failed: the photo may still carry EXIF/GPS.
+    if (attachments.attachments.some(attachment => attachment.metadataStripFailed === true)) {
+      toast.warning('Photo metadata could not be removed from an attachment.');
+    }
+
+    // Upload pending attachments now so the create body carries the real
+    // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
+    // test `ok`.
+    const uploaded = await attachments.uploadPending();
+    if (!uploaded.ok) {
+      setIsCreating(false);
+      return;
+    }
+
     // Computed once and reused for both the fingerprint and the create body, so
     // the two cannot disagree and a swapped attachment set is a fresh intent.
-    const attachmentWire = attachments.toWirePayload();
+    const attachmentWire = uploaded.wire;
     const intentFingerprint = JSON.stringify({
       prompt,
       mode,

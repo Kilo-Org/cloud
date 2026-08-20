@@ -6,6 +6,7 @@ import {
   kilocode_users,
   magic_link_tokens,
   user_notification_preferences,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -610,6 +611,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
@@ -639,6 +641,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: false,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
@@ -656,6 +659,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -698,6 +702,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -710,6 +715,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -746,6 +752,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -765,6 +772,39 @@ describe('user router - notification preferences', () => {
     expect(row?.security_findings_enabled).toBe(true);
   });
 
+  it('writes only notificationPreviews and leaves the category columns untouched', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({
+      notificationPreviews: 'full',
+    });
+
+    expect(result.notificationPreviews).toBe('full');
+    // All category columns stay at their DB default (true) because only the
+    // notificationPreviews key was supplied.
+    expect(result.chatMessages).toBe(true);
+    expect(result.agentAttention).toBe(true);
+    expect(result.agentUpdates).toBe(true);
+    expect(result.sessionStatus).toBe(true);
+    expect(result.kiloclawActivity).toBe(true);
+    expect(result.balanceAlerts).toBe(true);
+    expect(result.securityFindings).toBe(true);
+    expect(result.agentPushEnabled).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.notification_previews).toBe('full');
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+  });
+
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
@@ -777,6 +817,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -798,6 +839,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: false,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -839,6 +881,175 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+
+  it('one category toggle cannot delete unrelated subscriptions (six other categories + agent_push_enabled preserved)', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    // Seed every category OFF and the master gate OFF. A full-row overwrite
+    // would flip an unrelated subscription back ON, so this pins the
+    // provided-only partial upsert contract.
+    await db.insert(user_notification_preferences).values({
+      user_id: firstUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: false,
+    });
+
+    // Flip exactly one category ON.
+    const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
+    expect(result.balanceAlerts).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+
+    // The single flipped column changed; every other column is untouched.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(false);
+    expect(row?.chat_messages_enabled).toBe(false);
+    expect(row?.agent_attention_enabled).toBe(false);
+    expect(row?.session_status_enabled).toBe(false);
+    expect(row?.kiloclaw_activity_enabled).toBe(false);
+    expect(row?.security_findings_enabled).toBe(false);
+  });
+});
+
+describe('user router - register push token', () => {
+  let tokenUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'push-token-register@example.com',
+      google_user_name: 'Push Token Register',
+    });
+  });
+
+  afterEach(async () => {
+    await db.delete(user_push_tokens).where(eq(user_push_tokens.user_id, tokenUser.id));
+    await db
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, tokenUser.id));
+  });
+
+  it('stores the app version when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-with-version]',
+      platform: 'android',
+      appVersion: '1.0.4',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBe('1.0.4');
+    expect(row?.platform).toBe('android');
+  });
+
+  it('stores a null app version when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-without-version]',
+      platform: 'android',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBeNull();
+  });
+
+  it('updates the app version on re-registration of the same token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-re-register]';
+
+    await caller.user.registerPushToken({ token, platform: 'android' });
+    await caller.user.registerPushToken({ token, platform: 'android', appVersion: '1.0.4' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.app_version).toBe('1.0.4');
+  });
+
+  it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // Seed a distinctive preferences row so any accidental write is visible.
+    await db.insert(user_notification_preferences).values({
+      user_id: tokenUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: false,
+      notification_previews: 'full',
+    });
+
+    const token = 'ExponentPushToken[token-prefs-untouched]';
+    await caller.user.registerPushToken({ token, platform: 'android' });
+
+    // Token registration must not mutate any preference column.
+    const [afterRegister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterRegister?.agent_push_enabled).toBe(false);
+    expect(afterRegister?.chat_messages_enabled).toBe(false);
+    expect(afterRegister?.agent_attention_enabled).toBe(false);
+    expect(afterRegister?.session_status_enabled).toBe(false);
+    expect(afterRegister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterRegister?.balance_alerts_enabled).toBe(false);
+    expect(afterRegister?.security_findings_enabled).toBe(false);
+    expect(afterRegister?.notification_previews).toBe('full');
+
+    // The token row now exists, proving register ran.
+    const tokensAfterRegister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterRegister).toHaveLength(1);
+
+    await caller.user.unregisterPushToken({ token });
+
+    // Token removal must not mutate any preference column either.
+    const [afterUnregister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterUnregister?.agent_push_enabled).toBe(false);
+    expect(afterUnregister?.chat_messages_enabled).toBe(false);
+    expect(afterUnregister?.agent_attention_enabled).toBe(false);
+    expect(afterUnregister?.session_status_enabled).toBe(false);
+    expect(afterUnregister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterUnregister?.balance_alerts_enabled).toBe(false);
+    expect(afterUnregister?.security_findings_enabled).toBe(false);
+    expect(afterUnregister?.notification_previews).toBe('full');
+
+    // The token row is gone, proving unregister ran.
+    const tokensAfterUnregister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterUnregister).toHaveLength(0);
   });
 });
 

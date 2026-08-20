@@ -81,12 +81,14 @@ const native: VoiceInputNative = {
   },
   isRecognitionAvailable: () => ExpoSpeechRecognitionModule.isRecognitionAvailable(),
   supportsContinuousRecognition,
+  supportsOnDevice: () => ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
   start: options => {
     ExpoSpeechRecognitionModule.start({
       continuous: options.continuous,
       interimResults: options.interimResults,
       lang: options.lang,
       maxAlternatives: options.maxAlternatives,
+      requiresOnDeviceRecognition: options.requiresOnDeviceRecognition,
     });
   },
   stop: () => {

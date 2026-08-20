@@ -131,7 +131,7 @@ type CreatorInput = Parameters<typeof useNewSessionCreator>[0];
 type CreatorResult = ReturnType<typeof useNewSessionCreator>;
 
 // Simulated attachment wire payload (`{path, files}`). Each test sets this
-// before a submit; the fake `toWirePayload` below reads it at call time so a
+// before a submit; the fake `uploadPending` below reads it at call time so a
 // test can change attachments between two submits.
 let attachmentsWire: { path: string; files: string[] } | null = null;
 
@@ -143,8 +143,11 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   reset: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
-  toWirePayload: () => undefined,
-  toSubmissionPayload: () => undefined,
+  uploadPending: vi.fn(async () => ({
+    ok: true as const,
+    wire: undefined,
+    submission: undefined,
+  })),
 };
 
 function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
@@ -302,10 +305,14 @@ function runCreator(args: {
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
     return useNewSessionCreator({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape, never read by the create path
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape; only `attachments` and `uploadPending` are read by the create path
       attachments: {
         attachments: [],
-        toWirePayload: () => attachmentsWire,
+        uploadPending: async () => ({
+          ok: true as const,
+          wire: attachmentsWire,
+          submission: undefined,
+        }),
       } as never,
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',

@@ -69,9 +69,11 @@ import {
 import {
   type AgentAttachmentSubmissionPayload,
   type AgentAttachmentWire,
+  type UploadPendingResult,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
+import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import {
   CLIPBOARD_PASTE_EMPTY_MESSAGE,
   useClipboardPaste,
@@ -179,6 +181,8 @@ type ChatComposerProps = {
    * text the user typed while identity and the draft were still loading.
    */
   initialDraft?: string;
+  /** Active session id, used to scope the Android picker launch context. */
+  sessionId?: string | null;
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
 };
@@ -211,6 +215,7 @@ export function ChatComposer({
   autoSend,
   draftKey,
   initialDraft,
+  sessionId = null,
   controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
@@ -459,6 +464,12 @@ export function ChatComposer({
 
   const { addCandidates, removeAttachment, retryAttachment } = upload;
 
+  useAndroidPendingPickerRecovery({
+    surface: 'agent-chat',
+    sessionId: sessionId ?? null,
+    addCandidates,
+  });
+
   useSharePrefill({
     shareId,
     inputRef,
@@ -496,8 +507,9 @@ export function ChatComposer({
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
-    readyAttachmentsCount: upload.attachments.filter(attachment => attachment.status === 'uploaded')
-      .length,
+    sendableAttachmentsCount: upload.attachments.filter(
+      attachment => !(attachment.status === 'error' && attachment.terminal === true)
+    ).length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
     hasText,
@@ -703,16 +715,13 @@ export function ChatComposer({
   async function handleSend() {
     const trimmed = textRef.current.trim();
     // Decide admission from live values, not render-time `control.canSend`,
-    // which can lag behind a same-frame edit. An empty prompt with no ready
-    // attachment is never sent.
-    const readyAttachmentsCount = upload.attachments.filter(
-      attachment => attachment.status === 'uploaded'
+    // which can lag behind a same-frame edit. An empty prompt with no sendable
+    // attachment is never sent. "Sendable" counts non-terminal chips: upload is
+    // deferred to send, so chips are still `pending` (not `uploaded`) here.
+    const sendableAttachmentsCount = upload.attachments.filter(
+      attachment => !(attachment.status === 'error' && attachment.terminal === true)
     ).length;
-    if ((trimmed.length === 0 && readyAttachmentsCount === 0) || disabled || isSending) {
-      return;
-    }
-    if (upload.isUploading) {
-      toast.error('Wait for attachments to finish uploading.');
+    if ((trimmed.length === 0 && sendableAttachmentsCount === 0) || disabled || isSending) {
       return;
     }
     if (upload.hasFailedAttachments) {
@@ -746,6 +755,30 @@ export function ChatComposer({
     // protect the entire asynchronous send.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
+      // Upload pending attachments on the prompt branch only. Slash commands
+      // and session controls never carry chips (`parseChatComposerSubmission`
+      // rejects attachments plus a slash command with `attachment-error`).
+      // `uploaded` is a plain object; `{ ok: false }` is truthy, so test `ok`.
+      let uploaded: Extract<UploadPendingResult, { ok: true }> | undefined = undefined;
+      if (submission.type === 'prompt') {
+        // Warn (never block) when a chip kept its original image because
+        // metadata stripping failed: the photo may still carry EXIF/GPS.
+        if (upload.attachments.some(attachment => attachment.metadataStripFailed === true)) {
+          toast.warning('Photo metadata could not be removed from an attachment.');
+        }
+        const result = await upload.uploadPending();
+        if (!result.ok) {
+          // An in-flight retry blocks send; a terminal chip is already guarded
+          // by `hasFailedAttachments`, and an upload failure already toasted in
+          // `startUpload`.
+          if (upload.isUploading) {
+            toast.error('Wait for attachments to finish uploading.');
+          }
+          return;
+        }
+        uploaded = result;
+      }
+
       await executeChatComposerSubmission(
         submission,
         {
@@ -757,7 +790,7 @@ export function ChatComposer({
           },
           confirmExitSession: showRemoteSessionExitConfirmation,
           onSendPrompt: async prompt => {
-            await onSend(prompt, upload.toWirePayload(), upload.toSubmissionPayload());
+            await onSend(prompt, uploaded?.wire, uploaded?.submission);
           },
         },
         {
@@ -871,8 +904,14 @@ export function ChatComposer({
     // Fire-and-forget: the upload hook owns its own progress + error toasts,
     // and the composer's send flow consults `upload.isUploading` /
     // `upload.hasFailedAttachments` to gate admission.
-    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
-  }, [addCandidates, showActionSheetWithOptions]);
+    void addCandidates(
+      await pickAgentAttachments(showActionSheetWithOptions, {
+        userId,
+        surface: 'agent-chat',
+        sessionId: sessionId ?? null,
+      })
+    );
+  }, [addCandidates, showActionSheetWithOptions, userId, sessionId]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,

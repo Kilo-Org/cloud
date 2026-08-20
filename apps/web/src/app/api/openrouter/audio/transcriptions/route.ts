@@ -267,6 +267,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
   }
 
-  countAndStoreTranscriptionUsage(response.clone(), usageContext, span);
+  countAndStoreTranscriptionUsage(response.clone(), usageContext, span, provider);
   return wrapInSafeNextResponse(response);
 }

@@ -16,7 +16,6 @@ import type {
   OpenRouterGeneration,
 } from './providers/openrouter/types';
 import { fetchGeneration } from './providers/upstream-request';
-import { tryGetProviderById } from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -31,7 +30,7 @@ import {
 } from '@/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
@@ -934,7 +933,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
 export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  provider?: Provider
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
@@ -991,7 +991,7 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext, provider));
 }
 
 export function processOpenRouterUsage(
@@ -1219,7 +1219,8 @@ export function calculateKiloExclusiveCost_mUsd(
 
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
-  usageContext: MicrodollarUsageContext
+  usageContext: MicrodollarUsageContext,
+  provider?: Provider
 ): Promise<{ usageId: string; createdAt: string } | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
@@ -1231,12 +1232,14 @@ export async function processTokenData(
   }
 
   const timer = createTimer();
-  const provider = tryGetProviderById(usageContext.provider);
-  const generation =
-    provider &&
+  let generation: OpenRouterGeneration | undefined;
+  if (
+    provider?.id === usageContext.provider &&
     (await useGenerationLookup(usageStats, usageContext)) &&
-    usageStats.messageId &&
-    (await fetchGeneration(usageStats.messageId, provider));
+    usageStats.messageId
+  ) {
+    generation = await fetchGeneration(usageStats.messageId, provider);
+  }
   if (usageStats.messageId) {
     timer.log(`fetch generation for message ${usageStats.messageId}`);
   }

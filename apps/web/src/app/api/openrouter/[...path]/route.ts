@@ -1087,7 +1087,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.abuse_request_id = classifyResult.request_id;
   }
 
-  accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  accountForMicrodollarUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    effectiveProviderContext.provider
+  );
 
   const requestLogging = {
     user: maybeUser,

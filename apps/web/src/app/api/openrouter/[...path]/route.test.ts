@@ -365,6 +365,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
         responseTransforms: null,
       })
     );
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[3]).toBe(provider);
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
@@ -1203,6 +1204,7 @@ describe('percentage-routed partner fallback', () => {
         provider: sourceProvider.id,
         status_code: 200,
       });
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[3]).toBe(sourceProvider);
       expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
         expect.objectContaining({ providerId: sourceProvider.id })
       );
@@ -1269,6 +1271,7 @@ describe('percentage-routed partner fallback', () => {
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].provider).toBe(partnerProvider);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[3]).toBe(partnerProvider);
   });
 
   it('returns a failed managed fallback without a third attempt', async () => {

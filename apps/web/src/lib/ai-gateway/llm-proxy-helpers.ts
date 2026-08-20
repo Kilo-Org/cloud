@@ -42,7 +42,7 @@ import type {
 } from '@/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { GatewayChatApiKind, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
@@ -403,12 +403,13 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  provider: Provider
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
   after(
-    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan).then(
+    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan, provider).then(
       async usageIdentity => {
         // Chain the experiment-attribution write after the microdollar
         // write. This is best-effort analytics: failures here MUST NOT
@@ -1104,7 +1105,8 @@ export function countAndStoreEmbeddingUsage(
 export function countAndStoreTranscriptionUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  provider: Provider
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
@@ -1130,7 +1132,7 @@ export function countAndStoreTranscriptionUsage(
         return;
       }
 
-      return processTokenData(usageStats, usageContext);
+      return processTokenData(usageStats, usageContext, provider);
     })
   );
 }

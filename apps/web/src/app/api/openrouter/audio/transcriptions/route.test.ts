@@ -4,6 +4,8 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import { countAndStoreTranscriptionUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
 
 jest.mock('next/server', () => {
   return {
@@ -28,6 +30,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
+const mockedCountAndStoreTranscriptionUsage = jest.mocked(countAndStoreTranscriptionUsage);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -127,6 +130,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
     expect(upstream.safety_identifier).toBeTruthy();
     expect(upstream.user).toBe(upstream.safety_identifier);
+    expect(mockedCountAndStoreTranscriptionUsage.mock.calls[0]?.[3]).toBe(OPENROUTER);
     expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[0]).not.toMatchObject({
       feature: 'vscode-extension',
     });

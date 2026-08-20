@@ -1,6 +1,8 @@
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 const unavailableModelIds: ReadonlySet<string> = new Set([
+  'deepseek/deepseek-v4-flash:discounted',
+  'deepseek/deepseek-v4-pro:discounted',
   'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
   'google/gemma-4-31b-it:free',
   'nvidia/nemotron-3-nano-30b-a3b:free',

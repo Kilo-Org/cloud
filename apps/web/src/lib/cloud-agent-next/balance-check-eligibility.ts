@@ -24,7 +24,7 @@ export type BalanceCheckModelEligibility = {
  *   configured that can serve it, so the session is billed against the
  *   user's own key rather than their balance.
  *
- * Kilo-exclusive models (e.g. `deepseek/deepseek-v4-pro:discounted`) are
+ * Kilo-exclusive models (e.g. `openai/gpt-5.6-sol-discounted`) are
  * always excluded from the BYOK bypass: they are Kilo-funded and platform
  * billed, so even when `getModelUserByokProviders` reports a provider that
  * can route the model, they must still go through the worker-side balance

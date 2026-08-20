@@ -378,9 +378,6 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
   test('returns the routing allow-list for restricted exclusive models', () => {
     expect(
-      getKiloExclusiveInferenceProviderRestriction(deepseek_v4_pro_discounted_model.public_id)
-    ).toEqual(new Set(['deepseek']));
-    expect(
       getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
     ).toEqual(new Set(['openai']));
     expect(getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)).toEqual(
@@ -389,6 +386,9 @@ describe('getKiloExclusiveInferenceProviderRestriction', () => {
   });
 
   test('does not treat unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(deepseek_v4_pro_discounted_model.public_id)
+    ).toBeUndefined();
     expect(getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_stealth_model.public_id)).toBe(
       undefined
     );

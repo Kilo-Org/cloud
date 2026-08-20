@@ -54,14 +54,15 @@ describe('chat link actions', () => {
     expect(getSelectedChatLinkAction(sheet, 4)).toBeNull();
   });
 
-  it('builds the tap sheet with exactly Review PR / Open in browser / Cancel', () => {
+  it('builds the tap sheet with Review PR / Open in browser / Share / Cancel', () => {
     const sheet = buildPrLinkTapActionSheet();
 
-    expect(sheet.options).toEqual(['Review PR', 'Open in browser', 'Cancel']);
-    expect(sheet.cancelButtonIndex).toBe(2);
+    expect(sheet.options).toEqual(['Review PR', 'Open in browser', 'Share', 'Cancel']);
+    expect(sheet.cancelButtonIndex).toBe(3);
     expect(getSelectedChatLinkAction(sheet, 0)).toBe('review-pr');
     expect(getSelectedChatLinkAction(sheet, 1)).toBe('open');
-    expect(getSelectedChatLinkAction(sheet, 2)).toBeNull();
+    expect(getSelectedChatLinkAction(sheet, 2)).toBe('share');
+    expect(getSelectedChatLinkAction(sheet, 3)).toBeNull();
     expect(getSelectedChatLinkAction(sheet, undefined)).toBeNull();
   });
 

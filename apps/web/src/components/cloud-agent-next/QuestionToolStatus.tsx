@@ -22,7 +22,9 @@ function questionsFrom(toolPart: ToolPart): QuestionInfo[] {
 }
 
 function answersFrom(toolPart: ToolPart): string[][] {
-  return (toolPart.state.metadata as QuestionMetadata | undefined)?.answers ?? [];
+  const { state } = toolPart;
+  if (state.status === 'pending') return [];
+  return (state.metadata as QuestionMetadata | undefined)?.answers ?? [];
 }
 
 function QuestionAnswerList({

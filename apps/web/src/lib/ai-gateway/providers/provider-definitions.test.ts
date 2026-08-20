@@ -34,6 +34,25 @@ describe('LongCat provider', () => {
     expect(request.body.thinking).toEqual({ type: expectedType });
     expect(request.body.provider).toBeUndefined();
   });
+
+  test('forwards the hashed user ID in the LongCat header', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'LongCat-2.0',
+        messages: [{ role: 'user', content: 'hello' }],
+        user: 'hashed-user-id',
+      },
+    };
+    const extraHeaders: Record<string, string> = {};
+
+    await PROVIDERS.LONGCAT.transformRequest({
+      request,
+      extraHeaders,
+    } as TransformRequestContext);
+
+    expect(extraHeaders['Mt-User-Id']).toBe('hashed-user-id');
+  });
 });
 
 describe.each([

@@ -69,6 +69,9 @@ export default {
         type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
       };
       delete context.request.body.provider;
+      if (context.request.body.user) {
+        context.extraHeaders['Mt-User-Id'] = context.request.body.user;
+      }
     },
   },
   MARTIAN: {

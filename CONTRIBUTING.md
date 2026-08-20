@@ -131,7 +131,6 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 
 - `pnpm dev:seed kiloclaw:fake-instance <user-id> [options]` — creates a fake personal KiloClaw instance + subscription in the database only (no real container or Worker). Before creating, it retires any prior fake personal instances for that user. Supports `--plan=trial|standard|commit` and `--days=<n>`. For paid plans, it also grants enough credits to cover the plan cost and then deducts the subscription cost.
 - `pnpm dev:seed kiloclaw:fake-org-instance <user-id> <org-id> [options]` — same as above, but creates an instance belonging to an organization rather than a personal account.
-- `pnpm dev:seed kiloclaw:referrals-<scenario>` — seeds KiloClaw referral fixtures. Topics include `referrals-happy-path`, `referrals-pending-referrer`, `referrals-cap-boundary`, and `referrals-support-override`.
 - `pnpm dev:seed kiloclaw-billing:inactive-trials` — seeds inactive-trial billing fixtures. One user is provisioned through the real KiloClaw worker endpoint (`/api/platform/provision`), while others are DB-only rows representing users in recently-started, support-marked, or eligible inactive-trial states.
 
 ## Common Development Commands

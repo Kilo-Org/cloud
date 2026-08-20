@@ -9,8 +9,6 @@ describe('impact advocate', () => {
     IMPACT_ADVOCATE_PROGRAM_ID: process.env.IMPACT_ADVOCATE_PROGRAM_ID,
     IMPACT_ADVOCATE_TENANT_ALIAS: process.env.IMPACT_ADVOCATE_TENANT_ALIAS,
     IMPACT_ADVOCATE_WIDGET_ID: process.env.IMPACT_ADVOCATE_WIDGET_ID,
-    IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID: process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID,
-    IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID: process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID,
     IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID: process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID,
     IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID: process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID,
     IMPACT_ACCOUNT_SID: process.env.IMPACT_ACCOUNT_SID,
@@ -24,9 +22,6 @@ describe('impact advocate', () => {
     process.env.IMPACT_ADVOCATE_PROGRAM_ID = originalEnv.IMPACT_ADVOCATE_PROGRAM_ID;
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = originalEnv.IMPACT_ADVOCATE_TENANT_ALIAS;
     process.env.IMPACT_ADVOCATE_WIDGET_ID = originalEnv.IMPACT_ADVOCATE_WIDGET_ID;
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID =
-      originalEnv.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID;
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = originalEnv.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID;
     process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID =
       originalEnv.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID;
     process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID =
@@ -36,7 +31,7 @@ describe('impact advocate', () => {
   });
 
   it('builds register participant payloads with exact cookie attribution', async () => {
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'kilo';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'account-sid';
@@ -62,44 +57,18 @@ describe('impact advocate', () => {
   });
 
   it('normalizes bare widget IDs to the full Impact embed widget path', async () => {
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = '52766';
 
     const { getImpactAdvocateWidgetId } = await import('@/lib/impact/advocate');
 
-    expect(getImpactAdvocateWidgetId()).toBe('p/51699/w/referrerWidget');
+    expect(getImpactAdvocateWidgetId()).toBe('p/52766/w/referrerWidget');
   });
 
-  it('uses KiloClaw-scoped Advocate config for widget and token issuance', async () => {
-    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'kiloclaw-account';
-    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'kiloclaw-secret';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699-scoped';
-    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'kiloclaw-tenant';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = '51699-scoped';
-
-    const {
-      getImpactAdvocateProgramId,
-      getImpactAdvocateWidgetId,
-      issueImpactAdvocateVerifiedAccessToken,
-    } = await import('@/lib/impact/advocate');
-
-    expect(getImpactAdvocateProgramId()).toBe('51699-scoped');
-    expect(getImpactAdvocateWidgetId()).toBe('p/51699-scoped/w/referrerWidget');
-
-    const token = issueImpactAdvocateVerifiedAccessToken(
-      { id: 'user_123', google_user_email: 'referrer@example.com' },
-      new Date('2026-04-23T12:00:00.000Z')
-    );
-    const decoded = jwt.decode(token ?? '', { complete: true });
-    expect(decoded && typeof decoded === 'object' ? decoded.header.kid : null).toBe(
-      'kiloclaw-account'
-    );
-  });
-
-  it('does not configure KiloClaw from legacy unscoped program/widget config', async () => {
+  it('does not configure any Advocate program from legacy unscoped program/widget config', async () => {
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'legacy-account';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'legacy-secret';
     process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
@@ -124,12 +93,12 @@ describe('impact advocate', () => {
     ).toBeNull();
   });
 
-  it('does not use KiloClaw config for Kilo Pass', async () => {
-    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'fallback-account';
-    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'fallback-secret';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
-    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'fallback-tenant';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
+  it('never configures the retired KiloClaw Advocate program', async () => {
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'shared-account';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'shared-secret';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'shared-tenant';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
 
     const {
       getImpactAdvocateWidgetId,
@@ -137,16 +106,17 @@ describe('impact advocate', () => {
       issueImpactAdvocateVerifiedAccessToken,
     } = await import('@/lib/impact/advocate');
 
-    const scope = { product: 'kilo_pass' as const };
-    expect(isImpactAdvocateConfigured(scope)).toBe(false);
-    expect(getImpactAdvocateWidgetId(scope)).toBeNull();
-    expect(
-      issueImpactAdvocateVerifiedAccessToken(
-        { id: 'user_123', google_user_email: 'referrer@example.com' },
-        new Date('2026-04-23T12:00:00.000Z'),
-        scope
-      )
-    ).toBeNull();
+    for (const scope of [{ product: 'kiloclaw' as const }, { programKey: 'kiloclaw' as const }]) {
+      expect(isImpactAdvocateConfigured(scope)).toBe(false);
+      expect(getImpactAdvocateWidgetId(scope)).toBeNull();
+      expect(
+        issueImpactAdvocateVerifiedAccessToken(
+          { id: 'user_123', google_user_email: 'referrer@example.com' },
+          new Date('2026-04-23T12:00:00.000Z'),
+          scope
+        )
+      ).toBeNull();
+    }
   });
 
   it('uses Kilo Pass-scoped program and widget config for token issuance', async () => {
@@ -177,12 +147,10 @@ describe('impact advocate', () => {
     );
   });
 
-  it('rejects Kilo Pass Advocate config that reuses KiloClaw program or widget IDs', async () => {
+  it('rejects Kilo Pass Advocate config that reuses the retired KiloClaw program or widget IDs', async () => {
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'shared-account';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'shared-secret';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'shared-tenant';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
 
     const scope = { product: 'kilo_pass' as const };
 
@@ -204,11 +172,11 @@ describe('impact advocate', () => {
   });
 
   it('logs debug data without tokens, credentials, authorization headers, cookie values, or email identities', async () => {
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
     process.env.IMPACT_ADVOCATE_DEBUG_LOGGING = 'true';
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -240,11 +208,11 @@ describe('impact advocate', () => {
   });
 
   it('issues verified access JWTs with the account sid in the kid header', async () => {
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
 
     const { getImpactAdvocateWidgetId, issueImpactAdvocateVerifiedAccessToken } =
       await import('@/lib/impact/advocate');
@@ -255,7 +223,7 @@ describe('impact advocate', () => {
     );
 
     expect(token).toBeTruthy();
-    expect(getImpactAdvocateWidgetId()).toBe('p/51699/w/referrerWidget');
+    expect(getImpactAdvocateWidgetId()).toBe('p/52766/w/referrerWidget');
 
     const decoded = jwt.decode(token ?? '', { complete: true });
     if (!decoded || typeof decoded !== 'object') {
@@ -275,11 +243,11 @@ describe('impact advocate', () => {
   });
 
   it('looks up account rewards with account and user filters', async () => {
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
     process.env.IMPACT_ADVOCATE_DEBUG_LOGGING = 'true';
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
@@ -320,11 +288,11 @@ describe('impact advocate', () => {
   });
 
   it('redeems a credit reward with amount and unit', async () => {
-    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
-    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
     const fetchMock = jest
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));

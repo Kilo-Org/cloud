@@ -6,8 +6,7 @@ import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact/r
 import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
-  processQueuedKiloClawReferralRewards,
-} from '@/lib/impact/kiloclaw-referrals';
+} from '@/lib/impact/referral-delivery';
 import { sentryLogger } from '@/lib/utils.server';
 
 if (!CRON_SECRET) {
@@ -32,13 +31,11 @@ export async function GET(request: Request) {
     affiliateSummary,
     impactAdvocateRegistrationSummary,
     impactConversionSummary,
-    referralRewardSummary,
     impactAdvocateRewardRedemptionSummary,
   ] = await Promise.all([
     dispatchQueuedAffiliateEvents(),
     dispatchQueuedImpactAdvocateRegistrationAttempts(),
     dispatchQueuedImpactConversionReports(),
-    processQueuedKiloClawReferralRewards(),
     dispatchQueuedImpactAdvocateRewardRedemptions(),
   ]);
 
@@ -49,7 +46,6 @@ export async function GET(request: Request) {
         affiliateEvents: affiliateSummary,
         impactAdvocateRegistrations: impactAdvocateRegistrationSummary,
         impactConversionReports: impactConversionSummary,
-        referralRewards: referralRewardSummary,
         impactAdvocateRewardRedemptions: impactAdvocateRewardRedemptionSummary,
       },
       timestamp: new Date().toISOString(),

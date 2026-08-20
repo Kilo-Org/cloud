@@ -7,8 +7,6 @@ import {
   IMPACT_ADVOCATE_ACCOUNT_SID,
   IMPACT_ADVOCATE_API_BASE_URL,
   IMPACT_ADVOCATE_AUTH_TOKEN,
-  IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID,
-  IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID,
   IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID,
   IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID,
   IMPACT_ADVOCATE_TENANT_ALIAS,
@@ -57,7 +55,7 @@ function resolveImpactAdvocateProgramKey(
 ): ImpactAdvocateProgramKey {
   if (scope?.programKey) return scope.programKey;
   if (scope?.product) return getImpactAdvocateProgramKeyForProduct(scope.product);
-  return ImpactAdvocateProgramKey.KiloClaw;
+  return ImpactAdvocateProgramKey.KiloPass;
 }
 
 export type ImpactAdvocateIdentityPayload = {
@@ -221,49 +219,35 @@ function getImpactAdvocateWidgetPath(widgetId: string, programId: string): strin
   return `p/${trimmedWidgetId}/w/${IMPACT_ADVOCATE_WIDGET_NAME}`;
 }
 
-function getKiloClawAdvocateIdentifiersForComparison(): {
-  programIds: Set<string>;
-  widgetIds: Set<string>;
-} {
-  const programId = configuredValue(IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID);
-  const rawWidgetId = configuredValue(IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID);
-  const programIds = new Set<string>();
-  const widgetIds = new Set<string>();
+/**
+ * The KiloClaw Advocate program is retired. Its identifiers stay recorded here so
+ * a misconfigured Kilo Pass program can never be pointed at the dead program and
+ * silently register participants or redeem rewards against it.
+ */
+const RETIRED_KILOCLAW_ADVOCATE_PROGRAM_ID = '51699';
 
-  if (programId) {
-    programIds.add(programId);
-  }
-  if (programId && rawWidgetId) {
-    widgetIds.add(getImpactAdvocateWidgetPath(rawWidgetId, programId));
-  }
-
-  return { programIds, widgetIds };
-}
-
-function kiloPassAdvocateConfigReusesKiloClawIdentifiers(params: {
+function reusesRetiredKiloClawIdentifiers(params: {
   programId: string;
   widgetId: string;
 }): boolean {
-  const kiloClawIdentifiers = getKiloClawAdvocateIdentifiersForComparison();
   return (
-    kiloClawIdentifiers.programIds.has(params.programId) ||
-    kiloClawIdentifiers.widgetIds.has(params.widgetId)
+    params.programId === RETIRED_KILOCLAW_ADVOCATE_PROGRAM_ID ||
+    params.widgetId === getImpactAdvocateWidgetPath('', RETIRED_KILOCLAW_ADVOCATE_PROGRAM_ID)
   );
 }
 
 function getImpactAdvocateConfig(scope?: ImpactAdvocateConfigScope): ImpactAdvocateConfig | null {
   const programKey = resolveImpactAdvocateProgramKey(scope);
 
-  const scopedValues =
-    programKey === ImpactAdvocateProgramKey.KiloPass
-      ? {
-          programId: configuredValue(IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID),
-          widgetId: configuredValue(IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID),
-        }
-      : {
-          programId: configuredValue(IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID),
-          widgetId: configuredValue(IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID),
-        };
+  // Kilo Pass is the only live Advocate program; KiloClaw referrals are retired.
+  if (programKey !== ImpactAdvocateProgramKey.KiloPass) {
+    return null;
+  }
+
+  const scopedValues = {
+    programId: configuredValue(IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID),
+    widgetId: configuredValue(IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID),
+  };
 
   const accountSid = configuredValue(IMPACT_ADVOCATE_ACCOUNT_SID);
   const authToken = configuredValue(IMPACT_ADVOCATE_AUTH_TOKEN);
@@ -281,10 +265,7 @@ function getImpactAdvocateConfig(scope?: ImpactAdvocateConfigScope): ImpactAdvoc
     return null;
   }
 
-  if (
-    programKey === ImpactAdvocateProgramKey.KiloPass &&
-    kiloPassAdvocateConfigReusesKiloClawIdentifiers({ programId, widgetId })
-  ) {
+  if (reusesRetiredKiloClawIdentifiers({ programId, widgetId })) {
     return null;
   }
 

@@ -12,10 +12,9 @@ jest.mock('@/lib/impact/referral', () => ({
   dispatchQueuedImpactAdvocateRegistrationAttempts: jest.fn(),
 }));
 
-jest.mock('@/lib/impact/kiloclaw-referrals', () => ({
+jest.mock('@/lib/impact/referral-delivery', () => ({
   dispatchQueuedImpactAdvocateRewardRedemptions: jest.fn(),
   dispatchQueuedImpactConversionReports: jest.fn(),
-  processQueuedKiloClawReferralRewards: jest.fn(),
 }));
 
 import { dispatchQueuedAffiliateEvents } from '@/lib/impact/affiliate-events';
@@ -23,8 +22,7 @@ import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact/r
 import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
-  processQueuedKiloClawReferralRewards,
-} from '@/lib/impact/kiloclaw-referrals';
+} from '@/lib/impact/referral-delivery';
 import { GET } from './route';
 
 const mockDispatchQueuedAffiliateEvents = jest.mocked(dispatchQueuedAffiliateEvents);
@@ -37,8 +35,6 @@ const mockDispatchQueuedImpactConversionReports = jest.mocked(
 const mockDispatchQueuedImpactAdvocateRewardRedemptions = jest.mocked(
   dispatchQueuedImpactAdvocateRewardRedemptions
 );
-const mockProcessQueuedKiloClawReferralRewards = jest.mocked(processQueuedKiloClawReferralRewards);
-
 describe('GET /api/cron/dispatch-affiliate-events', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -56,7 +52,6 @@ describe('GET /api/cron/dispatch-affiliate-events', () => {
     expect(mockDispatchQueuedAffiliateEvents).not.toHaveBeenCalled();
     expect(mockDispatchQueuedImpactAdvocateRegistrationAttempts).not.toHaveBeenCalled();
     expect(mockDispatchQueuedImpactConversionReports).not.toHaveBeenCalled();
-    expect(mockProcessQueuedKiloClawReferralRewards).not.toHaveBeenCalled();
     expect(mockDispatchQueuedImpactAdvocateRewardRedemptions).not.toHaveBeenCalled();
   });
 
@@ -81,13 +76,6 @@ describe('GET /api/cron/dispatch-affiliate-events', () => {
       retried: 1,
       failed: 0,
     });
-    mockProcessQueuedKiloClawReferralRewards.mockResolvedValue({
-      claimed: 3,
-      applied: 2,
-      expired: 1,
-      pending: 0,
-      failed: 0,
-    });
     mockDispatchQueuedImpactAdvocateRewardRedemptions.mockResolvedValue({
       claimed: 2,
       redeemed: 2,
@@ -108,7 +96,6 @@ describe('GET /api/cron/dispatch-affiliate-events', () => {
     expect(mockDispatchQueuedAffiliateEvents).toHaveBeenCalledTimes(1);
     expect(mockDispatchQueuedImpactAdvocateRegistrationAttempts).toHaveBeenCalledTimes(1);
     expect(mockDispatchQueuedImpactConversionReports).toHaveBeenCalledTimes(1);
-    expect(mockProcessQueuedKiloClawReferralRewards).toHaveBeenCalledTimes(1);
     expect(mockDispatchQueuedImpactAdvocateRewardRedemptions).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
@@ -132,13 +119,6 @@ describe('GET /api/cron/dispatch-affiliate-events', () => {
             claimed: 2,
             delivered: 1,
             retried: 1,
-            failed: 0,
-          },
-          referralRewards: {
-            claimed: 3,
-            applied: 2,
-            expired: 1,
-            pending: 0,
             failed: 0,
           },
           impactAdvocateRewardRedemptions: {

@@ -30,7 +30,7 @@ export default function KiloPassReferralPage() {
         rewardSummary.isError ? 'Rewards are temporarily unavailable. Try again in a minute.' : null
       }
     >
-      <ImpactAdvocateReferralWidget product="kilo_pass" />
+      <ImpactAdvocateReferralWidget />
     </KiloPassReferralPageContent>
   );
 }

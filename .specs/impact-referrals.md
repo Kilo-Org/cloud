@@ -22,6 +22,8 @@ Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bo
 Updated 2026-06-05 -- final Commit term reward-extension behavior.
 Updated 2026-06-12 -- clarify subscription-independent Kilo Pass referral sharing and automatic pending reward
 application.
+Updated 2026-08-19 -- retire the KiloClaw Advocate referral program. Kilo Pass is the only live referral program; the
+KiloClaw rules below are retained as history for referral data that still exists.
 
 ## Conventions
 
@@ -81,7 +83,7 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   `.specs/stripe-early-fraud-warnings.md` after a new Stripe Early Fraud Warning; it is an adverse payment even when no
   later chargeback is created.
 
-### KiloClaw Definitions
+### KiloClaw Definitions (Retired)
 
 - **KiloClaw Advocate Program**: Impact Advocate referral program for KiloClaw. Existing ProgramId is `51699`.
 - **KiloClaw Advocate widget**: Existing Verified Access widget `p/51699/w/referrerWidget`.
@@ -132,8 +134,10 @@ referral cookies, participant registration, and provider-facing referral reporti
 eligibility, affiliate/referral attribution conflict resolution, first-paid-conversion detection, reward grant
 idempotency, reward caps, reward expiry, adverse-payment handling, and local billing/credit fulfillment.
 
-KiloClaw referrals reward both sides with one free KiloClaw month, fulfilled by delaying an eligible KiloClaw renewal by
-one calendar month. KiloClaw remains scoped to personal KiloClaw subscriptions and preserves existing behavior.
+KiloClaw referrals are retired. They rewarded both sides with one free KiloClaw month, fulfilled by delaying an
+eligible KiloClaw renewal by one calendar month. Because fresh KiloClaw instance provisioning is closed, no account can
+make a first paid KiloClaw subscription payment, so no KiloClaw referral can be earned. See
+`### KiloClaw Referral Program Retirement`.
 
 Kilo Pass referrals reward both sides with a one-time 50% Kilo Pass bonus based on the referee's eligible monthly tier,
 fulfilled as a future monthly `referral_bonus` issuance item after the reward is earned. Pending Kilo Pass rewards stack
@@ -153,12 +157,9 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 1. The system MUST support product-scoped Advocate program configuration for `kiloclaw` and `kilo_pass`.
 
-2. KiloClaw MUST keep compatibility with the existing configuration constants:
-   - Impact Account: `7138521`
-   - Impact Performance CampaignId: `50754`
-   - Impact Advocate ProgramId: `51699`
-   - UTT UUID: `A7138521-9724-4b8f-95f4-1db2fbae81141`
-   - Advocate widget ID: `p/51699/w/referrerWidget`
+2. The retired KiloClaw Advocate program used these constants. Advocate ProgramId `51699` and widget
+   `p/51699/w/referrerWidget` MUST NOT be reused by any live Advocate program. The shared Impact Account `7138521`,
+   Impact Performance CampaignId `50754`, and UTT UUID `A7138521-9724-4b8f-95f4-1db2fbae81141` remain in use.
 
 3. Impact Advocate account SID, auth token, and tenant alias MAY be shared across Advocate programs. KiloClaw and Kilo
    Pass MUST each require explicit product-scoped Advocate program ID and widget ID configuration. Products MUST NOT
@@ -379,7 +380,31 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 69. Fraudulent, test, admin-created, or manually adjusted subscriptions/payments MUST NOT qualify for referral rewards
     unless an authorized operator explicitly marks the conversion as eligible under a documented support process.
 
-### KiloClaw Product Rules
+### KiloClaw Referral Program Retirement
+
+69a. The KiloClaw Advocate referral program is retired. The system MUST NOT create new KiloClaw referral touches,
+     KiloClaw Advocate participants, KiloClaw referral conversions, KiloClaw reward decisions, or KiloClaw referral
+     rewards.
+
+69b. The system MUST NOT resolve Impact Advocate configuration for the KiloClaw program key, and MUST NOT issue KiloClaw
+     Advocate Verified Access tokens.
+
+69c. KiloClaw referral rewards that were pending or earned but never applied MUST be canceled. Already-applied KiloClaw
+     free months MUST NOT be reversed, and the renewal boundaries they moved MUST stand.
+
+69d. Historical KiloClaw referral records MUST be retained for accounting and support history, and MUST remain readable
+     through admin investigation surfaces. Retention does not make them eligible for any reward.
+
+69e. Queued Impact Advocate reward redemptions for KiloClaw rewards MUST terminate rather than retry indefinitely.
+
+69f. Retiring KiloClaw referrals MUST NOT change Impact Performance affiliate tracking for KiloClaw. Affiliate SALE
+     reporting for renewals of existing KiloClaw subscriptions MUST continue under
+     `.specs/impact-affiliate-tracking.md`, and MUST no longer be suppressed by referral attribution.
+
+69g. The KiloClaw rules in this spec are retained as history for the records described in 69d. They MUST NOT be
+     implemented for new conversions.
+
+### KiloClaw Product Rules (Retired)
 
 70. KiloClaw referrals apply only to personal KiloClaw subscriptions. Organization-scoped KiloClaw instances, team
     plans, admin interventions, and non-KiloClaw purchases are out of scope.
@@ -787,6 +812,13 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-08-19 -- Retire the KiloClaw referral program
+
+Removed the KiloClaw Advocate referral program. New KiloClaw referral touches, participants, conversions, decisions, and
+rewards are no longer created; KiloClaw Advocate configuration no longer resolves; unapplied KiloClaw rewards are
+canceled while applied free months stand; historical records are retained for support and accounting; and KiloClaw
+affiliate SALE reporting is no longer suppressed by referral attribution. Kilo Pass is the only live referral program.
 
 ### 2026-06-05 -- Extend guarded final Commit terms
 

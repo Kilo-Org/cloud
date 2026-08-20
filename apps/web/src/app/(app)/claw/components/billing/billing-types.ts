@@ -527,16 +527,6 @@ export type ClawBillingStatus = {
     futureFundingSource?: KiloClawFundingSource | null;
     standardContinuationScheduled?: boolean;
     needsSupportReview?: boolean;
-    referralRewards: {
-      totalAppliedMonths: number;
-      applications: Array<{
-        role: 'referrer' | 'referee';
-        appliedAt: string;
-        monthsGranted: number;
-        previousRenewalBoundary: string;
-        newRenewalBoundary: string;
-      }>;
-    };
   } | null;
 
   earlybird: {

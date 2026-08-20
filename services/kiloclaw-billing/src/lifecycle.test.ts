@@ -4396,19 +4396,11 @@ describe('credit renewal Kilo Pass bonus projection', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'process_paid_conversion':
-          return new Response(
-            JSON.stringify({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            }),
-            {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }
-          );
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -4683,19 +4675,11 @@ describe('credit renewal Kilo Pass bonus projection', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'process_paid_conversion':
-          return new Response(
-            JSON.stringify({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            }),
-            {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }
-          );
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -4727,7 +4711,7 @@ describe('credit renewal Kilo Pass bonus projection', () => {
 
     expect(sideEffectActions).toEqual([
       'issue_kilo_pass_bonus_from_usage_threshold',
-      'process_paid_conversion',
+      'enqueue_affiliate_event',
     ]);
   });
 
@@ -4928,19 +4912,11 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'process_paid_conversion':
-          return new Response(
-            JSON.stringify({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            }),
-            {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }
-          );
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -4971,7 +4947,7 @@ describe('credit renewal sweep affiliate tracking', () => {
       ])
     );
 
-    const paidConversionCalls = fetch.mock.calls
+    const affiliateSaleCalls = fetch.mock.calls
       .map(
         ([, init]) =>
           JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
@@ -4979,9 +4955,9 @@ describe('credit renewal sweep affiliate tracking', () => {
             input: Record<string, unknown>;
           }
       )
-      .filter(call => call.action === 'process_paid_conversion');
-    const paidConversionInputs = paidConversionCalls.map(call => call.input);
-    expect(paidConversionInputs).toEqual(
+      .filter(call => call.action === 'enqueue_affiliate_event');
+    const affiliateSaleInputs = affiliateSaleCalls.map(call => call.input);
+    expect(affiliateSaleInputs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           userId: 'legacy-user',
@@ -5143,19 +5119,11 @@ describe('credit renewal sweep affiliate tracking', () => {
               status: 200,
               headers: { 'content-type': 'application/json' },
             });
-          case 'process_paid_conversion':
-            return new Response(
-              JSON.stringify({
-                affiliateSaleEnqueued: true,
-                winningTouchType: 'affiliate',
-                conversionId: null,
-                disqualificationReason: null,
-              }),
-              {
-                status: 200,
-                headers: { 'content-type': 'application/json' },
-              }
-            );
+          case 'enqueue_affiliate_event':
+            return new Response(JSON.stringify({ ok: true }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
           default:
             throw new Error(`Unexpected side effect action: ${body.action}`);
         }
@@ -5365,19 +5333,11 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'process_paid_conversion':
-          return new Response(
-            JSON.stringify({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            }),
-            {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }
-          );
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -5654,19 +5614,11 @@ describe('credit renewal sweep affiliate tracking', () => {
               status: 200,
               headers: { 'content-type': 'application/json' },
             });
-          case 'process_paid_conversion':
-            return new Response(
-              JSON.stringify({
-                affiliateSaleEnqueued: true,
-                winningTouchType: 'affiliate',
-                conversionId: null,
-                disqualificationReason: null,
-              }),
-              {
-                status: 200,
-                headers: { 'content-type': 'application/json' },
-              }
-            );
+          case 'enqueue_affiliate_event':
+            return new Response(JSON.stringify({ ok: true }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
           default:
             throw new Error(`Unexpected side effect action: ${body.action}`);
         }
@@ -5716,7 +5668,7 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(deletes).toHaveLength(0);
   });
 
-  it('normalizes Postgres renewal timestamps before paid-conversion side effects', async () => {
+  it('normalizes Postgres renewal timestamps before affiliate sale side effects', async () => {
     const postgresRenewalAt = '2026-04-29 01:16:12.945+00';
     const renewalAtIso = '2026-04-29T01:16:12.945Z';
     const { db } = createMockDb([
@@ -5745,13 +5697,8 @@ describe('credit renewal sweep affiliate tracking', () => {
           return Response.json({ projectedBonusMicrodollars: 0 });
         case 'issue_kilo_pass_bonus_from_usage_threshold':
           return Response.json({ ok: true });
-        case 'process_paid_conversion':
-          return Response.json({
-            affiliateSaleEnqueued: false,
-            winningTouchType: 'none',
-            conversionId: null,
-            disqualificationReason: null,
-          });
+        case 'enqueue_affiliate_event':
+          return Response.json({ ok: true });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -5776,7 +5723,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             input: Record<string, unknown>;
           }
       )
-      .find(call => call.action === 'process_paid_conversion');
+      .find(call => call.action === 'enqueue_affiliate_event');
 
     expect(saleCall?.input.eventDateIso).toBe(renewalAtIso);
   });
@@ -5900,19 +5847,11 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'process_paid_conversion':
-          return new Response(
-            JSON.stringify({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            }),
-            {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }
-          );
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -5965,12 +5904,14 @@ describe('credit renewal sweep affiliate tracking', () => {
             input: Record<string, unknown>;
           }
       )
-      .find(call => call.action === 'process_paid_conversion');
+      .find(call => call.action === 'enqueue_affiliate_event');
 
     expect(saleCall).toEqual({
-      action: 'process_paid_conversion',
+      action: 'enqueue_affiliate_event',
       input: {
         userId: 'user-1',
+        provider: 'impact',
+        eventType: 'sale',
         dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
         eventDateIso: renewalAt,
         orderId: 'kiloclaw-subscription:instance-1:2026-04',
@@ -5983,7 +5924,7 @@ describe('credit renewal sweep affiliate tracking', () => {
     });
   });
 
-  it('does not roll back or fail renewal when paid conversion side effect fails', async () => {
+  it('does not roll back or fail renewal when the affiliate sale side effect fails', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, txUpdates } = createMockDb([
       [
@@ -6035,7 +5976,7 @@ describe('credit renewal sweep affiliate tracking', () => {
               status: 200,
               headers: { 'content-type': 'application/json' },
             });
-          case 'process_paid_conversion':
+          case 'enqueue_affiliate_event':
             return new Response(JSON.stringify({ error: 'temporarily unavailable' }), {
               status: 503,
               headers: { 'content-type': 'application/json' },
@@ -6114,19 +6055,11 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'process_paid_conversion':
-          return new Response(
-            JSON.stringify({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            }),
-            {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            }
-          );
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -6182,9 +6115,11 @@ describe('credit renewal sweep affiliate tracking', () => {
 
     expect(sideEffectCalls).toEqual([
       {
-        action: 'process_paid_conversion',
+        action: 'enqueue_affiliate_event',
         input: {
           userId: 'user-1',
+          provider: 'impact',
+          eventType: 'sale',
           dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
           eventDateIso: renewalAt,
           orderId: 'kiloclaw-subscription:instance-1:2026-04',
@@ -6495,13 +6430,8 @@ describe('credit renewal sweep affiliate tracking', () => {
             return Response.json({ projectedBonusMicrodollars: 0 });
           case 'issue_kilo_pass_bonus_from_usage_threshold':
             return Response.json({ ok: true });
-          case 'process_paid_conversion':
-            return Response.json({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            });
+          case 'enqueue_affiliate_event':
+            return Response.json({ ok: true });
           default:
             throw new Error(`Unexpected side effect action: ${body.action}`);
         }
@@ -6593,13 +6523,8 @@ describe('credit renewal sweep affiliate tracking', () => {
             return Response.json({ projectedBonusMicrodollars: 0 });
           case 'issue_kilo_pass_bonus_from_usage_threshold':
             return Response.json({ ok: true });
-          case 'process_paid_conversion':
-            return Response.json({
-              affiliateSaleEnqueued: true,
-              winningTouchType: 'affiliate',
-              conversionId: null,
-              disqualificationReason: null,
-            });
+          case 'enqueue_affiliate_event':
+            return Response.json({ ok: true });
           default:
             throw new Error(`Unexpected side effect action: ${body.action}`);
         }

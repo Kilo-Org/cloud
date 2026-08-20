@@ -76,22 +76,31 @@ function getCallbackPath(url: URL): string | null {
   return callbackPath;
 }
 
-function resolveImpactTouchScope(url: URL): {
+function urlTargetsKiloPass(url: URL): boolean {
+  return pathTargetsKiloPass(url.pathname) || pathTargetsKiloPass(getCallbackPath(url));
+}
+
+/**
+ * Kilo Pass is the only live Advocate referral program, so a referral touch that
+ * does not target it has no program to attribute to and is not recorded.
+ */
+function resolveImpactReferralTouchScope(url: URL): {
   product: ImpactReferralProduct;
   programKey: ImpactAdvocateProgramKey;
-} {
-  const callbackPath = getCallbackPath(url);
-  if (pathTargetsKiloPass(url.pathname) || pathTargetsKiloPass(callbackPath)) {
-    return {
-      product: ImpactReferralProduct.KiloPass,
-      programKey: ImpactAdvocateProgramKey.KiloPass,
-    };
-  }
-
+} | null {
+  if (!urlTargetsKiloPass(url)) return null;
   return {
-    product: ImpactReferralProduct.KiloClaw,
-    programKey: ImpactAdvocateProgramKey.KiloClaw,
+    product: ImpactReferralProduct.KiloPass,
+    programKey: ImpactAdvocateProgramKey.KiloPass,
   };
+}
+
+/**
+ * Affiliate tracking still covers KiloClaw, whose existing subscriptions keep
+ * renewing, so affiliate touches retain the KiloClaw product scope.
+ */
+function resolveImpactAffiliateTouchProduct(url: URL): ImpactReferralProduct {
+  return urlTargetsKiloPass(url) ? ImpactReferralProduct.KiloPass : ImpactReferralProduct.KiloClaw;
 }
 
 export function sanitizeOpaqueTrackingValue(
@@ -168,7 +177,11 @@ export function parseImpactReferralTouchFromUrl(
   }
 
   const trackingValue = sanitizeOpaqueTrackingValue(searchParams.get('_saasquatch'));
-  const scope = resolveImpactTouchScope(url);
+  const scope = resolveImpactReferralTouchScope(url);
+
+  if (!scope) {
+    return null;
+  }
 
   return {
     ...scope,
@@ -205,10 +218,8 @@ export function parseImpactAffiliateTouchFromUrl(
     return null;
   }
 
-  const scope = resolveImpactTouchScope(url);
-
   return {
-    product: scope.product,
+    product: resolveImpactAffiliateTouchProduct(url),
     trackingId: trackingValue.acceptedValue,
     trackingValueLength: trackingValue.originalLength,
     isTrackingValueAccepted: trackingValue.isAccepted,

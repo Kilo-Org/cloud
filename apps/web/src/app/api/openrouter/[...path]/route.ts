@@ -602,6 +602,67 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
+<<<<<<< ours
+=======
+  async function resolveAccessCheck(modelId: string) {
+    const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
+      modelId,
+      settings,
+      organizationPlan: plan,
+    });
+    if (modelRestrictionError) {
+      return {
+        balance,
+        effectiveProviderConfig: providerConfig,
+        groupModelAllowed: true,
+        groupProvidersAllowed: true,
+        modelRestrictionError,
+        plan,
+        settings,
+      };
+    }
+    let effectiveProviderConfig = providerConfig;
+    let groupModelAllowed = true;
+    let groupProvidersAllowed = true;
+    const groupPolicy = await organizationGroupPolicyPromise;
+    if (groupPolicy) {
+      const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
+      groupModelAllowed = groupDecision.allowed;
+      if (groupDecision.eligibleProviderRoutes) {
+        const currentOnly = providerConfig?.only;
+        const only = currentOnly
+          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
+          : [...groupDecision.eligibleProviderRoutes];
+        groupProvidersAllowed = only.length > 0;
+        effectiveProviderConfig = { ...providerConfig, only };
+      }
+    }
+    return {
+      balance,
+      effectiveProviderConfig,
+      groupModelAllowed,
+      groupProvidersAllowed,
+      modelRestrictionError,
+      plan,
+      settings,
+    };
+  }
+
+  function createAccessCheckResolver(modelId: string) {
+    let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
+    const get = () => (accessCheck ??= resolveAccessCheck(modelId));
+    return {
+      get,
+      getRoutingProviderConfig: isAnonymousContext(user)
+        ? undefined
+        : async () => (await get()).effectiveProviderConfig,
+    };
+  }
+
+  let accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
+
+>>>>>>> theirs
   // Resolve the initial provider before abuse enforcement because abuse needs
   // provider/BYOK context, and quarantine-3 may later rewrite these values.
   const initialProviderResultForAbuseService = await getProvider({
@@ -612,6 +673,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId,
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
+<<<<<<< ours
+=======
+    getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
+>>>>>>> theirs
   });
   if (initialProviderResultForAbuseService.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
@@ -727,6 +792,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     abuseDowngradedFrom = effectiveModelIdLowerCased;
     requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
     effectiveModelIdLowerCased = rulesEngineDecision.modelOverride;
+    accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
     const quarantineProviderResult = await getProvider({
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
@@ -735,6 +801,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       taskId,
       clientIp: ipAddress ?? null,
       machineId: machineIdHeader,
+<<<<<<< ours
+=======
+      getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
+>>>>>>> theirs
     });
     if (quarantineProviderResult.kind === 'not-found') {
       if (rulesEngineDecision.delayMs > 0) {
@@ -780,7 +850,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
+<<<<<<< ours
     const { balance, settings, plan } = await balanceAndSettingsPromise;
+=======
+    const {
+      balance,
+      effectiveProviderConfig,
+      groupModelAllowed,
+      groupProvidersAllowed,
+      modelRestrictionError,
+      plan,
+      settings,
+    } = await accessCheckResolver.get();
+>>>>>>> theirs
 
     if (
       balance <= 0 &&

@@ -103,6 +103,25 @@ describe('SharedSessionPage', () => {
     expect(html).not.toContain('Shared by Grace Hopper');
   });
 
+  it('renders an empty transcript when the snapshot fetch fails', async () => {
+    const shareToken = 'snapshot.failure.token';
+    mockFetchSharedSessionMetadata.mockResolvedValue({
+      title: 'Still reachable',
+      ownerName: 'Ada Lovelace',
+      gitUrl: null,
+      gitBranch: null,
+      createdAt: null,
+    });
+    mockFetchSharedSessionSnapshot.mockRejectedValue(new Error('Session ingest snapshot failed'));
+
+    const html = renderToStaticMarkup(
+      await SharedSessionPage({ params: Promise.resolve({ sessionId: shareToken }) })
+    );
+
+    expect(html).toContain('Still reachable');
+    expect(html).toContain('data-message-count="0"');
+  });
+
   it('uses not-found behavior when metadata cannot be resolved', async () => {
     const shareToken = 'rejected.share.token';
     mockFetchSharedSessionMetadata.mockResolvedValue(null);

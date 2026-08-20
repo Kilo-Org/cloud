@@ -24,7 +24,7 @@ export default async function SharedSessionPage({
   const { sessionId: shareToken } = await params;
   const [session, snapshot] = await Promise.all([
     fetchSharedSessionMetadata(shareToken),
-    fetchSharedSessionSnapshot(shareToken),
+    fetchSharedSessionSnapshot(shareToken).catch(() => null),
   ]);
 
   if (!session) {

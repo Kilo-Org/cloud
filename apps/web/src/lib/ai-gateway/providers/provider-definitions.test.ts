@@ -3,6 +3,7 @@ import { describe, expect, test } from '@jest/globals';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
+import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
@@ -77,10 +78,7 @@ describe.each([
   });
 
   test('enables the reasoning details response transform', () => {
-    expect(provider.responseTransforms).toEqual({
-      mapGeminiThoughtContent: false,
-      mapReasoningContentToDetails: true,
-    });
+    expect(provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
   });
 
   test('hardwires the upstream model and removes provider settings', async () => {

@@ -23,7 +23,12 @@ import {
 } from '@/lib/ai-gateway/providers/moonshotai';
 import { FRIENDLI_GLM_PUBLIC_ID, isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
+import {
+  ReasoningDetailsTransform,
+  type BYOKResult,
+  type Provider,
+  type ProviderId,
+} from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
@@ -45,6 +50,85 @@ import {
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
+import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
+  const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
+  const google = isRecord(extraContent.google) ? extraContent.google : {};
+  value.extra_content = {
+    ...extraContent,
+    google: {
+      ...google,
+      thought_signature: signature,
+    },
+  };
+}
+
+function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if (!isRecord(message)) {
+      continue;
+    }
+
+    delete message.thoughtSignature;
+
+    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    for (const toolCall of toolCalls) {
+      const legacySignature = toolCall.thoughtSignature;
+      delete toolCall.thoughtSignature;
+      if (typeof legacySignature === 'string') {
+        setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+    }
+
+    const reasoningDetails = message.reasoning_details;
+    delete message.reasoning_details;
+    if (!Array.isArray(reasoningDetails)) {
+      continue;
+    }
+
+    for (const detail of reasoningDetails) {
+      if (
+        !isRecord(detail) ||
+        detail.type !== ReasoningDetailType.Encrypted ||
+        typeof detail.data !== 'string' ||
+        detail.format !== ReasoningFormat.GoogleGeminiV1
+      ) {
+        continue;
+      }
+
+      const toolCall =
+        typeof detail.id === 'string'
+          ? toolCalls.find(candidate => candidate.id === detail.id)
+          : undefined;
+      setGeminiThoughtSignature(toolCall ?? message, detail.data);
+    }
+  }
+}
+
+function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest) {
+  const reasoningEffort = request.reasoning_effort;
+  const extra = request as typeof request & { google?: unknown };
+  delete extra.reasoning_effort;
+
+  if (reasoningEffort !== 'none') {
+    const existingGoogle = isRecord(extra.google) ? extra.google : {};
+    extra.google = {
+      ...existingGoogle,
+      thinking_config: {
+        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
+        include_thoughts: true,
+      },
+    };
+  }
+
+  mapGeminiReasoningDetails(request);
+}
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isOpenAiModel(requestedModel)) {
@@ -143,7 +227,7 @@ export function applyAnthropicThinkingDefault(
 }
 
 /**
- * Inverse of the `mapReasoningContentToDetails` response transform: folds
+ * Inverse of the reasoning-content response transform: folds
  * client-supplied `reasoning_details` back into the `reasoning_content` string
  * the upstream speaks, so reasoning survives the round trip.
  */
@@ -151,11 +235,19 @@ export function applyReasoningDetailsTransform(
   provider: Provider,
   requestToMutate: GatewayRequest
 ) {
-  if (
-    requestToMutate.kind === 'chat_completions' &&
-    provider.responseTransforms?.mapReasoningContentToDetails
-  ) {
-    mapReasoningDetailsToReasoningContent(requestToMutate.body);
+  if (requestToMutate.kind !== 'chat_completions') {
+    return;
+  }
+
+  switch (provider.responseTransforms) {
+    case ReasoningDetailsTransform.GeminiThought:
+      applyGeminiReasoningTransform(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.ReasoningContent:
+      mapReasoningDetailsToReasoningContent(requestToMutate.body);
+      break;
+    case null:
+      break;
   }
 }
 
@@ -180,8 +272,6 @@ export async function applyProviderSpecificLogic(
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
     repairChatCompletionsTools(requestToMutate.body);
-
-    applyReasoningDetailsTransform(provider, requestToMutate);
 
     if (isClaudeModel(requestedModel)) {
       // Workaround for older clients corrupting Claude reasoning, resulting in:
@@ -238,4 +328,6 @@ export async function applyProviderSpecificLogic(
     organization_id: organizationId,
     session_id: sessionId,
   });
+
+  applyReasoningDetailsTransform(provider, requestToMutate);
 }

@@ -2042,6 +2042,15 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const ReasoningDetailsTransform = {
+  GeminiThought: 'gemini-thought',
+  ReasoningContent: 'reasoning-content',
+} as const;
+
+export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
+
+export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
@@ -2050,7 +2059,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  use_gemini_reasoning_transform: z.boolean().optional(),
+  reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;

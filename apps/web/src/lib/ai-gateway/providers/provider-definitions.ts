@@ -3,7 +3,7 @@ import {
   isReasoningExplicitlyDisabled,
   removeChatCompletionsToolNames,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
 export default {
@@ -104,7 +104,7 @@ export default {
       // 'messages', // supported, not tested
       // 'responses', // supported, not tested
     ],
-    responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
     async transformRequest(context) {
       context.request.body.model = 'zai-org/GLM-5.2';
       delete context.request.body.provider;
@@ -136,7 +136,7 @@ export default {
       // 'messages', // supported, not tested
       // 'responses', // supported, not tested
     ],
-    responseTransforms: { mapGeminiThoughtContent: false, mapReasoningContentToDetails: true },
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
     async transformRequest(context) {
       context.request.body.model = 'perplexity/kimi-k3';
       if (context.request.kind === 'chat_completions') {

@@ -17,9 +17,6 @@ function createStripeInvoiceClient(): StripeCollectibleInvoiceClient & {
   invoices: {
     list: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['list']>;
     update: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['update']>;
-    finalizeInvoice: jest.MockedFunction<
-      StripeCollectibleInvoiceClient['invoices']['finalizeInvoice']
-    >;
     voidInvoice: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['voidInvoice']>;
     retrieve: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['retrieve']>;
   };
@@ -28,7 +25,6 @@ function createStripeInvoiceClient(): StripeCollectibleInvoiceClient & {
     invoices: {
       list: jest.fn<StripeCollectibleInvoiceClient['invoices']['list']>(),
       update: jest.fn<StripeCollectibleInvoiceClient['invoices']['update']>(),
-      finalizeInvoice: jest.fn<StripeCollectibleInvoiceClient['invoices']['finalizeInvoice']>(),
       voidInvoice: jest.fn<StripeCollectibleInvoiceClient['invoices']['voidInvoice']>(),
       retrieve: jest.fn<StripeCollectibleInvoiceClient['invoices']['retrieve']>(),
     },
@@ -36,7 +32,7 @@ function createStripeInvoiceClient(): StripeCollectibleInvoiceClient & {
 }
 
 describe('abandonCollectibleInvoicesForStripeSubscription', () => {
-  it('voids open invoices and finalizes then voids draft invoices for the subscription', async () => {
+  it('voids open invoices and disables auto-advance on draft invoices for the subscription', async () => {
     const stripe = createStripeInvoiceClient();
     stripe.invoices.list.mockImplementation(async params => {
       if (params.status === 'open') {
@@ -57,7 +53,6 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
       return { data: [], has_more: false } satisfies InvoicePage;
     });
     stripe.invoices.update.mockResolvedValue({});
-    stripe.invoices.finalizeInvoice.mockResolvedValue({});
     stripe.invoices.voidInvoice.mockResolvedValue({});
 
     await abandonCollectibleInvoicesForStripeSubscription({
@@ -78,10 +73,7 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
     expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_open_1');
     expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_open_2');
     expect(stripe.invoices.update).toHaveBeenCalledWith('in_draft_1', { auto_advance: false });
-    expect(stripe.invoices.finalizeInvoice).toHaveBeenCalledWith('in_draft_1', {
-      auto_advance: false,
-    });
-    expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_draft_1');
+    expect(stripe.invoices.voidInvoice).not.toHaveBeenCalledWith('in_draft_1');
     expect(stripe.invoices.retrieve).not.toHaveBeenCalled();
   });
 
@@ -150,6 +142,29 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
       stripe,
       stripeSubscriptionId: 'sub_races',
     });
+  });
+
+  it('voids a listed draft that is already open when auto-advance cannot be disabled', async () => {
+    const stripe = createStripeInvoiceClient();
+    stripe.invoices.list.mockImplementation(async params => {
+      if (params.status === 'draft') {
+        return {
+          data: [{ id: 'in_draft_raced_open', status: 'draft' }],
+          has_more: false,
+        } satisfies InvoicePage;
+      }
+      return { data: [], has_more: false } satisfies InvoicePage;
+    });
+    stripe.invoices.update.mockRejectedValue(new Error('invoice already finalized'));
+    stripe.invoices.retrieve.mockResolvedValue({ status: 'open' });
+    stripe.invoices.voidInvoice.mockResolvedValue({});
+
+    await abandonCollectibleInvoicesForStripeSubscription({
+      stripe,
+      stripeSubscriptionId: 'sub_draft_race',
+    });
+
+    expect(stripe.invoices.voidInvoice).toHaveBeenCalledWith('in_draft_raced_open');
   });
 
   it('rethrows unexpected void failures', async () => {

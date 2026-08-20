@@ -91,7 +91,6 @@ type StripeMock = {
   invoices: {
     list: ReturnType<typeof jest.fn>;
     update: ReturnType<typeof jest.fn>;
-    finalizeInvoice: ReturnType<typeof jest.fn>;
     voidInvoice: ReturnType<typeof jest.fn>;
     retrieve: ReturnType<typeof jest.fn>;
   };
@@ -379,7 +378,6 @@ jest.mock('@/lib/stripe-client', () => {
     invoices: {
       list: jest.fn(),
       update: jest.fn(),
-      finalizeInvoice: jest.fn(),
       voidInvoice: jest.fn(),
       retrieve: jest.fn(),
     },
@@ -500,7 +498,6 @@ function expectNoStripeManagementCalls(stripeMock: StripeMock): void {
   expect(stripeMock.subscriptionSchedules.release).not.toHaveBeenCalled();
   expect(stripeMock.invoices.list).not.toHaveBeenCalled();
   expect(stripeMock.invoices.update).not.toHaveBeenCalled();
-  expect(stripeMock.invoices.finalizeInvoice).not.toHaveBeenCalled();
   expect(stripeMock.invoices.voidInvoice).not.toHaveBeenCalled();
   expect(stripeMock.invoices.retrieve).not.toHaveBeenCalled();
 }
@@ -698,7 +695,6 @@ describe('kiloPassRouter', () => {
     stripeMock.invoices.list.mockReset();
     stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
     stripeMock.invoices.update.mockReset();
-    stripeMock.invoices.finalizeInvoice.mockReset();
     stripeMock.invoices.voidInvoice.mockReset();
     stripeMock.invoices.retrieve.mockReset();
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
@@ -3855,7 +3851,7 @@ describe('kiloPassRouter', () => {
       expect(updated?.cancel_at_period_end).toBe(true);
     });
 
-    it('voids open invoices and finalizes then voids draft invoices so Stripe stops collection', async () => {
+    it('voids open invoices and disables auto-advance on draft invoices so Stripe stops collection', async () => {
       const stripeMock = getStripeMock();
       stripeMock.subscriptions.update.mockResolvedValue({});
       stripeMock.invoices.list.mockImplementation(async (params: { status?: string }) => {
@@ -3868,7 +3864,6 @@ describe('kiloPassRouter', () => {
         return { data: [], has_more: false };
       });
       stripeMock.invoices.update.mockResolvedValue({});
-      stripeMock.invoices.finalizeInvoice.mockResolvedValue({});
       stripeMock.invoices.voidInvoice.mockResolvedValue({});
 
       const user = await insertTestUser({
@@ -3891,10 +3886,7 @@ describe('kiloPassRouter', () => {
       expect(stripeMock.invoices.update).toHaveBeenCalledWith('in_draft_pending', {
         auto_advance: false,
       });
-      expect(stripeMock.invoices.finalizeInvoice).toHaveBeenCalledWith('in_draft_pending', {
-        auto_advance: false,
-      });
-      expect(stripeMock.invoices.voidInvoice).toHaveBeenCalledWith('in_draft_pending');
+      expect(stripeMock.invoices.voidInvoice).not.toHaveBeenCalledWith('in_draft_pending');
       expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_test_cancel_void', {
         cancel_at_period_end: true,
       });

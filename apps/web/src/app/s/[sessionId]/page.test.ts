@@ -35,6 +35,10 @@ jest.mock('./shared-session-transcript', () => ({
   SharedSessionTranscript: ({ messages }: { messages: Array<{ info: { id: string } }> }) =>
     React.createElement('div', { 'data-message-count': messages.length }),
 }));
+jest.mock('./shared-session-date', () => ({
+  SharedSessionDate: ({ isoDate }: { isoDate: string | null }) =>
+    isoDate ? React.createElement('span', null, 'formatted-date') : null,
+}));
 
 describe('SharedSessionPage', () => {
   beforeEach(() => {
@@ -72,7 +76,7 @@ describe('SharedSessionPage', () => {
     expect(html).toContain('A shared session');
     expect(html).toContain('owner/repo');
     expect(html).toContain('main');
-    expect(html).toContain('Aug 19, 2026');
+    expect(html).toContain('formatted-date');
     expect(html).toContain('data-message-count="1"');
     expect(html).toContain('kilo import https://app.test.example.com/s/' + shareToken);
     expect(html).toContain('https://kilo.ai/install');

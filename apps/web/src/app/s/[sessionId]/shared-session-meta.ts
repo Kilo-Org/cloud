@@ -28,5 +28,5 @@ export function formatSessionDate(isoDate: string | null): string | null {
   const normalized = isoDate.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date);
 }

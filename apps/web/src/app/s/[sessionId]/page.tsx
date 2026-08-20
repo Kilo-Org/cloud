@@ -1,6 +1,6 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
-import { CalendarDays, GitBranch } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import { APP_URL } from '@/lib/constants';
 import {
@@ -10,8 +10,9 @@ import {
 import { OpenInCliButton } from '@/app/share/[shareId]/open-in-cli-button';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
 import { Button } from '@/components/ui/button';
+import { SharedSessionDate } from './shared-session-date';
 import { SharedSessionTranscript } from './shared-session-transcript';
-import { formatRepoFromGitUrl, formatSessionDate } from './shared-session-meta';
+import { formatRepoFromGitUrl } from './shared-session-meta';
 import { toSharedTranscriptMessages } from './shared-transcript';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,6 @@ export default async function SharedSessionPage({
   const messages = snapshot ? toSharedTranscriptMessages(snapshot.messages) : [];
   const ownerName = session.ownerName ?? 'Someone';
   const repo = formatRepoFromGitUrl(session.gitUrl);
-  const sessionDate = formatSessionDate(session.createdAt);
 
   return (
     <div className="bg-background min-h-screen">
@@ -60,7 +60,7 @@ export default async function SharedSessionPage({
             {session.title && (
               <p className="text-muted-foreground text-sm">Shared by {ownerName}</p>
             )}
-            {(repo || session.gitBranch || sessionDate) && (
+            {(repo || session.gitBranch || session.createdAt) && (
               <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 {repo && <span>{repo}</span>}
                 {session.gitBranch && (
@@ -69,12 +69,7 @@ export default async function SharedSessionPage({
                     {session.gitBranch}
                   </span>
                 )}
-                {sessionDate && (
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarDays className="size-3.5" aria-hidden />
-                    {sessionDate}
-                  </span>
-                )}
+                <SharedSessionDate isoDate={session.createdAt} />
               </div>
             )}
           </div>

@@ -21,12 +21,20 @@ describe('formatRepoFromGitUrl', () => {
 });
 
 describe('formatSessionDate', () => {
-  it('formats an ISO timestamp as a medium date', () => {
-    expect(formatSessionDate('2026-08-19T12:00:00.000Z')).toBe('Aug 19, 2026');
+  function localMediumDate(iso: string): string {
+    return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(iso));
+  }
+
+  it('formats an ISO timestamp as a medium date in the runtime timezone', () => {
+    expect(formatSessionDate('2026-08-19T12:00:00.000Z')).toBe(
+      localMediumDate('2026-08-19T12:00:00.000Z')
+    );
   });
 
   it('formats Postgres-style timestamps with a space separator', () => {
-    expect(formatSessionDate('2026-08-19 19:28:42.33099+00')).toBe('Aug 19, 2026');
+    expect(formatSessionDate('2026-08-19 19:28:42.33099+00')).toBe(
+      localMediumDate('2026-08-19T19:28:42.33099Z')
+    );
   });
 
   it('returns null for missing or invalid dates', () => {

@@ -120,7 +120,7 @@ export const VERCEL_AI_GATEWAY = {
   },
 } as const satisfies Provider;
 
-export function getProviderById(providerId: ProviderId): Provider | undefined {
+export function tryGetProviderById(providerId: ProviderId): Provider | undefined {
   switch (providerId) {
     case 'openrouter':
       return OPENROUTER;

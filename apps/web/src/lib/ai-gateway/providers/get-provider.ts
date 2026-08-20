@@ -14,8 +14,8 @@ import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import {
-  getProviderById,
   OPENROUTER,
+  tryGetProviderById,
   VERCEL_AI_GATEWAY,
 } from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
@@ -282,7 +282,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider: (kiloExclusiveModel && getProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER,
+    provider: (kiloExclusiveModel && tryGetProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };

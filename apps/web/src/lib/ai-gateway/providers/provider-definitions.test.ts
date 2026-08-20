@@ -1,9 +1,9 @@
 import { describe, expect, test } from '@jest/globals';
 
 import {
-  getProviderById,
   LONGCAT,
   OPENROUTER,
+  tryGetProviderById,
 } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
@@ -57,13 +57,13 @@ describe('LongCat provider', () => {
   });
 });
 
-describe('getProviderById', () => {
+describe('tryGetProviderById', () => {
   test('resolves static provider definitions', () => {
-    expect(getProviderById('openrouter')).toBe(OPENROUTER);
+    expect(tryGetProviderById('openrouter')).toBe(OPENROUTER);
   });
 
   test('does not claim dynamically constructed providers', () => {
-    expect(getProviderById('direct-byok')).toBeUndefined();
-    expect(getProviderById('friendli')).toBeUndefined();
+    expect(tryGetProviderById('direct-byok')).toBeUndefined();
+    expect(tryGetProviderById('friendli')).toBeUndefined();
   });
 });

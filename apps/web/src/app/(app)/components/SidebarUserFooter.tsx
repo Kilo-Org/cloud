@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
 import { BookOpen, ChevronsUpDown, Download, FileDown, LogOut, UserCog } from 'lucide-react';
-import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 type User = {
@@ -37,12 +36,8 @@ function getUserInitials(name: string) {
 export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooterProps) {
   const router = useRouter();
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/revoke-web-session', { method: 'POST' });
-    } finally {
-      await signOut({ callbackUrl: '/' });
-    }
+  const handleLogout = () => {
+    router.push('/users/sign_out?callbackUrl=%2F');
   };
 
   return (

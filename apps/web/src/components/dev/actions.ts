@@ -33,5 +33,5 @@ export async function nuke() {
     throw new Error('Failed to nuke account. Please try again later.');
   }
 
-  redirect('/api/auth/signout?callbackUrl=/profile');
+  redirect('/users/sign_out?callbackUrl=/profile');
 }

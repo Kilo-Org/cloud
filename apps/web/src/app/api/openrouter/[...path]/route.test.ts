@@ -29,8 +29,8 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -69,7 +69,7 @@ jest.mock('@/lib/ai-gateway/abuse-service', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/providers/get-provider');
-jest.mock('@/lib/ai-gateway/providers/partner-routing');
+jest.mock('@/lib/ai-gateway/providers/partner/routing');
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));

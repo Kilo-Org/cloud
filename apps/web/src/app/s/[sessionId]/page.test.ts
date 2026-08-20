@@ -32,8 +32,17 @@ jest.mock('@/app/share/[shareId]/open-in-editor-button', () => ({
     React.createElement('button', { 'data-session-id': sessionId, 'data-path': pathOverride }),
 }));
 jest.mock('./shared-session-transcript', () => ({
-  SharedSessionTranscript: ({ messages }: { messages: Array<{ info: { id: string } }> }) =>
-    React.createElement('div', { 'data-message-count': messages.length }),
+  SharedSessionTranscript: ({
+    messages,
+    unavailable,
+  }: {
+    messages: Array<{ info: { id: string } }>;
+    unavailable?: boolean;
+  }) =>
+    React.createElement('div', {
+      'data-message-count': messages.length,
+      'data-unavailable': unavailable ? 'true' : 'false',
+    }),
 }));
 jest.mock('./shared-session-date', () => ({
   SharedSessionDate: ({ isoDate }: { isoDate: string | null }) =>
@@ -78,6 +87,7 @@ describe('SharedSessionPage', () => {
     expect(html).toContain('main');
     expect(html).toContain('formatted-date');
     expect(html).toContain('data-message-count="1"');
+    expect(html).toContain('data-unavailable="false"');
     expect(html).toContain('kilo import https://app.test.example.com/s/' + shareToken);
     expect(html).toContain('https://kilo.ai/install');
     expect(html).toContain('Install Kilo');
@@ -105,9 +115,11 @@ describe('SharedSessionPage', () => {
 
     expect(html).toContain('Grace Hopper shared a session');
     expect(html).not.toContain('Shared by Grace Hopper');
+    expect(html).toContain('data-message-count="0"');
+    expect(html).toContain('data-unavailable="false"');
   });
 
-  it('renders an empty transcript when the snapshot fetch fails', async () => {
+  it('marks the transcript unavailable when the snapshot fetch fails', async () => {
     const shareToken = 'snapshot.failure.token';
     mockFetchSharedSessionMetadata.mockResolvedValue({
       title: 'Still reachable',
@@ -124,6 +136,7 @@ describe('SharedSessionPage', () => {
 
     expect(html).toContain('Still reachable');
     expect(html).toContain('data-message-count="0"');
+    expect(html).toContain('data-unavailable="true"');
   });
 
   it('uses not-found behavior when metadata cannot be resolved', async () => {

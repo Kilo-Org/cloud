@@ -117,4 +117,12 @@ describe('SharedSessionTranscript', () => {
     );
     expect(html).toContain('This session has no messages yet.');
   });
+
+  it('renders a load-failure message when the snapshot is unavailable', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SharedSessionTranscript, { messages: [], unavailable: true })
+    );
+    expect(html).toContain('Couldn&#x27;t load this transcript. Refresh the page to try again.');
+    expect(html).not.toContain('This session has no messages yet.');
+  });
 });

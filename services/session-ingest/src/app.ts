@@ -121,7 +121,7 @@ app.get('/session/:shareToken/metadata', async c => {
       owner_name: sharedSession.ownerName,
       git_url: sharedSession.gitUrl,
       git_branch: sharedSession.gitBranch,
-      created_at: sharedSession.createdAt,
+      created_at: new Date(sharedSession.createdAt).toISOString(),
     },
     200,
     { 'cache-control': 'no-store' }

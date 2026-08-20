@@ -362,8 +362,12 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   );
 }
 
+export function useOptionalManager(): SessionManager | null {
+  return useContext(ManagerContext);
+}
+
 export function useManager(): SessionManager {
-  const manager = useContext(ManagerContext);
+  const manager = useOptionalManager();
   if (!manager) throw new Error('useManager must be used within CloudAgentProvider');
   return manager;
 }

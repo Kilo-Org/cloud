@@ -66,7 +66,21 @@ function SharedTranscriptSegments({ parts, segmentKey }: { parts: Part[]; segmen
   );
 }
 
-export function SharedSessionTranscript({ messages }: { messages: StoredMessage[] }) {
+export function SharedSessionTranscript({
+  messages,
+  unavailable = false,
+}: {
+  messages: StoredMessage[];
+  unavailable?: boolean;
+}) {
+  if (unavailable) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Couldn&apos;t load this transcript. Refresh the page to try again.
+      </p>
+    );
+  }
+
   if (messages.length === 0) {
     return <p className="text-muted-foreground text-sm">This session has no messages yet.</p>;
   }

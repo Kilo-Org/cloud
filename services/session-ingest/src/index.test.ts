@@ -322,6 +322,38 @@ describe('public session route', () => {
     expect(await res.text()).toBe('{"ok":true}');
   });
 
+  it('serializes created_at as UTC ISO at the HTTP boundary', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    selectResult.mockResolvedValueOnce([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        ownerName: 'Shared owner',
+        gitUrl: 'https://github.com/owner/repo',
+        gitBranch: 'main',
+        createdAt: '2026-08-19 19:28:42.33099+00',
+      },
+    ]);
+
+    const res = await app.request(`/session/${encodeURIComponent(token)}/metadata`, {}, defaultEnv);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      title: 'Shared title',
+      owner_name: 'Shared owner',
+      git_url: 'https://github.com/owner/repo',
+      git_branch: 'main',
+      created_at: '2026-08-19T19:28:42.330Z',
+    });
+  });
+
   it('returns shared metadata with no-store caching', async () => {
     const { db, selectResult } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);

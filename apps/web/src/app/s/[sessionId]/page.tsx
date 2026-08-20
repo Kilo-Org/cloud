@@ -23,9 +23,11 @@ export default async function SharedSessionPage({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId: shareToken } = await params;
-  const [session, snapshot] = await Promise.all([
+  const [session, snapshotResult] = await Promise.all([
     fetchSharedSessionMetadata(shareToken),
-    fetchSharedSessionSnapshot(shareToken).catch(() => null),
+    fetchSharedSessionSnapshot(shareToken)
+      .then(snapshot => ({ ok: true as const, snapshot }))
+      .catch(() => ({ ok: false as const, snapshot: null })),
   ]);
 
   if (!session) {
@@ -34,7 +36,10 @@ export default async function SharedSessionPage({
 
   const shareUrl = `${APP_URL}/s/${shareToken}`;
   const importCommand = `kilo import ${shareUrl}`;
-  const messages = snapshot ? toSharedTranscriptMessages(snapshot.messages) : [];
+  const messages = snapshotResult.snapshot
+    ? toSharedTranscriptMessages(snapshotResult.snapshot.messages)
+    : [];
+  const transcriptUnavailable = !snapshotResult.ok;
   const ownerName = session.ownerName ?? 'Someone';
   const repo = formatRepoFromGitUrl(session.gitUrl);
 
@@ -79,7 +84,7 @@ export default async function SharedSessionPage({
           </div>
         </section>
 
-        <SharedSessionTranscript messages={messages} />
+        <SharedSessionTranscript messages={messages} unavailable={transcriptUnavailable} />
       </main>
     </div>
   );

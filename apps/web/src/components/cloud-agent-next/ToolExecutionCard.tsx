@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, Paperclip } from 'lucide-react';
+import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import type { ToolExecution, ToolPart, FilePart } from './types';
 
 type ToolExecutionCardProps = {
@@ -259,11 +260,12 @@ export function ToolExecutionCard({ execution, toolPart }: ToolExecutionCardProp
           <div>
             <div className="text-muted-foreground mb-1 text-xs font-medium">Attachments:</div>
             <div className="flex flex-wrap gap-2">
-              {data.attachments.map((file, index) =>
-                file.url ? (
+              {data.attachments.map((file, index) => {
+                const safeHref = toSafeHttpUrl(file.url);
+                return safeHref ? (
                   <a
                     key={file.id || index}
-                    href={file.url}
+                    href={safeHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="bg-background hover:bg-muted flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
@@ -279,8 +281,8 @@ export function ToolExecutionCard({ execution, toolPart }: ToolExecutionCardProp
                     <Paperclip className="h-3 w-3" />
                     <span>{file.filename || `File ${index + 1}`}</span>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           </div>
         )}

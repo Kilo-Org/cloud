@@ -395,6 +395,31 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toBe(readDb);
   });
 
+  it('selects the provider after applying the organization provider allow-list', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['amazon-bedrock'] },
+      plan: 'enterprise',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never);
+
+    expect(response.status).toBe(200);
+    const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
+    expect(getRoutingProviderConfig).toBeDefined();
+    expect(await getRoutingProviderConfig?.()).toEqual({ only: ['amazon-bedrock'] });
+  });
+
   it('returns 404 when the OpenRouter model id is unknown', async () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(false);
 

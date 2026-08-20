@@ -8,6 +8,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   GatewayRequest,
+  OpenRouterProviderConfig,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -62,7 +63,8 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
-  randomSeed: string
+  randomSeed: string,
+  routingProviderConfig = request.body.provider
 ) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
@@ -88,7 +90,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const provider = request.body.provider;
+  const provider: OpenRouterProviderConfig | undefined = routingProviderConfig;
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;
     const vercelInferenceProviders =

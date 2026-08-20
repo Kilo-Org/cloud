@@ -15,7 +15,13 @@ import { WastelandSidebar } from '@/components/wasteland/WastelandSidebar';
 const UUID = '[0-9a-f-]{36}';
 
 // Routes linked from the footer user menu (see SidebarUserFooter). Keep in sync.
-const FOOTER_MENU_ROUTES = ['/connected-accounts', '/data-exports', '/install', '/learn'];
+const FOOTER_MENU_ROUTES = [
+  '/connected-accounts',
+  '/data-exports',
+  '/install',
+  '/learn',
+  '/settings',
+];
 
 /** Extract the townId from a /gastown/[townId] pathname, or null. */
 function extractGastownTownId(pathname: string): string | null {

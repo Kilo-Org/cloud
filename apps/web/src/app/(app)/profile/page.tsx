@@ -13,10 +13,8 @@ import { cookies } from 'next/headers';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
 import { MessageErrorBoundary } from '@/components/cloud-agent/MessageErrorBoundary';
 
-import { Coins } from 'lucide-react';
 import { SurveyCredits } from '@/components/SurveyCredits';
 import { RedeemPromoCode } from '@/components/profile/RedeemPromoCode';
-import { AutoTopUpToggle } from '@/components/payment/AutoTopUpToggle';
 import { IntegrationsCard } from '@/components/profile/IntegrationsCard';
 import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
 import { PageLayout } from '@/components/PageLayout';
@@ -26,8 +24,9 @@ import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButto
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
-import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export const metadata = { itunes: smartAppBannerItunes('/profile') };
 
@@ -98,17 +97,17 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
       <Card className="w-full text-left">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Coins className="h-5 w-5" />
-            Automatic Top Up
-          </CardTitle>
+          <CardTitle>Automatic Top Up &amp; Auto Routing</CardTitle>
+          <CardDescription>
+            Configure automatic top-up and auto-routing in Settings.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <AutoTopUpToggle />
+          <Button asChild variant="outline">
+            <Link href="/settings">Open Settings</Link>
+          </Button>
         </CardContent>
       </Card>
-
-      <AutoRoutingModeCard />
 
       {params.source && (
         <IntegrationsCard

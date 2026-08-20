@@ -1,6 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Coins, CreditCard } from 'lucide-react';
 import { PageLayout } from '@/components/PageLayout';
 
 export default function ProfileLoading() {
@@ -84,39 +83,14 @@ export default function ProfileLoading() {
         </div>
       </div>
 
-      {/* Payment Details Card */}
-      <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-stretch">
-        <div className="flex-3">
-          <Card className="h-full w-full text-left">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Payment Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-10 w-48" /> {/* Remove payment method button */}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Auto Top-Up Card */}
+      {/* Settings Link Card */}
       <Card className="w-full text-left">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Coins className="h-5 w-5" />
-            Automatic Top Up
-          </CardTitle>
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="mt-2 h-4 w-full" />
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full max-w-xs" /> {/* Toggle */}
-            <Skeleton className="h-4 w-64" /> {/* Description */}
-          </div>
+        <CardContent>
+          <Skeleton className="h-10 w-32" />
         </CardContent>
       </Card>
 

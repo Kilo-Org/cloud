@@ -84,6 +84,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: ChartColumnIncreasing,
       url: '/usage',
     },
+    {
+      title: 'Settings',
+      icon: Settings,
+      url: '/settings',
+    },
   ];
 
   // KiloClaw group

@@ -132,8 +132,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const handleSecondaryAction = () => {
     const message =
       mode === 'review'
-        ? 'Kilo Code needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.'
-        : 'Kilo Code needs to share data with AI providers to work. If you decline, you will be signed out.';
+        ? 'kilo needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.'
+        : 'kilo needs to share data with AI providers to work. If you decline, you will be signed out.';
 
     Alert.alert(actions.destructiveTitle, message, [
       { text: 'Cancel', style: 'cancel' },
@@ -190,13 +190,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
             <Shield size={20} color={colors.foreground} />
           </View>
-          <Text className="text-base font-semibold text-foreground">Kilo Code</Text>
+          <Text className="text-base font-semibold text-foreground">kilo</Text>
         </View>
 
         <Text className="mt-6 text-2xl font-bold text-foreground">Before we get started</Text>
         <Text className="mt-3 text-base text-muted-foreground">
-          Kilo Code sends your messages to AI providers to generate responses. Here&apos;s
-          what&apos;s shared and with whom.
+          kilo sends your messages to AI providers to generate responses. Here&apos;s what&apos;s
+          shared and with whom.
         </Text>
 
         <Text className="mt-6 text-sm font-semibold text-foreground">Required to use Kilo</Text>

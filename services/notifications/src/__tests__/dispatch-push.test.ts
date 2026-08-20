@@ -1286,7 +1286,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const stub = getDO('user-generic');
     await stub.dispatchPush(baseInput({ userId: 'user-generic', idempotencyKey: 'k-generic' }));
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].title).toBe('Kilo Code');
+    expect(messages[0].title).toBe('kilo');
     expect(messages[0].title).not.toBe('T');
     expect(messages[0].body).not.toBe('B');
   });
@@ -1305,7 +1305,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const stub = getDO('user-throw');
     await stub.dispatchPush(baseInput({ userId: 'user-throw', idempotencyKey: 'k-throw' }));
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].title).toBe('Kilo Code');
+    expect(messages[0].title).toBe('kilo');
     expect(messages[0].body).not.toBe('B');
   });
 });

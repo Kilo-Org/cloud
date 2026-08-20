@@ -15,7 +15,7 @@ const CURRENT_KILOCLAW_STANDARD_PRICE_ID =
 const CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID =
   process.env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ?? 'price_test_kilo_pass_tier_19_monthly';
 
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import type * as creditsModule from '@/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
 
@@ -61,8 +61,17 @@ import {
   ensurePaymentMethodStored,
   processStripePaymentEventHook,
   handleSuccessfulChargeWithPayment,
+  handleUpdateSeatCount,
   isCardFingerprintEligibleForFreeCredits,
+  KNOWN_SEAT_PRICE_IDS,
 } from '@/lib/stripe';
+import { client } from '@/lib/stripe-client';
+import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
+import {
+  type ServiceFeeAssessmentRecord,
+  type ServiceFeeAssessmentStore,
+} from '@/lib/service-fees/assessments';
+import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
 import {
   type User,
   payment_methods,
@@ -82,6 +91,7 @@ import {
   impact_referral_conversions,
   impact_referral_reward_decisions,
   impact_referral_rewards,
+  stripe_service_fee_assessments,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -113,6 +123,7 @@ import { cleanupDbForTest } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
 
 const reportEventsMock = jest.mocked(reportEvents);
 
@@ -3067,7 +3078,17 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       id: params.id,
       amount: params.amount,
       customer: params.customer,
+      created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
     }) as unknown as Stripe.Charge;
+
+  const withTopUpPrincipalMetadata = (
+    metadata: StripeTopupMetadata,
+    principalMinor: number
+  ): StripeTopupMetadata => ({
+    ...metadata,
+    amountCents: String(principalMinor),
+    serviceFeePrincipalMinor: String(principalMinor),
+  });
 
   const makePaymentIntent = (params: {
     id: string;
@@ -3082,6 +3103,22 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       payment_method: params.payment_method ?? null,
     }) as unknown as Stripe.PaymentIntent;
 
+  let listCheckoutSessionsSpy: { mockRestore: () => void } | undefined;
+
+  beforeEach(async () => {
+    const { client } = await import('@/lib/stripe-client');
+    listCheckoutSessionsSpy = jest.spyOn(client.checkout.sessions, 'list').mockResolvedValue({
+      object: 'list',
+      data: [],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+  });
+
+  afterEach(() => {
+    listCheckoutSessionsSpy?.mockRestore();
+  });
+
   test('both organizationId and kiloUserId: processes organization top-up; uses kiloUserId', async () => {
     const user = await insertTestUser();
     const org = await createOrganization('Org-Both', user.id);
@@ -3092,7 +3129,10 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     const charge = makeCharge({ id: chId, amount: amountInCents, customer: 'cus_irrelevant' });
     const paymentIntent = makePaymentIntent({
       id: piId,
-      metadata: { organizationId: org.id, kiloUserId: user.id },
+      metadata: withTopUpPrincipalMetadata(
+        { organizationId: org.id, kiloUserId: user.id },
+        amountInCents
+      ),
     });
 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
@@ -3132,11 +3172,14 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     });
     const paymentIntent = makePaymentIntent({
       id: paymentIntentId,
-      metadata: {
-        type: 'org-auto-topup-setup',
-        kiloUserId: user.id,
-        organizationId: org.id,
-      },
+      metadata: withTopUpPrincipalMetadata(
+        {
+          type: 'org-auto-topup-setup',
+          kiloUserId: user.id,
+          organizationId: org.id,
+        },
+        amountInCents
+      ),
     });
 
     const processOrgTopUpMock = processTopupForOrganization as jest.MockedFunction<
@@ -3151,7 +3194,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       org.id,
       amountInCents,
       { type: 'stripe', stripe_payment_id: paymentIntentId },
-      { isAutoTopUp: true }
+      { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: amountInCents }
     );
   });
 
@@ -3197,7 +3240,10 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     // Mark as stripe-checkout-driven top-up, no card details to avoid free-credits flow side effects
     const paymentIntent = makePaymentIntent({
       id: paymentIntentId,
-      metadata: { kiloUserId: user.id, type: 'stripe-checkout-topup' },
+      metadata: withTopUpPrincipalMetadata(
+        { kiloUserId: user.id, type: 'stripe-checkout-topup' },
+        amountInCents
+      ),
       payment_method: null,
     });
 
@@ -3268,6 +3314,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         type: 'auto-topup-setup',
         kiloUserId: user.id,
         amountCents: '2000',
+        serviceFeePrincipalMinor: '2000',
       },
     } as unknown as Stripe.PaymentIntent;
 
@@ -3297,6 +3344,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         type: 'auto-topup-setup',
         kiloUserId: user.id,
         amountCents: '5000',
+        serviceFeePrincipalMinor: '5000',
       },
     } as unknown as Stripe.PaymentIntent;
 
@@ -3356,6 +3404,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         kiloUserId: user.id,
         organizationId: org.id,
         amountCents: '2000',
+        serviceFeePrincipalMinor: '2000',
       },
     } as unknown as Stripe.PaymentIntent;
 
@@ -3387,6 +3436,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
           kiloUserId: user.id,
           organizationId: org.id,
           amountCents: '5000',
+          serviceFeePrincipalMinor: '5000',
         },
       } as unknown as Stripe.PaymentIntent;
 
@@ -3447,6 +3497,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         kiloUserId: user.id,
         organizationId: org.id,
         amountCents: '3000',
+        serviceFeePrincipalMinor: '3000',
       },
     } as unknown as Stripe.PaymentIntent;
 
@@ -3489,7 +3540,13 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
           object: 'invoice',
           charge: userChargeId,
           amount_paid: 5000,
-          metadata: { type: 'auto-topup', kiloUserId: user.id },
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS - 1,
+          metadata: {
+            type: 'auto-topup',
+            kiloUserId: user.id,
+            amountCents: '5000',
+            serviceFeePrincipalMinor: '5000',
+          },
         } as unknown as Stripe.Invoice,
         previous_attributes: {},
       },
@@ -3538,7 +3595,13 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
           object: 'invoice',
           charge: orgChargeId,
           amount_paid: 5000,
-          metadata: { type: 'org-auto-topup', organizationId: org.id },
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS - 1,
+          metadata: {
+            type: 'org-auto-topup',
+            organizationId: org.id,
+            amountCents: '5000',
+            serviceFeePrincipalMinor: '5000',
+          },
         } as unknown as Stripe.Invoice,
         previous_attributes: {},
       },
@@ -3587,7 +3650,13 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
           object: 'invoice',
           charge: orgChargeId,
           amount_paid: 5000,
-          metadata: { type: 'org-auto-topup', organizationId: org.id },
+          created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS - 1,
+          metadata: {
+            type: 'org-auto-topup',
+            organizationId: org.id,
+            amountCents: '5000',
+            serviceFeePrincipalMinor: '5000',
+          },
         } as unknown as Stripe.Invoice,
         previous_attributes: {},
       },
@@ -3601,10 +3670,351 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         org.id,
         5000,
         { type: 'stripe', stripe_payment_id: orgChargeId },
-        { isAutoTopUp: true }
+        { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: 5000 }
       );
     } finally {
       processOrgTopUpMock.mockRestore();
+    }
+  });
+
+  test('credits trusted principal, not gross charge or invoice amount', async () => {
+    await cleanupDbForTest();
+
+    const user = await insertTestUser();
+    const org = await createOrganization('Org Principal Vs Gross', user.id);
+    const principalMinor = 10_000;
+    const grossPaidMinor = 10_500;
+    const paymentIntentId = `pi_principal_${Math.random()}`;
+    const chargeId = `ch_principal_${Math.random()}`;
+
+    const processOrgTopUpMock = processTopupForOrganization as jest.MockedFunction<
+      typeof processTopupForOrganization
+    >;
+    processOrgTopUpMock.mockResolvedValueOnce(undefined);
+
+    try {
+      await handleSuccessfulChargeWithPayment(
+        makeCharge({ id: chargeId, amount: grossPaidMinor, customer: user.stripe_customer_id }),
+        makePaymentIntent({
+          id: paymentIntentId,
+          metadata: withTopUpPrincipalMetadata(
+            {
+              type: 'stripe-checkout-topup',
+              kiloUserId: user.id,
+              organizationId: org.id,
+            },
+            principalMinor
+          ),
+        })
+      );
+
+      expect(processOrgTopUpMock).toHaveBeenCalledWith(
+        user.id,
+        org.id,
+        principalMinor,
+        { type: 'stripe', stripe_payment_id: paymentIntentId },
+        { isAutoTopUp: false, serviceFeeCents: 0, grossPaidCents: grossPaidMinor }
+      );
+    } finally {
+      processOrgTopUpMock.mockRestore();
+    }
+
+    const processTopUpMock = processTopUp as jest.MockedFunction<typeof processTopUp>;
+    processTopUpMock.mockResolvedValueOnce(true);
+    const invoiceChargeId = `ch_invoice_principal_${Math.random()}`;
+    await db.insert(auto_top_up_configs).values({
+      owned_by_user_id: user.id,
+      stripe_payment_method_id: `pm_principal_${Math.random()}`,
+      amount_cents: principalMinor,
+      attempt_started_at: new Date().toISOString(),
+    });
+
+    try {
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'invoice.paid',
+        data: {
+          object: {
+            id: `in_principal_${Math.random()}`,
+            object: 'invoice',
+            charge: invoiceChargeId,
+            amount_paid: grossPaidMinor,
+            created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+            metadata: {
+              type: 'auto-topup',
+              kiloUserId: user.id,
+              amountCents: String(principalMinor),
+              serviceFeePrincipalMinor: String(principalMinor),
+            },
+          } as unknown as Stripe.Invoice,
+          previous_attributes: {},
+        },
+      });
+
+      expect(processTopUpMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: user.id }),
+        principalMinor,
+        { type: 'stripe', stripe_payment_id: invoiceChargeId },
+        { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: grossPaidMinor }
+      );
+    } finally {
+      processTopUpMock.mockRestore();
+    }
+  });
+
+  test('invoice.created skips kilo-owned auto-top-up invoices and leaves seats/KiloClaw fee-free', async () => {
+    const { client } = await import('@/lib/stripe-client');
+    const createInvoiceItem = jest.spyOn(client.invoiceItems, 'create');
+
+    try {
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'invoice.created',
+        data: {
+          object: {
+            id: 'in_auto_skip',
+            object: 'invoice',
+            created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+            metadata: { type: 'auto-topup', kiloUserId: 'user_skip' },
+          } as unknown as Stripe.Invoice,
+          previous_attributes: {},
+        },
+      });
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'invoice.created',
+        data: {
+          object: {
+            id: 'in_org_auto_skip',
+            object: 'invoice',
+            created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+            metadata: { type: 'org-auto-topup', organizationId: 'org_skip' },
+          } as unknown as Stripe.Invoice,
+          previous_attributes: {},
+        },
+      });
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'invoice.created',
+        data: {
+          object: {
+            id: 'in_seat_created',
+            object: 'invoice',
+            created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+            metadata: { type: 'seats' },
+            lines: {
+              data: [
+                {
+                  pricing: { price_details: { price: process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID } },
+                },
+              ],
+            },
+          } as unknown as Stripe.Invoice,
+          previous_attributes: {},
+        },
+      });
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'invoice.created',
+        data: {
+          object: {
+            id: 'in_kiloclaw_created',
+            object: 'invoice',
+            created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+            lines: {
+              data: [
+                {
+                  pricing: {
+                    price_details: {
+                      price: process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID,
+                    },
+                  },
+                },
+              ],
+            },
+          } as unknown as Stripe.Invoice,
+          previous_attributes: {},
+        },
+      });
+
+      expect(createInvoiceItem).not.toHaveBeenCalled();
+    } finally {
+      createInvoiceItem.mockRestore();
+    }
+  });
+
+  test('invoice.created assesses an eligible personal Kilo Pass draft without attaching a second auto-top-up fee', async () => {
+    await cleanupDbForTest();
+    const user = await insertTestUser();
+    const { client } = await import('@/lib/stripe-client');
+    const createInvoiceItem = jest.spyOn(client.invoiceItems, 'create').mockResolvedValue({
+      id: 'ii_kilo_pass_fee',
+      amount: 245,
+    } as unknown as Stripe.Response<Stripe.InvoiceItem>);
+    const retrievePrice = jest.spyOn(client.prices, 'retrieve').mockResolvedValue({
+      id: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID,
+      tax_behavior: 'exclusive',
+    } as unknown as Stripe.Response<Stripe.Price>);
+    const invoiceId = `in_kilo_pass_created_${Math.random().toString(36).slice(2)}`;
+    const metadata = {
+      type: 'kilo-pass',
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+    };
+
+    try {
+      await processStripePaymentEventHook({
+        ...baseStripeEvent(),
+        type: 'invoice.created',
+        data: {
+          object: {
+            id: invoiceId,
+            object: 'invoice',
+            status: 'draft',
+            created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+            currency: 'usd',
+            customer: user.stripe_customer_id,
+            metadata,
+            parent: {
+              type: 'subscription_details',
+              quote_details: null,
+              subscription_details: {
+                metadata,
+                subscription: {
+                  id: 'sub_kilo_pass_created',
+                  object: 'subscription',
+                  metadata,
+                  items: {
+                    object: 'list',
+                    data: [],
+                    has_more: false,
+                    url: '/v1/subscription_items',
+                  },
+                },
+              },
+            },
+            lines: {
+              object: 'list',
+              has_more: false,
+              url: `/v1/invoices/${invoiceId}/lines`,
+              data: [
+                {
+                  id: 'il_kilo_pass_created',
+                  object: 'line_item',
+                  amount: 4_900,
+                  currency: 'usd',
+                  description: 'Kilo Pass',
+                  discountable: true,
+                  discount_amounts: null,
+                  discounts: [],
+                  invoice: invoiceId,
+                  livemode: false,
+                  metadata,
+                  parent: null,
+                  period: { start: 1, end: 2 },
+                  pretax_credit_amounts: null,
+                  pricing: {
+                    type: 'price_details',
+                    unit_amount_decimal: '4900',
+                    price_details: {
+                      price: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID,
+                      product: 'prod_kilo_pass',
+                    },
+                  },
+                  quantity: 1,
+                  subscription: null,
+                  taxes: null,
+                },
+              ],
+            },
+          } as unknown as Stripe.Invoice,
+          previous_attributes: {},
+        },
+      });
+
+      const [assessment] = await db
+        .select()
+        .from(stripe_service_fee_assessments)
+        .where(eq(stripe_service_fee_assessments.stripe_invoice_id, invoiceId))
+        .limit(1);
+      expect(assessment).toMatchObject({
+        flow: 'personal_kilo_pass',
+        kilo_user_id: user.id,
+        eligible_subtotal_minor: 4_900,
+        expected_fee_minor: 245,
+      });
+      expect(assessment?.outcome === 'charged' || assessment?.outcome === 'missed').toBe(true);
+      if (assessment?.outcome === 'missed') {
+        expect(createInvoiceItem).not.toHaveBeenCalled();
+      } else {
+        expect(createInvoiceItem).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      retrievePrice.mockRestore();
+      createInvoiceItem.mockRestore();
+    }
+  });
+
+  test('invoice.created fee attachment failure is acknowledged', async () => {
+    const handleKiloPassInvoiceCreated = jest.fn(async (_params: { invoice: Stripe.Invoice }) => {
+      throw new Error('fee attachment failed');
+    });
+    const invoice = {
+      id: 'in_kilo_pass_attach_fail',
+      object: 'invoice',
+      status: 'draft',
+      created: SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
+      currency: 'usd',
+      customer: 'cus_attach_fail',
+      metadata: {
+        type: 'kilo-pass',
+        kiloUserId: 'user_kilo_pass_attach_fail',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+      },
+      lines: {
+        object: 'list',
+        has_more: false,
+        data: [
+          {
+            pricing: {
+              price_details: { price: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID },
+            },
+            amount: 4_900,
+          },
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/service-fees/invoice-created', () => {
+        const actual = jest.requireActual('@/lib/service-fees/invoice-created');
+        return {
+          __esModule: true,
+          ...actual,
+          handleKiloPassInvoiceCreated,
+        };
+      });
+
+      await jest.isolateModulesAsync(async () => {
+        const { processStripePaymentEventHook: dispatch } = await import('@/lib/stripe');
+        await expect(
+          dispatch({
+            ...baseStripeEvent(),
+            type: 'invoice.created',
+            data: { object: invoice, previous_attributes: {} },
+          } as Stripe.Event)
+        ).resolves.toBeUndefined();
+      });
+
+      expect(handleKiloPassInvoiceCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ invoice })
+      );
+    } finally {
+      jest.dontMock('@/lib/service-fees/invoice-created');
+      jest.resetModules();
     }
   });
 
@@ -3966,4 +4376,526 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       }
     }
   );
+});
+
+function createMemoryAssessmentStore(): ServiceFeeAssessmentStore {
+  const rows = new Map<string, ServiceFeeAssessmentRecord>();
+  const store: ServiceFeeAssessmentStore = {
+    async transact(fn) {
+      return fn(store);
+    },
+    async findByAssessmentKey(assessmentKey) {
+      const row = rows.get(assessmentKey);
+      return row ? { ...row, metadata: { ...row.metadata } } : null;
+    },
+    async insert(record) {
+      if (rows.has(record.assessmentKey)) {
+        throw new Error(`duplicate assessment_key ${record.assessmentKey}`);
+      }
+      const copy = { ...record, metadata: { ...record.metadata } };
+      rows.set(record.assessmentKey, copy);
+      return { ...copy };
+    },
+    async update(assessmentKey, patch) {
+      const existing = rows.get(assessmentKey);
+      if (!existing) throw new Error(`missing ${assessmentKey}`);
+      const next = {
+        ...existing,
+        ...patch,
+        metadata: { ...existing.metadata, ...(patch.metadata ?? {}) },
+      };
+      rows.set(assessmentKey, next);
+      return { ...next };
+    },
+  };
+  return Object.assign(store, {
+    async findByStripeInvoiceId(stripeInvoiceId: string) {
+      const row = [...rows.values()].find(
+        candidate => candidate.stripeInvoiceId === stripeInvoiceId
+      );
+      return row ? { ...row, metadata: { ...row.metadata } } : null;
+    },
+  });
+}
+
+describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
+  const subscriptionId = 'sub_seat_capacity_fee';
+  const seatItemId = 'si_seat_paid';
+  const passItemId = 'si_pass';
+  const seatPriceId = 'price_test_seat_capacity';
+  const prorationDate = SERVICE_FEE_ACTIVATION_UNIX_SECONDS;
+  const now = new Date(prorationDate * 1000);
+  const seatProductId = [...SEAT_PRODUCT_IDS][0] ?? 'prod_seat';
+  let actor: User;
+  let organizationId: string;
+
+  function memoryStore() {
+    return createMemoryAssessmentStore();
+  }
+
+  function invoiceLine(params: {
+    id: string;
+    amount: number;
+    priceId: string;
+    productId: string;
+    subscriptionItem: string;
+  }): Stripe.InvoiceLineItem {
+    return {
+      id: params.id,
+      object: 'line_item',
+      amount: params.amount,
+      currency: 'usd',
+      description: params.subscriptionItem,
+      discountable: true,
+      discount_amounts: null,
+      discounts: [],
+      invoice: 'in_preview',
+      livemode: false,
+      metadata: {},
+      parent: {
+        type: 'subscription_item_details',
+        invoice_item_details: null,
+        subscription_item_details: {
+          invoice_item: null,
+          proration: true,
+          proration_details: { credited_items: null },
+          subscription: subscriptionId,
+          subscription_item: params.subscriptionItem,
+        },
+      },
+      period: { start: prorationDate, end: prorationDate + 86_400 },
+      pretax_credit_amounts: null,
+      pricing: {
+        type: 'price_details',
+        unit_amount_decimal: String(params.amount),
+        price_details: { price: params.priceId, product: params.productId },
+      },
+      quantity: 10,
+      subscription: subscriptionId,
+      taxes: null,
+    } as Stripe.InvoiceLineItem;
+  }
+
+  function mixedLines() {
+    return [
+      invoiceLine({
+        id: 'il_seat',
+        amount: 8_000,
+        priceId: seatPriceId,
+        productId: seatProductId,
+        subscriptionItem: seatItemId,
+      }),
+      invoiceLine({
+        id: 'il_pass',
+        amount: 3_000,
+        priceId: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID,
+        productId: 'prod_kilo_pass',
+        subscriptionItem: passItemId,
+      }),
+    ];
+  }
+
+  function orgSubscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subscription {
+    return {
+      id: subscriptionId,
+      object: 'subscription',
+      status: 'active',
+      customer: 'cus_seat_capacity',
+      metadata: {
+        type: 'kilo-pass-org',
+        organizationId,
+        kiloUserId: actor.id,
+        tier: 'tier_19',
+        cadence: 'monthly',
+        seats: '10',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            id: seatItemId,
+            quantity: 5,
+            current_period_start: prorationDate,
+            current_period_end: prorationDate + 2_592_000,
+            price: {
+              id: seatPriceId,
+              product: seatProductId,
+              unit_amount: 2_900,
+              recurring: { interval: 'month' },
+            },
+          },
+          {
+            id: passItemId,
+            quantity: 5,
+            current_period_start: prorationDate,
+            current_period_end: prorationDate + 2_592_000,
+            price: { id: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID, product: 'prod_kilo_pass' },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+      ...overrides,
+    } as Stripe.Subscription;
+  }
+
+  function previewInvoice(lines = mixedLines()): Stripe.Invoice {
+    return {
+      id: 'in_preview',
+      object: 'invoice',
+      created: prorationDate,
+      status: 'draft',
+      currency: 'usd',
+      customer: 'cus_seat_capacity',
+      lines: {
+        object: 'list',
+        data: lines,
+        has_more: false,
+        url: '/v1/invoices/upcoming/lines',
+      },
+    } as Stripe.Invoice;
+  }
+
+  function draftInvoice(lines = mixedLines()): Stripe.Invoice {
+    return {
+      ...previewInvoice(lines),
+      id: 'in_actual',
+      status: 'draft',
+    } as Stripe.Invoice;
+  }
+
+  beforeEach(async () => {
+    KNOWN_SEAT_PRICE_IDS.add(seatPriceId);
+    jest.spyOn(client.invoiceItems, 'list').mockResolvedValue({
+      object: 'list',
+      data: [],
+      has_more: false,
+      url: '/v1/invoiceitems',
+    } as never);
+    actor = await insertTestUser();
+    const organization = await createOrganization(`Seat capacity fee ${Date.now()}`, actor.id);
+    organizationId = organization.id;
+  });
+
+  afterEach(() => {
+    KNOWN_SEAT_PRICE_IDS.delete(seatPriceId);
+    jest.restoreAllMocks();
+  });
+
+  test('preview and update share proration_date and exclude seat amount', async () => {
+    const store = memoryStore();
+    const retrieve = jest
+      .spyOn(client.subscriptions, 'retrieve')
+      .mockResolvedValue(orgSubscription() as never);
+    const createPreview = jest
+      .spyOn(client.invoices, 'createPreview')
+      .mockResolvedValue(previewInvoice() as never);
+    const update = jest.spyOn(client.subscriptions, 'update').mockResolvedValue({
+      ...orgSubscription(),
+      latest_invoice: draftInvoice(),
+    } as never);
+    const createItem = jest.spyOn(client.invoiceItems, 'create').mockResolvedValue({
+      id: 'ii_fee',
+      amount: 150,
+    } as never);
+    const finalize = jest.spyOn(client.invoices, 'finalizeInvoice').mockResolvedValue({
+      ...draftInvoice(),
+      status: 'open',
+    } as never);
+    jest.spyOn(client.invoices, 'pay').mockResolvedValue({
+      ...draftInvoice(),
+      status: 'paid',
+    } as never);
+
+    await handleUpdateSeatCount(subscriptionId, 10, 5, {
+      now,
+      store,
+      getOrganizationPurchaseChannel: async () => 'self_serve',
+      resolveTaxInput: async () => ({
+        source: 'price',
+        taxBehavior: 'exclusive',
+      }),
+      sendAlert: async () => undefined,
+    });
+
+    expect(createPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription: subscriptionId,
+        subscription_details: expect.objectContaining({
+          proration_date: prorationDate,
+          items: [
+            { id: seatItemId, quantity: 10 },
+            { id: passItemId, quantity: 10 },
+          ],
+        }),
+      })
+    );
+    expect(update).toHaveBeenCalledWith(
+      subscriptionId,
+      expect.objectContaining({
+        proration_date: prorationDate,
+        proration_behavior: 'always_invoice',
+        expand: ['latest_invoice.lines'],
+      }),
+      expect.any(Object)
+    );
+    expect(update.mock.calls[0]?.[1]).not.toHaveProperty('metadata');
+    expect(createItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 150,
+        discountable: false,
+      })
+    );
+    expect(createItem.mock.calls[0]?.[0]).not.toEqual(
+      expect.objectContaining({ invoice: 'in_actual' })
+    );
+    expect(
+      await store.findByAssessmentKey(
+        kiloPassOrgStripe.createSeatCapacityServiceFeeAssessmentKey({
+          subscriptionId,
+          prorationDate,
+          paidSeatQuantity: 10,
+        })
+      )
+    ).toMatchObject({
+      eligibleSubtotalMinor: 3_000,
+      expectedFeeMinor: 150,
+      chargedFeeMinor: 150,
+      outcome: 'charged',
+    });
+    expect(retrieve).toHaveBeenCalled();
+    expect(finalize).toHaveBeenCalled();
+  });
+
+  test('seat-only updates do not preview or persist an assessment', async () => {
+    const store = memoryStore();
+    const insert = jest.spyOn(store, 'insert');
+    jest.spyOn(client.subscriptions, 'retrieve').mockResolvedValue({
+      id: subscriptionId,
+      object: 'subscription',
+      status: 'active',
+      metadata: {
+        type: 'seats',
+        kiloUserId: actor.id,
+        organizationId,
+        seats: '10',
+      },
+      items: {
+        data: [
+          {
+            id: seatItemId,
+            quantity: 5,
+            current_period_start: prorationDate,
+            current_period_end: prorationDate + 2_592_000,
+            price: {
+              id: seatPriceId,
+              product: seatProductId,
+              unit_amount: 2_900,
+              recurring: { interval: 'month' },
+            },
+          },
+        ],
+      },
+    } as never);
+    const createPreview = jest.spyOn(client.invoices, 'createPreview');
+    jest.spyOn(client.subscriptions, 'update').mockResolvedValue({
+      id: subscriptionId,
+      object: 'subscription',
+      status: 'active',
+      metadata: {
+        type: 'seats',
+        kiloUserId: actor.id,
+        organizationId,
+        seats: '10',
+      },
+      items: {
+        data: [
+          {
+            id: seatItemId,
+            quantity: 10,
+            current_period_start: prorationDate,
+            current_period_end: prorationDate + 2_592_000,
+            price: {
+              id: seatPriceId,
+              product: seatProductId,
+              unit_amount: 2_900,
+              recurring: { interval: 'month' },
+            },
+          },
+        ],
+      },
+    } as never);
+
+    await expect(handleUpdateSeatCount(subscriptionId, 10, 5, { now, store })).resolves.toEqual(
+      expect.objectContaining({ success: true })
+    );
+    expect(createPreview).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  test('tax resolution failure fails open and still updates seats', async () => {
+    const store = memoryStore();
+    const sendAlert = jest.fn(async () => undefined);
+    jest.spyOn(client.subscriptions, 'retrieve').mockResolvedValue(orgSubscription() as never);
+    jest.spyOn(client.invoices, 'createPreview').mockResolvedValue(previewInvoice() as never);
+    const update = jest.spyOn(client.subscriptions, 'update').mockResolvedValue({
+      ...orgSubscription(),
+      latest_invoice: { ...draftInvoice(), status: 'open' },
+    } as never);
+    const createItem = jest.spyOn(client.invoiceItems, 'create');
+    jest.spyOn(client.invoices, 'pay').mockResolvedValue({
+      ...draftInvoice(),
+      status: 'paid',
+    } as never);
+
+    await expect(
+      handleUpdateSeatCount(subscriptionId, 10, 5, {
+        now,
+        store,
+        getOrganizationPurchaseChannel: async () => 'self_serve',
+        resolveTaxInput: async () => {
+          throw new Error('fee_application_failed');
+        },
+        sendAlert,
+      })
+    ).resolves.toEqual(expect.objectContaining({ success: true }));
+
+    expect(update).toHaveBeenCalled();
+    expect(createItem).not.toHaveBeenCalled();
+    expect(
+      await store.findByAssessmentKey(
+        kiloPassOrgStripe.createSeatCapacityServiceFeeAssessmentKey({
+          subscriptionId,
+          prorationDate,
+          paidSeatQuantity: 10,
+        })
+      )
+    ).toMatchObject({
+      outcome: 'missed',
+      failureCode: 'fee_application_failed',
+      expectedFeeMinor: 150,
+    });
+    expect(sendAlert).toHaveBeenCalled();
+  });
+
+  test('injected tax attaches the prepared fee before finalize', async () => {
+    const store = memoryStore();
+    const calls: string[] = [];
+    jest.spyOn(client.subscriptions, 'retrieve').mockResolvedValue(orgSubscription() as never);
+    jest.spyOn(client.invoices, 'createPreview').mockImplementation(async () => {
+      calls.push('preview');
+      return previewInvoice() as never;
+    });
+    jest.spyOn(client.subscriptions, 'update').mockImplementation(async () => {
+      calls.push('update');
+      return {
+        ...orgSubscription(),
+        latest_invoice: draftInvoice(),
+      } as never;
+    });
+    jest.spyOn(client.invoiceItems, 'create').mockImplementation(async () => {
+      calls.push('attach');
+      return { id: 'ii_fee', amount: 150 } as never;
+    });
+    jest.spyOn(client.invoices, 'finalizeInvoice').mockImplementation(async () => {
+      calls.push('finalize');
+      return { ...draftInvoice(), status: 'open' } as never;
+    });
+    jest.spyOn(client.invoices, 'pay').mockImplementation(async () => {
+      calls.push('pay');
+      return { ...draftInvoice(), status: 'paid' } as never;
+    });
+
+    await handleUpdateSeatCount(subscriptionId, 10, 5, {
+      now,
+      store,
+      getOrganizationPurchaseChannel: async () => 'self_serve',
+      resolveTaxInput: async () => ({
+        source: 'price',
+        taxBehavior: 'exclusive',
+      }),
+      sendAlert: async () => undefined,
+    });
+
+    expect(calls).toEqual(['preview', 'attach', 'update', 'attach', 'finalize', 'pay']);
+  });
+
+  test('does not preview, look up tax/exemption, or write assessments after the advisory lock', async () => {
+    const store = memoryStore();
+    const calls: string[] = [];
+    const originalTransaction = db.transaction.bind(db);
+    jest.spyOn(db, 'transaction').mockImplementation(((...args: unknown[]) => {
+      calls.push('transaction-start');
+      const result = originalTransaction(...(args as Parameters<typeof db.transaction>));
+      return Promise.resolve(result).then(value => {
+        calls.push('transaction-end');
+        return value;
+      });
+    }) as typeof db.transaction);
+    const originalInsert = store.insert.bind(store);
+    jest.spyOn(store, 'insert').mockImplementation(async record => {
+      calls.push('assessment-insert');
+      return originalInsert(record);
+    });
+    jest.spyOn(client.subscriptions, 'retrieve').mockResolvedValue(orgSubscription() as never);
+    jest.spyOn(client.invoices, 'createPreview').mockImplementation(async () => {
+      calls.push('preview');
+      return previewInvoice() as never;
+    });
+    const resolveTaxInput = jest.fn(async () => {
+      calls.push('tax');
+      return {
+        source: 'price' as const,
+        taxBehavior: 'exclusive' as const,
+      };
+    });
+    const findEffectiveExemption = jest.fn(async () => {
+      calls.push('exemption');
+      return null;
+    });
+    jest.spyOn(client.subscriptions, 'update').mockImplementation(async () => {
+      calls.push('update');
+      return {
+        ...orgSubscription(),
+        latest_invoice: draftInvoice(),
+      } as never;
+    });
+    jest.spyOn(client.invoiceItems, 'create').mockImplementation(async () => {
+      calls.push('attach');
+      return { id: 'ii_fee', amount: 150 } as never;
+    });
+    jest.spyOn(client.invoices, 'finalizeInvoice').mockResolvedValue({
+      ...draftInvoice(),
+      status: 'open',
+    } as never);
+    jest.spyOn(client.invoices, 'pay').mockResolvedValue({
+      ...draftInvoice(),
+      status: 'paid',
+    } as never);
+
+    await handleUpdateSeatCount(subscriptionId, 10, 5, {
+      now,
+      store,
+      getOrganizationPurchaseChannel: async () => 'self_serve',
+      resolveTaxInput,
+      findEffectiveExemption,
+      sendAlert: async () => undefined,
+    });
+
+    const transactionStart = calls.indexOf('transaction-start');
+    const transactionEnd = calls.indexOf('transaction-end');
+    expect(transactionStart).toBeGreaterThan(-1);
+    expect(transactionEnd).toBeGreaterThan(transactionStart);
+    expect(calls.indexOf('preview')).toBeLessThan(transactionStart);
+    expect(calls.indexOf('tax')).toBeLessThan(transactionStart);
+    expect(calls.indexOf('exemption')).toBeLessThan(transactionStart);
+    expect(calls.indexOf('assessment-insert')).toBeLessThan(transactionStart);
+    expect(calls.indexOf('attach')).toBeLessThan(transactionStart);
+    expect(calls.lastIndexOf('attach')).toBeGreaterThan(transactionEnd);
+    expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('preview');
+    expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('tax');
+    expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('exemption');
+    expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('assessment-insert');
+    expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('attach');
+  });
 });

@@ -201,7 +201,35 @@ export function enumCheck<T extends Record<string, string>>(
   );
 }
 
+export const StripeServiceFeeFlow = {
+  PersonalTopUp: 'personal_top_up',
+  OrganizationTopUp: 'organization_top_up',
+  PersonalAutoTopUpSetup: 'personal_auto_top_up_setup',
+  OrganizationAutoTopUpSetup: 'organization_auto_top_up_setup',
+  PersonalAutoTopUp: 'personal_auto_top_up',
+  OrganizationAutoTopUp: 'organization_auto_top_up',
+  PersonalKiloPass: 'personal_kilo_pass',
+  OrganizationKiloPass: 'organization_kilo_pass',
+} as const;
+
+export type StripeServiceFeeFlow = (typeof StripeServiceFeeFlow)[keyof typeof StripeServiceFeeFlow];
+
+export const StripeServiceFeeOutcome = {
+  Pending: 'pending',
+  Charged: 'charged',
+  Exempt: 'exempt',
+  PreActivation: 'pre_activation',
+  ZeroRounded: 'zero_rounded',
+  UnsupportedCurrency: 'unsupported_currency',
+  Missed: 'missed',
+} as const;
+
+export type StripeServiceFeeOutcome =
+  (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
+
 export const SCHEMA_CHECK_ENUMS = {
+  StripeServiceFeeFlow,
+  StripeServiceFeeOutcome,
   KiloPassTier,
   KiloPassCadence,
   KiloPassPaymentProvider,
@@ -10910,3 +10938,209 @@ export const user_terms_acceptances = pgTable(
 
 export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
 export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;
+
+export const organization_service_fee_exemptions = pgTable(
+  'organization_service_fee_exemptions',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    is_exempt: boolean().notNull(),
+    reason: text().notNull(),
+    changed_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_org_svc_fee_exemptions_organization',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.changed_by_kilo_user_id],
+      foreignColumns: [kilocode_users.id],
+      name: 'FK_org_svc_fee_exemptions_changed_by',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    index('IDX_org_service_fee_exemptions_org_created_at').on(
+      table.organization_id,
+      table.created_at.desc()
+    ),
+    check(
+      'organization_service_fee_exemptions_reason_check',
+      sql`length(trim(${table.reason})) > 0`
+    ),
+  ]
+);
+
+export type OrganizationServiceFeeExemption =
+  typeof organization_service_fee_exemptions.$inferSelect;
+export type NewOrganizationServiceFeeExemption =
+  typeof organization_service_fee_exemptions.$inferInsert;
+
+export const stripe_service_fee_assessments = pgTable(
+  'stripe_service_fee_assessments',
+  {
+    assessment_key: text().primaryKey().notNull(),
+    version: text().notNull(),
+    flow: text().notNull().$type<StripeServiceFeeFlow>(),
+    outcome: text().notNull().$type<StripeServiceFeeOutcome>(),
+    currency: text().notNull(),
+    kilo_user_id: text(),
+    organization_id: uuid(),
+    stripe_customer_id: text(),
+    stripe_checkout_session_id: text(),
+    stripe_invoice_id: text(),
+    stripe_payment_intent_id: text(),
+    stripe_charge_id: text(),
+    stripe_fee_price_id: text(),
+    stripe_checkout_fee_line_item_id: text(),
+    stripe_invoice_fee_line_item_id: text(),
+    eligibility_created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    eligible_subtotal_minor: integer().notNull(),
+    expected_fee_minor: integer().notNull(),
+    charged_fee_minor: integer().default(0).notNull(),
+    gross_paid_minor: integer().default(0).notNull(),
+    settled_product_minor: integer().default(0).notNull(),
+    refunded_product_minor: integer().default(0).notNull(),
+    refunded_fee_minor: integer().default(0).notNull(),
+    refunded_gross_minor: integer().default(0).notNull(),
+    disputed_fee_minor: integer().default(0).notNull(),
+    settled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    exemption_id: uuid(),
+    failure_code: text(),
+    metadata: jsonb().$type<Record<string, unknown>>().default({}).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.kilo_user_id],
+      foreignColumns: [kilocode_users.id],
+      name: 'FK_stripe_svc_fee_assessments_kilo_user',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.organization_id],
+      foreignColumns: [organizations.id],
+      name: 'FK_stripe_svc_fee_assessments_organization',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.exemption_id],
+      foreignColumns: [organization_service_fee_exemptions.id],
+      name: 'FK_stripe_svc_fee_assessments_exemption',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    index('IDX_stripe_service_fee_assessments_stripe_customer_id').on(table.stripe_customer_id),
+    uniqueIndex('UQ_stripe_service_fee_assessments_checkout_session_id')
+      .on(table.stripe_checkout_session_id)
+      .where(isNotNull(table.stripe_checkout_session_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_stripe_invoice_id')
+      .on(table.stripe_invoice_id)
+      .where(isNotNull(table.stripe_invoice_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_stripe_payment_intent_id')
+      .on(table.stripe_payment_intent_id)
+      .where(isNotNull(table.stripe_payment_intent_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_stripe_charge_id')
+      .on(table.stripe_charge_id)
+      .where(isNotNull(table.stripe_charge_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_checkout_fee_line_item_id')
+      .on(table.stripe_checkout_fee_line_item_id)
+      .where(isNotNull(table.stripe_checkout_fee_line_item_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_invoice_fee_line_item_id')
+      .on(table.stripe_invoice_fee_line_item_id)
+      .where(isNotNull(table.stripe_invoice_fee_line_item_id)),
+    enumCheck('stripe_service_fee_assessments_flow_check', table.flow, StripeServiceFeeFlow),
+    enumCheck(
+      'stripe_service_fee_assessments_outcome_check',
+      table.outcome,
+      StripeServiceFeeOutcome
+    ),
+    check('stripe_service_fee_assessments_currency_check', sql`${table.currency} ~ '^[a-z]{3}$'`),
+    check(
+      'stripe_service_fee_assessments_owner_check',
+      sql`(
+        ${table.flow} LIKE 'personal_%'
+        AND ${table.kilo_user_id} IS NOT NULL
+        AND ${table.organization_id} IS NULL
+      ) OR (
+        ${table.flow} LIKE 'organization_%'
+        AND ${table.organization_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'stripe_service_fee_assessments_amounts_nonnegative_check',
+      sql`${table.eligible_subtotal_minor} >= 0
+        AND ${table.expected_fee_minor} >= 0
+        AND ${table.charged_fee_minor} >= 0
+        AND ${table.gross_paid_minor} >= 0
+        AND ${table.settled_product_minor} >= 0
+        AND ${table.refunded_product_minor} >= 0
+        AND ${table.refunded_fee_minor} >= 0
+        AND ${table.refunded_gross_minor} >= 0
+        AND ${table.disputed_fee_minor} >= 0`
+    ),
+    check(
+      'stripe_service_fee_assessments_refund_fee_check',
+      sql`${table.refunded_fee_minor} <= ${table.charged_fee_minor}`
+    ),
+    check(
+      'stripe_service_fee_assessments_refund_product_check',
+      sql`${table.refunded_product_minor} <= ${table.settled_product_minor}`
+    ),
+    check(
+      'stripe_service_fee_assessments_disputed_fee_check',
+      sql`${table.disputed_fee_minor} <= ${table.charged_fee_minor}`
+    ),
+    check(
+      'stripe_service_fee_assessments_pending_check',
+      sql`${table.outcome} <> 'pending'
+        OR (${table.charged_fee_minor} = 0 AND ${table.settled_at} IS NULL)`
+    ),
+    check(
+      'stripe_service_fee_assessments_charged_check',
+      sql`${table.outcome} <> 'charged' OR (
+        (
+          ${table.stripe_invoice_fee_line_item_id} IS NOT NULL
+          OR ${table.stripe_checkout_fee_line_item_id} IS NOT NULL
+          OR ${table.settled_at} IS NOT NULL
+        )
+        AND (${table.charged_fee_minor} <> 0 OR ${table.settled_product_minor} = 0)
+      )`
+    ),
+    check(
+      'stripe_service_fee_assessments_missed_check',
+      sql`${table.outcome} <> 'missed' OR (
+        ${table.expected_fee_minor} > 0
+        AND ${table.charged_fee_minor} = 0
+        AND ${table.failure_code} IS NOT NULL
+        AND length(trim(${table.failure_code})) > 0
+      )`
+    ),
+    check(
+      'stripe_service_fee_assessments_zero_rounded_check',
+      sql`${table.outcome} <> 'zero_rounded' OR ${table.expected_fee_minor} = 0`
+    ),
+    check(
+      'stripe_service_fee_assessments_uncharged_outcome_check',
+      sql`${table.outcome} NOT IN ('exempt', 'pre_activation', 'zero_rounded', 'unsupported_currency')
+        OR ${table.charged_fee_minor} = 0`
+    ),
+    check(
+      'stripe_service_fee_assessments_exemption_check',
+      sql`(${table.outcome} = 'exempt') = (${table.exemption_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
+export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;

@@ -4,12 +4,14 @@ import type Stripe from 'stripe';
 
 import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
+import { isServiceFeeInvoiceLine } from '@/lib/service-fees/stripe-lines';
 
 function getInvoiceLinePriceIds(invoice: Stripe.Invoice): string[] {
   const ids: string[] = [];
   const lines = invoice.lines?.data ?? [];
 
   for (const line of lines) {
+    if (isServiceFeeInvoiceLine(line)) continue;
     const priceId = line.pricing?.price_details?.price ?? null;
     if (priceId) ids.push(priceId);
   }

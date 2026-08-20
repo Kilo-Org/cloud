@@ -20,6 +20,15 @@ type ProcessTopUpOptions = {
   /** If true, this is a native auto top-up (not Orb) */
   isAutoTopUp?: boolean;
 
+  /** Observed service fee in minor units. Omitted or 0 hides the email fee row. */
+  serviceFeeCents?: number;
+
+  /** Gross amount paid in minor units, including fee and tax when present. */
+  grossPaidCents?: number;
+
+  /** Credits granted in minor units. Defaults to the trusted principal. */
+  creditsCents?: number;
+
   /**
    * Optional transaction handle.
    *
@@ -66,6 +75,9 @@ export async function processTopUp(
     creditDescription: creditDescriptionOverride,
     creditTransactionId: creditTransactionIdOverride,
     skipPostTopUpFreeStuff = false,
+    serviceFeeCents = 0,
+    grossPaidCents = amountInCents,
+    creditsCents = amountInCents,
   } = options;
 
   const creditDescription =
@@ -117,6 +129,9 @@ export async function processTopUp(
       await recoverTopUpConfirmationEmailIfMissing({
         user,
         amountInCents,
+        serviceFeeCents,
+        grossPaidCents,
+        creditsCents,
         stripeChargeOrInvoiceId: config.stripe_payment_id,
         isAutoTopUp,
       });
@@ -178,6 +193,9 @@ export async function processTopUp(
     await maybeSendTopUpConfirmationEmail({
       user,
       amountInCents,
+      serviceFeeCents,
+      grossPaidCents,
+      creditsCents,
       stripeChargeOrInvoiceId: config.stripe_payment_id,
       isAutoTopUp,
     });
@@ -245,11 +263,23 @@ async function runPostTopUpBestEffortStep(params: {
 async function maybeSendTopUpConfirmationEmail(params: {
   user: User;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
   purchaseDate?: Date;
 }): Promise<void> {
-  const { user, amountInCents, stripeChargeOrInvoiceId, isAutoTopUp, purchaseDate } = params;
+  const {
+    user,
+    amountInCents,
+    serviceFeeCents = 0,
+    grossPaidCents = amountInCents,
+    creditsCents = amountInCents,
+    stripeChargeOrInvoiceId,
+    isAutoTopUp,
+    purchaseDate,
+  } = params;
   try {
     const insertResult = await db
       .insert(transactional_email_log)
@@ -269,8 +299,10 @@ async function maybeSendTopUpConfirmationEmail(params: {
     const sendResult = await sendCreditsTopUpEmail({
       to: user.google_user_email,
       variant: isAutoTopUp ? 'auto' : 'manual',
-      amountCents: amountInCents,
-      creditsCents: amountInCents,
+      principalCents: amountInCents,
+      serviceFeeCents,
+      grossPaidCents,
+      creditsCents,
       purchaseDate: purchaseDate ?? new Date(),
       receiptUrl,
     });
@@ -306,6 +338,9 @@ async function maybeSendTopUpConfirmationEmail(params: {
 async function recoverTopUpConfirmationEmailIfMissing(params: {
   user: User;
   amountInCents: number;
+  serviceFeeCents?: number;
+  grossPaidCents?: number;
+  creditsCents?: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
 }): Promise<void> {

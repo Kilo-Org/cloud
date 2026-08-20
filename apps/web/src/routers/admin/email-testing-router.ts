@@ -6,7 +6,9 @@ import { verifyEmail } from '@/lib/email-neverbounce';
 import {
   subjects,
   creditsVars,
+  buildCreditsTopUpCreditsRowSection,
   buildCreditsTopUpReceiptSection,
+  buildCreditsTopUpServiceFeeSection,
   RawHtml,
   renderTemplate,
   type TemplateName,
@@ -187,8 +189,16 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         heading: 'Thanks for your top-up',
         intro:
           'Your Kilo credit top-up has been processed and the credits are now available on your account.',
+        amount_label: 'Amount',
         amount_usd: '10.00',
-        credits_usd: '10.00',
+        service_fee_section: buildCreditsTopUpServiceFeeSection({
+          serviceFeeCents: 0,
+          grossPaidCents: 1000,
+        }),
+        credits_row_section: buildCreditsTopUpCreditsRowSection({
+          creditsCents: 1000,
+          hasServiceFee: false,
+        }),
         purchase_date: formatDate(new Date()),
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),

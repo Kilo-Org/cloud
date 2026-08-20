@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
 
-const BYTES_PER_MEGABYTE = 1024 * 1024;
+const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
 export default function ApiRequestLogPage() {
   const [userId, setUserId] = useState('');
@@ -60,7 +60,7 @@ export default function ApiRequestLogPage() {
           <p className="text-muted-foreground text-sm tabular-nums">
             {summaryQuery.data.recordCount.toLocaleString()}{' '}
             {summaryQuery.data.recordCount === 1 ? 'record' : 'records'} ·{' '}
-            {(summaryQuery.data.sizeBytes / BYTES_PER_MEGABYTE).toFixed(1)} MB
+            {(summaryQuery.data.sizeBytes / BYTES_PER_GIGABYTE).toFixed(2)} GB
             {summaryQuery.data.oldestCreatedAt && (
               <>
                 {' '}

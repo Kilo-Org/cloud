@@ -90,6 +90,9 @@ type StripeMock = {
   };
   invoices: {
     list: ReturnType<typeof jest.fn>;
+    voidInvoice: ReturnType<typeof jest.fn>;
+    del: ReturnType<typeof jest.fn>;
+    retrieve: ReturnType<typeof jest.fn>;
   };
 };
 
@@ -374,6 +377,9 @@ jest.mock('@/lib/stripe-client', () => {
     },
     invoices: {
       list: jest.fn(),
+      voidInvoice: jest.fn(),
+      del: jest.fn(),
+      retrieve: jest.fn(),
     },
   };
 
@@ -491,6 +497,9 @@ function expectNoStripeManagementCalls(stripeMock: StripeMock): void {
   expect(stripeMock.subscriptionSchedules.update).not.toHaveBeenCalled();
   expect(stripeMock.subscriptionSchedules.release).not.toHaveBeenCalled();
   expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+  expect(stripeMock.invoices.voidInvoice).not.toHaveBeenCalled();
+  expect(stripeMock.invoices.del).not.toHaveBeenCalled();
+  expect(stripeMock.invoices.retrieve).not.toHaveBeenCalled();
 }
 
 async function insertBaseCreditsIssuance(params: {
@@ -684,6 +693,10 @@ describe('kiloPassRouter', () => {
     stripeMock.checkout.sessions.retrieve.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
+    stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
+    stripeMock.invoices.voidInvoice.mockReset();
+    stripeMock.invoices.del.mockReset();
+    stripeMock.invoices.retrieve.mockReset();
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
     getStoreCompletionMock().completeStoreKiloPassPurchase.mockReset();
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockReset();
@@ -3819,6 +3832,16 @@ describe('kiloPassRouter', () => {
       expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_test_cancel_me', {
         cancel_at_period_end: true,
       });
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+        subscription: 'sub_test_cancel_me',
+        status: 'open',
+        limit: 100,
+      });
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+        subscription: 'sub_test_cancel_me',
+        status: 'draft',
+        limit: 100,
+      });
 
       const updated = await db.query.kilo_pass_subscriptions.findFirst({
         columns: { status: true, cancel_at_period_end: true },
@@ -3826,6 +3849,81 @@ describe('kiloPassRouter', () => {
       });
       expect(updated?.status).toBe('active');
       expect(updated?.cancel_at_period_end).toBe(true);
+    });
+
+    it('voids open invoices and deletes draft invoices so Stripe stops collection', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.update.mockResolvedValue({});
+      stripeMock.invoices.list.mockImplementation(async (params: { status?: string }) => {
+        if (params.status === 'open') {
+          return { data: [{ id: 'in_open_failed', status: 'open' }], has_more: false };
+        }
+        if (params.status === 'draft') {
+          return { data: [{ id: 'in_draft_pending', status: 'draft' }], has_more: false };
+        }
+        return { data: [], has_more: false };
+      });
+      stripeMock.invoices.voidInvoice.mockResolvedValue({});
+      stripeMock.invoices.del.mockResolvedValue({});
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-void-invoices@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_cancel_void',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancelAtPeriodEnd: false,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.cancelSubscription();
+
+      expect(result).toEqual({ success: true });
+      expect(stripeMock.invoices.voidInvoice).toHaveBeenCalledWith('in_open_failed');
+      expect(stripeMock.invoices.del).toHaveBeenCalledWith('in_draft_pending');
+
+      const updated = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { cancel_at_period_end: true },
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_cancel_void'),
+      });
+      expect(updated?.cancel_at_period_end).toBe(true);
+    });
+
+    it('does not persist cancellation when voiding collectible invoices fails', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.update.mockResolvedValue({});
+      stripeMock.invoices.list.mockImplementation(async (params: { status?: string }) => {
+        if (params.status === 'open') {
+          return { data: [{ id: 'in_open_failed', status: 'open' }], has_more: false };
+        }
+        return { data: [], has_more: false };
+      });
+      stripeMock.invoices.voidInvoice.mockRejectedValue(new Error('stripe void failed'));
+      stripeMock.invoices.retrieve.mockResolvedValue({ status: 'open' });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-void-fails@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_cancel_void_fail',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancelAtPeriodEnd: false,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.cancelSubscription()).rejects.toThrow('stripe void failed');
+
+      const updated = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { cancel_at_period_end: true },
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_cancel_void_fail'),
+      });
+      expect(updated?.cancel_at_period_end).toBe(false);
     });
 
     it('rejects active Google Play subscriptions without canceling in Stripe', async () => {

@@ -32,6 +32,7 @@ type RepositoryProviderOnboardingPanelProps = {
   organizationId?: string;
   isCheckingConnection?: boolean;
   onCheckConnection: () => void;
+  returnTo?: string;
 };
 
 type RepositoryProvider = {
@@ -40,10 +41,17 @@ type RepositoryProvider = {
   icon: ReactNode;
 };
 
+function withReturnTo(href: string, returnTo?: string): string {
+  if (!returnTo) return href;
+  const separator = href.includes('?') ? '&' : '?';
+  return `${href}${separator}returnTo=${encodeURIComponent(returnTo)}`;
+}
+
 export function RepositoryProviderOnboardingPanel({
   organizationId,
   isCheckingConnection = false,
   onCheckConnection,
+  returnTo,
 }: RepositoryProviderOnboardingPanelProps) {
   const integrationBasePath = organizationId
     ? `/organizations/${organizationId}/integrations`
@@ -51,12 +59,12 @@ export function RepositoryProviderOnboardingPanel({
   const providers: RepositoryProvider[] = [
     {
       name: 'GitHub',
-      href: `${integrationBasePath}/github`,
+      href: withReturnTo(`${integrationBasePath}/github`, returnTo),
       icon: <ProviderLogo provider="github" className="size-5 text-foreground" />,
     },
     {
       name: 'GitLab',
-      href: `${integrationBasePath}/gitlab`,
+      href: withReturnTo(`${integrationBasePath}/gitlab`, returnTo),
       icon: <ProviderLogo provider="gitlab" className="size-5 text-[#FC6D26]" />,
     },
   ];
@@ -64,7 +72,7 @@ export function RepositoryProviderOnboardingPanel({
   if (organizationId) {
     providers.push({
       name: 'Bitbucket',
-      href: `${integrationBasePath}/bitbucket`,
+      href: withReturnTo(`${integrationBasePath}/bitbucket`, returnTo),
       icon: <ProviderLogo provider="bitbucket" className="size-5 text-[#0C66E4]" />,
     });
   }

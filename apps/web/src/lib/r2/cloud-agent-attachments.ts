@@ -1,6 +1,5 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
   CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION,
@@ -13,8 +12,6 @@ import {
 } from '@/lib/cloud-agent/constants';
 import { cloudAgentRelaxedAttachmentFilenameSchema } from '@/routers/cloud-agent-next-schemas';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
-import { db } from '@/lib/drizzle';
-import { cloud_agent_attachment_uploads } from '@kilocode/db/schema';
 
 type Service = 'app-builder' | 'cloud-agent';
 
@@ -142,14 +139,6 @@ export async function generateCloudAgentAttachmentUploadUrl({
     signableHeaders: new Set(['content-length', 'content-type']),
   });
 
-  // Write the TTL ledger row before returning the signed URL so the reaper can
-  // track unconsumed objects. `onConflictDoNothing` keeps a re-presign of the
-  // same key (e.g. a retried upload) from erroring on the unique `r2_key`.
-  await db
-    .insert(cloud_agent_attachment_uploads)
-    .values({ user_id: userId, r2_key: key })
-    .onConflictDoNothing({ target: cloud_agent_attachment_uploads.r2_key });
-
   return {
     signedUrl,
     key,
@@ -157,49 +146,6 @@ export async function generateCloudAgentAttachmentUploadUrl({
       Date.now() + CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS * 1000
     ).toISOString(),
   };
-}
-
-/**
- * Mark the caller's uploaded attachments as consumed by FULL R2 key, so the TTL
- * reaper never deletes an object a sent message still references. This is the
- * single place the `consumed_at` update runs. No-op when `keys` is empty.
- */
-export async function markCloudAgentAttachmentUploadsConsumedByKeys(params: {
-  userId: string;
-  keys: string[];
-}): Promise<void> {
-  const { userId, keys } = params;
-  if (keys.length === 0) {
-    return;
-  }
-  await db
-    .update(cloud_agent_attachment_uploads)
-    .set({ consumed_at: sql`now()` })
-    .where(
-      and(
-        eq(cloud_agent_attachment_uploads.user_id, userId),
-        inArray(cloud_agent_attachment_uploads.r2_key, keys)
-      )
-    );
-}
-
-/**
- * Mark the caller's uploaded attachments as consumed server-side, so the TTL
- * reaper never deletes an object a sent message still references. Old clients
- * never call `markAttachmentsSent`, so the send mutations mark the rows for the
- * wire payload they already carry. `attachments` is the wire shape
- * `{ path: messageUuid, files: [basename] }`; the full key is rebuilt here.
- */
-export async function markCloudAgentAttachmentUploadsConsumed(params: {
-  userId: string;
-  attachments?: { path: string; files: string[] };
-}): Promise<void> {
-  const { userId, attachments } = params;
-  if (!attachments || attachments.files.length === 0) {
-    return;
-  }
-  const keys = attachments.files.map(file => `${userId}/cloud-agent/${attachments.path}/${file}`);
-  await markCloudAgentAttachmentUploadsConsumedByKeys({ userId, keys });
 }
 
 export type GenerateCloudAgentAttachmentDownloadUrlParams = {

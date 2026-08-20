@@ -30,8 +30,6 @@ const uploadState = vi.hoisted(() => ({
   isUploading: false,
 }));
 
-const markAttachmentsSentMock = vi.hoisted(() => vi.fn(async () => undefined));
-
 const toastErrorMock = vi.hoisted(() => vi.fn());
 const toastWarningMock = vi.hoisted(() => vi.fn());
 
@@ -182,10 +180,6 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
   }),
 }));
 
-vi.mock('@/lib/agent-attachments/upload-task', () => ({
-  markAttachmentsSent: markAttachmentsSentMock,
-}));
-
 vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
   useAndroidPendingPickerRecovery: () => undefined,
 }));
@@ -310,13 +304,12 @@ beforeEach(() => {
 });
 
 describe('ChatComposer attachment-only send', () => {
-  it('sends an empty draft with a ready attachment, passing the returned payload and marking sent', async () => {
+  it('sends an empty draft with a ready attachment, passing the returned payload', async () => {
     uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
     uploadState.uploadPending = () => ({
       ok: true,
       wire: { path: 'path-1', files: ['file.png'] },
       submission: undefined,
-      keys: ['user-1/cloud-agent/path-1/file.png'],
     });
 
     const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
@@ -326,11 +319,6 @@ describe('ChatComposer attachment-only send', () => {
 
     expect(onSendMock).toHaveBeenCalledTimes(1);
     expect(onSendMock).toHaveBeenCalledWith('', { path: 'path-1', files: ['file.png'] }, undefined);
-    expect(markAttachmentsSentMock).toHaveBeenCalledTimes(1);
-    expect(markAttachmentsSentMock).toHaveBeenCalledWith({
-      organizationId: undefined,
-      keys: ['user-1/cloud-agent/path-1/file.png'],
-    });
   });
 
   it('does not send an empty draft with no attachments', async () => {
@@ -340,7 +328,6 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).not.toHaveBeenCalled();
-    expect(markAttachmentsSentMock).not.toHaveBeenCalled();
   });
 
   it('warns but still sends when a chip kept its original metadata', async () => {
@@ -351,7 +338,6 @@ describe('ChatComposer attachment-only send', () => {
       ok: true,
       wire: { path: 'path-1', files: ['file.png'] },
       submission: undefined,
-      keys: ['user-1/cloud-agent/path-1/file.png'],
     });
 
     const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
@@ -364,7 +350,6 @@ describe('ChatComposer attachment-only send', () => {
     );
     // Warn, not block: the send still proceeds.
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(markAttachmentsSentMock).toHaveBeenCalledTimes(1);
   });
 
   it('toasts when a send is blocked by an in-flight upload', async () => {

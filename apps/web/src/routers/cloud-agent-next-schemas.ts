@@ -148,15 +148,6 @@ export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
   filename: cloudAgentRelaxedAttachmentFilenameSchema,
 });
 
-/**
- * Mark a set of uploaded attachments as consumed. `keys` are FULL R2 keys
- * (`${userId}/cloud-agent/${messageUuid}/${id}.${ext}`), never basenames — the
- * ledger's unique column is `r2_key`.
- */
-export const cloudAgentMarkAttachmentsSentSchema = z.object({
-  keys: z.array(z.string().min(1).max(500)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
-});
-
 function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
   return data.images === undefined || data.attachments === undefined;
 }

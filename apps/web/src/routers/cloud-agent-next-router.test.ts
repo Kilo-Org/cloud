@@ -52,14 +52,6 @@ const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
-const mockMarkCloudAgentAttachmentUploadsConsumed =
-  jest.fn<
-    (input: { userId: string; attachments?: { path: string; files: string[] } }) => Promise<void>
-  >();
-
-const mockMarkCloudAgentAttachmentUploadsConsumedByKeys =
-  jest.fn<(input: { userId: string; keys: string[] }) => Promise<void>>();
-
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
@@ -142,8 +134,6 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl: mockGenerateCloudAgentAttachmentDownloadUrl,
-  markCloudAgentAttachmentUploadsConsumed: mockMarkCloudAgentAttachmentUploadsConsumed,
-  markCloudAgentAttachmentUploadsConsumedByKeys: mockMarkCloudAgentAttachmentUploadsConsumedByKeys,
 }));
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({
@@ -191,7 +181,6 @@ let createCaller: (ctx: { user: User }) => {
   }>;
   listGitHubRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
   listGitLabRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
-  markAttachmentsSent: (input: { keys: string[] }) => Promise<{ success: boolean }>;
 };
 
 beforeAll(async () => {
@@ -240,10 +229,6 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
-    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
-      userId: 'user-1',
-      attachments,
-    });
   });
 
   it('normalizes legacy image requests to canonical Worker attachments', async () => {
@@ -261,10 +246,6 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments: images }));
     expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
-    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
-      userId: 'user-1',
-      attachments: images,
-    });
   });
 
   it('routes free follow-up prompt models through the balance-skip client', async () => {
@@ -531,10 +512,6 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
     );
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
-    expect(mockMarkCloudAgentAttachmentUploadsConsumed).toHaveBeenCalledWith({
-      userId: 'user-1',
-      attachments: images,
-    });
   });
 
   it('rejects personal Bitbucket sessions before constructing a Cloud Agent client', async () => {
@@ -661,27 +638,6 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
       isFree: false,
       hasUserByokAvailable: false,
-    });
-  });
-});
-
-describe('cloudAgentNextRouter.markAttachmentsSent', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('marks the caller-owned rows via the shared keys helper with the full keys', async () => {
-    const caller = createCaller({ user: { id: 'user-owner', is_admin: false } as User });
-    // A key that belongs to a different user: the shared helper must still
-    // scope the update to the caller, so another user's row is never marked.
-    const foreignKey = 'user-other/cloud-agent/msg-1/file.pdf';
-
-    await caller.markAttachmentsSent({ keys: [foreignKey] });
-
-    expect(mockMarkCloudAgentAttachmentUploadsConsumedByKeys).toHaveBeenCalledTimes(1);
-    expect(mockMarkCloudAgentAttachmentUploadsConsumedByKeys).toHaveBeenCalledWith({
-      userId: 'user-owner',
-      keys: [foreignKey],
     });
   });
 });

@@ -18,7 +18,7 @@ export type AgentAttachment = {
   filename: string;
   /** Basename of the server-side R2 key; set once the upload succeeds. */
   remoteFilename?: string;
-  /** Full server-side R2 key; set once the upload succeeds. `markAttachmentsSent` consumes it. */
+  /** Full server-side R2 key; set once the upload succeeds. */
   remoteKey?: string;
   kind: AgentAttachmentKind;
   /** Normalized extension used for the R2 key suffix and MIME derivation. */

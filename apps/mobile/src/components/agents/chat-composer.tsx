@@ -72,7 +72,6 @@ import {
   type UploadPendingResult,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { markAttachmentsSent } from '@/lib/agent-attachments/upload-task';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import {
@@ -804,9 +803,6 @@ export function ChatComposer({
           },
         }
       );
-      if (uploaded) {
-        await markAttachmentsSent({ organizationId, keys: uploaded.keys });
-      }
     } catch {
       // Draft preserved; error already surfaced by the caller. The helper
       // will release the lock and clear pending state in its finally block.

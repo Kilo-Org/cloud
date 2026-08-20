@@ -459,7 +459,7 @@ describe('uploadPending', () => {
     renderer.unmount();
   });
 
-  it('resolves { ok: true, wire, submission, keys } on full success with full-key keys', async () => {
+  it('resolves { ok: true, wire, submission } on full success', async () => {
     const renderer = await mountHook();
     await addDocument();
 
@@ -478,7 +478,6 @@ describe('uploadPending', () => {
         messageUuid: expect.any(String),
         files: [{ remoteName: 'doc.pdf', originalName: 'doc.pdf', size: 1024 }],
       },
-      keys: ['org/2026/08/uuid/doc.pdf'],
     });
     renderer.unmount();
   });

@@ -10915,34 +10915,3 @@ export const user_terms_acceptances = pgTable(
 
 export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
 export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;
-
-/**
- * Ledger of presigned Cloud Agent attachment uploads. A row is written when a
- * presigned upload URL is issued and marked `consumed_at` once the attachment
- * is sent. Unconsumed rows past the TTL are reaped by the
- * `cleanup-orphan-agent-attachments` cron. `user_id` is nullable on purpose:
- * `softDeleteUser` nulls it (and `consumed_at`) so the row is reaped the same
- * way as any orphan without leaking PII.
- */
-export const cloud_agent_attachment_uploads = pgTable(
-  'cloud_agent_attachment_uploads',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    r2_key: text().notNull().unique(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
-  },
-  table => [
-    index('IDX_cloud_agent_attachment_uploads_consumed_created').on(
-      table.consumed_at,
-      table.created_at
-    ),
-  ]
-);
-
-export type CloudAgentAttachmentUpload = typeof cloud_agent_attachment_uploads.$inferSelect;
-export type NewCloudAgentAttachmentUpload = typeof cloud_agent_attachment_uploads.$inferInsert;

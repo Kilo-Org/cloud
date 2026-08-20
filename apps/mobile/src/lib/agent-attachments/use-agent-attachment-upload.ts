@@ -87,7 +87,6 @@ export type UploadPendingResult =
       ok: true;
       wire: AgentAttachmentWire | undefined;
       submission: AgentAttachmentSubmissionPayload | undefined;
-      keys: string[];
     }
   | { ok: false };
 
@@ -464,7 +463,6 @@ export function useAgentAttachmentUpload(
         .map(r => [r.id, r])
     );
     const uploaded: AgentAttachment[] = [];
-    const keys: string[] = [];
     for (const chip of chips) {
       if (
         chip.status === 'uploaded' &&
@@ -472,7 +470,6 @@ export function useAgentAttachmentUpload(
         chip.remoteKey !== undefined
       ) {
         uploaded.push(chip);
-        keys.push(chip.remoteKey);
       } else {
         const result = resultById.get(chip.id);
         if (result) {
@@ -483,14 +480,13 @@ export function useAgentAttachmentUpload(
             remoteKey: result.remoteKey,
             progress: 1,
           });
-          keys.push(result.remoteKey);
         }
       }
     }
 
     const wire = buildWirePayload(uploaded, pathRef.current);
     const submission = buildSubmissionPayload(uploaded, pathRef.current, messageUuidRef.current);
-    return { ok: true, wire, submission, keys };
+    return { ok: true, wire, submission };
   }, [startUpload]);
 
   const isUploading = isAnyAttachmentUploading(attachments);

@@ -38,14 +38,11 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
-  cloudAgentMarkAttachmentsSentSchema,
 } from './cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl,
   generateImageUploadUrl,
-  markCloudAgentAttachmentUploadsConsumed,
-  markCloudAgentAttachmentUploadsConsumedByKeys,
 } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -171,21 +168,12 @@ export const cloudAgentNextRouter = createTRPCRouter({
       }
 
       try {
-        const result = await client.prepareSession({
+        return await client.prepareSession({
           ...restInput,
           ...gitParams,
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
         });
-        // Old clients never call `markAttachmentsSent`; mark the caller's
-        // attachment rows consumed here so the reaper cannot delete an object
-        // the prepared session references. Mark the same payload the Worker
-        // received (`attachments ?? images`).
-        await markCloudAgentAttachmentUploadsConsumed({
-          userId: ctx.user.id,
-          attachments: attachments ?? images,
-        });
-        return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
@@ -264,20 +252,11 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
         const { attachments, images, ...restInput } = input;
-        const result = await client.sendMessage({
+        return await client.sendMessage({
           ...restInput,
           attachments: attachments ?? images,
           messageId: input.messageId ?? generateMessageId(),
         });
-        // Old clients never call `markAttachmentsSent`; mark the caller's
-        // attachment rows consumed here so the reaper cannot delete an object
-        // the sent message references. Mark the same payload the Worker
-        // received (`attachments ?? images`).
-        await markCloudAgentAttachmentUploadsConsumed({
-          userId: ctx.user.id,
-          attachments: attachments ?? images,
-        });
-        return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
@@ -398,20 +377,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
         messageUuid: input.messageUuid,
         filename: input.filename,
       });
-    }),
-
-  /**
-   * Mark the caller's uploaded attachments as consumed so the TTL reaper never
-   * deletes an object a sent message still references. `keys` are FULL R2 keys.
-   */
-  markAttachmentsSent: baseProcedure
-    .input(cloudAgentMarkAttachmentsSentSchema)
-    .mutation(async ({ ctx, input }) => {
-      await markCloudAgentAttachmentUploadsConsumedByKeys({
-        userId: ctx.user.id,
-        keys: input.keys,
-      });
-      return { success: true };
     }),
 
   /**

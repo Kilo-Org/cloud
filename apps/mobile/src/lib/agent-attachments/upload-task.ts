@@ -109,26 +109,3 @@ export async function uploadOne(args: {
 export function describeTerminalReason(_reason: string): string {
   return "This file can't be uploaded.";
 }
-
-/**
- * Mark the given full R2 keys as consumed on the attachment-upload ledger.
- * Called after a successful send so the TTL reaper never deletes an object a
- * sent message still references. `keys` are FULL R2 keys, never basenames.
- */
-export async function markAttachmentsSent(args: {
-  organizationId?: string;
-  keys: string[];
-}): Promise<void> {
-  const { organizationId, keys } = args;
-  if (keys.length === 0) {
-    return;
-  }
-  if (organizationId) {
-    await trpcClient.organizations.cloudAgentNext.markAttachmentsSent.mutate({
-      keys,
-      organizationId,
-    });
-    return;
-  }
-  await trpcClient.cloudAgentNext.markAttachmentsSent.mutate({ keys });
-}

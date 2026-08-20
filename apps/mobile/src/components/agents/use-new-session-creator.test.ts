@@ -9,7 +9,6 @@ import { type AgentMode } from '@/components/agents/mode-selector';
 import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
-import { markAttachmentsSent } from '@/lib/agent-attachments/upload-task';
 
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
@@ -62,12 +61,6 @@ vi.mock('@/lib/trpc', () => ({
     organizations: { cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } } },
   },
   useTRPC: () => ({ mockTrpc: true }),
-}));
-
-// `markAttachmentsSent` pulls `expo-file-system/legacy` (→ react-native) at
-// import time; mock the module boundary so the pure node test never loads RN.
-vi.mock('@/lib/agent-attachments/upload-task', () => ({
-  markAttachmentsSent: vi.fn(async () => undefined),
 }));
 
 vi.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
@@ -150,12 +143,11 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   reset: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
-  uploadPending: vi.fn(async () => ({
-    ok: true as const,
-    wire: undefined,
-    submission: undefined,
-    keys: [],
-  })),
+    uploadPending: vi.fn(async () => ({
+      ok: true as const,
+      wire: undefined,
+      submission: undefined,
+    })),
 };
 
 function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
@@ -320,7 +312,6 @@ function runCreator(args: {
           ok: true as const,
           wire: attachmentsWire,
           submission: undefined,
-          keys: [] as string[],
         }),
       } as never,
       mode: (args.mode ?? 'code') as never,
@@ -548,28 +539,6 @@ describe('useNewSessionCreator operationKey', () => {
     } finally {
       process.off('unhandledRejection', onUnhandledRejection);
     }
-  });
-
-  it('does not treat a post-success ledger-mark failure as a create failure and rotates the key', async () => {
-    prepareSessionMutate.mockResolvedValue(sessionResult());
-    vi.mocked(markAttachmentsSent).mockRejectedValueOnce(new Error('ledger mark failed'));
-    const creator = runCreator({});
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-    // The create-failure toast path must not run for a post-success failure.
-    expect(toastError).not.toHaveBeenCalled();
-    // Navigation still happens: the session exists and must not be dropped.
-    expect(routerReplace).toHaveBeenCalledTimes(1);
-
-    // The next submit is a fresh intent with a fresh key, not a retry of the
-    // successful operation key.
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-
-    const keys = usedOperationKeys();
-    expect(keys[1]).toBeDefined();
-    expect(keys[1]).not.toBe(keys[0]);
   });
 
   it('navigates once and defers no stack mutation to a later frame', async () => {

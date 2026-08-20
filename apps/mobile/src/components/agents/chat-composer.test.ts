@@ -187,7 +187,6 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
       ok: true,
       wire: undefined,
       submission: undefined,
-      keys: [],
     })),
   }),
 }));
@@ -210,10 +209,6 @@ vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
 
 vi.mock('@/lib/agent-attachments/validate', () => ({
   describeClassificationFailure: vi.fn(),
-}));
-
-vi.mock('@/lib/agent-attachments/upload-task', () => ({
-  markAttachmentsSent: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({

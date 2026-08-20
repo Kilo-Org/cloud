@@ -68,7 +68,15 @@ export async function attemptPushRegistrationReconciliation(
   await awaitLogoutReconciliationSettled();
 
   if (attemptInFlight) {
-    return { kind: 'in-flight' };
+    if (lastAttemptUserId === userId) {
+      return { kind: 'in-flight' };
+    }
+    // The in-flight attempt belongs to a different user: the app switched
+    // accounts mid-attempt. Await it so the previous user's attempt settles,
+    // then fall through to run this user's attempt. The spacing check below
+    // keys on `lastAttemptUserId === userId`, so a different user is never
+    // spacing-skipped.
+    await attemptInFlight;
   }
   const now = Date.now();
   if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS && lastAttemptUserId === userId) {

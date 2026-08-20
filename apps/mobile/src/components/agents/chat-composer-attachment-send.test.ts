@@ -25,7 +25,7 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // Controllable upload state. The mock factory reads these at call time, so a
 // test mutates them before mounting to drive the ready vs empty cases.
 const uploadState = vi.hoisted(() => ({
-  attachments: [] as { status?: string; remoteFilename?: string }[],
+  attachments: [] as { status?: string; remoteFilename?: string; metadataStripFailed?: boolean }[],
   uploadPending: (() => ({ ok: false })) as () => unknown,
   isUploading: false,
 }));
@@ -33,6 +33,7 @@ const uploadState = vi.hoisted(() => ({
 const markAttachmentsSentMock = vi.hoisted(() => vi.fn(async () => undefined));
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
+const toastWarningMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -97,7 +98,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: toastErrorMock },
+  toast: { error: toastErrorMock, warning: toastWarningMock },
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
@@ -340,6 +341,30 @@ describe('ChatComposer attachment-only send', () => {
 
     expect(onSendMock).not.toHaveBeenCalled();
     expect(markAttachmentsSentMock).not.toHaveBeenCalled();
+  });
+
+  it('warns but still sends when a chip kept its original metadata', async () => {
+    uploadState.attachments = [
+      { status: 'uploaded', remoteFilename: 'file.png', metadataStripFailed: true },
+    ];
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+      keys: ['user-1/cloud-agent/path-1/file.png'],
+    });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(toastWarningMock).toHaveBeenCalledWith(
+      'Photo metadata could not be removed from an attachment.'
+    );
+    // Warn, not block: the send still proceeds.
+    expect(onSendMock).toHaveBeenCalledTimes(1);
+    expect(markAttachmentsSentMock).toHaveBeenCalledTimes(1);
   });
 
   it('toasts when a send is blocked by an in-flight upload', async () => {

@@ -109,6 +109,12 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // Warn (never block) when a chip kept its original image because
+    // metadata stripping failed: the photo may still carry EXIF/GPS.
+    if (attachments.attachments.some(attachment => attachment.metadataStripFailed === true)) {
+      toast.warning('Photo metadata could not be removed from an attachment.');
+    }
+
     // Upload pending attachments now so the create body carries the real
     // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
     // test `ok`.

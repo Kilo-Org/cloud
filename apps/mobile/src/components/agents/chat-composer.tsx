@@ -762,6 +762,11 @@ export function ChatComposer({
       // `uploaded` is a plain object; `{ ok: false }` is truthy, so test `ok`.
       let uploaded: Extract<UploadPendingResult, { ok: true }> | undefined = undefined;
       if (submission.type === 'prompt') {
+        // Warn (never block) when a chip kept its original image because
+        // metadata stripping failed: the photo may still carry EXIF/GPS.
+        if (upload.attachments.some(attachment => attachment.metadataStripFailed === true)) {
+          toast.warning('Photo metadata could not be removed from an attachment.');
+        }
         const result = await upload.uploadPending();
         if (!result.ok) {
           // An in-flight retry blocks send; a terminal chip is already guarded

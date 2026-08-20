@@ -25,8 +25,10 @@ type UseAndroidPendingPickerRecoveryOptions = {
  * Recover a pending Android image-picker result after an Activity recreation.
  * Runs on mount and on `AppState` `'active'`. Accepts the result only when the
  * stored launch context matches the current account, surface, and session, and
- * is younger than 10 minutes. Clears the context once consumed or discarded so
- * one launch can never be matched twice.
+ * is younger than 10 minutes. A matching context is consumed and cleared once.
+ * An expired context is discarded and cleared (no composer should attach it).
+ * A non-expired mismatch (wrong account/surface/session) is left untouched so
+ * the matching composer — multiple composers stay mounted — can still read it.
  */
 export function useAndroidPendingPickerRecovery(
   options: UseAndroidPendingPickerRecoveryOptions
@@ -75,11 +77,15 @@ export function useAndroidPendingPickerRecovery(
         }
         return;
       }
-      // Mismatch (wrong account/surface/session) or expired: discard the
-      // pending result so a later launch cannot receive a stale result, then
-      // clear the context.
-      await discardAndroidPendingPickerResult();
-      await clearPickerLaunchContext();
+      if (expired) {
+        // A truly stale result no composer should attach: discard the pending
+        // result and clear the context so a later launch cannot receive it.
+        await discardAndroidPendingPickerResult();
+        await clearPickerLaunchContext();
+      }
+      // Non-expired mismatch (wrong account/surface/session): another mounted
+      // composer may still match this context. Leave both the context and the
+      // native result for that composer.
     } finally {
       inFlightRef.current = false;
     }

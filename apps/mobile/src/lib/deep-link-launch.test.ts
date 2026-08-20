@@ -38,6 +38,7 @@ import {
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
   restorePersistedPendingDeepLink,
+  setCurrentDeepLinkUserId,
   setPendingDeepLink,
   subscribeToPendingDeepLink,
 } from './deep-link-launch';
@@ -172,9 +173,67 @@ describe('deep-link-launch', () => {
           href: '/(app)/(tabs)/(3_profile)',
           source: 'notification',
           storedAt: Date.now(),
+          userId: null,
         })
       );
       _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
+    it('discards a record captured for a different user', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: 'user-a',
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-b');
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('restores a record captured for the matching user', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: 'user-a',
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-a');
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
+    it('restores a record captured while signed out (null userId)', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-b');
 
       await restorePersistedPendingDeepLink();
 

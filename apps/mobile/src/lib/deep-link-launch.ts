@@ -21,6 +21,8 @@ type PendingDeepLinkRecord = {
   href: string;
   source: DeepLinkSource;
   storedAt: number;
+  /** Signed-in user id at persist time, or null when captured while signed out. */
+  userId: string | null;
 };
 
 /** A persisted record older than this is discarded on restore. */
@@ -29,6 +31,18 @@ const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
 let launchLinkHandled = false;
+
+// The signed-in user id at persist time, bound to each durable record so a
+// destination captured for one account is never restored for another. The
+// auth context sets it on sign-in (with the new user id) and on sign-out
+// (with null). A null value means "captured while signed out", which still
+// restores.
+let currentDeepLinkUserId: string | null = null;
+
+/** Sets the signed-in user id that `persistPendingDeepLink` records. */
+export function setCurrentDeepLinkUserId(userId: string | null): void {
+  currentDeepLinkUserId = userId;
+}
 
 // Monotonic epoch bumped on every set, consume, and clear. Restore captures it
 // before its async read and only fills when it is unchanged, so a live capture
@@ -87,7 +101,12 @@ function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
 /** Fire-and-forget durable mirror. A failure is reported to Sentry; the
  *  in-memory slot still works for the live process. */
 function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
-  const record: PendingDeepLinkRecord = { href, source, storedAt: Date.now() };
+  const record: PendingDeepLinkRecord = {
+    href,
+    source,
+    storedAt: Date.now(),
+    userId: currentDeepLinkUserId,
+  };
   enqueuePendingDeepLinkWrite(async () => {
     await getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record));
   });
@@ -200,6 +219,14 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
     return;
   }
 
+  // A record captured for a different signed-in user must never navigate the
+  // current account. A null record userId (captured while signed out) still
+  // restores.
+  if (record.userId !== null && record.userId !== currentDeepLinkUserId) {
+    deletePersistedPendingDeepLink();
+    return;
+  }
+
   setPendingDeepLink(record.href, record.source);
 }
 
@@ -216,6 +243,7 @@ const pendingDeepLinkRecordSchema = z.object({
   href: z.string(),
   source: z.enum(['universal-link', 'notification']),
   storedAt: z.number(),
+  userId: z.string().nullable(),
 });
 
 function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
@@ -279,6 +307,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
+  currentDeepLinkUserId = null;
   // eslint-disable-next-line prefer-await-to-then -- reset the chain to the empty sentinel
   pendingDeepLinkWriteChain = Promise.resolve();
 }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one harness holds the reconciliation single-flight, spacing, epoch, and switch-mid-attempt suites */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const logoutMock = vi.hoisted(() => ({
@@ -201,6 +202,34 @@ describe('attemptPushRegistrationReconciliation', () => {
     gate.release?.();
     const firstOutcome = await first;
     expect(firstOutcome.kind).toBe('registered');
+  });
+
+  it("awaits a different user's in-flight attempt and then registers for the new user", async () => {
+    const gate = { release: null as (() => void) | null };
+    const readGate = new Promise<void>(resolve => {
+      gate.release = resolve;
+    });
+    notificationsMock.getDevicePushTokenOutcome.mockImplementation(async () => {
+      await readGate;
+      return { kind: 'token', token: 'push-1' };
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+
+    const first = attemptPushRegistrationReconciliation('u1');
+    // Wait until A's attempt is in flight (its device-token read started).
+    await vi.waitFor(() => {
+      expect(notificationsMock.getDevicePushTokenOutcome).toHaveBeenCalled();
+    });
+
+    // B calls while A's attempt is in flight: B must not be dropped as
+    // in-flight, and must register for B after A settles.
+    const second = attemptPushRegistrationReconciliation('u2');
+    gate.release?.();
+
+    expect(await first).toEqual({ kind: 'registered' });
+    expect(await second).toEqual({ kind: 'registered' });
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledTimes(2);
   });
 
   it('discards the result when the auth epoch moves during the attempt', async () => {

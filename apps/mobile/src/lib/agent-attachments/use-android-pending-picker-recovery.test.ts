@@ -113,26 +113,26 @@ describe('useAndroidPendingPickerRecovery', () => {
     expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
   });
 
-  it('discards and clears on a wrong-account mismatch', async () => {
+  it('does NOT discard or clear on a non-expired wrong-account mismatch', async () => {
     mocks.userId = 'user-2';
     mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ userId: 'user-1' }));
 
     await mount();
 
-    expect(mocks.discardAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
-    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
     expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
     expect(mocks.addCandidates).not.toHaveBeenCalled();
   });
 
-  it('discards and clears on a wrong-surface mismatch', async () => {
+  it('does NOT discard or clear on a non-expired wrong-surface mismatch', async () => {
     mocks.userId = 'user-1';
     mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-chat' }));
 
     await mount();
 
-    expect(mocks.discardAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
-    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
     expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
   });
 

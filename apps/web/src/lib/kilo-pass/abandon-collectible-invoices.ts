@@ -9,11 +9,13 @@ const ALREADY_ABANDONED_INVOICE_STATUSES: ReadonlySet<string> = new Set([
   'uncollectible',
 ]);
 
+export type CollectibleInvoice = Pick<Stripe.Invoice, 'id' | 'status'>;
+
 export type StripeCollectibleInvoiceClient = {
   invoices: {
     list: (
       params: Stripe.InvoiceListParams
-    ) => PromiseLike<Pick<Stripe.ApiList<Stripe.Invoice>, 'data' | 'has_more'>>;
+    ) => PromiseLike<{ data: CollectibleInvoice[]; has_more: boolean }>;
     update: (invoiceId: string, params: Stripe.InvoiceUpdateParams) => Promise<unknown>;
     finalizeInvoice: (
       invoiceId: string,
@@ -37,8 +39,8 @@ async function listInvoicesByStatus(params: {
   stripe: StripeCollectibleInvoiceClient;
   stripeSubscriptionId: string;
   status: (typeof COLLECTIBLE_INVOICE_STATUSES)[number];
-}): Promise<Stripe.Invoice[]> {
-  const invoices: Stripe.Invoice[] = [];
+}): Promise<CollectibleInvoice[]> {
+  const invoices: CollectibleInvoice[] = [];
   let startingAfter: string | undefined;
 
   do {
@@ -94,7 +96,7 @@ async function ignoreIfAlreadyAbandoned(params: {
 
 async function abandonInvoice(params: {
   stripe: StripeCollectibleInvoiceClient;
-  invoice: Pick<Stripe.Invoice, 'id' | 'status'>;
+  invoice: CollectibleInvoice;
 }): Promise<void> {
   const invoiceId = params.invoice.id;
   if (!invoiceId) return;

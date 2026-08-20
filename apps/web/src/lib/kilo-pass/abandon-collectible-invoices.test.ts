@@ -1,27 +1,36 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import type Stripe from 'stripe';
 
-import { abandonCollectibleInvoicesForStripeSubscription } from './abandon-collectible-invoices';
+import {
+  abandonCollectibleInvoicesForStripeSubscription,
+  type StripeCollectibleInvoiceClient,
+} from './abandon-collectible-invoices';
+
+type InvoiceStatus = NonNullable<Stripe.Invoice['status']>;
 
 type InvoicePage = {
-  data: Array<{ id: string; status: 'draft' | 'open' | 'paid' | 'void' | 'uncollectible' }>;
+  data: Array<{ id: string; status: InvoiceStatus }>;
   has_more: boolean;
 };
 
-function createStripeInvoiceClient() {
+function createStripeInvoiceClient(): StripeCollectibleInvoiceClient & {
+  invoices: {
+    list: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['list']>;
+    update: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['update']>;
+    finalizeInvoice: jest.MockedFunction<
+      StripeCollectibleInvoiceClient['invoices']['finalizeInvoice']
+    >;
+    voidInvoice: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['voidInvoice']>;
+    retrieve: jest.MockedFunction<StripeCollectibleInvoiceClient['invoices']['retrieve']>;
+  };
+} {
   return {
     invoices: {
-      list: jest.fn<
-        (params: { status?: string; starting_after?: string }) => Promise<InvoicePage>
-      >(),
-      update:
-        jest.fn<(invoiceId: string, params: { auto_advance?: boolean }) => Promise<unknown>>(),
-      finalizeInvoice:
-        jest.fn<(invoiceId: string, params?: { auto_advance?: boolean }) => Promise<unknown>>(),
-      voidInvoice: jest.fn<(invoiceId: string) => Promise<unknown>>(),
-      retrieve:
-        jest.fn<
-          (invoiceId: string) => Promise<{ status: InvoicePage['data'][number]['status'] }>
-        >(),
+      list: jest.fn<StripeCollectibleInvoiceClient['invoices']['list']>(),
+      update: jest.fn<StripeCollectibleInvoiceClient['invoices']['update']>(),
+      finalizeInvoice: jest.fn<StripeCollectibleInvoiceClient['invoices']['finalizeInvoice']>(),
+      voidInvoice: jest.fn<StripeCollectibleInvoiceClient['invoices']['voidInvoice']>(),
+      retrieve: jest.fn<StripeCollectibleInvoiceClient['invoices']['retrieve']>(),
     },
   };
 }
@@ -29,7 +38,7 @@ function createStripeInvoiceClient() {
 describe('abandonCollectibleInvoicesForStripeSubscription', () => {
   it('voids open invoices and finalizes then voids draft invoices for the subscription', async () => {
     const stripe = createStripeInvoiceClient();
-    stripe.invoices.list.mockImplementation(async (params: { status?: string }) => {
+    stripe.invoices.list.mockImplementation(async params => {
       if (params.status === 'open') {
         return {
           data: [
@@ -78,23 +87,21 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
 
   it('pages through collectible invoices', async () => {
     const stripe = createStripeInvoiceClient();
-    stripe.invoices.list.mockImplementation(
-      async (params: { status?: string; starting_after?: string }) => {
-        if (params.status === 'open' && params.starting_after == null) {
-          return {
-            data: [{ id: 'in_open_page_1', status: 'open' }],
-            has_more: true,
-          } satisfies InvoicePage;
-        }
-        if (params.status === 'open' && params.starting_after === 'in_open_page_1') {
-          return {
-            data: [{ id: 'in_open_page_2', status: 'open' }],
-            has_more: false,
-          } satisfies InvoicePage;
-        }
-        return { data: [], has_more: false } satisfies InvoicePage;
+    stripe.invoices.list.mockImplementation(async params => {
+      if (params.status === 'open' && params.starting_after == null) {
+        return {
+          data: [{ id: 'in_open_page_1', status: 'open' }],
+          has_more: true,
+        } satisfies InvoicePage;
       }
-    );
+      if (params.status === 'open' && params.starting_after === 'in_open_page_1') {
+        return {
+          data: [{ id: 'in_open_page_2', status: 'open' }],
+          has_more: false,
+        } satisfies InvoicePage;
+      }
+      return { data: [], has_more: false } satisfies InvoicePage;
+    });
     stripe.invoices.voidInvoice.mockResolvedValue({});
 
     await abandonCollectibleInvoicesForStripeSubscription({
@@ -114,7 +121,7 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
 
   it('ignores invoices that are already paid, void, or missing', async () => {
     const stripe = createStripeInvoiceClient();
-    stripe.invoices.list.mockImplementation(async (params: { status?: string }) => {
+    stripe.invoices.list.mockImplementation(async params => {
       if (params.status === 'open') {
         return {
           data: [
@@ -147,7 +154,7 @@ describe('abandonCollectibleInvoicesForStripeSubscription', () => {
 
   it('rethrows unexpected void failures', async () => {
     const stripe = createStripeInvoiceClient();
-    stripe.invoices.list.mockImplementation(async (params: { status?: string }) => {
+    stripe.invoices.list.mockImplementation(async params => {
       if (params.status === 'open') {
         return {
           data: [{ id: 'in_open_fail', status: 'open' }],

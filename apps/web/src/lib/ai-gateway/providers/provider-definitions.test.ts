@@ -1,15 +1,19 @@
 import { describe, expect, test } from '@jest/globals';
 
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import {
+  getProviderById,
+  LONGCAT,
+  OPENROUTER,
+} from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
 
 describe('LongCat provider', () => {
   test('targets the LongCat chat completions endpoint', () => {
-    expect(`${PROVIDERS.LONGCAT.apiUrl}/chat/completions`).toBe(
+    expect(`${LONGCAT.apiUrl}/chat/completions`).toBe(
       'https://api.longcat.ai/openai/v1/chat/completions'
     );
-    expect(PROVIDERS.LONGCAT.supportedChatApis).toEqual(['chat_completions']);
+    expect(LONGCAT.supportedChatApis).toEqual(['chat_completions']);
   });
 
   test.each([
@@ -27,7 +31,7 @@ describe('LongCat provider', () => {
       },
     };
 
-    await PROVIDERS.LONGCAT.transformRequest({ request } as TransformRequestContext);
+    await LONGCAT.transformRequest({ request } as TransformRequestContext);
 
     expect(request.body.thinking).toEqual({ type: expectedType });
     expect(request.body.provider).toBeUndefined();
@@ -44,11 +48,22 @@ describe('LongCat provider', () => {
     };
     const extraHeaders: Record<string, string> = {};
 
-    await PROVIDERS.LONGCAT.transformRequest({
+    await LONGCAT.transformRequest({
       request,
       extraHeaders,
     } as TransformRequestContext);
 
     expect(extraHeaders['Mt-User-Id']).toBe('hashed-user-id');
+  });
+});
+
+describe('getProviderById', () => {
+  test('resolves static provider definitions', () => {
+    expect(getProviderById('openrouter')).toBe(OPENROUTER);
+  });
+
+  test('does not claim dynamically constructed providers', () => {
+    expect(getProviderById('direct-byok')).toBeUndefined();
+    expect(getProviderById('friendli')).toBeUndefined();
   });
 });

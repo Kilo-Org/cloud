@@ -1,5 +1,5 @@
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { getProviderById, OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayChatApiKind } from '@/lib/ai-gateway/providers/types';
 
 const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
@@ -16,8 +16,7 @@ const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
  */
 export function gatewayChatApisForModel(modelId: string): ReadonlyArray<GatewayChatApiKind> {
   const exclusive = findKiloExclusiveModel(modelId);
-  const provider =
-    Object.values(PROVIDERS).find(p => p.id === exclusive?.gateway) ?? PROVIDERS.OPENROUTER;
+  const provider = (exclusive && getProviderById(exclusive.gateway)) ?? OPENROUTER;
   return provider.supportedChatApis;
 }
 

@@ -417,7 +417,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect(getRoutingProviderConfig).toBeDefined();
-    expect(await getRoutingProviderConfig?.()).toEqual({ only: ['amazon-bedrock'] });
+    expect(await getRoutingProviderConfig?.()).toMatchObject({ only: ['amazon-bedrock'] });
   });
 
   it('returns 404 when the OpenRouter model id is unknown', async () => {

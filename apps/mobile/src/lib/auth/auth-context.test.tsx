@@ -61,6 +61,11 @@ const hoisted = vi.hoisted(() => {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   };
 
+  const deepLinkLaunch = {
+    clearPendingDeepLink: vi.fn(),
+    setCurrentDeepLinkUserId: vi.fn(),
+  };
+
   return {
     callOrder,
     secureStore,
@@ -70,6 +75,7 @@ const hoisted = vi.hoisted(() => {
     posthogStorage,
     sentry,
     appState,
+    deepLinkLaunch,
   };
 });
 
@@ -108,6 +114,11 @@ vi.mock('@/lib/analytics/posthog', () => ({
 vi.mock('@/lib/appsflyer', () => ({
   resetAppsFlyerState: hoisted.appsflyer.resetAppsFlyerState,
   trackEvent: hoisted.appsflyer.trackEvent,
+}));
+
+vi.mock('@/lib/deep-link-launch', () => ({
+  clearPendingDeepLink: hoisted.deepLinkLaunch.clearPendingDeepLink,
+  setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
 }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
@@ -170,6 +181,8 @@ vi.mock('@/lib/storage-keys', () => ({
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  PENDING_DEEP_LINK_KEY: 'pending-deep-link',
+  PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
@@ -194,6 +207,16 @@ type AuthContextValue = {
   signIn: (token: string) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
+
+/** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
+ *  `generateApiToken` in apps/web/src/lib/tokens.ts). */
+function base64url(input: string): string {
+  return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+function makeToken(payload: Record<string, unknown>): string {
+  return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
+}
 
 /** Load the auth-context module from a fresh module registry so
  *  module-level state (preloadedToken) is clean. Returns the module
@@ -330,6 +353,32 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
+    expect(hoisted.deepLinkLaunch.clearPendingDeepLink).toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('clears the pending deep-link user id on sign-out', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith(null);
+
+    unmount();
+  });
+
+  it('binds the pending deep-link user id on sign-in from the token', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-1' }));
+    });
+
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
 
     unmount();
   });

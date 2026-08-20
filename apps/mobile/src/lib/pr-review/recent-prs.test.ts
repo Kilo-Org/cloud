@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearRecentPrs, getRecentPrs, type RecentPr, upsertRecentPr } from './recent-prs';
+import {
+  clearRecentPrs,
+  getRecentPrs,
+  markRecentPrFailed,
+  type RecentPr,
+  removeRecentPr,
+  upsertRecentPr,
+} from './recent-prs';
 
 const store = new Map<string, string>();
 
@@ -119,5 +126,51 @@ describe('recent-prs', () => {
     store.set('pr-review-recents', 'placeholder');
     await clearRecentPrs();
     expect(store.has('pr-review-recents')).toBe(false);
+  });
+
+  it('parseRecents reads a legacy entry without lastResult as ok', async () => {
+    store.set(
+      'pr-review-recents',
+      JSON.stringify([
+        {
+          owner: 'octocat',
+          repo: 'hello',
+          number: 1,
+          title: 'Legacy',
+          lastOpenedAt: 1_700_000_000_000,
+        },
+      ])
+    );
+    await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, lastResult: 'ok' }]);
+  });
+
+  it('markRecentPrFailed is a no-op for an unknown key', async () => {
+    await upsertRecentPr(makeRecent({ repo: 'hello', number: 1, title: 'One' }));
+    await markRecentPrFailed({ owner: 'octocat', repo: 'hello', number: 999 });
+
+    await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, lastResult: 'ok' }]);
+  });
+
+  it('markRecentPrFailed flips an existing entry to failed', async () => {
+    await upsertRecentPr(makeRecent({ repo: 'hello', number: 1, title: 'One' }));
+    await markRecentPrFailed({ owner: 'octocat', repo: 'hello', number: 1 });
+
+    await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, lastResult: 'failed' }]);
+  });
+
+  it('removeRecentPr deletes one entry and keeps the rest', async () => {
+    await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 1, title: 'One' }));
+    await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 2, title: 'Two' }));
+    await removeRecentPr({ owner: 'octocat', repo: 'hello', number: 1 });
+
+    await expect(getRecentPrs()).resolves.toMatchObject([{ number: 2, title: 'Two' }]);
+  });
+
+  it('a successful backfill writes lastResult ok over a previously failed entry', async () => {
+    await upsertRecentPr(makeRecent({ repo: 'hello', number: 1, title: 'One' }));
+    await markRecentPrFailed({ owner: 'octocat', repo: 'hello', number: 1 });
+    await upsertRecentPr(makeRecent({ repo: 'hello', number: 1, title: 'One', lastResult: 'ok' }));
+
+    await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, lastResult: 'ok' }]);
   });
 });

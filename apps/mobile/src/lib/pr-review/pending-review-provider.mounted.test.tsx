@@ -1,5 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake drafts factories settle without await because they resolve immediately */
+/* eslint-disable max-lines -- the persistence, hydration-race, and submit-retention suites share one drafts-mock harness in this file */
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -265,6 +266,80 @@ describe('PendingReviewProvider persistence', () => {
       'pr-review:acme/kilo#42',
       expect.arrayContaining([ITEM_B])
     );
+  });
+
+  it('removeComments drops exactly the named ids and persists the remainder', async () => {
+    draftsMock.loadDraft.mockResolvedValue([ITEM_A, ITEM_B, ITEM_C]);
+    const { renders } = mountProvider({ userId: 'u1', draftEntityKey: 'pr-review:acme/kilo#42' });
+    await flushMicrotasks();
+    expect(latest(renders).items).toHaveLength(3);
+
+    draftsMock.saveDraft.mockClear();
+    act(() => {
+      latest(renders).removeComments(['a', 'c']);
+    });
+    expect(latest(renders).items.map(item => item.id)).toEqual(['b']);
+    expect(draftsMock.saveDraft).toHaveBeenCalledWith('u1', 'pr-review:acme/kilo#42', [ITEM_B]);
+    expect(draftsMock.clearDraft).not.toHaveBeenCalled();
+  });
+
+  it('removeComments with every id clears the stored draft through the empty branch', async () => {
+    draftsMock.loadDraft.mockResolvedValue([ITEM_A, ITEM_B]);
+    const { renders } = mountProvider({ userId: 'u1', draftEntityKey: 'pr-review:acme/kilo#42' });
+    await flushMicrotasks();
+
+    act(() => {
+      latest(renders).removeComments(['a', 'b']);
+    });
+    expect(latest(renders).items).toEqual([]);
+    expect(draftsMock.clearDraft).toHaveBeenCalledWith('u1', 'pr-review:acme/kilo#42');
+  });
+
+  it('empty removeComments before hydration is a no-op and retains the stored draft', async () => {
+    // APPROVE with an empty in-memory queue calls removeComments([]). That
+    // must not invalidate hydration or mark the provider hydrated, or the
+    // empty-state persistence effect would clear the stored draft and the
+    // delayed load would be discarded.
+    const gate = deferred<PendingReviewItem[] | null>();
+    draftsMock.loadDraft.mockReturnValue(gate.promise);
+    const { renders } = mountProvider({ userId: 'u1', draftEntityKey: 'pr-review:acme/kilo#42' });
+
+    act(() => {
+      latest(renders).removeComments([]);
+    });
+    expect(latest(renders).items).toEqual([]);
+
+    await act(async () => {
+      gate.resolve([ITEM_A, ITEM_B]);
+    });
+    await flushMicrotasks();
+    expect(latest(renders).items).toEqual([ITEM_A, ITEM_B]);
+    expect(draftsMock.clearDraft).not.toHaveBeenCalled();
+    expect(draftsMock.saveDraft).toHaveBeenCalledWith('u1', 'pr-review:acme/kilo#42', [
+      ITEM_A,
+      ITEM_B,
+    ]);
+  });
+
+  it('removeComments before hydration resolves wins over a late hydration result', async () => {
+    // A submit lands while hydration is still in flight: the posted ids are
+    // removed, and the late load must not merge them back into the queue.
+    const gate = deferred<PendingReviewItem[] | null>();
+    draftsMock.loadDraft.mockReturnValue(gate.promise);
+    const { renders } = mountProvider({ userId: 'u1', draftEntityKey: 'pr-review:acme/kilo#42' });
+
+    act(() => {
+      latest(renders).addComment(ITEM_A);
+      latest(renders).removeComments(['a']);
+    });
+    expect(latest(renders).items).toEqual([]);
+
+    await act(async () => {
+      gate.resolve([ITEM_A, ITEM_B]);
+    });
+    await flushMicrotasks();
+    expect(latest(renders).items).toEqual([]);
+    expect(draftsMock.saveDraft).not.toHaveBeenCalled();
   });
 
   it('runs memory-only with no hydrate or persist when the userId is unknown', async () => {

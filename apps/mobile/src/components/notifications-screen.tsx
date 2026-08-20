@@ -3,6 +3,7 @@
  * with their optimistic-mutation + retry + loading patterns. Extracting subcomponents
  * would re-encode the same hooks. The screen stays a single rendered surface. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import {
   Bell,
@@ -48,6 +49,7 @@ import {
   registerForPushNotifications,
 } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
@@ -213,6 +215,14 @@ export function NotificationsScreen() {
     () => new Set()
   );
 
+  // The preview row is a single string-enum control (not a boolean category),
+  // so its in-flight, error, and last-intent state is tracked separately from
+  // `pendingCategories`. `previewIntent` remembers the value the user last
+  // tried to set so the inline retry can re-attempt it.
+  const [isPreviewPending, setIsPreviewPending] = useState(false);
+  const [previewErrorCode, setPreviewErrorCode] = useState<string | undefined>(undefined);
+  const [previewIntent, setPreviewIntent] = useState<'generic' | 'full'>('generic');
+
   const {
     data: permissionGranted = false,
     isLoading: permissionLoading,
@@ -340,13 +350,16 @@ export function NotificationsScreen() {
           category,
         });
       },
-      onError: (error, _vars, context) => {
+      onError: (error, variables, context) => {
         rollbackAgentPushOptimistic({
           queryClient,
           queryKey: preferencesQueryKey,
           context,
         });
         toast.error(error.message);
+        if (variables.notificationPreviews !== undefined) {
+          setPreviewErrorCode(readTrpcErrorField(error, 'code'));
+        }
       },
       onSettled: (_data, _error, variables) => {
         const category = categoryFromVariables(variables);
@@ -360,6 +373,9 @@ export function NotificationsScreen() {
             return next;
           });
         }
+        if (variables.notificationPreviews !== undefined) {
+          setIsPreviewPending(false);
+        }
         void queryClient.invalidateQueries({ queryKey: preferencesQueryKey });
       },
     })
@@ -369,6 +385,16 @@ export function NotificationsScreen() {
     (category: NotificationCategoryKey, next: boolean) => {
       setPendingCategories(prev => new Set([...prev, category]));
       setPreference.mutate({ [category]: next });
+    },
+    [setPreference]
+  );
+
+  const handlePreviewChange = useCallback(
+    (next: 'generic' | 'full') => {
+      setPreviewErrorCode(undefined);
+      setPreviewIntent(next);
+      setIsPreviewPending(true);
+      setPreference.mutate({ notificationPreviews: next });
     },
     [setPreference]
   );
@@ -402,7 +428,11 @@ export function NotificationsScreen() {
         }
         setIsRegisteringToken(true);
         try {
-          await registerToken.mutateAsync({ token, platform: getPlatform() });
+          await registerToken.mutateAsync({
+            token,
+            platform: getPlatform(),
+            appVersion: Application.nativeApplicationVersion ?? undefined,
+          });
         } catch {
           // registerToken's onError already surfaced the toast; swallow here so
           // the outer catch does not double-report the same failure.
@@ -438,6 +468,14 @@ export function NotificationsScreen() {
     gateSettled,
     notificationsEnabled,
   });
+
+  // Message-preview row: a single string-enum control rendered from the server
+  // value with no optimistic flip. UNAUTHORIZED is a terminal failure (the row
+  // stays disabled with no retry); any other mutation error is retryable.
+  const previewValue = preferences?.notificationPreviews ?? 'generic';
+  const previewIsFull = previewValue === 'full';
+  const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
+  const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
   return (
     <View className="flex-1 bg-background">
@@ -590,6 +628,71 @@ export function NotificationsScreen() {
                 />
               ))}
             </>
+          )}
+        </View>
+
+        {/* Message previews */}
+        <View className="gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Message previews
+          </Text>
+          {preferencesLoading && (
+            <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+              <View className="flex-1">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="mt-0.5 h-4 w-40" />
+              </View>
+              <Skeleton className="h-[31px] w-[51px] rounded-full" />
+            </View>
+          )}
+          {preferencesError && (
+            <View className="rounded-lg bg-secondary p-3">
+              <InlineRetry
+                label="Retry loading notification previews"
+                color={colors.destructive}
+                onPress={() => void refetchPreferences()}
+              />
+            </View>
+          )}
+          {preferences && (
+            <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+              <View className="flex-1">
+                <Text
+                  className={cn('text-sm font-medium', previewDisabled && 'text-muted-foreground')}
+                >
+                  {previewIsFull ? 'Always' : 'When unlocked'}
+                </Text>
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  {previewIsFull
+                    ? 'Notifications show the message text on your lock screen.'
+                    : 'Notifications show that something happened. Open Kilo to read it.'}
+                </Text>
+              </View>
+              {isPreviewPending && (
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+              )}
+              {previewErrorCode !== undefined && !previewTerminal && (
+                <InlineRetry
+                  label="Retry saving notification previews"
+                  color={colors.destructive}
+                  onPress={() => {
+                    handlePreviewChange(previewIntent);
+                  }}
+                />
+              )}
+              <Switch
+                value={previewIsFull}
+                disabled={previewDisabled}
+                accessibilityLabel="Show full previews"
+                accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
+                onValueChange={value => {
+                  if (previewDisabled) {
+                    return;
+                  }
+                  handlePreviewChange(value ? 'full' : 'generic');
+                }}
+              />
+            </View>
           )}
         </View>
 

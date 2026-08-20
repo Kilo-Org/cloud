@@ -70,6 +70,19 @@ export async function attemptLogoutReconciliation(
   }
 }
 
+/**
+ * Awaits the in-flight logout reconciliation attempt, if any, without
+ * throwing. Callers that must not race the unregister (push-token
+ * registration) trigger `attemptLogoutReconciliation` first and then await
+ * this, so registration cannot start until any in-flight unregister for the
+ * current sign-in has settled.
+ */
+export async function awaitLogoutReconciliationSettled(): Promise<void> {
+  if (attemptInFlight) {
+    await attemptInFlight;
+  }
+}
+
 async function runReconciliation(userId: string): Promise<ReconciliationAttemptOutcome> {
   const epoch = currentAuthEpoch();
   const tombstone = await readLogoutCleanupTombstone();

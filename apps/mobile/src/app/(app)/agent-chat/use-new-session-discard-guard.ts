@@ -1,15 +1,17 @@
 import { useNavigation } from 'expo-router';
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useRef } from 'react';
 import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+
 /**
- * New-session discard confirm. Registers a single `beforeRemove` listener via
- * React Navigation, which fires for every way the screen can be removed —
+ * New-session discard confirm. Registers a predictive-Back-safe guard via
+ * `usePreventRemove`, which fires for every way the screen can be removed —
  * header back, Android hardware back, and the iOS swipe-back gesture — so all
  * three paths get the same confirmation instead of only the header button.
  *
- * Mirrors the `beforeRemove` + `Alert.alert` pattern of
+ * Mirrors the `usePreventRemove` + `Alert.alert` pattern of
  * `useSettingsBackGuard` without any Security-specific helpers: when the
  * prompt is non-empty (`dirty`), the exit is intercepted and the user chooses
  * Keep editing (dismiss, draft intact) or Discard. On Discard the caller's
@@ -18,7 +20,8 @@ import { toast } from 'sonner-native';
  *
  * `skipNextGuardRef` is the caller's bypass: set it true right before a
  * successful Start/spawn navigation (`router.replace`) so the leave is not
- * intercepted as an abandon. The listener consumes it on the next removal.
+ * intercepted as an abandon. The callback consumes it on the next removal and
+ * replays the action, because the removal was already prevented.
  *
  * A Discard whose `onDiscard` rejects keeps the screen (no dispatch) and
  * toasts, so a failed draft clear never loses the prompt.
@@ -33,44 +36,38 @@ export function useNewSessionDiscardGuard({
   skipNextGuardRef: RefObject<boolean>;
 }>): void {
   const navigation = useNavigation();
-  // Keep the latest onDiscard in a ref so the effect below doesn't depend on
-  // it directly — onDiscard is a fresh closure every render, which would
-  // otherwise tear down and re-register the listener on every render.
+  // Keep the latest onDiscard in a ref so the callback below doesn't depend on
+  // it directly — onDiscard is a fresh closure every render. usePreventRemove
+  // already keeps the callback itself fresh via useLatestCallback, but the ref
+  // keeps onDiscard stable without re-registering.
   const onDiscardRef = useRef(onDiscard);
   onDiscardRef.current = onDiscard;
 
-  useEffect(
-    () =>
-      navigation.addListener('beforeRemove', event => {
-        if (skipNextGuardRef.current) {
-          skipNextGuardRef.current = false;
-          return;
-        }
-        if (!dirty) {
-          return;
-        }
-        event.preventDefault();
-        const action = event.data.action;
-        Alert.alert('Discard draft?', 'Your prompt will be lost.', [
-          { text: 'Keep editing', style: 'cancel' },
-          {
-            text: 'Discard',
-            style: 'destructive',
-            onPress: () => {
-              void (async () => {
-                try {
-                  await onDiscardRef.current();
-                  navigation.dispatch(action);
-                } catch {
-                  // The clear failed: stay on the screen so the draft is kept
-                  // and the user can retry or keep editing.
-                  toast.error('Could not discard the draft. Please try again.');
-                }
-              })();
-            },
-          },
-        ]);
-      }),
-    [navigation, dirty, skipNextGuardRef]
-  );
+  usePreventRemove(dirty, ({ data }) => {
+    if (skipNextGuardRef.current) {
+      skipNextGuardRef.current = false;
+      navigation.dispatch(data.action);
+      return;
+    }
+    const action = data.action;
+    Alert.alert('Discard draft?', 'Your prompt will be lost.', [
+      { text: 'Keep editing', style: 'cancel' },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await onDiscardRef.current();
+              navigation.dispatch(action);
+            } catch {
+              // The clear failed: stay on the screen so the draft is kept
+              // and the user can retry or keep editing.
+              toast.error('Could not discard the draft. Please try again.');
+            }
+          })();
+        },
+      },
+    ]);
+  });
 }

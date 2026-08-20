@@ -16,6 +16,20 @@ export type ParsedClipboardImage = {
 };
 
 /**
+ * Exact decoded byte length of a base64 payload, without decoding it.
+ * Handles padded (`==`), single-padded (`=`), and unpadded payloads.
+ */
+export function decodedBase64ByteLength(payload: string): number {
+  let padding = 0;
+  if (payload.endsWith('==')) {
+    padding = 2;
+  } else if (payload.endsWith('=')) {
+    padding = 1;
+  }
+  return Math.floor((payload.length * 3) / 4) - padding;
+}
+
+/**
  * Parse a `data:<mime>;base64,<payload>` string returned by
  * `expo-clipboard`'s `getImageAsync`. Accepts only PNG and JPEG.
  * Returns `null` for every unsupported or empty input. Never throws.
@@ -94,13 +108,17 @@ export type ClipboardImageFile = { uri: string; name: string; mimeType: string }
  *
  * 1. Requests a PNG (`format: 'png'`) from the clipboard.
  * 2. Parses the returned data URI.
- * 3. Writes the decoded base64 payload into `Paths.cache/clipboard-images/`
+ * 3. Rejects an oversized image before any directory or file is created.
+ * 4. Writes the decoded base64 payload into `Paths.cache/clipboard-images/`
  *    through the modern `expo-file-system` API.
  *
- * Returns `null` on every failure: clipboard empty, permission denied,
- * unsupported type, or a write error.
+ * Returns `'too-large'` when `maxBytes` is set and the decoded payload
+ * exceeds it. Returns `null` on every other failure: clipboard empty,
+ * permission denied, unsupported type, or a write error.
  */
-export async function readClipboardImageFile(): Promise<ClipboardImageFile | null> {
+export async function readClipboardImageFile(
+  maxBytes?: number
+): Promise<ClipboardImageFile | 'too-large' | null> {
   try {
     const image = await Clipboard.getImageAsync({ format: 'png' });
     if (!image) {
@@ -109,6 +127,9 @@ export async function readClipboardImageFile(): Promise<ClipboardImageFile | nul
     const parsed = parseClipboardImageData(image.data);
     if (!parsed) {
       return null;
+    }
+    if (maxBytes !== undefined && decodedBase64ByteLength(parsed.base64) > maxBytes) {
+      return 'too-large';
     }
     const directory = new Directory(Paths.cache, 'clipboard-images');
     directory.create({ idempotent: true, intermediates: true });

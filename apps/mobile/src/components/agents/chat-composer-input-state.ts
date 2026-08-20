@@ -1,7 +1,7 @@
 type ChatComposerControlInput = {
   attachmentsCount: number;
-  /** Number of attachments with `status === 'uploaded'`. */
-  readyAttachmentsCount: number;
+  /** Number of attachments that are NOT terminally rejected (`status === 'error' && terminal === true`). */
+  sendableAttachmentsCount: number;
   attachmentMax: number;
   disabled: boolean;
   hasText: boolean;
@@ -11,7 +11,7 @@ type ChatComposerControlInput = {
 };
 
 type ChatComposerControlState = {
-  /** Backend accepts an empty prompt when at least one attachment is ready. */
+  /** Backend accepts an empty prompt when at least one attachment is sendable. */
   canSend: boolean;
   /** Mirrors `editable` on the text input. */
   inputEditable: boolean;
@@ -40,7 +40,7 @@ export function resolveChatComposerControlState(
 ): ChatComposerControlState {
   const {
     attachmentsCount,
-    readyAttachmentsCount,
+    sendableAttachmentsCount,
     attachmentMax,
     disabled,
     hasText,
@@ -60,7 +60,7 @@ export function resolveChatComposerControlState(
   const inputEditable = !toolbarDisabled && !voiceInputActive;
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
   return {
-    canSend: (hasText || readyAttachmentsCount > 0) && !disabled && !isSending,
+    canSend: (hasText || sendableAttachmentsCount > 0) && !disabled && !isSending,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,
     paperclipDisabled,

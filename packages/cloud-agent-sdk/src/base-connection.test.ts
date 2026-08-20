@@ -406,6 +406,41 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       expect(sockets).toHaveLength(2);
       connection.destroy();
     });
+
+    it('keeps one socket when online fires while the first socket is still connecting', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const onReplacingConnection = jest.fn();
+      const { connection, onConnected } = createTestConnection({
+        refreshAuth,
+        onReplacingConnection,
+      });
+      connection.connect();
+
+      // Socket 1 is still CONNECTING (readyState 0) when the first NetInfo
+      // `unknown → online` report arrives. handleOnline schedules a reconnect,
+      // which awaits refreshAuth before opening a replacement socket.
+      sockets[0].readyState = 0; // WebSocket.CONNECTING
+      mockWindow.dispatchEvent(new Event('online'));
+
+      // During the async refreshAuth gap, socket 1 finishes its handshake and
+      // receives its first inbound message (connected becomes true).
+      sockets[0].readyState = 1; // WebSocket.OPEN
+      connectSocket(0);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The refresh completed, but the re-validation in refreshAndConnect saw
+      // that socket 1 established during the gap and left it alone — one socket
+      // per open, no duplicate `/stream` socket.
+      expect(sockets).toHaveLength(1);
+      expect(onConnected).toHaveBeenCalledTimes(1);
+      expect(onReplacingConnection).not.toHaveBeenCalled();
+      expect(sockets[0].close).not.toHaveBeenCalled();
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+
+      connection.destroy();
+    });
   });
 
   describe('reconnect attempts reset after exhaustion', () => {

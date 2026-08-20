@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the toggle consent-gating suite shares the createVoiceInputActions harness. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -95,12 +96,21 @@ const mockController = vi.hoisted(() => {
         subscribers.delete(listener);
       };
     }),
+    supportsOnDevice: vi.fn<() => boolean>(() => true),
   };
 });
+
+const voiceNetworkConsentMock = vi.hoisted(() => ({
+  readVoiceNetworkConsent: vi.fn<(userId: string) => Promise<'granted' | 'declined' | 'unset'>>(),
+  writeVoiceNetworkConsent:
+    vi.fn<(userId: string, value: 'granted' | 'declined') => Promise<void>>(),
+}));
 
 vi.mock('./native-voice-input', () => ({
   voiceInputController: mockController,
 }));
+
+vi.mock('./voice-network-consent', () => voiceNetworkConsentMock);
 
 type ActionHarness = {
   actions: {
@@ -115,12 +125,13 @@ type ActionHarness = {
 };
 
 function buildActions(
-  overrides: { disabled?: boolean; draft?: string; owner?: string } = {}
+  overrides: { disabled?: boolean; draft?: string; owner?: string; userId?: string } = {}
 ): ActionHarness {
   const owner = overrides.owner ?? 'owner-A';
   const draft = vi.fn<() => string>(() => overrides.draft ?? 'draft text');
   const onDraftChange = vi.fn<(nextDraft: string) => void>();
   const disabled = vi.fn<() => boolean>(() => overrides.disabled ?? false);
+  const userId = vi.fn<() => string | undefined>(() => overrides.userId);
 
   const actions = createVoiceInputActions({
     controller: mockController,
@@ -128,6 +139,7 @@ function buildActions(
     getDraft: draft,
     getOnDraftChange: () => onDraftChange,
     getOwner: () => owner,
+    getUserId: userId,
   });
 
   return { actions, disabled, draft, onDraftChange, owner };
@@ -148,6 +160,8 @@ describe('useVoiceInput integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockController.setSnapshot(idleSnapshot());
+    mockController.supportsOnDevice.mockReturnValue(true);
+    voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-US' }]);
     getSupportedLocalesMock.mockResolvedValue({
       locales: ['en-US', 'nl-NL'],
@@ -250,6 +264,112 @@ describe('useVoiceInput integration', () => {
 
         await actions.toggle();
 
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('starts with on-device recognition when on-device is supported regardless of consent', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(true);
+        expect(alertMock.alert).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
+      });
+
+      it('starts with network recognition when on-device is unsupported and consent is granted', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
+      });
+
+      it('shows a toast and does not start when consent is declined', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(toastMock.error).toHaveBeenCalledWith(
+          'Speech stays off until you allow online transcription.'
+        );
+        expect(alertMock.alert).not.toHaveBeenCalled();
+      });
+
+      it('raises the disclosure and does not start when consent is unset', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledTimes(1);
+        expect(alertMock.alert).toHaveBeenCalledWith(
+          'Speech is processed online',
+          expect.stringContaining('This device cannot transcribe offline'),
+          expect.any(Array)
+        );
+        expect(toastMock.error).not.toHaveBeenCalled();
+      });
+
+      it('persists granted and starts when the disclosure Allow action is pressed', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+        voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(undefined);
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = buttons?.find(button => button.text === 'Allow');
+        allow?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'granted'
+        );
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
+      });
+
+      it('persists declined without starting when the disclosure Not now action is pressed', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const notNow = buttons?.find(button => button.text === 'Not now');
+        notNow?.onPress?.();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'declined'
+        );
         expect(mockController.start).not.toHaveBeenCalled();
       });
     });

@@ -32,7 +32,7 @@ vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 
 // The sign-out deletes live in auth-context.tsx; mounting it pulls in the full
 // teardown graph, so stub every side-effecting collaborator.
-vi.mock('@sentry/react-native', () => ({ setUser: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({ setUser: vi.fn(), captureException: vi.fn() }));
 vi.mock('@/lib/analytics/posthog', () => ({
   discardPostHog: vi.fn().mockResolvedValue(undefined),
 }));

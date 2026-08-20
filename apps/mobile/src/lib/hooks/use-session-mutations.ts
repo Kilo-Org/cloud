@@ -4,6 +4,7 @@ import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
   mapStoredSessions,
   removeStoredSession,
@@ -23,8 +24,10 @@ export function useSessionMutations() {
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();
   const activeListFilter = trpc.activeSessions.list.pathFilter();
 
-  const invalidateSessions = async () => {
-    await invalidateAgentSessionQueries(queryClient, trpc);
+  const invalidateSessions = () => {
+    scheduleCacheMaintenance(() => {
+      void invalidateAgentSessionQueries(queryClient, trpc);
+    });
   };
 
   const snapshotAndUpdate = async (

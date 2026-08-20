@@ -18,6 +18,8 @@ type PrReviewPendingCommentRowProps = Readonly<{
   onPress: () => void;
   onDelete: () => void;
   disabled?: boolean;
+  /** True when the comment was written against an older commit than the PR head. */
+  stale?: boolean;
 }>;
 
 export function PrReviewPendingCommentRow({
@@ -25,6 +27,7 @@ export function PrReviewPendingCommentRow({
   onPress,
   onDelete,
   disabled = false,
+  stale = false,
 }: PrReviewPendingCommentRowProps) {
   const colors = useThemeColors();
   const location = pendingCommentLocationLabel(item);
@@ -35,7 +38,11 @@ export function PrReviewPendingCommentRow({
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`Edit pending comment on ${location}`}
+        accessibilityLabel={
+          stale
+            ? `Edit outdated pending comment on ${location}`
+            : `Edit pending comment on ${location}`
+        }
         className="min-h-9 flex-1 gap-0.5 active:opacity-70"
       >
         <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
@@ -44,6 +51,18 @@ export function PrReviewPendingCommentRow({
         <Text className="text-xs leading-4 text-foreground" numberOfLines={1}>
           {item.body.trim().length > 0 ? item.body : '(empty)'}
         </Text>
+        {stale ? (
+          <View className="flex-row items-center gap-1.5">
+            <View className="rounded-full border border-warn-tile-border bg-warn-tile-bg px-2 py-0.5">
+              <Text className="text-[10px] font-medium uppercase tracking-wide text-warn">
+                Outdated
+              </Text>
+            </View>
+            <Text className="flex-1 text-[10px] text-muted-foreground">
+              the PR moved since you wrote this.
+            </Text>
+          </View>
+        ) : null}
       </Pressable>
       <Pressable
         onPress={onDelete}
@@ -90,17 +109,17 @@ function pendingCommentLocationLabel(item: {
 
 export function PendingQueueHint({
   queuedCount,
-  hasStaleItems,
+  staleCount,
 }: {
   queuedCount: number;
-  hasStaleItems: boolean;
+  staleCount: number;
 }) {
   let message = '';
   if (queuedCount === 0) {
     message = 'No comments queued. The review will be submitted with just the event above.';
-  } else if (hasStaleItems) {
+  } else if (staleCount > 0) {
     message =
-      'Some comments may be outdated because the PR head changed after they were queued. Submission will use the current head.';
+      'Comments written against an older commit are not sent. They stay in your queue so you can edit or delete them.';
   } else {
     message = 'All comments will be sent in a single batched request.';
   }

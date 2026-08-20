@@ -2,7 +2,9 @@ import { type ShareId } from '@/lib/share-payload';
 
 /**
  * Conjunction of the guards the auth effect in `_layout.tsx` passes before its
- * success tail. Keep in lockstep with that effect — do not refactor either in isolation.
+ * success tail. Consumed by BOTH the pending-share gate effect and the pending
+ * deep-link consumer. Keep in lockstep with that effect — do not refactor either
+ * in isolation.
  */
 export function isShellReadyForShare(input: {
   hasToken: boolean;

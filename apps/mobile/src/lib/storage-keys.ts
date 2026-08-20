@@ -40,3 +40,31 @@ export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';
 /** iOS App Attest key identifier. The key itself lives in the Secure Enclave. */
 export const ATTEST_KEY_ID_KEY = 'auth-attest-key-id';
+/**
+ * Durable mirror of the pending deep-link destination (P1-E-43b). Written
+ * fire-and-forget on `setPendingDeepLink`, restored on cold start, and deleted
+ * when the slot is consumed or on sign-out.
+ */
+export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';
+/**
+ * Launch context for the Android image picker (P1-I-66b). Written right before
+ * a camera/library launch and read by the recovery hook after an Activity
+ * recreation. Deleted on sign-out: it carries a user id and a session id.
+ */
+export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
+/**
+ * Per-user network-fallback consent for voice transcription (P1-I-68a). Not
+ * deleted on sign-out — a per-user decision must survive sign-out and sign-in
+ * of the same account, matching `CONSENT_USER_KEY_PREFIX`.
+ */
+export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
+
+/**
+ * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
+ * no collisions. Shared by the analytics and voice-network consent records.
+ */
+export function encodeStorageKey(prefix: string, userId: string): string {
+  return `${prefix}${[...new TextEncoder().encode(userId)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')}`;
+}

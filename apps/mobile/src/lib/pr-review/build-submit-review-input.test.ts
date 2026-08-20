@@ -4,6 +4,7 @@ import {
   buildSubmitReviewInput,
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
+import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 
 function makeItem(overrides: Partial<PendingReviewItem> = {}): PendingReviewItem {
@@ -144,6 +145,25 @@ describe('buildSubmitReviewInput', () => {
     // without mutating them.
     expect(items).toHaveLength(2);
   });
+
+  it('maps a fresh-only comment list so stale bodies never reach the input', () => {
+    // The submit sheet partitions the queue and passes only the fresh subset
+    // here; a stale body must never appear in the submitted input.
+    const freshItems = [
+      makeItem({ id: 'a', path: 'a.ts', line: 1, body: 'fresh-a' }),
+      makeItem({ id: 'b', path: 'b.ts', line: 2, body: 'fresh-b' }),
+    ];
+    const input = buildSubmitReviewInput({
+      owner: 'kilocode',
+      repo: 'kilo',
+      number: 42,
+      event: 'COMMENT',
+      commitSha: 'head-2',
+      items: freshItems,
+    });
+    expect(input.comments?.map(comment => comment.body)).toEqual(['fresh-a', 'fresh-b']);
+    expect(input.comments).toHaveLength(2);
+  });
 });
 
 describe('reviewSubmitBlockReason', () => {
@@ -214,5 +234,24 @@ describe('reviewSubmitBlockReason', () => {
     expect(
       reviewSubmitBlockReason({ event: 'COMMENT', hasSummary: false, commentCount: 1 })
     ).toBeNull();
+  });
+
+  it('blocks when every queued comment is stale and there is no summary', () => {
+    // The submit sheet passes `commentCount: fresh.length`, so an all-stale
+    // queue (fresh.length === 0) still blocks a COMMENT/REQUEST_CHANGES
+    // submit even though the queue itself is non-empty.
+    const items = [
+      makeItem({ id: 'a', commitSha: 'old-head' }),
+      makeItem({ id: 'b', commitSha: 'old-head' }),
+    ];
+    const { fresh } = partitionPendingItems(items, 'new-head');
+    expect(fresh).toHaveLength(0);
+
+    const reason = reviewSubmitBlockReason({
+      event: 'COMMENT',
+      hasSummary: false,
+      commentCount: fresh.length,
+    });
+    expect(reason).toBe('Add a summary or at least one comment to post a comment review.');
   });
 });

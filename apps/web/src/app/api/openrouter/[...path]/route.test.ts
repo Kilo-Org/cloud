@@ -12,7 +12,7 @@ import {
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
@@ -29,8 +29,8 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
+import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -69,7 +69,7 @@ jest.mock('@/lib/ai-gateway/abuse-service', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/providers/get-provider');
-jest.mock('@/lib/ai-gateway/providers/partner-routing');
+jest.mock('@/lib/ai-gateway/providers/partner/routing');
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
@@ -368,10 +368,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
-    const responseTransforms = {
-      mapGeminiThoughtContent: true,
-      mapReasoningContentToDetails: false,
-    };
+    const responseTransforms = ReasoningDetailsTransform.GeminiThought;
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider: { ...provider, responseTransforms },

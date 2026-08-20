@@ -5,7 +5,7 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
-import { ChatComposer } from '@/components/agents/chat-composer';
+import { ChatComposer, type ChatComposerControl } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
   customModeOptionsFromRuntimeAgents,
@@ -58,7 +58,13 @@ import {
   shouldShowFooterWorkingIndicator,
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
+import {
+  countInFlightMessages,
+  resolveRetryPrompt,
+  retryMessageAndClear,
+} from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
+import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -162,6 +168,7 @@ export function SessionDetailContent({
     visible: false,
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerControlRef = useRef<ChatComposerControl | null>(null);
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -453,10 +460,16 @@ export function SessionDetailContent({
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
   // decision gets one 4s follow-up refetch — no polling loop.
+  const store = useStore();
+  // The first focus on a session id is owned by `manager.switchSession`, which
+  // already fetches the session metadata (including `associatedPr`). Every
+  // later focus refetches; this ref tracks which id has been seeded.
+  const seededSessionIdRef = useRef<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const refetch = async (scheduleFollowUp: boolean) => {
         try {
@@ -479,15 +492,54 @@ export function SessionDetailContent({
         }
       };
 
-      void refetch(true);
+      // Check the current `fetchedSessionData` and, when a review decision is
+      // pending, schedule the one-shot 4s follow-up. Runs once against the
+      // current value and again on every later write until the session's data
+      // has landed (or the effect is cancelled).
+      const checkAndSchedule = (): boolean => {
+        if (cancelled) {
+          return true;
+        }
+        const fetched = store.get(manager.atoms.fetchedSessionData);
+        if (fetched?.kiloSessionId !== sessionId) {
+          return false;
+        }
+        unsubscribe?.();
+        unsubscribe = null;
+        if (fetched.associatedPr?.reviewDecisionPending) {
+          pendingTimeout = setTimeout(() => {
+            pendingTimeout = null;
+            void refetch(false);
+          }, 4000);
+        }
+        return true;
+      };
+
+      if (!shouldRefetchOnFocus(seededSessionIdRef.current, sessionId)) {
+        // First focus: `switchSession` owns the metadata read, so issue no
+        // request. Seed the ref and keep the pending-decision follow-up. The
+        // manager's fetch can land before this effect runs (switchSession
+        // writes first), so check the current value once before subscribing.
+        // Subscribe only when the data has not landed yet; a match schedules
+        // at most one follow-up and stops listening.
+        seededSessionIdRef.current = sessionId;
+        if (!checkAndSchedule()) {
+          unsubscribe = store.sub(manager.atoms.fetchedSessionData, () => {
+            checkAndSchedule();
+          });
+        }
+      } else {
+        void refetch(true);
+      }
 
       return () => {
         cancelled = true;
+        unsubscribe?.();
         if (pendingTimeout !== null) {
           clearTimeout(pendingTimeout);
         }
       };
-    }, [manager, sessionId])
+    }, [manager, sessionId, store])
   );
 
   useEffect(() => {
@@ -589,212 +641,7 @@ export function SessionDetailContent({
     }
   }
 
-  const renderItem = useCallback(
-    ({ item }: { item: SessionTranscriptItem }) => {
-      if (item.type === 'preparation') {
-        return <PreparationGroup attempt={item.attempt} />;
-      }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
-      }
-      // Look up delivery state by message id. The map is keyed by user-message
-      // id and may briefly contain an entry before the bubble has rendered
-      // (ServiceEvents can be applied while chat events are still buffered),
-      // so a plain lookup is enough — no render-order guard.
-      const deliveryState =
-        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
-      return (
-        <MessageBubble
-          message={item.message}
-          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
-          isSessionStreaming={isStreaming}
-          getChildMessages={getChildMessages}
-          defaultReasoningExpanded={reasoningDefaultExpanded}
-          onOpenChildSession={handleOpenChildSession}
-          deliveryState={deliveryState}
-          onLongPressDetails={setDetailsMessage}
-          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
-        />
-      );
-    },
-    [
-      lastAssistantMessageId,
-      isStreaming,
-      getChildMessages,
-      reasoningDefaultExpanded,
-      handleOpenChildSession,
-      pendingMessages,
-      heldQueuedIds,
-    ]
-  );
-
-  const handleStop = useCallback(async () => {
-    try {
-      await manager.interrupt();
-    } catch {
-      toast.error('Failed to stop execution');
-    }
-  }, [manager]);
-
-  const handleBackToSessions = useCallback(() => {
-    router.replace('/(app)/(tabs)/(2_agents)' as Href);
-  }, [router]);
-
-  const handleModelSelect = useCallback(
-    (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
-      if (activeSessionType === 'remote') {
-        const selectedOption = pickerSelection?.option;
-        const selectedRef = selectedOption?.modelRef;
-        const option = selectedRef
-          ? modelOptions.find(
-              candidate =>
-                candidate.overrideSource === selectedOption.overrideSource &&
-                candidate.modelRef?.providerID === selectedRef.providerID &&
-                candidate.modelRef.modelID === selectedRef.modelID
-            )
-          : modelOptions.find(candidate => candidate.id === value);
-        if (option) {
-          manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
-        }
-        return;
-      }
-
-      manager.setCloudAgentModelOverride({
-        model: value,
-        ...(variant ? { variant } : {}),
-      });
-      setCurrentModel(value);
-      setCurrentVariant(variant);
-      savePersistedModel(organizationId, { model: value, variant });
-      persistServerLastSelected({ model: value, ...(variant ? { variant } : {}) });
-    },
-    [
-      activeSessionType,
-      manager,
-      modelOptions,
-      organizationId,
-      persistServerLastSelected,
-      savePersistedModel,
-      setCurrentModel,
-      setCurrentVariant,
-    ]
-  );
-
-  const shouldShowLoading =
-    isLoading ||
-    (fetchedData === null && !statusIndicator && !error) ||
-    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
-  const shouldBlockMessages = shouldShowLoading;
-  const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
-    isStreaming,
-    pendingMessageCount: pendingMessages.size,
-  });
-  const hasFooterStatusIndicator =
-    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
-  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
-    isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator: hasFooterStatusIndicator,
-  });
-  // Only a live PreparationGroup duplicates footer progress. Completed groups
-  // stay in the transcript after cold starts and must not suppress a later
-  // recycle re-prepare footer (Setting up environment…).
-  const hasInProgressTranscriptPreparation = useMemo(
-    () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
-    [transcript]
-  );
-  const showSessionFooterRow = shouldShowSessionFooterRow({
-    cloudStatusType: cloudStatus?.type,
-    hasInProgressTranscriptPreparation,
-    shouldShowFooterWorking,
-    hasStatusIndicator: statusIndicator !== null,
-    messageCount: messages.length,
-  });
-
-  const emptyStateText = statusIndicator ? null : 'No messages yet';
-
-  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
-  const rename = useSessionDetailRename({
-    sessionId,
-    isLoaded: isSessionLoaded,
-    serverTitle,
-    fallbackTitle: 'Session',
-  });
-  const handleRenameSave = rename.submit;
-  const handleRenameClose = rename.closeModal;
-  const headerRight = (
-    <View className="flex-row items-center gap-2">
-      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
-      <SessionContextMetrics
-        info={contextInfo}
-        totalCostMicrodollars={totalMicrodollars}
-        hasMessages={messages.length > 0}
-        loading={shouldShowLoading}
-        onPress={
-          contextInfo
-            ? () => {
-                setOpenContextSheetIdentity({
-                  sessionId,
-                  providerID: contextInfo.providerID,
-                  modelID: contextInfo.modelID,
-                });
-              }
-            : undefined
-        }
-      />
-    </View>
-  );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
-  const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
-  const hasBlockingInteraction = blockingInteraction !== 'none';
-  // One number for both kinds: the user must see every waiting request, not
-  // only the ones of the kind currently on screen.
-  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
-
-  // When a blocking question/permission card dismisses, hand screen-reader
-  // focus back to the transcript so the user does not get stranded on a
-  // node that no longer exists. We track the previous blocking kind and
-  // only fire on the non-none → none transition (i.e. the user satisfied
-  // the card), not on the very first mount.
-  const transcriptRef = useRef<RNText | null>(null);
-  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
-  useEffect(() => {
-    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
-    const isBlocking = blockingInteraction !== 'none';
-    previousBlockingInteractionRef.current = blockingInteraction;
-    if (!wasBlocking || isBlocking) {
-      return undefined;
-    }
-    if (moveA11yFocus(transcriptRef)) {
-      return undefined;
-    }
-    const handle = setTimeout(() => {
-      moveA11yFocus(transcriptRef);
-    }, 50);
-    return () => {
-      clearTimeout(handle);
-    };
-  }, [blockingInteraction]);
-  // One condition for the composer and for the bottom BlurBar that reserves
-  // its space: if the bar claimed the space on a condition the composer does
-  // not share, the composer pops in and the layout jumps on every open.
-  const isComposerMounted = !isReadOnly || messages.length === 0;
-  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
-  const isComposerDisabled = resolveSessionComposerDisabled({
-    isReadOnly,
-    canSend,
-    shouldShowLoading,
-    hasBlockingInteraction,
-    requiresModel,
-    // A pinned agent model satisfies the model requirement even before the
-    // catalog selection resolves.
-    hasModel: Boolean(pinned.model ?? currentModel),
-  });
-  const composerPlaceholder =
-    (cloudStatus &&
-      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
-    'Message...';
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
     async (
@@ -890,6 +737,253 @@ export function SessionDetailContent({
     ]
   );
 
+  const handleCopyToComposer = useCallback((text: string) => {
+    composerControlRef.current?.setText(text);
+  }, []);
+
+  const handleRetryMessage = useCallback(
+    (message: StoredMessage) => {
+      const prompt = resolveRetryPrompt(message, messages);
+      if (prompt === null) {
+        return;
+      }
+      // Same guard handleSend opens with: when no model resolves, run the send
+      // anyway (the user gets the existing toast) and keep the failed row.
+      if (requiresModel && !(pinned.model ?? currentModel)) {
+        void handleSend(prompt);
+        return;
+      }
+      void retryMessageAndClear(
+        async () => {
+          await handleSend(prompt);
+        },
+        () => {
+          manager.clearFailedMessage(message.info.id);
+        }
+      );
+    },
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: SessionTranscriptItem }) => {
+      if (item.type === 'preparation') {
+        return <PreparationGroup attempt={item.attempt} />;
+      }
+      if (item.type === 'time') {
+        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
+      }
+      // Look up delivery state by message id. The map is keyed by user-message
+      // id and may briefly contain an entry before the bubble has rendered
+      // (ServiceEvents can be applied while chat events are still buffered),
+      // so a plain lookup is enough — no render-order guard.
+      const deliveryState =
+        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+      // Suppress Retry on an assistant failure with no preceding user row.
+      const retryPrompt = resolveRetryPrompt(item.message, messages);
+      return (
+        <MessageBubble
+          message={item.message}
+          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
+          isSessionStreaming={isStreaming}
+          getChildMessages={getChildMessages}
+          defaultReasoningExpanded={reasoningDefaultExpanded}
+          onOpenChildSession={handleOpenChildSession}
+          deliveryState={deliveryState}
+          onLongPressDetails={setDetailsMessage}
+          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
+          onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          onCopyToComposer={handleCopyToComposer}
+        />
+      );
+    },
+    [
+      lastAssistantMessageId,
+      isStreaming,
+      getChildMessages,
+      reasoningDefaultExpanded,
+      handleOpenChildSession,
+      pendingMessages,
+      heldQueuedIds,
+      messages,
+      handleRetryMessage,
+      handleCopyToComposer,
+    ]
+  );
+
+  const handleStop = useCallback(async () => {
+    try {
+      await manager.interrupt();
+    } catch {
+      toast.error('Failed to stop execution');
+    }
+  }, [manager]);
+
+  const handleBackToSessions = useCallback(() => {
+    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+  }, [router]);
+
+  const handleModelSelect = useCallback(
+    (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
+      if (activeSessionType === 'remote') {
+        const selectedOption = pickerSelection?.option;
+        const selectedRef = selectedOption?.modelRef;
+        const option = selectedRef
+          ? modelOptions.find(
+              candidate =>
+                candidate.overrideSource === selectedOption.overrideSource &&
+                candidate.modelRef?.providerID === selectedRef.providerID &&
+                candidate.modelRef.modelID === selectedRef.modelID
+            )
+          : modelOptions.find(candidate => candidate.id === value);
+        if (option) {
+          manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
+        }
+        return;
+      }
+
+      manager.setCloudAgentModelOverride({
+        model: value,
+        ...(variant ? { variant } : {}),
+      });
+      setCurrentModel(value);
+      setCurrentVariant(variant);
+      savePersistedModel(organizationId, { model: value, variant });
+      persistServerLastSelected({ model: value, ...(variant ? { variant } : {}) });
+    },
+    [
+      activeSessionType,
+      manager,
+      modelOptions,
+      organizationId,
+      persistServerLastSelected,
+      savePersistedModel,
+      setCurrentModel,
+      setCurrentVariant,
+    ]
+  );
+
+  const shouldShowLoading =
+    isLoading ||
+    (fetchedData === null && !statusIndicator && !error) ||
+    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
+  const shouldBlockMessages = shouldShowLoading;
+  // Failed delivery entries must not count as in-flight: after a terminal
+  // delivery failure the working spinner and wake lock would otherwise stay on.
+  const inFlightMessageCount = useMemo(
+    () => countInFlightMessages(pendingMessages),
+    [pendingMessages]
+  );
+  const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
+    isStreaming,
+    pendingMessageCount: inFlightMessageCount,
+  });
+  const hasFooterStatusIndicator =
+    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
+  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
+    isAgentWorking: shouldShowWorkingIndicator,
+    hasStatusIndicator: hasFooterStatusIndicator,
+  });
+  // Only a live PreparationGroup duplicates footer progress. Completed groups
+  // stay in the transcript after cold starts and must not suppress a later
+  // recycle re-prepare footer (Setting up environment…).
+  const hasInProgressTranscriptPreparation = useMemo(
+    () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
+    [transcript]
+  );
+  const showSessionFooterRow = shouldShowSessionFooterRow({
+    cloudStatusType: cloudStatus?.type,
+    hasInProgressTranscriptPreparation,
+    shouldShowFooterWorking,
+    hasStatusIndicator: statusIndicator !== null,
+    messageCount: messages.length,
+  });
+
+  const emptyStateText = statusIndicator ? null : 'No messages yet';
+
+  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  const rename = useSessionDetailRename({
+    sessionId,
+    isLoaded: isSessionLoaded,
+    serverTitle,
+    fallbackTitle: 'Session',
+  });
+  const handleRenameSave = rename.submit;
+  const handleRenameClose = rename.closeModal;
+  const headerRight = (
+    <View className="flex-row items-center gap-2">
+      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+      <SessionContextMetrics
+        info={contextInfo}
+        totalCostMicrodollars={totalMicrodollars}
+        hasMessages={messages.length > 0}
+        loading={shouldShowLoading}
+        onPress={
+          contextInfo
+            ? () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo.providerID,
+                  modelID: contextInfo.modelID,
+                });
+              }
+            : undefined
+        }
+      />
+    </View>
+  );
+  const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
+  const hasBlockingInteraction = blockingInteraction !== 'none';
+  // One number for both kinds: the user must see every waiting request, not
+  // only the ones of the kind currently on screen.
+  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
+
+  // When a blocking question/permission card dismisses, hand screen-reader
+  // focus back to the transcript so the user does not get stranded on a
+  // node that no longer exists. We track the previous blocking kind and
+  // only fire on the non-none → none transition (i.e. the user satisfied
+  // the card), not on the very first mount.
+  const transcriptRef = useRef<RNText | null>(null);
+  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
+  useEffect(() => {
+    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
+    const isBlocking = blockingInteraction !== 'none';
+    previousBlockingInteractionRef.current = blockingInteraction;
+    if (!wasBlocking || isBlocking) {
+      return undefined;
+    }
+    if (moveA11yFocus(transcriptRef)) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      moveA11yFocus(transcriptRef);
+    }, 50);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [blockingInteraction]);
+  // One condition for the composer and for the bottom BlurBar that reserves
+  // its space: if the bar claimed the space on a condition the composer does
+  // not share, the composer pops in and the layout jumps on every open.
+  const isComposerMounted = !isReadOnly || messages.length === 0;
+  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  const isComposerDisabled = resolveSessionComposerDisabled({
+    isReadOnly,
+    canSend,
+    shouldShowLoading,
+    hasBlockingInteraction,
+    requiresModel,
+    // A pinned agent model satisfies the model requirement even before the
+    // catalog selection resolves.
+    hasModel: Boolean(pinned.model ?? currentModel),
+  });
+  const composerPlaceholder =
+    (cloudStatus &&
+      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
+    'Message...';
+  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
+
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
       // Slash commands ride the same manager.send() pipeline. The manager
@@ -976,8 +1070,23 @@ export function SessionDetailContent({
     isFocused,
     isDisconnected: agentStatus.type === 'disconnected',
     isStreaming,
-    pendingMessageCount: pendingMessages.size,
+    pendingMessageCount: inFlightMessageCount,
   });
+
+  // Child-sheet pagination fields live only on the `ready` hydration state.
+  // The sheet can render `content` before hydration reports ready (live child
+  // rows already exist), so default every non-ready state.
+  const openChildSessionId = childSessionSheet.sheet?.sessionId ?? null;
+  const openChildHydrationState =
+    openChildSessionId === null ? null : getChildSessionHydrationState(openChildSessionId);
+  const childHasOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.hasOlder : false;
+  const childIsLoadingOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.isLoadingOlder : false;
+  const childOlderMessagesError =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.olderError : null;
+  const childOlderMessagesOmittedItemCount =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.omittedItemCount : 0;
 
   return (
     <PartDetailSheetHost messages={messages}>
@@ -1049,6 +1158,15 @@ export function SessionDetailContent({
             getChildMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            hasOlderMessages={childHasOlderMessages}
+            isLoadingOlderMessages={childIsLoadingOlderMessages}
+            olderMessagesError={childOlderMessagesError}
+            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+            onLoadOlderMessages={() => {
+              if (openChildSessionId !== null) {
+                void manager.loadOlderChildMessages(openChildSessionId);
+              }
+            }}
             renderPart={props => <PartRenderer {...props} />}
             onOpenChildSession={handleOpenChildSession}
             onRetry={() => {
@@ -1195,7 +1313,9 @@ export function SessionDetailContent({
                 shareId={shareId}
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
-                initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                sessionId={sessionId}
+                controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
@@ -1278,6 +1398,9 @@ export function SessionDetailContent({
         olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
         onLoadOlderMessages={() => {
           void manager.loadOlderMessages();
+        }}
+        onReachedBottom={() => {
+          manager.trimRetainedHistory();
         }}
         renderItem={renderItem}
       />

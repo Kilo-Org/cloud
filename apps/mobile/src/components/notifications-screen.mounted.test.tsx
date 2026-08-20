@@ -128,12 +128,12 @@ async function renderScreen() {
   return result;
 }
 
-function previewSwitches(root: I): I[] {
+function switchesByLabel(root: I, label: string): I[] {
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Switch' &&
-      n.props.accessibilityLabel === 'Show full previews'
+      n.props.accessibilityLabel === label
   );
 }
 
@@ -143,24 +143,6 @@ function previewRetry(root: I): I[] {
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
       n.props.accessibilityLabel === 'Retry saving notification previews'
-  );
-}
-
-function kiloclawSwitches(root: I): I[] {
-  return root.findAll(
-    n =>
-      typeof n.type === 'string' &&
-      (n.type as string) === 'Switch' &&
-      n.props.accessibilityLabel === 'KiloClaw activity'
-  );
-}
-
-function chatMessagesSwitches(root: I): I[] {
-  return root.findAll(
-    n =>
-      typeof n.type === 'string' &&
-      (n.type as string) === 'Switch' &&
-      n.props.accessibilityLabel === 'Chat messages'
   );
 }
 
@@ -174,36 +156,19 @@ function skeletonCount(root: I): number {
   return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton').length;
 }
 
-function previewSwitchOnValueChange(root: I): ((value: boolean) => void) | undefined {
-  const sw = previewSwitches(root)[0];
+function switchOnValueChange(root: I, label: string): ((value: boolean) => void) | undefined {
+  const sw = switchesByLabel(root, label)[0];
   return sw ? (sw.props as { onValueChange?: (value: boolean) => void }).onValueChange : undefined;
 }
 
-function kiloclawSwitchOnValueChange(root: I): ((value: boolean) => void) | undefined {
-  const sw = kiloclawSwitches(root)[0];
-  return sw ? (sw.props as { onValueChange?: (value: boolean) => void }).onValueChange : undefined;
-}
-
-// The preview switch renders as soon as the preference query resolves, but it
-// stays disabled until the master gate settles (the device-token query is
-// gated on the permission query, so it settles one cascade later). Wait for the
-// switch to be enabled before driving a change, otherwise the disabled switch
+// The switch renders as soon as the preference query resolves, but it stays
+// disabled until the master gate settles (the device-token query is gated on
+// the permission query, so it settles one cascade later). Wait for the switch
+// to be enabled before driving a change, otherwise the disabled switch
 // swallows the onValueChange.
-async function waitForEnabledPreviewSwitch(renderer: R): Promise<void> {
+async function waitForEnabledSwitch(renderer: R, label: string): Promise<void> {
   await waitFor(() => {
-    const sw = previewSwitches(renderer.root);
-    return sw.length === 1 && sw[0]?.props.disabled === false;
-  }, 200);
-}
-
-// The KiloClaw switch renders as soon as the preference query resolves, but it
-// stays disabled until the master gate settles (the device-token query is
-// gated on the permission query, so it settles one cascade later). Wait for the
-// switch to be enabled before driving a change, otherwise the disabled switch
-// swallows the onValueChange.
-async function waitForEnabledKiloClawSwitch(renderer: R): Promise<void> {
-  await waitFor(() => {
-    const sw = kiloclawSwitches(renderer.root);
+    const sw = switchesByLabel(renderer.root, label);
     return sw.length === 1 && sw[0]?.props.disabled === false;
   }, 200);
 }
@@ -221,19 +186,21 @@ describe('NotificationsScreen message-previews row', () => {
   it('happy: reflects the server value and persists a change', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs({ notificationPreviews: 'generic' }));
     const { renderer } = await renderScreen();
-    await waitForEnabledPreviewSwitch(renderer);
+    await waitForEnabledSwitch(renderer, 'Show full previews');
 
-    expect(previewSwitches(renderer.root)[0]?.props.value).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Show full previews')[0]?.props.value).toBe(false);
 
     // A change to "full" must persist through the mutation; the refetch then
     // returns the new server value.
     prefsQueryFn.mockResolvedValue(fullPrefs({ notificationPreviews: 'full' }));
     act(() => {
-      previewSwitchOnValueChange(renderer.root)?.(true);
+      switchOnValueChange(renderer.root, 'Show full previews')?.(true);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
     expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ notificationPreviews: 'full' });
-    await waitFor(() => previewSwitches(renderer.root)[0]?.props.value === true);
+    await waitFor(
+      () => switchesByLabel(renderer.root, 'Show full previews')[0]?.props.value === true
+    );
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -244,10 +211,10 @@ describe('NotificationsScreen message-previews row', () => {
       message: 'boom',
     });
     const { renderer } = await renderScreen();
-    await waitForEnabledPreviewSwitch(renderer);
+    await waitForEnabledSwitch(renderer, 'Show full previews');
 
     act(() => {
-      previewSwitchOnValueChange(renderer.root)?.(true);
+      switchOnValueChange(renderer.root, 'Show full previews')?.(true);
     });
     // pending
     expect(activityIndicators(renderer.root).length).toBe(1);
@@ -255,7 +222,7 @@ describe('NotificationsScreen message-previews row', () => {
     await waitFor(() => activityIndicators(renderer.root).length === 0);
 
     // The switch re-renders from the unchanged server value (still generic).
-    expect(previewSwitches(renderer.root)[0]?.props.value).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Show full previews')[0]?.props.value).toBe(false);
     expect(previewRetry(renderer.root).length).toBe(1);
     expect(toastError).toHaveBeenCalledWith('boom');
   });
@@ -267,17 +234,17 @@ describe('NotificationsScreen message-previews row', () => {
       message: 'Unauthorized',
     });
     const { renderer } = await renderScreen();
-    await waitForEnabledPreviewSwitch(renderer);
+    await waitForEnabledSwitch(renderer, 'Show full previews');
 
     act(() => {
-      previewSwitchOnValueChange(renderer.root)?.(true);
+      switchOnValueChange(renderer.root, 'Show full previews')?.(true);
     });
     // pending
     expect(activityIndicators(renderer.root).length).toBe(1);
     // settled
     await waitFor(() => activityIndicators(renderer.root).length === 0);
 
-    expect(previewSwitches(renderer.root)[0]?.props.disabled).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Show full previews')[0]?.props.disabled).toBe(true);
     expect(previewRetry(renderer.root).length).toBe(0);
     expect(toastError).toHaveBeenCalledWith('Unauthorized');
   });
@@ -287,7 +254,7 @@ describe('NotificationsScreen message-previews row', () => {
     prefsQueryFn.mockReturnValue(new Promise(() => undefined));
     const { renderer } = await renderScreen();
 
-    expect(previewSwitches(renderer.root).length).toBe(0);
+    expect(switchesByLabel(renderer.root, 'Show full previews').length).toBe(0);
     expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
   });
 });
@@ -307,10 +274,10 @@ describe('NotificationsScreen KiloClaw activity row', () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
 
-    await waitForEnabledKiloClawSwitch(renderer);
+    await waitForEnabledSwitch(renderer, 'KiloClaw activity');
 
     act(() => {
-      kiloclawSwitchOnValueChange(renderer.root)?.(false);
+      switchOnValueChange(renderer.root, 'KiloClaw activity')?.(false);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
     expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ kiloclawActivity: false });
@@ -321,9 +288,9 @@ describe('NotificationsScreen KiloClaw activity row', () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
 
-    await waitFor(() => chatMessagesSwitches(renderer.root).length === 1);
-    expect(kiloclawSwitches(renderer.root).length).toBe(0);
-    expect(chatMessagesSwitches(renderer.root).length).toBe(1);
+    await waitFor(() => switchesByLabel(renderer.root, 'Chat messages').length === 1);
+    expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
+    expect(switchesByLabel(renderer.root, 'Chat messages').length).toBe(1);
   });
 
   it('retryable unhappy: prefs error shows retry and no KiloClaw row', async () => {
@@ -340,7 +307,7 @@ describe('NotificationsScreen KiloClaw activity row', () => {
             n.props.accessibilityLabel === 'Retry loading notification categories'
         ).length === 1
     );
-    expect(kiloclawSwitches(renderer.root).length).toBe(0);
+    expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
   });
 
   it('empty loading: pending prefs shows skeletons and no KiloClaw switch', async () => {
@@ -348,7 +315,7 @@ describe('NotificationsScreen KiloClaw activity row', () => {
     prefsQueryFn.mockReturnValue(new Promise(() => undefined));
     const { renderer } = await renderScreen();
 
-    expect(kiloclawSwitches(renderer.root).length).toBe(0);
+    expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
     expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
   });
 });

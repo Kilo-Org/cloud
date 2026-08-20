@@ -319,7 +319,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-1.5 px-6 pt-1.5">
+        <View className="gap-4 px-6 pt-4">
           <ContextPreview
             selection={selection}
             fallbackPath={path}
@@ -328,7 +328,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             preferFallback={isEdit}
           />
           <View className="gap-1">
-            <Text className="text-xs font-medium text-foreground">Comment</Text>
+            <Text className="text-sm font-medium text-foreground">Comment</Text>
             {isEdit || draft.settled ? (
               <CommentBodyField
                 inputRef={bodyInputRef}

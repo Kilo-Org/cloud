@@ -72,17 +72,16 @@ export function ComposerFooter({
 }): ReactNode {
   return (
     // Lives inside the formSheet ScrollView (not a sticky sibling).
-    // size=sm + tight footer: half-detent + empty-body error must keep Cancel
-    // above the closed-sheet limit (~874) without scrolling.
-    <PrFormSheetFooter className="pb-1 pt-1">
+    // Half detent stays a drag-down; keep Cancel above the closed-sheet
+    // limit (~874) without scrolling.
+    <PrFormSheetFooter>
       {isEdit ? (
-        <Button size="sm" onPress={onSave} disabled={primaryDisabled} accessibilityLabel="Save">
+        <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel="Save">
           <Text>Save</Text>
         </Button>
       ) : (
         <>
           <Button
-            size="sm"
             onPress={onCommentNow}
             loading={isSubmitting}
             disabled={primaryDisabled}
@@ -91,11 +90,10 @@ export function ComposerFooter({
             <Text>Comment now</Text>
           </Button>
           <Button
-            size="sm"
             variant="secondary"
             onPress={onAddToReview}
             disabled={isSubmitting}
-            className="mt-0.5"
+            className="mt-2"
             accessibilityLabel="Add to review"
           >
             <Text>Add to review</Text>
@@ -103,11 +101,10 @@ export function ComposerFooter({
         </>
       )}
       <Button
-        size="sm"
         variant="ghost"
         onPress={onCancel}
         disabled={isSubmitting}
-        className="mt-0.5"
+        className="mt-2"
         accessibilityLabel="Cancel"
       >
         <Text>Cancel</Text>
@@ -139,7 +136,7 @@ export function ContextPreview({
   const previewText = preferFallback ? '' : (selection?.selectedText ?? '');
   // Single-line context keeps half-detent + keyboard-open room for CTAs.
   return (
-    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
+    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
       <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
         {path} {side} {lineLabel}
       </Text>

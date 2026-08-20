@@ -51,6 +51,7 @@ export default function PrReviewNumberLayout() {
   const sheetOptions = {
     presentation: 'formSheet' as const,
     sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
+    sheetInitialDetentIndex: 'last' as const,
     sheetGrabberVisible: true,
     headerShown: false,
   };

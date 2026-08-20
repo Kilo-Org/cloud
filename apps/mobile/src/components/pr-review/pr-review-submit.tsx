@@ -250,7 +250,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-2 px-6 pt-2">
+        <View className="gap-4 px-6 pt-4">
           <ReviewEventChips
             value={event}
             disabled={isSubmitting}
@@ -339,7 +339,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               }
             }}
             disabled={isSubmitting}
-            className="mt-1"
+            className="mt-2"
             accessibilityLabel="Cancel"
           >
             <Text>Cancel</Text>

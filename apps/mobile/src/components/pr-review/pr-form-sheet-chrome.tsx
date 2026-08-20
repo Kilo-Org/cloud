@@ -67,7 +67,7 @@ export function PrFormSheetFooter(props: { children: ReactNode; className?: stri
   return (
     <View
       className={cn(
-        'mt-0.5 border-t-[0.5px] border-hair-soft bg-background px-6 pb-1.5 pt-1',
+        'mt-0.5 border-t-[0.5px] border-hair-soft bg-background px-6 pb-4 pt-3',
         props.className
       )}
     >

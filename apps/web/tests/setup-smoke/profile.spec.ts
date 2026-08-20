@@ -62,6 +62,9 @@ test.describe('local setup smoke', () => {
     await expect(profileCard.getByRole('button', { name: 'Edit profile' })).toBeVisible();
     await expect(profileCard.getByText(testEmail, { exact: true })).toBeVisible();
 
+    await expect(page.getByRole('link', { name: 'Open Settings' })).toBeVisible();
+
+    await page.goto('/settings');
     await expect(page.getByText('Auto routing', { exact: true })).toBeVisible();
   });
 });

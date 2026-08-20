@@ -1041,9 +1041,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   cloud_agent_code_reviews, review memory feedback/proposals,
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
-  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
-  *   user_notification_preferences)
-  * - operation_ledgers (keyed by kilo_user_id)
+ *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
+ *   user_notification_preferences)
+ * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail

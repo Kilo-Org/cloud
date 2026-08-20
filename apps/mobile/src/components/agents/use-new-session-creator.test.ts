@@ -143,11 +143,11 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   reset: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
-    uploadPending: vi.fn(async () => ({
-      ok: true as const,
-      wire: undefined,
-      submission: undefined,
-    })),
+  uploadPending: vi.fn(async () => ({
+    ok: true as const,
+    wire: undefined,
+    submission: undefined,
+  })),
 };
 
 function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {

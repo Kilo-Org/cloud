@@ -263,15 +263,15 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai', 'fireworks'], model_deny_list: [] },
+          settings: { provider_allow_list: ['deepseek', 'fireworks'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const catalogLookup = async () => new Set(['fireworks', 'deepseek']);
+    const catalogLookup = async () => new Set(['fireworks', 'openai']);
 
     expect(
-      await getEffectiveModelDecision(policy, 'deepseek/deepseek-v4-pro:discounted', catalogLookup)
+      await getEffectiveModelDecision(policy, 'openai/gpt-5.6-sol-discounted', catalogLookup)
     ).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
@@ -280,19 +280,19 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai', 'deepseek'], model_deny_list: [] },
+          settings: { provider_allow_list: ['openai', 'fireworks'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'deepseek/deepseek-v4-pro:discounted',
+      'openai/gpt-5.6-sol-discounted',
       async () => new Set(['fireworks'])
     );
 
     expect(decision.allowed).toBe(true);
-    expect([...decision.eligibleProviderRoutes!]).toEqual(['deepseek']);
+    expect([...decision.eligibleProviderRoutes!]).toEqual(['openai']);
   });
 
   it('does not apply exclusive restrictions to the unsuffixed catalog model', async () => {
@@ -305,16 +305,16 @@ describe('effective organization model access', () => {
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const catalogLookup = async () => new Set(['fireworks', 'deepseek']);
+    const catalogLookup = async () => new Set(['fireworks', 'openai']);
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'deepseek/deepseek-v4-pro:discounted',
+      'openai/gpt-5.6-sol-discounted',
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
       policy,
-      'deepseek/deepseek-v4-pro',
+      'openai/gpt-5.6-sol',
       catalogLookup
     );
 
@@ -328,7 +328,7 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai', 'deepseek'], model_deny_list: [] },
+          settings: { provider_allow_list: ['openai'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
@@ -337,7 +337,7 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'deepseek/deepseek-v4-pro:discounted',
+      'openai/gpt-5.6-sol-discounted',
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(
@@ -347,7 +347,7 @@ describe('effective organization model access', () => {
     );
 
     expect(restricted.allowed).toBe(true);
-    expect([...restricted.eligibleProviderRoutes!]).toEqual(['deepseek']);
+    expect([...restricted.eligibleProviderRoutes!]).toEqual(['openai']);
     expect(unrestricted).toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 });

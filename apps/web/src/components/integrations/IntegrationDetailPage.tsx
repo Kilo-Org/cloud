@@ -230,14 +230,23 @@ export async function UserIntegrationDetailPage({
   const entry = getIntegrationDetailEntry(detailPlatform);
   await getUserFromAuthOrRedirect('/users/sign_in');
   const search = await searchParams;
+  const returnTo = search.returnTo ? validateReturnPath(search.returnTo) : null;
 
   return (
     <PageLayout
       title={entry.title}
       subtitle={entry.userSubtitle}
-      headerActions={<BackLink href="/integrations" label="Back to Integrations" />}
+      headerActions={
+        <BackLink
+          href={returnTo ?? '/integrations'}
+          label={returnTo ? 'Return to setup' : 'Back to Integrations'}
+        />
+      }
     >
-      <SuspendedIntegrationDetails platform={detailPlatform} search={search} />
+      <SuspendedIntegrationDetails
+        platform={detailPlatform}
+        search={{ ...search, returnTo: returnTo ?? undefined }}
+      />
     </PageLayout>
   );
 }

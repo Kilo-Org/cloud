@@ -38,6 +38,7 @@ import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const ACTIVATION = new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000);
+const AFTER_ACTIVATION = new Date((SERVICE_FEE_ACTIVATION_UNIX_SECONDS + 30 * 24 * 60 * 60) * 1000);
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -319,7 +320,7 @@ describe('drizzle organization service fee exemption store', () => {
       isExempt: false,
       reason: 'child exemption revoked',
       changedByKiloUserId: admin.id,
-      now: new Date('2026-10-01T00:00:00.000Z'),
+      now: AFTER_ACTIVATION,
     });
 
     const childView = await getOrganizationServiceFeeExemption({
@@ -340,17 +341,17 @@ describe('drizzle organization service fee exemption store', () => {
     const childAtGrant = await getEffectiveOrganizationServiceFeeExemption({
       store: exemptions,
       organizationId: child.id,
-      at: new Date('2026-09-01T00:00:00.000Z'),
+      at: ACTIVATION,
     });
     const childAtRevoke = await getEffectiveOrganizationServiceFeeExemption({
       store: exemptions,
       organizationId: child.id,
-      at: new Date('2026-10-01T00:00:00.000Z'),
+      at: AFTER_ACTIVATION,
     });
     const parentNow = await getEffectiveOrganizationServiceFeeExemption({
       store: exemptions,
       organizationId: parent.id,
-      at: new Date('2026-10-01T00:00:00.000Z'),
+      at: AFTER_ACTIVATION,
     });
     expect(childAtGrant).toMatchObject({
       isExempt: true,
@@ -373,14 +374,14 @@ describe('drizzle organization service fee exemption store', () => {
     const siblingEffective = await getEffectiveOrganizationServiceFeeExemption({
       store: exemptions,
       organizationId: sibling.id,
-      at: new Date('2026-09-01T00:00:00.000Z'),
+      at: ACTIVATION,
     });
     expect(siblingEffective).toBeNull();
 
     const childDecision = await prepareServiceFeeAssessmentDecision(
       organizationInput(child.id, admin.id, {
         assessmentKey: `invoice:${crypto.randomUUID()}`,
-        eligibilityCreatedAt: new Date('2026-09-01T00:00:00.000Z'),
+        eligibilityCreatedAt: ACTIVATION,
       }),
       {
         findEffectiveExemption: async (organizationId, at) => {

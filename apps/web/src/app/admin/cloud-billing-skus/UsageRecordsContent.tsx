@@ -296,6 +296,10 @@ export default function UsageRecordsContent() {
   const catalog = useQuery(trpc.admin.cloudBillingSkus.list.queryOptions());
   const intervalIdParam = searchParams.get('intervalId');
   const sessionIdParam = searchParams.get('sessionId');
+  const initialSummaryStart = toDateTimeLocalValue(
+    new Date(Date.now() - (sessionIdParam ? 7 : 1) * 24 * 60 * 60 * 1_000)
+  );
+  const initialSummaryEnd = toDateTimeLocalValue(new Date());
   const [kind, setKind] = useState<SearchKind>(
     sessionIdParam ? 'session' : intervalIdParam ? 'interval' : 'user'
   );
@@ -310,8 +314,8 @@ export default function UsageRecordsContent() {
       return {
         kind: 'session',
         value: sessionIdParam,
-        summaryStart: new Date(Date.now() - 7 * 24 * 60 * 60 * 1_000).toISOString(),
-        summaryEnd: new Date().toISOString(),
+        summaryStart: new Date(initialSummaryStart).toISOString(),
+        summaryEnd: new Date(initialSummaryEnd).toISOString(),
         closeReason: closeReasonValue,
       };
     }
@@ -322,10 +326,8 @@ export default function UsageRecordsContent() {
   const [cursor, setCursor] = useState<Cursor | undefined>();
   const [previousCursors, setPreviousCursors] = useState<Array<Cursor | undefined>>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [summaryStart, setSummaryStart] = useState(() =>
-    toDateTimeLocalValue(new Date(Date.now() - 24 * 60 * 60 * 1_000))
-  );
-  const [summaryEnd, setSummaryEnd] = useState(() => toDateTimeLocalValue(new Date()));
+  const [summaryStart, setSummaryStart] = useState(initialSummaryStart);
+  const [summaryEnd, setSummaryEnd] = useState(initialSummaryEnd);
   const [summaryRequest, setSummaryRequest] = useState<UsageSummaryRequest | null>(null);
   const [summaryInputError, setSummaryInputError] = useState<string | null>(null);
   const [rawResponseOpen, setRawResponseOpen] = useState(false);

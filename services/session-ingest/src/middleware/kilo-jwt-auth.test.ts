@@ -1,446 +1,412 @@
 import { Hono } from 'hono';
 import { SignJWT } from 'jose';
-import { vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-vi.mock('@kilocode/worker-utils/kilo-token-auth', () => ({
-  findKiloUserPepper: vi.fn(),
+import { kiloJwtAuthMiddleware, type KiloJwtAuthVariables } from './kilo-jwt-auth';
+
+const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
+
+const userRowByUserId = vi.hoisted(
+  () => new Map<string, { pepper: string | null; blockedReason: string | null }>()
+);
+
+const dbState = vi.hoisted(() => ({ fails: false }));
+
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: () => ({
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => {
+            if (dbState.fails) throw new Error('connection refused');
+            const row = userRowByUserId.get('usr_123');
+            if (!row) return [];
+            return [{ api_token_pepper: row.pepper, blocked_reason: row.blockedReason }];
+          },
+        }),
+      }),
+    }),
+  }),
 }));
 
-import { findKiloUserPepper } from '@kilocode/worker-utils/kilo-token-auth';
-import { kiloJwtAuthMiddleware } from './kilo-jwt-auth';
+type TicketStore = {
+  tickets: Map<string, { userId: string; expiresAt: number }>;
+  mint: (userId: string, expiresAt: number) => string;
+  namespace: {
+    idFromName: (name: string) => string;
+    get: (id: string) => { consume: () => Promise<{ userId: string } | null> };
+  };
+};
 
-type CachedUserAuthV1 =
-  | { v: 1; exists: false }
-  | { v: 1; exists: true; pepper: string | null; blockedReason: string | null };
+function makeTicketStore(): TicketStore {
+  const tickets = new Map<string, { userId: string; expiresAt: number }>();
+  return {
+    tickets,
+    mint(userId: string, expiresAt: number): string {
+      const ticket = crypto.randomUUID();
+      tickets.set(ticket, { userId, expiresAt });
+      return ticket;
+    },
+    namespace: {
+      idFromName: (name: string) => name,
+      get: (id: string) => ({
+        consume: async () => {
+          const entry = tickets.get(id);
+          if (!entry || entry.expiresAt <= Date.now()) {
+            tickets.delete(id);
+            return null;
+          }
+          tickets.delete(id);
+          return { userId: entry.userId };
+        },
+      }),
+    },
+  };
+}
 
 type TestEnv = {
   NEXTAUTH_SECRET_PROD: {
     get: () => Promise<string>;
   };
-  USER_EXISTS_CACHE: {
-    get: ReturnType<typeof vi.fn<(key: string) => Promise<string | null>>>;
-    put: ReturnType<
-      typeof vi.fn<
-        (key: string, value: string, options?: { expirationTtl: number }) => Promise<void>
-      >
-    >;
-  };
   HYPERDRIVE: {
     connectionString: string;
   };
+  CONNECTION_TICKET_DO: TicketStore['namespace'];
 };
 
-const SECRET = 'test-secret';
-const USER_ID = 'usr_123';
-const PEPPER = 'pepper-current';
-const GENERIC_403 = 'User account not found';
-
-const unblockedUser: CachedUserAuthV1 = {
-  v: 1,
-  exists: true,
-  pepper: PEPPER,
-  blockedReason: null,
-};
-
-function makeEnv(opts?: { cached?: string | null }): TestEnv {
+function makeEnv(secret: string, ticketStore: TicketStore = makeTicketStore()): TestEnv {
   return {
     NEXTAUTH_SECRET_PROD: {
-      get: async () => SECRET,
-    },
-    USER_EXISTS_CACHE: {
-      get: vi.fn(async () => opts?.cached ?? null),
-      put: vi.fn(async () => undefined),
+      get: async () => secret,
     },
     HYPERDRIVE: { connectionString: 'postgres://test' },
+    CONNECTION_TICKET_DO: ticketStore.namespace,
   };
 }
 
 function makeApp() {
-  const app = new Hono<{ Bindings: TestEnv; Variables: { user_id: string } }>();
+  const app = new Hono<{ Bindings: TestEnv; Variables: KiloJwtAuthVariables }>();
   app.use('/api/*', kiloJwtAuthMiddleware);
   app.get('/api/me', c => c.json({ user_id: c.get('user_id') }));
+  app.get('/api/user/cli', c => c.json({ user_id: c.get('user_id') }));
+  app.get('/api/user/web', c => c.json({ user_id: c.get('user_id') }));
+  app.delete('/api/session/:sessionId', c =>
+    c.json({ user_id: c.get('user_id'), deletionAudience: c.get('deletionAudience') === true })
+  );
   return app;
 }
 
-async function sign(
-  payload: Record<string, unknown>,
-  opts?: { audience?: string }
-): Promise<string> {
-  let jwt = new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h');
-  if (opts?.audience) jwt = jwt.setAudience(opts.audience);
-  return jwt.sign(new TextEncoder().encode(SECRET));
-}
-
-function userToken(pepper: string | null = PEPPER) {
-  return sign({ kiloUserId: USER_ID, version: 3, apiTokenPepper: pepper });
-}
-
-function internalToken(userId = USER_ID) {
-  return sign({ kiloUserId: userId, version: 3 });
-}
-
-function authRequest(token: string) {
-  return new Request('http://local/api/me', {
-    headers: { Authorization: `Bearer ${token}` },
+async function signUserToken(pepper: string): Promise<string> {
+  const { token } = await signKiloToken({
+    userId: 'usr_123',
+    pepper,
+    secret: TEST_JWT_SECRET,
+    expiresInSeconds: 3600,
+    env: 'production',
+    extra: { tokenSource: 'kilo-chat' },
   });
+  return token;
+}
+
+async function signInternalToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({ version: 3, kiloUserId: 'usr_123' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(new TextEncoder().encode(TEST_JWT_SECRET));
 }
 
 describe('kiloJwtAuthMiddleware', () => {
   beforeEach(() => {
-    vi.mocked(findKiloUserPepper).mockReset();
+    clearSecretCacheForTest();
+    userRowByUserId.clear();
+    dbState.fails = false;
+  });
+
+  it('returns a retryable 503 when the secret store fails', async () => {
+    const token = await signUserToken('pepper-current');
+    const env = makeEnv(TEST_JWT_SECRET);
+    env.NEXTAUTH_SECRET_PROD.get = async () => {
+      throw new Error('secrets store unavailable');
+    };
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      env
+    );
+
+    expect(res.status).toBe(503);
+  });
+
+  it('returns a retryable 503 when the database fails', async () => {
+    dbState.fails = true;
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(503);
   });
 
   it('rejects missing Authorization header', async () => {
-    const res = await makeApp().fetch(new Request('http://local/api/me'), makeEnv());
+    const res = await makeApp().fetch(new Request('http://local/api/me'), makeEnv(TEST_JWT_SECRET));
     expect(res.status).toBe(401);
   });
 
-  it('rejects a token with an audience', async () => {
-    const token = await sign(
-      { kiloUserId: USER_ID, version: 3, apiTokenPepper: PEPPER },
-      { audience: 'session-ingest' }
-    );
-    const env = makeEnv({ cached: JSON.stringify(unblockedUser) });
+  it('accepts a token with the current pepper for an active account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
 
-    const res = await makeApp().fetch(authRequest(token), env);
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('rejects a stale pepper even when the user exists', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-stale');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
 
     expect(res.status).toBe(401);
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
   });
 
-  it('authorizes a user token with matching pepper when unblocked', async () => {
-    const token = await userToken();
-    const env = makeEnv({ cached: JSON.stringify(unblockedUser) });
+  it('rejects a blocked account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'manual block' });
+    const token = await signUserToken('pepper-current');
 
-    const res = await makeApp().fetch(authRequest(token), env);
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
+  it('accepts an internal token (no pepper) for an active account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signInternalToken();
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ user_id: USER_ID });
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
   });
 
-  it('rejects a user token with a stale pepper', async () => {
-    const token = await userToken('pepper-stale');
-    const env = makeEnv({ cached: JSON.stringify(unblockedUser) });
+  it('rejects an internal token (no pepper) for a blocked account', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'manual block' });
+    const token = await signInternalToken();
 
-    const res = await makeApp().fetch(authRequest(token), env);
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
+  it('reads ?token= on a websocket upgrade to /api/user/cli', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/cli?token=${token}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('does not read ?token= on a websocket upgrade to /api/user/web', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?token=${token}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Missing or invalid ticket',
+    });
+  });
+
+  it('rejects a raw bearer on a websocket upgrade to /api/user/web', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signUserToken('pepper-current');
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/user/web', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Missing or invalid ticket',
+    });
+  });
+
+  it('accepts a fresh ticket on a websocket upgrade to /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() + 60_000);
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user_id: 'usr_123' });
+  });
+
+  it('rejects a replay of the same ticket on /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() + 60_000);
+
+    const first = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+    expect(first.status).toBe(200);
+
+    const replay = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(replay.status).toBe(401);
+    expect(await replay.json()).toEqual({
+      success: false,
+      error: 'Invalid or expired ticket',
+    });
+  });
+
+  it('rejects an expired ticket on /api/user/web', async () => {
+    const ticketStore = makeTicketStore();
+    const ticket = ticketStore.mint('usr_123', Date.now() - 1);
+
+    const res = await makeApp().fetch(
+      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+        headers: { Upgrade: 'websocket' },
+      }),
+      makeEnv(TEST_JWT_SECRET, ticketStore)
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Invalid or expired ticket',
+    });
+  });
+
+  it('rejects session-ingest user-deletion audience tokens on non-delete routes', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'deleted' });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({ version: 3, kiloUserId: 'usr_123' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience(SESSION_INGEST_USER_DELETION_AUDIENCE)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      makeEnv(TEST_JWT_SECRET)
+    );
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ success: false, error: GENERIC_403 });
-  });
-
-  it('rejects a user token with matching pepper when blocked', async () => {
-    const token = await userToken();
-    const env = makeEnv({
-      cached: JSON.stringify({
-        v: 1,
-        exists: true,
-        pepper: PEPPER,
-        blockedReason: 'tos',
-      } satisfies CachedUserAuthV1),
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'Deletion token cannot be used for this request',
     });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ success: false, error: GENERIC_403 });
   });
 
-  it('authorizes a user token with null pepper when cached pepper is null and unblocked', async () => {
-    const token = await userToken(null);
-    const env = makeEnv({
-      cached: JSON.stringify({
-        v: 1,
-        exists: true,
-        pepper: null,
-        blockedReason: null,
-      } satisfies CachedUserAuthV1),
-    });
+  it('accepts session-ingest user-deletion audience tokens on leaf session DELETE', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'deleted' });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({ version: 3, kiloUserId: 'usr_123' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience(SESSION_INGEST_USER_DELETION_AUDIENCE)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
 
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ user_id: USER_ID });
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
-  });
-
-  it('rejects a user token with null pepper when cached pepper is a string', async () => {
-    const token = await userToken(null);
-    const env = makeEnv({ cached: JSON.stringify(unblockedUser) });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ success: false, error: GENERIC_403 });
-  });
-
-  it('rejects a missing user', async () => {
-    const token = await userToken();
-    const env = makeEnv({
-      cached: JSON.stringify({ v: 1, exists: false } satisfies CachedUserAuthV1),
-    });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ success: false, error: GENERIC_403 });
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
-  });
-
-  it('treats malformed KV JSON as a miss, then reads Postgres', async () => {
-    vi.mocked(findKiloUserPepper).mockResolvedValue({
-      pepper: PEPPER,
-      blockedReason: null,
-    });
-    const token = await userToken();
-    const env = makeEnv({ cached: '{"not":"auth-state"' });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(200);
-    expect(findKiloUserPepper).toHaveBeenCalledWith('postgres://test', USER_ID);
-    expect(env.USER_EXISTS_CACHE.put).toHaveBeenCalledWith(
-      `user-auth:v1:${USER_ID}`,
-      JSON.stringify(unblockedUser),
-      { expirationTtl: 60 }
+    const res = await makeApp().fetch(
+      new Request('http://local/api/session/ses_abc', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      makeEnv(TEST_JWT_SECRET)
     );
-  });
-
-  it('treats an otherwise valid cache state with extra fields as a miss', async () => {
-    vi.mocked(findKiloUserPepper).mockResolvedValue({
-      pepper: PEPPER,
-      blockedReason: null,
-    });
-    const token = await userToken();
-    const env = makeEnv({ cached: JSON.stringify({ ...unblockedUser, unexpected: true }) });
-
-    const res = await makeApp().fetch(authRequest(token), env);
 
     expect(res.status).toBe(200);
-    expect(findKiloUserPepper).toHaveBeenCalledWith('postgres://test', USER_ID);
+    expect(await res.json()).toEqual({ user_id: 'usr_123', deletionAudience: true });
   });
 
-  it.each(['1', '0'] as const)(
-    'treats legacy %j cache values as a miss, then reads Postgres',
-    async cached => {
-      vi.mocked(findKiloUserPepper).mockResolvedValue({
-        pepper: PEPPER,
-        blockedReason: null,
-      });
-      const token = await userToken();
-      const env = makeEnv({ cached });
+  it('rejects a token bound to a different audience', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'usr_123',
+      apiTokenPepper: 'pepper-current',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .setAudience('user-data-export')
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
 
-      const res = await makeApp().fetch(authRequest(token), env);
-
-      expect(res.status).toBe(200);
-      expect(findKiloUserPepper).toHaveBeenCalledWith('postgres://test', USER_ID);
-      expect(env.USER_EXISTS_CACHE.put).toHaveBeenCalledWith(
-        `user-auth:v1:${USER_ID}`,
-        JSON.stringify(unblockedUser),
-        { expirationTtl: 60 }
-      );
-    }
-  );
-
-  it('does not read Postgres on a warm cache hit', async () => {
-    const token = await userToken();
-    const env = makeEnv({ cached: JSON.stringify(unblockedUser) });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(200);
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
-    expect(env.USER_EXISTS_CACHE.put).not.toHaveBeenCalled();
-  });
-
-  it('reads Postgres on a cache miss and puts user-auth:v1 with TTL 60', async () => {
-    vi.mocked(findKiloUserPepper).mockResolvedValue({
-      pepper: PEPPER,
-      blockedReason: null,
-    });
-    const token = await userToken();
-    const env = makeEnv();
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(env.USER_EXISTS_CACHE.put).toHaveBeenCalledWith(
-      `user-auth:v1:${USER_ID}`,
-      JSON.stringify(unblockedUser),
-      { expirationTtl: 60 }
+    const res = await makeApp().fetch(
+      new Request('http://local/api/me', { headers: { Authorization: `Bearer ${token}` } }),
+      makeEnv(TEST_JWT_SECRET)
     );
-    expect(res.status).toBe(200);
-    expect(findKiloUserPepper).toHaveBeenCalledTimes(1);
-  });
 
-  it('puts a missing-user cache entry with TTL 300', async () => {
-    vi.mocked(findKiloUserPepper).mockResolvedValue(undefined);
-    const token = await userToken();
-    const env = makeEnv();
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(env.USER_EXISTS_CACHE.put).toHaveBeenCalledWith(
-      `user-auth:v1:${USER_ID}`,
-      JSON.stringify({ v: 1, exists: false }),
-      { expirationTtl: 300 }
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it('awaits KV.put before returning 200', async () => {
-    let resolvePut!: () => void;
-    const putGate = new Promise<void>(resolve => {
-      resolvePut = resolve;
-    });
-    vi.mocked(findKiloUserPepper).mockResolvedValue({
-      pepper: PEPPER,
-      blockedReason: null,
-    });
-    const token = await userToken();
-    const env = makeEnv();
-    env.USER_EXISTS_CACHE.put.mockImplementation(() => putGate);
-
-    const responsePromise = Promise.resolve(makeApp().fetch(authRequest(token), env));
-    await vi.waitFor(() => {
-      expect(env.USER_EXISTS_CACHE.put).toHaveBeenCalled();
-    });
-
-    let settled = false;
-    void responsePromise.then(() => {
-      settled = true;
-    });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-
-    resolvePut();
-    const res = await responsePromise;
-    expect(res.status).toBe(200);
-  });
-
-  it('returns 503 when Postgres throws and does not authorize', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    vi.mocked(findKiloUserPepper).mockRejectedValue(new Error('hyperdrive down'));
-    const token = await userToken();
-    const env = makeEnv();
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(503);
-    expect(env.USER_EXISTS_CACHE.put).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith(
-      'Auth infrastructure failure',
-      expect.objectContaining({
-        operation: 'user-auth-load',
-        kiloUserId: USER_ID,
-        errorMessage: 'hyperdrive down',
-      })
-    );
-    error.mockRestore();
-  });
-
-  it('returns 503 when the cache read throws and does not authorize', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const token = await userToken();
-    const env = makeEnv();
-    env.USER_EXISTS_CACHE.get.mockRejectedValueOnce(new Error('kv unavailable'));
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(503);
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith(
-      'Auth infrastructure failure',
-      expect.objectContaining({
-        operation: 'user-auth-load',
-        kiloUserId: USER_ID,
-        errorMessage: 'kv unavailable',
-      })
-    );
-    error.mockRestore();
-  });
-
-  it('returns the authoritative result when caching the state fails', async () => {
-    vi.mocked(findKiloUserPepper).mockResolvedValue({
-      pepper: PEPPER,
-      blockedReason: null,
-    });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const token = await userToken();
-    const env = makeEnv();
-    env.USER_EXISTS_CACHE.put.mockRejectedValueOnce(new Error('kv unavailable'));
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(
-      'Failed to cache user auth state',
-      expect.objectContaining({ operation: 'user-auth-cache-put', kiloUserId: USER_ID })
-    );
-    warn.mockRestore();
-  });
-
-  it('returns 503 when the secret store cannot resolve the JWT secret', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const token = await userToken();
-    const env = makeEnv();
-    env.NEXTAUTH_SECRET_PROD.get = vi.fn(async () => {
-      throw new Error('secret store unavailable');
-    });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(503);
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith(
-      'Auth infrastructure failure',
-      expect.objectContaining({
-        operation: 'nextauth-secret-get',
-        errorMessage: 'secret store unavailable',
-      })
-    );
-    error.mockRestore();
-  });
-
-  it('authorizes an internal token when the user is unblocked', async () => {
-    const token = await internalToken();
-    const env = makeEnv({ cached: JSON.stringify(unblockedUser) });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ user_id: USER_ID });
-    expect(findKiloUserPepper).not.toHaveBeenCalled();
-  });
-
-  it('authorizes an internal token when the user is blocked', async () => {
-    const token = await internalToken();
-    const env = makeEnv({
-      cached: JSON.stringify({
-        v: 1,
-        exists: true,
-        pepper: PEPPER,
-        blockedReason: 'gdpr',
-      } satisfies CachedUserAuthV1),
-    });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ user_id: USER_ID });
-  });
-
-  it('rejects an internal token when the user is missing', async () => {
-    const token = await internalToken('deleted_user');
-    const env = makeEnv({
-      cached: JSON.stringify({ v: 1, exists: false } satisfies CachedUserAuthV1),
-    });
-
-    const res = await makeApp().fetch(authRequest(token), env);
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ success: false, error: GENERIC_403 });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ success: false, error: 'Invalid or expired token' });
   });
 });

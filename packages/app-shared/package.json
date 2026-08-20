@@ -8,6 +8,7 @@
     "./utils": "./src/utils.ts",
     "./security-agent": "./src/security-agent/index.ts",
     "./code-review": "./src/code-review/index.ts",
+    "./code-reviews": "./src/code-reviews/index.ts",
     "./organizations": "./src/organizations/index.ts",
     "./platforms": "./src/platforms.ts",
     "./universal-links": "./src/universal-links/index.ts",
@@ -15,7 +16,10 @@
     "./images-schema": "./src/images-schema.ts",
     "./cloud-agent": "./src/cloud-agent.ts",
     "./analytics": "./src/analytics/index.ts",
-    "./pr-review": "./src/pr-review/index.ts"
+    "./app-version": "./src/app-version.ts",
+    "./pr-review": "./src/pr-review/index.ts",
+    "./commerce": "./src/commerce/index.ts",
+    "./moderation": "./src/moderation/index.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

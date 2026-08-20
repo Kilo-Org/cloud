@@ -55,7 +55,7 @@ export const OPERATION_TAXONOMIES = ['safe-retry', 'reconcile-first', 'never-rep
 export type OperationTaxonomy = (typeof OPERATION_TAXONOMIES)[number];
 
 /** Ledger domains. `create_remote` session identity lives in the DO, not here. */
-export const OPERATION_DOMAINS = ['session', 'pr', 'security'] as const;
+export const OPERATION_DOMAINS = ['session', 'pr', 'security', 'purchase'] as const;
 export type OperationDomain = (typeof OPERATION_DOMAINS)[number];
 
 export const OPERATION_TERMINAL_STATUSES = [

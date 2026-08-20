@@ -16,11 +16,16 @@ import { CollapsibleCodeBlock } from './collapsible-code-block.tsx';
 const remarkPlugins = [remarkGfm];
 
 const extractCodeText = (codeChildren: unknown): string | undefined => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Walks react-markdown's ReactNode children tree, not a parseable data contract.
   if (typeof codeChildren === 'string') {
     return codeChildren;
   }
 
-  if (Array.isArray(codeChildren) && codeChildren.every(part => typeof part === 'string')) {
+  if (
+    Array.isArray(codeChildren) &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Walks react-markdown's ReactNode children tree, not a parseable data contract.
+    codeChildren.every(part => typeof part === 'string')
+  ) {
     return codeChildren.join('');
   }
 
@@ -39,6 +44,7 @@ const extractCodeChild = (
   children: ReactNode
 ): { readonly className: string | undefined; readonly code: string } | undefined => {
   for (const child of asNodeList(children)) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Walks a ReactNode children tree, not a parseable data contract.
     if (child === null || typeof child !== 'object') {
       // Skip non-element children (text nodes, null).
     } else if (
@@ -81,13 +87,17 @@ const assistantMarkdownComponentsStreaming = createAssistantMarkdownComponents(t
 const assistantMarkdownComponentsFinalized = createAssistantMarkdownComponents(false);
 
 const formatToolValue = (value: unknown): string => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Formats an arbitrary tool-result value by its JS runtime type; no fixed data contract to parse against.
   if (typeof value === 'string') {
     return value;
   }
 
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Formats an arbitrary tool-result value by its JS runtime type; no fixed data contract to parse against.
     typeof value === 'number' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Formats an arbitrary tool-result value by its JS runtime type; no fixed data contract to parse against.
     typeof value === 'boolean' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Formats an arbitrary tool-result value by its JS runtime type; no fixed data contract to parse against.
     typeof value === 'bigint' ||
     value === null
   ) {
@@ -281,6 +291,19 @@ const ToolExchangeEvent = ({
         resultText={getToolExchangeResultText(result, result?.imageDataUrl !== undefined)}
         status={getToolExchangeStatus(result)}
         subtitle={toolCall.title ?? ''}
+        title={toolCall.name}
+      />
+    );
+  }
+
+  if ('webMcpOrigin' in toolCall) {
+    return (
+      <ToolExchangePanel
+        argumentsText={formatToolValue(toolCall.arguments)}
+        imageAlt={`Image produced by ${toolCall.name}`}
+        resultText={getToolExchangeResultText(result, false)}
+        status={getToolExchangeStatus(result)}
+        subtitle={toolCall.webMcpOrigin}
         title={toolCall.name}
       />
     );

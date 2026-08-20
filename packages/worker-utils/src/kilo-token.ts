@@ -25,6 +25,7 @@ export const kiloTokenPayload = z.object({
   createdOnPlatform: z.string().optional(),
   tokenSource: z.string().optional(),
   deviceAuthRequestCode: z.string().optional(),
+  deviceSessionId: z.string().optional(),
   // Org memberships (baked into gastown tokens to avoid DB lookups)
   orgMemberships: z
     .array(z.object({ orgId: z.string(), role: z.enum(['owner', 'member', 'billing_manager']) }))
@@ -52,6 +53,7 @@ export type SignKiloTokenExtra = Pick<
   | 'createdOnPlatform'
   | 'tokenSource'
   | 'deviceAuthRequestCode'
+  | 'deviceSessionId'
   | 'orgMemberships'
 >;
 
@@ -95,6 +97,10 @@ export async function signKiloToken(params: {
  *
  * Checks: signature, expiration (built into jose), version === 3, and that
  * kiloUserId is a non-empty string.
+ *
+ * When `options.audience` is set, the token must have that exact audience.
+ * When omitted, tokens that include an audience are rejected so a
+ * purpose-bound service token cannot be replayed as a general user token.
  *
  * @throws if the token is invalid, expired, or fails schema validation.
  */

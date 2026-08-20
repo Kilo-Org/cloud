@@ -11,7 +11,8 @@ import {
   StripeEarlyFraudWarningOwnerClassification,
   type StripeEarlyFraudWarningOwnerClassification as OwnerClassification,
 } from '@kilocode/db/schema-types';
-import { and, eq, isNull, like, not, or } from 'drizzle-orm';
+import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
+import { and, eq, isNull, not, or } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
@@ -82,7 +83,7 @@ async function resolveOwner(
         eq(kilocode_users.stripe_customer_id, customerId),
         or(
           isNull(kilocode_users.blocked_reason),
-          not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+          not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
         )
       )
     )

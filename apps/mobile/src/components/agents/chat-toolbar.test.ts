@@ -84,4 +84,24 @@ describe('ChatToolbar', () => {
     const props = pasteButtonProps ?? {};
     expect(props.disabled).toBe(false);
   });
+
+  it('locks only the model picker when modelLocked is true', () => {
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({
+      ...defaultProps(),
+      modelLocked: true,
+      modelLockLabel: 'Locked Bot',
+    }) as Node;
+
+    const modelSelectorProps = findElementByType(element, 'ModelSelector');
+    expect(modelSelectorProps).not.toBeNull();
+    const modelProps = modelSelectorProps ?? {};
+    expect(modelProps.disabled).toBe(true);
+    expect(modelProps.lockLabel).toBe('Locked Bot');
+
+    const modeSelectorProps = findElementByType(element, 'ModeSelector');
+    expect(modeSelectorProps).not.toBeNull();
+    const modeProps = modeSelectorProps ?? {};
+    expect(modeProps.disabled).toBe(false);
+  });
 });

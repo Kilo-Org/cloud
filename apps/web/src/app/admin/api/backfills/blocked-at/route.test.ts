@@ -28,6 +28,9 @@ describe('blockedAtBackfillCandidates', () => {
     const softDeleted = await insertTestUser({
       blocked_reason: 'soft-deleted at 2026-01-15T12:00:00.000Z',
     });
+    const deletionInProgress = await insertTestUser({
+      blocked_reason: 'deletion-in-progress at 2026-01-15T12:00:00.000Z',
+    });
 
     const matches = await missingBlockedAtUserIds();
 
@@ -35,6 +38,7 @@ describe('blockedAtBackfillCandidates', () => {
     expect(matches).not.toContain(unblocked.id);
     expect(matches).not.toContain(alreadyBackfilled.id);
     expect(matches).not.toContain(softDeleted.id);
+    expect(matches).not.toContain(deletionInProgress.id);
   });
 });
 

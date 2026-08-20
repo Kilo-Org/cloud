@@ -19,7 +19,7 @@ import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { desc, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
@@ -449,8 +449,8 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
-  const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
+  const openrouter_data = await fetchGatewayModels(OPENROUTER);
+  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {

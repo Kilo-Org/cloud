@@ -112,6 +112,7 @@ export const InvitedOrganizationMemberSchema = z.object({
   inviteId: z.string(),
   status: z.literal('invited'),
   inviteUrl: z.string(),
+  emailStatus: z.enum(['pending', 'sending', 'delivered', 'failed']).nullable(),
   dailyUsageLimitUsd: z.number().nullable(),
   currentDailyUsageUsd: z.number().nullable(),
 });
@@ -124,6 +125,7 @@ type InvitedMember = {
   inviteId: string; // Database ID for deletion
   status: 'invited';
   inviteUrl: string;
+  emailStatus: 'pending' | 'sending' | 'delivered' | 'failed' | null;
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
 };

@@ -3,6 +3,7 @@ import { type Href, router } from 'expo-router';
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
 import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { takeDevSessionFromUrl } from './dev-session-inject';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 
 /** Target app path for the /cloud/sessions universal-link route. */
@@ -45,6 +46,7 @@ export function redirectSystemPath({
   initial: boolean;
 }): string | null {
   try {
+    takeDevSessionFromUrl(path);
     const href = resolveIncomingUrl(path);
     // Untouched → default handling (and future share intent).
     if (href == null) {

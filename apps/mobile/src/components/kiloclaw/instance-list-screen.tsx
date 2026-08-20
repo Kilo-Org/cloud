@@ -33,14 +33,14 @@ type Props = {
 // Compact labels for the per-card banner. Kept separate from
 // access-required-screen's fuller copy, which is for the dedicated
 // full-screen surface, not a list row.
-const ACCESS_ISSUE_LABELS: Record<AccessRequiredSubcase, string> = {
+const ACCESS_ISSUE_LABELS = {
   trial_expired: 'Trial ended, subscribe to keep using this instance',
   subscription_canceled: 'Subscription inactive, resubscribe to keep using this instance',
   subscription_past_due: 'Payment issue, update billing to keep using this instance',
   quarantined: 'Instance quarantined, needs manual review',
   multiple_current_conflict: 'Account needs review',
   non_canonical_earlybird: 'Legacy plan needs review',
-};
+} satisfies Record<AccessRequiredSubcase, string>;
 
 function splitInstances(instances: ClawInstance[]) {
   return {

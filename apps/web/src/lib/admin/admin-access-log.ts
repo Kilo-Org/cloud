@@ -53,6 +53,7 @@ export type AdminAccessKind = 'admin_guard' | 'kilo_admin_elevation' | 'support_
 export type SupportServiceOutcome =
   | 'found'
   | 'not_found'
+  | 'enqueued'
   | 'deleted'
   | 'already_deleted'
   | 'refused'

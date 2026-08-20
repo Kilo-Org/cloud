@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   CodeReviewCouncilConfigSchema,
   ModelsSchema,
+  OpenRouterPricing,
   OrganizationSettingsSchema,
   StoredModelSchema,
 } from './schema-types';
@@ -125,6 +126,18 @@ describe('ModelsSchema', () => {
     });
 
     expect(result.data[0].reasoning).toBeUndefined();
+  });
+});
+
+describe('OpenRouterPricing', () => {
+  it('preserves discounts used to calculate display pricing', () => {
+    const pricing = OpenRouterPricing.parse({
+      prompt: '0.000000435',
+      completion: '0.00000087',
+      discount: 0.5,
+    });
+
+    expect(pricing.discount).toBe(0.5);
   });
 });
 

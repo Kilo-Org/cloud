@@ -233,7 +233,10 @@ describe('GET /api/internal/support/users', () => {
       const res = await GET(lookupRequest('missing@example.com'));
       expect(res.status).toBe(404);
       expect(res.headers.get('content-type')).toContain('application/json');
-      expect(await res.json()).toEqual({ error: 'User not found' });
+      expect(await res.json()).toEqual({
+        error: 'User not found',
+        code: 'USER_NOT_FOUND',
+      });
       expect(events[0]).toMatchObject({ outcome: 'not_found', target: null });
     });
 
@@ -248,7 +251,10 @@ describe('GET /api/internal/support/users', () => {
 
       const res = await GET(lookupRequest('customer@example.com'));
       expect(res.status).toBe(404);
-      expect(await res.json()).toEqual({ error: 'User not found' });
+      expect(await res.json()).toEqual({
+        error: 'User not found',
+        code: 'USER_NOT_FOUND',
+      });
       expect(events[0]).toMatchObject({
         outcome: 'not_found',
         target: `user:${USER_ID}`,

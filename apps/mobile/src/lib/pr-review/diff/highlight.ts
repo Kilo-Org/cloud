@@ -43,52 +43,52 @@ function getLowlight(): LowlightInstance {
 // a single text node, so callers get a valid result back without
 // throwing). Filenames are lower-cased and the last extension is
 // matched so `foo.test.ts` resolves to `typescript`.
-const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'typescript',
-  mts: 'typescript',
-  cts: 'typescript',
-  js: 'javascript',
-  jsx: 'javascript',
-  mjs: 'javascript',
-  cjs: 'javascript',
-  py: 'python',
-  go: 'go',
-  rs: 'rust',
-  java: 'java',
-  rb: 'ruby',
-  json: 'json',
-  jsonc: 'json',
-  md: 'markdown',
-  mdx: 'markdown',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  css: 'css',
-  scss: 'css',
-  html: 'xml',
-  htm: 'xml',
-  xml: 'xml',
-  vue: 'xml',
-  svelte: 'xml',
-  yml: 'yaml',
-  yaml: 'yaml',
-  toml: 'ini',
-  ini: 'ini',
-  c: 'c',
-  h: 'c',
-  cpp: 'cpp',
-  cxx: 'cpp',
-  cc: 'cpp',
-  hpp: 'cpp',
-  cs: 'csharp',
-  php: 'php',
-  swift: 'swift',
-  kt: 'kotlin',
-  scala: 'scala',
-  sql: 'sql',
-  graphql: 'graphql',
-};
+const EXTENSION_LANGUAGE_MAP: ReadonlyMap<string, string> = new Map([
+  ['ts', 'typescript'],
+  ['tsx', 'typescript'],
+  ['mts', 'typescript'],
+  ['cts', 'typescript'],
+  ['js', 'javascript'],
+  ['jsx', 'javascript'],
+  ['mjs', 'javascript'],
+  ['cjs', 'javascript'],
+  ['py', 'python'],
+  ['go', 'go'],
+  ['rs', 'rust'],
+  ['java', 'java'],
+  ['rb', 'ruby'],
+  ['json', 'json'],
+  ['jsonc', 'json'],
+  ['md', 'markdown'],
+  ['mdx', 'markdown'],
+  ['sh', 'bash'],
+  ['bash', 'bash'],
+  ['zsh', 'bash'],
+  ['css', 'css'],
+  ['scss', 'css'],
+  ['html', 'xml'],
+  ['htm', 'xml'],
+  ['xml', 'xml'],
+  ['vue', 'xml'],
+  ['svelte', 'xml'],
+  ['yml', 'yaml'],
+  ['yaml', 'yaml'],
+  ['toml', 'ini'],
+  ['ini', 'ini'],
+  ['c', 'c'],
+  ['h', 'c'],
+  ['cpp', 'cpp'],
+  ['cxx', 'cpp'],
+  ['cc', 'cpp'],
+  ['hpp', 'cpp'],
+  ['cs', 'csharp'],
+  ['php', 'php'],
+  ['swift', 'swift'],
+  ['kt', 'kotlin'],
+  ['scala', 'scala'],
+  ['sql', 'sql'],
+  ['graphql', 'graphql'],
+]);
 
 export function languageForPath(path: string | null | undefined): string | null {
   if (!path) {
@@ -101,7 +101,7 @@ export function languageForPath(path: string | null | undefined): string | null 
     return null;
   }
   const ext = basename.slice(dot + 1).toLowerCase();
-  return EXTENSION_LANGUAGE_MAP[ext] ?? null;
+  return EXTENSION_LANGUAGE_MAP.get(ext) ?? null;
 }
 
 export type HighlightToken = {
@@ -116,51 +116,51 @@ export type HighlightToken = {
 // Map a highlight.js class name to our smaller palette. We don't ship
 // every hljs sub-language — only the ones that show up in the
 // reviewer surface often enough to be worth coloring.
-const HLJS_CLASS_PALETTE: Record<string, string> = {
+const HLJS_CLASS_PALETTE: ReadonlyMap<string, string> = new Map([
   // Keywords / control flow
-  keyword: 'keyword',
-  built_in: 'builtin',
-  'builtin-name': 'builtin',
-  literal: 'literal',
-  symbol: 'literal',
-  boolean: 'literal',
-  number: 'number',
-  'function-variable': 'function',
-  'class-name': 'type',
-  type: 'type',
-  'title.function': 'function',
-  'title.class': 'type',
-  function: 'function',
-  attr: 'attribute',
-  attribute: 'attribute',
-  variable: 'variable',
-  template_variable: 'variable',
-  params: 'variable',
-  property: 'property',
-  tag: 'tag',
-  selector: 'selector',
-  selector_tag: 'selector',
-  selector_class: 'selector',
-  selector_id: 'selector',
-  selector_pseudo: 'selector',
+  ['keyword', 'keyword'],
+  ['built_in', 'builtin'],
+  ['builtin-name', 'builtin'],
+  ['literal', 'literal'],
+  ['symbol', 'literal'],
+  ['boolean', 'literal'],
+  ['number', 'number'],
+  ['function-variable', 'function'],
+  ['class-name', 'type'],
+  ['type', 'type'],
+  ['title.function', 'function'],
+  ['title.class', 'type'],
+  ['function', 'function'],
+  ['attr', 'attribute'],
+  ['attribute', 'attribute'],
+  ['variable', 'variable'],
+  ['template_variable', 'variable'],
+  ['params', 'variable'],
+  ['property', 'property'],
+  ['tag', 'tag'],
+  ['selector', 'selector'],
+  ['selector_tag', 'selector'],
+  ['selector_class', 'selector'],
+  ['selector_id', 'selector'],
+  ['selector_pseudo', 'selector'],
   // Literals
-  string: 'string',
-  regexp: 'string',
-  meta_string: 'string',
-  subst: 'string',
-  char: 'string',
+  ['string', 'string'],
+  ['regexp', 'string'],
+  ['meta_string', 'string'],
+  ['subst', 'string'],
+  ['char', 'string'],
   // Comments / doc
-  comment: 'comment',
-  doctag: 'comment',
-  quote: 'string',
+  ['comment', 'comment'],
+  ['doctag', 'comment'],
+  ['quote', 'string'],
   // Operators / punctuation
-  operator: 'operator',
-  punctuation: 'operator',
+  ['operator', 'operator'],
+  ['punctuation', 'operator'],
   // Misc
-  meta: 'meta',
-  addition: 'add',
-  deletion: 'del',
-};
+  ['meta', 'meta'],
+  ['addition', 'add'],
+  ['deletion', 'del'],
+]);
 
 // Cap the per-line cache at 5,000 entries — large diffs can have many
 // repeated short lines (empty context rows, import lines) but a hard
@@ -170,7 +170,7 @@ const highlightCache = new Map<string, HighlightToken[]>();
 
 function tokenFromHljsClassNames(classNames: readonly string[]): string | null {
   for (const name of classNames) {
-    const palette = HLJS_CLASS_PALETTE[name];
+    const palette = HLJS_CLASS_PALETTE.get(name);
     if (palette) {
       return palette;
     }
@@ -178,7 +178,7 @@ function tokenFromHljsClassNames(classNames: readonly string[]): string | null {
     // the prefix and try again.
     if (name.startsWith('hljs-')) {
       const stripped = name.slice('hljs-'.length);
-      const palette2 = HLJS_CLASS_PALETTE[stripped];
+      const palette2 = HLJS_CLASS_PALETTE.get(stripped);
       if (palette2) {
         return palette2;
       }
@@ -282,7 +282,12 @@ function runHighlight(text: string, language: string): HighlightToken[] {
     const tokens: HighlightToken[] = [];
     // The root node has a single span child whose children carry the
     // real classes. We flatten through `flattenHast` to get one
-    // token per contiguous text/class run.
+    // token per contiguous text/class run. `hast`'s `Properties` index
+    // signature is wider than our local `HastNode.className` (it allows
+    // numbers/booleans too), so a direct assertion doesn't type-check —
+    // the runtime shape from `lowlight` is deterministic and always
+    // matches our narrower local walker type.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- lowlight's Root always matches this shape; only its Properties index signature is wider than our local HastNode
     flattenHast(tree as unknown as HastNode, tokens);
     if (tokens.length === 0 && text.length > 0) {
       return [{ text, className: null }];

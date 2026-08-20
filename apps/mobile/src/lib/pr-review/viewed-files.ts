@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { z } from 'zod';
 
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_VIEWED_KEY } from '@/lib/storage-keys';
@@ -10,7 +11,25 @@ type ViewedFileEntry = {
 
 type ViewedFileMap = Record<string, ViewedFileEntry>;
 
+const viewedFileEntrySchema = z.object({
+  headSha: z.string(),
+  viewedPaths: z.array(z.string()),
+});
+const rawViewedFileMapSchema = z.record(z.string(), z.unknown());
+
 const VIEWED_FILES_PR_LIMIT = 20;
+
+// Process-lifetime cache of the parsed map. `readMap` returns it when set so a
+// second read after a toggle (or any other read) does not re-read and re-parse
+// SecureStore. `clearViewedFiles` resets it so sign-out and account change drop
+// the private content (auth-context.tsx calls it).
+let cachedMap: ViewedFileMap | null = null;
+
+// Monotonic write/clear generation. `readMap` captures it before the
+// SecureStore read and only publishes the parsed map when it is unchanged, so
+// a first read that started while the cache was empty cannot overwrite a write
+// or refill the cache after a clear.
+let generation = 0;
 
 type ViewedFilePrRef = {
   owner: string;
@@ -22,37 +41,25 @@ function viewedFilesKey(ref: ViewedFilePrRef): string {
   return `${ref.owner.toLowerCase()}/${ref.repo.toLowerCase()}#${ref.number}`;
 }
 
-function isValidEntry(value: unknown): value is ViewedFileEntry {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  const entry = value as Record<string, unknown>;
-  return (
-    typeof entry.headSha === 'string' &&
-    Array.isArray(entry.viewedPaths) &&
-    entry.viewedPaths.every(path => typeof path === 'string')
-  );
-}
-
 function parseMap(raw: string | null): ViewedFileMap {
   if (raw == null || raw.length === 0) {
     return {};
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const shape = rawViewedFileMapSchema.safeParse(parsed);
+    if (!shape.success) {
       return {};
     }
-    // Drop any structurally invalid entry rather than trusting the cast, so
+    // Drop any structurally invalid entry rather than trusting a cast, so
     // one corrupt record can't make getViewedFiles return a non-array or
     // make toggleViewedFile throw on `.includes`.
-    const result: ViewedFileMap = {};
-    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (isValidEntry(value)) {
-        result[key] = { headSha: value.headSha, viewedPaths: value.viewedPaths };
-      }
-    }
-    return result;
+    return Object.fromEntries(
+      Object.entries(shape.data).flatMap<[string, ViewedFileEntry]>(([key, value]) => {
+        const entry = viewedFileEntrySchema.safeParse(value);
+        return entry.success ? [[key, entry.data]] : [];
+      })
+    );
   } catch {
     return {};
   }
@@ -78,8 +85,21 @@ function computeNextViewedPaths(
 }
 
 async function readMap(): Promise<ViewedFileMap> {
+  const cached = cachedMap;
+  if (cached !== null) {
+    return cached;
+  }
+  const gen = generation;
   const raw = await SecureStore.getItemAsync(PR_REVIEW_VIEWED_KEY);
-  return parseMap(raw);
+  if (gen !== generation) {
+    // A write or clear happened while this read was in flight. A write
+    // publishes the fresh map to `cachedMap`; a clear nulls it. Return the
+    // authoritative current state, never the stale parse.
+    return cachedMap ?? {};
+  }
+  const parsed = parseMap(raw);
+  cachedMap = parsed;
+  return parsed;
 }
 
 export async function getViewedFiles(ref: ViewedFilePrRef, headSha: string): Promise<string[]> {
@@ -130,9 +150,24 @@ export async function toggleViewedFile(input: ToggleViewedFileInput): Promise<vo
       trimmed[trimmedKey] = value;
     }
     await SecureStore.setItemAsync(PR_REVIEW_VIEWED_KEY, toJsonString(trimmed));
+    cachedMap = trimmed;
+    generation += 1;
   });
 }
 
 export async function clearViewedFiles(): Promise<void> {
+  // Fence first: a concurrent getViewedFiles must not return the prior
+  // account's paths (or publish a SecureStore read of the not-yet-deleted
+  // value) while deletion is in flight.
+  cachedMap = {};
+  generation += 1;
   await deleteAccountMetadata(PR_REVIEW_VIEWED_KEY);
+}
+
+/**
+ * For tests: drop the process-lifetime cache so a test that swaps the fake
+ * SecureStore gets a fresh read. Mirrors `clearHighlightCacheForTests`.
+ */
+export function resetViewedFilesCacheForTests(): void {
+  cachedMap = null;
 }

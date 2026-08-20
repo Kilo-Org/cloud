@@ -7,6 +7,8 @@
 
 import { type Component, type RefObject } from 'react';
 
+import { readTrpcErrorField } from '@/lib/trpc-error';
+
 import { type BlockingInteraction } from './agent-interaction-policy';
 
 type BlockingCardKind = 'question' | 'permission';
@@ -149,41 +151,6 @@ export function applyBlockingCardAppearance(
 }
 
 /**
- * Extract the tRPC error code from a thrown value. The tRPC v11 client
- * surfaces `data.code`; server-shaped errors expose `shape.data.code`. We
- * also accept a top-level `code` field so future tRPC versions can't silently
- * change the retryable/non-retryable boundary.
- */
-function readTrpcErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
-  }
-  const record = error as Record<string, unknown>;
-  const data = record.data;
-  if (data && typeof data === 'object') {
-    const code = (data as Record<string, unknown>).code;
-    if (typeof code === 'string') {
-      return code;
-    }
-  }
-  const shape = record.shape;
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>).data;
-    if (shapeData && typeof shapeData === 'object') {
-      const code = (shapeData as Record<string, unknown>).code;
-      if (typeof code === 'string') {
-        return code;
-      }
-    }
-  }
-  const top = record.code;
-  if (typeof top === 'string') {
-    return top;
-  }
-  return undefined;
-}
-
-/**
  * Classify a thrown submission failure into a retryable or non-retryable
  * blocking card error. The `action` argument lets callers distinguish a
  * failed answer from a failed skip, so the recovery message and retry CTA
@@ -200,7 +167,7 @@ export function classifyBlockingSubmissionError(
   kind: BlockingCardKind,
   action: BlockingCardRetryAction = 'answer'
 ): BlockingCardSubmissionError {
-  const code = readTrpcErrorCode(error);
+  const code = readTrpcErrorField(error, 'code');
   if (code === 'NOT_FOUND') {
     return {
       kind: 'non-retryable',

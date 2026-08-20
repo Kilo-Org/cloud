@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import { Pencil } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
@@ -11,6 +12,8 @@ import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 import { buildToolDiffModel } from '../tool-diff-model';
 import { ToolDiffPreview } from '../tool-diff-preview';
+
+const optionalStringSchema = z.string().optional();
 
 function EditFallbackBody({
   oldString,
@@ -44,8 +47,8 @@ function EditFallbackBody({
  */
 export function EditToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
-  const oldString = typeof input.oldString === 'string' ? input.oldString : '';
-  const newString = typeof input.newString === 'string' ? input.newString : '';
+  const oldString = optionalStringSchema.safeParse(input.oldString).data ?? '';
+  const newString = optionalStringSchema.safeParse(input.newString).data ?? '';
 
   const error = part.state.status === 'error' ? part.state.error : undefined;
 

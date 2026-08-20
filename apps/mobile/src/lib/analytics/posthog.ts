@@ -128,8 +128,10 @@ async function chainDiscard(prev: Promise<void>, next: Promise<void>): Promise<v
 // (`app_version` compares lexicographically). Native SDK auto-captures
 // $app_version/$app_build on events; flag targeting needs them as person
 // properties, which this supplies.
-function appVersionProperties(): Record<string, string> {
-  const props: Record<string, string> = {};
+type AppVersionProperties = { app_version?: string; app_build?: string };
+
+function appVersionProperties(): AppVersionProperties {
+  const props: AppVersionProperties = {};
   if (Application.nativeApplicationVersion) {
     props.app_version = Application.nativeApplicationVersion;
   }
@@ -288,6 +290,10 @@ export async function discardPostHog(): Promise<void> {
 
   const completion = (async () => {
     const c = client;
+    // A bare/partial client (e.g. an incomplete test double) can reach here
+    // without `setPersistedProperty`, despite the `PostHog` type promising it
+    // always exists — treat that the same as no client.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see comment above: guards against a client that violates its own type's contract
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
       notifyPostHogReady();

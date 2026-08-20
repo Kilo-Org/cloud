@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- factory function assembles all SDK callbacks; splitting would scatter related transport logic across files */
 import type { createTRPCClient } from '@trpc/client';
+import { z } from 'zod';
 import { createBrowserLifecycleHooks, createSessionManager } from '@kilocode/cloud-agent-sdk';
 import type {
   CloudAgentSessionId,
@@ -63,8 +64,15 @@ type ActiveSessionsResult = Awaited<ReturnType<TrpcClient['activeSessions']['lis
 // Error code extraction — extension-owned copy of the mobile classifier
 // ---------------------------------------------------------------------------
 
+const stringSchema = z.string();
+
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return value instanceof Object;
+}
+
+function asString(value: unknown): string | undefined {
+  const result = stringSchema.safeParse(value);
+  return result.success ? result.data : undefined;
 }
 
 /**
@@ -78,8 +86,8 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
   }
   const { data } = error;
   if (isObject(data)) {
-    const { code } = data;
-    if (typeof code === 'string') {
+    const code = asString(data['code']);
+    if (code !== undefined) {
       return code;
     }
   }
@@ -87,17 +95,13 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
   if (isObject(shape)) {
     const shapeData = shape['data'];
     if (isObject(shapeData)) {
-      const { code } = shapeData;
-      if (typeof code === 'string') {
+      const code = asString(shapeData['code']);
+      if (code !== undefined) {
         return code;
       }
     }
   }
-  const top = error['code'];
-  if (typeof top === 'string') {
-    return top;
-  }
-  return undefined;
+  return asString(error['code']);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,12 +653,14 @@ export function createExtensionAgentSessionManager({
       }),
 
     // ---- getTicket ----
-    getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
+    getTicket: async (
+      sessionId: CloudAgentSessionId
+    ): Promise<{ ticket: string; expiresAt: number }> => {
       const token = getToken();
-      const body: Record<string, string> = { cloudAgentSessionId: sessionId };
-      if (organizationId !== null) {
-        body['organizationId'] = organizationId;
-      }
+      const body = {
+        cloudAgentSessionId: sessionId,
+        ...(organizationId === null ? {} : { organizationId }),
+      };
       const response = await fetch(`${apiBaseUrl}/api/cloud-agent-next/sessions/stream-ticket`, {
         body: JSON.stringify(body),
         headers: {
@@ -664,14 +670,21 @@ export function createExtensionAgentSessionManager({
         method: 'POST',
       });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fetch json is untyped
-      const data = (await response.json()) as { ticket?: string; error?: string };
+      const data = (await response.json()) as {
+        ticket?: string;
+        expiresAt?: number;
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(data.error ?? 'Failed to get stream ticket');
       }
       if (data.ticket === undefined) {
         throw new Error('Missing ticket in stream-ticket response');
       }
-      return data.ticket;
+      if (data.expiresAt === undefined) {
+        throw new Error('Missing expiresAt in stream-ticket response');
+      }
+      return { expiresAt: data.expiresAt, ticket: data.ticket };
     },
 
     // ---- initiate ----

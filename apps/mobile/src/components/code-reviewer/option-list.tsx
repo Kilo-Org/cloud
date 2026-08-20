@@ -8,13 +8,13 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-type OptionListProps<T extends string> = {
+type OptionListProps<T extends string, TSaveResult> = {
   title: string;
   options: readonly T[];
   selected: T | undefined;
   /** Must resolve/reject once the save actually completes — the screen
    * navigates back only on confirmed success. */
-  onSelect: (value: T) => Promise<unknown>;
+  onSelect: (value: T) => Promise<TSaveResult>;
   /** Optional per-option caption below the label. */
   descriptions?: Readonly<Record<T, string>>;
   /** Disables every row, e.g. while the config backing `selected` is still loading. */
@@ -22,14 +22,14 @@ type OptionListProps<T extends string> = {
 };
 
 /** Full-screen single-select list. Selecting saves, then pops the screen only once the save confirms. */
-export function OptionList<T extends string>({
+export function OptionList<T extends string, TSaveResult>({
   title,
   options,
   selected,
   onSelect,
   descriptions,
   disabled,
-}: Readonly<OptionListProps<T>>) {
+}: Readonly<OptionListProps<T, TSaveResult>>) {
   const router = useRouter();
   const colors = useThemeColors();
   const [pending, setPending] = useState<T | null>(null);

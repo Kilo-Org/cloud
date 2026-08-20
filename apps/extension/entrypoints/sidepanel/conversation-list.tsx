@@ -2,11 +2,69 @@
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { elementScroll, useVirtualizer } from '@tanstack/react-virtual';
 import { getConversationScrollKey } from '@/src/shared/agent-conversation';
 import type { GroupedConversationItem } from '@/src/shared/agent-conversation';
 import { LEGACY_CONVERSATION_GREETING } from '@/src/shared/agent-conversation-tabs';
 import { AgentConversationItemView } from './agent-conversation-events';
+
+/**
+ * Distance from the end that still counts as "at the bottom". Mobile uses the
+ * same 100px band (`use-session-auto-scroll-state.ts`). It must stay well above
+ * the corrections the virtualizer applies when a row's real height replaces the
+ * estimate, otherwise its own scroll writes read as the user leaving the bottom.
+ */
+const AT_BOTTOM_THRESHOLD_PX = 100;
+
+// eslint-disable-next-line typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type
+type ScrollPosition = {
+  clientHeight: number;
+  scrollHeight: number;
+  scrollTop: number;
+};
+
+/** What a scroll position means for auto-scroll. Pure, so it is unit tested. */
+export type ConversationScrollDecision = 'follow' | 'keep' | 'release';
+
+export const isAtConversationBottom = (position: ScrollPosition): boolean =>
+  position.scrollTop + position.clientHeight >= position.scrollHeight - AT_BOTTOM_THRESHOLD_PX;
+
+/*
+ * A scroll event carries no gesture, so user intent is decided by who wrote the
+ * offset, not by how far it moved. `lastPinnedTop` is the offset our own pin
+ * wrote, so a position away from the bottom that still equals it is content
+ * growing below us; any other position away from the bottom is someone else
+ * moving the list, which is the user leaving. Inside the bottom band nothing is
+ * released, so the virtualizer's own end-anchoring writes stay harmless.
+ */
+export const decideConversationScroll = ({
+  lastPinnedTop,
+  position,
+  sawDownwardIntent,
+}: {
+  lastPinnedTop: number;
+  position: ScrollPosition;
+  sawDownwardIntent: boolean;
+}): ConversationScrollDecision => {
+  if (isAtConversationBottom(position)) {
+    return sawDownwardIntent ? 'follow' : 'keep';
+  }
+
+  return Math.abs(position.scrollTop - lastPinnedTop) > 1 ? 'release' : 'keep';
+};
+
+// eslint-disable-next-line typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type
+type ConversationEnds = { firstKey: string; lastKey: string };
+
+/*
+ * The list stays mounted while the panel swaps conversations, so a released pin
+ * must not leak into the next one. Loading older messages keeps the last item,
+ * a new message keeps the first: only another conversation replaces both ends.
+ */
+export const isDifferentConversation = (
+  previous: ConversationEnds,
+  next: ConversationEnds
+): boolean => previous.firstKey !== next.firstKey && previous.lastKey !== next.lastKey;
 
 const getConversationItemKey = (item: GroupedConversationItem): string =>
   item.type === 'event' ? item.event.id : item.toolCall.id;
@@ -16,9 +74,20 @@ const getListSpacerStyle = (height: number): CSSProperties => ({
 const getVirtualRowStyle = (start: number): CSSProperties => ({
   transform: `translateY(${start}px)`,
 });
-const isScrolledToBottom = (element: HTMLElement): boolean =>
-  element.scrollTop + element.clientHeight >= element.scrollHeight - 16;
+const readScrollPosition = (element: HTMLElement): ScrollPosition => ({
+  clientHeight: element.clientHeight,
+  scrollHeight: element.scrollHeight,
+  scrollTop: element.scrollTop,
+});
 const isScrollable = (element: HTMLElement): boolean => element.scrollHeight > element.clientHeight;
+const getConversationEnds = (items: GroupedConversationItem[]): ConversationEnds | null => {
+  const [first] = items;
+  const last = items.at(-1);
+
+  return first === undefined || last === undefined
+    ? null
+    : { firstKey: getConversationItemKey(first), lastKey: getConversationItemKey(last) };
+};
 
 const ConversationVirtualRow = ({
   index,
@@ -78,11 +147,18 @@ export const ConversationList = ({
   const listRef = useRef<HTMLElement | null>(null);
   // Source of truth for auto-scroll, owned outside React so a streaming render cannot race it. The state mirror below only drives the jump button.
   const isStuckToBottomRef = useRef(true);
-  const lastScrollTopRef = useRef(0);
   const lastPinnedTopRef = useRef(0);
-  const pinFrameRef = useRef<number | null>(null);
+  /* A pin that follows a deliberate re-arm (mount, jump button, conversation swap,
+     downward gesture) starts from wherever the user is, so it skips the guard once. */
+  const forcePinRef = useRef(true);
+  const conversationEndsRef = useRef<ConversationEnds | null>(null);
   const [showJumpButton, setShowJumpButton] = useState(false);
   const scrollKey = getConversationScrollKey(items);
+  /*
+   * Deliberately no `anchorTo: 'end'`: `pinToBottom` below re-glues the end off
+   * the live DOM offset on every measurement, so a second end-anchor would only
+   * add a writer that works from a stale offset (see `scrollToFn`).
+   */
   const virtualizer = useVirtualizer({
     count: items.length,
     /*
@@ -94,15 +170,28 @@ export const ConversationList = ({
     estimateSize: () => 52,
     getScrollElement: () => listRef.current,
     overscan: 8,
+    /*
+     * Every virtualizer scroll write is a measurement correction computed from
+     * the offset it last *observed*. That lags the DOM by a frame, because the
+     * only thing that tells it about a move is the scroll event: a scrollbar
+     * drag lands, the correction fires in the same frame, and the drag is undone
+     * before any code can read it. Drop a correction whose starting offset is no
+     * longer the live one — it is stale by definition, and the pin below re-glues
+     * the bottom from the live DOM anyway. A correction that does agree with the
+     * DOM still runs, so a row measured above a reader scrolled up keeps their
+     * view in place.
+     */
+    scrollToFn: (offset, scrollOptions, instance) => {
+      const element = listRef.current;
+
+      if (element !== null && Math.abs(offset - element.scrollTop) > 1) {
+        return;
+      }
+
+      elementScroll(offset, scrollOptions, instance);
+    },
   });
   const totalSize = virtualizer.getTotalSize();
-
-  const cancelPin = useCallback((): void => {
-    if (pinFrameRef.current !== null) {
-      cancelAnimationFrame(pinFrameRef.current);
-      pinFrameRef.current = null;
-    }
-  }, []);
 
   const releaseToManualScroll = useCallback((): void => {
     if (!isStuckToBottomRef.current) {
@@ -110,9 +199,8 @@ export const ConversationList = ({
     }
 
     isStuckToBottomRef.current = false;
-    cancelPin();
     setShowJumpButton(true);
-  }, [cancelPin]);
+  }, []);
 
   const followBottomAgain = useCallback((): void => {
     if (isStuckToBottomRef.current) {
@@ -120,51 +208,46 @@ export const ConversationList = ({
     }
 
     isStuckToBottomRef.current = true;
+    forcePinRef.current = true;
     setShowJumpButton(false);
   }, []);
 
-  // Pin to the bottom across a few frames so late virtualizer measurements cannot leave us short. An auto-pin (force false) bails when the position sits above the last pin: a scrollbar drag's scroll event can coalesce with our pin write so handleScroll misses it, but sampling scrollTop here catches the upward move and releases instead of yanking the view back.
-  const pinToBottom = useCallback(
-    (force = false): void => {
-      cancelPin();
+  /*
+   * One write against the live DOM, which already accounts for the list padding
+   * the virtualizer knows nothing about. Convergence is measurement-driven, not
+   * frame-budgeted: every row measurement changes `totalSize` and re-runs the
+   * effect below, and `anchorTo: 'end'` holds the end in between. Deliberately
+   * not `scrollToIndex`, whose reconcile loop keeps re-targeting the end for
+   * seconds and drags a reader who scrolls up back down.
+   *
+   * The same decision runs here, not only in the scroll handler: this pin fires
+   * from a layout effect, before the browser can deliver the scroll event for a
+   * scrollbar drag, and a drag plus this write inside one frame coalesce into a
+   * single event that reports our offset. Sampling the live offset is the only
+   * place that upward drag is still visible.
+   */
+  const pinToBottom = useCallback((): void => {
+    const element = listRef.current;
 
-      const runPass = (remainingPasses: number, allowRelease: boolean): void => {
-        const element = listRef.current;
+    if (element === null) {
+      return;
+    }
 
-        if (element === null || !isStuckToBottomRef.current || items.length === 0) {
-          pinFrameRef.current = null;
-          return;
-        }
+    const decision = decideConversationScroll({
+      lastPinnedTop: lastPinnedTopRef.current,
+      position: readScrollPosition(element),
+      sawDownwardIntent: false,
+    });
 
-        if (
-          allowRelease &&
-          lastPinnedTopRef.current - element.scrollTop > 16 &&
-          !isScrolledToBottom(element)
-        ) {
-          releaseToManualScroll();
-          return;
-        }
+    if (!forcePinRef.current && decision === 'release') {
+      releaseToManualScroll();
+      return;
+    }
 
-        virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
-        element.scrollTop = element.scrollHeight;
-        lastPinnedTopRef.current = element.scrollTop;
-        lastScrollTopRef.current = element.scrollTop;
-
-        if (remainingPasses > 0) {
-          pinFrameRef.current = requestAnimationFrame(() => {
-            runPass(remainingPasses - 1, true);
-          });
-          return;
-        }
-
-        pinFrameRef.current = null;
-      };
-
-      // A forced pin (jump-to-latest) re-pins from wherever the user is, so it skips the release check on its first pass; later passes re-enable it once the fresh baseline is set.
-      runPass(5, !force);
-    },
-    [cancelPin, items.length, releaseToManualScroll, virtualizer]
-  );
+    forcePinRef.current = false;
+    element.scrollTop = element.scrollHeight;
+    lastPinnedTopRef.current = element.scrollTop;
+  }, [releaseToManualScroll]);
 
   // Bind scroll detection straight to the DOM node so upward intent is seen on the input event itself, before any in-flight pin can write the position back to the bottom.
   useEffect(() => {
@@ -177,8 +260,8 @@ export const ConversationList = ({
     /*
      * A downward user gesture arms a re-follow: handleScroll completes it once
      * that gesture actually reaches the bottom. Requiring recorded intent is
-     * what stops the virtualizer's post-scroll-up re-measurement — which
-     * teleports scrollTop straight back to the bottom — from re-arming on its own.
+     * what stops a programmatic scroll that lands at the bottom from re-arming
+     * on its own.
      */
     let sawDownwardIntent = false;
     const handleWheel = (event: WheelEvent): void => {
@@ -221,26 +304,25 @@ export const ConversationList = ({
         sawDownwardIntent = true;
       }
     };
+    // Backstop for gestures with no input event of their own, such as dragging the scrollbar.
     const handleScroll = (): void => {
-      const currentTop = element.scrollTop;
-      const previousTop = lastScrollTopRef.current;
-      lastScrollTopRef.current = currentTop;
+      const position = readScrollPosition(element);
+      const decision = decideConversationScroll({
+        lastPinnedTop: lastPinnedTopRef.current,
+        position,
+        sawDownwardIntent,
+      });
 
-      // Backstop for gestures with no input event of their own, such as dragging the scrollbar: any move above the last pinned position is the user leaving the bottom.
-      if (
-        currentTop < previousTop - 1 &&
-        currentTop < lastPinnedTopRef.current - 1 &&
-        !isScrolledToBottom(element)
-      ) {
+      if (decision === 'release') {
         sawDownwardIntent = false;
         releaseToManualScroll();
         return;
       }
 
-      // Re-arm once a real downward gesture (not a virtualizer teleport) reaches the bottom. Reset the pin baseline to this bottom so the next content-growth pin does not read a stale-high lastPinned and mistake the growth gap for a scroll-up.
-      if (sawDownwardIntent && isScrolledToBottom(element)) {
+      // Reset the pin baseline to this bottom so the next content-growth pin does not read a stale-high lastPinned and mistake the growth gap for a scroll-up.
+      if (decision === 'follow') {
         sawDownwardIntent = false;
-        lastPinnedTopRef.current = currentTop;
+        lastPinnedTopRef.current = position.scrollTop;
         followBottomAgain();
       }
     };
@@ -260,7 +342,21 @@ export const ConversationList = ({
     };
   }, [followBottomAgain, releaseToManualScroll]);
 
-  useEffect(() => cancelPin, [cancelPin]);
+  // Registered before the pin effect so a conversation swap re-arms following in the same commit that pins it.
+  useLayoutEffect(() => {
+    const ends = getConversationEnds(items);
+
+    if (ends === null) {
+      return;
+    }
+
+    const previous = conversationEndsRef.current;
+    conversationEndsRef.current = ends;
+
+    if (previous !== null && isDifferentConversation(previous, ends)) {
+      followBottomAgain();
+    }
+  }, [followBottomAgain, items]);
 
   useLayoutEffect(() => {
     if (items.length > 0 && isStuckToBottomRef.current) {
@@ -270,7 +366,7 @@ export const ConversationList = ({
 
   const jumpToLatest = (): void => {
     followBottomAgain();
-    pinToBottom(true);
+    pinToBottom();
   };
   const virtualItems = virtualizer.getVirtualItems();
 

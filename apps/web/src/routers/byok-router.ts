@@ -31,7 +31,7 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { AISDKError, createGateway, generateText } from 'ai';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -448,7 +448,7 @@ export const byokRouter = createTRPCRouter({
         return {
           finalProvider,
           model: createGateway({
-            apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
+            apiKey: VERCEL_AI_GATEWAY.apiKey,
           })(model),
           providerOptions: {
             gateway: {

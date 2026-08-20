@@ -1,9 +1,23 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { getUserAuthProviders, unlinkAuthProviderFromUser } from '@/lib/user';
+import {
+  assertUserCanBeSoftDeleted,
+  getUserAuthProviders,
+  SoftDeletePreconditionError,
+  unlinkAuthProviderFromUser,
+} from '@/lib/user';
 import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
+  sendSignInCodeEmail,
 } from '@/lib/email';
+import {
+  consumeSignInCode,
+  createSignInCode,
+  deleteSignInCode,
+  releaseSignInCode,
+  reserveSignInCode,
+} from '@/lib/auth/magic-link-tokens';
+import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
@@ -877,33 +891,153 @@ export const userRouter = createTRPCRouter({
     return successResult({ is_member: isMember });
   }),
 
-  requestAccountDeletion: baseProcedure.mutation(async ({ ctx }) => {
-    const userEmail = ctx.user.google_user_email;
-    const userId = ctx.user.id;
+  requestAccountDeletionChallenge: baseProcedure
+    .output(z.object({ challengeId: z.uuid(), devCode: z.string().optional() }))
+    .mutation(async ({ ctx }) => {
+      const userEmail = ctx.user.google_user_email;
+      const userId = ctx.user.id;
 
-    const lastRequested = ctx.user.account_deletion_requested_at;
-    if (
-      lastRequested &&
-      Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
-    ) {
+      const lastRequested = ctx.user.account_deletion_requested_at;
+      if (
+        lastRequested &&
+        Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
+      ) {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Account deletion already requested. Please wait before trying again.',
+        });
+      }
+
+      const { code, challengeId } = await createSignInCode(userEmail);
+      const sendResult = await sendSignInCodeEmail(userEmail, code);
+      const includeDevCode = process.env.NODE_ENV !== 'production';
+
+      if (sendResult.sent) {
+        await db
+          .update(kilocode_users)
+          .set({ account_deletion_requested_at: new Date().toISOString() })
+          .where(eq(kilocode_users.id, userId));
+        return includeDevCode ? { challengeId, devCode: code } : { challengeId };
+      }
+
+      if (sendResult.reason === 'provider_not_configured') {
+        // Local/dev has no mail provider. Keep the code row so the caller can
+        // still complete the flow with the returned dev code. In production,
+        // treat this like any other send failure: discard the code and fail so
+        // the user is not left stuck with a cooldown and no code.
+        if (!includeDevCode) {
+          await deleteSignInCode(userEmail, code);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to send confirmation code. Please try again.',
+          });
+        }
+        await db
+          .update(kilocode_users)
+          .set({ account_deletion_requested_at: new Date().toISOString() })
+          .where(eq(kilocode_users.id, userId));
+        return { challengeId, devCode: code };
+      }
+
+      // neverbounce_rejected: discard the code and leave the stamp untouched so
+      // a retry / resend stays available.
+      await deleteSignInCode(userEmail, code);
       throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Account deletion already requested. Please wait before trying again.',
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to send confirmation code. Please try again.',
       });
-    }
+    }),
 
-    await Promise.all([
-      sendAccountDeletionConfirmationEmail(userEmail),
-      sendAccountDeletionSupportNotification(userEmail, userId),
-    ]);
+  requestAccountDeletion: baseProcedure
+    .input(z.object({ challengeId: z.uuid(), code: z.string().min(1) }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const userEmail = ctx.user.google_user_email;
+      const userId = ctx.user.id;
 
-    await db
-      .update(kilocode_users)
-      .set({ account_deletion_requested_at: new Date().toISOString() })
-      .where(eq(kilocode_users.id, userId));
+      // TODO: remove this branch, and make the input required again, once no
+      // shipped client calls this without a challenge. Builds already in the
+      // stores send no input and a required input answers them with a 400, so
+      // they keep the old support-ticket flow: it emails the user and support
+      // and deletes nothing, which is what those builds tell the user happened.
+      // Drop it when the mobile release that sends { challengeId, code } has
+      // rolled out and input-less traffic in Axiom reaches zero.
+      if (!input) {
+        const lastRequested = ctx.user.account_deletion_requested_at;
+        if (
+          lastRequested &&
+          Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
+        ) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Account deletion already requested. Please wait before trying again.',
+          });
+        }
 
-    return successResult();
-  }),
+        await Promise.all([
+          sendAccountDeletionConfirmationEmail(userEmail),
+          sendAccountDeletionSupportNotification(userEmail, userId),
+        ]);
+
+        await db
+          .update(kilocode_users)
+          .set({ account_deletion_requested_at: new Date().toISOString() })
+          .where(eq(kilocode_users.id, userId));
+
+        return successResult();
+      }
+
+      try {
+        await assertUserCanBeSoftDeleted(userId);
+      } catch (error) {
+        if (error instanceof SoftDeletePreconditionError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        throw error;
+      }
+
+      const reserveResult = await reserveSignInCode(userEmail, input.code, input.challengeId);
+      if (reserveResult === 'invalid') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid confirmation code' });
+      }
+      if (reserveResult === 'too_many_attempts') {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many attempts. Please request a new confirmation code.',
+        });
+      }
+      if (reserveResult === 'in_progress') {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Confirmation code is already being verified. Please wait.',
+        });
+      }
+
+      // The code is consumed only after removal succeeds. Burning it first
+      // stranded the caller: a failed removal left no usable code and the
+      // 1 h request cooldown blocked a new one.
+      try {
+        await performGdprRemoval(userId, {
+          destroyReason: 'admin_request',
+          actor: {
+            id: userId,
+            email: userEmail,
+            name: ctx.user.google_user_name,
+          },
+        });
+      } catch (error) {
+        await releaseSignInCode(userEmail, input.code, input.challengeId);
+        // A precondition race inside performGdprRemoval (re-asserted there) maps
+        // to the same PRECONDITION_FAILED surface.
+        if (error instanceof SoftDeletePreconditionError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        throw error;
+      }
+
+      await consumeSignInCode(userEmail, input.code, input.challengeId);
+
+      return { status: 'deleted' as const };
+    }),
 
   // ─── Push Notification Tokens ──────────────────────────────────────
 
@@ -912,6 +1046,7 @@ export const userRouter = createTRPCRouter({
       z.object({
         token: z.string().min(1),
         platform: z.enum(['ios', 'android']),
+        appVersion: z.string().max(64).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -921,10 +1056,16 @@ export const userRouter = createTRPCRouter({
           user_id: ctx.user.id,
           token: input.token,
           platform: input.platform,
+          app_version: input.appVersion ?? null,
         })
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
-          set: { user_id: ctx.user.id, platform: input.platform, updated_at: sql`now()` },
+          set: {
+            user_id: ctx.user.id,
+            platform: input.platform,
+            app_version: input.appVersion ?? null,
+            updated_at: sql`now()`,
+          },
         });
       return { success: true };
     }),
@@ -966,6 +1107,7 @@ export const userRouter = createTRPCRouter({
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
         balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
         security_findings_enabled: user_notification_preferences.security_findings_enabled,
+        notification_previews: user_notification_preferences.notification_previews,
       })
       .from(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -981,6 +1123,7 @@ export const userRouter = createTRPCRouter({
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
       balanceAlerts: row?.balance_alerts_enabled ?? true,
       securityFindings: row?.security_findings_enabled ?? true,
+      notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
     };
   }),
@@ -995,6 +1138,7 @@ export const userRouter = createTRPCRouter({
         kiloclawActivity: z.boolean().optional(),
         balanceAlerts: z.boolean().optional(),
         securityFindings: z.boolean().optional(),
+        notificationPreviews: z.enum(['generic', 'full']).optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
         agentPushEnabled: z.boolean().optional(),
       })
@@ -1008,8 +1152,8 @@ export const userRouter = createTRPCRouter({
       // include a column in the upsert when the caller actually provided it, so
       // omitted columns keep their DB default on insert and are left untouched
       // on update.
-      const set: Record<string, boolean> = {};
-      const values: Record<string, boolean> = {};
+      const set: Record<string, boolean | string> = {};
+      const values: Record<string, boolean | string> = {};
       if (input.chatMessages !== undefined) {
         set.chat_messages_enabled = input.chatMessages;
         values.chat_messages_enabled = input.chatMessages;
@@ -1033,6 +1177,10 @@ export const userRouter = createTRPCRouter({
       if (input.securityFindings !== undefined) {
         set.security_findings_enabled = input.securityFindings;
         values.security_findings_enabled = input.securityFindings;
+      }
+      if (input.notificationPreviews !== undefined) {
+        set.notification_previews = input.notificationPreviews;
+        values.notification_previews = input.notificationPreviews;
       }
       if (agentPush !== undefined) {
         set.agent_push_enabled = agentPush;
@@ -1060,6 +1208,7 @@ export const userRouter = createTRPCRouter({
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
           balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
           security_findings_enabled: user_notification_preferences.security_findings_enabled,
+          notification_previews: user_notification_preferences.notification_previews,
         })
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, ctx.user.id))
@@ -1073,6 +1222,7 @@ export const userRouter = createTRPCRouter({
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
         balanceAlerts: row?.balance_alerts_enabled ?? true,
         securityFindings: row?.security_findings_enabled ?? true,
+        notificationPreviews: row?.notification_previews ?? 'generic',
         agentPushEnabled: effectiveAgentPush,
       };
     }),

@@ -16,12 +16,12 @@ type ContextUsageRingProps = {
 const DEFAULT_SIZE = 28;
 const DEFAULT_STROKE = 3;
 
-const TONE_COLORS: Record<ContextTone, keyof ReturnType<typeof useThemeColors>> = {
+const TONE_COLORS = {
   destructive: 'destructive',
   warning: 'warn',
   primary: 'primary',
   neutral: 'mutedForeground',
-};
+} satisfies Record<ContextTone, keyof ReturnType<typeof useThemeColors>>;
 
 function toneColor(tone: ContextTone, colors: ReturnType<typeof useThemeColors>): string {
   return colors[TONE_COLORS[tone]];

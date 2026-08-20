@@ -5,7 +5,7 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -15,7 +15,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
-import { ChatComposer } from '@/components/agents/chat-composer';
+import { ChatComposer, type ChatComposerControl } from '@/components/agents/chat-composer';
+import {
+  type AgentMode,
+  customModeOptionsFromRuntimeAgents,
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+  lockedModelOption,
+  resolvePinnedAgentModel,
+} from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
@@ -50,7 +58,13 @@ import {
   shouldShowFooterWorkingIndicator,
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
+import {
+  countInFlightMessages,
+  resolveRetryPrompt,
+  retryMessageAndClear,
+} from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
+import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -78,6 +92,11 @@ import {
 } from '@/components/agents/child-session-sheet-state';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
+import {
+  buildTerminalErrorCopyText,
+  resolveSessionTerminalError,
+} from '@/components/agents/session-terminal-error';
+import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
@@ -124,12 +143,14 @@ type SessionDetailContentProps = {
   shareId?: string;
   /** Auto-send flag from remote spawn; the composer fires once after share delivery completes. */
   autoSend?: boolean;
+  /** Mode picked at spawn; seeds the mode until the session reports its own. */
+  spawnedMode?: string;
 };
 
-const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
+const COMPOSER_PLACEHOLDERS = {
   preparing: 'Setting up environment...',
   finalizing: 'Wrapping up...',
-};
+} satisfies Partial<Record<CloudStatus['type'], string>>;
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
@@ -138,6 +159,7 @@ export function SessionDetailContent({
   openedVia = 'app',
   shareId,
   autoSend,
+  spawnedMode,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -146,6 +168,7 @@ export function SessionDetailContent({
     visible: false,
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerControlRef = useRef<ChatComposerControl | null>(null);
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -347,7 +370,72 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
     cloudAgentModelOverride,
+    spawnedMode,
   });
+
+  // Custom modes come from the session's `runtimeAgents` (slug + name). The
+  // selected slug is appended once when it is neither a built-in nor already
+  // listed, so an inherited custom slug stays visible in the picker.
+  const runtimeAgents = sessionConfig?.runtimeAgents;
+  const customOptions = useMemo(
+    () =>
+      ensureSelectedCustomOption(
+        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
+        currentMode
+      ),
+    [runtimeAgents, currentMode]
+  );
+  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
+  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
+  const pinned = useMemo(
+    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
+    [currentMode, runtimeAgents]
+  );
+  const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
+  const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
+  const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;
+  // When locked to a model that is not already in the catalog, append a
+  // fallback option so the chip can still show the pinned model id.
+  const modelOptionsForToolbar = useMemo(() => {
+    if (!modelLocked || !pinned.model) {
+      return modelOptions;
+    }
+    return modelOptions.some(option => option.id === pinned.model)
+      ? modelOptions
+      : [...modelOptions, lockedModelOption(pinned)];
+  }, [modelLocked, pinned, modelOptions]);
+  const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+
+  // Sync the cloud-agent override to the selected agent's pin (or clear it)
+  // so the SDK's `cloudAgentModelOverride` preference cannot beat the pin.
+  const applyCloudAgentModelOverride = useCallback(
+    (mode: AgentMode) => {
+      if (activeSessionType !== 'cloud-agent') {
+        return;
+      }
+      const agentPin = resolvePinnedAgentModel({ slug: mode, runtimeAgents });
+      if (agentPin.model) {
+        manager.setCloudAgentModelOverride({
+          model: agentPin.model,
+          ...(agentPin.variant ? { variant: agentPin.variant } : {}),
+        });
+      } else {
+        manager.setCloudAgentModelOverride(null);
+      }
+    },
+    [activeSessionType, manager, runtimeAgents]
+  );
+
+  const handleModeChange = useCallback(
+    (mode: AgentMode) => {
+      setCurrentMode(mode);
+      if (sessionConfig) {
+        setSessionConfig({ ...sessionConfig, mode });
+      }
+      applyCloudAgentModelOverride(mode);
+    },
+    [setCurrentMode, sessionConfig, setSessionConfig, applyCloudAgentModelOverride]
+  );
 
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -372,10 +460,16 @@ export function SessionDetailContent({
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
   // decision gets one 4s follow-up refetch — no polling loop.
+  const store = useStore();
+  // The first focus on a session id is owned by `manager.switchSession`, which
+  // already fetches the session metadata (including `associatedPr`). Every
+  // later focus refetches; this ref tracks which id has been seeded.
+  const seededSessionIdRef = useRef<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const refetch = async (scheduleFollowUp: boolean) => {
         try {
@@ -398,15 +492,54 @@ export function SessionDetailContent({
         }
       };
 
-      void refetch(true);
+      // Check the current `fetchedSessionData` and, when a review decision is
+      // pending, schedule the one-shot 4s follow-up. Runs once against the
+      // current value and again on every later write until the session's data
+      // has landed (or the effect is cancelled).
+      const checkAndSchedule = (): boolean => {
+        if (cancelled) {
+          return true;
+        }
+        const fetched = store.get(manager.atoms.fetchedSessionData);
+        if (fetched?.kiloSessionId !== sessionId) {
+          return false;
+        }
+        unsubscribe?.();
+        unsubscribe = null;
+        if (fetched.associatedPr?.reviewDecisionPending) {
+          pendingTimeout = setTimeout(() => {
+            pendingTimeout = null;
+            void refetch(false);
+          }, 4000);
+        }
+        return true;
+      };
+
+      if (!shouldRefetchOnFocus(seededSessionIdRef.current, sessionId)) {
+        // First focus: `switchSession` owns the metadata read, so issue no
+        // request. Seed the ref and keep the pending-decision follow-up. The
+        // manager's fetch can land before this effect runs (switchSession
+        // writes first), so check the current value once before subscribing.
+        // Subscribe only when the data has not landed yet; a match schedules
+        // at most one follow-up and stops listening.
+        seededSessionIdRef.current = sessionId;
+        if (!checkAndSchedule()) {
+          unsubscribe = store.sub(manager.atoms.fetchedSessionData, () => {
+            checkAndSchedule();
+          });
+        }
+      } else {
+        void refetch(true);
+      }
 
       return () => {
         cancelled = true;
+        unsubscribe?.();
         if (pendingTimeout !== null) {
           clearTimeout(pendingTimeout);
         }
       };
-    }, [manager, sessionId])
+    }, [manager, sessionId, store])
   );
 
   useEffect(() => {
@@ -508,6 +641,130 @@ export function SessionDetailContent({
     }
   }
 
+  const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
+
+  const handleSend = useCallback(
+    async (
+      text: string,
+      attachments?: AgentAttachmentWire,
+      submission?: AgentAttachmentSubmissionPayload
+    ) => {
+      if (requiresModel && !(pinned.model ?? currentModel)) {
+        toast.error('Select a model before sending');
+        return;
+      }
+      // Pick the wire shape via the same pure helper the unit test covers:
+      //   - cloud-agent → unchanged `{path, files}` (S3a)
+      //   - remote + supportsAttachments → materialize presigned GETs and
+      //     forward as `attachmentParts` (S3b)
+      //   - everything else → no attachment field on the wire
+      const kind = resolveSendAttachmentKind(
+        activeSessionType,
+        supportsAttachments,
+        attachments !== undefined
+      );
+      if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
+        const message =
+          "This session can't receive files. Remove the attachments to send your message.";
+        toast.error(message);
+        throw new Error(message);
+      }
+      let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
+        undefined;
+      if (kind === 'remote-capable' && submission) {
+        const result = await buildRemoteAttachmentPartsWithRetryableFeedback(
+          submission,
+          buildRemoteAttachmentParts
+        );
+        if (!result.ok) {
+          // Retryable presign failure: the manager never reached send(), so
+          // its onSendFailed toast does not fire. Surface the retryable message
+          // through the same toast channel and throw so the composer keeps the
+          // draft/attachments for a retry.
+          toast.error(result.message);
+          throw new Error(result.message);
+        }
+        attachmentParts = result.parts;
+      }
+      const sendModel =
+        activeSessionType === 'cloud-agent' && pinned.model ? pinned.model : currentModel;
+      const sendVariant =
+        activeSessionType === 'cloud-agent' && pinned.model
+          ? (pinned.variant ?? '')
+          : currentVariant;
+      // Sync the override to the exact model/variant being sent so the SDK's
+      // `cloudAgentModelOverride` preference cannot beat the pin on send, and
+      // a leftover pin cannot beat a user pick. `sendModel` is always truthy
+      // here (the guard above returns early when no model resolves), so this
+      // never clears to null on an unpinned send.
+      if (activeSessionType === 'cloud-agent') {
+        manager.setCloudAgentModelOverride(
+          sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
+        );
+      }
+      // manager.send() reports failures via its own return value (and toasts
+      // through the manager's onSendFailed hook) rather than rejecting — it
+      // is the single toast owner for send failures. Throw here, without a
+      // second toast, purely so the composer's `await onSend(...)` sees the
+      // rejection and preserves the draft.
+      const sent = await manager.send({
+        payload: {
+          type: 'prompt',
+          prompt: text,
+          mode: currentMode,
+          model: sendModel,
+          variant: sendVariant || undefined,
+        },
+        ...(kind === 'cloud' && attachments ? { attachments } : {}),
+        ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
+      });
+      if (!sent) {
+        throw new Error('Failed to send message');
+      }
+      captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
+    },
+    [
+      manager,
+      currentMode,
+      currentModel,
+      currentVariant,
+      pinned.model,
+      pinned.variant,
+      requiresModel,
+      activeSessionType,
+      supportsAttachments,
+      analyticsSurface,
+    ]
+  );
+
+  const handleCopyToComposer = useCallback((text: string) => {
+    composerControlRef.current?.setText(text);
+  }, []);
+
+  const handleRetryMessage = useCallback(
+    (message: StoredMessage) => {
+      const prompt = resolveRetryPrompt(message, messages);
+      if (prompt === null) {
+        return;
+      }
+      // Same guard handleSend opens with: when no model resolves, run the send
+      // anyway (the user gets the existing toast) and keep the failed row.
+      if (requiresModel && !(pinned.model ?? currentModel)) {
+        void handleSend(prompt);
+        return;
+      }
+      void retryMessageAndClear(
+        async () => {
+          await handleSend(prompt);
+        },
+        () => {
+          manager.clearFailedMessage(message.info.id);
+        }
+      );
+    },
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -522,6 +779,8 @@ export function SessionDetailContent({
       // so a plain lookup is enough — no render-order guard.
       const deliveryState =
         item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+      // Suppress Retry on an assistant failure with no preceding user row.
+      const retryPrompt = resolveRetryPrompt(item.message, messages);
       return (
         <MessageBubble
           message={item.message}
@@ -533,6 +792,8 @@ export function SessionDetailContent({
           deliveryState={deliveryState}
           onLongPressDetails={setDetailsMessage}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
+          onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          onCopyToComposer={handleCopyToComposer}
         />
       );
     },
@@ -544,6 +805,9 @@ export function SessionDetailContent({
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
+      messages,
+      handleRetryMessage,
+      handleCopyToComposer,
     ]
   );
 
@@ -604,9 +868,15 @@ export function SessionDetailContent({
     (fetchedData === null && !statusIndicator && !error) ||
     (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
   const shouldBlockMessages = shouldShowLoading;
+  // Failed delivery entries must not count as in-flight: after a terminal
+  // delivery failure the working spinner and wake lock would otherwise stay on.
+  const inFlightMessageCount = useMemo(
+    () => countInFlightMessages(pendingMessages),
+    [pendingMessages]
+  );
   const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
     isStreaming,
-    pendingMessageCount: pendingMessages.size,
+    pendingMessageCount: inFlightMessageCount,
   });
   const hasFooterStatusIndicator =
     statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
@@ -663,7 +933,6 @@ export function SessionDetailContent({
       />
     </View>
   );
-  const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
   // One number for both kinds: the user must see every waiting request, not
@@ -705,87 +974,15 @@ export function SessionDetailContent({
     shouldShowLoading,
     hasBlockingInteraction,
     requiresModel,
-    hasModel: Boolean(currentModel),
+    // A pinned agent model satisfies the model requirement even before the
+    // catalog selection resolves.
+    hasModel: Boolean(pinned.model ?? currentModel),
   });
   const composerPlaceholder =
-    (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
+    (cloudStatus &&
+      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
+    'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
-
-  const handleSend = useCallback(
-    async (
-      text: string,
-      attachments?: AgentAttachmentWire,
-      submission?: AgentAttachmentSubmissionPayload
-    ) => {
-      if (requiresModel && !currentModel) {
-        toast.error('Select a model before sending');
-        return;
-      }
-      // Pick the wire shape via the same pure helper the unit test covers:
-      //   - cloud-agent → unchanged `{path, files}` (S3a)
-      //   - remote + supportsAttachments → materialize presigned GETs and
-      //     forward as `attachmentParts` (S3b)
-      //   - everything else → no attachment field on the wire
-      const kind = resolveSendAttachmentKind(
-        activeSessionType,
-        supportsAttachments,
-        attachments !== undefined
-      );
-      if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
-        const message =
-          "This session can't receive files. Remove the attachments to send your message.";
-        toast.error(message);
-        throw new Error(message);
-      }
-      let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
-        undefined;
-      if (kind === 'remote-capable' && submission) {
-        const result = await buildRemoteAttachmentPartsWithRetryableFeedback(
-          submission,
-          buildRemoteAttachmentParts
-        );
-        if (!result.ok) {
-          // Retryable presign failure: the manager never reached send(), so
-          // its onSendFailed toast does not fire. Surface the retryable message
-          // through the same toast channel and throw so the composer keeps the
-          // draft/attachments for a retry.
-          toast.error(result.message);
-          throw new Error(result.message);
-        }
-        attachmentParts = result.parts;
-      }
-      // manager.send() reports failures via its own return value (and toasts
-      // through the manager's onSendFailed hook) rather than rejecting — it
-      // is the single toast owner for send failures. Throw here, without a
-      // second toast, purely so the composer's `await onSend(...)` sees the
-      // rejection and preserves the draft.
-      const sent = await manager.send({
-        payload: {
-          type: 'prompt',
-          prompt: text,
-          mode: currentMode,
-          model: currentModel,
-          variant: currentVariant || undefined,
-        },
-        ...(kind === 'cloud' && attachments ? { attachments } : {}),
-        ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
-      });
-      if (!sent) {
-        throw new Error('Failed to send message');
-      }
-      captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
-    },
-    [
-      manager,
-      currentMode,
-      currentModel,
-      currentVariant,
-      requiresModel,
-      activeSessionType,
-      supportsAttachments,
-      analyticsSurface,
-    ]
-  );
 
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
@@ -873,8 +1070,23 @@ export function SessionDetailContent({
     isFocused,
     isDisconnected: agentStatus.type === 'disconnected',
     isStreaming,
-    pendingMessageCount: pendingMessages.size,
+    pendingMessageCount: inFlightMessageCount,
   });
+
+  // Child-sheet pagination fields live only on the `ready` hydration state.
+  // The sheet can render `content` before hydration reports ready (live child
+  // rows already exist), so default every non-ready state.
+  const openChildSessionId = childSessionSheet.sheet?.sessionId ?? null;
+  const openChildHydrationState =
+    openChildSessionId === null ? null : getChildSessionHydrationState(openChildSessionId);
+  const childHasOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.hasOlder : false;
+  const childIsLoadingOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.isLoadingOlder : false;
+  const childOlderMessagesError =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.olderError : null;
+  const childOlderMessagesOmittedItemCount =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.omittedItemCount : 0;
 
   return (
     <PartDetailSheetHost messages={messages}>
@@ -946,6 +1158,15 @@ export function SessionDetailContent({
             getChildMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            hasOlderMessages={childHasOlderMessages}
+            isLoadingOlderMessages={childIsLoadingOlderMessages}
+            olderMessagesError={childOlderMessagesError}
+            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+            onLoadOlderMessages={() => {
+              if (openChildSessionId !== null) {
+                void manager.loadOlderChildMessages(openChildSessionId);
+              }
+            }}
             renderPart={props => <PartRenderer {...props} />}
             onOpenChildSession={handleOpenChildSession}
             onRetry={() => {
@@ -1076,10 +1297,13 @@ export function SessionDetailContent({
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 mode={currentMode}
-                onModeChange={setCurrentMode}
-                model={currentModel}
-                variant={currentVariant}
-                modelOptions={modelOptions}
+                onModeChange={handleModeChange}
+                model={displayModel}
+                variant={displayVariant}
+                modelOptions={modelOptionsForToolbar}
+                customOptions={customOptions}
+                modelLocked={modelLocked}
+                modelLockLabel={pinned.agentName}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}
@@ -1089,7 +1313,9 @@ export function SessionDetailContent({
                 shareId={shareId}
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
-                initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                sessionId={sessionId}
+                controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
@@ -1099,27 +1325,53 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    if (shouldBlockMessages) {
-      return <SessionSkeletonMessages />;
-    }
-    if (error && messages.length === 0) {
+    const terminalError = resolveSessionTerminalError({
+      error,
+      statusIndicator,
+      messageCount: messages.length,
+    });
+    if (terminalError) {
+      const copyText = buildTerminalErrorCopyText(
+        sessionId,
+        terminalError.title,
+        terminalError.message
+      );
       return (
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
-            variant="server"
+            variant={terminalError.variant}
             placement="top"
             className="px-0 pt-0"
-            title="Couldn't load this session"
-            message={error}
-            onRetry={() => {
-              void manager.switchSession(sessionId);
-            }}
+            title={terminalError.title}
+            message={terminalError.message}
+            onRetry={
+              terminalError.retryable
+                ? () => {
+                    void manager.switchSession(sessionId);
+                  }
+                : undefined
+            }
+            isRetrying={isLoading}
           />
-          <Button variant="ghost" onPress={handleBackToSessions}>
-            <Text>Back to sessions</Text>
-          </Button>
+          <View className="flex-row gap-3">
+            <Button
+              variant="ghost"
+              accessibilityLabel="Copy error details"
+              onPress={() => {
+                void performCopy(copyText);
+              }}
+            >
+              <Text>Copy</Text>
+            </Button>
+            <Button variant="ghost" onPress={handleBackToSessions}>
+              <Text>Back to sessions</Text>
+            </Button>
+          </View>
         </View>
       );
+    }
+    if (shouldBlockMessages) {
+      return <SessionSkeletonMessages />;
     }
     if (messages.length === 0) {
       return (
@@ -1146,6 +1398,9 @@ export function SessionDetailContent({
         olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
         onLoadOlderMessages={() => {
           void manager.loadOlderMessages();
+        }}
+        onReachedBottom={() => {
+          manager.trimRetainedHistory();
         }}
         renderItem={renderItem}
       />

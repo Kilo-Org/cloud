@@ -18,6 +18,7 @@ function isAndroidApiLevelAtLeast(level: number): boolean {
     return false;
   }
   const version = Platform.Version;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Platform.Version is an environment probe typed `string | number`; typeof is the only way to tell which
   if (typeof version === 'number') {
     return version >= level;
   }
@@ -80,12 +81,14 @@ const native: VoiceInputNative = {
   },
   isRecognitionAvailable: () => ExpoSpeechRecognitionModule.isRecognitionAvailable(),
   supportsContinuousRecognition,
+  supportsOnDevice: () => ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
   start: options => {
     ExpoSpeechRecognitionModule.start({
       continuous: options.continuous,
       interimResults: options.interimResults,
       lang: options.lang,
       maxAlternatives: options.maxAlternatives,
+      requiresOnDeviceRecognition: options.requiresOnDeviceRecognition,
     });
   },
   stop: () => {

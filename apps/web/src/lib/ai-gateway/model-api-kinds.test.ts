@@ -53,10 +53,7 @@ describe('modelServesAllGatewayChatApis', () => {
 
   it('rejects a Kilo-exclusive model served by a provider without Messages support', () => {
     expect(modelServesAllGatewayChatApis('test-exclusive/alibaba-only')).toBe(false);
-    expect(gatewayChatApisForModel('test-exclusive/alibaba-only')).toEqual([
-      'chat_completions',
-      'responses',
-    ]);
+    expect(gatewayChatApisForModel('test-exclusive/alibaba-only')).toEqual(['chat_completions']);
   });
 
   it('treats disabled Kilo-exclusive models like plain OpenRouter models, matching get-provider', () => {

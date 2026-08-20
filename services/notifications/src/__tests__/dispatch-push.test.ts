@@ -16,9 +16,14 @@ vi.mock('../lib/expo-push', () => ({
 }));
 
 type DbState = {
-  tokens: { user_id: string; token: string }[];
+  tokens: { user_id: string; token: string; app_version?: string | null }[];
   staleTokensToDelete?: string[];
   deleteCalls?: number;
+  // When set, the `user_notification_preferences` read returns this value.
+  // When unset, the read returns an absent row (treated as 'generic').
+  previews?: 'generic' | 'full';
+  // When true, the `user_notification_preferences` read throws.
+  previewsThrows?: boolean;
 };
 
 function installDbMock(state: DbState) {
@@ -26,8 +31,15 @@ function installDbMock(state: DbState) {
     select: () => ({
       from: (table: Parameters<typeof getTableName>[0]) => ({
         where: async () => {
-          if (getTableName(table) === 'user_push_tokens') {
-            return state.tokens.map(t => ({ token: t.token }));
+          const tableName = getTableName(table);
+          if (tableName === 'user_push_tokens') {
+            return state.tokens.map(t => ({ token: t.token, app_version: t.app_version ?? null }));
+          }
+          if (tableName === 'user_notification_preferences') {
+            if (state.previewsThrows) {
+              throw new Error('previews read failed');
+            }
+            return state.previews ? [{ notification_previews: state.previews }] : [];
           }
           return [];
         },
@@ -1045,6 +1057,8 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
         dataType: unknown;
         sound: string | null;
         priority: string;
+        channelId: string;
+        previews: string;
       };
       to: string;
     };
@@ -1057,6 +1071,8 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
       dataType: 'cloud_agent_session',
       sound: 'default',
       priority: 'high',
+      channelId: 'agent',
+      previews: 'generic',
     });
     expect(payload.to).toBe('<redacted>');
     // Neither the device token nor the user/agent-controlled content may appear.
@@ -1216,5 +1232,80 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
     expect([first.kind, second.kind].sort()).toEqual(['delivered', 'duplicate']);
     // The core guarantee: exactly one OS push submission for the key.
     expect(sendPushNotifications).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NotificationChannelDO preview mode and channel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  it('adds channelId to every message when the token has an app version', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-chan', token: 'tok1', app_version: '1.0.4' },
+        { user_id: 'user-chan', token: 'tok2', app_version: '1.0.4' },
+      ],
+    });
+    const stub = getDO('user-chan');
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'user-chan', idempotencyKey: 'k-chan' })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages).toHaveLength(2);
+    for (const message of messages) {
+      expect(message.channelId).toBe('chat');
+    }
+  });
+
+  it('omits channelId for a token without an app version (old client)', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-chan-old', token: 'tok-old', app_version: null },
+        { user_id: 'user-chan-old', token: 'tok-new', app_version: '1.0.4' },
+      ],
+    });
+    const stub = getDO('user-chan-old');
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'user-chan-old', idempotencyKey: 'k-chan-old' })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages).toHaveLength(2);
+    const oldMessage = messages.find(m => m.to === 'tok-old');
+    const newMessage = messages.find(m => m.to === 'tok-new');
+    expect(oldMessage?.channelId).toBeUndefined();
+    expect(newMessage?.channelId).toBe('chat');
+  });
+
+  it('substitutes generic content when previews is generic', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-generic', token: 'tok1' }], previews: 'generic' });
+    const stub = getDO('user-generic');
+    await stub.dispatchPush(baseInput({ userId: 'user-generic', idempotencyKey: 'k-generic' }));
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Kilo Code');
+    expect(messages[0].title).not.toBe('T');
+    expect(messages[0].body).not.toBe('B');
+  });
+
+  it('passes through full content when previews is full', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-full', token: 'tok1' }], previews: 'full' });
+    const stub = getDO('user-full');
+    await stub.dispatchPush(baseInput({ userId: 'user-full', idempotencyKey: 'k-full' }));
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('T');
+    expect(messages[0].body).toBe('B');
+  });
+
+  it('substitutes generic content when the preference read throws', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-throw', token: 'tok1' }], previewsThrows: true });
+    const stub = getDO('user-throw');
+    await stub.dispatchPush(baseInput({ userId: 'user-throw', idempotencyKey: 'k-throw' }));
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Kilo Code');
+    expect(messages[0].body).not.toBe('B');
   });
 });

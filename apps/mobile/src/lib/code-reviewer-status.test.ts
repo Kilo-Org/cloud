@@ -43,13 +43,13 @@ describe('classifyProviderState', () => {
         isFetching: true,
         connected: undefined,
         hasData: false,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'loading' });
   });
 
   it('is an error on initial-load failure (no cached data)', () => {
-    const refetch = vi.fn();
+    const refetch = vi.fn<() => void>();
     const result = classifyProviderState({
       isLoading: false,
       isError: true,
@@ -65,6 +65,21 @@ describe('classifyProviderState', () => {
     }
   });
 
+  it('regression: a query error never renders Connect (never disconnected)', () => {
+    // A failed connect-state query must surface as an error, not fall through
+    // to `disconnected`, which is the state that renders the Connect card.
+    const result = classifyProviderState({
+      isLoading: false,
+      isError: true,
+      isFetching: false,
+      connected: false,
+      hasData: false,
+      refetch: vi.fn<() => void>(),
+    });
+    expect(result.status).toBe('error');
+    expect(result.status).not.toBe('disconnected');
+  });
+
   it('does not error when a refetch fails but stale data is still present', () => {
     expect(
       classifyProviderState({
@@ -73,7 +88,7 @@ describe('classifyProviderState', () => {
         isFetching: false,
         connected: true,
         hasData: true,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'connected' });
   });
@@ -86,7 +101,7 @@ describe('classifyProviderState', () => {
         isFetching: false,
         connected: true,
         hasData: true,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'connected' });
   });
@@ -99,9 +114,26 @@ describe('classifyProviderState', () => {
         isFetching: false,
         connected: false,
         hasData: true,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'disconnected' });
+  });
+
+  it('is loading (not disconnected) when the query is paused with no data yet', () => {
+    // A paused query (offline/unknown connectivity, empty cache) is pending
+    // but not fetching, so isLoading is false while data is still undefined.
+    // It must not fall through to disconnected (which renders the Connect
+    // card) on a cold launch.
+    expect(
+      classifyProviderState({
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        connected: undefined,
+        hasData: false,
+        refetch: vi.fn<() => void>(),
+      })
+    ).toEqual({ status: 'loading' });
   });
 });
 
@@ -114,7 +146,7 @@ describe('classifyPermission', () => {
         isError: true,
         isFetching: true,
         role: undefined,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'ready', canEdit: true });
   });
@@ -127,13 +159,13 @@ describe('classifyPermission', () => {
         isError: false,
         isFetching: true,
         role: undefined,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'loading' });
   });
 
   it('is an error when the org list query fails', () => {
-    const refetch = vi.fn();
+    const refetch = vi.fn<() => void>();
     const result = classifyPermission({
       isPersonal: false,
       isLoading: false,
@@ -158,7 +190,7 @@ describe('classifyPermission', () => {
           isError: false,
           isFetching: false,
           role,
-          refetch: vi.fn(),
+          refetch: vi.fn<() => void>(),
         })
       ).toEqual({ status: 'ready', canEdit: true });
     }
@@ -172,7 +204,7 @@ describe('classifyPermission', () => {
         isError: false,
         isFetching: false,
         role: 'member',
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'ready', canEdit: false });
 
@@ -183,7 +215,7 @@ describe('classifyPermission', () => {
         isError: false,
         isFetching: false,
         role: undefined,
-        refetch: vi.fn(),
+        refetch: vi.fn<() => void>(),
       })
     ).toEqual({ status: 'ready', canEdit: false });
   });

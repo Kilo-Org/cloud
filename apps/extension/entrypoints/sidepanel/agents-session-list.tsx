@@ -37,9 +37,7 @@ export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey }
  * section observe this query; an identical key plus input means React Query
  * serves them from one request.
  */
-const activeSessionsListInput = (
-  organizationId: string | null
-): { organizationId: string | null; includeCloudAgentSessions: boolean } => ({
+const activeSessionsListInput = (organizationId: string | null) => ({
   includeCloudAgentSessions: true,
   organizationId,
 });
@@ -143,6 +141,42 @@ export const sessionStatusBadge = (
 };
 
 // ---------------------------------------------------------------------------
+// Shared layout + copy
+// ---------------------------------------------------------------------------
+
+/** One vertical rhythm for both sections. */
+const sectionClass = 'space-y-2 px-4 py-2';
+
+/**
+ * One text column for both sections: an Active row indents its title by
+ * px-2 (8px) + a size-3.5 icon (14px) + gap-1.5 (6px) = 28px. `pl-7` puts a
+ * History row, a sub-line, and an empty line on that same left edge.
+ */
+const rowTextColumnClass = 'py-1.5 pl-7 pr-2';
+
+/** One empty-state treatment for both sections. */
+const emptyStateClass = 'type-label pl-7 pr-2 text-foreground-muted';
+
+/**
+ * Pick the History empty-state copy. With active sessions listed above, the
+ * account is not empty, so the first-run sentence would be a false statement.
+ */
+export const historyEmptyMessage = ({
+  hasActiveSessions,
+  isSearching,
+}: {
+  hasActiveSessions: boolean;
+  isSearching: boolean;
+}): string => {
+  if (isSearching) {
+    return 'No sessions match your search.';
+  }
+  return hasActiveSessions
+    ? 'No past sessions yet.'
+    : 'No sessions yet. Start your first session above.';
+};
+
+// ---------------------------------------------------------------------------
 // Active sessions section
 // ---------------------------------------------------------------------------
 
@@ -214,7 +248,7 @@ const ActiveSessionsSection = ({
 
   if (isLoading) {
     return (
-      <div className="space-y-1 px-4 py-2">
+      <div className={sectionClass}>
         <div className="flex items-center gap-2">
           <Bot className="size-4 text-foreground-muted" />
           <span className="type-label text-foreground-muted">Active</span>
@@ -226,7 +260,7 @@ const ActiveSessionsSection = ({
 
   if (isError && data === undefined) {
     return (
-      <div className="space-y-2 px-4 py-2">
+      <div className={sectionClass}>
         <div className="flex items-center gap-2">
           <Bot className="size-4 text-foreground-muted" />
           <span className="type-label text-foreground-muted">Active</span>
@@ -255,7 +289,7 @@ const ActiveSessionsSection = ({
   }
 
   return (
-    <div className="space-y-1 px-4 py-2">
+    <div className={sectionClass}>
       <div className="flex items-center gap-2">
         <Bot className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">Active</span>
@@ -283,7 +317,7 @@ const ActiveSessionsSection = ({
         </div>
       ) : null}
       {sessions.length === 0 ? (
-        <p className="type-label text-foreground-muted pl-6">No active sessions</p>
+        <p className={emptyStateClass}>No active sessions</p>
       ) : (
         <div className="space-y-0.5">
           {sessions.map(session => {
@@ -466,7 +500,7 @@ const HistorySessionsSection = ({
   const showSearch = inputValue !== '' || isLoading || hasError || rows.length > 0;
 
   return (
-    <div className="space-y-2 px-4 py-3">
+    <div className={sectionClass}>
       <div className="flex items-center gap-2">
         <History className="size-4 text-foreground-muted" />
         <span className="type-label text-foreground-muted">History</span>
@@ -514,9 +548,9 @@ const HistorySessionsSection = ({
 
       {/* Loading state */}
       {isLoading ? (
-        <div className="space-y-2 py-1">
+        <div className="space-y-0.5">
           {[1, 2, 3].map(idx => (
-            <div className="flex items-center gap-2 px-2 py-1.5" key={idx}>
+            <div className={`flex items-center gap-2 ${rowTextColumnClass}`} key={idx}>
               <span className="h-3 flex-1 animate-pulse rounded bg-surface-selected" />
               <span className="h-3 w-10 animate-pulse rounded bg-surface-selected" />
             </div>
@@ -526,13 +560,9 @@ const HistorySessionsSection = ({
 
       {/* Empty state */}
       {hasNoResults ? (
-        <div className="py-3 text-center">
-          <p className="type-body text-foreground-muted">
-            {isSearching
-              ? 'No sessions match your search.'
-              : 'No sessions yet. Start your first session above.'}
-          </p>
-        </div>
+        <p className={emptyStateClass}>
+          {historyEmptyMessage({ hasActiveSessions: activeIds.size > 0, isSearching })}
+        </p>
       ) : null}
 
       {/* Row list */}
@@ -540,7 +570,7 @@ const HistorySessionsSection = ({
         <div className="space-y-0.5">
           {rows.map(session => (
             <button
-              className="w-full rounded-md px-2 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+              className={`w-full rounded-md text-left type-body transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ${rowTextColumnClass}`}
               key={session.id}
               onClick={() => {
                 onOpenSession(session.id);

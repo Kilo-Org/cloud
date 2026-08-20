@@ -84,26 +84,26 @@ export default function ReposRoute() {
   const confirmedEmpty =
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
   const orgScope = scope === PERSONAL_SCOPE ? undefined : scope;
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- deliberately partial (bitbucket has no entry); lookup must accept the full ReviewerPlatform key set
   const manageRepoAccessLabelByPlatform: Partial<Record<ReviewerPlatform, string>> = {
     github: 'repository access',
     gitlab: 'repository access',
   };
   const manageRepoAccessLabel = manageRepoAccessLabelByPlatform[platform];
-  const emptyStateCopyByPlatform: Record<ReviewerPlatform, { title: string; description: string }> =
-    {
-      github: {
-        title: 'Install the GitHub app on repositories',
-        description: 'Grant the Kilo GitHub App access to the repositories you want reviewed.',
-      },
-      gitlab: {
-        title: 'No repositories found',
-        description: 'You may need to grant access to more groups or projects on GitLab.',
-      },
-      bitbucket: {
-        title: 'No repositories found',
-        description: 'No repositories are available in this Bitbucket workspace.',
-      },
-    };
+  const emptyStateCopyByPlatform = {
+    github: {
+      title: 'Install the GitHub app on repositories',
+      description: 'Grant the Kilo GitHub App access to the repositories you want reviewed.',
+    },
+    gitlab: {
+      title: 'No repositories found',
+      description: 'You may need to grant access to more groups or projects on GitLab.',
+    },
+    bitbucket: {
+      title: 'No repositories found',
+      description: 'No repositories are available in this Bitbucket workspace.',
+    },
+  } satisfies Record<ReviewerPlatform, { title: string; description: string }>;
   const emptyStateCopy = emptyStateCopyByPlatform[platform];
 
   const setMode = (nextMode: 'all' | 'selected') => {

@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
+import { resolveAccessibleKiloSession } from '../services/session-access';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
@@ -65,6 +66,10 @@ type WSAttachment =
       connectionId: string;
       subscribedSessions: string[];
       replaced?: true;
+      // Set from the authenticated /user/web route; undefined on sockets
+      // accepted before this field existed. Needed for command/subscribe
+      // access rechecks against current session membership.
+      kiloUserId?: string;
     };
 
 // Type re-export so test files and other internal callers can reference the
@@ -126,6 +131,12 @@ const SESSION_OWNER_CHANGED_ERROR = {
   source: 'relay',
   code: 'SESSION_OWNER_CHANGED',
   message: 'Session owner changed',
+};
+
+const SESSION_ACCESS_DENIED_ERROR = {
+  source: 'relay',
+  code: 'SESSION_ACCESS_DENIED',
+  message: 'You no longer have access to this session',
 };
 
 const CATALOG_TOO_LARGE_ERROR = {
@@ -377,10 +388,12 @@ export class UserConnectionDO extends DurableObject<Env> {
     } else {
       this.replaceWebSocket(connectionId);
 
+      const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
       const attachment: WSAttachment = {
         role: 'web',
         connectionId,
         subscribedSessions: [],
+        kiloUserId,
       };
       this.ctx.acceptWebSocket(server, ['web']);
       server.serializeAttachment(attachment);
@@ -403,7 +416,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): void {
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     this.ensureState();
 
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
@@ -429,7 +442,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (attachment.role === 'cli') {
       this.handleCliMessage(ws, attachment, parsed, raw, binaryByteCount);
     } else if (!attachment.replaced) {
-      this.handleWebMessage(ws, attachment, parsed);
+      await this.handleWebMessage(ws, attachment, parsed);
     }
   }
 
@@ -1195,11 +1208,11 @@ export class UserConnectionDO extends DurableObject<Env> {
   // Web message handling
   // ---------------------------------------------------------------------------
 
-  private handleWebMessage(
+  private async handleWebMessage(
     ws: WebSocket,
     attachment: WSAttachment & { role: 'web' },
     parsed: unknown
-  ): void {
+  ): Promise<void> {
     const result = WebOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
       console.warn('Invalid web message', {
@@ -1212,13 +1225,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'subscribe':
-        this.handleWebSubscribe(ws, attachment, msg.sessionId);
+        await this.handleWebSubscribe(ws, attachment, msg.sessionId);
         break;
       case 'unsubscribe':
         this.handleWebUnsubscribe(ws, attachment, msg.sessionId);
         break;
       case 'command':
-        this.handleWebCommand(ws, msg);
+        await this.handleWebCommand(ws, attachment, msg);
         break;
       case 'ping':
         this.sendToWeb(ws, { type: 'pong', nonce: msg.nonce });
@@ -1226,11 +1239,25 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  private handleWebSubscribe(
+  private async handleWebSubscribe(
     ws: WebSocket,
     attachment: WSAttachment & { role: 'web' },
     sessionId: string
-  ): void {
+  ): Promise<void> {
+    // Recheck current membership before subscribing: a removed member must not
+    // receive events from an org session they no longer have access to.
+    const kiloUserId = attachment.kiloUserId;
+    if (!kiloUserId) {
+      return;
+    }
+    const accessible = await resolveAccessibleKiloSession(this.env, {
+      kiloUserId,
+      kiloSessionId: sessionId,
+    });
+    if (!accessible) {
+      return;
+    }
+
     let subs = this.webSubscriptions.get(sessionId);
     if (!subs) {
       subs = new Set();
@@ -1291,8 +1318,9 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  private handleWebCommand(
+  private async handleWebCommand(
     ws: WebSocket,
+    attachment: WSAttachment & { role: 'web' },
     msg: {
       id: string;
       command: string;
@@ -1301,7 +1329,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       data?: unknown;
       mutationId?: string;
     }
-  ): void {
+  ): Promise<void> {
     const now = Date.now();
     this.expirePendingCommands(now);
 
@@ -1332,6 +1360,33 @@ export class UserConnectionDO extends DurableObject<Env> {
         error: INVALID_COMMAND_ERROR,
       });
       return;
+    }
+
+    // Command-time access recheck: a removed member must not forward a command
+    // to a session they no longer have access to. Catalog commands without a
+    // sessionId skip this check.
+    if (msg.sessionId) {
+      const kiloUserId = attachment.kiloUserId;
+      if (!kiloUserId) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: SESSION_ACCESS_DENIED_ERROR,
+        });
+        return;
+      }
+      const accessible = await resolveAccessibleKiloSession(this.env, {
+        kiloUserId,
+        kiloSessionId: msg.sessionId,
+      });
+      if (!accessible) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: SESSION_ACCESS_DENIED_ERROR,
+        });
+        return;
+      }
     }
 
     // Find target CLI
@@ -1845,6 +1900,19 @@ export class UserConnectionDO extends DurableObject<Env> {
       });
     }
     return { instances };
+  }
+
+  /**
+   * Close every live web viewer socket. Called on member removal so a removed
+   * member's open viewer connections are torn down immediately. Returns the
+   * number of sockets closed.
+   */
+  closeViewerSockets(): number {
+    const sockets = this.ctx.getWebSockets('web');
+    for (const ws of sockets) {
+      ws.close(1000, 'session access revoked');
+    }
+    return sockets.length;
   }
 
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {

@@ -45,10 +45,7 @@ const OVERALL_TIMEOUT_MS = 150_000;
 const PULSE_PEAK = 1.06;
 const PULSE_DURATION_MS = 1400;
 
-const TERMINAL_CONTENT: Record<
-  ProvisioningTerminalReason,
-  { title: string; body: (name: string) => string }
-> = {
+const TERMINAL_CONTENT = {
   query_error: {
     title: "Couldn't check on setup",
     body: name =>
@@ -68,7 +65,7 @@ const TERMINAL_CONTENT: Record<
     body: name =>
       `Setup for ${name} is taking longer than usual (over ${OVERALL_TIMEOUT_MS / 60_000} minutes).`,
   },
-};
+} satisfies Record<ProvisioningTerminalReason, { title: string; body: (name: string) => string }>;
 
 function provisioningStageMessage(state: OnboardingState): string {
   if (state.instanceStatus === 'running' && state.gatewayReady && !state.gatewaySettled) {

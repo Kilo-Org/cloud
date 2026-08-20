@@ -2,10 +2,7 @@
  * Caps long mono payloads for display. Returns a sliced copy and whether the
  * cap applied — never mutates the caller's string.
  */
-export function prepareMonoScrollContent(
-  content: string,
-  maxLength?: number
-): { displayText: string; isTruncated: boolean } {
+export function prepareMonoScrollContent(content: string, maxLength?: number) {
   if (maxLength === undefined || content.length <= maxLength) {
     return { displayText: content, isTruncated: false };
   }

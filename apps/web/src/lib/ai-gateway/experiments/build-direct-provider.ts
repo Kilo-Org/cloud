@@ -1,9 +1,9 @@
 import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { CustomLlmApiConfig } from '@kilocode/db';
-import type {
-  GatewayChatApiKind,
-  Provider,
-  TransformRequestContext,
+import {
+  type GatewayChatApiKind,
+  type Provider,
+  type TransformRequestContext,
 } from '@/lib/ai-gateway/providers/types';
 
 /**
@@ -19,68 +19,6 @@ export type ResolvedExperimentUpstream = CustomLlmApiConfig & { api_key: string 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function mapGeminiThoughtSignatures(context: TransformRequestContext) {
-  if (context.request.kind !== 'chat_completions') {
-    return;
-  }
-
-  for (const message of context.request.body.messages) {
-    if (!isRecord(message)) {
-      continue;
-    }
-
-    delete message.thoughtSignature;
-
-    if (!Array.isArray(message.tool_calls)) {
-      continue;
-    }
-
-    for (const toolCall of message.tool_calls) {
-      if (!isRecord(toolCall)) {
-        continue;
-      }
-
-      const signature = toolCall.thoughtSignature;
-      delete toolCall.thoughtSignature;
-      if (typeof signature !== 'string') {
-        continue;
-      }
-
-      const extraContent = isRecord(toolCall.extra_content) ? toolCall.extra_content : {};
-      const google = isRecord(extraContent.google) ? extraContent.google : {};
-      toolCall.extra_content = {
-        ...extraContent,
-        google: {
-          ...google,
-          thought_signature: signature,
-        },
-      };
-    }
-  }
-}
-
-function applyGeminiReasoningTransform(context: TransformRequestContext, reasoningEffort: unknown) {
-  if (context.request.kind !== 'chat_completions') {
-    return;
-  }
-
-  const extra = context.request.body as typeof context.request.body & { google?: unknown };
-  delete extra.reasoning_effort;
-
-  if (reasoningEffort !== 'none') {
-    const existingGoogle = isRecord(extra.google) ? extra.google : {};
-    extra.google = {
-      ...existingGoogle,
-      thinking_config: {
-        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
-        include_thoughts: true,
-      },
-    };
-  }
-
-  mapGeminiThoughtSignatures(context);
 }
 
 function renameJsonRefProperties(value: unknown): boolean {
@@ -160,16 +98,8 @@ export function buildDirectProvider(
     apiUrlOverrides: {},
     apiKey: upstream.api_key,
     supportedChatApis,
-    responseTransforms: upstream.use_gemini_reasoning_transform
-      ? { mapGeminiThoughtContent: true, mapReasoningContentToDetails: false }
-      : null,
+    responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {
-      const useGeminiReasoning = Boolean(upstream.use_gemini_reasoning_transform);
-      const reasoningEffort =
-        useGeminiReasoning && context.request.kind === 'chat_completions'
-          ? context.request.body.reasoning_effort
-          : undefined;
-
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;
         for (const key of upstream.remove_from_body) {
@@ -183,9 +113,6 @@ export function buildDirectProvider(
       context.request.body.model = upstream.internal_id;
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
-      }
-      if (useGeminiReasoning) {
-        applyGeminiReasoningTransform(context, reasoningEffort);
       }
       if (upstream.sanitize_ref_fields) {
         sanitizeJsonRefToolResults(context);

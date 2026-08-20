@@ -33,6 +33,8 @@ export function resolveNewSessionSubmitEnabled({
   model: string;
   selectedRepo: string;
 }): boolean {
+  // `attachmentsIsUploading` means "an upload is in flight". Attached-but-not-
+  // uploaded chips no longer block Start: they upload during the create call.
   const canCreate =
     hasPrompt &&
     Boolean(selectedRepo) &&
@@ -67,4 +69,37 @@ export function resolveNewSessionSubmitDisabled(input: {
   selectedRepo: string;
 }): boolean {
   return !resolveNewSessionSubmitEnabled(input);
+}
+
+/**
+ * Whether the cloud-target "Start session" button is disabled, including the
+ * effective-profile gate. A failed profile query is deliberately NOT a disable
+ * reason: the form shows an inline error + Retry and Start stays enabled,
+ * submitting with no effective profile id (the default is omitted). Only a
+ * still-loading profile blocks Start, so an unsettled default is never
+ * silently dropped.
+ */
+export function resolveNewSessionStartDisabled(input: {
+  attachmentsHasFailed: boolean;
+  attachmentsIsUploading: boolean;
+  hasPrompt: boolean;
+  isCreating: boolean;
+  isRemoteTargetSelected: boolean;
+  isSubmitting: boolean;
+  model: string;
+  selectedRepo: string;
+  isProfileLoading: boolean;
+}): boolean {
+  return (
+    resolveNewSessionSubmitDisabled({
+      attachmentsHasFailed: input.attachmentsHasFailed,
+      attachmentsIsUploading: input.attachmentsIsUploading,
+      hasPrompt: input.hasPrompt,
+      isCreating: input.isCreating,
+      isRemoteTargetSelected: input.isRemoteTargetSelected,
+      isSubmitting: input.isSubmitting,
+      model: input.model,
+      selectedRepo: input.selectedRepo,
+    }) || input.isProfileLoading
+  );
 }

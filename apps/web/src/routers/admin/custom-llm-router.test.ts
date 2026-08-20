@@ -183,6 +183,116 @@ describe('adminCustomLlmRouter', () => {
     });
   });
 
+  describe('copy', () => {
+    it('copies a custom LLM with its encrypted credentials and new IDs and name', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const sourcePublicId = 'kilo-internal/test-model-copy-source';
+      const copiedPublicId = 'kilo-internal/test-model-copy-target';
+
+      await caller.admin.customLlm.upsert({
+        public_id: sourcePublicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-secret-to-copy' },
+      });
+
+      const result = await caller.admin.customLlm.copy({
+        source_public_id: sourcePublicId,
+        public_id: copiedPublicId,
+        display_name: 'Copied GPT-4',
+        internal_id: 'copied-gpt-4',
+      });
+
+      expect(result).toEqual({
+        public_id: copiedPublicId,
+        definition: {
+          ...validDefinition,
+          display_name: 'Copied GPT-4',
+          internal_id: 'copied-gpt-4',
+        },
+      });
+
+      const [sourceRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, sourcePublicId));
+      const [copiedRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, copiedPublicId));
+
+      expect(copiedRow?.definition).toEqual({
+        ...validDefinition,
+        display_name: 'Copied GPT-4',
+        internal_id: 'copied-gpt-4',
+      });
+      expect(copiedRow?.encrypted_api_key).toEqual(sourceRow?.encrypted_api_key);
+      expect((result as Record<string, unknown>).encrypted_api_key).toBeUndefined();
+    });
+
+    it('does not overwrite a custom LLM with the requested new ID', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const sourcePublicId = 'kilo-internal/test-model-copy-conflict-source';
+      const existingPublicId = 'kilo-internal/test-model-copy-conflict-target';
+
+      await caller.admin.customLlm.upsert({
+        public_id: sourcePublicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-source-secret' },
+      });
+      await caller.admin.customLlm.upsert({
+        public_id: existingPublicId,
+        definition: { ...validDefinition, display_name: 'Existing model' },
+        credentials: { type: 'api_key', api_key: 'sk-existing-secret' },
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: sourcePublicId,
+          public_id: existingPublicId,
+          display_name: 'Should not overwrite',
+          internal_id: 'should-not-overwrite',
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+      });
+
+      const [existingRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, existingPublicId));
+      expect(existingRow?.definition.display_name).toBe('Existing model');
+    });
+
+    it('rejects a copy with an empty internal ID', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const sourcePublicId = 'kilo-internal/test-model-copy-empty-internal-id-source';
+      const copiedPublicId = 'kilo-internal/test-model-copy-empty-internal-id-target';
+
+      await caller.admin.customLlm.upsert({
+        public_id: sourcePublicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-source-secret' },
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: sourcePublicId,
+          public_id: copiedPublicId,
+          display_name: 'Copied model',
+          internal_id: '   ',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+
+      const [copiedRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, copiedPublicId));
+      expect(copiedRow).toBeUndefined();
+    });
+  });
+
   describe('delete', () => {
     it('deletes a custom LLM by public_id', async () => {
       const caller = await createCallerForUser(admin.id);

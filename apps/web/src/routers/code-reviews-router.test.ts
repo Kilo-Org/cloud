@@ -76,6 +76,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 }));
 
 import { db } from '@/lib/drizzle';
+import type { SuccessResult } from '@/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
@@ -1855,6 +1856,98 @@ describe('codeReviewRouter attempts', () => {
     );
   });
 
+  it('returns the selected model for an in-flight review before usage is persisted', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { model_slug: 'openai/gpt-5' },
+      is_enabled: true,
+      runtime_state: {},
+      created_by: testUser.id,
+    });
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'running', {
+          session_id: 'agent-running',
+          cli_session_id: 'ses_running',
+          model: null,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.get({ reviewId: review.id });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        review: expect.objectContaining({
+          model: 'openai/gpt-5',
+          session_id: 'agent-running',
+        }),
+      })
+    );
+  });
+
+  it('does not replace a historical review model with the current config', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { model_slug: 'openai/gpt-5' },
+      is_enabled: true,
+      runtime_state: {},
+      created_by: testUser.id,
+    });
+    const sessionId = `ses_router_model_${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
+    usageIds.push(usageId);
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'completed', {
+          cli_session_id: sessionId,
+          model: null,
+          created_at: '2026-06-18T09:00:00.000Z',
+          started_at: '2026-06-18T09:10:00.000Z',
+          completed_at: '2026-06-18T11:00:00.000Z',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: testUser.id,
+      cost: 100,
+      input_tokens: 1000,
+      output_tokens: 200,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-18T10:00:00.000Z',
+      model: 'anthropic/claude-sonnet-4.6',
+    });
+    await db.insert(microdollar_usage_metadata).values({
+      id: usageId,
+      message_id: `msg_${usageId}`,
+      session_id: sessionId,
+      created_at: '2026-06-18T10:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.get({ reviewId: review.id });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        review: expect.objectContaining({
+          model: 'anthropic/claude-sonnet-4.6',
+        }),
+      })
+    );
+  });
+
   it('retrigger dispatches using the newly created attempt id', async () => {
     await insertEnabledAgentConfig();
     const [review] = await db
@@ -1880,6 +1973,63 @@ describe('codeReviewRouter attempts', () => {
 
     expect(latestAttempt?.retry_reason).toBe('manual_retrigger');
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+  });
+
+  it('parallel retriggers dispatch once and the second is a conflict', async () => {
+    await insertEnabledAgentConfig();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    // Pre-create the terminal attempt so both retriggers find an existing attempt and race
+    // only on the status CAS (avoiding a concurrent attempt-creation race).
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      session_id: 'agent-first',
+      cli_session_id: 'ses_first',
+      status: 'failed',
+      terminal_reason: 'sandbox_error',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+
+    const results = await Promise.allSettled([
+      caller.codeReviews.retrigger({ reviewId: review.id }),
+      caller.codeReviews.retrigger({ reviewId: review.id }),
+    ]);
+
+    // Exactly one call succeeds. The loser is either a CONFLICT (it reached the
+    // status CAS and lost) or a BAD_REQUEST (it read 'pending' before the CAS
+    // ran). Both are non-success outcomes; the test must not depend on which one.
+    const fulfilled = results.filter(
+      (r): r is PromiseFulfilledResult<SuccessResult<{ message: string }>> =>
+        r.status === 'fulfilled'
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(fulfilled[0].value.success).toBe(true);
+
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(rejected).toHaveLength(1);
+    expect(['CONFLICT', 'BAD_REQUEST']).toContain((rejected[0].reason as { code?: string }).code);
+
+    // Exactly one dispatch and one retry attempt, regardless of which call won.
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+
+    const attempts = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const retryAttempts = attempts.filter(attempt => attempt.retry_reason === 'manual_retrigger');
+    expect(retryAttempts).toHaveLength(1);
   });
 
   it('retries Bitbucket with its platform preserved and a fresh session attempt', async () => {

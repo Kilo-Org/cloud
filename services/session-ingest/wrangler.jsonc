@@ -64,6 +64,10 @@
         "name": "USER_CONNECTION_DO",
         "class_name": "UserConnectionDO",
       },
+      {
+        "name": "CONNECTION_TICKET_DO",
+        "class_name": "ConnectionTicketDO",
+      },
     ],
   },
   "migrations": [
@@ -74,6 +78,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["UserConnectionDO"],
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["ConnectionTicketDO"],
     },
   ],
   "r2_buckets": [

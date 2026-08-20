@@ -28,6 +28,7 @@ import {
   modelsByProvider,
   api_request_log,
 } from '@kilocode/db/schema';
+import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
@@ -75,10 +76,25 @@ import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
+import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
-import { eq, and, ne, or, ilike, like, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  ne,
+  or,
+  ilike,
+  like,
+  desc,
+  asc,
+  sql,
+  isNull,
+  inArray,
+  count,
+  min,
+} from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
@@ -657,6 +673,12 @@ export const adminRouter = createTRPCRouter({
               dbOrTx: tx,
             });
           } else {
+            if (isGoneOrDeletingBlockedReason(current?.blocked_reason ?? null)) {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Cannot unblock a user that is being deleted or already deleted',
+              });
+            }
             await tx
               .update(kilocode_users)
               .set({
@@ -2110,13 +2132,18 @@ export const adminRouter = createTRPCRouter({
   }),
 
   apiRequestLog: createTRPCRouter({
-    getOldestEntry: adminProcedure.query(async () => {
-      const [oldest] = await db
-        .select({ created_at: api_request_log.created_at })
-        .from(api_request_log)
-        .orderBy(asc(api_request_log.created_at))
-        .limit(1);
-      return oldest ? { created_at: oldest.created_at } : null;
+    getSummary: adminProcedure.query(async () => {
+      const [summary] = await db
+        .select({
+          recordCount: count(),
+          sizeBytes: sql<number>`pg_total_relation_size('api_request_log'::regclass)`.mapWith(
+            Number
+          ),
+          oldestCreatedAt: min(api_request_log.created_at),
+        })
+        .from(api_request_log);
+
+      return summary;
     }),
   }),
 
@@ -2391,4 +2418,5 @@ export const adminRouter = createTRPCRouter({
   freeModelUsage: adminFreeModelUsageRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
+  userDeletionQueue: adminUserDeletionQueueRouter,
 });

@@ -1,0 +1,122 @@
+import { browser } from '#imports';
+import { z } from 'zod';
+import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
+import {
+  WEB_MCP_DISCOVER_MESSAGE,
+  WEB_MCP_EXECUTE_MESSAGE,
+  isTabDebuggerResponse,
+} from '@/src/shared/tab-debugger';
+import type { EvalTabResult, WebMcpDiscoveryResult } from '@/src/shared/tab-debugger';
+import { capRemoteMcpToolResult } from '@/src/shared/remote-mcp-tools';
+
+/*
+ * Chrome's eval returns a JSON string. Parse it into a structured value so the
+ * result enters conversation state as an object, not a quoted string. A
+ * non-JSON string and null pass through verbatim.
+ */
+const stringSchema = z.string();
+const jsonRecordSchema = z.record(z.string(), z.unknown());
+
+const parseWebMcpResult = (value: unknown) => {
+  const asString = stringSchema.safeParse(value);
+  if (!asString.success) {
+    return value;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(asString.data);
+    return parsed;
+  } catch {
+    return asString.data;
+  }
+};
+
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  jsonRecordSchema.safeParse(value).success;
+
+const isWebMcpDiscoveryResult = (value: unknown): value is WebMcpDiscoveryResult =>
+  isRecordObject(value) &&
+  stringSchema.safeParse(value['documentId']).success &&
+  Array.isArray(value['tools']);
+
+/*
+ * Discover the WebMCP tools registered by the selected tab's page through the
+ * background transport. Never throws: an invalid, non-ok, or wrong-typed
+ * response, a non-ok inner result, or a thrown sendMessage rejection all
+ * resolve to undefined so a discovery failure silently disables page tools for
+ * the turn.
+ */
+export const discoverWebMcpTools = async (
+  tabId: number
+): Promise<WebMcpDiscoveryResult | undefined> => {
+  try {
+    const response: unknown = await browser.runtime.sendMessage({
+      tabId,
+      type: WEB_MCP_DISCOVER_MESSAGE,
+    });
+
+    if (!isTabDebuggerResponse(response)) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      return undefined;
+    }
+
+    if (response.type !== WEB_MCP_DISCOVER_MESSAGE) {
+      return undefined;
+    }
+
+    if (!response.result.ok) {
+      return undefined;
+    }
+
+    const { value } = response.result;
+
+    return isWebMcpDiscoveryResult(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/*
+ * Run a WebMCP tool call through the background transport. The background
+ * re-checks the definition signature against the page's live registration, so
+ * a stale call (the page re-registered the tool after the turn started) fails
+ * with a stale-tool error instead of running against the wrong definition.
+ */
+export const executeWebMcpToolCall = async (event: WebMcpToolCallEvent): Promise<EvalTabResult> => {
+  try {
+    const response: unknown = await browser.runtime.sendMessage({
+      arguments: JSON.stringify(event.arguments),
+      definitionSignature: event.definitionSignature,
+      documentId: event.documentId,
+      tabId: event.tabId,
+      toolName: event.name,
+      type: WEB_MCP_EXECUTE_MESSAGE,
+    });
+
+    if (!isTabDebuggerResponse(response)) {
+      return { error: 'Extension background returned an invalid response.', ok: false };
+    }
+
+    if (!response.ok) {
+      return { error: response.error, ok: false };
+    }
+
+    if (response.type !== WEB_MCP_EXECUTE_MESSAGE) {
+      return { error: 'Extension background returned the wrong response.', ok: false };
+    }
+
+    if (!response.result.ok) {
+      return response.result;
+    }
+
+    return { ok: true, value: capRemoteMcpToolResult(parseWebMcpResult(response.result.value)) };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to run WebMCP tool.',
+      ok: false,
+    };
+  }
+};

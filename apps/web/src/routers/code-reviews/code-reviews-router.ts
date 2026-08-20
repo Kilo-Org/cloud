@@ -50,6 +50,8 @@ import {
   type ListCodeReviewsResponse,
 } from '@/lib/code-reviews/core';
 import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
+import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
+import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
@@ -377,7 +379,35 @@ export const codeReviewRouter = createTRPCRouter({
             cached: 0,
           };
 
-      return successResult({ review: { ...review, council_result }, attempts, tokenUsage });
+      let selectedModel = review.model ?? (isTerminal ? (billingUsage?.model ?? null) : null);
+      if (!selectedModel && !isTerminal) {
+        selectedModel = selectedModelFromReviewSources({
+          persistedModel: null,
+          repoFullName: review.repo_full_name,
+          config: getManualCodeReviewConfig(review)?.agentConfig ?? null,
+        });
+        if (!selectedModel) {
+          const owner = review.owned_by_organization_id
+            ? { type: 'org' as const, id: review.owned_by_organization_id }
+            : review.owned_by_user_id
+              ? { type: 'user' as const, id: review.owned_by_user_id }
+              : null;
+          if (owner) {
+            const agentConfig = await getAgentConfigForOwner(owner, 'code_review', review.platform);
+            selectedModel = selectedModelFromReviewSources({
+              persistedModel: null,
+              repoFullName: review.repo_full_name,
+              config: (agentConfig?.config as CodeReviewAgentConfig | undefined) ?? null,
+            });
+          }
+        }
+      }
+
+      return successResult({
+        review: { ...review, council_result, model: selectedModel ?? review.model },
+        attempts,
+        tokenUsage,
+      });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -591,8 +621,17 @@ export const codeReviewRouter = createTRPCRouter({
 
         const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
 
-        // Reset the review for retry
-        await resetCodeReviewForRetry(input.reviewId);
+        // Reset the review for retry. The reset is a status CAS: it only matches reviews
+        // still in a retriggable terminal state. A concurrent retrigger that already flipped
+        // the row to 'pending' yields zero rows, so we reject the duplicate without dispatching.
+        const resetCount = await resetCodeReviewForRetry(input.reviewId);
+        if (resetCount === 0) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This code review is already being retried.',
+          });
+        }
+
         await createCodeReviewAttempt({
           codeReviewId: input.reviewId,
           retryOfAttemptId: currentAttempt.id,

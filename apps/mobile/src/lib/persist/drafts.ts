@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { utf8ByteLength } from '@/lib/utf8-utils';
@@ -46,9 +47,11 @@ export function draftScope(userId: string): string {
   return `${DRAFT_SCOPE_PREFIX}${userId}`;
 }
 
+const stringDraftSchema = z.string();
+
 /** Runtime shape guard for a composer text draft (a JSON string). */
 export function isStringDraft(value: unknown): value is string {
-  return typeof value === 'string';
+  return stringDraftSchema.safeParse(value).success;
 }
 
 /** Shape validator for one loaded draft value, supplied by the caller. */
@@ -65,6 +68,51 @@ export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
 /** Pending-review draft entity key, unique per pull request. */
 export function prReviewDraftKey(owner: string, repo: string, number: number): string {
   return `pr-review:${owner}/${repo}#${number}`;
+}
+
+/** Merge-sheet draft entity key, unique per pull request. */
+export function prMergeDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-merge:${owner}/${repo}#${number}`;
+}
+
+/** Reply draft entity key, unique per review comment thread. */
+// eslint-disable-next-line eslint/max-params -- the key encodes owner, repo, number, and comment id
+export function prReplyDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  commentId: number
+): string {
+  return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
+}
+
+/** Inline review-comment draft entity key, unique per diff position. */
+// eslint-disable-next-line eslint/max-params -- the key encodes the full diff position
+export function prCommentDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  path: string,
+  side: string,
+  line: number,
+  startLine?: number
+): string {
+  return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
+}
+
+const mergeDraftSchema = z.object({
+  title: z.string(),
+  message: z.string(),
+});
+
+/** Runtime shape guard for a merge-sheet draft ({ title, message }). */
+export function isMergeDraft(value: unknown): value is { title: string; message: string } {
+  return mergeDraftSchema.safeParse(value).success;
+}
+
+/** Security dismiss draft entity key, unique per scope and finding. */
+export function securityDismissDraftKey(scope: string, findingId: string): string {
+  return `security-dismiss:${scope}:${findingId}`;
 }
 
 /**
@@ -304,12 +352,13 @@ export async function flushDraft(userId: string, entityKey: string): Promise<voi
  * Serialized behind any in-flight write for the same key, so a clear can
  * never race a queued save back into existence. Not epoch-fenced: clearing
  * is explicit user intent and must work regardless of auth transitions.
- * Remove failures are reported to Sentry and swallowed, so callers can
- * invoke it fire-and-forget.
+ * Remove failures are reported to Sentry and swallowed, but the returned
+ * boolean tells the caller whether the entry was actually removed, so a
+ * discard flow can stay on the screen when the clear fails.
  */
-export async function clearDraft(userId: string, entityKey: string): Promise<void> {
+export async function clearDraft(userId: string, entityKey: string): Promise<boolean> {
   if (!userId) {
-    return;
+    return true;
   }
   const key = fullKey(userId, entityKey);
   const pending = pendingSaves.get(key);
@@ -321,6 +370,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<voi
     await chainSave(key, async () => {
       await encryptedKv.removeItem(draftScope(userId), entityKey);
     });
+    return true;
   } catch (error) {
     reportDraftFailure({
       message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
@@ -328,6 +378,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<voi
       userId,
       entityKey,
     });
+    return false;
   }
 }
 

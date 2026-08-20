@@ -1,7 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { user_push_tokens } from '@kilocode/db/schema';
-import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
+import {
+  androidChannelIdForPushData,
+  genericPushContentForPushData,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+} from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
 import { isPushSinkEnabled } from '../lib/push-sink';
@@ -164,9 +169,24 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // 5. Tokens. Missing Expo tokens only means no OS push can be sent; the
     //    in-app badge state above is still authoritative for client hydration.
     const tokens = await db
-      .select({ token: user_push_tokens.token })
+      .select({ token: user_push_tokens.token, app_version: user_push_tokens.app_version })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, input.userId));
+
+    // Preview mode + Android channel. Resolved before the sink branch so the
+    // sink log can record them (both are non-content). Fail closed: a read
+    // that throws, or an absent row, is treated as 'generic'.
+    const channelId = androidChannelIdForPushData(input.push.data);
+    let previews: 'generic' | 'full' = 'generic';
+    try {
+      const [prefRow] = await db
+        .select({ notification_previews: user_notification_preferences.notification_previews })
+        .from(user_notification_preferences)
+        .where(eq(user_notification_preferences.user_id, input.userId));
+      previews = prefRow?.notification_previews ?? 'generic';
+    } catch {
+      previews = 'generic';
+    }
 
     if (tokens.length === 0) {
       const ts = Date.now();
@@ -200,6 +220,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
               : undefined,
           sound: input.push.sound ?? null,
           priority: input.push.priority ?? 'default',
+          channelId,
+          previews,
         },
         to: '<redacted>',
       });
@@ -209,13 +231,23 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }
 
     // 7. Send via Expo
+    const { title, body } =
+      previews === 'generic'
+        ? genericPushContentForPushData(input.push.data)
+        : { title: input.push.title, body: input.push.body };
+
     const messages: ExpoPushMessage[] = tokens.map(
-      ({ token }) =>
+      ({ token, app_version }) =>
         ({
           to: token,
-          title: input.push.title,
-          body: input.push.body,
+          title,
+          body,
           data: input.push.data,
+          // Android 8+ drops a notification addressed to a channel that does
+          // not exist. Only clients that create channels (a non-null app
+          // version at registration) get a channelId; older clients fall back
+          // to the default channel. iOS ignores channelId either way.
+          ...(app_version != null && { channelId }),
           ...(badgeTotal !== undefined && { badge: badgeTotal }),
           sound: input.push.sound ?? undefined,
           priority: input.push.priority ?? 'default',

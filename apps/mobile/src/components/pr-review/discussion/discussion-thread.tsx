@@ -63,6 +63,8 @@ type DiscussionThreadProps = {
   /** Controlled by the Discussion tab (keyed by threadId). */
   readonly expanded: boolean;
   readonly onToggleExpand: () => void;
+  /** The viewer's GitHub login, passed to comment rows for self-target gating. */
+  readonly viewerLogin?: string | null;
 };
 
 export function DiscussionThread({
@@ -72,6 +74,7 @@ export function DiscussionThread({
   thread,
   expanded,
   onToggleExpand,
+  viewerLogin = null,
 }: Readonly<DiscussionThreadProps>) {
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
@@ -139,6 +142,7 @@ export function DiscussionThread({
               <CommentRow
                 comment={comment}
                 reactionsDisabled={isReacting}
+                viewerLogin={viewerLogin}
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
                 }}
@@ -246,24 +250,24 @@ type BadgeProps = {
   readonly label: string;
 };
 
-const BADGE_TONE_CLASS: Record<BadgeProps['tone'], string> = {
+const BADGE_TONE_CLASS = {
   good: 'bg-secondary text-good',
   warn: 'bg-secondary text-warn',
   destructive: 'bg-secondary text-destructive',
   muted: 'bg-secondary text-muted-foreground',
-};
+} satisfies Record<BadgeProps['tone'], string>;
 
 function Badge({ tone, icon: Icon, label }: Readonly<BadgeProps>) {
   const colors = useThemeColors();
   const toneClass = BADGE_TONE_CLASS[tone];
   // Native Lucide icons don't resolve NativeWind text classes, so set the
   // icon color explicitly per tone from the theme tokens.
-  const iconColor: Record<BadgeProps['tone'], string> = {
+  const iconColor = {
     good: colors.good,
     warn: colors.warn,
     destructive: colors.destructive,
     muted: colors.mutedForeground,
-  };
+  } satisfies Record<BadgeProps['tone'], string>;
   return (
     <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', toneClass)}>
       {Icon ? <Icon size={10} color={iconColor[tone]} /> : null}

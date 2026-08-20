@@ -265,6 +265,18 @@ describe('cli-sessions', () => {
       });
     });
 
+    test('passes an abort signal to S3Client.send', async () => {
+      mockSend.mockResolvedValueOnce({});
+      const signal = new AbortController().signal;
+
+      await deleteBlobs('session-123', [{ folderName: 'sessions', filename: 'ui_messages' }], {
+        signal,
+      });
+
+      const sendCall = mockSend.mock.calls[0] as unknown[];
+      expect(sendCall?.[1]).toEqual({ abortSignal: signal });
+    });
+
     test('handles empty blobs array', async () => {
       mockSend.mockResolvedValueOnce({});
 

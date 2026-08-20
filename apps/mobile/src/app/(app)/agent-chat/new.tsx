@@ -9,6 +9,9 @@ import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
+import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { lockedModelOption, resolvePinnedAgentModel } from '@/components/agents/mode-normalize';
+import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import {
   NewSessionModelProvider,
   useNewSessionModelState,
@@ -18,13 +21,14 @@ import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session
 import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
-import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
+import { resolveNewSessionStartDisabled } from '@/lib/new-session-submit';
 import {
   clearDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -40,6 +44,8 @@ import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
+
+import { useNewSessionDiscardGuard } from './use-new-session-discard-guard';
 
 export default function NewSessionScreen() {
   const { organizationId } = useLocalSearchParams<{
@@ -65,8 +71,16 @@ function NewSessionScreenBody() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasPrompt, setHasPrompt] = useState(false);
+  // Commit choice for the cloud session: Leave changes (false) is the default.
+  const [autoCommit, setAutoCommit] = useState(false);
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
+  // Armed right before a successful Start/spawn navigation so the discard
+  // confirm is skipped for a leave the user already committed to. The remote
+  // spawn path arms it at admission and resets it when the spawn settles
+  // without navigating (failure), so an abandon after a failed spawn still
+  // confirms.
+  const skipDiscardGuardRef = useRef(false);
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
@@ -93,7 +107,7 @@ function NewSessionScreenBody() {
   // settles.
   const initialPrompt = resolvePrefillOverDraft(
     sharePrefillText,
-    draftState.settled ? draftState.text : null
+    draftState.settled ? draftState.value : null
   );
 
   // Save the new-session draft debounced on every text change, and flush the
@@ -136,6 +150,18 @@ function NewSessionScreenBody() {
   const { saveModel } = usePersistedAgentModel();
   const attachments = useAgentAttachmentUpload({ organizationId });
 
+  // Custom modes and the pinned model come from the effective default profile.
+  // The lock applies only to the Cloud Agent target; a remote target keeps the
+  // unlocked model view and never sends a gateway pin.
+  const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
+  const pinned = resolvePinnedAgentModel({ slug: mode, profileAgents });
+  const displayModel = pinned.model ?? modelView.selectedValue;
+  const displayVariant = pinned.model ? (pinned.variant ?? '') : modelView.selectedVariant;
+  const modelOptionsForToolbar =
+    pinned.model && !modelView.options.some(option => option.id === pinned.model)
+      ? [...modelView.options, lockedModelOption(pinned)]
+      : modelView.options;
+
   const trpc = useTRPC();
   const {
     repositories,
@@ -151,6 +177,14 @@ function NewSessionScreenBody() {
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
+
+  const {
+    profile,
+    profileId,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    refetch: refetchProfile,
+  } = useEffectiveAgentProfile(organizationId);
 
   // Keep the inline selector and picker list in sync.
   const {
@@ -170,11 +204,15 @@ function NewSessionScreenBody() {
   );
 
   // A successful session creation owns clearing the new-session draft; a
-  // failure must preserve it for the retry.
+  // failure must preserve it for the retry. The success path navigates via
+  // `replace`, so arm the discard-confirm bypass here — `onCreated` runs
+  // synchronously before the navigation, and the leave must not be
+  // intercepted as an abandon.
   const handleCreated = useCallback(() => {
     if (userId) {
       void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
     }
+    skipDiscardGuardRef.current = true;
   }, [userId]);
 
   // Remote spawn success lives inside the spawn dispatch (it replaces the
@@ -186,15 +224,25 @@ function NewSessionScreenBody() {
   // the unmount flush preserves the draft.
   const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({ userId });
 
+  // A committed remote spawn arms the discard-confirm bypass alongside the
+  // draft-clearing marker. The bypass is reset when the spawn settles without
+  // navigating (a failed spawn), so an abandon after a failure still confirms.
+  const handleSpawnAdmitted = useCallback(() => {
+    markRemoteSpawnAttempted();
+    skipDiscardGuardRef.current = true;
+  }, [markRemoteSpawnAttempted]);
+
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
     mode,
-    model,
+    model: displayModel,
     organizationId,
     onCreated: handleCreated,
     selectedRepo,
     setIsCreating,
-    variant,
+    variant: displayVariant,
+    autoCommit,
+    profileId,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -250,7 +298,14 @@ function NewSessionScreenBody() {
     selection: modelView.spawnSelection,
     // Arms the draft-clearing marker only when the dispatch admits the spawn:
     // a blocked admission or cancelled voice submit never clears the draft.
-    onSpawnAdmitted: markRemoteSpawnAttempted,
+    onSpawnAdmitted: handleSpawnAdmitted,
+    // A committed spawn that settles without navigating (retryable or
+    // non-retryable) must re-arm the discard confirm, so an abandon after a
+    // failed spawn still asks. A successful spawn replaces the screen before
+    // this can run, so the bypass stays armed and the guard consumes it.
+    onSpawnFailed: () => {
+      skipDiscardGuardRef.current = false;
+    },
   });
 
   const handleModelSelect = useCallback(
@@ -286,6 +341,27 @@ function NewSessionScreenBody() {
     }
   }
 
+  // Discard confirm: leaving with a non-empty prompt asks first. Discard
+  // clears the stored draft and the route-owned prompt ref before the captured
+  // navigation action is replayed, so a discarded prompt can never resurface.
+  const handleDiscardDraft = useCallback(async () => {
+    if (userId) {
+      const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+      if (!cleared) {
+        // The stored draft could not be removed: stay on the screen so the
+        // guard keeps the draft and toasts instead of navigating away.
+        throw new Error('Failed to clear the new-session draft');
+      }
+    }
+    promptRef.current = '';
+  }, [userId, promptRef]);
+
+  useNewSessionDiscardGuard({
+    dirty: hasPrompt,
+    onDiscard: handleDiscardDraft,
+    skipNextGuardRef: skipDiscardGuardRef,
+  });
+
   const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
     await settleVoiceInputBeforeSubmit({
       lock: submissionLockRef,
@@ -303,9 +379,22 @@ function NewSessionScreenBody() {
   }, []);
 
   const { addCandidates, removeAttachment, retryAttachment } = attachments;
+
+  useAndroidPendingPickerRecovery({
+    surface: 'agent-new',
+    sessionId: null,
+    addCandidates,
+  });
+
   const handleAddAttachment = useCallback(async () => {
-    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
-  }, [addCandidates, showActionSheetWithOptions]);
+    void addCandidates(
+      await pickAgentAttachments(showActionSheetWithOptions, {
+        userId,
+        surface: 'agent-new',
+        sessionId: null,
+      })
+    );
+  }, [addCandidates, showActionSheetWithOptions, userId]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
@@ -328,15 +417,16 @@ function NewSessionScreenBody() {
       attachments.hasFailedAttachments ||
       modelView.isSelectionUnavailable ||
       instanceCatalog.isLoading
-    : resolveNewSessionSubmitDisabled({
+    : resolveNewSessionStartDisabled({
         attachmentsHasFailed: attachments.hasFailedAttachments,
         attachmentsIsUploading: attachments.isUploading,
         hasPrompt,
         isCreating,
         isRemoteTargetSelected,
         isSubmitting,
-        model,
+        model: displayModel,
         selectedRepo,
+        isProfileLoading,
       });
 
   const handleStartSession = useCallback(() => {
@@ -361,9 +451,12 @@ function NewSessionScreenBody() {
         isModelsError={isModelsError}
         isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
         mode={mode}
-        model={modelView.selectedValue}
-        variant={modelView.selectedVariant}
-        modelOptions={modelView.options}
+        model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
+        variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
+        modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
+        customOptions={customOptions}
+        modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
+        modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}
         initialPrompt={initialPrompt}
         onChangeText={handlePromptChange}
         onModeChange={setMode}
@@ -388,6 +481,12 @@ function NewSessionScreenBody() {
         onRefreshRepos={() => void refreshReposForceFresh()}
         repositories={repositories}
         selectedRepo={selectedRepo}
+        profile={profile}
+        isProfileLoading={isProfileLoading}
+        isProfileError={isProfileError}
+        onRetryProfile={() => void refetchProfile()}
+        autoCommit={autoCommit}
+        onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         onStartSession={handleStartSession}

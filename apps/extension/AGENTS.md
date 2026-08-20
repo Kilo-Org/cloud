@@ -59,7 +59,7 @@ Before committing extension changes, run `pnpm format`. Prefer `pnpm --filter ki
 
 - Safe mode exposes read tools (`get_page_snapshot`, `find_in_page`, `get_element_details`, `search_memories`, `get_memory`, and when the model supports images `get_viewport_screenshot`), workflow read tools (`search_workflows`, `get_workflow`), and card-gated tools (`save_workflow`, `save_memory`).
 - `search_workflows` without a query lists workflows scoped to the selected tab. With a query it searches every site, ranks in-scope matches first, and reports `inScope` and `startUrl` per result.
-- `save_workflow` and `save_memory` are card-gated — the executor blocks the tool turn until the user approves or rejects on the approval card, unless auto-approve workflow changes is on, which stores a workflow save with no card; `save_memory` is always card-gated.
+- `save_workflow` and `save_memory` are card-gated — the executor blocks the tool turn until the user approves or rejects on the approval card. Auto-approve workflow changes stores a workflow save with no card. Auto-approve memory saves does the same for `save_memory`; it is off by default, so the confirmation card is the default behavior. A settings read failure always falls back to showing the card.
 - `run_workflow` is gated behind the "Allow workflows in safe mode" toggle. In dangerous mode the toggle is bypassed and `run_workflow` is always available.
 - `delete_workflow` and `eval` are dangerous-mode only and never exposed in safe mode.
 - Safe tools must not click, type, navigate, submit forms, read cookies, read storage (other than the user's own saved memories via `search_memories`/`get_memory`), or run model-authored JavaScript. The one allowed side effect is `get_viewport_screenshot` momentarily foregrounding the target tab to capture the visible viewport, then restoring the previously active tab.
@@ -93,7 +93,7 @@ Do not treat a dry run that stops after recorded actions as a broken workflow, a
 
 ### Settings
 
-- Auto-approve workflow changes and Auto-approve workflow runs are off by default.
+- Auto-approve workflow changes and Auto-approve workflow runs are off by default. The memory equivalent, Auto-approve memory saves, lives in the memories settings section with its own storage key (`local:kiloMemorySettings`), so a workflow toggle write cannot revert it.
 - The approval card shows a unified diff of the script when a stored workflow is edited, and the plain script when a new workflow is created.
 
 ## Prompt Context

@@ -1,8 +1,4 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import {
-  type ReasoningDetailText,
-  ReasoningDetailType,
-} from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
@@ -12,7 +8,6 @@ import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@/lib/drizzle';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { withRequestId } from '@/lib/ai-gateway/request-id';
 import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
@@ -21,7 +16,7 @@ import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
-import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
+import { applyReasoningDetailsResponseTransform } from '@/lib/ai-gateway/reasoning-details-transform';
 
 /**
  * Handle passed to the response pipeline so the upstream response body can be
@@ -77,9 +72,9 @@ async function isLoggingEnabledForUser(
   user: User | null,
   organizationId: string | null
 ): Promise<boolean> {
-  if (user?.google_user_email.endsWith('@kilo.ai')) return true;
+  // Hardcoded opt-ins mainly for local testing
+  if (user?.google_user_email.endsWith('@anaconda.com')) return true;
   if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
-  if (organizationId === KILO_ORGANIZATION_ID) return true;
   return isDynamicallyOptedIntoRequestLogging({
     accountId: user?.id ?? null,
     organizationId,
@@ -405,54 +400,6 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isGeminiThoughtDelta(delta: Record<string, unknown>) {
-  const extraContent = delta.extra_content;
-  if (!isRecord(extraContent)) {
-    return false;
-  }
-  const google = extraContent.google;
-  return isRecord(google) && google.thought === true;
-}
-
-function rewriteGeminiThoughtContent(delta: unknown) {
-  if (!isRecord(delta) || typeof delta.content !== 'string' || !isGeminiThoughtDelta(delta)) {
-    return;
-  }
-
-  delta.reasoning_content = delta.content;
-  delete delta.content;
-}
-
-/**
- * Converts the DeepSeek-style `reasoning_content` string into OpenRouter-style
- * `reasoning_details`, matching the shape produced by OpenRouter and consumed
- * by clients such as `@openrouter/ai-sdk-provider`. The flat string carries no
- * format or signature, so every chunk becomes a `reasoning.text` detail at
- * index 0; clients merge consecutive same-type deltas into a single block.
- */
-function rewriteReasoningContentToReasoningDetails(delta: unknown) {
-  if (
-    !isRecord(delta) ||
-    typeof delta.reasoning_content !== 'string' ||
-    typeof delta.reasoning_details !== 'undefined'
-  ) {
-    return;
-  }
-
-  const detail = {
-    type: ReasoningDetailType.Text,
-    text: delta.reasoning_content,
-    index: 0,
-    format: ReasoningFormat.Unknown,
-  } satisfies ReasoningDetailText;
-  delta.reasoning_details = [detail];
-  delete delta.reasoning_content;
-}
-
 export async function rewriteModelResponse_ChatCompletions({
   response,
   removeCost,
@@ -487,10 +434,8 @@ export async function rewriteModelResponse_ChatCompletions({
     if (usage) {
       rewriteUsage(usage, removeCost);
     }
-    if (responseTransforms?.mapReasoningContentToDetails) {
-      for (const choice of json.choices ?? []) {
-        rewriteReasoningContentToReasoningDetails(choice.message);
-      }
+    for (const choice of json.choices ?? []) {
+      applyReasoningDetailsResponseTransform(responseTransforms, choice.message);
     }
 
     return NextResponse.json(json, {
@@ -547,12 +492,7 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.role === null) {
               delete delta.role;
             }
-            if (responseTransforms?.mapGeminiThoughtContent) {
-              rewriteGeminiThoughtContent(delta);
-            }
-            if (responseTransforms?.mapReasoningContentToDetails) {
-              rewriteReasoningContentToReasoningDetails(delta);
-            }
+            applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }
 
           if (!json.choices) {

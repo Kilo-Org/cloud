@@ -116,7 +116,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         return;
       }
       authRefreshAttempted = true;
-      connectInternal(0, expectedGeneration);
+      connectInternal(0, expectedGeneration, true);
     } catch (err) {
       console.error('[Connection] Failed to refresh auth:', err);
       if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
@@ -140,8 +140,16 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
           // Continue with existing auth — the old ticket might still work
         }
         if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+        // The async refresh gap can let the in-flight socket finish its
+        // handshake and receive its first message. If it did, there is nothing
+        // to replace — reconnecting would close a healthy socket and open a
+        // duplicate (the two-socket `/stream` open). This is the NetInfo
+        // `unknown → online` race: handleOnline decides to reconnect while the
+        // socket is still CONNECTING, but the socket establishes before the
+        // refresh resolves.
+        if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
       }
-      connectInternal(0, expectedGeneration);
+      connectInternal(0, expectedGeneration, true);
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;
@@ -167,12 +175,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }, delay);
   }
 
-  function connectInternal(attempt = 0, expectedGeneration = generation) {
+  function connectInternal(attempt = 0, expectedGeneration = generation, skipAuthRefresh = false) {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     if (
       config.refreshAuth &&
       (config.shouldRefreshAuthBeforeConnect?.() ?? false) &&
+      !skipAuthRefresh &&
       !preconnectAuthRefreshAttempted
     ) {
       void refreshAndConnect(expectedGeneration);

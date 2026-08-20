@@ -30,10 +30,15 @@ vi.mock('./dos/SessionAccessCacheDO', () => ({
   getSessionAccessCacheDO: vi.fn(),
 }));
 
+vi.mock('./dos/UserConnectionDO', () => ({
+  getUserConnectionDO: vi.fn(),
+}));
+
 import { app } from './index';
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { signSessionShareToken } from './services/session-share-token';
 
 type TestBindings = {
@@ -45,7 +50,6 @@ type TestBindings = {
   INTERNAL_API_SECRET_PROD: { get(): Promise<string> };
   SESSION_SHARE_JWT_SECRET_PROD: { get(): Promise<string> };
   SESSION_SHARE_TOKEN_MIN_IAT: string;
-  USER_EXISTS_CACHE?: { delete: ReturnType<typeof vi.fn<(key: string) => Promise<void>>> };
 };
 
 function makeDbFakes() {
@@ -104,6 +108,7 @@ describe('session access invalidation route', () => {
 
     expect(res.status).toBe(401);
     expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
   });
 
   it.each(['wrong-secretxxx', 'wrong'])(
@@ -133,6 +138,7 @@ describe('session access invalidation route', () => {
       expect(res.status).toBe(401);
       expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
       expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+      expect(getUserConnectionDO).not.toHaveBeenCalled();
     }
   );
 
@@ -141,6 +147,9 @@ describe('session access invalidation route', () => {
     vi.mocked(getSessionAccessCacheDO).mockReturnValue(
       cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
     );
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeViewerSockets: vi.fn(async () => 0),
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
 
     const res = await app.request(
       '/internal/session-access/invalidate',
@@ -166,88 +175,47 @@ describe('session access invalidation route', () => {
       '11111111-1111-4111-8111-111111111111'
     );
   });
-});
 
-describe('user auth invalidation route', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
-  it('rejects invalidation without the internal secret', async () => {
-    const cache = { delete: vi.fn(async () => undefined) };
-
-    const res = await app.request(
-      '/internal/user-auth/invalidate',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
-      },
-      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+  it('closes the removed member viewer sockets', async () => {
+    const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
     );
-
-    expect(res.status).toBe(401);
-    expect(cache.delete).not.toHaveBeenCalled();
-  });
-
-  it('rejects invalidation with an incorrect internal secret', async () => {
-    const cache = { delete: vi.fn(async () => undefined) };
+    const closeViewerSockets = vi.fn(async () => 1);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeViewerSockets,
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
 
     const res = await app.request(
-      '/internal/user-auth/invalidate',
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'X-Internal-Secret': 'wrong-secret',
-        },
-        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
-      },
-      { ...defaultEnv, USER_EXISTS_CACHE: cache }
-    );
-
-    expect(res.status).toBe(401);
-    expect(cache.delete).not.toHaveBeenCalled();
-  });
-
-  it('rejects invalidation with a malformed body', async () => {
-    const cache = { delete: vi.fn(async () => undefined) };
-
-    const res = await app.request(
-      '/internal/user-auth/invalidate',
+      '/internal/session-access/invalidate',
       {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           'X-Internal-Secret': 'internal-secret',
         },
-        body: JSON.stringify({ kiloUserId: 123 }),
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
       },
-      { ...defaultEnv, USER_EXISTS_CACHE: cache }
-    );
-
-    expect(res.status).toBe(400);
-    expect(cache.delete).not.toHaveBeenCalled();
-  });
-
-  it('deletes the versioned user-auth cache key', async () => {
-    const cache = { delete: vi.fn(async () => undefined) };
-
-    const res = await app.request(
-      '/internal/user-auth/invalidate',
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'X-Internal-Secret': 'internal-secret',
-        },
-        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
-      },
-      { ...defaultEnv, USER_EXISTS_CACHE: cache }
+      defaultEnv
     );
 
     expect(res.status).toBe(204);
-    expect(cache.delete).toHaveBeenCalledWith('user-auth:v1:usr_blocked');
+    expect(getUserConnectionDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: 'usr_removed',
+    });
+    expect(closeViewerSockets).toHaveBeenCalled();
+    expect(cache.invalidateOrganization).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111'
+    );
+  });
+});
+
+describe('internal-secret middleware', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
   });
 
   it('protects the session export route with the shared internal-secret middleware', async () => {
@@ -262,22 +230,18 @@ describe('user auth invalidation route', () => {
 
   it('returns 503 when the Secrets Store cannot resolve the internal secret', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const cache = { delete: vi.fn(async () => undefined) };
     const suppliedSecret = 'caller-supplied-secret';
 
     const res = await app.request(
-      '/internal/user-auth/invalidate',
+      '/internal/session/ses_12345678901234567890123456/export',
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
-          'content-type': 'application/json',
           'X-Internal-Secret': suppliedSecret,
         },
-        body: JSON.stringify({ kiloUserId: 'usr_blocked' }),
       },
       {
         ...defaultEnv,
-        USER_EXISTS_CACHE: cache,
         INTERNAL_API_SECRET_PROD: {
           get: async () => {
             throw new Error('secret store unavailable');
@@ -291,7 +255,6 @@ describe('user auth invalidation route', () => {
     expect(body).toEqual({ success: false, error: 'Service temporarily unavailable' });
     expect(JSON.stringify(body)).not.toContain('secret store unavailable');
     expect(JSON.stringify(body)).not.toContain(suppliedSecret);
-    expect(cache.delete).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith(
       'Auth infrastructure failure',
       expect.objectContaining({
@@ -359,6 +322,38 @@ describe('public session route', () => {
     expect(await res.text()).toBe('{"ok":true}');
   });
 
+  it('serializes created_at as UTC ISO at the HTTP boundary', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    selectResult.mockResolvedValueOnce([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        ownerName: 'Shared owner',
+        gitUrl: 'https://github.com/owner/repo',
+        gitBranch: 'main',
+        createdAt: '2026-08-19 19:28:42.33099+00',
+      },
+    ]);
+
+    const res = await app.request(`/session/${encodeURIComponent(token)}/metadata`, {}, defaultEnv);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      title: 'Shared title',
+      owner_name: 'Shared owner',
+      git_url: 'https://github.com/owner/repo',
+      git_branch: 'main',
+      created_at: '2026-08-19T19:28:42.330Z',
+    });
+  });
+
   it('returns shared metadata with no-store caching', async () => {
     const { db, selectResult } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -372,6 +367,9 @@ describe('public session route', () => {
         kiloUserId: 'usr_123',
         title: 'Shared title',
         ownerName: 'Shared owner',
+        gitUrl: 'https://github.com/owner/repo',
+        gitBranch: 'main',
+        createdAt: '2026-08-19T10:00:00.000Z',
       },
     ]);
 
@@ -383,6 +381,9 @@ describe('public session route', () => {
       success: true,
       title: 'Shared title',
       owner_name: 'Shared owner',
+      git_url: 'https://github.com/owner/repo',
+      git_branch: 'main',
+      created_at: '2026-08-19T10:00:00.000Z',
     });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });

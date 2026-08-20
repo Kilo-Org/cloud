@@ -26,20 +26,20 @@ type KvRowProps = {
   selectable?: boolean;
 };
 
-const VALUE_TONE: Record<NonNullable<KvRowProps['valueTone']>, string> = {
+const VALUE_TONE = {
   default: 'text-foreground',
   good: 'text-good',
   warn: 'text-warn',
   danger: 'text-destructive',
   muted: 'text-muted-foreground',
-};
+} satisfies Record<NonNullable<KvRowProps['valueTone']>, string>;
 
-const DOT_TONE: Record<KvTone, string> = {
+const DOT_TONE = {
   good: 'bg-good',
   warn: 'bg-warn',
   danger: 'bg-destructive',
   muted: 'bg-muted-foreground',
-};
+} satisfies Record<KvTone, string>;
 
 /** Label-left / mono-value-right row with hair-soft bottom divider. */
 export function KvRow({

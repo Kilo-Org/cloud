@@ -25,7 +25,7 @@ export function resolveSessionPrTapTarget(
   input: SessionPrNavigationInput
 ): SessionPrNavigationResult {
   const url = input.url;
-  const parsed = typeof url === 'string' && url.length > 0 ? parseGitHubPrUrl(url) : null;
+  const parsed = url ? parseGitHubPrUrl(url) : null;
 
   if (parsed) {
     return { kind: 'in-app', href: getPrReviewPath(parsed.owner, parsed.repo, input.number) };

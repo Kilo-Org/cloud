@@ -43,6 +43,7 @@
 // uses `listPatchFilePaths`, a cheap header scan, instead of this parser.
 
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 import { languageForPath } from '@/lib/pr-review/diff/highlight';
@@ -53,7 +54,10 @@ const PATCH_TOTAL_LINE_CAP = 2000;
 
 const PATCH_FILE_HEADER_RE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
 
+const optionalStringSchema = z.string().optional();
+
 /** First-character → row type for a chunk body line. */
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- looked up by an arbitrary character from patch text, not a closed key set
 const CHUNK_LINE_TYPE: Record<string, ParsedDiffLine['type']> = {
   ' ': 'context',
   '-': 'del',
@@ -121,8 +125,7 @@ export function buildToolPatchModel(part: ToolPart): ToolPatchModel | null {
   if (part.tool !== 'patch' && part.tool !== 'apply_patch') {
     return null;
   }
-  const patchText =
-    typeof part.state.input.patchText === 'string' ? part.state.input.patchText : '';
+  const patchText = optionalStringSchema.safeParse(part.state.input.patchText).data ?? '';
   if (!patchText) {
     return null;
   }

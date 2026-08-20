@@ -68,7 +68,7 @@ export function useDiffSelection({
       const map = new Map<number, string>();
       for (const hunkLine of args.hunk.lines) {
         const key = args.side === 'LEFT' ? hunkLine.oldLine : hunkLine.newLine;
-        if (typeof key === 'number') {
+        if (key !== undefined) {
           map.set(key, hunkLine.text);
         }
       }

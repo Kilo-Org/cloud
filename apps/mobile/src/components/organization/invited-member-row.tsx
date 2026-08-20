@@ -7,6 +7,11 @@ import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
 import { cn, formatDate, parseTimestamp } from '@/lib/utils';
 
+import {
+  emailStatusLabel,
+  invitedMemberActionOptions,
+  useResendInvite,
+} from './invited-member-row-state';
 import { ROLE_LABEL } from './member-row';
 
 type InvitedMemberRowProps = {
@@ -34,7 +39,9 @@ export function InvitedMemberRow({
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const mutations = useOrganizationMutations(organizationId);
+  const resendInvite = useResendInvite(organizationId);
   const dateLabel = inviteDateLabel(invite.inviteDate);
+  const statusLabel = emailStatusLabel(invite.emailStatus);
 
   function confirmRevoke() {
     Alert.alert('Revoke invitation', `Revoke the invitation sent to ${invite.email}?`, [
@@ -50,18 +57,21 @@ export function InvitedMemberRow({
   }
 
   function openActions() {
-    const options = ['Share invite link', 'Revoke invitation', 'Cancel'];
+    const options = invitedMemberActionOptions(invite.emailStatus);
     showActionSheetWithOptions(
       {
         options,
-        cancelButtonIndex: 2,
-        destructiveButtonIndex: 1,
+        cancelButtonIndex: options.length - 1,
+        destructiveButtonIndex: options.length - 2,
         containerStyle: { paddingBottom: bottom },
       },
       index => {
-        if (index === 0) {
+        const label = index !== undefined ? options[index] : undefined;
+        if (label === 'Share invite link') {
           void Share.share({ message: invite.inviteUrl });
-        } else if (index === 1) {
+        } else if (label === 'Resend invite') {
+          resendInvite.mutate({ inviteId: invite.inviteId });
+        } else if (label === 'Revoke invitation') {
           confirmRevoke();
         }
       }
@@ -82,6 +92,17 @@ export function InvitedMemberRow({
         {dateLabel && (
           <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
             {dateLabel}
+          </Text>
+        )}
+        {statusLabel && (
+          <Text
+            className={cn(
+              'mt-0.5 text-xs',
+              invite.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'
+            )}
+            numberOfLines={1}
+          >
+            {statusLabel}
           </Text>
         )}
       </View>

@@ -1568,9 +1568,12 @@ export async function cancelCodeReview(reviewId: string): Promise<void> {
  * Resets a failed code review for retry
  * Clears status back to 'pending' and removes error/session data
  */
-export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
+export async function resetCodeReviewForRetry(reviewId: string): Promise<number> {
   try {
-    await db
+    // Status CAS: only reset reviews still in a retriggable terminal state. A concurrent
+    // retrigger that already flipped the row to 'pending' (or any other state) matches zero
+    // rows, so the caller can reject the duplicate without dispatching twice.
+    const reset = await db
       .update(cloud_agent_code_reviews)
       .set({
         status: 'pending',
@@ -1591,7 +1594,15 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
         total_cost_musd: null,
         updated_at: new Date().toISOString(),
       })
-      .where(eq(cloud_agent_code_reviews.id, reviewId));
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted'])
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return reset.length;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'resetCodeReviewForRetry' },

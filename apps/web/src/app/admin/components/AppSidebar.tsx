@@ -31,6 +31,7 @@ import {
   Scale,
   Route,
   Tags,
+  Trash2,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -74,6 +75,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Users',
     url: '/admin/users',
     icon: () => <Users />,
+  },
+  {
+    title: () => 'Deletion queue',
+    url: '/admin/deletion-queue',
+    icon: () => <Trash2 />,
   },
   {
     title: () => 'Admins',

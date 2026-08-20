@@ -1,8 +1,7 @@
 import { type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import { useEffect, useState } from 'react';
 
-import { normalizeAgentMode } from '@/components/agents/mode-options';
-import { type AgentMode } from '@/components/agents/mode-selector';
+import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 type SessionConfigSnapshot = {
@@ -27,7 +26,14 @@ type ResolveSessionConfigSelectionOptions = {
   cloudAgentModelOverride?: CloudAgentModelOverrideSnapshot;
 };
 
-type UseSessionConfigSyncOptions = ResolveSessionConfigSelectionOptions;
+type UseSessionConfigSyncOptions = ResolveSessionConfigSelectionOptions & {
+  /**
+   * Mode chosen at spawn, threaded from the route. Seeds the initial mode only:
+   * a stored `fetchedData.mode`, a live `sessionConfig.mode`, and a later user
+   * pick all win over it.
+   */
+  spawnedMode?: string;
+};
 
 type UseSessionConfigSyncResult = {
   currentMode: AgentMode;
@@ -46,7 +52,7 @@ export function resolveSessionConfigSelection({
   selectedModel,
   selectedVariant,
   cloudAgentModelOverride = null,
-}: ResolveSessionConfigSelectionOptions): { model: string; variant: string } {
+}: ResolveSessionConfigSelectionOptions) {
   if (activeSessionType === 'remote') {
     return { model: selectedModel, variant: selectedVariant };
   }
@@ -86,6 +92,7 @@ export function useSessionConfigSync({
   selectedModel,
   selectedVariant,
   cloudAgentModelOverride = null,
+  spawnedMode,
 }: UseSessionConfigSyncOptions): UseSessionConfigSyncResult {
   const initialSelection = resolveSessionConfigSelection({
     activeSessionType,
@@ -97,7 +104,7 @@ export function useSessionConfigSync({
     cloudAgentModelOverride,
   });
   const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
-    normalizeAgentMode(fetchedData?.mode)
+    normalizeAgentMode(fetchedData?.mode ?? spawnedMode)
   );
   const [currentModel, setCurrentModel] = useState(initialSelection.model);
   const [currentVariant, setCurrentVariant] = useState(initialSelection.variant);

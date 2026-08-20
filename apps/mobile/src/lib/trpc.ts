@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@/lib/config';
 import { performRefresh, REFRESH_MARGIN_MS } from '@/lib/auth/credentials';
 import { buildAuthHeaders } from '@/lib/auth/auth-header';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
 import {
   getActiveToken,
@@ -33,13 +34,13 @@ const E2E_LATENCY_RULES: readonly (readonly [procedure: string, delayMs: number]
 ];
 
 function requestUrlString(url: RequestInfo | URL): string {
-  if (typeof url === 'string') {
-    return url;
-  }
   if (url instanceof URL) {
     return url.href;
   }
-  return url.url;
+  if (url instanceof Request) {
+    return url.url;
+  }
+  return url;
 }
 
 function e2eLatencyForUrl(url: string): number {
@@ -87,7 +88,7 @@ export const deadlineFetch: typeof fetch = async (url, init) => {
 async function getAuthHeaders() {
   const token = await getAuthTokenForRequest();
   if (!token) {
-    return buildAuthHeaders(token);
+    return { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() };
   }
 
   // Proactive refresh: if the token is expiring within the margin, rotate
@@ -121,10 +122,10 @@ async function getAuthHeaders() {
   ) {
     await performRefresh();
     const refreshedToken = getActiveToken()?.token ?? (await getAuthTokenForRequest());
-    return buildAuthHeaders(refreshedToken);
+    return { ...buildAuthHeaders(refreshedToken), ...buildClientMetadataHeaders() };
   }
 
-  return buildAuthHeaders(currentToken);
+  return { ...buildAuthHeaders(currentToken), ...buildClientMetadataHeaders() };
 }
 
 const singleLink = httpLink({

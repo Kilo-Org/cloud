@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, App, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import {
@@ -15,19 +15,20 @@ import {
   Smartphone,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
-import { toast } from 'sonner-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useDeleteAccount } from '@/components/use-delete-account';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
@@ -42,8 +43,26 @@ import {
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
-function providerIcon(_provider: string) {
-  return KeyRound;
+const PROVIDER_LABELS = {
+  anaconda: 'Anaconda',
+  apple: 'Apple',
+  discord: 'Discord',
+  email: 'Email',
+  'fake-login': 'Test Account',
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  google: 'Google',
+  linkedin: 'LinkedIn',
+  workos: 'Enterprise SSO',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
+function providerLabel(provider: string) {
+  return lookup(PROVIDER_LABELS, provider) ?? provider;
 }
 
 export function ProfileScreen() {
@@ -82,29 +101,25 @@ export function ProfileScreen() {
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
 
-  const deleteAccount = useMutation(
-    trpc.user.requestAccountDeletion.mutationOptions({
-      onSuccess: () => {
-        toast.success('Account deletion request sent. Check your email for confirmation.');
-      },
-      onError: error => {
-        toast.error(error.message);
-      },
-    })
-  );
+  const {
+    phase: deletePhase,
+    isPending: deletePending,
+    devCode,
+    beginDelete,
+    submitCode,
+    setCode,
+  } = useDeleteAccount();
 
   const confirmDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
-      'This will send a request to permanently delete your account and all associated data. This action cannot be undone.',
+      'This permanently deletes your account and signs you out. We will email a confirmation code.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete account',
           style: 'destructive',
-          onPress: () => {
-            deleteAccount.mutate();
-          },
+          onPress: beginDelete,
         },
       ]
     );
@@ -247,24 +262,17 @@ export function ProfileScreen() {
               />
             )}
 
-            {data?.providers.map(p => {
-              const Icon = providerIcon(p.provider);
-              return (
-                <Animated.View
-                  key={`${p.provider}-${p.email}`}
-                  className="flex-row items-start gap-3 rounded-lg bg-secondary p-3"
-                  entering={FadeIn.duration(200)}
-                >
-                  <Icon size={18} color={colors.secondaryForeground} />
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-sm font-medium capitalize">{p.provider}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {p.email}
-                    </Text>
-                  </View>
-                </Animated.View>
-              );
-            })}
+            {data?.providers.map((p, index) => (
+              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+                <ConfigureRow
+                  icon={KeyRound}
+                  title={providerLabel(p.provider)}
+                  subtitle={p.email}
+                  className="rounded-lg bg-secondary px-3"
+                  last={index === data.providers.length - 1}
+                />
+              </Animated.View>
+            ))}
           </View>
         )}
 
@@ -294,13 +302,6 @@ export function ProfileScreen() {
           />
         </View>
 
-        {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}
-        {Platform.OS === 'ios' && isAuthenticated && !organizationId ? (
-          <View className="mt-6">
-            <RestorePurchasesButton />
-          </View>
-        ) : null}
-
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
           <ActionTile
@@ -328,9 +329,30 @@ export function ProfileScreen() {
             label="Delete Account"
             color={colors.destructive}
             destructive
-            disabled={deleteAccount.isPending}
+            disabled={deletePending}
             onPress={confirmDeleteAccount}
           />
+
+          {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
+            <View className="gap-3 rounded-lg bg-secondary p-3">
+              <FormField
+                label="Confirmation code"
+                placeholder="6-digit code"
+                keyboardType="number-pad"
+                defaultValue={devCode ?? undefined}
+                onChangeText={setCode}
+                editable={deletePhase !== 'executing'}
+              />
+              <Button
+                variant="destructive"
+                loading={deletePhase === 'executing'}
+                disabled={deletePhase === 'executing'}
+                onPress={submitCode}
+              >
+                <Text>Confirm deletion</Text>
+              </Button>
+            </View>
+          )}
 
           <Text className="text-center text-xs text-muted-foreground">
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})

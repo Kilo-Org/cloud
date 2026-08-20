@@ -113,7 +113,19 @@ type StandaloneSuggestion = {
 type ChildSessionHydrationState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready' }
+  | {
+      status: 'ready';
+      /** Opaque cursor for the child's next older page, or null when fully read. */
+      cursor: string | null;
+      /** True when the child has more older history to load. */
+      hasOlder: boolean;
+      /** True while `loadOlderChildMessages` is fetching a page for this child. */
+      isLoadingOlder: boolean;
+      /** Typed failure from the child's most recent older-messages load. */
+      olderError: OlderMessagesError | null;
+      /** Total items omitted across every page loaded for this child so far. */
+      omittedItemCount: number;
+    }
   | { status: 'error'; message: string };
 
 const IDLE_CHILD_SESSION_HYDRATION_STATE = {
@@ -136,6 +148,19 @@ const EMPTY_REMOTE_COMMAND_STATE = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are still on this session';
+
+/**
+ * Maximum number of retained messages. Once the loaded transcript exceeds this,
+ * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
+ */
+const RETAINED_MESSAGE_WINDOW = 200;
+
+/**
+ * Shared empty-parts sentinel. `memoizedStoredMessage` compares `cached.parts
+ * === parts`; `partsMap.get(id) ?? []` would allocate a fresh array on every
+ * `partsRevision` bump, defeating the memo for rows that have no parts entry.
+ */
+const EMPTY_PARTS: Part[] = [];
 
 /**
  * Flatten a `ModelSelection` into the Decision 5 create_session model object.
@@ -365,6 +390,14 @@ type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   /**
+   * Load the next page of older messages for a hydrated child session using
+   * that child's own cursor. Replays through the child apply path, updates
+   * only per-child pagination state, and never touches the root session's
+   * cursor or atoms. No-op when `fetchSnapshotPage` is absent, the child is
+   * not ready, or the child has no cursor.
+   */
+  loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void>;
+  /**
    * Load the next page of older messages for the active session using the
    * stored cursor. Dedupes concurrent calls, never clears existing/live
    * messages, and classifies typed failures into `olderMessagesError`.
@@ -372,6 +405,15 @@ type SessionManager = {
    * already surfaced for the active session.
    */
   loadOlderMessages(): Promise<void>;
+  /**
+   * Drop the oldest loaded older-page(s) from local storage while the retained
+   * root transcript exceeds `RETAINED_MESSAGE_WINDOW`. Pops the oldest stack
+   * entry, deletes its messages, restores the pre-page cursor, and re-arms
+   * `hasOlderMessages`. Child rows in the shared storage do not count toward
+   * the window. No-op below the window or with an empty stack. Never trims
+   * the initial bounded page (it is not on the stack).
+   */
+  trimRetainedHistory(): void;
   /**
    * Merge a freshly fetched `associatedPr` (or null after an unlink) into the
    * current `fetchedSessionData` atom. Mobile calls this after a focus refetch.
@@ -410,6 +452,11 @@ type SessionManager = {
   respondToPermission(requestId: string, response: 'once' | 'always' | 'reject'): Promise<void>;
   acceptSuggestion(requestId: string, index: number): Promise<void>;
   dismissSuggestion(requestId: string): Promise<void>;
+  /**
+   * Remove one failed delivery entry after a successful retry so its row
+   * stops showing.
+   */
+  clearFailedMessage(messageId: string): void;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -421,6 +468,8 @@ type SessionManager = {
 // ---------------------------------------------------------------------------
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+/** Terminal message for a child session whose first page is a worker 404 (not-found). */
+const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
 const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
   'selected model is not available for this cloud agent session';
 const SELECTED_MODEL_UNAVAILABLE_ERROR =
@@ -599,6 +648,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const olderMessagesOmittedItemCountAtom = atom<number>(0);
   const transcriptClearedAtom = atom(false);
 
+  // Memoized per-row StoredMessage objects. Reused while both `info` and the
+  // parts array keep the same reference, so unchanged rows keep object identity
+  // across a delta on another row (React.memo relies on this).
+  const storedMessageMemo = new Map<string, StoredMessage>();
+
+  function memoizedStoredMessage(id: string, info: MessageInfo, parts: Part[]): StoredMessage {
+    const cached = storedMessageMemo.get(id);
+    if (cached !== undefined && cached.info === info && cached.parts === parts) {
+      return cached;
+    }
+    const next: StoredMessage = { info, parts };
+    storedMessageMemo.set(id, next);
+    return next;
+  }
+
+  function pruneStoredMessageMemo(ids: readonly string[]): void {
+    const idSet = new Set(ids);
+    for (const id of storedMessageMemo.keys()) {
+      if (!idSet.has(id)) storedMessageMemo.delete(id);
+    }
+  }
+
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
     const storage = get(sessionStorageAtom);
@@ -606,14 +677,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
+    get(storage.atoms.partsRevision);
     const rootSessionId = get(rootSessionIdAtom);
     const out: StoredMessage[] = [];
     for (const id of ids) {
       const info = msgMap.get(id);
       if (!info) continue;
       if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
-      out.push({ info, parts: partsMap.get(id) ?? [] });
+      out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
     }
+    pruneStoredMessageMemo(ids);
     return out;
   });
 
@@ -636,11 +709,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
+    get(storage.atoms.partsRevision);
+    pruneStoredMessageMemo(ids);
     return (childSessionId: string): StoredMessage[] => {
       const out: StoredMessage[] = [];
       for (const id of ids) {
         const info = msgMap.get(id);
-        if (info?.sessionID === childSessionId) out.push({ info, parts: partsMap.get(id) ?? [] });
+        if (info?.sessionID === childSessionId)
+          out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
       }
       return out;
     };
@@ -708,6 +784,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
   /**
+   * Stack of loaded older pages, oldest first. Each entry records the cursor
+   * that was current before that page was fetched and the message ids the page
+   * added. `trimRetainedHistory` pops from the front (oldest) to stay under
+   * `RETAINED_MESSAGE_WINDOW`. The initial bounded page is never pushed here,
+   * so the live tail always survives.
+   */
+  let retainedHistoryStack: Array<{ cursorBefore: string | null; messageIds: string[] }> = [];
+  /**
    * Last non-empty `mode` from a remote prompt send. Used as agent inheritance
    * fallback when `sessionConfigAtom.mode` is absent/`''`. Reset on switch/destroy.
    */
@@ -728,6 +812,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   function clearAllAtoms(): void {
     store.set(sessionStorageAtom, null);
+    storedMessageMemo.clear();
     store.set(rootSessionIdAtom, null);
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -780,6 +865,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesInFlight = null;
     lastPromptMode = null;
     olderMessagesTerminal = false;
+    retainedHistoryStack = [];
     currentCapabilities = undefined;
     pendingInterruptSession = null;
   }
@@ -805,6 +891,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     );
   }
 
+  /**
+   * Replay a child page/snapshot's messages into the active storage through
+   * the chat processor. Child pages must never go through `applyPage`: that
+   * path drops any page whose `info.id` is not the root session id, and a
+   * child page never carries the root id.
+   */
+  function replayChildMessages(
+    storage: JotaiSessionStorage,
+    messages: SessionSnapshot['messages']
+  ): void {
+    const chatProcessor = createChatProcessor(storage, {
+      onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
+    });
+    for (const message of messages) {
+      chatProcessor.process({ type: 'message.updated', info: message.info });
+      for (const part of message.parts) {
+        chatProcessor.process({ type: 'message.part.updated', part });
+      }
+    }
+  }
+
   async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
     const existingState = store.get(childSessionHydrationStatesAtom).get(childSessionId);
     if (existingState?.status === 'ready') return;
@@ -824,21 +932,52 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const request = (async () => {
       try {
+        if (config.fetchSnapshotPage) {
+          const page = await config.fetchSnapshotPage(childSessionId, {});
+          if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+
+          // A null page (worker 404) or any typed failure on the first page is
+          // a terminal hydration error for this child.
+          if (page === null) {
+            setChildSessionHydrationState(childSessionId, {
+              status: 'error',
+              message: CHILD_SESSION_NOT_FOUND_MESSAGE,
+            });
+            return;
+          }
+          if (page.kind !== 'success') {
+            setChildSessionHydrationState(childSessionId, {
+              status: 'error',
+              message: formatError(page),
+            });
+            return;
+          }
+
+          replayChildMessages(storage, page.messages);
+          setChildSessionHydrationState(childSessionId, {
+            status: 'ready',
+            cursor: page.nextCursor,
+            hasOlder: page.nextCursor !== null,
+            isLoadingOlder: false,
+            olderError: null,
+            omittedItemCount: page.omittedItemCount,
+          });
+          return;
+        }
+
+        // Legacy fallback: full snapshot, no pagination state.
         const snapshot = await config.fetchSnapshot(childSessionId);
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
 
-        const chatProcessor = createChatProcessor(storage, {
-          onToolAttachment: config.onToolAttachment,
-          onFilePart: config.onFilePart,
+        replayChildMessages(storage, snapshot.messages);
+        setChildSessionHydrationState(childSessionId, {
+          status: 'ready',
+          cursor: null,
+          hasOlder: false,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
         });
-        for (const message of snapshot.messages) {
-          chatProcessor.process({ type: 'message.updated', info: message.info });
-          for (const part of message.parts) {
-            chatProcessor.process({ type: 'message.part.updated', part });
-          }
-        }
-
-        setChildSessionHydrationState(childSessionId, { status: 'ready' });
       } catch (err) {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
         setChildSessionHydrationState(childSessionId, {
@@ -856,6 +995,81 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         childSessionHydrationRequests.delete(childSessionId);
       }
     }
+  }
+
+  async function loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void> {
+    if (!config.fetchSnapshotPage) return;
+    const fetchSnapshotPage = config.fetchSnapshotPage;
+
+    const state = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+    if (!state || state.status !== 'ready') return;
+    if (state.cursor === null) return;
+    if (state.isLoadingOlder) return;
+
+    const storage = store.get(sessionStorageAtom);
+    const rootSessionId = activeSessionId;
+    if (!storage || !rootSessionId) return;
+
+    const generation = childSessionHydrationGeneration;
+    const cursor = state.cursor;
+
+    setChildSessionHydrationState(childSessionId, { ...state, isLoadingOlder: true });
+
+    let outcome: SessionSnapshotPageOutcome | null;
+    try {
+      outcome = await fetchSnapshotPage(childSessionId, { cursor });
+    } catch (_err) {
+      // Network/transport-level failure maps to a retryable older error. The
+      // cursor is preserved so a retry continues from here.
+      if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+      const current = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+      if (!current || current.status !== 'ready') return;
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        isLoadingOlder: false,
+        olderError: { kind: 'retryable' },
+      });
+      return;
+    }
+    if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+
+    const current = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+    if (!current || current.status !== 'ready') return;
+
+    if (outcome === null) {
+      // Access-not-found (worker 404): terminal for this child.
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        isLoadingOlder: false,
+        hasOlder: false,
+        olderError: { kind: 'invalid_data' },
+      });
+      return;
+    }
+
+    if (outcome.kind === 'success') {
+      replayChildMessages(storage, outcome.messages);
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        cursor: outcome.nextCursor,
+        hasOlder: outcome.nextCursor !== null,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: current.omittedItemCount + outcome.omittedItemCount,
+      });
+      return;
+    }
+
+    // Typed failure. A later-page failure only writes `olderError`; it never
+    // changes the hydration status (a first-page failure is handled by
+    // `hydrateChildSession`). `retryable_failure` maps to the retryable kind;
+    // `invalid_data` and `too_large` map directly.
+    setChildSessionHydrationState(childSessionId, {
+      ...current,
+      isLoadingOlder: false,
+      olderError:
+        outcome.kind === 'retryable_failure' ? { kind: 'retryable' } : { kind: outcome.kind },
+    });
   }
 
   function updateCapabilityAtoms(session: CloudAgentSession): void {
@@ -1171,7 +1385,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
 
       if (outcome.kind === 'success') {
-        applyPage(outcome, expectedGeneration);
+        if (applyPage(outcome, expectedGeneration)) {
+          retainedHistoryStack.push({
+            cursorBefore: cursor,
+            messageIds: outcome.messages.map(m => m.info.id),
+          });
+        }
         store.set(isLoadingOlderMessagesAtom, false);
         return;
       }
@@ -1199,6 +1418,49 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (olderMessagesInFlight === loadPromise) {
         olderMessagesInFlight = null;
       }
+    }
+  }
+
+  function countRootTranscriptMessages(storage: JotaiSessionStorage): number {
+    const rootSessionId = store.get(rootSessionIdAtom);
+    let count = 0;
+    for (const id of storage.getMessageIds()) {
+      const info = storage.getMessageInfo(id);
+      if (!info) continue;
+      if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  function trimRetainedHistory(): void {
+    const storage = store.get(sessionStorageAtom);
+    if (!storage) return;
+    // The cursor must be the OLDEST popped entry's `cursorBefore`, not the
+    // last one popped. When two or more pages drop in one pass, overwriting
+    // on every pop leaves the cursor pointing at the newest dropped page, so
+    // `loadOlderMessages` could not re-fetch the oldest dropped page.
+    // Count only root-transcript rows. Child pages share this storage and
+    // must not push the window over the limit.
+    let trimmedAny = false;
+    let oldestCursorBefore: string | null = null;
+    while (
+      countRootTranscriptMessages(storage) > RETAINED_MESSAGE_WINDOW &&
+      retainedHistoryStack.length > 0
+    ) {
+      const entry = retainedHistoryStack.shift();
+      if (!entry) break;
+      if (!trimmedAny) {
+        trimmedAny = true;
+        oldestCursorBefore = entry.cursorBefore;
+      }
+      for (const id of entry.messageIds) {
+        storage.deleteMessage(id);
+      }
+    }
+    if (trimmedAny) {
+      olderMessagesCursor = oldestCursorBefore;
+      store.set(hasOlderMessagesAtom, true);
     }
   }
 
@@ -1468,6 +1730,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
 
+          // Compact/summarize turns (and stripped oversized `message.updated`
+          // frames) are not picker-authoritative: they omit `agent`/`variant`
+          // or mark `summary: true`, and writing those through would reset
+          // mode/reasoning to empty/"unknown" values.
+          if (event.info.summary === true || !event.info.agent) {
+            return;
+          }
+
           if (canApplyMessageObservation) {
             const selection = toModelSelection(
               { providerID: event.info.providerID, modelID: event.info.modelID },
@@ -1717,6 +1987,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession.storage.clear();
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
+    // Reset the retained-history stack so a later `trimRetainedHistory`
+    // cannot restore a pre-clear cursor.
+    retainedHistoryStack = [];
     // Same idle reset as clearAllAtoms: an in-flight older-page fetch will
     // hit the generation guard and return without clearing these atoms.
     store.set(isLoadingOlderMessagesAtom, false);
@@ -1753,6 +2026,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function dismissSuggestion(requestId: string): Promise<void> {
     if (currentSession) await currentSession.dismissSuggestion({ requestId });
+  }
+
+  function clearFailedMessage(messageId: string): void {
+    currentSession?.state.clearFailedMessage(messageId);
+    const next = new Map(store.get(pendingMessagesAtom));
+    next.delete(messageId);
+    store.set(pendingMessagesAtom, next);
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -1839,7 +2119,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   return {
     switchSession,
     hydrateChildSession,
+    loadOlderChildMessages,
     loadOlderMessages,
+    trimRetainedHistory,
     updateFetchedAssociatedPr,
     send,
     setRemoteModelOverride,
@@ -1855,6 +2137,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     respondToPermission,
     acceptSuggestion,
     dismissSuggestion,
+    clearFailedMessage,
     createAndStart,
     clearError: () => {
       store.set(errorAtom, null);

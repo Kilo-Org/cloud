@@ -1,4 +1,4 @@
-import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -43,6 +43,13 @@ type SessionMessageListProps<T> = {
    * indicators.
    */
   contentBottomInset?: number;
+  /**
+   * Optional callback fired when the list returns to the bottom after the
+   * user scrolled away. Fires only on the false→true transition of
+   * `isAtBottom`, never on mount. The host uses this to trim retained
+   * history exactly when the user returns to the live tail.
+   */
+  onReachedBottom?: () => void;
 };
 
 export function SessionMessageList<T>({
@@ -57,6 +64,7 @@ export function SessionMessageList<T>({
   renderItem,
   ListFooterComponent,
   contentBottomInset,
+  onReachedBottom,
 }: Readonly<SessionMessageListProps<T>>) {
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
@@ -113,6 +121,22 @@ export function SessionMessageList<T>({
     inFlightRef.current = false;
   }, [sessionId]);
 
+  // Fire `onReachedBottom` only on the false→true transition of
+  // `isAtBottom`. The previous-value ref prevents a fire on mount (the list
+  // starts at the bottom) and on repeat renders while already at the bottom.
+  // The handler is held in a ref so a new inline callback identity from the
+  // host never re-runs this effect.
+  const onReachedBottomRef = useRef(onReachedBottom);
+  onReachedBottomRef.current = onReachedBottom;
+  const prevIsAtBottomRef = useRef(isAtBottom);
+  useEffect(() => {
+    const prev = prevIsAtBottomRef.current;
+    prevIsAtBottomRef.current = isAtBottom;
+    if (isAtBottom && !prev) {
+      onReachedBottomRef.current?.();
+    }
+  }, [isAtBottom]);
+
   // Non-visual a11y signal for older-page arrival (visual loading skeleton
   // was removed). Announce only when items were actually prepended.
   const olderArrivalInitializedRef = useRef(false);
@@ -143,10 +167,6 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = nextNewestKey;
   }, [items, keyExtractor]);
 
-  // Defensive: the structural list ref is required by the hook but
-  // downstream types may infer it as nullable.
-  const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<T>>;
-
   // When the optional `contentBottomInset` is omitted we return the
   // original module-level `listContentContainerStyle` reference so the
   // default-prop path is behavior-identical (no allocation, no value
@@ -163,7 +183,7 @@ export function SessionMessageList<T>({
   return (
     <View className="flex-1">
       <FlashList<T>
-        ref={listRefSafe}
+        ref={listRef}
         style={listStyle}
         contentContainerStyle={resolvedContentContainerStyle}
         data={items}

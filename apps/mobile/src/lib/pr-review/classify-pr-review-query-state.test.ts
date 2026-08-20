@@ -22,6 +22,10 @@ function makeTopLevelTrpcError(code: string): unknown {
   return { code };
 }
 
+function makeTrpcErrorWithMessage(code: string, message: string): unknown {
+  return { data: { code, message } };
+}
+
 describe('classifyPrReviewQueryState', () => {
   it('classifies PRECONDITION_FAILED as a reconnect state (no retry, reconnect CTA)', () => {
     expect(classifyPrReviewQueryState(makeTrpcError('PRECONDITION_FAILED'))).toEqual({
@@ -97,6 +101,20 @@ describe('classifyPrReviewMutationError', () => {
       kind: 'reconnect',
       message: 'GitHub connection expired',
     });
+  });
+
+  it('classifies PRECONDITION_FAILED with terms_required as a terms-required state', () => {
+    expect(
+      classifyPrReviewMutationError(
+        makeTrpcErrorWithMessage('PRECONDITION_FAILED', 'terms_required')
+      )
+    ).toEqual({ kind: 'terms-required', message: 'terms_required' });
+  });
+
+  it('keeps other PRECONDITION_FAILED messages as reconnect', () => {
+    expect(
+      classifyPrReviewMutationError(makeTrpcErrorWithMessage('PRECONDITION_FAILED', 'revoked'))
+    ).toEqual({ kind: 'reconnect', message: 'GitHub connection expired' });
   });
 
   it('falls back to retryable for unknown / non-tRPC errors', () => {

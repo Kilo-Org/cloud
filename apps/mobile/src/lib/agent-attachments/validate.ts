@@ -175,10 +175,16 @@ export function classifyAttachment(candidate: AttachmentCandidate): ClassifiedAt
   };
 }
 
+type AttachmentAcceptance = {
+  ok: boolean;
+  acceptedCount: number;
+  truncated?: boolean;
+};
+
 export function canAddAttachments(
   currentCount: number,
   incomingCount: number
-): { ok: boolean; acceptedCount: number; truncated?: boolean } {
+): AttachmentAcceptance {
   const remaining = AGENT_ATTACHMENT_MAX_FILES - currentCount;
   if (remaining <= 0) {
     return { ok: false, acceptedCount: 0 };

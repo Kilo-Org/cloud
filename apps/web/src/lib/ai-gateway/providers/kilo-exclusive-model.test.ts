@@ -3,6 +3,7 @@ import {
   applyKiloExclusiveModelSettings,
   calculateCost_mUsd,
   convertFromKiloExclusiveModel,
+  getInferenceProvider,
   type KiloExclusiveModel,
   type PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -114,6 +115,38 @@ describe('convertFromKiloExclusiveModel', () => {
     });
 
     expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');
+  });
+});
+
+describe('getInferenceProvider', () => {
+  it('uses a single inference provider restriction before the gateway', () => {
+    const model = makeModel({
+      internal_id: 'vendor/x',
+      gateway: 'vercel',
+      inference_provider_restriction: ['openai'],
+    });
+
+    expect(getInferenceProvider(model)).toEqual({
+      slug: 'openai',
+      name: 'OPENAI',
+      training: false,
+      retainsPrompts: true,
+    });
+  });
+
+  it('reports data collection for a concrete gateway provider', () => {
+    const model = makeModel({
+      internal_id: 'vendor/x',
+      gateway: 'alibaba',
+      flags: ['requires-data-collection'],
+    });
+
+    expect(getInferenceProvider(model)).toEqual({
+      slug: 'alibaba',
+      name: 'ALIBABA',
+      training: true,
+      retainsPrompts: true,
+    });
   });
 });
 

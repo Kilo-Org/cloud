@@ -1,4 +1,4 @@
-import { resolveEffectiveModel } from './model-selection';
+import { resolveEffectiveModel, selectedModelFromReviewSources } from './model-selection';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 
 const FALLBACK = 'anthropic/claude-sonnet-4.6';
@@ -117,5 +117,39 @@ describe('resolveEffectiveModel', () => {
       FALLBACK
     );
     expect(result.source).toBe('global');
+  });
+});
+
+describe('selectedModelFromReviewSources', () => {
+  it('prefers a persisted review model', () => {
+    expect(
+      selectedModelFromReviewSources({
+        persistedModel: 'openai/gpt-5',
+        repoFullName: 'acme/api',
+        config: baseConfig(),
+      })
+    ).toBe('openai/gpt-5');
+  });
+
+  it('uses the selected config model when the review row has none yet', () => {
+    expect(
+      selectedModelFromReviewSources({
+        persistedModel: null,
+        repoFullName: 'acme/api',
+        config: baseConfig([
+          { repository_id: 1, repo_full_name: 'acme/api', model_slug: 'openai/gpt-5' },
+        ]),
+      })
+    ).toBe('openai/gpt-5');
+  });
+
+  it('returns null when neither the review nor a config is available', () => {
+    expect(
+      selectedModelFromReviewSources({
+        persistedModel: null,
+        repoFullName: 'acme/api',
+        config: null,
+      })
+    ).toBeNull();
   });
 });

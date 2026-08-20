@@ -17,6 +17,8 @@ function optional(key: keyof typeof OPTIONAL_ENV_KEYS): string | undefined {
 
 export const API_BASE_URL: string = required('apiBaseUrl');
 export const WEB_BASE_URL: string = required('webBaseUrl');
+export const TERMS_URL = `${WEB_BASE_URL}/terms-app`;
+export const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
 export const APPSFLYER_DEV_KEY: string = required('appsFlyerDevKey');
 export const APPSFLYER_APP_ID: string = required('appsFlyerAppId');
 

@@ -33,6 +33,8 @@ type ModelSelectorProps = {
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
   isLoading?: boolean;
+  /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
+  lockLabel?: string;
 };
 
 type ModelPickerSelectionScopeContextValue = {
@@ -70,12 +72,7 @@ export function ModelPickerSelectionScopeProvider({
 }
 
 function toSessionModelOption(option: ModelOption | SessionModelOption): SessionModelOption {
-  if (
-    'displayId' in option &&
-    typeof option.displayId === 'string' &&
-    'showGatewayMetadata' in option &&
-    typeof option.showGatewayMetadata === 'boolean'
-  ) {
+  if ('displayId' in option && 'showGatewayMetadata' in option) {
     return {
       ...option,
       displayId: option.displayId,
@@ -127,6 +124,7 @@ export function ModelSelector({
   onSelect,
   disabled = false,
   isLoading = false,
+  lockLabel,
 }: Readonly<ModelSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -150,7 +148,11 @@ export function ModelSelector({
   const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
   const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
   const accessibilityLabel =
-    hasVariants && variantLabel ? `${modelLabel}, ${variantLabel} thinking effort` : modelLabel;
+    (hasVariants && variantLabel ? `${modelLabel}, ${variantLabel} thinking effort` : modelLabel) +
+    (lockLabel && disabled ? `, Locked by agent "${lockLabel}"` : '');
+  // A pinned variant is meaningful even when the locked option carries a single
+  // variant, so surface the badge whenever a lock label is present.
+  const showVariantBadge = compactVariantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
     if (effectivelyDisabled) {
@@ -192,7 +194,7 @@ export function ModelSelector({
           </View>
         ) : null}
         {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
-        {hasVariants && compactVariantLabel ? (
+        {showVariantBadge ? (
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
             <Brain size={12} color={colors.mutedForeground} />
             <Text className="text-xs font-medium text-muted-foreground" numberOfLines={1}>

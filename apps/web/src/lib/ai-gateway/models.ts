@@ -28,7 +28,10 @@ import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_5_6_sol_stealth_model,
+} from '@/lib/ai-gateway/providers/openai-exclusive';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -48,7 +51,16 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 9,
+          weight: 8,
+          reasoning: { enabled: true, effort: 'high' },
+        } satisfies AutoFreeModel,
+      ]
+    : []),
+  ...(tencent_hy3_free_model.status === 'public'
+    ? [
+        {
+          model: tencent_hy3_free_model.public_id,
+          weight: 1,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -83,13 +95,14 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels.map(({ model }) => model),
-  ...(tencent_hy3_free_model.status === 'public' ? [tencent_hy3_free_model.public_id] : []),
   ...(longcat_2_free_model.status === 'public' ? [longcat_2_free_model.public_id] : []),
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
-  ...(gpt_5_6_sol_stealth_model.status === 'public' ? [gpt_5_6_sol_stealth_model.public_id] : []),
+  ...(gpt_5_6_sol_discounted_model.status === 'public'
+    ? [gpt_5_6_sol_discounted_model.public_id]
+    : []),
   GLM_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
@@ -126,6 +139,7 @@ export const kiloExclusiveModels = [
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_stealth_model,
+  gpt_5_6_sol_discounted_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,

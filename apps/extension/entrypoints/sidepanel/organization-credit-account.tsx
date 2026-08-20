@@ -15,13 +15,13 @@ const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow: FetchLike = (input, init) => fetch(input, init);
 const selectedOrganizationIdSchema = z.string();
 
-export const useOrganizationCreditAccount = (
-  token: string
-): {
+interface UseOrganizationCreditAccountResult {
   organizationOptions: KiloOrganizationOption[];
   selectOrganization: (organizationId: string) => void;
   selectedOrganizationId: string;
-} => {
+}
+
+export const useOrganizationCreditAccount = (token: string): UseOrganizationCreditAccountResult => {
   const [organizationOptions, setOrganizationOptions] = useState<KiloOrganizationOption[]>([]);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
   const selectedOrganizationIdRef = useRef('');

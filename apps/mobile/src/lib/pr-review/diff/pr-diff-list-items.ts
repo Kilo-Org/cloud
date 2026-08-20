@@ -191,7 +191,7 @@ export function addContextLoadState(args: {
   filePath: string;
   gapIndex: number;
   status: 'loading' | 'error' | 'unavailable';
-}): Record<string, Record<number, ExpandSeparatorState>> {
+}) {
   const previous = args.state[args.filePath];
   const previousState = previous?.[args.gapIndex];
   if (args.status === 'unavailable') {
@@ -201,7 +201,7 @@ export function addContextLoadState(args: {
         ...previous,
         [args.gapIndex]: { status: 'unavailable' },
       },
-    };
+    } satisfies Record<string, Record<number, ExpandSeparatorState>>;
   }
   const existingLines =
     previousState?.status === 'loading' ||
@@ -219,7 +219,7 @@ export function addContextLoadState(args: {
       ...previous,
       [args.gapIndex]: nextStatus,
     },
-  };
+  } satisfies Record<string, Record<number, ExpandSeparatorState>>;
 }
 
 export function getCumulativeLines(state: ExpandSeparatorState | undefined): string[] {
@@ -242,7 +242,7 @@ export function setContextLines(args: {
   gapIndex: number;
   lines: string[];
   totalLines?: number;
-}): Record<string, Record<number, ExpandSeparatorState>> {
+}) {
   const previous = args.state[args.filePath];
   const previousState = previous?.[args.gapIndex];
   const existingLines =
@@ -263,36 +263,7 @@ export function setContextLines(args: {
       ...previous,
       [args.gapIndex]: nextStatus,
     },
-  };
-}
-
-export function readTrpcErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
-  }
-  const record = error as Record<string, unknown>;
-  const data = record.data;
-  if (data && typeof data === 'object') {
-    const code = (data as Record<string, unknown>).code;
-    if (typeof code === 'string') {
-      return code;
-    }
-  }
-  const shape = record.shape;
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>).data;
-    if (shapeData && typeof shapeData === 'object') {
-      const code = (shapeData as Record<string, unknown>).code;
-      if (typeof code === 'string') {
-        return code;
-      }
-    }
-  }
-  const top = record.code;
-  if (typeof top === 'string') {
-    return top;
-  }
-  return undefined;
+  } satisfies Record<string, Record<number, ExpandSeparatorState>>;
 }
 
 export type BuildItemsArgs = {

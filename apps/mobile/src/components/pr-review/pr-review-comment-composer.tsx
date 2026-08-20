@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the comment composer owns the durable comment draft (load, save, seed, clear) beside the existing create/edit form; the draft wiring stays with the form it persists */
 // Comment-composer content. Two modes:
 //   - create: Comment now + Add to review + Insert suggestion (needs headSha).
 //   - edit: single Save updating a queued PendingReviewItem (local-only).
@@ -14,19 +15,27 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import {
+  ComposerInlineError,
+  useComposerInlineError,
+} from '@/components/pr-review/composer-inline-error';
+import {
   CommentBodyField,
   ComposerFooter,
   composerRangeLabel,
   ContextPreview,
 } from '@/components/pr-review/pr-review-comment-composer-parts';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import {
+  ensureTermsAcceptedOutcome,
+  TERMS_OUTDATED_COPY,
+} from '@/components/pr-review/discussion/reply-input';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { clearDraft, prCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useCreateReviewCommentMutation } from '@/lib/pr-review/use-pr-review-mutations';
 
@@ -69,6 +78,18 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const createComment = useCreateReviewCommentMutation({ owner, repo, number });
   const isEdit = mode.kind === 'edit';
 
+  // Durable comment draft (create mode only). Edit mode edits an already-queued
+  // item, durable through the pending-review provider, so no draft there.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const commentDraftKey = prCommentDraftKey(owner, repo, number, path, side, line, startLine);
+  const draftUserId = isEdit ? undefined : userId;
+  const draft = useFencedDraftLoad({
+    userId: draftUserId,
+    isIdentityLoading,
+    entityKey: commentDraftKey,
+  });
+  useDraftFlushOnBackground(draftUserId, commentDraftKey, true);
+
   // Edit mode ignores the bridge so editing A never shows B's path/lines.
   const selection = isEdit ? null : getDiffSelection({ owner, repo, number });
 
@@ -78,28 +99,29 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const bodyInputRef = useRef<TextInput | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const [hasBody, setHasBody] = useState(() => initialBody.trim().length > 0);
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
-  // True when `inlineError` is a local empty-body validation error (no
-  // mutation toast owns it), so it must announce through AccessibleStatus;
-  // mutation-classified errors are toast-owned and stay visual-only.
-  const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
+  // Seed the refs from the settled draft once per identity/destination, before
+  // the body field mounts (create mode only). Re-seeding on a key change (and
+  // resetting to the initial body when there is no draft) keeps a reused
+  // instance from showing or saving the previous account's or position's text.
+  const draftSeedKeyRef = useRef<string | null>(null);
+  const draftSeedKey = `${draftUserId ?? 'anonymous'}\u0000${commentDraftKey}`;
+  if (!isEdit && draft.settled && draftSeedKeyRef.current !== draftSeedKey) {
+    draftSeedKeyRef.current = draftSeedKey;
+    bodyRef.current = draft.value ?? initialBody;
+    bodyBaselineRef.current = draft.value ?? initialBody;
+  }
+  const {
+    inlineError,
+    inlineErrorKind,
+    inlineErrorIsLocal,
+    setInlineError,
+    setInlineErrorKind,
+    setInlineErrorIsLocal,
+    clearBadRequestOnBodyEdit,
+  } = useComposerInlineError(createComment.error, isEdit);
 
   const isSubmitting = !isEdit && createComment.isPending;
   const lineRangeLabel = composerRangeLabel(line, startLine);
-
-  useEffect(() => {
-    if (isEdit || !createComment.error) {
-      return;
-    }
-    const classification = classifyPrReviewMutationError(createComment.error);
-    const display = mutationErrorDisplay('composer', classification, createComment.error);
-    setInlineError(display.message);
-    setInlineErrorKind(display.kind);
-    setInlineErrorIsLocal(false);
-  }, [createComment.error, isEdit]);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
   // pinned header. Compact kb layout fits at offset 0 — snap back so body +
@@ -115,19 +137,13 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     };
   }, []);
 
-  function clearBadRequestOnBodyEdit() {
-    // bad-request clears on body change; forbidden stays for the session.
-    if (inlineErrorKind === 'bad-request') {
-      setInlineError(null);
-      setInlineErrorKind(null);
-      setInlineErrorIsLocal(false);
-    }
-  }
-
   function handleBodyChange(value: string) {
     bodyRef.current = value;
     setHasBody(value.trim().length > 0);
     clearBadRequestOnBodyEdit();
+    if (draftUserId) {
+      saveDraft(draftUserId, commentDraftKey, value);
+    }
   }
 
   function handleAddToReview() {
@@ -152,6 +168,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       body,
       commitSha: mode.headSha,
     });
+    if (draftUserId) {
+      void clearDraft(draftUserId, commentDraftKey);
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
@@ -170,6 +189,16 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setInlineError(null);
     setInlineErrorKind(null);
     setInlineErrorIsLocal(false);
+    const outcome = await ensureTermsAcceptedOutcome();
+    if (outcome.kind === 'outdated') {
+      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineErrorKind('bad-request');
+      setInlineErrorIsLocal(false);
+      return;
+    }
+    if (outcome.kind === 'dismissed') {
+      return;
+    }
     try {
       await createComment.mutateAsync({
         owner,
@@ -182,6 +211,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         ...(startLine !== undefined ? { startLine, startSide: side } : {}),
         commitSha: mode.headSha,
       });
+      if (draftUserId) {
+        void clearDraft(draftUserId, commentDraftKey);
+      }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDismiss();
     } catch {
@@ -212,7 +244,16 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (dirty) {
       Alert.alert('Discard comment?', 'Your draft will be lost.', [
         { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: onDismiss },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            if (draftUserId) {
+              void clearDraft(draftUserId, commentDraftKey);
+            }
+            onDismiss();
+          },
+        },
       ]);
       return;
     }
@@ -230,6 +271,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     bodyRef.current = block;
     setHasBody(block.trim().length > 0);
     clearBadRequestOnBodyEdit();
+    // Persist the inserted suggestion like a typed change, so a process kill
+    // after Insert (with no later keystroke) does not lose the suggestion.
+    if (draftUserId) {
+      saveDraft(draftUserId, commentDraftKey, block);
+    }
     bodyInputRef.current?.setNativeProps({
       text: block,
       selection: { start: block.length, end: block.length },
@@ -283,12 +329,14 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
           />
           <View className="gap-1">
             <Text className="text-xs font-medium text-foreground">Comment</Text>
-            <CommentBodyField
-              inputRef={bodyInputRef}
-              isDisabled={isSubmitting}
-              defaultValue={initialBody}
-              onChangeText={handleBodyChange}
-            />
+            {isEdit || draft.settled ? (
+              <CommentBodyField
+                inputRef={bodyInputRef}
+                isDisabled={isSubmitting}
+                defaultValue={bodyRef.current}
+                onChangeText={handleBodyChange}
+              />
+            ) : null}
             {showInsertSuggestion ? (
               <Button
                 variant="ghost"
@@ -302,21 +350,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
               </Button>
             ) : null}
           </View>
-          {inlineError && inlineErrorKind !== 'reconnect' ? (
-            <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5">
-              {/* Local empty-body validation has no toast owner, so
-                  AccessibleStatus announces it on both platforms.
-                  Mutation-classified errors are toast-owned
-                  (announcingToast), so the inline text stays visual-only
-                  and never double-announces. */}
-              {inlineErrorIsLocal ? (
-                <AccessibleStatus message={inlineError} tone="error" className="text-xs" />
-              ) : (
-                <Text className="text-xs text-destructive">{inlineError}</Text>
-              )}
-            </View>
-          ) : null}
-          {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+          <ComposerInlineError
+            inlineError={inlineError}
+            inlineErrorKind={inlineErrorKind}
+            inlineErrorIsLocal={inlineErrorIsLocal}
+          />
         </View>
 
         <ComposerFooter

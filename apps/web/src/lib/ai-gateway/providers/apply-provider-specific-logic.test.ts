@@ -7,9 +7,15 @@ import {
   applyReasoningDetailsTransform,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+import {
+  ReasoningDetailsTransform,
+  type Provider,
+  type ProviderId,
+} from '@/lib/ai-gateway/providers/types';
+import {
+  FRIENDLI_GLM_PUBLIC_ID,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/partner/constants';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -120,7 +126,7 @@ describe('applyReasoningDetailsTransform', () => {
     const request = makeReasoningRequest();
 
     applyReasoningDetailsTransform(
-      makeProvider({ mapGeminiThoughtContent: false, mapReasoningContentToDetails: true }),
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
       request
     );
 
@@ -129,24 +135,117 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
-  it.each([null, { mapGeminiThoughtContent: false, mapReasoningContentToDetails: false }])(
-    'leaves reasoning_details untouched with transforms %p',
-    responseTransforms => {
-      const request = makeReasoningRequest();
+  it('leaves reasoning_details untouched without a transform', () => {
+    const request = makeReasoningRequest();
 
-      applyReasoningDetailsTransform(makeProvider(responseTransforms), request);
+    applyReasoningDetailsTransform(makeProvider(null), request);
 
-      const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
-      expect(assistant.reasoning_details).toBeDefined();
-      expect(assistant.reasoning_content).toBeUndefined();
-    }
-  );
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    expect(assistant.reasoning_details).toBeDefined();
+    expect(assistant.reasoning_content).toBeUndefined();
+  });
+
+  it('maps Gemini encrypted details to matching tool-call signatures', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        reasoning_effort: 'high',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'opaque-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body).toMatchObject({
+      google: { thinking_config: { thinking_level: 'high', include_thoughts: true } },
+      messages: [
+        {
+          tool_calls: [
+            {
+              id: 'call-1',
+              extra_content: { google: { thought_signature: 'opaque-signature' } },
+            },
+          ],
+        },
+      ],
+    });
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+    expect(request.body.messages[0]).not.toHaveProperty('reasoning_details');
+  });
+
+  it('keeps id-less Gemini signatures on the message when tool calls are present', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'message-signature',
+                format: 'google-gemini-v1',
+              },
+              {
+                type: 'reasoning.encrypted',
+                data: 'tool-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body.messages[0]).toMatchObject({
+      extra_content: { google: { thought_signature: 'message-signature' } },
+      tool_calls: [
+        {
+          id: 'call-1',
+          extra_content: { google: { thought_signature: 'tool-signature' } },
+        },
+      ],
+    });
+  });
 
   it('does not touch Messages requests', () => {
     const request = makeMessagesRequest('vendor/model');
 
     applyReasoningDetailsTransform(
-      makeProvider({ mapGeminiThoughtContent: false, mapReasoningContentToDetails: true }),
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
       request
     );
 

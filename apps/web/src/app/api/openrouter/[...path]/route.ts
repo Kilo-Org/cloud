@@ -64,7 +64,7 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
 import {
   createAnonymousContext,
   isAnonymousContext,

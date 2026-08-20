@@ -69,7 +69,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
     sharedConnectionRef.current = createUserWebConnection({
       websocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
       getAuthToken: async () => {
-        const result = await trpcClient.activeSessions.getToken.query();
+        const result = await trpcClient.activeSessions.createWebTicket.mutate();
         return result.token;
       },
       lifecycleHooks: createBrowserLifecycleHooks(),
@@ -362,8 +362,12 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   );
 }
 
+export function useOptionalManager(): SessionManager | null {
+  return useContext(ManagerContext);
+}
+
 export function useManager(): SessionManager {
-  const manager = useContext(ManagerContext);
+  const manager = useOptionalManager();
   if (!manager) throw new Error('useManager must be used within CloudAgentProvider');
   return manager;
 }

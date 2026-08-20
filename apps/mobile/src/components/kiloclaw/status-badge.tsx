@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 type StatusValue = InstanceStatus | GatewayState | null | undefined;
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- statusTone() must look up an arbitrary backend status string, not just the known keys
 const STATUS_TONES: Record<string, StatusDotTone> = {
   running: 'good',
   stopped: 'muted',
@@ -19,6 +20,7 @@ const STATUS_TONES: Record<string, StatusDotTone> = {
   shutting_down: 'warn',
 };
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- statusLabel() must look up an arbitrary backend status string, not just the known keys
 const STATUS_LABELS: Record<string, string> = {
   running: 'RUNNING',
   stopped: 'STOPPED',

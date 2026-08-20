@@ -64,6 +64,23 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
         break;
       }
       case 'tool-call': {
+        // WebMCP events carry a webMcpOrigin field; must precede the eval branch.
+        if ('webMcpOrigin' in event) {
+          events.push({
+            arguments: event.arguments,
+            definitionSignature: event.definitionSignature,
+            documentId: event.documentId,
+            id: event.id,
+            name: event.name,
+            ...(event.providerToolCallId === undefined
+              ? {}
+              : { providerToolCallId: event.providerToolCallId }),
+            tabId: event.tabId,
+            type: event.type,
+            webMcpOrigin: event.webMcpOrigin,
+          });
+          break;
+        }
         if (event.name === 'eval') {
           events.push({
             code: event.code,

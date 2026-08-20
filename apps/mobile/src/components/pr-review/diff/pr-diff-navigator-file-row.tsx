@@ -11,7 +11,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 
-function splitPath(path: string): { dir: string; basename: string } {
+function splitPath(path: string) {
   const slash = path.lastIndexOf('/');
   if (slash === -1) {
     return { dir: '', basename: path };

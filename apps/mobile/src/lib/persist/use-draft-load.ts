@@ -2,74 +2,94 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   clearDraft,
+  type DraftShapeValidator,
   flushDraft,
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
 } from '@/lib/persist/drafts';
 
-type UseFencedDraftLoadInput = {
+type UseFencedDraftLoadInput<T> = {
   userId: string | undefined;
   isIdentityLoading: boolean;
   /** Full draft entity key under `draft:<userId>` (e.g. `agent-composer:new`). */
   entityKey: string;
+  /** Shape validator for the loaded value; defaults to a string draft. */
+  validate?: DraftShapeValidator<T>;
 };
 
 /**
- * Loads a durable string draft under `draft:<userId>` once per
- * identity/entity generation. Resets to the not-settled state whenever the
- * identity or entity changes, and only the newest generation's load may
- * publish: every effect run captures the current generation and every
- * cleanup (unmount or a superseding run) bumps it, so a load started for an
- * older account or session can never publish into the newest screen. `text`
- * stays null until a stored draft (or the absence of one) has loaded.
+ * Loads a durable draft under `draft:<userId>` once per identity/entity
+ * generation. Resets to the not-settled state whenever the identity or entity
+ * changes, and only the newest generation's load may publish: every effect run
+ * captures the current generation and every cleanup (unmount or a superseding
+ * run) bumps it, so a load started for an older account or session can never
+ * publish into the newest screen. `value` stays null until a stored draft (or
+ * the absence of one) has loaded. The draft shape is the caller's contract:
+ * pass a `validate` guard for a non-string draft, or omit it for a string.
  */
-export function useFencedDraftLoad({
+export function useFencedDraftLoad<T = string>({
   userId,
   isIdentityLoading,
   entityKey,
-}: UseFencedDraftLoadInput): {
+  validate,
+}: UseFencedDraftLoadInput<T>): {
   settled: boolean;
-  text: string | null;
+  value: T | null;
 } {
-  const [draftState, setDraftState] = useState<{ settled: boolean; text: string | null }>({
+  const resolvedValidate = (validate ?? isStringDraft) as DraftShapeValidator<T>;
+  // Hold the resolved validator in a ref so the effect's dependency array stays
+  // limited to the identity/entity generation (the validator is a stable
+  // module-level guard for every caller).
+  const resolvedValidateRef = useRef(resolvedValidate);
+  resolvedValidateRef.current = resolvedValidate;
+  const [draftState, setDraftState] = useState<{ settled: boolean; value: T | null }>({
     settled: false,
-    text: null,
+    value: null,
   });
   // Reset the settled draft state when the identity or entity changes, so the
   // prompt stays hidden while the new generation's draft loads and never
   // shows the previous account's or session's draft.
   const draftIdentity = `${userId ?? 'anonymous'}\u0000${entityKey}`;
   const [prevDraftIdentity, setPrevDraftIdentity] = useState(draftIdentity);
-  if (prevDraftIdentity !== draftIdentity) {
-    setPrevDraftIdentity(draftIdentity);
-    setDraftState({ settled: false, text: null });
-  }
+  // The reset must be visible on THIS render, not the next: a deferred
+  // setDraftState would still return the previous account's or entity's
+  // settled value here, and a surface seeding from that stale value would
+  // pin the old text to the new key.
+  const identityChanged = prevDraftIdentity !== draftIdentity;
   // Generation fence: a load applies only when its captured generation is
-  // still current. Cleanup (unmount or a superseding run) bumps the
-  // generation, so a stale load can never publish after a newer run armed
-  // itself (refs dodge type-aware flow narrowing).
+  // still current. The identity-change render bumps the generation
+  // synchronously, so an in-flight load whose read already resolved can never
+  // publish the previous account's or entity's value before the effect
+  // cleanup runs. Cleanup (unmount or a superseding run) bumps it again, so a
+  // stale load can never publish after a newer run armed itself (refs dodge
+  // type-aware flow narrowing).
   const draftLoadGenerationRef = useRef(0);
+  if (identityChanged) {
+    setPrevDraftIdentity(draftIdentity);
+    setDraftState({ settled: false, value: null });
+    draftLoadGenerationRef.current += 1;
+  }
   useEffect(() => {
     draftLoadGenerationRef.current += 1;
     const generation = draftLoadGenerationRef.current;
     if (!userId) {
       if (!isIdentityLoading) {
-        setDraftState({ settled: true, text: null });
+        setDraftState({ settled: true, value: null });
       }
       return undefined;
     }
     void (async () => {
-      const text = await loadDraft(userId, entityKey, isStringDraft);
+      const value = await loadDraft(userId, entityKey, resolvedValidateRef.current);
       if (draftLoadGenerationRef.current === generation) {
-        setDraftState({ settled: true, text: text ?? null });
+        setDraftState({ settled: true, value: value ?? null });
       }
     })();
     return () => {
       draftLoadGenerationRef.current += 1;
     };
   }, [userId, isIdentityLoading, entityKey]);
-  return draftState;
+  return identityChanged ? { settled: false, value: null } : draftState;
 }
 
 type UseRemoteSpawnDraftCleanupInput = {
@@ -96,9 +116,7 @@ type UseRemoteSpawnDraftCleanupInput = {
  * user who abandons the screen after a failed attempt loses the prompt, the
  * same as if the attempt had succeeded.
  */
-export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanupInput): {
-  markRemoteSpawnAttempted: () => void;
-} {
+export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanupInput) {
   const spawnAttemptedRef = useRef(false);
   const markRemoteSpawnAttempted = useCallback(() => {
     spawnAttemptedRef.current = true;

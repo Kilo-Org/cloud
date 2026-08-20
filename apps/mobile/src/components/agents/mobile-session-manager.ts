@@ -17,10 +17,12 @@ import {
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
+import { type AgentMode } from '@/components/agents/mode-normalize';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
@@ -37,32 +39,7 @@ const FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS = 1000;
  * session-detail route and blocking-card classifier use.
  */
 export function readFetchSessionErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
-  }
-  const record = error as Record<string, unknown>;
-  const data = record.data;
-  if (data && typeof data === 'object') {
-    const code = (data as Record<string, unknown>).code;
-    if (typeof code === 'string') {
-      return code;
-    }
-  }
-  const shape = record.shape;
-  if (shape && typeof shape === 'object') {
-    const shapeData = (shape as Record<string, unknown>).data;
-    if (shapeData && typeof shapeData === 'object') {
-      const code = (shapeData as Record<string, unknown>).code;
-      if (typeof code === 'string') {
-        return code;
-      }
-    }
-  }
-  const top = record.code;
-  if (typeof top === 'string') {
-    return top;
-  }
-  return undefined;
+  return readTrpcErrorField(error, 'code');
 }
 
 /**
@@ -160,8 +137,6 @@ type CreateMobileAgentSessionManagerOptions = {
   organizationId?: string;
 };
 
-type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
-
 const skipBatchOptions = { context: { skipBatch: true } };
 
 export function createMobileAgentSessionManager({
@@ -211,13 +186,15 @@ export function createMobileAgentSessionManager({
         ...(activeSession.capabilities ? { capabilities: activeSession.capabilities } : {}),
       };
     },
-    getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
-      const ticket = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
+    getTicket: async (
+      sessionId: CloudAgentSessionId
+    ): Promise<{ ticket: string; expiresAt: number }> => {
+      const result = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
         const token = await getAuthTokenForRequest();
-        const body: Record<string, string> = { cloudAgentSessionId: sessionId };
-        if (organizationId) {
-          body.organizationId = organizationId;
-        }
+        const body = {
+          cloudAgentSessionId: sessionId,
+          ...(organizationId ? { organizationId } : {}),
+        };
         const response = await fetch(
           `${API_BASE_URL}/api/cloud-agent-next/sessions/stream-ticket`,
           {
@@ -229,16 +206,23 @@ export function createMobileAgentSessionManager({
             body: JSON.stringify(body),
           }
         );
-        const data = (await response.json()) as { ticket?: string; error?: string };
+        const data = (await response.json()) as {
+          ticket?: string;
+          expiresAt?: number;
+          error?: string;
+        };
         if (!response.ok) {
           throw new Error(data.error ?? 'Failed to get stream ticket');
         }
         if (!data.ticket) {
           throw new Error('Missing ticket in stream-ticket response');
         }
-        return data.ticket;
+        if (data.expiresAt === undefined) {
+          throw new Error('Missing expiresAt in stream-ticket response');
+        }
+        return { ticket: data.ticket, expiresAt: data.expiresAt };
       });
-      return ticket;
+      return result;
     },
     fetchSnapshot: async (id: KiloSessionId) => {
       const [sessionData, messagesResult] = await Promise.all([
@@ -262,7 +246,6 @@ export function createMobileAgentSessionManager({
           const baseInput = {
             cloudAgentSessionId: input.sessionId as string,
             payload: input.payload,
-            autoCommit: true,
             messageId: input.messageId,
             ...(input.attachments ? { attachments: input.attachments } : {}),
           };

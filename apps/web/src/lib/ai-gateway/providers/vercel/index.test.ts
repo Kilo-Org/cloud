@@ -382,6 +382,17 @@ describe('applyVercelSettings managed requests', () => {
     expect(getVercelInferenceProvidersMock).toHaveBeenCalledWith('openai/gpt-5');
   });
 
+  it('does not add managed OpenAI BYOK to the discounted GPT-5.6 Sol endpoint', async () => {
+    process.env.OPENAI_API_KEY = 'openai-managed-key';
+    const request = managedRequest({ only: ['openai'] });
+
+    await applyManagedVercelSettings('openai/gpt-5.6-sol-discounted', request);
+
+    expect(request.body.model).toBe('openai/gpt-5.6-sol');
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['openai']);
+    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
+  });
+
   it('does not add managed OpenAI credentials when Vercel does not offer OpenAI', async () => {
     process.env.OPENAI_API_KEY = 'openai-managed-key';
     const request = managedRequest();

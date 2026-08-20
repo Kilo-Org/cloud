@@ -46,6 +46,7 @@ interface __BaseEnv_Env {
 	SandboxSmallContainment: DurableObjectNamespace<import("./src/index").SandboxSmallContainment>;
 	SandboxCodeReviewContainment: DurableObjectNamespace<import("./src/index").SandboxCodeReviewContainment>;
 	CLOUD_AGENT_SESSION: DurableObjectNamespace<import("./src/index").CloudAgentSession>;
+	STREAM_TICKET_NONCE_DO: DurableObjectNamespace<import("./src/index").StreamTicketNonceDO>;
 	USER_KILO_FACADE: DurableObjectNamespace<import("./src/index").UserKiloFacade>;
 	SESSION_INGEST: Service /* entrypoint SessionIngestRPC from session-ingest */;
 	GIT_TOKEN_SERVICE: Service /* entrypoint GitTokenRPCEntrypoint from git-token-service-dev */ | Service /* entrypoint GitTokenRPCEntrypoint from git-token-service */;
@@ -105,6 +106,7 @@ declare namespace Cloudflare {
 		SandboxSmallContainment: DurableObjectNamespace<import("./src/index").SandboxSmallContainment>;
 		SandboxCodeReviewContainment: DurableObjectNamespace<import("./src/index").SandboxCodeReviewContainment>;
 		CLOUD_AGENT_SESSION: DurableObjectNamespace<import("./src/index").CloudAgentSession>;
+		STREAM_TICKET_NONCE_DO: DurableObjectNamespace<import("./src/index").StreamTicketNonceDO>;
 		USER_KILO_FACADE: DurableObjectNamespace<import("./src/index").UserKiloFacade>;
 		SESSION_INGEST: Service /* entrypoint SessionIngestRPC from session-ingest */;
 		GIT_TOKEN_SERVICE: Service /* entrypoint GitTokenRPCEntrypoint from git-token-service-dev */;

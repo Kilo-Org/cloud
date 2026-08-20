@@ -11,6 +11,16 @@ export function isTextPart(part: Part): part is TextPart {
   return part.type === 'text';
 }
 
+/**
+ * Returns the first text part's text, or '' when there is none.
+ * The human-authored prompt is always the first text part, so only `ignored`
+ * parts are skipped. A file-only message yields an empty string.
+ */
+export function firstHumanText(parts: readonly Part[]): string {
+  const part = parts.find((p): p is TextPart => isTextPart(p) && p.ignored !== true);
+  return part?.text ?? '';
+}
+
 /** CLI snapshot-init progress injected as a synthetic text part (matches kilo-vscode). */
 export function isSnapshotProgressPart(part: Part): boolean {
   return isTextPart(part) && part.synthetic === true && part.text.includes('Initializing snapshot');

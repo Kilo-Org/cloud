@@ -25,9 +25,13 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // Controllable upload state. The mock factory reads these at call time, so a
 // test mutates them before mounting to drive the ready vs empty cases.
 const uploadState = vi.hoisted(() => ({
-  attachments: [] as { status?: string; remoteFilename?: string }[],
-  toWirePayload: (() => undefined) as () => unknown,
+  attachments: [] as { status?: string; remoteFilename?: string; metadataStripFailed?: boolean }[],
+  uploadPending: (() => ({ ok: false })) as () => unknown,
+  isUploading: false,
 }));
+
+const toastErrorMock = vi.hoisted(() => vi.fn());
+const toastWarningMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -45,6 +49,7 @@ vi.mock('react', async () => {
       return refSlots.slots[index] as React.RefObject<T>;
     }),
     useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useImperativeHandle: vi.fn(),
   };
 });
 
@@ -91,7 +96,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: toastErrorMock, warning: toastWarningMock },
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
@@ -169,11 +174,14 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
-    isUploading: false,
+    isUploading: uploadState.isUploading,
     hasFailedAttachments: false,
-    toWirePayload: uploadState.toWirePayload,
-    toSubmissionPayload: () => undefined,
+    uploadPending: uploadState.uploadPending,
   }),
+}));
+
+vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
+  useAndroidPendingPickerRecovery: () => undefined,
 }));
 
 vi.mock('@/lib/agent-attachments/use-clipboard-image-hint', () => ({
@@ -291,13 +299,18 @@ beforeEach(() => {
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
   uploadState.attachments = [];
-  uploadState.toWirePayload = () => undefined;
+  uploadState.uploadPending = () => ({ ok: false });
+  uploadState.isUploading = false;
 });
 
 describe('ChatComposer attachment-only send', () => {
-  it('sends an empty draft with a ready attachment, passing prompt and the wire payload', async () => {
+  it('sends an empty draft with a ready attachment, passing the returned payload', async () => {
     uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png' }];
-    uploadState.toWirePayload = () => ({ path: 'path-1', files: ['file.png'] });
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+    });
 
     const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
 
@@ -315,5 +328,41 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('warns but still sends when a chip kept its original metadata', async () => {
+    uploadState.attachments = [
+      { status: 'uploaded', remoteFilename: 'file.png', metadataStripFailed: true },
+    ];
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+    });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(toastWarningMock).toHaveBeenCalledWith(
+      'Photo metadata could not be removed from an attachment.'
+    );
+    // Warn, not block: the send still proceeds.
+    expect(onSendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('toasts when a send is blocked by an in-flight upload', async () => {
+    uploadState.attachments = [{ status: 'uploading' }];
+    uploadState.isUploading = true;
+    uploadState.uploadPending = () => ({ ok: false });
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith('Wait for attachments to finish uploading.');
   });
 });

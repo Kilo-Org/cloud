@@ -31,13 +31,18 @@ import {
   DRAFT_MAX_ENTRIES,
   draftScope,
   flushDraft,
+  isMergeDraft,
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
+  prCommentDraftKey,
+  prMergeDraftKey,
+  prReplyDraftKey,
   prReviewDraftKey,
   resetDraftTimersForTests,
   resolvePrefillOverDraft,
   saveDraft,
+  securityDismissDraftKey,
 } from './drafts';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
@@ -116,6 +121,32 @@ describe('draft scope and entity keys', () => {
     expect(agentComposerDraftKey('sess-1')).toBe('agent-composer:sess-1');
     expect(NEW_SESSION_DRAFT_KEY).toBe('agent-composer:new');
     expect(prReviewDraftKey('acme', 'kilo', 42)).toBe('pr-review:acme/kilo#42');
+    expect(securityDismissDraftKey('personal', 'finding-1')).toBe(
+      'security-dismiss:personal:finding-1'
+    );
+  });
+
+  it('builds the merge, reply, and comment draft entity keys', () => {
+    expect(prMergeDraftKey('acme', 'kilo', 42)).toBe('pr-merge:acme/kilo#42');
+    expect(prReplyDraftKey('acme', 'kilo', 42, 7)).toBe('pr-reply:acme/kilo#42:7');
+    expect(prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10)).toBe(
+      'pr-comment:acme/kilo#42:src/a.ts:RIGHT:10-10'
+    );
+    expect(prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10, 8)).toBe(
+      'pr-comment:acme/kilo#42:src/a.ts:RIGHT:8-10'
+    );
+  });
+
+  it('isMergeDraft accepts a title+message object and rejects other shapes', () => {
+    expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
+    expect(isMergeDraft({ title: '', message: '' })).toBe(true);
+    expect(isMergeDraft({ title: 'T' })).toBe(false);
+    expect(isMergeDraft({ message: 'M' })).toBe(false);
+    expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);
+    expect(isMergeDraft({ title: 'T', message: 2 })).toBe(false);
+    expect(isMergeDraft('not an object')).toBe(false);
+    expect(isMergeDraft(null)).toBe(false);
+    expect(isMergeDraft(['T', 'M'])).toBe(false);
   });
 
   it('resolvePrefillOverDraft lets a non-empty prefill beat the stored draft', () => {
@@ -168,6 +199,79 @@ describe('round trip and absent load', () => {
     await expect(loadDraft('', 'k', isStringDraft)).resolves.toBeNull();
     expect(kvMock.setItem).not.toHaveBeenCalled();
     expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('merge, reply, and comment keys restore per account and destination', () => {
+  it('saves and restores a merge draft under the same account and PR', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, { title: 'T', message: 'M' });
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({ title: 'T', message: 'M' });
+  });
+
+  it('does not restore a merge draft under a different account or PR', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, { title: 'T', message: 'M' });
+    await flushDraft('u1', key);
+    await expect(loadDraft('u2', key, isMergeDraft)).resolves.toBeNull();
+    await expect(
+      loadDraft('u1', prMergeDraftKey('acme', 'kilo', 43), isMergeDraft)
+    ).resolves.toBeNull();
+  });
+
+  it('saves and restores a reply draft under the same account and thread', async () => {
+    const key = prReplyDraftKey('acme', 'kilo', 42, 7);
+    saveDraft('u1', key, 'a reply');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isStringDraft)).resolves.toBe('a reply');
+  });
+
+  it('does not restore a reply draft under a different account or comment', async () => {
+    const key = prReplyDraftKey('acme', 'kilo', 42, 7);
+    saveDraft('u1', key, 'a reply');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u2', key, isStringDraft)).resolves.toBeNull();
+    await expect(
+      loadDraft('u1', prReplyDraftKey('acme', 'kilo', 42, 8), isStringDraft)
+    ).resolves.toBeNull();
+  });
+
+  it('saves and restores a comment draft under the same account and diff position', async () => {
+    const key = prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10);
+    saveDraft('u1', key, 'a comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isStringDraft)).resolves.toBe('a comment');
+  });
+
+  it('does not restore a comment draft under a different account or line', async () => {
+    const key = prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10);
+    saveDraft('u1', key, 'a comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u2', key, isStringDraft)).resolves.toBeNull();
+    await expect(
+      loadDraft('u1', prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 11), isStringDraft)
+    ).resolves.toBeNull();
+  });
+
+  it('clear removes the merge, reply, and comment entries', async () => {
+    const mergeKey = prMergeDraftKey('acme', 'kilo', 42);
+    const replyKey = prReplyDraftKey('acme', 'kilo', 42, 7);
+    const commentKey = prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10);
+    saveDraft('u1', mergeKey, { title: 'T', message: 'M' });
+    saveDraft('u1', replyKey, 'a reply');
+    saveDraft('u1', commentKey, 'a comment');
+    await Promise.all([
+      flushDraft('u1', mergeKey),
+      flushDraft('u1', replyKey),
+      flushDraft('u1', commentKey),
+    ]);
+    await clearDraft('u1', mergeKey);
+    await clearDraft('u1', replyKey);
+    await clearDraft('u1', commentKey);
+    await expect(loadDraft('u1', mergeKey, isMergeDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', replyKey, isStringDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', commentKey, isStringDraft)).resolves.toBeNull();
   });
 });
 
@@ -427,10 +531,10 @@ describe('write rejection boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('clearDraft reports and resolves when the remove fails', async () => {
+  it('clearDraft reports and returns false when the remove fails', async () => {
     kvMock.removeItem.mockRejectedValueOnce(new Error('kv down'));
     seedStoredValue('draft:u1', 'k', '"old"');
-    await expect(clearDraft('u1', 'k')).resolves.toBeUndefined();
+    await expect(clearDraft('u1', 'k')).resolves.toBe(false);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 

@@ -18,10 +18,12 @@ import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { UserAdminNote } from '@kilocode/db/schema';
+import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete-reasons';
 import { formatDate } from '@/lib/admin-utils';
 import type { NoteWithAdminUser, UserDetailProps } from '@/types/admin';
 
 export function UserAdminNotes(user: UserDetailProps) {
+  const isGoneOrDeleting = isGoneOrDeletingBlockedReason(user.blocked_reason);
   const [notes, setNotes] = useState<NoteWithAdminUser[]>(user.admin_notes || []);
   const [noteToDelete, setNoteToDelete] = useState<UserAdminNote | null>(null);
   const [noteContent, setNoteContent] = useState('');
@@ -132,16 +134,18 @@ export function UserAdminNotes(user: UserDetailProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="new-note">
-                {user.blocked_reason
-                  ? 'Add a new note or unblock user'
-                  : 'Add a new note or block user'}
+                {isGoneOrDeleting
+                  ? 'Add a new note'
+                  : user.blocked_reason
+                    ? 'Add a new note or unblock user'
+                    : 'Add a new note or block user'}
               </Label>
               <Textarea
                 id="new-note"
                 value={noteContent}
                 onChange={e => setNoteContent(e.target.value)}
                 placeholder={
-                  user.blocked_reason
+                  user.blocked_reason && !isGoneOrDeleting
                     ? 'Type your note here or provide a reason for unblocking...'
                     : 'Type your note here...'
                 }
@@ -157,7 +161,7 @@ export function UserAdminNotes(user: UserDetailProps) {
                 >
                   {addNoteMutation.isPending ? 'Adding...' : 'Add Note'}
                 </Button>
-                {user.blocked_reason ? (
+                {isGoneOrDeleting ? null : user.blocked_reason ? (
                   <Button
                     onClick={handleUnblockUser}
                     disabled={updateUserMutation.isPending || addNoteMutation.isPending}

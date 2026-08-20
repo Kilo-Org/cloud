@@ -1,4 +1,4 @@
-import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
+import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
 
 /**
  * How long the connection must stay down before the banner appears. NetInfo
@@ -22,6 +22,9 @@ export type OfflineBannerStore = {
   destroy: () => void;
 };
 
+/** The banner's committed connectivity state. */
+type BannerState = 'online' | 'offline' | 'unknown';
+
 export function createOfflineBannerStore(options: {
   source: ConnectivitySource;
   timer: OfflineBannerTimer;
@@ -30,7 +33,9 @@ export function createOfflineBannerStore(options: {
   const { source, timer } = options;
   const showDelayMs = options.showDelayMs ?? OFFLINE_BANNER_SHOW_DELAY_MS;
 
-  let committedOnline = true;
+  // Start unknown, not online: until NetInfo settles we cannot claim the
+  // connection works, but we also must not show the offline banner.
+  let state: BannerState = 'unknown';
   let pending: { cancel(): void } | null = null;
   const listeners = new Set<() => void>();
 
@@ -39,26 +44,33 @@ export function createOfflineBannerStore(options: {
     pending = null;
   }
 
-  function commit(online: boolean): void {
-    committedOnline = online;
-    for (const listener of listeners) {
-      listener();
+  function commit(next: BannerState): void {
+    const wasOffline = state === 'offline';
+    state = next;
+    // Notify only when the observable `isOffline` value changes; an
+    // unknown → online transition leaves it false and must not re-render.
+    if (wasOffline !== (next === 'offline')) {
+      for (const listener of listeners) {
+        listener();
+      }
     }
   }
 
-  function handleSourceState(state: ConnectivityState): void {
-    const online = isOnline(state);
+  function handleSourceState(sourceState: ConnectivityState): void {
+    const status = connectivityStatus(sourceState);
     cancelPending();
-    if (online === committedOnline) {
+    if (status === 'unknown') {
+      // Do not reveal the banner while connectivity is unknown, and do not
+      // advance the committed state from its boot default.
       return;
     }
-    if (online) {
-      commit(true);
+    if (status === 'online') {
+      commit('online');
       return;
     }
     pending = timer.set(() => {
       pending = null;
-      commit(false);
+      commit('offline');
     }, showDelayMs);
   }
 
@@ -73,7 +85,7 @@ export function createOfflineBannerStore(options: {
     };
   };
 
-  const isOffline = (): boolean => !committedOnline;
+  const isOffline = (): boolean => state === 'offline';
 
   const destroy = (): void => {
     cancelPending();

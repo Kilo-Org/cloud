@@ -8,6 +8,7 @@ export type DeviceAuthState = {
   expiresIn: number | undefined;
   error: string | undefined;
   verificationUrl: string | undefined;
+  resumed?: boolean;
 };
 
 export function errorDeviceAuthState(
@@ -40,7 +41,8 @@ export function idleDeviceAuthState(): DeviceAuthState {
 
 export function pendingDeviceAuthState(
   code: string | undefined,
-  verificationUrl: string | undefined
+  verificationUrl: string | undefined,
+  resumed = false
 ): DeviceAuthState {
   return {
     status: 'pending',
@@ -50,6 +52,7 @@ export function pendingDeviceAuthState(
     expiresIn: undefined,
     error: undefined,
     verificationUrl,
+    resumed,
   };
 }
 

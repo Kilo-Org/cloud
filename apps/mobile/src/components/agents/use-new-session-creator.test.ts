@@ -116,11 +116,22 @@ vi.mock('expo-crypto', () => {
   };
 });
 
+const outboxMock = vi.hoisted(() => ({
+  getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
+  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
+  remove: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
+
 type CreatorInput = Parameters<typeof useNewSessionCreator>[0];
 type CreatorResult = ReturnType<typeof useNewSessionCreator>;
 
 // Simulated attachment wire payload (`{path, files}`). Each test sets this
-// before a submit; the fake `toWirePayload` below reads it at call time so a
+// before a submit; the fake `uploadPending` below reads it at call time so a
 // test can change attachments between two submits.
 let attachmentsWire: { path: string; files: string[] } | null = null;
 
@@ -132,8 +143,11 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   reset: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
-  toWirePayload: () => undefined,
-  toSubmissionPayload: () => undefined,
+  uploadPending: vi.fn(async () => ({
+    ok: true as const,
+    wire: undefined,
+    submission: undefined,
+  })),
 };
 
 function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
@@ -145,6 +159,7 @@ function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
     selectedRepo: '',
     setIsCreating: vi.fn(() => undefined),
     variant: 'medium',
+    autoCommit: false,
     ...overrides,
   };
 }
@@ -221,6 +236,10 @@ beforeEach(() => {
   hapticsMock.rejectWith = undefined;
   attachmentsWire = null;
   scheduledFrames.count = 0;
+  outboxMock.getStoredOperationKey.mockReturnValue(null);
+  outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+  outboxMock.remove.mockResolvedValue(undefined);
+  outboxMock.whenLoaded.mockResolvedValue(true);
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrameStub);
 });
 
@@ -259,6 +278,8 @@ function runCreator(args: {
   variant?: string;
   organizationId?: string;
   selectedRepo?: string;
+  autoCommit?: boolean;
+  profileId?: string | null;
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
   const refs: { current: unknown }[] = [];
@@ -284,10 +305,14 @@ function runCreator(args: {
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
     return useNewSessionCreator({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape, never read by the create path
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape; only `attachments` and `uploadPending` are read by the create path
       attachments: {
         attachments: [],
-        toWirePayload: () => attachmentsWire,
+        uploadPending: async () => ({
+          ok: true as const,
+          wire: attachmentsWire,
+          submission: undefined,
+        }),
       } as never,
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',
@@ -296,6 +321,8 @@ function runCreator(args: {
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
+      autoCommit: args.autoCommit ?? false,
+      profileId: args.profileId,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -534,6 +561,20 @@ describe('useNewSessionCreator operationKey', () => {
   });
 });
 
+describe('useNewSessionCreator mode passthrough', () => {
+  it('passes a custom mode slug through unchanged to prepareSession', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ mode: 'reviewer' });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      mode: 'reviewer',
+    });
+  });
+});
+
 describe('useNewSessionCreator onCreated', () => {
   it('fires onCreated once on success, before navigating', async () => {
     const onCreated = vi.fn(() => undefined);
@@ -602,6 +643,148 @@ describe('useNewSessionCreator onCreated', () => {
   });
 });
 
+describe('useNewSessionCreator profileId', () => {
+  it('passes profileId into prepareSession when an effective id exists', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ profileId: 'profile-1' });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ profileId: 'profile-1' });
+  });
+
+  it('omits profileId from prepareSession when no effective id exists', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('profileId');
+  });
+});
+
+describe('useNewSessionCreator autoCommit', () => {
+  it('sends autoCommit false (Leave changes) by default', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: false });
+  });
+
+  it('sends autoCommit true when Commit and push is chosen', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ autoCommit: true });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: true });
+  });
+});
+
+describe('useNewSessionCreator mutation outbox (P1-E-40c)', () => {
+  beforeEach(() => {
+    prepareSessionMutate.mockReset();
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    outboxMock.getStoredOperationKey.mockReturnValue(null);
+    outboxMock.writeSafeRetry.mockReset();
+    outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+    outboxMock.remove.mockReset();
+    outboxMock.remove.mockResolvedValue(undefined);
+  });
+
+  it('writes a safe-retry row before mutate and removes it on success', async () => {
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.writeSafeRetry).toHaveBeenCalledTimes(1);
+    expect(outboxMock.writeSafeRetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: expect.any(String),
+        fingerprint: expect.any(String),
+      })
+    );
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+    // The row is written before the mutate fires.
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      prepareSessionMutate.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('reuses a stored operationKey instead of minting a new UUID', async () => {
+    outboxMock.getStoredOperationKey.mockReturnValue('stored-op-key');
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      operationKey: 'stored-op-key',
+    });
+  });
+
+  it('awaits the outbox load before reading the stored key (no key-reuse race)', async () => {
+    const order: string[] = [];
+    outboxMock.whenLoaded.mockImplementation(async () => {
+      order.push('whenLoaded');
+      await Promise.resolve();
+      return true;
+    });
+    outboxMock.getStoredOperationKey.mockImplementation(() => {
+      order.push('getStoredOperationKey');
+      return 'stored-op-key';
+    });
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(order).toEqual(['whenLoaded', 'getStoredOperationKey']);
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      operationKey: 'stored-op-key',
+    });
+  });
+
+  it('refuses to create when the outbox read failed (no duplicate key)', async () => {
+    outboxMock.whenLoaded.mockResolvedValueOnce(false);
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(outboxMock.writeSafeRetry).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith('Could not read pending sessions. Try again.');
+  });
+
+  it('keeps the row on a retryable failure so a relaunch reuses the key', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(creationInProgressError());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes the row on a terminal failure', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(badRequestError());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('restored new-session submit', () => {
   it('sends the restored prompt without editing once the route seeds the prompt ref', async () => {
     const resultRef = mountCreator(createInput({ organizationId: 'org-1' }));
@@ -621,7 +804,7 @@ describe('restored new-session submit', () => {
   });
 });
 
-type DraftLoadState = { settled: boolean; text: string | null };
+type DraftLoadState = { settled: boolean; value: string | null };
 
 function FencedDraftHarness({
   userId,
@@ -702,14 +885,14 @@ describe('useFencedDraftLoad generation fencing', () => {
         firstLoad.resolve(staleText);
       });
       await flushMicrotasks();
-      expect(renders.at(-1)).toEqual({ settled: false, text: null });
+      expect(renders.at(-1)).toEqual({ settled: false, value: null });
 
       // The current generation's load resolves: it publishes.
       await act(async () => {
         secondLoad.resolve(freshText);
       });
       await flushMicrotasks();
-      expect(renders.at(-1)).toEqual({ settled: true, text: freshText });
+      expect(renders.at(-1)).toEqual({ settled: true, value: freshText });
       expect(vi.mocked(loadDraft)).toHaveBeenCalledWith(
         second.userId,
         second.entityKey,
@@ -744,7 +927,7 @@ describe('useFencedDraftLoad generation fencing', () => {
       gate.resolve('late draft');
     });
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: false, text: null });
+    expect(renders.at(-1)).toEqual({ settled: false, value: null });
   });
 });
 

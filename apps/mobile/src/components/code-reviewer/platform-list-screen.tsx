@@ -16,11 +16,11 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { useTRPC } from '@/lib/trpc';
 
-const PLATFORM_ICONS: Record<ReviewerPlatform, typeof GitBranch> = {
+const PLATFORM_ICONS = {
   github: GitBranch,
   gitlab: GitMerge,
   bitbucket: GitPullRequest,
-};
+} satisfies Record<ReviewerPlatform, typeof GitBranch>;
 
 const ALL_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 

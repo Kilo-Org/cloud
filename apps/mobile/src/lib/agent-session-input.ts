@@ -87,8 +87,6 @@ export function buildAgentSessionSearchInput(options: {
  * same context must produce the *same* query key — the live-sync owner writes WS
  * payloads straight into that key, so a mismatch would silently split the cache.
  */
-export function buildActiveSessionsInput(organizationId: string | null | undefined): {
-  organizationId: string | null;
-} {
+export function buildActiveSessionsInput(organizationId: string | null | undefined) {
   return { organizationId: organizationId ?? null };
 }

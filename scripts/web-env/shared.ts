@@ -725,8 +725,15 @@ export function readSecret(prompt: string): Promise<string> {
           resolve(value);
           return;
         }
-        if (character === '\u007f') value = value.slice(0, -1);
-        else value += character;
+        if (character === '\u007f') {
+          if (value) {
+            value = value.slice(0, -1);
+            process.stdout.write('\b \b');
+          }
+        } else {
+          value += character;
+          process.stdout.write('*');
+        }
       }
     };
     process.stdin.on('data', onData);

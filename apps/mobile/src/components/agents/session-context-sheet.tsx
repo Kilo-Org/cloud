@@ -45,12 +45,12 @@ type SessionContextSheetProps = {
 const SHEET_RING_SIZE = 96;
 const SHEET_RING_STROKE = 8;
 
-const TONE_TEXT_CLASS: Record<ContextTone, string> = {
+const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
   warning: 'text-warn',
   primary: 'text-foreground',
   neutral: 'text-foreground',
-};
+} satisfies Record<ContextTone, string>;
 
 function toneTextClass(tone: ContextTone): string {
   return TONE_TEXT_CLASS[tone];

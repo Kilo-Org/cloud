@@ -12,6 +12,8 @@ import {
   mapSecurityDismissOperationError,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useHoistedOperationKey } from '@/lib/operation-key';
+import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -19,20 +21,29 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 // types even when structurally identical, so we always call both hooks (one
 // disabled) and return whichever is active. See use-code-reviewer.ts:32.
 
-type ListFindingsFilters = Parameters<typeof trpcClient.securityAgent.listFindings.query>[0];
+export type ListFindingsFilters = Parameters<typeof trpcClient.securityAgent.listFindings.query>[0];
 
-export function useSecurityFindings(scope: string, filters: ListFindingsFilters) {
-  const trpc = useTRPC();
+type SecurityFindingsPage = Awaited<ReturnType<typeof trpcClient.securityAgent.listFindings.query>>;
+
+/**
+ * Build the findings-list infinite-query options. Kept as a pure builder so
+ * the retention bound is testable without mounting the hook.
+ */
+export function buildSecurityFindingsQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  scope: string,
+  filters: ListFindingsFilters
+) {
   const isPersonal = isPersonalSecurityScope(scope);
   const baseQueryKey = isPersonal
     ? trpc.securityAgent.listFindings.queryKey()
     : trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope });
 
-  return useInfiniteQuery({
+  return withInfiniteRetention({
     queryKey: [...baseQueryKey, filters],
     initialPageParam: filters.offset ?? 0,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam }: { pageParam: number }) =>
       isPersonal
         ? trpcClient.securityAgent.listFindings.query({ ...filters, offset: pageParam })
         : trpcClient.organizations.securityAgent.listFindings.query({
@@ -40,11 +51,23 @@ export function useSecurityFindings(scope: string, filters: ListFindingsFilters)
             ...filters,
             offset: pageParam,
           }),
-    getNextPageParam: (lastPage, pages) => {
-      const loadedCount = pages.reduce((count, page) => count + page.findings.length, 0);
-      return getNextSecurityFindingsOffset(filters.offset ?? 0, loadedCount, lastPage.totalCount);
-    },
+    // Derive the next offset from the last page's own offset, not by summing
+    // the retained `pages` array. `maxPages` trims the oldest page once the
+    // bound is exceeded, so summing `pages` undercounts and would repeat the
+    // same offset forever. `lastPageParam` is monotonic and trim-safe.
+    getNextPageParam: (
+      lastPage: SecurityFindingsPage,
+      _pages: SecurityFindingsPage[],
+      lastPageParam: number
+    ) =>
+      getNextSecurityFindingsOffset(lastPageParam, lastPage.findings.length, lastPage.totalCount),
   });
+}
+
+export function useSecurityFindings(scope: string, filters: ListFindingsFilters) {
+  const trpc = useTRPC();
+
+  return useInfiniteQuery(buildSecurityFindingsQueryOptions(trpc, scope, filters));
 }
 
 export function useSecurityFinding(scope: string, id: string) {
@@ -157,10 +180,11 @@ export function useStartSecurityAnalysis(scope: string) {
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startAnalysis.mutate>[0]) =>
       isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.startAnalysis.mutate(vars)
+        ? trpcClient.securityAgent.startAnalysis.mutate({ ...vars, forceSandbox: true })
         : trpcClient.organizations.securityAgent.startAnalysis.mutate({
             organizationId: scope,
             ...vars,
+            forceSandbox: true,
           }),
     onError: error => {
       toast.error(error.message);
@@ -175,8 +199,10 @@ export function useStartSecurityAnalysis(scope: string) {
           queryClient.invalidateQueries({
             queryKey: trpc.securityAgent.getFinding.queryKey({ id: vars.findingId }),
           }),
-          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
         ]);
+        scheduleCacheMaintenance(() => {
+          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+        });
         return;
       }
       await Promise.all([
@@ -192,12 +218,13 @@ export function useStartSecurityAnalysis(scope: string) {
             id: vars.findingId,
           }),
         }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.listFindings.queryKey({
-            organizationId: scope,
-          }),
-        }),
       ]);
+      scheduleCacheMaintenance(() => {
+        reconcileFirstPage(
+          queryClient,
+          trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
+        );
+      });
     },
   });
 }

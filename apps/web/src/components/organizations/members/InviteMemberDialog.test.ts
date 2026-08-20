@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { hasInviteSeatCapacity } from './InviteMemberDialog';
+import { hasInviteSeatCapacity, INVITE_SUCCESS_MESSAGE } from './InviteMemberDialog';
 
 describe('hasInviteSeatCapacity', () => {
   test('allows Teams invitations when seat requirements are disabled', () => {
@@ -22,5 +22,12 @@ describe('hasInviteSeatCapacity', () => {
         totalSeats: 1,
       })
     ).toBe(false);
+  });
+});
+
+describe('INVITE_SUCCESS_MESSAGE', () => {
+  test('says the invite was created, not sent', () => {
+    expect(INVITE_SUCCESS_MESSAGE).toBe('Invite created');
+    expect(INVITE_SUCCESS_MESSAGE.toLowerCase()).not.toContain('sent');
   });
 });

@@ -1,13 +1,13 @@
 import { type SendMessagePayload, type TransportSendPayload } from '@kilocode/cloud-agent-sdk';
 
-import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 
 /**
  * Normalize a transport send payload into the wire `SendMessagePayload`.
  *
  * Kept in its own module (rather than alongside `buildRemoteAttachmentParts`)
- * because it depends on `mode-options`, which transitively pulls in React
- * Native / Expo modules. Isolating it keeps the attachment helper importable
+ * because it depends on `mode-normalize`, a pure helper module with no React
+ * Native / Expo imports. Isolating it keeps the attachment helper importable
  * from the Node-based unit test environment.
  */
 export function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {

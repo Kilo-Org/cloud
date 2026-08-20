@@ -1,6 +1,7 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { type VoiceInputControllerSnapshot } from './voice-input-controller';
 import { voiceInputController } from './native-voice-input';
 import { type VoiceInputStatus } from './voice-input-state';
@@ -55,6 +56,7 @@ const getServerSnapshot = getSnapshot;
 
 export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResult {
   const { disabled, getDraft, onDraftChange } = options;
+  const { userId } = useCurrentUserId();
 
   const ownerRef = useRef<string | null>(null);
   ownerRef.current ??= nextOwnerId();
@@ -69,6 +71,9 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
   const getDisabledRef = useRef(disabled);
   getDisabledRef.current = disabled;
 
+  const getUserIdRef = useRef(userId);
+  getUserIdRef.current = userId;
+
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const actionsRef = useRef<VoiceInputActions | null>(null);
@@ -78,6 +83,7 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
     getDraft: () => getDraftRef.current(),
     getOnDraftChange: () => getOnDraftChangeRef.current,
     getOwner: () => owner,
+    getUserId: () => getUserIdRef.current,
   });
   const actions = actionsRef.current;
 

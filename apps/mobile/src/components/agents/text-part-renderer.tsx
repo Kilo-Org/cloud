@@ -5,7 +5,7 @@ type TextPartRendererProps = {
 };
 
 export function TextPartRenderer({ text }: Readonly<TextPartRendererProps>) {
-  if (!text) {
+  if (!text.trim()) {
     return null;
   }
 

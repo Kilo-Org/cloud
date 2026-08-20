@@ -19,10 +19,7 @@ type ProviderErrorVariant = 'server' | 'permission' | 'not-found';
  * `permanent` (rendered with the permission/not-found QueryError variant and
  * no retry); anything else is a transient server error.
  */
-export function classifyProviderErrorCode(errorCode: string | undefined): {
-  permanent: boolean;
-  variant: ProviderErrorVariant;
-} {
+export function classifyProviderErrorCode(errorCode: string | undefined) {
   const permanent =
     errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED' || errorCode === 'NOT_FOUND';
   let variant: ProviderErrorVariant = 'server';
@@ -53,7 +50,7 @@ export function classifyProviderState(input: {
   isFetching: boolean;
   connected: boolean | undefined;
   hasData: boolean;
-  refetch: () => unknown;
+  refetch: () => void;
   /** TRPC error code (error.data?.code) when isError, for permanent-vs-transient classification. */
   errorCode?: string;
 }): ProviderState {
@@ -67,11 +64,18 @@ export function classifyProviderState(input: {
     const { permanent, variant } = classifyProviderErrorCode(input.errorCode);
     return {
       status: 'error',
-      refetch: () => void input.refetch(),
+      refetch: input.refetch,
       isRetrying: input.isFetching,
       permanent,
       variant,
     };
+  }
+  // A paused query (offline/unknown connectivity) with an empty cache is
+  // pending but not fetching, so `isLoading` (isPending && isFetching) is
+  // false. "No data yet" must stay loading, not fall through to disconnected
+  // (which renders the Connect card on a cold launch before NetInfo settles).
+  if (!input.hasData) {
+    return { status: 'loading' };
   }
   return input.connected ? { status: 'connected' } : { status: 'disconnected' };
 }
@@ -90,7 +94,7 @@ export function classifyPermission(input: {
   isError: boolean;
   isFetching: boolean;
   role: string | undefined;
-  refetch: () => unknown;
+  refetch: () => void;
 }): PermissionState {
   if (input.isPersonal) {
     return { status: 'ready', canEdit: true };
@@ -99,7 +103,7 @@ export function classifyPermission(input: {
     return { status: 'loading' };
   }
   if (input.isError) {
-    return { status: 'error', refetch: () => void input.refetch(), isRetrying: input.isFetching };
+    return { status: 'error', refetch: input.refetch, isRetrying: input.isFetching };
   }
   return { status: 'ready', canEdit: canManageOrganizationBilling(input.role) };
 }

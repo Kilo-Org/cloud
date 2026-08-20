@@ -4,11 +4,48 @@ import {
   credit_transactions,
   device_sessions,
   kilocode_users,
+  magic_link_tokens,
   user_notification_preferences,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
+import { sendSignInCodeEmail } from '@/lib/email';
+import {
+  sendAccountDeletionConfirmationEmail,
+  sendAccountDeletionSupportNotification,
+} from '@/lib/email';
+import { performGdprRemoval } from '@/lib/user/gdpr-removal';
+import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
+
+jest.mock('@/lib/email', () => {
+  const actual = jest.requireActual('@/lib/email');
+  return {
+    ...actual,
+    sendSignInCodeEmail: jest.fn(),
+    sendAccountDeletionConfirmationEmail: jest.fn(),
+    sendAccountDeletionSupportNotification: jest.fn(),
+  };
+});
+
+jest.mock('@/lib/user/gdpr-removal', () => ({
+  performGdprRemoval: jest.fn(),
+}));
+
+jest.mock('@/lib/user', () => {
+  const actual = jest.requireActual('@/lib/user');
+  return {
+    ...actual,
+    assertUserCanBeSoftDeleted: jest.fn(),
+  };
+});
+
+const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
+const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmationEmail);
+const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
+const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
+const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
 
 let testUser: User;
 let surveyTestUser: User;
@@ -574,6 +611,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
@@ -603,6 +641,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: false,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
@@ -620,6 +659,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -662,6 +702,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -674,6 +715,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -710,6 +752,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -729,6 +772,39 @@ describe('user router - notification preferences', () => {
     expect(row?.security_findings_enabled).toBe(true);
   });
 
+  it('writes only notificationPreviews and leaves the category columns untouched', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({
+      notificationPreviews: 'full',
+    });
+
+    expect(result.notificationPreviews).toBe('full');
+    // All category columns stay at their DB default (true) because only the
+    // notificationPreviews key was supplied.
+    expect(result.chatMessages).toBe(true);
+    expect(result.agentAttention).toBe(true);
+    expect(result.agentUpdates).toBe(true);
+    expect(result.sessionStatus).toBe(true);
+    expect(result.kiloclawActivity).toBe(true);
+    expect(result.balanceAlerts).toBe(true);
+    expect(result.securityFindings).toBe(true);
+    expect(result.agentPushEnabled).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.notification_previews).toBe('full');
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+  });
+
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
@@ -741,6 +817,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -762,6 +839,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: false,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -803,6 +881,175 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+
+  it('one category toggle cannot delete unrelated subscriptions (six other categories + agent_push_enabled preserved)', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    // Seed every category OFF and the master gate OFF. A full-row overwrite
+    // would flip an unrelated subscription back ON, so this pins the
+    // provided-only partial upsert contract.
+    await db.insert(user_notification_preferences).values({
+      user_id: firstUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: false,
+    });
+
+    // Flip exactly one category ON.
+    const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
+    expect(result.balanceAlerts).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+
+    // The single flipped column changed; every other column is untouched.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(false);
+    expect(row?.chat_messages_enabled).toBe(false);
+    expect(row?.agent_attention_enabled).toBe(false);
+    expect(row?.session_status_enabled).toBe(false);
+    expect(row?.kiloclaw_activity_enabled).toBe(false);
+    expect(row?.security_findings_enabled).toBe(false);
+  });
+});
+
+describe('user router - register push token', () => {
+  let tokenUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'push-token-register@example.com',
+      google_user_name: 'Push Token Register',
+    });
+  });
+
+  afterEach(async () => {
+    await db.delete(user_push_tokens).where(eq(user_push_tokens.user_id, tokenUser.id));
+    await db
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, tokenUser.id));
+  });
+
+  it('stores the app version when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-with-version]',
+      platform: 'android',
+      appVersion: '1.0.4',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBe('1.0.4');
+    expect(row?.platform).toBe('android');
+  });
+
+  it('stores a null app version when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-without-version]',
+      platform: 'android',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBeNull();
+  });
+
+  it('updates the app version on re-registration of the same token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-re-register]';
+
+    await caller.user.registerPushToken({ token, platform: 'android' });
+    await caller.user.registerPushToken({ token, platform: 'android', appVersion: '1.0.4' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.app_version).toBe('1.0.4');
+  });
+
+  it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // Seed a distinctive preferences row so any accidental write is visible.
+    await db.insert(user_notification_preferences).values({
+      user_id: tokenUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: false,
+      notification_previews: 'full',
+    });
+
+    const token = 'ExponentPushToken[token-prefs-untouched]';
+    await caller.user.registerPushToken({ token, platform: 'android' });
+
+    // Token registration must not mutate any preference column.
+    const [afterRegister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterRegister?.agent_push_enabled).toBe(false);
+    expect(afterRegister?.chat_messages_enabled).toBe(false);
+    expect(afterRegister?.agent_attention_enabled).toBe(false);
+    expect(afterRegister?.session_status_enabled).toBe(false);
+    expect(afterRegister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterRegister?.balance_alerts_enabled).toBe(false);
+    expect(afterRegister?.security_findings_enabled).toBe(false);
+    expect(afterRegister?.notification_previews).toBe('full');
+
+    // The token row now exists, proving register ran.
+    const tokensAfterRegister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterRegister).toHaveLength(1);
+
+    await caller.user.unregisterPushToken({ token });
+
+    // Token removal must not mutate any preference column either.
+    const [afterUnregister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterUnregister?.agent_push_enabled).toBe(false);
+    expect(afterUnregister?.chat_messages_enabled).toBe(false);
+    expect(afterUnregister?.agent_attention_enabled).toBe(false);
+    expect(afterUnregister?.session_status_enabled).toBe(false);
+    expect(afterUnregister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterUnregister?.balance_alerts_enabled).toBe(false);
+    expect(afterUnregister?.security_findings_enabled).toBe(false);
+    expect(afterUnregister?.notification_previews).toBe('full');
+
+    // The token row is gone, proving unregister ran.
+    const tokensAfterUnregister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterUnregister).toHaveLength(0);
   });
 });
 
@@ -994,5 +1241,268 @@ describe('user router - device sessions', () => {
       .from(device_sessions)
       .where(eq(device_sessions.id, currentSessionId));
     expect(row?.revoked_at).toBeNull();
+  });
+});
+
+describe('user router - account deletion', () => {
+  let deletionUser: User;
+
+  beforeEach(async () => {
+    deletionUser = await insertTestUser({
+      google_user_email: `deletion-${crypto.randomUUID()}@example.com`,
+      google_user_name: 'Deletion Test User',
+    });
+
+    mockSendSignInCodeEmail.mockReset();
+    mockSendDeletionConfirmation.mockReset();
+    mockSendDeletionSupportNotification.mockReset();
+    mockPerformGdprRemoval.mockReset();
+    mockAssertUserCanBeSoftDeleted.mockReset();
+
+    mockAssertUserCanBeSoftDeleted.mockResolvedValue(undefined);
+    mockPerformGdprRemoval.mockResolvedValue({ warnings: [] });
+    mockSendSignInCodeEmail.mockResolvedValue({ sent: false, reason: 'provider_not_configured' });
+    mockSendDeletionConfirmation.mockResolvedValue({ sent: true });
+    mockSendDeletionSupportNotification.mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, deletionUser.google_user_email));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, deletionUser.id));
+  });
+
+  it('challenge sends the sign-in code email to the authenticated email', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+
+    const result = await caller.user.requestAccountDeletionChallenge();
+
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith(
+      deletionUser.google_user_email,
+      expect.any(String)
+    );
+    expect(result.challengeId).toEqual(expect.any(String));
+    expect(result.devCode).toEqual(expect.any(String));
+  });
+
+  it('challenge does not accept a client-supplied email', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+
+    await caller.user.requestAccountDeletionChallenge();
+
+    // The mutation takes no input; the only email used is the authenticated
+    // user's own address, never a client-provided value.
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith(
+      deletionUser.google_user_email,
+      expect.any(String)
+    );
+  });
+
+  it('challenge returns devCode when the email sends in non-production', async () => {
+    mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
+    const caller = await createCallerForUser(deletionUser.id);
+
+    const result = await caller.user.requestAccountDeletionChallenge();
+
+    expect(result.challengeId).toEqual(expect.any(String));
+    expect(result.devCode).toEqual(expect.any(String));
+  });
+
+  it('challenge omits devCode in production', async () => {
+    mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
+    const caller = await createCallerForUser(deletionUser.id);
+    const restoreNodeEnv = jest.replaceProperty(process.env, 'NODE_ENV', 'production');
+    try {
+      const result = await caller.user.requestAccountDeletionChallenge();
+
+      expect(result.challengeId).toEqual(expect.any(String));
+      expect(result.devCode).toBeUndefined();
+    } finally {
+      restoreNodeEnv.restore();
+    }
+  });
+
+  it('wrong code does not delete the account', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+    const wrongCode = devCode === '000000' ? '111111' : '000000';
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: wrongCode })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('no input keeps the legacy request flow: emails only, no removal', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+
+    const result = await caller.user.requestAccountDeletion();
+
+    expect(result).toEqual({ success: true });
+    expect(mockSendDeletionConfirmation).toHaveBeenCalledWith(deletionUser.google_user_email);
+    expect(mockSendDeletionSupportNotification).toHaveBeenCalledWith(
+      deletionUser.google_user_email,
+      deletionUser.id
+    );
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+
+    const [stored] = await db
+      .select({ requestedAt: kilocode_users.account_deletion_requested_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, deletionUser.id));
+    expect(stored?.requestedAt).not.toBeNull();
+  });
+
+  it('valid code calls performGdprRemoval once', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    const result = await caller.user.requestAccountDeletion({
+      challengeId,
+      code: devCode as string,
+    });
+
+    expect(result).toEqual({ status: 'deleted' });
+    expect(mockPerformGdprRemoval).toHaveBeenCalledTimes(1);
+    expect(mockPerformGdprRemoval).toHaveBeenCalledWith(deletionUser.id, {
+      destroyReason: 'admin_request',
+      actor: {
+        id: deletionUser.id,
+        email: deletionUser.google_user_email,
+        name: deletionUser.google_user_name,
+      },
+    });
+  });
+
+  it('keeps the code usable when performGdprRemoval fails, so a retry succeeds', async () => {
+    mockPerformGdprRemoval.mockRejectedValueOnce(new Error('kiloclaw destroy failed'));
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toThrow();
+
+    const [afterFailure] = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(afterFailure?.consumed_at).toBeNull();
+    expect(afterFailure?.reserved_until).toBeNull();
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).resolves.toEqual({ status: 'deleted' });
+
+    expect(mockPerformGdprRemoval).toHaveBeenCalledTimes(2);
+
+    const [afterRetry] = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(afterRetry?.consumed_at).not.toBeNull();
+  });
+
+  it('rejects a replay of the code after a successful deletion', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await caller.user.requestAccountDeletion({ challengeId, code: devCode as string });
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects an expired code without deleting', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await db
+      .update(magic_link_tokens)
+      .set({
+        // Shift both timestamps into the past so the code is expired while
+        // still satisfying the `expires_at > created_at` check constraint.
+        created_at: new Date(Date.now() - 2 * 60_000).toISOString(),
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+      })
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('wrong code increments attempts and does not delete', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+    const wrongCode = devCode === '000000' ? '111111' : '000000';
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: wrongCode })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+
+    const [row] = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(row?.attempts).toBe(1);
+  });
+
+  it('maps too_many_attempts to TOO_MANY_REQUESTS', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await db
+      .update(magic_link_tokens)
+      .set({ attempts: 5 })
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
+  it('production provider_not_configured does not stamp and throws INTERNAL_SERVER_ERROR', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    const restoreNodeEnv = jest.replaceProperty(process.env, 'NODE_ENV', 'production');
+    try {
+      await expect(caller.user.requestAccountDeletionChallenge()).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+
+      const [user] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, deletionUser.id));
+      expect(user?.account_deletion_requested_at).toBeNull();
+    } finally {
+      restoreNodeEnv.restore();
+    }
+  });
+
+  it('precondition error maps to PRECONDITION_FAILED without deleting', async () => {
+    mockAssertUserCanBeSoftDeleted.mockRejectedValue(
+      new SoftDeletePreconditionError('active subscription')
+    );
+    const caller = await createCallerForUser(deletionUser.id);
+    const { challengeId, devCode } = await caller.user.requestAccountDeletionChallenge();
+
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId, code: devCode as string })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
   });
 });

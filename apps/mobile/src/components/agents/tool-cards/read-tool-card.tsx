@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { Eye } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -24,6 +25,8 @@ import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 // the cap keeps highlighting and layout bounded, and the hit shows the shared
 // Truncated marker. 50k chars matches the markdown fence cap.
 const READ_CODE_CHARACTER_CAP = 50_000;
+
+const readToolInputSchema = z.object({ filePath: z.string() });
 
 /**
  * The code body per the read precedence chain: a parseable display (empty
@@ -73,7 +76,7 @@ function renderReadCodeBody(
  */
 export function ReadToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
-  const filePath = typeof input.filePath === 'string' ? input.filePath : '';
+  const filePath = readToolInputSchema.safeParse(input).data?.filePath ?? '';
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;

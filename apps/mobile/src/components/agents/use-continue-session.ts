@@ -44,15 +44,7 @@ export function useContinueSession(args: {
   manager: ReturnType<typeof useSessionManager>;
   models: SessionModelOption[];
   modelsLoading: boolean;
-}): {
-  continueSession: (input: {
-    gitUrl: string | null | undefined;
-    mode: string;
-    model: string;
-    variant: string;
-  }) => Promise<void>;
-  isContinuing: boolean;
-} {
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -115,7 +107,7 @@ export function useContinueSession(args: {
             appendShareParams(
               getSpawnedAgentSessionPath(outcome.sessionID, args.organizationId) as string,
               shareId,
-              { autoSend: true }
+              { autoSend: true, mode: fields.mode }
             ) as Href
           );
           return;

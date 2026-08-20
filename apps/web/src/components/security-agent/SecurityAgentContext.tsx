@@ -180,6 +180,22 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * Refetches the config when a save fails with a stale-revision CONFLICT so the
+ * next Save uses the fresh revision. Returns true when it refetched.
+ */
+export function refetchConfigOnConflictError(
+  error: unknown,
+  refetchConfig: () => Promise<unknown>
+): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const data = (error as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return false;
+  if ((data as { code?: unknown }).code !== 'CONFLICT') return false;
+  void refetchConfig();
+  return true;
+}
+
 const COMMAND_POLL_INTERVAL_MS = 3000;
 const EMPTY_REPOSITORIES: SecurityAgentContextValue['allRepositories'] = [];
 const EMPTY_REPOSITORY_IDS: number[] = [];
@@ -787,16 +803,6 @@ function useSecurityAgentProviderValue(
     trpc.organizations.securityAgent.saveConfig.mutationOptions({
       onSuccess: async data => {
         toast.success('Configuration saved');
-        if (data.backlogAdmissionWarning) {
-          toast.warning(securityAgentCommandAdmissionCopy.existing_findings_backlog.failureTitle, {
-            description: data.backlogAdmissionWarning,
-          });
-        }
-        if (data.remediationBacklogAdmissionWarning) {
-          toast.warning('Existing remediations not queued', {
-            description: data.remediationBacklogAdmissionWarning,
-          });
-        }
         if (data.existingRemediationCommandId) {
           trackCommand(data.existingRemediationCommandId);
         }
@@ -811,6 +817,7 @@ function useSecurityAgentProviderValue(
       },
       onError: error => {
         toast.error('Failed to save configuration', { description: error.message });
+        refetchConfigOnConflictError(error, refetchConfig);
       },
     })
   );
@@ -986,16 +993,6 @@ function useSecurityAgentProviderValue(
     trpc.securityAgent.saveConfig.mutationOptions({
       onSuccess: async data => {
         toast.success('Configuration saved');
-        if (data.backlogAdmissionWarning) {
-          toast.warning(securityAgentCommandAdmissionCopy.existing_findings_backlog.failureTitle, {
-            description: data.backlogAdmissionWarning,
-          });
-        }
-        if (data.remediationBacklogAdmissionWarning) {
-          toast.warning('Existing remediations not queued', {
-            description: data.remediationBacklogAdmissionWarning,
-          });
-        }
         if (data.existingRemediationCommandId) {
           trackCommand(data.existingRemediationCommandId);
         }
@@ -1010,6 +1007,7 @@ function useSecurityAgentProviderValue(
       },
       onError: error => {
         toast.error('Failed to save configuration', { description: error.message });
+        refetchConfigOnConflictError(error, refetchConfig);
       },
     })
   );
@@ -1210,6 +1208,7 @@ function useSecurityAgentProviderValue(
         orgSaveConfigMutate(
           {
             organizationId,
+            expectedRevision: configData?.configRevision ?? null,
             slaCriticalDays: config.critical,
             slaHighDays: config.high,
             slaMediumDays: config.medium,
@@ -1238,6 +1237,7 @@ function useSecurityAgentProviderValue(
       } else {
         personalSaveConfigMutate(
           {
+            expectedRevision: configData?.configRevision ?? null,
             slaCriticalDays: config.critical,
             slaHighDays: config.high,
             slaMediumDays: config.medium,
@@ -1265,7 +1265,7 @@ function useSecurityAgentProviderValue(
         );
       }
     },
-    [isOrg, organizationId, orgSaveConfigMutate, personalSaveConfigMutate]
+    [isOrg, organizationId, orgSaveConfigMutate, personalSaveConfigMutate, configData]
   );
 
   const handleToggleEnabled = useCallback(

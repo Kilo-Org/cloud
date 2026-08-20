@@ -1,7 +1,6 @@
 import { createElement, isValidElement, type ReactNode } from 'react';
 import {
   type AccessibilityActionEvent,
-  type AccessibilityActionInfo,
   type AccessibilityRole,
   type GestureResponderEvent,
   type ImageStyle,
@@ -73,10 +72,12 @@ function containsMeaningfulNonImageText(nodes: ReactNode[]): boolean {
       if (containsMeaningfulNonImageText(node as ReactNode[])) {
         return true;
       }
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode primitive-arm check; no non-typeof discriminant separates string/number in this union
     } else if (typeof node === 'string') {
       if (node.trim().length > 0) {
         return true;
       }
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode primitive-arm check; no non-typeof discriminant separates string/number in this union
     } else if (typeof node === 'number') {
       return true;
     } else if (isValidElement(node)) {
@@ -146,7 +147,7 @@ export class MarkdownRenderer extends Renderer {
   }
 
   private textOrChildren(children: string | ReactNode[], styles?: TextStyle): ReactNode {
-    if (typeof children !== 'string' && children.length > 0 && containsMarkdownImage(children)) {
+    if (Array.isArray(children) && children.length > 0 && containsMarkdownImage(children)) {
       return children;
     }
     return this.textNode(children, styles);
@@ -157,7 +158,7 @@ export class MarkdownRenderer extends Renderer {
     // the image keeps its own tap target and label. A heading that mixes an
     // image with real text keeps header semantics, so wrap it in a
     // header-role View that leaves the image reachable.
-    if (typeof text !== 'string' && text.length > 0 && containsMarkdownImage(text)) {
+    if (Array.isArray(text) && text.length > 0 && containsMarkdownImage(text)) {
       if (containsMeaningfulNonImageText(text)) {
         return createElement(View, { accessibilityRole: 'header', key: this.getKey() }, text);
       }
@@ -198,7 +199,7 @@ export class MarkdownRenderer extends Renderer {
     title?: string
   ): ReactNode {
     const interactionProps = this.linkInteractionProps(children, href, title);
-    if (typeof children !== 'string' && children.length > 0 && containsMarkdownImage(children)) {
+    if (Array.isArray(children) && children.length > 0 && containsMarkdownImage(children)) {
       return createElement(Pressable, { ...interactionProps, key: this.getKey() }, children);
     }
     return createElement(
@@ -214,22 +215,10 @@ export class MarkdownRenderer extends Renderer {
   }
 
   /** Interaction wiring shared by the Pressable (image) and Text link branches. */
-  private linkInteractionProps(
-    children: string | ReactNode[],
-    href: string,
-    title?: string
-  ): {
-    accessibilityRole: 'link';
-    accessibilityHint: string;
-    accessibilityLabel: string;
-    accessibilityActions: AccessibilityActionInfo[] | undefined;
-    onAccessibilityAction: (event: AccessibilityActionEvent) => void;
-    onLongPress: ((event: GestureResponderEvent) => void) | undefined;
-    onPress: () => void;
-  } {
+  private linkInteractionProps(children: string | ReactNode[], href: string, title?: string) {
     const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
     return {
-      accessibilityRole: 'link',
+      accessibilityRole: 'link' as const,
       accessibilityHint: LINK_ACCESSIBILITY_HINT,
       accessibilityLabel,
       accessibilityActions: getLinkAccessibilityActions(this.onLongPressLink !== undefined),
@@ -290,7 +279,7 @@ export class MarkdownRenderer extends Renderer {
   }
 
   override html(text: string | ReactNode[], styles?: TextStyle): ReactNode {
-    if (typeof text !== 'string') {
+    if (Array.isArray(text)) {
       return this.textOrChildren(text, styles);
     }
     const images = parseHtmlImages(text);

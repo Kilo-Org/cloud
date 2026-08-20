@@ -12,9 +12,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
+import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
 import {
+  buildSecurityFindingsQueryOptions,
   dismissFindingIntentFingerprint,
+  type ListFindingsFilters,
   useDismissSecurityFinding,
+  useStartSecurityAnalysis,
 } from './use-security-findings';
 
 const hoistedKeys = vi.hoisted(() => ({
@@ -29,17 +34,24 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
+vi.mock('react-native', () => ({
+  InteractionManager: { runAfterInteractions: vi.fn() },
+}));
+
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
 
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  isPersonalSecurityScope: (scope: string) => scope === 'personal',
-  getNextSecurityFindingsOffset: () => undefined,
-  getRemediationUnavailableCopy: () => undefined,
-  isActiveRemediationStatus: () => false,
-}));
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
+  const actual = await importOriginal<typeof SecurityAgentModule>();
+  return {
+    ...actual,
+    isPersonalSecurityScope: (scope: string) => scope === 'personal',
+    getRemediationUnavailableCopy: () => undefined,
+    isActiveRemediationStatus: () => false,
+  };
+});
 
 vi.mock('@/lib/hooks/use-security-agent-commands', () => ({
   trackSecurityAgentCommand: trackCommandMock,
@@ -57,6 +69,32 @@ vi.mock('sonner-native', () => ({
   toast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
+// `use-security-agent-mutations` imports the outbox (P1-E-40c), which pulls in
+// `@sentry/react-native` (Flow) transitively; mock it so this pure-logic test
+// never loads react-native's index.js.
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => ({
+    getStoredOperationKey: vi.fn(() => null),
+    writeSafeRetry: vi.fn(async () => {
+      await Promise.resolve();
+    }),
+    writeReconcileFirst: vi.fn(async (row: { operationKey: string }) => {
+      await Promise.resolve();
+      return row.operationKey;
+    }),
+    remove: vi.fn(async () => {
+      await Promise.resolve();
+    }),
+    needsReconcile: [],
+    loaded: true,
+    whenLoaded: vi.fn(async () => {
+      await Promise.resolve();
+      return true;
+    }),
+    refresh: vi.fn(),
+  }),
+}));
+
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onError?: (error: unknown) => void;
@@ -68,6 +106,8 @@ type MutationOptions = {
 let lastCapturedOptions: MutationOptions | null = null;
 const personalDismissMutateMock = vi.fn();
 const orgDismissMutateMock = vi.fn();
+const personalStartAnalysisMutateMock = vi.fn();
+const orgStartAnalysisMutateMock = vi.fn();
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
@@ -104,10 +144,12 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     securityAgent: {
       dismissFinding: { mutate: (vars: unknown) => personalDismissMutateMock(vars) },
+      startAnalysis: { mutate: (vars: unknown) => personalStartAnalysisMutateMock(vars) },
     },
     organizations: {
       securityAgent: {
         dismissFinding: { mutate: (vars: unknown) => orgDismissMutateMock(vars) },
+        startAnalysis: { mutate: (vars: unknown) => orgStartAnalysisMutateMock(vars) },
       },
     },
   },
@@ -210,6 +252,40 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
   });
 });
 
+describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    personalStartAnalysisMutateMock.mockReset();
+    orgStartAnalysisMutateMock.mockReset();
+  });
+
+  it('always sends forceSandbox: true on a personal analysis start', async () => {
+    personalStartAnalysisMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-1' });
+    useStartSecurityAnalysis('personal');
+
+    await lastCapturedOptions?.mutationFn?.({ findingId: FINDING_ID });
+
+    expect(personalStartAnalysisMutateMock).toHaveBeenCalledWith({
+      findingId: FINDING_ID,
+      forceSandbox: true,
+    });
+  });
+
+  it('always sends forceSandbox: true on an org analysis start', async () => {
+    orgStartAnalysisMutateMock.mockResolvedValueOnce({ success: true, commandId: 'cmd-2' });
+    useStartSecurityAnalysis(ORG_ID);
+
+    await lastCapturedOptions?.mutationFn?.({ findingId: FINDING_ID, retrySandboxOnly: true });
+
+    expect(orgStartAnalysisMutateMock).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      findingId: FINDING_ID,
+      retrySandboxOnly: true,
+      forceSandbox: true,
+    });
+  });
+});
+
 describe('dismissFindingIntentFingerprint (P1-A-08e changed-input)', () => {
   it('stays stable for a retry of the same scope+finding and rotates when any intent input changes', () => {
     const original = dismissFindingIntentFingerprint('personal', DISMISS_VARS);
@@ -226,4 +302,59 @@ describe('dismissFindingIntentFingerprint (P1-A-08e changed-input)', () => {
     ).not.toBe(original);
     expect(dismissFindingIntentFingerprint(ORG_ID, DISMISS_VARS)).not.toBe(original);
   });
+});
+
+function createFindingsTrpcStub() {
+  const stub = {
+    securityAgent: { listFindings: { queryKey: () => ['securityAgent', 'listFindings'] } },
+    organizations: {
+      securityAgent: {
+        listFindings: { queryKey: () => ['organizations', 'securityAgent', 'listFindings'] },
+      },
+    },
+  };
+  return stub as never;
+}
+
+describe('buildSecurityFindingsQueryOptions (retention bound)', () => {
+  it('carries a numeric maxPages for a personal scope', () => {
+    const filters: ListFindingsFilters = {};
+    const options = buildSecurityFindingsQueryOptions(
+      createFindingsTrpcStub(),
+      'personal',
+      filters
+    );
+
+    expect(options.maxPages).toBe(INFINITE_QUERY_MAX_PAGES);
+  });
+
+  it('carries a numeric maxPages for an organization scope', () => {
+    const filters: ListFindingsFilters = {};
+    const options = buildSecurityFindingsQueryOptions(createFindingsTrpcStub(), ORG_ID, filters);
+
+    expect(typeof options.maxPages).toBe('number');
+  });
+});
+
+describe('buildSecurityFindingsQueryOptions (retention-safe pagination)', () => {
+  it('advances past the trimmed pages on a sixth page (no repeated offset)', () => {
+    const options = buildSecurityFindingsQueryOptions(createFindingsTrpcStub(), 'personal', {});
+    const getNextPageParam = options.getNextPageParam as (
+      lastPage: { findings: unknown[]; totalCount: number },
+      pages: { findings: unknown[]; totalCount: number }[],
+      lastPageParam: number
+    ) => number | undefined;
+
+    // React Query trims to the last 5 pages (maxPages) once a sixth page is
+    // fetched; the trimmed `pages` array must not drive the next offset.
+    const trimmedPages = Array.from({ length: 5 }, () => makeFindingsPage(50));
+
+    // Page 6 was fetched with offset 250; the next offset must be 300, not 250.
+    expect(getNextPageParam(makeFindingsPage(50), trimmedPages, 250)).toBe(300);
+  });
+});
+
+const makeFindingsPage = (count: number) => ({
+  findings: Array.from({ length: count }, (_, i) => ({ id: `f-${i}` })),
+  totalCount: 400,
 });

@@ -22,7 +22,7 @@ export const resolveSignedInTransition = (
     return null;
   }
 
-  if (typeof next.email !== 'string' || next.email.length === 0) {
+  if (next.email === undefined || next.email.length === 0) {
     return null;
   }
 
@@ -59,7 +59,7 @@ export const createAnalyticsIdentityTracker = ({
        */
       previous = next;
 
-      if (decision !== 'identify' || typeof next.email !== 'string' || next.email.length === 0) {
+      if (decision !== 'identify' || next.email === undefined || next.email.length === 0) {
         return;
       }
 

@@ -25,7 +25,10 @@ export function Bubble({ side, children, className }: Readonly<BubbleProps>) {
         )}
       >
         <TextClassContext.Provider value="text-accent-soft-foreground font-medium text-[15px] leading-[21px]">
-          {typeof children === 'string' ? <Text>{children}</Text> : children}
+          {
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+            typeof children === 'string' ? <Text>{children}</Text> : children
+          }
         </TextClassContext.Provider>
       </View>
     );
@@ -38,7 +41,10 @@ export function Bubble({ side, children, className }: Readonly<BubbleProps>) {
       )}
     >
       <TextClassContext.Provider value="text-foreground font-medium text-[15px] leading-[21px]">
-        {typeof children === 'string' ? <Text>{children}</Text> : children}
+        {
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+          typeof children === 'string' ? <Text>{children}</Text> : children
+        }
       </TextClassContext.Provider>
     </View>
   );

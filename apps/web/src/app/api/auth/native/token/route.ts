@@ -122,7 +122,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   5. Key persistence (after settlement, binds key to user id).
  *
  * Response contract (frozen — mobile client is built against it):
- *   200 { token, refreshToken?, expiresIn? }
+ *   200 { token, refreshToken?, expiresIn?, created? }
  *   401 { error: 'INVALID_TOKEN' }
  *   401 { error: 'INVALID_CODE' }
  *   425 { error: 'CODE_IN_PROGRESS' }
@@ -416,6 +416,7 @@ export async function POST(request: NextRequest) {
             token: refreshCredentials.token,
             refreshToken: refreshCredentials.refreshToken,
             expiresIn: refreshCredentials.expiresIn,
+            created: result.isNew,
           },
           { status: 200 }
         );
@@ -430,14 +431,19 @@ export async function POST(request: NextRequest) {
           }));
         const pair = await issueSessionCredentials(result.user, sid);
         return NextResponse.json(
-          { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
+          {
+            token: pair.token,
+            refreshToken: pair.refreshToken,
+            expiresIn: pair.expiresIn,
+            created: result.isNew,
+          },
           { status: 200 }
         );
       }
 
       captureMessage('native_token_legacy_long_lived_count: 1');
       const token = generateApiToken(result.user);
-      return NextResponse.json({ token }, { status: 200 });
+      return NextResponse.json({ token, created: result.isNew }, { status: 200 });
     } catch (error) {
       phase = 'release';
       throw error;
@@ -569,6 +575,7 @@ export async function POST(request: NextRequest) {
         token: refreshCredentials.token,
         refreshToken: refreshCredentials.refreshToken,
         expiresIn: refreshCredentials.expiresIn,
+        created: result.isNew,
       },
       { status: 200 }
     );
@@ -583,12 +590,17 @@ export async function POST(request: NextRequest) {
       }));
     const pair = await issueSessionCredentials(result.user, sid);
     return NextResponse.json(
-      { token: pair.token, refreshToken: pair.refreshToken, expiresIn: pair.expiresIn },
+      {
+        token: pair.token,
+        refreshToken: pair.refreshToken,
+        expiresIn: pair.expiresIn,
+        created: result.isNew,
+      },
       { status: 200 }
     );
   }
 
   captureMessage('native_token_legacy_long_lived_count: 1');
   const token = generateApiToken(result.user);
-  return NextResponse.json({ token }, { status: 200 });
+  return NextResponse.json({ token, created: result.isNew }, { status: 200 });
 }

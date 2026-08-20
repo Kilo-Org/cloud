@@ -37,6 +37,13 @@ import { getLowerDomainFromEmail } from '@/lib/utils';
 
 const emailSchema = z.email();
 
+/**
+ * Success copy for the invite mutation. The invitation is created but the email
+ * is sent asynchronously through the outbox, so the copy must say "created", not
+ * "sent".
+ */
+export const INVITE_SUCCESS_MESSAGE = 'Invite created';
+
 const ROLE_LABELS = {
   owner: 'Owner',
   admin: 'Admin',
@@ -170,7 +177,7 @@ export function InviteMemberDialog({
       },
       {
         onSuccess: () => {
-          toast.success('Member invitation sent successfully');
+          toast.success(INVITE_SUCCESS_MESSAGE);
           onMemberInvited();
           onOpenChange(false);
           handleReset();

@@ -70,6 +70,7 @@ export function validateItemKey(scope: string, k: string): void {
 }
 
 function validateValue(v: string): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime guard against a non-string call from an untyped JS caller
   if (typeof v !== 'string') {
     throw new TypeError('encrypted-kv: value must be a string');
   }

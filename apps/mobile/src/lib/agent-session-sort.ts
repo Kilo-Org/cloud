@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * The set of fields the agent-sessions list/search endpoints accept as the
  * `orderBy` argument. Today they both default to `updated_at` server-side;
@@ -10,7 +12,7 @@ export type AgentSessionSortBy = (typeof AGENT_SESSION_SORT_OPTIONS)[number];
 
 export const DEFAULT_AGENT_SESSION_SORT: AgentSessionSortBy = 'updated_at';
 
-const SORT_BY_SET = new Set<string>(AGENT_SESSION_SORT_OPTIONS);
+const agentSessionSortBySchema = z.enum(AGENT_SESSION_SORT_OPTIONS);
 
 /**
  * Coerce arbitrary persisted/legacy/unknown input into a known sort value.
@@ -18,10 +20,8 @@ const SORT_BY_SET = new Set<string>(AGENT_SESSION_SORT_OPTIONS);
  * SecureStore record can never crash the list.
  */
 export function parseAgentSessionSortBy(value: unknown): AgentSessionSortBy {
-  if (typeof value === 'string' && SORT_BY_SET.has(value)) {
-    return value as AgentSessionSortBy;
-  }
-  return DEFAULT_AGENT_SESSION_SORT;
+  const result = agentSessionSortBySchema.safeParse(value);
+  return result.success ? result.data : DEFAULT_AGENT_SESSION_SORT;
 }
 
 type AgentSessionTimestamps = { created_at: string; updated_at: string };

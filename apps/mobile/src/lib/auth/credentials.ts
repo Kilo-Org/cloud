@@ -8,6 +8,13 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 
+// Apple `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` is not in iCloud or
+// iTunes backup and does not migrate to a new device. Pin every bearer-token
+// write and delete to it so credentials never follow a device restore.
+export const IOS_BEARER_SECURE_STORE_OPTIONS = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 /**
  * Credential persistence and refresh rotation, with no React dependency.
  *
@@ -71,9 +78,9 @@ export async function persistSignInCredentialsAtEpoch(
   // a newer sign-in or sign-out: their own credential write is queued
   // strictly behind this one.
   const clearPartialCredentials = async (): Promise<void> => {
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY);
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
   };
 
   // Fence one credential operation: skip it when the epoch moved before the
@@ -83,8 +90,8 @@ export async function persistSignInCredentialsAtEpoch(
       return false;
     }
     await (value === undefined
-      ? SecureStore.deleteItemAsync(key)
-      : SecureStore.setItemAsync(key, value));
+      ? SecureStore.deleteItemAsync(key, IOS_BEARER_SECURE_STORE_OPTIONS)
+      : SecureStore.setItemAsync(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
     if (!isCurrentAuthEpoch(epoch)) {
       await clearPartialCredentials();
       return false;

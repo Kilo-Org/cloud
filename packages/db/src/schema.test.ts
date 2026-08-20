@@ -7,7 +7,15 @@ import * as schema from './schema';
 import { SCHEMA_CHECK_ENUMS } from './schema';
 import { createDrizzleClient } from './client';
 import { computeDatabaseUrl } from './database-url';
-import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './schema-types';
+import {
+  KiloPassCadence,
+  KiloPassPaymentProvider,
+  KiloPassTier,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionRequestStatus,
+  UserDeletionStepKey,
+  UserDeletionStepStatus,
+} from './schema-types';
 
 const schemaTestDb = createDrizzleClient({
   connectionString: computeDatabaseUrl(),
@@ -646,6 +654,58 @@ describe('database schema', () => {
       AffiliateProvider: ['impact'],
       AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
+      UserDeletionRequestStatus: ['pending', 'in_progress', 'finalizing', 'completed', 'cancelled'],
+      UserDeletionStepStatus: [
+        'pending',
+        'running',
+        'retry_wait',
+        'needs_attention',
+        'manual_action_required',
+        'succeeded',
+        'not_applicable',
+        'manually_verified',
+      ],
+      UserDeletionStepKey: [
+        'kiloclaw_destroy',
+        'customerio',
+        'cli_v1_blobs',
+        'cli_v2_sessions',
+        'usage_prompt_prefixes',
+        'posthog',
+        'substack',
+        'anonymize',
+        'pylon_reply',
+        'pylon_contact',
+      ],
+      UserDeletionCloudSubjectResolution: [
+        'current_user',
+        'authoritative_absence',
+        'prior_queue_cleanup',
+        'legacy_identity_unresolved',
+      ],
+      UserDeletionAuditEventType: [
+        'request_created',
+        'intake_refused',
+        'access_disabled',
+        'access_absent',
+        'preflight_disposition',
+        'task_disposition',
+        'manual_retry',
+        'manual_action',
+        'anonymized',
+        'deletion_ready_for_customer_reply',
+        'cancelled',
+        'completed',
+      ],
+      UserDeletionProviderScope: [
+        'kiloclaw',
+        'customerio',
+        'cloud_storage',
+        'session_ingest',
+        'posthog',
+        'substack',
+        'pylon',
+      ],
       ImpactReferralProduct: ['kiloclaw', 'kilo_pass'],
       ImpactAdvocateProgramKey: ['kiloclaw', 'kilo_pass'],
       ImpactAttributionTouchType: ['affiliate', 'referral'],
@@ -1559,6 +1619,258 @@ describe('database schema', () => {
           throw error;
         }
       }
+    });
+  });
+});
+
+describe('user deletion queue invariants', () => {
+  async function withDeletionTestUser(
+    testFn: (params: { userId: string; email: string }) => Promise<void>
+  ): Promise<void> {
+    const userId = `schema-deletion-${crypto.randomUUID()}`;
+    const email = `${userId}@example.com`;
+
+    await schemaTestDb.db.insert(schema.kilocode_users).values({
+      id: userId,
+      google_user_email: email,
+      google_user_name: 'Deletion Schema Test User',
+      google_user_image_url: 'https://example.com/avatar.png',
+      stripe_customer_id: `cus_${crypto.randomUUID()}`,
+    });
+
+    try {
+      await testFn({ userId, email });
+    } finally {
+      await schemaTestDb.db
+        .delete(schema.user_deletion_requests)
+        .where(eq(schema.user_deletion_requests.user_id, userId));
+      await schemaTestDb.db
+        .delete(schema.kilocode_users)
+        .where(eq(schema.kilocode_users.id, userId));
+    }
+  }
+
+  function requestValues(params: {
+    userId?: string | null;
+    email: string;
+    hmac: string;
+    pylonTicket?: string | null;
+    status?: (typeof UserDeletionRequestStatus)[keyof typeof UserDeletionRequestStatus];
+    completedAt?: string | null;
+    cancelledAt?: string | null;
+  }): typeof schema.user_deletion_requests.$inferInsert {
+    const status = params.status ?? UserDeletionRequestStatus.Pending;
+    return {
+      user_id: params.userId === undefined ? undefined : params.userId,
+      status,
+      target_email:
+        status === UserDeletionRequestStatus.Completed ||
+        status === UserDeletionRequestStatus.Cancelled
+          ? null
+          : params.email,
+      target_email_hmac: params.hmac,
+      pylon_ticket_ref: params.pylonTicket ?? null,
+      cloud_subject_resolution:
+        params.userId === null
+          ? UserDeletionCloudSubjectResolution.AuthoritativeAbsence
+          : UserDeletionCloudSubjectResolution.CurrentUser,
+      completed_at: params.completedAt ?? null,
+      cancelled_at: params.cancelledAt ?? null,
+    };
+  }
+
+  it('rejects a second active request for the same email HMAC', async () => {
+    await withDeletionTestUser(async ({ userId, email }) => {
+      const hmac = `hmac-${crypto.randomUUID()}`;
+      await schemaTestDb.db
+        .insert(schema.user_deletion_requests)
+        .values(requestValues({ userId, email, hmac }));
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values(
+          requestValues({
+            userId: null,
+            email,
+            hmac,
+          })
+        )
+      ).rejects.toMatchObject({
+        cause: { constraint: 'UQ_user_deletion_requests_active_email_hmac' },
+      });
+    });
+  });
+
+  it('rejects a second active request for the same user id', async () => {
+    await withDeletionTestUser(async ({ userId, email }) => {
+      await schemaTestDb.db.insert(schema.user_deletion_requests).values(
+        requestValues({
+          userId,
+          email,
+          hmac: `hmac-${crypto.randomUUID()}`,
+        })
+      );
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values(
+          requestValues({
+            userId,
+            email: `other-${email}`,
+            hmac: `hmac-${crypto.randomUUID()}`,
+          })
+        )
+      ).rejects.toMatchObject({
+        cause: { constraint: 'UQ_user_deletion_requests_active_user_id' },
+      });
+    });
+  });
+
+  it('rejects a second active request for the same Pylon ticket', async () => {
+    await withDeletionTestUser(async ({ userId, email }) => {
+      await schemaTestDb.db.insert(schema.user_deletion_requests).values(
+        requestValues({
+          userId,
+          email,
+          hmac: `hmac-${crypto.randomUUID()}`,
+          pylonTicket: '#iss-shared',
+        })
+      );
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values(
+          requestValues({
+            userId: null,
+            email: `other-${email}`,
+            hmac: `hmac-${crypto.randomUUID()}`,
+            pylonTicket: 'iss-shared',
+          })
+        )
+      ).rejects.toMatchObject({
+        cause: { constraint: 'UQ_user_deletion_requests_active_pylon_ticket' },
+      });
+    });
+  });
+
+  it('allows a new request after the previous one completed', async () => {
+    await withDeletionTestUser(async ({ userId, email }) => {
+      const hmac = `hmac-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.user_deletion_requests).values(
+        requestValues({
+          userId,
+          email,
+          hmac,
+          status: UserDeletionRequestStatus.Completed,
+          completedAt: '2026-08-11T00:00:00.000Z',
+        })
+      );
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values(
+          requestValues({
+            userId,
+            email,
+            hmac,
+          })
+        )
+      ).resolves.toBeDefined();
+    });
+  });
+
+  it('rejects unknown request status, completed without timestamp, and active without email', async () => {
+    await withDeletionTestUser(async ({ userId, email }) => {
+      await expect(
+        schemaTestDb.db.execute(sql`
+          INSERT INTO user_deletion_requests (
+            user_id, status, target_email, target_email_hmac,
+            cloud_subject_resolution
+          ) VALUES (
+            ${userId}, 'anonymized', NULL, ${`hmac-${crypto.randomUUID()}`}, 'current_user'
+          )
+        `)
+      ).rejects.toMatchObject({
+        cause: { constraint: 'user_deletion_requests_status_check' },
+      });
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values(
+          requestValues({
+            userId,
+            email,
+            hmac: `hmac-${crypto.randomUUID()}`,
+            status: UserDeletionRequestStatus.Completed,
+          })
+        )
+      ).rejects.toMatchObject({
+        cause: { constraint: 'user_deletion_requests_completed_at_check' },
+      });
+
+      await expect(
+        schemaTestDb.db.execute(sql`
+          INSERT INTO user_deletion_requests (
+            user_id, status, target_email, target_email_hmac,
+            cloud_subject_resolution
+          ) VALUES (
+            ${userId}, 'pending', NULL, ${`hmac-${crypto.randomUUID()}`}, 'current_user'
+          )
+        `)
+      ).rejects.toMatchObject({
+        cause: { constraint: 'user_deletion_requests_active_email_check' },
+      });
+    });
+  });
+
+  it('rejects duplicate catalog keys, skipped status, and mismatched claim fields', async () => {
+    await withDeletionTestUser(async ({ userId, email }) => {
+      const [request] = await schemaTestDb.db
+        .insert(schema.user_deletion_requests)
+        .values(requestValues({ userId, email, hmac: `hmac-${crypto.randomUUID()}` }))
+        .returning({ id: schema.user_deletion_requests.id });
+
+      if (!request) {
+        throw new Error('Failed to insert deletion request');
+      }
+
+      await schemaTestDb.db.insert(schema.user_deletion_steps).values({
+        request_id: request.id,
+        step_key: UserDeletionStepKey.Customerio,
+      });
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_steps).values({
+          request_id: request.id,
+          step_key: UserDeletionStepKey.Customerio,
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'UQ_user_deletion_steps_request_step' },
+      });
+
+      await expect(
+        schemaTestDb.db.execute(sql`
+          INSERT INTO user_deletion_steps (request_id, step_key, status)
+          VALUES (${request.id}, 'anonymize', 'skipped')
+        `)
+      ).rejects.toMatchObject({
+        cause: { constraint: 'user_deletion_steps_status_check' },
+      });
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_steps).values({
+          request_id: request.id,
+          step_key: UserDeletionStepKey.Anonymize,
+          claim_token: crypto.randomUUID(),
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'user_deletion_steps_claim_fields_check' },
+      });
+
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_steps).values({
+          request_id: request.id,
+          step_key: UserDeletionStepKey.Posthog,
+          status: UserDeletionStepStatus.ManuallyVerified,
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'user_deletion_steps_manual_evidence_check' },
+      });
     });
   });
 });

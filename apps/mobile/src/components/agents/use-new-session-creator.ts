@@ -12,6 +12,7 @@ import { replaceWithAgentSession } from '@/components/agents/session-detail-rout
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { useHoistedOperationKey } from '@/lib/operation-key';
+import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import {
   type AgentAttachmentWire,
   type useAgentAttachmentUpload,
@@ -28,6 +29,24 @@ type UseNewSessionCreatorInput = {
   selectedRepo: string;
   setIsCreating: (value: boolean) => void;
   variant: string;
+  /** Commit and push the agent's changes (true) or leave them uncommitted (false). */
+  autoCommit: boolean;
+  /** Effective environment profile id; omitted from the create body when unset. */
+  profileId?: string | null;
+};
+
+type PrepareSessionInput = {
+  prompt: string;
+  initialMessageId: string;
+  mode: AgentMode;
+  model: string;
+  variant: string | undefined;
+  githubRepo: string;
+  autoCommit: boolean;
+  autoInitiate: boolean;
+  operationKey: string;
+  profileId?: string;
+  attachments?: AgentAttachmentWire;
 };
 
 type UseNewSessionCreatorResult = {
@@ -51,6 +70,8 @@ export function useNewSessionCreator({
   selectedRepo,
   setIsCreating,
   variant,
+  autoCommit,
+  profileId,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -59,6 +80,14 @@ export function useNewSessionCreator({
   // P1-A-08b: one `operationKey` per submit intent, so a retry of the same
   // intent dedupes on the ledger instead of spawning a second session.
   const { getKey, rotateKey } = useHoistedOperationKey();
+  // P1-E-40c: persist the safe-retry row across relaunch so a crash mid-flight
+  // reuses the same key instead of minting a duplicate session.
+  const {
+    getStoredOperationKey,
+    writeSafeRetry,
+    remove: removeOutboxRow,
+    whenLoaded,
+  } = useMutationOutbox();
 
   const createSessionFromDraft = useCallback(async () => {
     // Read the live, post-settlement draft (see `settleVoiceInputBeforeSubmit`
@@ -79,47 +108,75 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
+    // Warn (never block) when a chip kept its original image because
+    // metadata stripping failed: the photo may still carry EXIF/GPS.
+    if (attachments.attachments.some(attachment => attachment.metadataStripFailed === true)) {
+      toast.warning('Photo metadata could not be removed from an attachment.');
+    }
+
+    // Upload pending attachments now so the create body carries the real
+    // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
+    // test `ok`.
+    const uploaded = await attachments.uploadPending();
+    if (!uploaded.ok) {
+      setIsCreating(false);
+      return;
+    }
+
     // Computed once and reused for both the fingerprint and the create body, so
     // the two cannot disagree and a swapped attachment set is a fresh intent.
-    const attachmentWire = attachments.toWirePayload();
+    const attachmentWire = uploaded.wire;
     const intentFingerprint = JSON.stringify({
       prompt,
       mode,
       model,
       variant: variant || undefined,
       repo: selectedRepo,
+      autoCommit,
       organizationId: organizationId ?? null,
+      profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
     });
-    const operationKey = getKey(intentFingerprint);
+    // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
+    // fresh key only when no stored row exists. A stored row must never be
+    // replaced by a new in-memory key. Gate on the outbox load first: a submit
+    // that races the launch load would read empty rows and mint a duplicate.
+    // A failed outbox read reads as no stored rows, so refuse instead of
+    // minting a fresh key over a row whose POST the server may have accepted.
+    if (!(await whenLoaded())) {
+      toast.error('Could not read pending sessions. Try again.');
+      setIsCreating(false);
+      return;
+    }
+    const operationKey = getStoredOperationKey(intentFingerprint) ?? getKey(intentFingerprint);
 
     try {
       const initialMessageId = generateMessageId();
-      const baseInput: {
-        prompt: string;
-        initialMessageId: string;
-        mode: AgentMode;
-        model: string;
-        variant: string | undefined;
-        githubRepo: string;
-        autoCommit: boolean;
-        autoInitiate: boolean;
-        operationKey: string;
-        attachments?: AgentAttachmentWire;
-      } = {
+      const baseInput: PrepareSessionInput = {
         prompt,
         initialMessageId,
         mode,
         model,
         variant: variant || undefined,
         githubRepo: selectedRepo,
-        autoCommit: true,
+        autoCommit,
         autoInitiate: true,
         operationKey,
       };
+      if (profileId) {
+        baseInput.profileId = profileId;
+      }
       if (attachmentWire) {
         baseInput.attachments = attachmentWire;
       }
+
+      // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
+      // reuses the same key on relaunch instead of minting a duplicate.
+      await writeSafeRetry({
+        operationKey,
+        fingerprint: intentFingerprint,
+        input: baseInput,
+      });
 
       const result = organizationId
         ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
@@ -131,6 +188,7 @@ export function useNewSessionCreator({
       // Rotate before the post-success work so a UI failure cannot keep the
       // successful key for a retry.
       rotateKey();
+      await removeOutboxRow(intentFingerprint);
 
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.
@@ -173,6 +231,7 @@ export function useNewSessionCreator({
       // A typed terminal rejection ends the intent; a retryable one keeps the key.
       if (!isCloudPrepareRetryableError(error)) {
         rotateKey();
+        await removeOutboxRow(intentFingerprint);
       }
     } finally {
       setIsCreating(false);
@@ -182,7 +241,9 @@ export function useNewSessionCreator({
     model,
     mode,
     variant,
+    autoCommit,
     organizationId,
+    profileId,
     queryClient,
     trpc,
     router,
@@ -190,6 +251,10 @@ export function useNewSessionCreator({
     setIsCreating,
     getKey,
     rotateKey,
+    getStoredOperationKey,
+    writeSafeRetry,
+    removeOutboxRow,
+    whenLoaded,
     onCreated,
   ]);
 

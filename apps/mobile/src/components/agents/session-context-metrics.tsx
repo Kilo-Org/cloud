@@ -27,12 +27,12 @@ type SessionContextMetricsProps = {
 const RING_SIZE = 28;
 const RING_STROKE = 3;
 
-const TONE_TEXT_CLASS: Record<ContextTone, string> = {
+const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
   warning: 'text-warn',
   primary: 'text-foreground',
   neutral: 'text-foreground',
-};
+} satisfies Record<ContextTone, string>;
 
 function toneTextClass(tone: ContextTone): string {
   return TONE_TEXT_CLASS[tone];

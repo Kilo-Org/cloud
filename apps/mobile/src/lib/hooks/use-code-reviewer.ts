@@ -112,9 +112,9 @@ export function useReviewConfig(
     enabled: !isPersonal(scope),
   });
   // The org procedure's inferred type carries a few org/Bitbucket-only
-  // fields (manuallyAddedRepositories, reviewMemoryEnabled, actionRequired)
-  // beyond our shared ReviewConfigData contract — a strict structural
-  // superset, so this narrowing cast is safe (same reasoning as
+  // fields (manuallyAddedRepositories, reviewMemoryEnabled) beyond our
+  // shared ReviewConfigData contract — a strict structural superset, so
+  // this narrowing cast is safe (same reasoning as
   // useSaveReviewConfig's getQueryData<ReviewConfigData> below).
   return (isPersonal(scope) ? personal : org) as UseQueryResult<ReviewConfigData>;
 }
@@ -251,12 +251,16 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         // still be a real edit and could clobber stored values.
         const narrowedSelectedRepositoryIds =
           rawSelectedRepositoryIds !== undefined
-            ? rawSelectedRepositoryIds.filter((id): id is number => typeof id === 'number')
+            ? rawSelectedRepositoryIds.filter(
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing a number id from a string id in a mixed primitive union has no non-typeof narrowing
+                (id): id is number => typeof id === 'number'
+              )
             : undefined;
         const narrowedRepositoryModelOverrides =
           rawRepositoryModelOverrides !== undefined
             ? rawRepositoryModelOverrides.filter(
                 (override): override is typeof override & { repositoryId: number } =>
+                  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing a number id from a string id in a mixed primitive union has no non-typeof narrowing
                   typeof override.repositoryId === 'number'
               )
             : undefined;

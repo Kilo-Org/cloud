@@ -29,19 +29,27 @@ export function takePendingShareNavigation(): PendingShareNavigation | null {
   return pendingQueue.shift() ?? null;
 }
 
-/** Append the share delivery params to a route path. */
+/**
+ * Append the share delivery params to a route path.
+ *
+ * `mode` carries the agent mode the spawn was started with. A freshly spawned
+ * session has no stored config yet, so without it the destination composer
+ * falls back to `code` and the auto-sent first message switches the session
+ * off the chosen mode.
+ */
 export function appendShareParams(
   base: string,
   shareId: ShareId,
-  options: { autoSend?: boolean } = {}
+  options: { autoSend?: boolean; mode?: string } = {}
 ): string {
   const separator = base.includes('?') ? '&' : '?';
   const autoSend = options.autoSend === true ? '&autoSend=1' : '';
-  return `${base}${separator}shareId=${encodeURIComponent(shareId)}${autoSend}`;
+  const mode = options.mode ? `&mode=${encodeURIComponent(options.mode)}` : '';
+  return `${base}${separator}shareId=${encodeURIComponent(shareId)}${autoSend}${mode}`;
 }
 
 /** Parse the destination params a focused delivery must set from a pending href. */
-export function parseShareHrefParams(href: string): { organizationId: string | undefined } {
+export function parseShareHrefParams(href: string) {
   const queryStart = href.indexOf('?');
   if (queryStart === -1) {
     return { organizationId: undefined };
@@ -90,6 +98,9 @@ function normalizePath(path: string): string[] {
  * Delivery waits until the formSheet is fully gone — never a fixed timer.
  */
 export function navigationContainsShareGate(state: unknown): boolean {
+  // Walks the untyped React Navigation state tree, which has no shared
+  // discriminant to narrow on.
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see above
   if (!state || typeof state !== 'object') {
     return false;
   }

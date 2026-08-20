@@ -22,6 +22,14 @@ vi.mock('./SessionIngestDO', () => ({
   getSessionIngestDO: sessionIngestMocks.getSessionIngestDO,
 }));
 
+const sessionAccessMocks = vi.hoisted(() => ({
+  resolveAccessibleKiloSession: vi.fn(),
+}));
+
+vi.mock('../services/session-access', () => ({
+  resolveAccessibleKiloSession: sessionAccessMocks.resolveAccessibleKiloSession,
+}));
+
 import {
   MAX_CATALOG_RESULT_BYTES,
   MAX_DURABLE_RESULT_BYTES,
@@ -208,7 +216,7 @@ function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): M
   );
 
   doInstance.fetch(
-    new Request(`http://local/web?connectionId=${connectionId}`, {
+    new Request(`http://local/web?connectionId=${connectionId}&kiloUserId=usr_1`, {
       headers: { Upgrade: 'websocket' },
     })
   );
@@ -271,9 +279,10 @@ function addCliSocket(
 function addWebSocket(
   mockCtx: ReturnType<typeof createMockCtx>,
   connectionId = 'web-1',
-  subscribedSessions: string[] = []
+  subscribedSessions: string[] = [],
+  kiloUserId = 'usr_1'
 ): MockWS {
-  const attachment = { role: 'web' as const, connectionId, subscribedSessions };
+  const attachment = { role: 'web' as const, connectionId, subscribedSessions, kiloUserId };
   const ws = createMockWs(['web'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -303,25 +312,26 @@ function sendHeartbeat(
     ...(options.capabilities ? { capabilities: options.capabilities } : {}),
     ...(options.instance ? { instance: options.instance } : {}),
   });
-  doInstance.webSocketMessage(cliWs as never, msg);
+  void doInstance.webSocketMessage(cliWs as never, msg);
 }
 
 /** Send a subscribe from a web ws */
-function sendSubscribe(doInstance: UserConnectionDO, webWs: MockWS, sessionId: string) {
+async function sendSubscribe(doInstance: UserConnectionDO, webWs: MockWS, sessionId: string) {
   const msg = JSON.stringify({ type: 'subscribe', sessionId });
-  doInstance.webSocketMessage(webWs as never, msg);
+  await doInstance.webSocketMessage(webWs as never, msg);
+  await flushAsync();
 }
 
 /** Send an unsubscribe from a web ws */
 function sendUnsubscribe(doInstance: UserConnectionDO, webWs: MockWS, sessionId: string) {
   const msg = JSON.stringify({ type: 'unsubscribe', sessionId });
-  doInstance.webSocketMessage(webWs as never, msg);
+  void doInstance.webSocketMessage(webWs as never, msg);
 }
 
 /** Send a viewer ping from a web ws */
 function sendPing(doInstance: UserConnectionDO, webWs: MockWS, nonce: string) {
   const msg = JSON.stringify({ type: 'ping', nonce });
-  doInstance.webSocketMessage(webWs as never, msg);
+  void doInstance.webSocketMessage(webWs as never, msg);
 }
 
 /** Send a command from a web ws. Auto-flushes so durable-before-send
@@ -339,7 +349,7 @@ async function sendCommand(
   }
 ): Promise<void> {
   const msg = JSON.stringify({ type: 'command', ...opts });
-  doInstance.webSocketMessage(webWs as never, msg);
+  await doInstance.webSocketMessage(webWs as never, msg);
   await flushAsync();
 }
 
@@ -352,7 +362,7 @@ async function sendCliResponse(
   opts: { id: string; result?: unknown; error?: unknown }
 ): Promise<void> {
   const msg = JSON.stringify({ type: 'response', ...opts });
-  doInstance.webSocketMessage(cliWs as never, msg);
+  void doInstance.webSocketMessage(cliWs as never, msg);
   await flushAsync();
 }
 
@@ -405,6 +415,12 @@ describe('UserConnectionDO', () => {
     sessionIngestMocks.getSessionIngestDO.mockReturnValue({
       resetAttentionStatusOnCliDisconnect: sessionIngestMocks.resetAttentionStatusOnCliDisconnect,
       claimSessionReadyPush: sessionIngestMocks.claimSessionReadyPush,
+    });
+    sessionAccessMocks.resolveAccessibleKiloSession.mockReset();
+    sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: null,
+      cloudAgentSessionScopeId: null,
     });
   });
 
@@ -587,7 +603,7 @@ describe('UserConnectionDO', () => {
 
       // web subscribes to s1 — subscribe sent to cli1 (the current owner)
       const webWs = mockCtx.sockets.find(s => s._tags.includes('web'))!;
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
 
       cli1.send.mockClear();
       cli2.send.mockClear();
@@ -613,8 +629,8 @@ describe('UserConnectionDO', () => {
 
       // subWeb subscribes to s1, otherWeb subscribes to s2 (subscriptions are
       // irrelevant to broadcast delivery — both should still receive cli1's heartbeat)
-      sendSubscribe(doInstance, subWeb, 's1');
-      sendSubscribe(doInstance, otherWeb, 's2');
+      await sendSubscribe(doInstance, subWeb, 's1');
+      await sendSubscribe(doInstance, otherWeb, 's2');
       subWeb.send.mockClear();
       otherWeb.send.mockClear();
 
@@ -675,7 +691,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
         protocolVersion: '1',
       });
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
@@ -695,7 +711,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
@@ -713,7 +729,7 @@ describe('UserConnectionDO', () => {
 
       // cli1 owns s1
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, subWeb, 's1');
+      await sendSubscribe(doInstance, subWeb, 's1');
       subWeb.send.mockClear();
       otherWeb.send.mockClear();
 
@@ -832,7 +848,7 @@ describe('UserConnectionDO', () => {
       // Establish ownership and subscription first so the heartbeat broadcast
       // is targeted at this web socket.
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
@@ -895,7 +911,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
         capabilities: { attachments: true },
       });
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
       // Latest heartbeat omits capabilities.
@@ -1079,7 +1095,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
 
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
 
       // CLI should receive subscribe
       expect(cliWs.send).toHaveBeenCalledTimes(1);
@@ -1093,7 +1109,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')]);
       webWs.send.mockClear();
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
 
       expect(parseSent(webWs)).toEqual({
         type: 'system',
@@ -1119,7 +1135,7 @@ describe('UserConnectionDO', () => {
 
       // No heartbeat sent, so no owner for 's1'
       // Trigger ensureState via a harmless message first
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
 
       // Both CLIs should receive subscribe
       expect(cli1.send).toHaveBeenCalled();
@@ -1133,8 +1149,8 @@ describe('UserConnectionDO', () => {
       addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      sendSubscribe(doInstance, webWs, 's1');
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
 
       const att = webWs.deserializeAttachment() as {
         subscribedSessions: string[];
@@ -1150,7 +1166,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
 
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       cliWs.send.mockClear();
 
       sendUnsubscribe(doInstance, webWs, 's1');
@@ -1171,8 +1187,8 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
 
-      sendSubscribe(doInstance, web1, 's1');
-      sendSubscribe(doInstance, web2, 's1');
+      await sendSubscribe(doInstance, web1, 's1');
+      await sendSubscribe(doInstance, web2, 's1');
       cliWs.send.mockClear();
 
       // Unsubscribe first — CLI should NOT get unsubscribe
@@ -1217,6 +1233,7 @@ describe('UserConnectionDO', () => {
         role: 'web',
         connectionId: 'viewer-1',
         subscribedSessions: [],
+        kiloUserId: 'usr_1',
       });
     });
   });
@@ -1258,7 +1275,7 @@ describe('UserConnectionDO', () => {
       cliWs.send.mockClear();
 
       const oldWeb = connectWebSocket(doInstance, 'viewer-1');
-      sendSubscribe(doInstance, oldWeb, 's1');
+      await sendSubscribe(doInstance, oldWeb, 's1');
       cliWs.send.mockClear();
 
       const newWeb = connectWebSocket(doInstance, 'viewer-1');
@@ -1272,6 +1289,7 @@ describe('UserConnectionDO', () => {
         role: 'web',
         connectionId: 'viewer-1',
         subscribedSessions: [],
+        kiloUserId: 'usr_1',
       });
     });
 
@@ -1535,7 +1553,7 @@ describe('UserConnectionDO', () => {
       // State should NOT be cleaned up — cli2 is live
       // Verify by routing a command to s1 — should reach cli2
       cli2.send.mockClear();
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       expect(cli2.send).toHaveBeenCalled();
       expect(parseSent(cli2)).toEqual({ type: 'subscribe', sessionId: 's1' });
     });
@@ -1801,8 +1819,8 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
-      sendSubscribe(doInstance, webWs, 's1');
-      sendSubscribe(doInstance, webWs, 's2');
+      await sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's2');
 
       mockCtx.removeSocket(webWs);
       disconnectWeb(doInstance, webWs);
@@ -1814,7 +1832,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: {},
       });
-      doInstance.webSocketMessage(cliWs as never, cliEventMsg);
+      void doInstance.webSocketMessage(cliWs as never, cliEventMsg);
       // No web sockets to receive the event — no crash = success
     });
 
@@ -1824,7 +1842,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       cliWs.send.mockClear();
 
       mockCtx.removeSocket(webWs);
@@ -3501,7 +3519,7 @@ describe('UserConnectionDO', () => {
       const otherWeb = addWebSocket(mockCtx, 'web-other');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, subWeb, 's1');
+      await sendSubscribe(doInstance, subWeb, 's1');
       subWeb.send.mockClear();
       otherWeb.send.mockClear();
 
@@ -3512,7 +3530,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(subWeb.send).toHaveBeenCalledTimes(1);
       expect(parseSent(subWeb)).toEqual({
@@ -3531,8 +3549,8 @@ describe('UserConnectionDO', () => {
       const childWeb = addWebSocket(mockCtx, 'web-child');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('parent-session')]);
-      sendSubscribe(doInstance, parentWeb, 'parent-session');
-      sendSubscribe(doInstance, childWeb, 'child-session-1');
+      await sendSubscribe(doInstance, parentWeb, 'parent-session');
+      await sendSubscribe(doInstance, childWeb, 'child-session-1');
       parentWeb.send.mockClear();
       childWeb.send.mockClear();
 
@@ -3543,7 +3561,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(parentWeb.send).toHaveBeenCalledTimes(1);
       expect(childWeb.send).toHaveBeenCalledTimes(1);
@@ -3564,8 +3582,8 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('parent-session')]);
-      sendSubscribe(doInstance, webWs, 'parent-session');
-      sendSubscribe(doInstance, webWs, 'child-session-1');
+      await sendSubscribe(doInstance, webWs, 'parent-session');
+      await sendSubscribe(doInstance, webWs, 'child-session-1');
       webWs.send.mockClear();
 
       const eventMsg = JSON.stringify({
@@ -3575,7 +3593,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       // Should only receive once despite subscribing to both
       expect(webWs.send).toHaveBeenCalledTimes(1);
@@ -3587,7 +3605,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('parent-session')]);
-      sendSubscribe(doInstance, webWs, 'parent-session');
+      await sendSubscribe(doInstance, webWs, 'parent-session');
       webWs.send.mockClear();
 
       // CLI sends event for a child session with parentSessionId
@@ -3598,7 +3616,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-child-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(webWs.send).toHaveBeenCalledTimes(1);
       expect(parseSent(webWs)).toEqual({
@@ -3616,7 +3634,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('other-session')]);
-      sendSubscribe(doInstance, webWs, 'other-session');
+      await sendSubscribe(doInstance, webWs, 'other-session');
       webWs.send.mockClear();
 
       // Child event with parent that nobody subscribes to
@@ -3627,7 +3645,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-child-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(webWs.send).not.toHaveBeenCalled();
     });
@@ -3638,7 +3656,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
       const eventMsg = JSON.stringify({
@@ -3647,7 +3665,7 @@ describe('UserConnectionDO', () => {
         event: 'message.updated',
         data: { id: 'msg-1' },
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       expect(webWs.send).toHaveBeenCalledTimes(1);
       expect(parseSent(webWs)).toEqual({
@@ -3664,7 +3682,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
       const eventMsg = JSON.stringify({
@@ -3673,7 +3691,7 @@ describe('UserConnectionDO', () => {
         event: 'session.status',
         data: {},
       });
-      doInstance.webSocketMessage(cliWs as never, eventMsg);
+      void doInstance.webSocketMessage(cliWs as never, eventMsg);
 
       const sent = parseSent(webWs);
       expect(sent).not.toHaveProperty('parentSessionId');
@@ -3725,7 +3743,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       // Trigger ensureState by calling any method (e.g., webSocketMessage with subscribe)
-      sendSubscribe(doInstance, webWs, 's1');
+      await sendSubscribe(doInstance, webWs, 's1');
 
       // Verify state was reconstructed by routing a command
       const web2 = addWebSocket(mockCtx, 'web-2');
@@ -3760,7 +3778,7 @@ describe('UserConnectionDO', () => {
         event: 'test',
         data: {},
       });
-      doInstance.webSocketMessage(cliWs as never, triggerMsg);
+      void doInstance.webSocketMessage(cliWs as never, triggerMsg);
 
       // webWs should have received the event because it was subscribed via attachment
       expect(webWs.send).toHaveBeenCalledTimes(1);
@@ -3781,7 +3799,7 @@ describe('UserConnectionDO', () => {
         replaced: true,
       });
 
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({
           type: 'event',
@@ -4198,7 +4216,7 @@ describe('UserConnectionDO', () => {
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
       // Should not throw
-      doInstance.webSocketMessage(cliWs as never, 'not-json');
+      void doInstance.webSocketMessage(cliWs as never, 'not-json');
     });
 
     it('logs invalid CLI JSON metadata without raw payload content', async () => {
@@ -4207,7 +4225,7 @@ describe('UserConnectionDO', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const malformed = '{"secret":"raw-secret-must-not-be-logged"';
 
-      doInstance.webSocketMessage(cliWs as never, malformed);
+      void doInstance.webSocketMessage(cliWs as never, malformed);
 
       expect(warn).toHaveBeenCalledWith('Failed to parse WebSocket message as JSON', {
         role: 'cli',
@@ -4223,7 +4241,10 @@ describe('UserConnectionDO', () => {
       mockCtx.addSocket(ws);
 
       // Trigger ensureState first
-      doInstance.webSocketMessage(ws as never, JSON.stringify({ type: 'heartbeat', sessions: [] }));
+      void doInstance.webSocketMessage(
+        ws as never,
+        JSON.stringify({ type: 'heartbeat', sessions: [] })
+      );
       // Should not throw
     });
 
@@ -4234,12 +4255,12 @@ describe('UserConnectionDO', () => {
 
       // Invalid CLI message
       const badMsg = JSON.stringify({ type: 'invalid_type' });
-      doInstance.webSocketMessage(cliWs as never, badMsg);
+      void doInstance.webSocketMessage(cliWs as never, badMsg);
       // Should not throw
 
       // Invalid web message
       const webWs = addWebSocket(mockCtx, 'web-1');
-      doInstance.webSocketMessage(webWs as never, badMsg);
+      void doInstance.webSocketMessage(webWs as never, badMsg);
       // Should not throw
     });
 
@@ -4254,7 +4275,7 @@ describe('UserConnectionDO', () => {
         result: { secret },
       });
 
-      doInstance.webSocketMessage(cliWs as never, malformed);
+      void doInstance.webSocketMessage(cliWs as never, malformed);
 
       expect(warn).toHaveBeenCalledWith('CLI message parse failed', {
         role: 'cli',
@@ -5945,7 +5966,7 @@ describe('UserConnectionDO', () => {
       });
 
       // Send raw — schema validation must reject it.
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
 
       // No response forwarded to CLI.
       const cliCommands = allSent(mockCtx.sockets.find(s => s._tags.includes('cli'))!).filter(
@@ -6077,7 +6098,7 @@ describe('UserConnectionDO', () => {
       // Start the first CLI reply — the handler rehydrates the durable
       // entry, builds the in-memory entry, then blocks on the deferred
       // storage.put before sending the live response.
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { first: true } })
       );
@@ -6086,7 +6107,7 @@ describe('UserConnectionDO', () => {
       // Start the second CLI reply while the first is held on storage.put.
       // The completedCorrelationIds reservation is still set, so the
       // second reply returns early without delivering.
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { second: true } })
       );
@@ -6612,7 +6633,7 @@ describe('UserConnectionDO', () => {
           })
       );
 
-      doInstance.webSocketMessage(
+      await doInstance.webSocketMessage(
         webWs as never,
         JSON.stringify({
           type: 'command',
@@ -6634,7 +6655,7 @@ describe('UserConnectionDO', () => {
       await Promise.resolve();
       const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
       expect(markers.has(correlationId!)).toBe(true);
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { wrong: true } })
       );
@@ -6678,7 +6699,7 @@ describe('UserConnectionDO', () => {
           })
       );
 
-      doInstance.webSocketMessage(
+      await doInstance.webSocketMessage(
         webWs as never,
         JSON.stringify({
           type: 'command',
@@ -6699,7 +6720,7 @@ describe('UserConnectionDO', () => {
       await Promise.resolve();
       const markers = Reflect.get(doInstance, 'completedCorrelationIds') as Set<string>;
       expect(markers.has(correlationId!)).toBe(true);
-      doInstance.webSocketMessage(
+      void doInstance.webSocketMessage(
         firstOwner as never,
         JSON.stringify({ type: 'response', id: correlationId, result: { wrong: true } })
       );
@@ -7430,7 +7451,7 @@ describe('UserConnectionDO', () => {
         command: 'send_message',
         sessionId: 's1',
       });
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
 
       // Flush enough for the initial write to fail and the .catch + .finally
       // to execute. The command was never forwarded to the CLI.
@@ -7478,7 +7499,7 @@ describe('UserConnectionDO', () => {
         command: 'send_message',
         sessionId: 's1',
       });
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
 
       // Drain microtasks so the waitUntil launches and the initial write
       // promise is awaited (but not yet resolved).
@@ -7545,7 +7566,7 @@ describe('UserConnectionDO', () => {
         command: 'send_message',
         sessionId: 's1',
       });
-      doInstance.webSocketMessage(webWs as never, msg);
+      void doInstance.webSocketMessage(webWs as never, msg);
       await flushAsync();
 
       // Get the correlationId that was assigned.
@@ -7655,5 +7676,112 @@ describe('UserConnectionDO', () => {
         },
       });
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // Command and subscribe access recheck
+  // -------------------------------------------------------------------------
+
+  describe('command and subscribe access recheck', () => {
+    it('rejects a command on an inaccessible org session without forwarding', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce(null);
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).toHaveBeenCalledWith(
+        expect.anything(),
+        { kiloUserId: 'usr_1', kiloSessionId: 's1' }
+      );
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_ACCESS_DENIED',
+          message: 'You no longer have access to this session',
+        },
+      });
+      expect(cliWs.send).not.toHaveBeenCalled();
+    });
+
+    it('forwards a command on an accessible personal session', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: null,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+
+      expect(cliWs.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(cliWs)).toMatchObject({
+        type: 'command',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+    });
+
+    it('does not tell the CLI to forward events when a subscribe loses org access', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce(null);
+
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(cliWs.send).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('closeViewerSockets', () => {
+  it('closes every web socket and returns the count', () => {
+    const { doInstance, mockCtx } = setup();
+    const web1 = addWebSocket(mockCtx, 'web-1');
+    const web2 = addWebSocket(mockCtx, 'web-2');
+    const cli = addCliSocket(mockCtx, 'cli-1');
+
+    const closed = doInstance.closeViewerSockets();
+
+    expect(closed).toBe(2);
+    expect(web1.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(web2.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(cli.close).not.toHaveBeenCalled();
+  });
+
+  it('does not close non-web sockets', () => {
+    const { doInstance, mockCtx } = setup();
+    const cli1 = addCliSocket(mockCtx, 'cli-1');
+    const cli2 = addCliSocket(mockCtx, 'cli-2');
+
+    const closed = doInstance.closeViewerSockets();
+
+    expect(closed).toBe(0);
+    expect(cli1.close).not.toHaveBeenCalled();
+    expect(cli2.close).not.toHaveBeenCalled();
   });
 });

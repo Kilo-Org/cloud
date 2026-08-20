@@ -2897,10 +2897,10 @@ const scenarios: FirefoxScenario[] = [
         await clickButtonByLabel(session.driver, `Delete memory "${betaPreview}"`);
         await waitForText(session.driver, EMPTY_MEMORIES_MESSAGE);
 
-        const regionButtons = await session.driver.findElements(
-          By.css('section[aria-label="Memories"] button')
+        const memoryRowButtons = await session.driver.findElements(
+          By.css('section[aria-label="Memories"] button[aria-label^="Delete memory"]')
         );
-        assert.equal(regionButtons.length, 0);
+        assert.equal(memoryRowButtons.length, 0);
         await closeFirefoxSettings(session.driver);
       }),
   },

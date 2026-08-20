@@ -53,7 +53,7 @@ describe('mapPrOperationError', () => {
     (surface, expected) => {
       const mapped = mapPrOperationError(IN_PROGRESS, surface);
       expect(mapped).toBeInstanceOf(Error);
-      expect((mapped as Error).message).toBe(expected);
+      expect(mapped.message).toBe(expected);
     }
   );
 
@@ -62,7 +62,7 @@ describe('mapPrOperationError', () => {
     surface => {
       const mapped = mapPrOperationError(AMBIGUOUS, surface);
       expect(mapped).toBeInstanceOf(Error);
-      expect((mapped as Error).message).toBe(PR_OPERATION_AMBIGUOUS_MESSAGE);
+      expect(mapped.message).toBe(PR_OPERATION_AMBIGUOUS_MESSAGE);
     }
   );
 
@@ -71,7 +71,7 @@ describe('mapPrOperationError', () => {
     surface => {
       const mapped = mapPrOperationError(PERSISTENCE_FAILED, surface);
       expect(mapped).toBeInstanceOf(Error);
-      expect((mapped as Error).message).toBe(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+      expect(mapped.message).toBe(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
     }
   );
 

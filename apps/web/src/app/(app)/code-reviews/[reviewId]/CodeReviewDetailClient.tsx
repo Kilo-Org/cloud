@@ -106,6 +106,13 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   }
 
   const review = data.review;
+  const latestAttempt = data.attempts.at(-1);
+  const displaySessionId =
+    review.session_id ??
+    review.cli_session_id ??
+    latestAttempt?.session_id ??
+    latestAttempt?.cli_session_id ??
+    null;
   const status = review.status as CodeReviewStatus;
   const statusInfo = getCodeReviewStatusIcon(status);
   const statusLabel = CODE_REVIEW_STATUS_LABELS[status] ?? review.status;
@@ -209,7 +216,15 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
             {review.model && (
               <div>
                 <dt className="text-muted-foreground">Model</dt>
-                <dd>{review.model}</dd>
+                <dd className="break-all">{review.model}</dd>
+              </div>
+            )}
+            {displaySessionId && (
+              <div>
+                <dt className="text-muted-foreground">Session</dt>
+                <dd title={displaySessionId} className="font-mono text-xs break-all">
+                  {displaySessionId}
+                </dd>
               </div>
             )}
             <div>

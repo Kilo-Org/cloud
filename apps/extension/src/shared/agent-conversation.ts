@@ -74,6 +74,18 @@ export type AgentConversationEvent =
     }
   | {
       readonly arguments: Record<string, unknown>;
+      readonly definitionSignature: string;
+      readonly documentId: string;
+      readonly id: string;
+      readonly name: string;
+      readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
+      readonly tabId: number;
+      readonly type: 'tool-call';
+      readonly webMcpOrigin: string;
+    }
+  | {
+      readonly arguments: Record<string, unknown>;
       readonly id: string;
       /** The agent's own tool name (`read`, `bash`, …), not an extension tool. */
       readonly name: string;
@@ -103,6 +115,10 @@ export type RemoteMcpToolCallEvent = Extract<
 export type WorkflowToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly name: WorkflowToolName }
+>;
+export type WebMcpToolCallEvent = Extract<
+  AgentConversationEvent,
+  { readonly webMcpOrigin: string }
 >;
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
@@ -149,6 +165,16 @@ interface CreateWorkflowToolCallOptions {
   readonly name: WorkflowToolName;
   readonly providerToolCallId?: string;
   readonly tabId: number;
+}
+
+interface CreateWebMcpToolCallOptions {
+  readonly arguments: Record<string, unknown>;
+  readonly definitionSignature: string;
+  readonly documentId: string;
+  readonly name: string;
+  readonly providerToolCallId?: string;
+  readonly tabId: number;
+  readonly webMcpOrigin: string;
 }
 
 interface CreateToolResultOptions {
@@ -256,6 +282,26 @@ export const createWorkflowToolCall = ({
   ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
   tabId,
   type: 'tool-call',
+});
+
+export const createWebMcpToolCall = ({
+  arguments: toolArguments,
+  definitionSignature,
+  documentId,
+  name,
+  providerToolCallId,
+  tabId,
+  webMcpOrigin,
+}: CreateWebMcpToolCallOptions): WebMcpToolCallEvent => ({
+  arguments: toolArguments,
+  definitionSignature,
+  documentId,
+  id: createEventId(),
+  name,
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  tabId,
+  type: 'tool-call',
+  webMcpOrigin,
 });
 
 export const createToolResult = ({

@@ -37,6 +37,9 @@ export type ResolvedSessionShare = {
   kiloUserId: string;
   title: string | null;
   ownerName: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  createdAt: string;
 };
 
 export type SessionShareTokenEnv = {
@@ -128,6 +131,9 @@ export async function resolveSessionShareToken(
       kiloUserId: cli_sessions_v2.kilo_user_id,
       title: cli_sessions_v2.title,
       ownerName: kilocode_users.google_user_name,
+      gitUrl: cli_sessions_v2.git_url,
+      gitBranch: cli_sessions_v2.git_branch,
+      createdAt: cli_sessions_v2.created_at,
     })
     .from(cli_sessions_v2)
     .leftJoin(kilocode_users, eq(cli_sessions_v2.kilo_user_id, kilocode_users.id))

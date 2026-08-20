@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -38,7 +38,7 @@ type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: st
 
 /** Shown when the App Store account already owns a pass on another Kilo account. */
 export const KILO_PASS_OTHER_ACCOUNT_COPY =
-  'This App Store subscription belongs to another Kilo account. Sign in to that account to manage it.';
+  'The Kilo Pass on this Apple Account belongs to a different Kilo account. Sign in to that Kilo account to manage it.';
 
 /**
  * A failed preflight is either retryable (transient network/5xx) or
@@ -48,6 +48,16 @@ export const KILO_PASS_OTHER_ACCOUNT_COPY =
 type PreflightFailure =
   | { kind: 'retryable'; message: string; product: AppStoreKiloPassProduct }
   | { kind: 'nonRetryable'; message: string };
+
+function getPreflightFailureMessage(reason: string | null): string {
+  if (reason === 'already_subscribed') {
+    return 'You already have a Kilo Pass subscription.';
+  }
+  if (reason === 'owned_by_another_account') {
+    return KILO_PASS_OTHER_ACCOUNT_COPY;
+  }
+  return 'Kilo Pass purchase is not available right now.';
+}
 
 function formatTier(product: AppStoreKiloPassProduct): string {
   return `$${product.webMonthlyPriceUsd} in credits`;
@@ -164,9 +174,20 @@ function KiloPassNativeIapContent() {
     productsRefetch,
     purchase,
     ownedByAnotherAccount,
+    ownedAppleProductId,
+    ownedOriginalTransactionId,
+    ownershipChecked,
   } = useKiloPassNativeIap();
   useInlinePurchaseErrorOwnership();
+  const queryClient = useQueryClient();
   const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());
+  const invalidateAfterManagement = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
+      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
+      queryClient.invalidateQueries(trpc.kiloPass.getPurchasePresentation.pathFilter()),
+    ]);
+  };
   const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
   const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
   let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
@@ -180,7 +201,11 @@ function KiloPassNativeIapContent() {
   const preflightBlocked = preflightFailure?.kind === 'nonRetryable';
   const isRetryDisabled = isPending || productsIsRefetching;
   const tilesDisabled =
-    isPending || preflightBlocked || preflightPurchase.isPending || ownedByAnotherAccount;
+    isPending ||
+    preflightBlocked ||
+    preflightPurchase.isPending ||
+    ownedByAnotherAccount ||
+    !ownershipChecked;
   const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -206,6 +231,7 @@ function KiloPassNativeIapContent() {
         storefront: 'app_store',
         product: 'kilo_pass',
         appleProductId: product.appleProductId,
+        appleOriginalTransactionId: ownedOriginalTransactionId,
       });
     } catch {
       setPreflightFailure({
@@ -219,10 +245,7 @@ function KiloPassNativeIapContent() {
     if (!preflight.allowed) {
       setPreflightFailure({
         kind: 'nonRetryable',
-        message:
-          preflight.reason === 'already_subscribed'
-            ? 'You already have a Kilo Pass subscription.'
-            : 'Kilo Pass purchase is not available right now.',
+        message: getPreflightFailureMessage(preflight.reason),
       });
       return;
     }
@@ -240,6 +263,18 @@ function KiloPassNativeIapContent() {
 
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
+
+    // Apple owns tier changes inside a subscription group: requesting another SKU
+    // while this device already owns one is refused by StoreKit, and the app cannot
+    // show the proration Apple applies. Send those taps to App Store management.
+    if (ownedAppleProductId && ownedAppleProductId !== product.appleProductId) {
+      void (async () => {
+        const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
+        await openAppStoreManagement({ invalidateAfter: invalidateAfterManagement });
+      })();
+      return;
+    }
+
     void runPreflight(product);
   };
 
@@ -347,6 +382,7 @@ function KiloPassNativeIapContent() {
             onResult={result => {
               if (result === 'restored') {
                 setRestoreFeedback({ type: 'success', text: 'Subscription restored.' });
+                ensureProfileAfterKiloPassPurchase(router);
               } else if (result === 'empty') {
                 setRestoreFeedback({ type: 'info', text: 'No purchases to restore.' });
               } else {

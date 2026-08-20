@@ -161,6 +161,7 @@ type KiloPassCaller = {
     product: 'credits' | 'kilo_pass';
     program?: string | null;
     appleProductId: string;
+    appleOriginalTransactionId?: string | null;
   }) => Promise<{
     allowed: boolean;
     statusClass: 'healthy' | 'pending' | 'retryable' | 'terminal' | 'inactive';
@@ -170,6 +171,7 @@ type KiloPassCaller = {
       | 'unsupported_combination'
       | 'unknown_product'
       | 'already_subscribed'
+      | 'owned_by_another_account'
       | null;
   }>;
   completeAppStorePurchase: (input: {
@@ -1082,6 +1084,87 @@ describe('kiloPassRouter', () => {
         storefront: 'app_store',
         product: 'kilo_pass',
         appleProductId: 'kilopass.tier19.monthly.v1',
+      });
+
+      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
+    });
+
+    it("blocks a purchase when this device's subscription belongs to another Kilo account", async () => {
+      const owner = await insertTestUser();
+      const buyer = await insertTestUser();
+      const providerSubscriptionId = `orig_${crypto.randomUUID()}`;
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: owner.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId,
+      });
+      await db.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: owner.id,
+        payment_provider: KiloPassPaymentProvider.AppStore,
+        product_id: 'kilopass.tier19.monthly.v1',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: `tx_${crypto.randomUUID()}`,
+        provider_original_transaction_id: providerSubscriptionId,
+        app_account_token: owner.app_store_account_token,
+        environment: 'Sandbox',
+        purchased_at: '2026-01-01T00:00:00.000Z',
+        expires_at: '2026-02-01T00:00:00.000Z',
+        raw_payload_json: {},
+      });
+
+      const caller = await createCallerForUser(buyer.id);
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'ios',
+        storefront: 'app_store',
+        product: 'kilo_pass',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+        appleOriginalTransactionId: providerSubscriptionId,
+      });
+
+      expect(result).toEqual({
+        allowed: false,
+        statusClass: 'terminal',
+        reason: 'owned_by_another_account',
+      });
+    });
+
+    it('allows the owning account to buy with its own device transaction', async () => {
+      const owner = await insertTestUser();
+      const providerSubscriptionId = `orig_${crypto.randomUUID()}`;
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: owner.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId,
+      });
+      await db.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: owner.id,
+        payment_provider: KiloPassPaymentProvider.AppStore,
+        product_id: 'kilopass.tier19.monthly.v1',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: `tx_${crypto.randomUUID()}`,
+        provider_original_transaction_id: providerSubscriptionId,
+        app_account_token: owner.app_store_account_token,
+        environment: 'Sandbox',
+        purchased_at: '2026-01-01T00:00:00.000Z',
+        expires_at: '2026-02-01T00:00:00.000Z',
+        raw_payload_json: {},
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'ios',
+        storefront: 'app_store',
+        product: 'kilo_pass',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+        appleOriginalTransactionId: providerSubscriptionId,
       });
 
       expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });

@@ -674,6 +674,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
 <<<<<<< ours
+<<<<<<< ours
+=======
+    getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
+>>>>>>> theirs
 =======
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
 >>>>>>> theirs
@@ -802,6 +806,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       clientIp: ipAddress ?? null,
       machineId: machineIdHeader,
 <<<<<<< ours
+<<<<<<< ours
+=======
+      getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
+>>>>>>> theirs
 =======
       getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
 >>>>>>> theirs
@@ -862,6 +870,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       plan,
       settings,
     } = await accessCheckResolver.get();
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 
     if (

@@ -45,17 +45,17 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
 export function genericPushContentForPushData(data: PushData): { title: string; body: string } {
   switch (data.type) {
     case 'cloud_agent_session':
-      return { title: 'Kilo Code', body: 'Your agent session has an update' };
+      return { title: 'Kilo', body: 'Your agent session has an update' };
     case 'chat.message':
-      return { title: 'Kilo Code', body: 'You have a new message' };
+      return { title: 'Kilo', body: 'You have a new message' };
     case 'instance-lifecycle':
-      return { title: 'Kilo Code', body: 'Your instance has an update' };
+      return { title: 'Kilo', body: 'Your instance has an update' };
     case 'scheduled-action':
-      return { title: 'Kilo Code', body: 'A scheduled action has an update' };
+      return { title: 'Kilo', body: 'A scheduled action has an update' };
     case 'low_balance':
-      return { title: 'Kilo Code', body: 'Your balance needs attention' };
+      return { title: 'Kilo', body: 'Your balance needs attention' };
     case 'security_finding':
-      return { title: 'Kilo Code', body: 'A security finding needs attention' };
+      return { title: 'Kilo', body: 'A security finding needs attention' };
     default: {
       // Exhaustiveness: new PushData variants must be handled above.
       const _exhaustive: never = data;

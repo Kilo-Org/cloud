@@ -43,11 +43,11 @@ function MethodPicker({
   onChange: (next: AllowedMergeMethod) => void;
 }>) {
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
         Method
       </Text>
-      <RadioGroup label="Method" className="flex-row flex-wrap gap-1">
+      <RadioGroup label="Method" className="flex-row flex-wrap gap-2">
         {methodOptions.map(option => {
           const active = method === option.value;
           // Long labels stay readable via accessibilityLabel; chip shows short text.
@@ -62,7 +62,7 @@ function MethodPicker({
               {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
               accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
               className={cn(
-                'min-h-8 items-center justify-center rounded-full border px-2.5 py-1 active:opacity-70',
+                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
                 active && 'border-primary bg-primary',
                 !active && isDisabled && 'border-hair-soft bg-secondary',
                 !active && !isDisabled && 'border-border bg-secondary'
@@ -70,7 +70,7 @@ function MethodPicker({
             >
               <Text
                 className={cn(
-                  'text-xs font-medium',
+                  'text-sm font-medium',
                   active && 'text-primary-foreground',
                   !active && isDisabled && 'text-muted-foreground',
                   !active && !isDisabled && 'text-foreground'
@@ -99,8 +99,8 @@ function CommitTitleField({
 }>) {
   const colors = useThemeColors();
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium text-foreground">Commit title</Text>
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-foreground">Commit title</Text>
       <TextInput
         ref={inputRef}
         defaultValue={titleRef.current}
@@ -112,7 +112,7 @@ function CommitTitleField({
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-9 max-h-12 rounded-md border border-input bg-background px-3 py-1 text-sm leading-5 text-foreground',
+          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -137,8 +137,8 @@ function CommitMessageField({
   const keyboardVisible = useFormSheetKeyboardVisible();
   const tight = compact || keyboardVisible;
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium text-foreground">Commit message</Text>
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-foreground">Commit message</Text>
       <TextInput
         ref={inputRef}
         defaultValue={messageRef.current}
@@ -150,9 +150,9 @@ function CommitMessageField({
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-1 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
           'focus:border-ring',
-          tight ? 'max-h-12 min-h-9' : 'min-h-11 max-h-16'
+          tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}
         multiline
         textAlignVertical="top"
@@ -178,7 +178,7 @@ function DeleteBranchToggle({
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-1.5">
+    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-4 py-3">
       <Text className="flex-1 pr-3 text-sm font-medium">Delete branch</Text>
       <Switch
         accessibilityLabel="Delete branch after merge"
@@ -236,7 +236,7 @@ export function MergeSheetFormBody(props: {
 
   return (
     <>
-      <View className="gap-1.5 px-6 pt-1.5">
+      <View className="gap-4 px-6 pt-4">
         {noMethodsAllowed ? (
           <View className="rounded-md border border-border bg-secondary p-3">
             <AccessibleStatus
@@ -286,9 +286,8 @@ export function MergeSheetFormBody(props: {
         ) : null}
       </View>
 
-      <PrFormSheetFooter className="pb-1 pt-1">
+      <PrFormSheetFooter>
         <Button
-          size="sm"
           onPress={onConfirm}
           loading={isMutating}
           disabled={
@@ -301,11 +300,10 @@ export function MergeSheetFormBody(props: {
           <Text>{submitLabel}</Text>
         </Button>
         <Button
-          size="sm"
           variant="ghost"
           onPress={onDismiss}
           disabled={isMutating}
-          className="mt-0.5"
+          className="mt-2"
           accessibilityLabel="Cancel"
         >
           <Text>Cancel</Text>

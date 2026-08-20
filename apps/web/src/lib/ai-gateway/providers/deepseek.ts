@@ -4,13 +4,14 @@ export function isDeepseekModel(model: string) {
   return model.includes('deepseek');
 }
 
+// DeepSeek now uses time-of-day based pricing, which our static pricing catalog does not support.
 export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-pro:discounted',
   internal_id: 'deepseek/deepseek-v4-pro-0813',
   display_name: 'DeepSeek: DeepSeek V4 Pro 0813 (lowest price)',
   description:
     'This DeepSeek V4 Pro 0813 endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
-  status: 'public',
+  status: 'disabled',
   context_length: 1048576,
   max_completion_tokens: 384000,
   gateway: 'openrouter',
@@ -37,7 +38,7 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   display_name: 'DeepSeek: DeepSeek V4 Flash 0731 (lowest price)',
   description:
     'This DeepSeek V4 Flash 0731 endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
-  status: 'public',
+  status: 'disabled',
   context_length: 1048576,
   max_completion_tokens: 384000,
   gateway: 'openrouter',

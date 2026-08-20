@@ -16,7 +16,7 @@ import type {
   OpenRouterGeneration,
 } from './providers/openrouter/types';
 import { fetchGeneration } from './providers/upstream-request';
-import PROVIDERS from './providers/provider-definitions';
+import { tryGetProviderById } from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -1231,7 +1231,7 @@ export async function processTokenData(
   }
 
   const timer = createTimer();
-  const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
+  const provider = tryGetProviderById(usageContext.provider);
   const generation =
     provider &&
     (await useGenerationLookup(usageStats, usageContext)) &&

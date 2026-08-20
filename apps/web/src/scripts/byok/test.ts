@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { Stream } from 'openai/streaming';
 import type { ChatCompletionChunk } from 'openai/resources';
 
@@ -18,8 +18,8 @@ async function main() {
   }
 
   const openai = new OpenAI({
-    apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
-    baseURL: PROVIDERS.VERCEL_AI_GATEWAY.apiUrl,
+    apiKey: VERCEL_AI_GATEWAY.apiKey,
+    baseURL: VERCEL_AI_GATEWAY.apiUrl,
   });
 
   const stream = (await openai.chat.completions.create({

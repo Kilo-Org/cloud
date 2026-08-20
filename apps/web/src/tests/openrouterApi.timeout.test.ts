@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/nextjs';
 import { upstreamRequest } from '../lib/ai-gateway/providers/upstream-request';
-import PROVIDERS from '../lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '../lib/ai-gateway/providers/provider-definitions';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -59,7 +59,7 @@ describe('upstreamRequest timeout', () => {
         body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
         extraHeaders: {},
         provider: {
-          ...PROVIDERS.OPENROUTER,
+          ...OPENROUTER,
           apiUrl: 'https://gateway.example.test/v3',
           apiUrlOverrides,
         },
@@ -83,7 +83,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
       signal: controller.signal,
     });
 
@@ -116,7 +116,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -144,7 +144,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -172,7 +172,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
       vercelRequestId: 'iad1::iad1::request-id',
     });
 
@@ -207,7 +207,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
       signal: controller.signal,
       vercelRequestId: 'iad1::iad1::request-id',
     });
@@ -238,7 +238,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -274,7 +274,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -306,7 +306,7 @@ describe('upstreamRequest timeout', () => {
       },
       extraHeaders: {},
       provider: {
-        ...PROVIDERS.OPENROUTER,
+        ...OPENROUTER,
         apiUrl: 'https://gateway.example.test/v1?token=url-secret',
       },
     });
@@ -354,7 +354,7 @@ describe('upstreamRequest timeout', () => {
         messages: [{ role: 'user', content: 'test' }],
       },
       extraHeaders: {},
-      provider: PROVIDERS.OPENROUTER,
+      provider: OPENROUTER,
     });
 
     expect(result.type).toBe('error');
@@ -392,7 +392,7 @@ describe('upstreamRequest timeout', () => {
       },
       extraHeaders: { 'x-safe-extra-header': 'extra-header-secret' },
       provider: {
-        ...PROVIDERS.OPENROUTER,
+        ...OPENROUTER,
         apiUrl: 'https://gateway.example.test/v1?token=url-secret',
         apiKey: 'provider-api-key-secret',
       },

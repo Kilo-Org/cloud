@@ -3,7 +3,7 @@ import {
   getEmbeddingProvider,
   getTranscriptionProvider,
 } from '@/lib/ai-gateway/providers/get-provider';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { createAnonymousContext } from '@/lib/anonymous';
 import {
   getModelUserByokProviders,
@@ -37,7 +37,7 @@ describe('getEmbeddingProvider', () => {
     mockedGetBYOKforOrganization.mockClear().mockResolvedValue(null);
   });
 
-  it('should route all non-BYOK models to PROVIDERS.OPENROUTER', async () => {
+  it('should route all non-BYOK models to OpenRouter', async () => {
     const user = createTestUser();
 
     for (const model of [
@@ -47,7 +47,7 @@ describe('getEmbeddingProvider', () => {
     ]) {
       const result = await getEmbeddingProvider(model, user, undefined);
       expect(result.provider.id).toBe('openrouter');
-      expect(result.provider).toBe(PROVIDERS.OPENROUTER);
+      expect(result.provider).toBe(OPENROUTER);
       expect(result.userByok).toBeNull();
     }
   });
@@ -62,7 +62,7 @@ describe('getEmbeddingProvider', () => {
     const result = await getEmbeddingProvider('openai/text-embedding-3-small', user, undefined);
 
     expect(result.provider.id).toBe('vercel');
-    expect(result.provider).toBe(PROVIDERS.VERCEL_AI_GATEWAY);
+    expect(result.provider).toBe(VERCEL_AI_GATEWAY);
     expect(result.userByok).toBe(mockByokResult);
     expect(mockedGetBYOKforUser).toHaveBeenCalledWith(readDb, user.id, ['openai']);
   });
@@ -106,7 +106,7 @@ describe('getTranscriptionProvider', () => {
   it('routes transcription requests to OpenRouter', async () => {
     const result = await getTranscriptionProvider();
 
-    expect(result.provider).toBe(PROVIDERS.OPENROUTER);
+    expect(result.provider).toBe(OPENROUTER);
     expect(result.userByok).toBeNull();
   });
 });

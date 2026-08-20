@@ -13,7 +13,11 @@ import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import {
+  OPENROUTER,
+  tryGetProviderById,
+  VERCEL_AI_GATEWAY,
+} from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
@@ -205,7 +209,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   if (vercelByok) {
     return {
       kind: 'provider',
-      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      provider: VERCEL_AI_GATEWAY,
       userByok: vercelByok,
       bypassAccessCheck: false,
     };
@@ -270,7 +274,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   ) {
     return {
       kind: 'provider',
-      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      provider: VERCEL_AI_GATEWAY,
       userByok: null,
       bypassAccessCheck: false,
     };
@@ -278,9 +282,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider:
-      Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
-      PROVIDERS.OPENROUTER,
+    provider: (kiloExclusiveModel && tryGetProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };
@@ -294,16 +296,16 @@ export async function getEmbeddingProvider(
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (userByok) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok };
+    return { provider: VERCEL_AI_GATEWAY, userByok };
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter
-  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+  return { provider: OPENROUTER, userByok: null };
 }
 
 export async function getTranscriptionProvider(): Promise<{
   provider: Provider;
   userByok: BYOKResult[] | null;
 }> {
-  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+  return { provider: OPENROUTER, userByok: null };
 }

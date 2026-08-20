@@ -16,7 +16,7 @@ import type {
   OpenRouterGeneration,
 } from './providers/openrouter/types';
 import { fetchGeneration } from './providers/upstream-request';
-import { tryGetProviderById } from './providers/provider-definitions';
+import { OPENROUTER, VERCEL_AI_GATEWAY } from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -1231,12 +1231,13 @@ export async function processTokenData(
   }
 
   const timer = createTimer();
-  const provider = tryGetProviderById(usageContext.provider);
   const generation =
-    provider &&
     (await useGenerationLookup(usageStats, usageContext)) &&
     usageStats.messageId &&
-    (await fetchGeneration(usageStats.messageId, provider));
+    (await fetchGeneration(
+      usageStats.messageId,
+      usageContext.provider === 'openrouter' ? OPENROUTER : VERCEL_AI_GATEWAY
+    ));
   if (usageStats.messageId) {
     timer.log(`fetch generation for message ${usageStats.messageId}`);
   }

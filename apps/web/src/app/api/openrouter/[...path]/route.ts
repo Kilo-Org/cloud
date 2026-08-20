@@ -611,6 +611,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
+    let groupProvidersAllowed = true;
     const groupPolicy = await organizationGroupPolicyPromise;
     if (groupPolicy) {
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
@@ -620,6 +621,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         const only = currentOnly
           ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
           : [...groupDecision.eligibleProviderRoutes];
+        groupProvidersAllowed = only.length > 0;
         effectiveProviderConfig = { ...providerConfig, only };
       }
     }
@@ -627,6 +629,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       balance,
       effectiveProviderConfig,
       groupModelAllowed,
+      groupProvidersAllowed,
       modelRestrictionError,
       plan,
       settings,
@@ -642,6 +645,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return accessCheck;
   }
 
+  function getRoutingProviderConfigFor(modelId: string) {
+    return isAnonymousContext(user)
+      ? undefined
+      : async () => (await getAccessCheck(modelId)).effectiveProviderConfig;
+  }
+
   // Resolve the initial provider before abuse enforcement because abuse needs
   // provider/BYOK context, and quarantine-3 may later rewrite these values.
   const initialProviderResultForAbuseService = await getProvider({
@@ -652,9 +661,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId,
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
-    getRoutingProviderConfig: isAnonymousContext(user)
-      ? undefined
-      : async () => (await getAccessCheck(effectiveModelIdLowerCased)).effectiveProviderConfig,
+    getRoutingProviderConfig: getRoutingProviderConfigFor(effectiveModelIdLowerCased),
   });
   if (initialProviderResultForAbuseService.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
@@ -778,9 +785,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       taskId,
       clientIp: ipAddress ?? null,
       machineId: machineIdHeader,
-      getRoutingProviderConfig: isAnonymousContext(user)
-        ? undefined
-        : async () => (await getAccessCheck(effectiveModelIdLowerCased)).effectiveProviderConfig,
+      getRoutingProviderConfig: getRoutingProviderConfigFor(effectiveModelIdLowerCased),
     });
     if (quarantineProviderResult.kind === 'not-found') {
       if (rulesEngineDecision.delayMs > 0) {
@@ -830,6 +835,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       balance,
       effectiveProviderConfig,
       groupModelAllowed,
+      groupProvidersAllowed,
       modelRestrictionError,
       plan,
       settings,
@@ -849,9 +855,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError;
     }
 
-    if (!groupModelAllowed || effectiveProviderConfig?.only?.length === 0) {
+    if (!groupModelAllowed) {
       return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
+    if (!groupProvidersAllowed) return modelNotAllowedResponse();
 
     // Experiment traffic captures prompts to R2 for partner evaluation, which
     // is a form of data collection that the gateway-pinned `data_collection`

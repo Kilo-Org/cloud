@@ -282,6 +282,8 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
+  const resolveRoutingProviderConfig = async () =>
+    (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
   if (
     eligibleForVercelRouting &&
@@ -289,7 +291,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
       requestedModel,
       request,
       taskId || user.id,
-      await getRoutingProviderConfig?.()
+      resolveRoutingProviderConfig
     ))
   ) {
     return {

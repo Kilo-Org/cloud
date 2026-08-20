@@ -64,7 +64,7 @@ export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
   randomSeed: string,
-  routingProviderConfig = request.body.provider
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
@@ -90,7 +90,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const provider: OpenRouterProviderConfig | undefined = routingProviderConfig;
+  const provider = await getRoutingProviderConfig();
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;
     const vercelInferenceProviders =

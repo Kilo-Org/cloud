@@ -147,6 +147,80 @@ describe('convertProviderOptions', () => {
   });
 });
 
+describe('shouldRouteToVercel', () => {
+  function request(provider?: GatewayRequest['body']['provider']): GatewayRequest {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider,
+      },
+    };
+  }
+
+  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
+    jest.resetModules();
+    jest.doMock('@/lib/ai-gateway/providers/routing-config', () => ({
+      getRuntimeGatewayRoutingConfig: jest.fn().mockResolvedValue({
+        vercelPaid: 100,
+        vercelFree: 100,
+        vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
+        friendli: 0,
+        perplexity: 0,
+      }),
+    }));
+    jest.doMock('@/lib/ai-gateway/is-free-model', () => ({
+      isFreeModel: jest.fn().mockResolvedValue(false),
+    }));
+    jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelModelsFromRedis: jest
+        .fn()
+        .mockResolvedValue(new Set(['anthropic/claude-sonnet-4.5'])),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn().mockResolvedValue(['anthropic']),
+    }));
+    return (await import('@/lib/ai-gateway/providers/vercel')).shouldRouteToVercel;
+  }
+
+  it('uses resolved provider policy instead of unrestricted request preferences', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel();
+
+    await expect(
+      shouldRouteToVercel('anthropic/claude-sonnet-4.5', request(), 'seed', async () => ({
+        only: ['google-vertex'],
+      }))
+    ).resolves.toBe(false);
+  });
+
+  it('falls back to request preferences when no policy config is resolved', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel();
+
+    await expect(
+      shouldRouteToVercel(
+        'anthropic/claude-sonnet-4.5',
+        request({ only: ['anthropic'] }),
+        'seed',
+        async () => undefined
+      )
+    ).resolves.toBe(true);
+  });
+
+  it('does not resolve provider policy for models opted out of Vercel routing', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
+    const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
+
+    await expect(
+      shouldRouteToVercel(
+        'anthropic/claude-sonnet-4.5',
+        request(),
+        'seed',
+        getRoutingProviderConfig
+      )
+    ).resolves.toBe(false);
+    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+  });
+});
+
 describe('applyVercelSettings BYOK pinning', () => {
   function byokRequest(ignore: string[]): GatewayRequest {
     return {

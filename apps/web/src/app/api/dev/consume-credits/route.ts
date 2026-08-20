@@ -97,8 +97,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ttfb_ms: null,
     };
 
-    // Use the existing countAndStoreUsage function
-    await countAndStoreUsage(mockResponse, usageContext, undefined);
+    // Synthetic usage has no upstream provider or generation to fetch.
+    await countAndStoreUsage(mockResponse, usageContext, undefined, undefined);
 
     // Reset the balance cache using the proper function
     await forceImmediateExpirationRecomputation(kiloUserId);

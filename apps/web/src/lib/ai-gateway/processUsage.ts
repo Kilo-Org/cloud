@@ -934,7 +934,7 @@ export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
   openrouterRequestSpan: Span | undefined,
-  provider?: Provider
+  provider: Provider | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
@@ -1220,7 +1220,7 @@ export function calculateKiloExclusiveCost_mUsd(
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext,
-  provider?: Provider
+  provider: Provider | undefined
 ): Promise<{ usageId: string; createdAt: string } | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {

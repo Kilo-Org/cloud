@@ -266,6 +266,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
           api_kind: apiKind,
           isStreaming: false,
         } as MicrodollarUsageContext,
+        undefined,
         undefined
       )
     ).resolves.toBeNull();

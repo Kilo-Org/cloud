@@ -1255,7 +1255,7 @@ describe('processAppStoreKiloPassNotification', () => {
     );
   });
 
-  it('reverses the Apple paid base amount plus issued bonus and promo credits for the refunded issuance', async () => {
+  it('reverses the granted base amount plus issued bonus and promo credits for the refunded issuance', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({
       appAccountToken: user.app_store_account_token,
@@ -1383,7 +1383,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(creditTransactions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          amountMicrodollars: -toMicrodollars(24.7),
+          amountMicrodollars: -toMicrodollars(19),
           description: 'App Store Kilo Pass refund clawback',
         }),
         expect.objectContaining({
@@ -1396,18 +1396,13 @@ describe('processAppStoreKiloPassNotification', () => {
         }),
       ])
     );
-    expect(creditTransactions).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          amountMicrodollars: -toMicrodollars(19),
-        }),
-      ])
-    );
 
+    // Granted credits are reversed in full, so the refund leaves the acquired
+    // total exactly where it started rather than minus the App Store margin.
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    expect(updatedUser?.total_microdollars_acquired).toBe(-toMicrodollars(5.7));
+    expect(updatedUser?.total_microdollars_acquired).toBe(0);
   });
 
   it('scopes App Store refund reversals to the refunded transaction after a same-month upgrade', async () => {
@@ -1862,7 +1857,7 @@ describe('processAppStoreKiloPassNotification', () => {
       refundTransaction: { currency: 'USD', price: 0 },
     },
   ])(
-    'ends subscription and writes processed_at even when USD refund price is invalid ($name)',
+    'reverses the granted base amount regardless of the reported refund price ($name)',
     async ({ name, refundTransaction }) => {
       const user = await insertTestUser();
       const decodedTransaction = transaction({
@@ -1902,7 +1897,11 @@ describe('processAppStoreKiloPassNotification', () => {
         .select()
         .from(credit_transactions)
         .where(eq(credit_transactions.kilo_user_id, user.id));
-      expect(negativeCreditTransactions.filter(row => row.amount_microdollars < 0)).toHaveLength(0);
+      expect(
+        negativeCreditTransactions
+          .filter(row => row.amount_microdollars < 0)
+          .map(row => row.amount_microdollars)
+      ).toEqual([-toMicrodollars(19)]);
 
       const refundEvent = await db.query.kilo_pass_store_events.findFirst({
         where: eq(kilo_pass_store_events.event_id, refundNotificationUUID),

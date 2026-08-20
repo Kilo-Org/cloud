@@ -417,7 +417,7 @@ describe('useNativeAuth created-account announcement', () => {
       await result?.verifyEmailCode('user@example.com', '123456');
     });
 
-    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to kilo.');
+    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to Kilo.');
   });
 
   it('stays silent when created is absent', async () => {

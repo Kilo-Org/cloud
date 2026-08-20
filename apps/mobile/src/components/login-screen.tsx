@@ -187,7 +187,7 @@ export function LoginScreen() {
         >
           <View className="w-full max-w-sm items-center gap-2">
             <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
-            <Text className="text-center text-lg">Welcome to Kilo Code</Text>
+            <Text className="text-center text-lg">Welcome to Kilo</Text>
           </View>
 
           {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2

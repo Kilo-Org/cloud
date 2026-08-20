@@ -184,7 +184,7 @@ describe('adminCustomLlmRouter', () => {
   });
 
   describe('copy', () => {
-    it('copies a custom LLM with its encrypted credentials and a new ID and name', async () => {
+    it('copies a custom LLM with its encrypted credentials and new IDs and name', async () => {
       const caller = await createCallerForUser(admin.id);
       const sourcePublicId = 'kilo-internal/test-model-copy-source';
       const copiedPublicId = 'kilo-internal/test-model-copy-target';
@@ -199,6 +199,7 @@ describe('adminCustomLlmRouter', () => {
         source_public_id: sourcePublicId,
         public_id: copiedPublicId,
         display_name: 'Copied GPT-4',
+        internal_id: 'copied-gpt-4',
       });
 
       expect(result).toEqual({
@@ -206,6 +207,7 @@ describe('adminCustomLlmRouter', () => {
         definition: {
           ...validDefinition,
           display_name: 'Copied GPT-4',
+          internal_id: 'copied-gpt-4',
         },
       });
 
@@ -221,6 +223,7 @@ describe('adminCustomLlmRouter', () => {
       expect(copiedRow?.definition).toEqual({
         ...validDefinition,
         display_name: 'Copied GPT-4',
+        internal_id: 'copied-gpt-4',
       });
       expect(copiedRow?.encrypted_api_key).toEqual(sourceRow?.encrypted_api_key);
       expect((result as Record<string, unknown>).encrypted_api_key).toBeUndefined();
@@ -247,6 +250,7 @@ describe('adminCustomLlmRouter', () => {
           source_public_id: sourcePublicId,
           public_id: existingPublicId,
           display_name: 'Should not overwrite',
+          internal_id: 'should-not-overwrite',
         })
       ).rejects.toMatchObject({
         code: 'CONFLICT',
@@ -257,6 +261,35 @@ describe('adminCustomLlmRouter', () => {
         .from(custom_llm2)
         .where(eq(custom_llm2.public_id, existingPublicId));
       expect(existingRow?.definition.display_name).toBe('Existing model');
+    });
+
+    it('rejects a copy with an empty internal ID', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const sourcePublicId = 'kilo-internal/test-model-copy-empty-internal-id-source';
+      const copiedPublicId = 'kilo-internal/test-model-copy-empty-internal-id-target';
+
+      await caller.admin.customLlm.upsert({
+        public_id: sourcePublicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-source-secret' },
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: sourcePublicId,
+          public_id: copiedPublicId,
+          display_name: 'Copied model',
+          internal_id: '   ',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+
+      const [copiedRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, copiedPublicId));
+      expect(copiedRow).toBeUndefined();
     });
   });
 

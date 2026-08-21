@@ -976,6 +976,24 @@ export default function CloudChatPage({
                               </div>
                             )}
                             <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                              {billingFailure && (
+                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
+                                  <CloudAgentBillingError
+                                    failure={billingFailure}
+                                    presentation={billingPayerPresentation(billingFailure, {
+                                      currentUserId,
+                                      organization:
+                                        organizationId && organizationName && organizationRole
+                                          ? {
+                                              id: organizationId,
+                                              name: organizationName,
+                                              role: organizationRole,
+                                            }
+                                          : undefined,
+                                    })}
+                                  />
+                                </div>
+                              )}
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
@@ -1014,24 +1032,6 @@ export default function CloudChatPage({
                                   },
                                 }}
                               />
-                              {billingFailure && (
-                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
-                                  <CloudAgentBillingError
-                                    failure={billingFailure}
-                                    presentation={billingPayerPresentation(billingFailure, {
-                                      currentUserId,
-                                      organization:
-                                        organizationId && organizationName && organizationRole
-                                          ? {
-                                              id: organizationId,
-                                              name: organizationName,
-                                              role: organizationRole,
-                                            }
-                                          : undefined,
-                                    })}
-                                  />
-                                </div>
-                              )}
                               {!billingFailure && statusIndicator?.type === 'error' && (
                                 <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2" role="alert">
                                   <SessionStatusIndicator indicator={statusIndicator} />

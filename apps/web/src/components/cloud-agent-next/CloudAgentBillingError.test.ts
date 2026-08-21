@@ -4,7 +4,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 
-import { CloudAgentBillingError, currentPaymentReturnPath } from './CloudAgentBillingError';
+import {
+  billingBalanceCopy,
+  CloudAgentBillingError,
+  currentPaymentReturnPath,
+} from './CloudAgentBillingError';
 
 type BillingErrorProps = ComponentProps<typeof CloudAgentBillingError>;
 
@@ -36,14 +40,14 @@ describe('CloudAgentBillingError', () => {
     });
     expect(html).toContain('role="alert"');
     expect(html).toContain('Your account needs more credits to start Cloud Agent compute.');
-    expect(html).toContain('Available: $1.25 · Required: $2.00');
+    expect(html).toContain('Available: $1.25 · Need more than $2.00');
     expect(html).toContain('Your prompt did not start.');
     expect(html).toContain('Add credits');
   });
 
   it.each([
     ['remainingMicrodollars', 'Available: $1.00'],
-    ['minimumRequiredMicrodollars', 'Required: $2.00'],
+    ['minimumRequiredMicrodollars', 'Need more than $2.00'],
   ] as const)('renders %s independently', (key, text) => {
     const html = renderBillingError({
       failure: {
@@ -85,5 +89,17 @@ describe('CloudAgentBillingError', () => {
         search: '?sessionId=ses-1&tab=chat',
       } as Location)
     ).toBe('/cloud/chat?sessionId=ses-1&tab=chat');
+  });
+
+  it('makes an equal balance threshold unambiguous', () => {
+    expect(
+      billingBalanceCopy({
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'user', id: 'u1' },
+        retryable: false,
+        remainingMicrodollars: 5_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      })
+    ).toBe('Available: $5.00 · Need more than $5.00');
   });
 });

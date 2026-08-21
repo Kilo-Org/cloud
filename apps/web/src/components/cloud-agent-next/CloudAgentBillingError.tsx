@@ -22,10 +22,23 @@ export function currentPaymentReturnPath(location: Pick<Location, 'pathname' | '
   return `${location.pathname}${location.search}`;
 }
 
+export function billingBalanceCopy(failure: CustomerBillingFailure): string | null {
+  const available =
+    failure.remainingMicrodollars === undefined
+      ? undefined
+      : `Available: ${formatBillingMoney(failure.remainingMicrodollars)}`;
+  const required =
+    failure.minimumRequiredMicrodollars === undefined
+      ? undefined
+      : `Need more than ${formatBillingMoney(failure.minimumRequiredMicrodollars)}`;
+  return [available, required].filter(Boolean).join(' · ') || null;
+}
+
 export function CloudAgentBillingError({ failure, presentation }: Props) {
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
   const { payerName, action } = presentation;
+  const balanceCopy = billingBalanceCopy(failure);
   const content =
     failure.code === 'INSUFFICIENT_CREDITS'
       ? `${payerName} needs more credits to start Cloud Agent compute.`
@@ -40,18 +53,7 @@ export function CloudAgentBillingError({ failure, presentation }: Props) {
         <p>{content}</p>
         {failure.code === 'INSUFFICIENT_CREDITS' && (
           <>
-            {(failure.remainingMicrodollars !== undefined ||
-              failure.minimumRequiredMicrodollars !== undefined) && (
-              <p className="font-mono text-xs tabular-nums">
-                {failure.remainingMicrodollars !== undefined &&
-                  `Available: ${formatBillingMoney(failure.remainingMicrodollars)}`}
-                {failure.remainingMicrodollars !== undefined &&
-                  failure.minimumRequiredMicrodollars !== undefined &&
-                  ' · '}
-                {failure.minimumRequiredMicrodollars !== undefined &&
-                  `Required: ${formatBillingMoney(failure.minimumRequiredMicrodollars)}`}
-              </p>
-            )}
+            {balanceCopy && <p className="font-mono text-xs tabular-nums">{balanceCopy}</p>}
             <p>Your prompt did not start.</p>
           </>
         )}

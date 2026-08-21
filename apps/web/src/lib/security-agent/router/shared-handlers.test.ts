@@ -385,6 +385,44 @@ describe('getConfig', () => {
       isEnabled: false,
     });
   });
+
+  it('pins the high-confidence automation defaults for legacy configs', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      storedConfig: {},
+      config: {
+        sla_critical_days: 15,
+        sla_high_days: 30,
+        sla_medium_days: 45,
+        sla_low_days: 90,
+        sla_enabled: true,
+        auto_sync_enabled: true,
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+        model_slug: 'analysis-model',
+        analysis_mode: 'auto',
+        auto_dismiss_enabled: false,
+        auto_analysis_enabled: false,
+        auto_analysis_include_existing: false,
+        auto_remediation_enabled: false,
+        auto_remediation_include_existing: false,
+        auto_remediation_enabled_at: null,
+        remediation_model_slug: 'remediation-model',
+        sla_notifications_enabled: false,
+        sla_notification_min_severity: 'high',
+        sla_notification_warning_days: 3,
+        new_finding_notifications_enabled: false,
+        new_finding_notification_min_severity: 'high',
+      },
+    });
+
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      autoDismissConfidenceThreshold: 'high',
+      autoAnalysisMinSeverity: 'high',
+      autoRemediationMinSeverity: 'high',
+      autoRemediationRequireApproval: true,
+    });
+  });
 });
 
 describe('setEnabled', () => {
@@ -500,6 +538,21 @@ describe('saveConfig', () => {
         input: { expectedRevision: 1 },
       })
     ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('maps autoRemediationRequireApproval to the snake_case config field', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 2 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 1, autoRemediationRequireApproval: false },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ auto_remediation_require_approval: false }),
+      })
+    );
   });
 });
 

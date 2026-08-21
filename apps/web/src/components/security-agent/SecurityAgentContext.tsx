@@ -68,6 +68,7 @@ type SecurityAgentContextValue = {
         autoRemediationEnabled: boolean;
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
+        autoRemediationRequireApproval: boolean;
         autoRemediationEnabledAt: string | null;
         remediationModelSlug?: string;
         slaNotificationsEnabled: boolean;
@@ -121,6 +122,7 @@ type SecurityAgentContextValue = {
       autoRemediationEnabled: boolean;
       autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoRemediationIncludeExisting: boolean;
+      autoRemediationRequireApproval: boolean;
       remediationModelSlug: string;
       slaNotificationsEnabled: boolean;
       slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
@@ -1191,6 +1193,7 @@ function useSecurityAgentProviderValue(
         autoRemediationEnabled: boolean;
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
+        autoRemediationRequireApproval: boolean;
         remediationModelSlug: string;
         slaNotificationsEnabled: boolean;
         slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
@@ -1228,6 +1231,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: config.autoRemediationEnabled,
             autoRemediationMinSeverity: config.autoRemediationMinSeverity,
             autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            autoRemediationRequireApproval: config.autoRemediationRequireApproval,
             slaNotificationsEnabled: config.slaNotificationsEnabled,
             slaNotificationMinSeverity: config.slaNotificationMinSeverity,
             slaNotificationWarningDays: config.slaNotificationWarningDays,
@@ -1257,6 +1261,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: config.autoRemediationEnabled,
             autoRemediationMinSeverity: config.autoRemediationMinSeverity,
             autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            autoRemediationRequireApproval: config.autoRemediationRequireApproval,
             slaNotificationsEnabled: config.slaNotificationsEnabled,
             slaNotificationMinSeverity: config.slaNotificationMinSeverity,
             slaNotificationWarningDays: config.slaNotificationWarningDays,
@@ -1424,6 +1429,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: configData.autoRemediationEnabled ?? false,
             autoRemediationMinSeverity: configData.autoRemediationMinSeverity ?? 'high',
             autoRemediationIncludeExisting: configData.autoRemediationIncludeExisting ?? false,
+            autoRemediationRequireApproval: configData.autoRemediationRequireApproval ?? true,
             autoRemediationEnabledAt: configData.autoRemediationEnabledAt ?? null,
             remediationModelSlug,
           }

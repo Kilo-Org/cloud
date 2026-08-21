@@ -283,7 +283,10 @@ export async function saveSecurityAgentConfigWithRevision(params: {
     }
 
     let existingRemediationCommandId: string | undefined;
-    if (params.enqueueRemediation) {
+    // Approval-required mode skips the include-existing bulk command: the
+    // worker policy would reject every candidate with `approval_required`, and
+    // the manual startRemediation path is the approval flow.
+    if (params.enqueueRemediation && !fullConfig.auto_remediation_require_approval) {
       const command = await createSecurityAgentCommand(tx, {
         commandType: 'apply_auto_remediation' satisfies SecurityCommandType,
         origin: 'settings_include_existing',

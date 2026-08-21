@@ -67,6 +67,7 @@ export const SaveSecurityConfigInputSchema = z.object({
   autoRemediationEnabled: z.boolean().optional(),
   autoRemediationMinSeverity: AutoRemediationMinSeveritySchema.optional(),
   autoRemediationIncludeExisting: z.boolean().optional(),
+  autoRemediationRequireApproval: z.boolean().optional(),
   remediationModelSlug: z.string().optional(),
   slaNotificationsEnabled: z.boolean().optional(),
   slaNotificationMinSeverity: NotificationMinSeveritySchema.optional(),

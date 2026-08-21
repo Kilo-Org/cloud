@@ -7,6 +7,7 @@ import {
   buildRemediationPrepareSessionBody,
   buildRemediationPrompt,
 } from './remediation.js';
+import { DEFAULT_SECURITY_AGENT_CONFIG } from './types.js';
 
 vi.mock('./db/queries.js', async importOriginal => ({
   ...(await importOriginal<typeof QueriesModule>()),
@@ -38,6 +39,106 @@ describe('security remediation admission', () => {
       origin: 'manual',
       reason: 'finding_not_found',
     });
+  });
+});
+
+describe('security remediation approval gate', () => {
+  const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+  const validFinding = {
+    id: findingId,
+    owned_by_user_id: 'user-1',
+    owned_by_organization_id: null,
+    repo_full_name: 'kilo/repo',
+    source: 'dependabot',
+    source_id: '42',
+    status: 'open',
+    severity: 'high',
+    package_name: 'lodash',
+    package_ecosystem: 'npm',
+    dependency_scope: 'runtime',
+    cve_id: null,
+    ghsa_id: null,
+    cwe_ids: null,
+    cvss_score: null,
+    title: 'Command Injection in lodash',
+    description: null,
+    vulnerable_version_range: '< 4.17.21',
+    patched_version: '4.17.21',
+    manifest_path: 'package.json',
+    raw_data: { updated_at: '2026-01-01T00:00:00.000Z' },
+    last_synced_at: '2026-01-02T00:00:00.000Z',
+    analysis_status: 'completed',
+    analysis_completed_at: '2026-01-02T00:05:00.000Z',
+    analysis: {
+      analyzedAt: '2026-01-02T00:05:00.000Z',
+      sandboxAnalysis: {
+        isExploitable: true,
+        suggestedAction: 'open_pr',
+        suggestedFix: 'Upgrade lodash to 4.17.21',
+        usageLocations: [],
+        summary: 'Reachable vulnerable lodash usage',
+        rawMarkdown: '',
+        analysisAt: '2026-01-02T00:05:00.000Z',
+      },
+    },
+  };
+
+  const emptyAttemptsDb = {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve([])),
+      })),
+    })),
+  };
+
+  function approvalRequiredRuntimeConfig() {
+    return {
+      config: {
+        ...DEFAULT_SECURITY_AGENT_CONFIG,
+        auto_remediation_enabled: true,
+        auto_remediation_require_approval: true,
+      },
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+    };
+  }
+
+  it('rejects auto_policy admission with approval_required when approval is required', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(validFinding as never);
+
+    await expect(
+      admitRemediationAttempt({
+        db: emptyAttemptsDb as never,
+        findingId,
+        origin: 'auto_policy',
+        owner: { type: 'user', id: 'user-1' },
+        runtimeConfig: approvalRequiredRuntimeConfig(),
+      })
+    ).resolves.toEqual({ admitted: false, reason: 'approval_required' });
+  });
+
+  it('never rejects manual admission for the approval flag', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({
+      ...validFinding,
+      analysis: {
+        ...validFinding.analysis,
+        sandboxAnalysis: {
+          ...validFinding.analysis.sandboxAnalysis,
+          suggestedAction: 'monitor',
+        },
+      },
+    } as never);
+
+    await expect(
+      admitRemediationAttempt({
+        db: emptyAttemptsDb as never,
+        findingId,
+        origin: 'manual',
+        owner: { type: 'user', id: 'user-1' },
+        runtimeConfig: approvalRequiredRuntimeConfig(),
+      })
+    ).resolves.toEqual({ admitted: false, reason: 'monitor_required' });
   });
 });
 

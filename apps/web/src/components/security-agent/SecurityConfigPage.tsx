@@ -73,6 +73,7 @@ export function SecurityConfigPage() {
     autoRemediationEnabled: configData?.autoRemediationEnabled ?? false,
     autoRemediationMinSeverity: configData?.autoRemediationMinSeverity ?? 'high',
     autoRemediationIncludeExisting: configData?.autoRemediationIncludeExisting ?? false,
+    autoRemediationRequireApproval: configData?.autoRemediationRequireApproval ?? true,
     remediationModelSlug:
       configData?.remediationModelSlug ??
       configData?.analysisModelSlug ??

@@ -95,7 +95,6 @@ export const SECURITY_REMEDIATION_REJECTION_REASONS = [
 
 export type SecurityRemediationRejectionReason =
   (typeof SECURITY_REMEDIATION_REJECTION_REASONS)[number];
-export type SecurityRemediationCapabilityReason = 'eligible' | SecurityRemediationRejectionReason;
 
 export const SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS = [
   ...SECURITY_REMEDIATION_REJECTION_REASONS,
@@ -105,6 +104,13 @@ export const SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS = [
 
 export type SecurityRemediationAdmissionRejectionReason =
   (typeof SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS)[number];
+
+// The capability decision reuses the admission reason set: the approval flag
+// rejects auto admission with `approval_required` (manual start is the
+// approval path and never reaches it).
+export type SecurityRemediationCapabilityReason =
+  | 'eligible'
+  | SecurityRemediationAdmissionRejectionReason;
 
 export type SecurityRemediationEligibilityParams = {
   finding: SecurityRemediationFinding;

@@ -650,6 +650,8 @@ export function formatValidationEvidenceEntry(
 // copy in the mobile tree (use-security-findings.ts imports it from here).
 const REMEDIATION_UNAVAILABLE_COPY = {
   finding_not_found: 'Security finding no longer exists.',
+  approval_required:
+    'Auto Remediation requires approval. Start remediation manually to approve it.',
   finding_not_open: 'Finding is no longer open.',
   repo_not_in_scope: 'Repository is not selected for Security Agent.',
   analysis_required: 'Run codebase analysis before starting remediation.',

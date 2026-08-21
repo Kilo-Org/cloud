@@ -23,7 +23,7 @@ function policy(
 const owner = { userId: 'user-1', organizationId: 'org-1' };
 
 describe('policyNeedsCandidateEvaluation', () => {
-  it('is false for an unrestricted policy with only a deny list', () => {
+  it('is false for an unrestricted policy with an inactive baseline deny list', () => {
     expect(
       policyNeedsCandidateEvaluation(policy({ organizationModelDenyList: ['openai/gpt-4o'] }))
     ).toBe(false);
@@ -41,11 +41,18 @@ describe('policyNeedsCandidateEvaluation', () => {
         policy({
           memberGrant: {
             mode: 'selected',
+            includeOrganizationBaseline: false,
             modelAllowList: ['anthropic/claude'],
             providerAllowList: [],
           },
         })
       )
+    ).toBe(true);
+  });
+
+  it('is true for an organization baseline grant', () => {
+    expect(
+      policyNeedsCandidateEvaluation(policy({ memberGrant: { mode: 'organization_baseline' } }))
     ).toBe(true);
   });
 
@@ -63,14 +70,14 @@ describe('collectDeniedAutoRoutingModelIds', () => {
 });
 
 describe('deniedModelIdsForCandidates', () => {
-  it('returns the normalized organization deny list and matching candidates', () => {
+  it('does not apply the organization deny list to an unrestricted grant', () => {
     expect(
       deniedModelIdsForCandidates(
         policy({ organizationModelDenyList: ['openai/gpt-4o:free'] }),
         ['anthropic/claude'],
         () => true
       )
-    ).toEqual(['openai/gpt-4o']);
+    ).toEqual([]);
   });
 
   it('adds models that fail the effective access policy', () => {
@@ -79,6 +86,7 @@ describe('deniedModelIdsForCandidates', () => {
         policy({
           organizationProviderCeiling: ['anthropic'],
           organizationModelDenyList: ['openai/o3'],
+          memberGrant: { mode: 'organization_baseline' },
         }),
         ['anthropic/claude', 'google/gemini-2.5-flash', 'kilo-auto/efficient'],
         modelId => modelId !== 'google/gemini-2.5-flash'
@@ -99,7 +107,10 @@ describe('deniedModelIdsForCandidates', () => {
   it('expands a normalized deny-list entry to matching suffixed candidates', () => {
     expect(
       deniedModelIdsForCandidates(
-        policy({ organizationModelDenyList: ['example/model'] }),
+        policy({
+          organizationModelDenyList: ['example/model'],
+          memberGrant: { mode: 'organization_baseline' },
+        }),
         ['anthropic/claude', 'example/model:suffix'],
         () => true
       )
@@ -112,6 +123,7 @@ describe('deniedModelIdsForCandidates', () => {
         policy({
           memberGrant: {
             mode: 'selected',
+            includeOrganizationBaseline: false,
             modelAllowList: ['anthropic/claude'],
             providerAllowList: [],
           },

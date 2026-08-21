@@ -24,7 +24,7 @@ export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationMode
   return (
     policy.requireModelInCurrentSnapshot === true ||
     policy.organizationProviderCeiling !== undefined ||
-    policy.memberGrant.mode === 'selected'
+    policy.memberGrant.mode !== 'unrestricted'
   );
 }
 
@@ -49,7 +49,11 @@ export function deniedModelIdsForCandidates(
   candidateIds: ReadonlyArray<string>,
   isAllowed: (modelId: string) => boolean
 ): string[] {
-  const normalizedDeny = new Set(policy.organizationModelDenyList.map(normalizeModelId));
+  const normalizedDeny = new Set(
+    policy.memberGrant.mode === 'organization_baseline'
+      ? policy.organizationModelDenyList.map(normalizeModelId)
+      : []
+  );
   const denied = new Set(normalizedDeny);
   for (const candidate of new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))) {
     if (normalizedDeny.has(normalizeModelId(candidate)) || !isAllowed(candidate)) {

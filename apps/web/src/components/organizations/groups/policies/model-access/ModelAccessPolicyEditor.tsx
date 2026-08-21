@@ -76,41 +76,21 @@ export function ModelAccessPolicyEditor({
 
   const selectedModels = useMemo(() => new Set(modelIds.map(normalizeModelId)), [modelIds]);
   const selectedProviders = useMemo(() => new Set(providerSlugs), [providerSlugs]);
-  const deniedModels = useMemo(
-    () => new Set((editorData?.modelDenyList ?? []).map(normalizeModelId)),
-    [editorData]
-  );
-  const providerCeiling = editorData?.providerAllowList;
-  const providerCeilingSet = useMemo(
-    () => (providerCeiling ? new Set(providerCeiling) : null),
-    [providerCeiling]
-  );
   const providerIndex = useMemo(() => buildModelProvidersIndex(providers), [providers]);
 
   const modelRows = useMemo((): ModelRow[] => {
-    return models
-      .map((model, sourceIndex) => {
-        const modelId = normalizeModelId(model.slug);
-        const routes = [...(providerIndex.get(modelId) ?? [])];
-        const eligibleRoutes = providerCeilingSet
-          ? routes.filter(route => providerCeilingSet.has(route))
-          : routes;
-        const unavailableReason = deniedModels.has(modelId)
-          ? 'Unavailable under organization model settings'
-          : eligibleRoutes.length === 0
-            ? 'No route is available under organization provider settings'
-            : undefined;
-        return {
-          modelId,
-          modelName: model.name,
-          providerSlugs: eligibleRoutes,
-          preferredIndex: undefined,
-          sourceIndex,
-          unavailableReason,
-        };
-      })
-      .filter(row => selectedModels.has(row.modelId) || !row.unavailableReason);
-  }, [deniedModels, models, providerCeilingSet, providerIndex, selectedModels]);
+    return models.map((model, sourceIndex) => {
+      const modelId = normalizeModelId(model.slug);
+      const routes = [...(providerIndex.get(modelId) ?? [])];
+      return {
+        modelId,
+        modelName: model.name,
+        providerSlugs: routes,
+        preferredIndex: undefined,
+        sourceIndex,
+      };
+    });
+  }, [models, providerIndex]);
 
   const filteredModels = useMemo(() => {
     const search = modelSearch.trim().toLowerCase();
@@ -127,12 +107,6 @@ export function ModelAccessPolicyEditor({
 
   const providerRows = useMemo((): ProviderRow[] => {
     return providers
-      .filter(
-        provider =>
-          selectedProviders.has(provider.slug) ||
-          !providerCeilingSet ||
-          providerCeilingSet.has(provider.slug)
-      )
       .map(provider => ({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
@@ -142,14 +116,10 @@ export function ModelAccessPolicyEditor({
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
-        unavailableReason:
-          providerCeilingSet && !providerCeilingSet.has(provider.slug)
-            ? 'Unavailable under organization provider settings'
-            : undefined,
       }))
       .filter(provider => provider.modelCount > 0)
       .sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
-  }, [providerCeilingSet, providers, selectedProviders]);
+  }, [providers]);
 
   const locationOptions = useMemo(() => {
     const values = new Set<string>();

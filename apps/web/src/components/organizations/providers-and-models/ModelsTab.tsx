@@ -39,7 +39,7 @@ export function ModelsTab({
       <p className="text-muted-foreground text-sm">
         {scope === 'organization'
           ? 'Disable specific models for organization members. New models from enabled providers are allowed by default.'
-          : 'Grant specific models through this policy. Organization-wide restrictions still apply.'}
+          : 'Grant specific models in addition to the organization default access.'}
       </p>
 
       {isLoading ? (

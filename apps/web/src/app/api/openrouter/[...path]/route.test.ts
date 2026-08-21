@@ -411,6 +411,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       settings: { provider_allow_list: ['amazon-bedrock'] },
       plan: 'enterprise',
     });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['amazon-bedrock']),
+    });
 
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never);
@@ -421,7 +425,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
   });
 
-  it('skips group policy evaluation when organization policy denies the model', async () => {
+  it('allows a group grant to override the organization model baseline', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -440,8 +444,112 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody()) as never);
 
+    expect(response.status).toBe(200);
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'openai/gpt-4o'
+    );
+  });
+
+  it('allows a group provider grant outside the organization provider baseline', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['openai'] },
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['google']),
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('google/gemini-2.5-pro')) as never);
+
+    expect(response.status).toBe(200);
+    const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
+    expect((await getRoutingProviderConfig?.())?.only).toEqual(['google']);
+  });
+
+  it('allows an explicitly granted model through an enterprise experiment', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { model_deny_list: ['openai/gpt-4o'] },
+      plan: 'enterprise',
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'friendli' },
+      userByok: null,
+      bypassAccessCheck: false,
+      experiment: {
+        experimentId: 'experiment-1',
+        variantId: 'variant-1',
+        variantVersionId: 'version-1',
+        allocationSubject: 'user',
+      },
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('blocks an enterprise experiment outside the effective provider routes', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['openai'] },
+      plan: 'enterprise',
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'friendli' },
+      userByok: null,
+      bypassAccessCheck: false,
+      experiment: {
+        experimentId: 'experiment-1',
+        variantId: 'variant-1',
+        variantVersionId: 'version-1',
+        allocationSubject: 'user',
+      },
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['openai']),
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
     expect(response.status).toBe(404);
-    expect(mockedGetEffectiveModelDecision).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the OpenRouter model id is unknown', async () => {
@@ -960,7 +1068,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.cost_mUsd).toBe(3000);
   });
 
-  it('passes enterprise organization model deny list to the efficient decision worker', async () => {
+  it('passes effective organization policy denials to the efficient decision worker', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -977,6 +1085,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       },
       plan: 'enterprise',
     });
+    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['openai/gpt-4o']);
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
@@ -1090,7 +1199,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('guides enterprise teams whose deny list blocks every pool model to configure a custom Efficient pool', async () => {
+  it('guides enterprise teams whose baseline blocks every pool model to configure a custom Efficient pool', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -1104,6 +1213,11 @@ describe('kilo-auto/efficient classifier billing', () => {
       balance: 1000,
       settings: { model_deny_list: ['anthropic/claude-haiku-4'] },
       plan: 'enterprise',
+    });
+    mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue(['anthropic/claude-haiku-4']);
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: false,
+      denialSource: 'organization_model',
     });
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 

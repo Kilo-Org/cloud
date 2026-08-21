@@ -25,6 +25,7 @@ import {
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
+  SESSION_CREATE_TOMBSTONED_IDS_KEY,
   type SessionRegistrationContext,
 } from './session-registration.js';
 import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
@@ -2010,6 +2011,348 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
       sandboxId: 'sb-test-123',
       sandboxProvider: 'cloudflare',
+    });
+  });
+});
+
+describe('createSessionWithLedger clone reconciliation', () => {
+  const SOURCE_KILO_SESSION_ID = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const STORED_MESSAGE_ID = 'msg_stored_original_0123456789ab';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    generateSandboxRoutingTargetMock.mockResolvedValue({
+      kind: 'isolated',
+      sandboxId: 'sb-test-123',
+    });
+    settleOperationMock.mockResolvedValue({ settled: true });
+    markReconcilePendingMock.mockResolvedValue({});
+    recordOperationProgressMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue(undefined);
+  });
+
+  function cloneRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
+    return makeRequest({
+      clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
+      options: { operationKey: OPERATION_KEY },
+      ...overrides,
+    });
+  }
+
+  /** Reconcile-pending clone row whose progress holds the stored destination IDs. */
+  async function cloneRow(overrides: Record<string, unknown> = {}): Promise<OperationLedgerRow> {
+    return makeLedgerRow({
+      canonical_result: {
+        cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        initialMessageId: INITIAL_MESSAGE_ID,
+        sandboxId: 'sb-test-123',
+        sandboxProvider: 'cloudflare',
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+          await sessionCreateIntentFingerprint(cloneRequest()),
+        ...overrides,
+      },
+    });
+  }
+
+  it('resumes a clone with the stored IDs when the ownership row is absent', async () => {
+    const request = cloneRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow(),
+    });
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 3 },
+    });
+    // First query: ownership absent. Second: distinct-id email.
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      SOURCE_KILO_SESSION_ID
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+  });
+
+  it('keeps a clone unknown outcome reconcile-pending and resumes the stored IDs on a same-key retry', async () => {
+    const request = cloneRequest();
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    // Attempt 1: fresh clone create whose ingest transport outcome is unknown.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({}),
+    });
+    createCliSessionMock.mockRejectedValueOnce(new Error('session ingest unavailable'));
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, request)).rejects.toThrow('session ingest unavailable');
+    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+
+    // Attempt 2: same-key retry reconciles the stored IDs via the clone resume.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: await cloneRow(),
+    });
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 3 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenLastCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      SOURCE_KILO_SESSION_ID
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        outcomeCode: 'ok',
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+  });
+
+  it('tombstones a rejected clone so the next same-key retry allocates fresh IDs', async () => {
+    const request = cloneRequest();
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    // Attempt 1: explicit clone rejection. The best-effort settle fails, so the
+    // row stays non-terminal and the tombstone is what protects the retry.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({}),
+    });
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'rejected',
+      code: 'source_access_denied',
+    });
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_clone_failed',
+    });
+
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+        cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+      },
+    });
+
+    // Attempt 2: same-key retry sees the tombstone and allocates fresh IDs.
+    const FRESH_CLOUD_ID = 'agent_fresh_11111111-1111-1111-1111-111111111111';
+    const FRESH_KILO_ID = 'ses_fresh_222222222222222222222222';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({
+        [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      }),
+    });
+    generateSessionIdMock.mockReturnValueOnce(FRESH_CLOUD_ID);
+    generateKiloSessionIdMock.mockReturnValueOnce(FRESH_KILO_ID);
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: FRESH_KILO_ID, copiedItemCount: 1 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenLastCalledWith(
+      FRESH_KILO_ID,
+      FRESH_CLOUD_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      SOURCE_KILO_SESSION_ID
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: {
+          cloudAgentSessionId: FRESH_CLOUD_ID,
+          kiloSessionId: FRESH_KILO_ID,
+        },
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: FRESH_CLOUD_ID,
+      kiloSessionId: FRESH_KILO_ID,
+    });
+  });
+
+  it('tombstones a rejected clone resume so the next same-key retry allocates fresh IDs', async () => {
+    const request = cloneRequest();
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    // Attempt 1: same-key retry reconciles the stored IDs via the clone resume,
+    // and the resume ingest rejects the clone. The tombstone is what protects
+    // the retry even though the settle is best-effort.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow(),
+    });
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'rejected',
+      code: 'source_access_denied',
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_clone_failed',
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      SOURCE_KILO_SESSION_ID
+    );
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+        cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+      },
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+
+    // Attempt 2: same-key retry sees the tombstone and allocates fresh IDs.
+    const FRESH_CLOUD_ID = 'agent_fresh_11111111-1111-1111-1111-111111111111';
+    const FRESH_KILO_ID = 'ses_fresh_222222222222222222222222';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({
+        [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      }),
+    });
+    generateSessionIdMock.mockReturnValueOnce(FRESH_CLOUD_ID);
+    generateKiloSessionIdMock.mockReturnValueOnce(FRESH_KILO_ID);
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: FRESH_KILO_ID, copiedItemCount: 1 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenLastCalledWith(
+      FRESH_KILO_ID,
+      FRESH_CLOUD_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      SOURCE_KILO_SESSION_ID
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      cloudAgentSessionId: FRESH_CLOUD_ID,
+      kiloSessionId: FRESH_KILO_ID,
+    });
+  });
+
+  it('rebuilds the allocation with the stored initialMessageId, not the retry new id', async () => {
+    const request = cloneRequest({
+      initialTurn: { type: 'prompt', prompt: 'Build the feature', id: 'msg_retry_new' },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({ initialMessageId: STORED_MESSAGE_ID }),
+    });
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await runCreate(ctx, request);
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.objectContaining({
+          initialTurn: expect.objectContaining({
+            messageId: STORED_MESSAGE_ID,
+            prompt: 'Build the feature',
+          }),
+        }),
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
     });
   });
 });

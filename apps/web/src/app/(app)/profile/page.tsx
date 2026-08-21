@@ -53,7 +53,8 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
     ? 'Remaining Personal Credits'
     : 'Remaining Credits';
   return (
-    // NOTE: When making changes to this structure, make sure to also update the structure in the loading.tsx file
+    // NOTE: When making changes to this structure, make sure to also update the structure in the loading.tsx file.
+    // The Development Tools card below is intentionally excluded from the loading skeleton because it is dev-only.
     <PageLayout title="Profile">
       <div className="flex w-full flex-col gap-4 lg:flex-row">
         <Card className="flex-1 rounded-xl shadow-sm">
@@ -147,29 +148,30 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
         </Card> */}
 
       {process.env.NODE_ENV === 'development' && process.env.DEBUG_SHOW_DEV_UI && (
-        <Card className="w-full rounded-xl border-red-800 bg-red-950/50 shadow lg:w-1/2">
+        <Card className="w-full">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-200">
+            <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5" />
               Development Tools
             </CardTitle>
-            <CardDescription className="text-red-300">
+            <CardDescription>
               These tools are only available in development mode.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <p className="text-muted-foreground text-sm font-medium">Consume Credits</p>
+                <p className="text-muted-foreground type-label">Consume credits</p>
                 <DevConsumeCreditsButton />
               </div>
               <Separator />
               <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground type-label">Dev organization</p>
                 <CreateKilocodeOrgButton />
               </div>
               <Separator />
               <div className="flex flex-col gap-2">
-                <p className="text-muted-foreground text-sm font-medium">Danger Zone</p>
+                <p className="text-destructive type-label">Danger zone</p>
                 <DevNukeAccountButton kiloUserId={user.id} />
               </div>
             </div>

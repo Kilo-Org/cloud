@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
 import { nuke } from './actions';
 
@@ -10,16 +10,15 @@ export function DevNukeAccountButton({ kiloUserId: _kiloUserId }: { kiloUserId?:
   return (
     <Button
       type="button"
-      variant="danger"
-      size="md"
-      className="flex h-12 w-full max-w-[272px] cursor-pointer items-center justify-center"
-      data-test-id="nuke-account-button"
+      variant="destructive"
       onClick={() => {
         void nuke();
       }}
+      data-test-id="nuke-account-button"
+      className="w-full"
     >
-      <AlertTriangle className="mx-2 h-5 w-5" />
-      Nuke Account
+      <AlertTriangle />
+      Reset account
     </Button>
   );
 }

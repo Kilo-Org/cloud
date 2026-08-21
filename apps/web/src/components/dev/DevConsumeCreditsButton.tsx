@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DollarSign } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -72,13 +72,11 @@ export function DevConsumeCreditsButton() {
         <Button
           type="button"
           variant="secondary"
-          size="md"
-          className="flex items-center"
           onClick={handleConsume}
           disabled={isLoading || !amount}
         >
-          <DollarSign className="mr-2 h-4 w-4" />
-          {isLoading ? 'Consuming... (very slow, be patient)' : 'Consume'}
+          <DollarSign />
+          {isLoading ? 'Consuming…' : 'Consume'}
         </Button>
       </div>
       {amountError && (

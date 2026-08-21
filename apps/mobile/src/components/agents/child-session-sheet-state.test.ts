@@ -34,12 +34,63 @@ describe('getChildSessionSheetState', () => {
     ).toBe('empty');
   });
 
+  it('shows an empty state when the session error is null', () => {
+    expect(
+      getChildSessionSheetState(
+        {
+          status: 'ready',
+          cursor: null,
+          hasOlder: false,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        },
+        0,
+        null
+      )
+    ).toBe('empty');
+  });
+
   it('shows an error after failed hydration with no messages', () => {
     expect(getChildSessionSheetState({ status: 'error', message: 'Failed' }, 0)).toBe('error');
   });
 
   it('keeps rendering messages if a refresh fails', () => {
     expect(getChildSessionSheetState({ status: 'error', message: 'Failed' }, 1)).toBe('content');
+  });
+
+  it('shows an error for a runtime error with no messages and hydration ready', () => {
+    expect(
+      getChildSessionSheetState(
+        {
+          status: 'ready',
+          cursor: null,
+          hasOlder: false,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        },
+        0,
+        'Requests ending with a model turn are not supported.'
+      )
+    ).toBe('error');
+  });
+
+  it('keeps rendering messages when a runtime error exists', () => {
+    expect(
+      getChildSessionSheetState(
+        {
+          status: 'ready',
+          cursor: null,
+          hasOlder: false,
+          isLoadingOlder: false,
+          olderError: null,
+          omittedItemCount: 0,
+        },
+        1,
+        'Requests ending with a model turn are not supported.'
+      )
+    ).toBe('content');
   });
 });
 

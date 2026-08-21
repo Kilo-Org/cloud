@@ -24,6 +24,7 @@ import { MessageErrorBoundary } from './message-error-boundary';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
+import { SessionStatusIndicator } from './session-status-indicator';
 import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
@@ -32,6 +33,7 @@ type ChildSessionSheetProps = {
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
   hydrationState: ChildSessionHydrationState;
+  sessionError: string | null;
   isStreaming: boolean;
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
@@ -53,6 +55,7 @@ export function ChildSessionSheet({
   title,
   getChildMessages,
   hydrationState,
+  sessionError,
   isStreaming,
   hasOlderMessages,
   isLoadingOlderMessages,
@@ -67,7 +70,7 @@ export function ChildSessionSheet({
   modelOptions,
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
-  const state = getChildSessionSheetState(hydrationState, messages.length);
+  const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
   // always propagate the home-indicator inset), so we floor the value with
@@ -107,13 +110,16 @@ export function ChildSessionSheet({
       />
     );
   } else if (state === 'error') {
-    content = (
-      <QueryError
-        title="Could not load subagent session"
-        message={hydrationState.status === 'error' ? hydrationState.message : undefined}
-        onRetry={onRetry}
-      />
-    );
+    content =
+      hydrationState.status === 'error' ? (
+        <QueryError
+          title="Could not load subagent session"
+          message={hydrationState.message}
+          onRetry={onRetry}
+        />
+      ) : (
+        <QueryError title="Subagent session failed" message={sessionError ?? undefined} />
+      );
   } else if (state === 'empty') {
     content = (
       <EmptyState
@@ -130,6 +136,17 @@ export function ChildSessionSheet({
           title="Loading subagent session"
           description="Waiting for subagent messages…"
         />
+      </View>
+    );
+  }
+
+  if (state === 'content' && sessionError) {
+    content = (
+      <View className="flex-1">
+        <SessionStatusIndicator
+          indicator={{ type: 'error', message: sessionError, timestamp: 0 }}
+        />
+        {content}
       </View>
     );
   }

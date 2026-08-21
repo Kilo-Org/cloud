@@ -1,4 +1,7 @@
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterProviderConfig,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
@@ -195,10 +198,22 @@ export type GetProviderInput = {
   /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
    *  cohort allocation subject for experiment routing. */
   machineId: string | null;
+  /** Resolves organization/group provider policy only when selecting a managed
+   * gateway. Direct BYOK and custom LLM routes remain exempt. */
+  getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+  const {
+    requestedModel,
+    request,
+    user,
+    organizationId,
+    taskId,
+    clientIp,
+    machineId,
+    getRoutingProviderConfig,
+  } = input;
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
@@ -267,10 +282,17 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
+  const resolveRoutingProviderConfig = async () =>
+    (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
+    (await shouldRouteToVercel(
+      requestedModel,
+      request,
+      taskId || user.id,
+      resolveRoutingProviderConfig
+    ))
   ) {
     return {
       kind: 'provider',

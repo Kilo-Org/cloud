@@ -8,8 +8,8 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 
-const mockAdmitOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockAdmitOperation = jest.fn<Promise<unknown>, unknown[]>();
+const mockSettleOperation = jest.fn<Promise<unknown>, unknown[]>();
 
 jest.mock('@kilocode/db/operation-ledger', () => {
   const actual = jest.requireActual('@kilocode/db/operation-ledger');

@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRootNavigationState } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
@@ -82,6 +82,21 @@ function PushRegistrationMount() {
   return null;
 }
 
+/** TEMP-DEBUG: log the (app) stack routes on every change. */
+function ExitDebugMount() {
+  const rootNavState = useRootNavigationState();
+  useEffect(() => {
+    const appRoute = rootNavState?.routes?.find(r => r.name === '(app)');
+    console.log(
+      '[exit-debug] app stack (layout):',
+      JSON.stringify(
+        appRoute?.state?.routes?.map(r => ({ name: r.name, params: r.params }))
+      )
+    );
+  }, [rootNavState]);
+  return null;
+}
+
 export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
@@ -92,6 +107,7 @@ export default function AppLayout() {
       <CachePersistenceMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
+      <ExitDebugMount />
       <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>

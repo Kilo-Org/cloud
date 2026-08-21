@@ -2,6 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
   cloudBillingSkuIdSchema,
+  cloudBillingAmountMicrodollars,
   createCloudBillingSkuInputSchema,
   normalizeCloudBillingSkuRate,
 } from '@/lib/cloud-billing-sku';
@@ -13,6 +14,7 @@ import {
 import { sharedContainerCapacity } from '@/lib/cloudflare/container-capacity';
 import {
   cloud_billing_sku,
+  compute_usage_charge,
   container_usage_interval,
   container_usage_segment,
   type CloudBillingSku,
@@ -20,7 +22,7 @@ import {
   type ContainerUsageSegment,
 } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { and, asc, desc, eq, gt, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 
 export type SerializedCloudBillingSku = Omit<CloudBillingSku, 'created_at'> & {
@@ -40,6 +42,12 @@ const usageSearchSchema = z
     search: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('recent') }),
       z.object({ kind: z.literal('interval'), id: z.string().trim().min(1).max(512) }),
+      z.object({
+        kind: z.literal('session'),
+        id: z.string().trim().min(1).max(512),
+        start: z.iso.datetime(),
+        end: z.iso.datetime(),
+      }),
       z.object({
         kind: z.literal('subject'),
         subjectType: z.enum(['user', 'org']),
@@ -68,8 +76,36 @@ const usageSearchSchema = z
   })
   .strict()
   .superRefine((input, context) => {
-    if (input.search.kind !== 'subject') return;
-    validateUsageWindow(input.search.start, input.search.end, context);
+    if (input.search.kind === 'subject' || input.search.kind === 'session') {
+      validateUsageWindow(input.search.start, input.search.end, context);
+    }
+  });
+
+const chargeSearchSchema = z
+  .object({
+    userId: z.string().trim().min(1).max(256).optional(),
+    organizationId: z.string().uuid().optional(),
+    intervalId: z.string().trim().min(1).max(512).optional(),
+    sessionId: z.string().trim().min(1).max(512).optional(),
+    skuId: cloudBillingSkuIdSchema.optional(),
+    start: z.iso.datetime(),
+    end: z.iso.datetime(),
+    cursor: z
+      .object({ createdAt: z.iso.datetime(), usageSource: z.string(), usageSourceId: z.string() })
+      .strict()
+      .optional(),
+    limit: z.number().int().min(1).max(100).default(25),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    validateUsageWindow(input.start, input.end, context);
+    if (input.userId && input.organizationId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'Filter by either a user or an organization, not both',
+      });
+    }
   });
 
 const segmentSearchSchema = z
@@ -153,10 +189,15 @@ export type SerializedUsageInterval = Pick<
   | 'exit_code'
   | 'final_stop_seq'
   | 'status'
+  | 'session_id'
+  | 'billing_mode'
+  | 'rate_cents_per_unit'
+  | 'settled_billable_seconds'
 > & {
   started_at: string;
   last_seen_at: string;
   stopped_at: string | null;
+  settled_amount_microdollars: number | null;
 };
 
 export function serializeUsageInterval(interval: ContainerUsageInterval): SerializedUsageInterval {
@@ -176,9 +217,69 @@ export function serializeUsageInterval(interval: ContainerUsageInterval): Serial
     exit_code: interval.exit_code,
     final_stop_seq: interval.final_stop_seq,
     status: interval.status,
+    session_id: interval.session_id,
+    billing_mode: interval.billing_mode,
+    rate_cents_per_unit: interval.rate_cents_per_unit
+      ? normalizeCloudBillingSkuRate(interval.rate_cents_per_unit)
+      : null,
+    settled_billable_seconds: interval.settled_billable_seconds,
+    settled_amount_microdollars: interval.rate_cents_per_unit
+      ? cloudBillingAmountMicrodollars(
+          interval.rate_cents_per_unit,
+          interval.settled_billable_seconds
+        )
+      : null,
     started_at: new Date(interval.started_at).toISOString(),
     last_seen_at: new Date(interval.last_seen_at).toISOString(),
     stopped_at: interval.stopped_at ? new Date(interval.stopped_at).toISOString() : null,
+  };
+}
+
+export type SerializedUsageCharge = {
+  usage_source: string;
+  usage_source_id: string;
+  payer_type: 'user' | 'org';
+  payer_id: string;
+  cloud_billing_sku_id: string;
+  quantity: string;
+  rate_cents_per_unit: string;
+  amount_microdollars: number;
+  created_at: string;
+  service: string | null;
+  interval_id: string | null;
+  session_id: string | null;
+};
+
+export function serializeUsageCharge(charge: {
+  usageSource: string;
+  usageSourceId: string;
+  userId: string | null;
+  organizationId: string | null;
+  skuId: string;
+  quantity: string;
+  rate: string;
+  amountMicrodollars: number;
+  createdAt: string;
+  service: string | null;
+  intervalId: string | null;
+  sessionId: string | null;
+}): SerializedUsageCharge {
+  const payerId = charge.userId ?? charge.organizationId;
+  if (!payerId)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Charge payer is invalid' });
+  return {
+    usage_source: charge.usageSource,
+    usage_source_id: charge.usageSourceId,
+    payer_type: charge.userId ? 'user' : 'org',
+    payer_id: payerId,
+    cloud_billing_sku_id: charge.skuId,
+    quantity: normalizeCloudBillingSkuRate(charge.quantity),
+    rate_cents_per_unit: normalizeCloudBillingSkuRate(charge.rate),
+    amount_microdollars: charge.amountMicrodollars,
+    created_at: new Date(charge.createdAt).toISOString(),
+    service: charge.service,
+    interval_id: charge.intervalId,
+    session_id: charge.sessionId,
   };
 }
 
@@ -616,6 +717,15 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     }
     if (input.search.kind === 'interval') {
       predicates.push(eq(container_usage_interval.id, input.search.id));
+    } else if (input.search.kind === 'session') {
+      // session_id is the authoritative, dedicated interval column. The bounded
+      // time range keeps this unindexed support lookup selective until an index
+      // can be added in a separate schema change.
+      predicates.push(
+        eq(container_usage_interval.session_id, input.search.id),
+        gte(container_usage_interval.started_at, input.search.start),
+        lt(container_usage_interval.started_at, input.search.end)
+      );
     } else {
       predicates.push(
         eq(container_usage_interval.subject_type, input.search.subjectType),
@@ -661,6 +771,87 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       nextCursor:
         hasMore && last
           ? { startedAt: new Date(last.started_at).toISOString(), id: last.id }
+          : null,
+    };
+  }),
+
+  searchUsageCharges: adminProcedure.input(chargeSearchSchema).query(async ({ input }) => {
+    const predicates: SQL[] = [
+      gte(compute_usage_charge.created_at, input.start),
+      lt(compute_usage_charge.created_at, input.end),
+    ];
+    if (input.userId) predicates.push(eq(compute_usage_charge.user_id, input.userId));
+    if (input.organizationId) {
+      predicates.push(eq(compute_usage_charge.organization_id, input.organizationId));
+    }
+    if (input.intervalId) {
+      predicates.push(
+        eq(compute_usage_charge.usage_source, 'container_usage_segment'),
+        sql`${compute_usage_charge.usage_source_id} in (
+          select ${container_usage_segment.idempotency_key} from ${container_usage_segment}
+          where ${container_usage_segment.interval_id} = ${input.intervalId}
+        )`
+      );
+    }
+    if (input.sessionId) predicates.push(eq(container_usage_interval.session_id, input.sessionId));
+    if (input.skuId) predicates.push(eq(compute_usage_charge.cloud_billing_sku_id, input.skuId));
+    if (input.cursor) {
+      predicates.push(
+        or(
+          lt(compute_usage_charge.created_at, input.cursor.createdAt),
+          and(
+            eq(compute_usage_charge.created_at, input.cursor.createdAt),
+            sql`(${compute_usage_charge.usage_source}, ${compute_usage_charge.usage_source_id}) < (${input.cursor.usageSource}, ${input.cursor.usageSourceId})`
+          )
+        ) ?? sql`false`
+      );
+    }
+    const rows = await db
+      .select({
+        usageSource: compute_usage_charge.usage_source,
+        usageSourceId: compute_usage_charge.usage_source_id,
+        userId: compute_usage_charge.user_id,
+        organizationId: compute_usage_charge.organization_id,
+        skuId: compute_usage_charge.cloud_billing_sku_id,
+        quantity: compute_usage_charge.quantity,
+        rate: compute_usage_charge.rate_cents_per_unit,
+        amountMicrodollars: compute_usage_charge.amount_microdollars,
+        createdAt: compute_usage_charge.created_at,
+        service: container_usage_interval.service,
+        intervalId: container_usage_interval.id,
+        sessionId: container_usage_interval.session_id,
+      })
+      .from(compute_usage_charge)
+      .leftJoin(
+        container_usage_segment,
+        and(
+          eq(compute_usage_charge.usage_source, 'container_usage_segment'),
+          eq(compute_usage_charge.usage_source_id, container_usage_segment.idempotency_key)
+        )
+      )
+      .leftJoin(
+        container_usage_interval,
+        eq(container_usage_segment.interval_id, container_usage_interval.id)
+      )
+      .where(and(...predicates))
+      .orderBy(
+        desc(compute_usage_charge.created_at),
+        desc(compute_usage_charge.usage_source),
+        desc(compute_usage_charge.usage_source_id)
+      )
+      .limit(input.limit + 1);
+    const hasMore = rows.length > input.limit;
+    const page = rows.slice(0, input.limit);
+    const last = page.at(-1);
+    return {
+      items: page.map(serializeUsageCharge),
+      nextCursor:
+        hasMore && last
+          ? {
+              createdAt: new Date(last.createdAt).toISOString(),
+              usageSource: last.usageSource,
+              usageSourceId: last.usageSourceId,
+            }
           : null,
     };
   }),

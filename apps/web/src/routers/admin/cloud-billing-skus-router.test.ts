@@ -6,18 +6,21 @@ import type {
 } from '@/lib/cloudflare/container-usage-analytics';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
   cloud_billing_sku,
+  compute_usage_charge,
   container_usage_interval,
   container_usage_segment,
   type User,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   reconcileUsageWithCloudflare,
   serializeCloudBillingSku,
   serializeUsageInterval,
   serializeUsageSegment,
+  serializeUsageCharge,
 } from './cloud-billing-skus-router';
 
 const mockQueryContainerUsageAnalytics =
@@ -70,6 +73,18 @@ async function insertUsageInterval(params: {
     last_seen_at: params.lastSeenAt ?? params.startedAt ?? '2026-07-22T10:00:00.000Z',
     metadata: params.metadata,
   });
+}
+
+async function ensureCurrentChargePartition() {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const name = `compute_usage_charge_${start.getUTCFullYear()}_${String(start.getUTCMonth() + 1).padStart(2, '0')}`;
+  await db.execute(
+    sql.raw(
+      `CREATE TABLE IF NOT EXISTS "${name}" PARTITION OF "compute_usage_charge" FOR VALUES FROM ('${start.toISOString().slice(0, 10)}') TO ('${end.toISOString().slice(0, 10)}')`
+    )
+  );
 }
 
 function providerSettings() {
@@ -260,7 +275,48 @@ describe('admin.cloudBillingSkus usage records', () => {
     ]);
     expect(result.items[0]).not.toHaveProperty('context_fingerprint');
     expect(result.items[0]).not.toHaveProperty('metadata');
-    expect(result.items[0]).not.toHaveProperty('session_id');
+    expect(result.items[0]).toMatchObject({
+      session_id: null,
+      billing_mode: 'shadow',
+      rate_cents_per_unit: null,
+      settled_billable_seconds: 0,
+      settled_amount_microdollars: null,
+    });
+  });
+
+  it('serializes paid interval snapshots with exact settled amounts', () => {
+    const serialized = serializeUsageInterval({
+      id: 'paid-interval',
+      service: 'cloud-agent-next',
+      instance_id: 'instance-1',
+      start_epoch_ms: 123,
+      cloud_billing_sku_id: 'usage-search-sku',
+      context_fingerprint: 'a'.repeat(64),
+      subject_type: 'user',
+      subject_id: 'user-1',
+      actor_type: 'user',
+      actor_id: 'user-1',
+      session_id: 'agent_paid',
+      started_at: '2026-04-29 01:16:12.945+00',
+      last_seen_at: '2026-04-29 01:17:12.945+00',
+      last_heartbeat_seq: 1,
+      confirmed_seconds: 10,
+      billing_mode: 'paid',
+      rate_cents_per_unit: '0.123456789012',
+      settled_billable_seconds: 3,
+      stopped_at: null,
+      close_reason: null,
+      exit_code: null,
+      final_stop_seq: null,
+      status: 'open',
+      metadata: null,
+    });
+    expect(serialized).toMatchObject({
+      session_id: 'agent_paid',
+      rate_cents_per_unit: '0.123456789012',
+      settled_billable_seconds: 3,
+      settled_amount_microdollars: 3_703,
+    });
   });
 
   it('pages exact subject history deterministically', async () => {
@@ -1104,6 +1160,160 @@ describe('admin.cloudBillingSkus usage records', () => {
     await expect(nonAdminCaller.admin.cloudBillingSkus.usageHealth()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+  });
+});
+
+describe('admin.cloudBillingSkus charge ledger', () => {
+  beforeEach(async () => {
+    await ensureCurrentChargePartition();
+    await db
+      .insert(cloud_billing_sku)
+      .values({ ...validInput('charge-ledger-sku'), created_by_user_id: admin.id });
+    await db
+      .insert(cloud_billing_sku)
+      .values({ ...validInput('charge-ledger-other'), created_by_user_id: admin.id });
+  });
+
+  it('joins paid container charges and filters by payer, interval, session, sku, dates, and cursor', async () => {
+    const organization = await createTestOrganization('Charge ledger org', admin.id, 1_000_000);
+    const createdAt = new Date().toISOString();
+    await insertUsageInterval({
+      id: 'charge-interval',
+      skuId: 'charge-ledger-sku',
+      metadata: {},
+      startedAt: createdAt,
+      lastSeenAt: createdAt,
+    });
+    await db
+      .update(container_usage_interval)
+      .set({
+        session_id: 'agent_charge',
+        billing_mode: 'paid',
+        rate_cents_per_unit: '0.123456789012',
+        confirmed_seconds: 3,
+        settled_billable_seconds: 3,
+      })
+      .where(eq(container_usage_interval.id, 'charge-interval'));
+    await db.insert(container_usage_segment).values({
+      interval_id: 'charge-interval',
+      seq: 1,
+      idempotency_key: 'charge-segment',
+      reported_seconds: 3,
+      usage_seconds: 3,
+      received_at: createdAt,
+    });
+    await db.insert(compute_usage_charge).values([
+      {
+        usage_source: 'container_usage_segment',
+        usage_source_id: 'charge-segment',
+        user_id: admin.id,
+        cloud_billing_sku_id: 'charge-ledger-sku',
+        quantity: '3',
+        rate_cents_per_unit: '0.123456789012',
+        amount_microdollars: 3_703,
+        created_at: createdAt,
+      },
+      {
+        usage_source: 'non-container',
+        usage_source_id: 'other-source',
+        organization_id: organization.id,
+        cloud_billing_sku_id: 'charge-ledger-other',
+        quantity: '1',
+        rate_cents_per_unit: '1',
+        amount_microdollars: 10_000,
+        created_at: createdAt,
+      },
+    ]);
+    const caller = await createCallerForUser(admin.id);
+    const start = new Date(Date.now() - 60_000).toISOString();
+    const end = new Date(Date.now() + 60_000).toISOString();
+    const first = await caller.admin.cloudBillingSkus.searchUsageCharges({ start, end, limit: 1 });
+    expect(first.items).toHaveLength(1);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await caller.admin.cloudBillingSkus.searchUsageCharges({
+      start,
+      end,
+      limit: 1,
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(second.items).toHaveLength(1);
+    expect([...first.items, ...second.items]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          interval_id: 'charge-interval',
+          session_id: 'agent_charge',
+          amount_microdollars: 3_703,
+          rate_cents_per_unit: '0.123456789012',
+        }),
+        expect.objectContaining({
+          usage_source: 'non-container',
+          interval_id: null,
+          service: null,
+          payer_type: 'org',
+          payer_id: organization.id,
+        }),
+      ])
+    );
+    await expect(
+      caller.admin.cloudBillingSkus.searchUsageCharges({
+        start,
+        end,
+        userId: admin.id,
+        intervalId: 'charge-interval',
+      })
+    ).resolves.toMatchObject({ items: [expect.objectContaining({ session_id: 'agent_charge' })] });
+    await expect(
+      caller.admin.cloudBillingSkus.searchUsageCharges({
+        start,
+        end,
+        sessionId: 'agent_charge',
+        skuId: 'charge-ledger-sku',
+      })
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ interval_id: 'charge-interval' })],
+    });
+    await expect(
+      caller.admin.cloudBillingSkus.searchUsageCharges({
+        start,
+        end,
+        organizationId: organization.id,
+      })
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ usage_source: 'non-container' })],
+    });
+    await expect(
+      caller.admin.cloudBillingSkus.searchUsageCharges({
+        start: new Date(Date.now() - 120_000).toISOString(),
+        end: new Date(Date.now() - 60_000).toISOString(),
+      })
+    ).resolves.toMatchObject({ items: [] });
+    await expect(
+      caller.admin.cloudBillingSkus.searchUsageCharges({
+        start,
+        end,
+        userId: admin.id,
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('normalizes production-shaped charge timestamps', () => {
+    expect(
+      serializeUsageCharge({
+        usageSource: 'source',
+        usageSourceId: 'id',
+        userId: 'user',
+        organizationId: null,
+        skuId: 'charge-ledger-sku',
+        quantity: '1',
+        rate: '0.1',
+        amountMicrodollars: 1_000,
+        createdAt: '2026-04-29 01:16:12.945+00',
+        service: null,
+        intervalId: null,
+        sessionId: null,
+      }).created_at
+    ).toBe('2026-04-29T01:16:12.945Z');
   });
 });
 

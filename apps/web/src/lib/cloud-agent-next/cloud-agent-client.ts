@@ -8,6 +8,7 @@ import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from './types.js';
 export type { SendMessagePayload } from './types.js';
 
@@ -374,6 +375,23 @@ export type HealthOutput = {
   version: string;
 };
 
+export type ComputeBillingStatus = {
+  payer: { type: 'user' | 'org'; id: string };
+  attribution: 'payer_shared' | 'session';
+  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable';
+  estimatedHourlyRateMicrodollars: number | null;
+  estimatedIntervalAmountMicrodollars: number | null;
+  billingMode: 'shadow' | 'paid' | null;
+  interval: {
+    id: string;
+    startedAt: string;
+    lastSeenAt: string;
+    stoppedAt: string | null;
+    confirmedSeconds: number;
+    settledBillableSeconds: number;
+  } | null;
+};
+
 /**
  * Custom error class for payment-related errors from cloud-agent.
  */
@@ -387,10 +405,32 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
+export class CloudAgentBillingError extends Error {
+  constructor(
+    readonly billingFailure: NonNullable<ReturnType<typeof parseCustomerBillingFailure>>,
+    readonly httpStatus: 402 | 409 | 503
+  ) {
+    super('Cloud Agent compute billing request was not accepted');
+    this.name = 'CloudAgentBillingError';
+  }
+}
+
 /**
  * Helper to re-throw InsufficientCreditsError as TRPCError with PAYMENT_REQUIRED code.
  */
 export function rethrowAsPaymentRequired(error: unknown): never {
+  if (error instanceof CloudAgentBillingError) {
+    throw new TRPCError({
+      code:
+        error.httpStatus === 402
+          ? 'PAYMENT_REQUIRED'
+          : error.httpStatus === 409
+            ? 'CONFLICT'
+            : 'SERVICE_UNAVAILABLE',
+      message: error.message,
+      cause: { billingFailure: error.billingFailure },
+    });
+  }
   if (error instanceof InsufficientCreditsError) {
     throw new TRPCError({
       code: 'PAYMENT_REQUIRED',
@@ -404,6 +444,7 @@ export function rethrowAsPaymentRequired(error: unknown): never {
  * Check if an error indicates insufficient credits (402 Payment Required).
  */
 function isInsufficientCreditsError(err: unknown): boolean {
+  if (parseCustomerBillingFailure(err)) return false;
   if (err instanceof TRPCClientError) {
     const httpStatus = err.data?.httpStatus || err.shape?.data?.httpStatus;
     if (httpStatus === 402) {
@@ -418,6 +459,19 @@ function isInsufficientCreditsError(err: unknown): boolean {
     }
   }
   return false;
+}
+
+function preserveBillingFailure(error: unknown): void {
+  const billingFailure = parseCustomerBillingFailure(error);
+  if (!billingFailure) return;
+  const status =
+    error instanceof TRPCClientError
+      ? (error.data?.httpStatus ?? error.shape?.data?.httpStatus)
+      : undefined;
+  throw new CloudAgentBillingError(
+    billingFailure,
+    status === 402 || status === 409 || status === 503 ? status : 503
+  );
 }
 
 function normalizeCloudAgentProtocolError(error: unknown): unknown {
@@ -453,6 +507,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
+  };
+  getComputeBillingStatus: {
+    query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -625,6 +682,10 @@ export class CloudAgentNextClient {
     }
   }
 
+  async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {
+    return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+  }
+
   /**
    * Prepare a new cloud agent session.
    */
@@ -647,6 +708,7 @@ export class CloudAgentNextClient {
       return result;
     } catch (error) {
       const normalizedError = normalizeCloudAgentProtocolError(error);
+      preserveBillingFailure(normalizedError);
 
       console.log('[CloudAgentNextClient.prepareSession] Request failed', {
         elapsed: Date.now() - startTime,
@@ -699,6 +761,7 @@ export class CloudAgentNextClient {
       return await this.client.initiateFromKilocodeSessionV2.mutate(input);
     } catch (error) {
       const normalizedError = normalizeCloudAgentProtocolError(error);
+      preserveBillingFailure(normalizedError);
 
       // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
@@ -727,6 +790,7 @@ export class CloudAgentNextClient {
       return await this.client.sendMessageV2.mutate(input);
     } catch (error) {
       const normalizedError = normalizeCloudAgentProtocolError(error);
+      preserveBillingFailure(normalizedError);
 
       // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {

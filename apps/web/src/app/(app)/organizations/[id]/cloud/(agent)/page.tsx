@@ -21,9 +21,11 @@ export default async function OrganizationCloudPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ organization, role }) => (
         <NewSessionPanel
           organizationId={organization.id}
+          organizationName={organization.name}
+          organizationRole={role}
           isDevcontainerAvailable={isDevcontainerAvailable}
         />
       )}

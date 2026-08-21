@@ -99,6 +99,10 @@ class MemoryStorage {
   clear(): void {
     this.values.clear();
   }
+
+  size(): number {
+    return this.values.size;
+  }
 }
 
 function ack(intervalId = 'interval-1') {
@@ -185,6 +189,21 @@ describe('MeteredSandbox', () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('reads billing runtime status without creating a billing generation or waking the container', async () => {
+    const { sandbox, storage, rpc } = createSandbox(createRpc(), false, 'SandboxSmallContainment');
+
+    await expect(sandbox.getBillingRuntimeStatus()).resolves.toEqual({
+      sandboxClassName: 'SandboxSmallContainment',
+      running: false,
+      blocked: false,
+      context: undefined,
+    });
+
+    expect(storage.size()).toBe(0);
+    expect(rpc.recordStart).not.toHaveBeenCalled();
+    expect(rpc.recordHeartbeat).not.toHaveBeenCalled();
   });
 
   it('accepts any successful meter admission before a selected cold start', async () => {

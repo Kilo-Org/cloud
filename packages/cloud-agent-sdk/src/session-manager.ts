@@ -1,6 +1,10 @@
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import type { Images } from '@kilocode/app-shared/images-schema';
-import { errorShapeSchema } from './schemas';
+import {
+  errorShapeSchema,
+  parseCustomerBillingFailure,
+  type CustomerBillingFailure,
+} from './schemas';
 import type {
   CreateRemoteSessionInput,
   RemoteAttachmentPart,
@@ -357,6 +361,7 @@ type SessionManagerAtoms = {
   suggestion: W<SuggestionState | null>;
   pendingMessages: W<ReadonlyMap<string, MessageDeliveryState>>;
   failedPrompt: W<string | null>;
+  billingFailure: W<CustomerBillingFailure | null>;
   fetchedSessionData: W<FetchedSessionData | null>;
   /** Slash command catalog reported by the wrapper for the current session. */
   availableCommands: W<SlashCommandInfo[]>;
@@ -634,6 +639,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
   const failedPromptAtom = atom<string | null>(null);
+  const billingFailureAtom = atom<CustomerBillingFailure | null>(null);
   const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
   /**
    * Catalog of kilo slash commands the wrapper has reported. Populated by
@@ -851,6 +857,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activeSuggestionAtom, null);
     store.set(pendingMessagesAtom, new Map());
     store.set(failedPromptAtom, null);
+    store.set(billingFailureAtom, null);
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
@@ -1895,6 +1902,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           ? { attachmentParts: input.attachmentParts }
           : {}),
       });
+      store.set(billingFailureAtom, null);
+      store.set(failedPromptAtom, null);
 
       // User continued after `/clear`: drop the marker so a later reconnect
       // replays full history (pre-clear may reappear — accepted tradeoff).
@@ -1910,6 +1919,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return true;
     } catch (err) {
       store.set(failedPromptAtom, messageText);
+      store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const message = formatError(err);
       config.onSendFailed?.(messageText, message, err);
       if (store.get(agentStatusAtom).type !== 'disconnected') {
@@ -2179,6 +2189,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activeSuggestion: activeSuggestionAtom,
       pendingMessages: pendingMessagesAtom,
       failedPrompt: failedPromptAtom,
+      billingFailure: billingFailureAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       availableCommands: availableCommandsAtom,
       messagesList: messagesListAtom,

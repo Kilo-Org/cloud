@@ -756,14 +756,40 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;
     const admission = await createAgentSandbox(this.env, metadata).ensureBillingAdmission();
     if (admission.success) return null;
-    const paymentRequired =
-      admission.code === 'insufficient_credits' || admission.code === 'stopping';
+    const payer = metadata.identity.orgId
+      ? { type: 'org' as const, id: metadata.identity.orgId }
+      : { type: 'user' as const, id: metadata.identity.userId };
+    const billingFailure =
+      admission.code === 'insufficient_credits'
+        ? {
+            code: 'INSUFFICIENT_CREDITS' as const,
+            payer,
+            retryable: false,
+            ...(admission.remainingMicrodollars === undefined
+              ? {}
+              : { remainingMicrodollars: admission.remainingMicrodollars }),
+            ...(admission.minimumRequiredMicrodollars === undefined
+              ? {}
+              : { minimumRequiredMicrodollars: admission.minimumRequiredMicrodollars }),
+          }
+        : admission.code === 'stopping'
+          ? { code: 'COMPUTE_STOPPING' as const, payer, retryable: true }
+          : { code: 'BILLING_UNAVAILABLE' as const, payer, retryable: true };
     return {
       success: false,
-      code: paymentRequired ? 'PAYMENT_REQUIRED' : 'INTERNAL',
-      error: paymentRequired
-        ? 'Container billing requires additional credits'
-        : 'Container billing admission is temporarily unavailable',
+      code:
+        admission.code === 'insufficient_credits'
+          ? 'PAYMENT_REQUIRED'
+          : admission.code === 'stopping'
+            ? 'COMPUTE_STOPPING'
+            : 'BILLING_UNAVAILABLE',
+      error:
+        admission.code === 'insufficient_credits'
+          ? 'Insufficient credits to start compute'
+          : admission.code === 'stopping'
+            ? 'Cloud Agent is saving and stopping compute'
+            : 'Cloud Agent cannot verify compute billing right now',
+      billingFailure,
       failureBoundary: 'admission',
     };
   }

@@ -133,6 +133,21 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     return (await this.getBillingBlock()) !== undefined;
   }
 
+  /** Read-only status: storage and container state only; this never wakes or admits. */
+  async getBillingRuntimeStatus(): Promise<{
+    sandboxClassName: SandboxClassName;
+    running: boolean;
+    blocked: boolean;
+    context?: BillingContext;
+  }> {
+    return {
+      sandboxClassName: this.sandboxClassName,
+      running: this.ctx.container?.running === true,
+      blocked: (await this.getBillingBlock()) !== undefined,
+      context: await getBillingContext(this.ctx.storage),
+    };
+  }
+
   async ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult> {
     const parsed = parseSandboxBillingInput(input);
     assertSandboxBillingAllocation(this.sandboxClassName, parsed);

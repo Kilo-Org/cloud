@@ -70,6 +70,11 @@ import {
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
 import { formatSessionError } from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { CloudAgentBillingError } from './CloudAgentBillingError';
+import { billingPayerPresentation } from './billing-payer-presentation';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { useCloudAgentAttachmentUpload } from '@/hooks/useCloudAgentAttachmentUpload';
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
@@ -115,6 +120,8 @@ type Repository = {
 
 type NewSessionPanelProps = {
   organizationId?: string;
+  organizationName?: string;
+  organizationRole?: OrganizationRole;
   isDevcontainerAvailable: boolean;
 };
 
@@ -125,7 +132,12 @@ type ContextualTipProps = {
   onDismiss: () => void;
 };
 
-export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: NewSessionPanelProps) {
+export function NewSessionPanel({
+  organizationId,
+  organizationName,
+  organizationRole,
+  isDevcontainerAvailable,
+}: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
@@ -202,6 +214,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [billingFailure, setBillingFailure] = useState<CustomerBillingFailure | null>(null);
   const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
@@ -1087,11 +1100,14 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
 
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
+      setBillingFailure(null);
     } catch (error) {
+      const failure = parseCustomerBillingFailure(error);
+      setBillingFailure(failure);
       console.error('Failed to prepare session:', error);
-      toast.error('Failed to create session', {
-        description: formatSessionError(error),
-      });
+      if (!failure) {
+        toast.error('Failed to create session', { description: formatSessionError(error) });
+      }
     } finally {
       setIsPreparing(false);
     }
@@ -1218,6 +1234,17 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       </SetPageTitle>
       <MobileSidebarToggle />
       <div className="w-full max-w-2xl space-y-4">
+        {billingFailure && (
+          <CloudAgentBillingError
+            failure={billingFailure}
+            presentation={billingPayerPresentation(billingFailure, {
+              organization:
+                organizationId && organizationName && organizationRole
+                  ? { id: organizationId, name: organizationName, role: organizationRole }
+                  : undefined,
+            })}
+          />
+        )}
         {/* Insufficient balance banner */}
         {hasInsufficientBalance && eligibilityData && !hasLimitedAccess && (
           <InsufficientBalanceBanner

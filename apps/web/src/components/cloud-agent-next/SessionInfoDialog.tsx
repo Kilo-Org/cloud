@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Share2 } from 'lucide-react';
 import { ShareSessionDialog } from './ShareSessionDialog';
 import { formatShortModelName } from '@/lib/format-model-name';
+import type { ComputeBillingStatus } from '@/lib/cloud-agent-next/cloud-agent-client';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -21,7 +22,8 @@ type SessionInfoDialogProps = {
   kiloSessionId?: string;
   model: string;
   modelDisplayName?: string;
-  cost: number; // in microdollars
+  tokenUsageMicrodollars: number;
+  computeStatus?: ComputeBillingStatus;
 };
 
 export function SessionInfoDialog({
@@ -30,12 +32,13 @@ export function SessionInfoDialog({
   sessionId,
   model,
   modelDisplayName,
-  cost,
+  tokenUsageMicrodollars,
+  computeStatus,
   kiloSessionId,
 }: SessionInfoDialogProps) {
   const [showShareDialog, setShowShareDialog] = useState(false);
 
-  const costInDollars = cost / 1_000_000;
+  const tokenUsageDollars = tokenUsageMicrodollars / 1_000_000;
 
   return (
     <>
@@ -81,10 +84,43 @@ export function SessionInfoDialog({
 
             <div>
               <label className="text-muted-foreground mb-2 block text-sm font-medium">
-                Total Cost
+                Token Usage
               </label>
               <div className="bg-muted rounded-md px-3 py-2 font-mono text-sm">
-                ${costInDollars.toFixed(4)}
+                ${tokenUsageDollars.toFixed(4)}
+              </div>
+            </div>
+            <div>
+              <label className="text-muted-foreground mb-2 block text-sm font-medium">
+                Compute
+              </label>
+              <div className="bg-muted space-y-1 rounded-md px-3 py-2 text-sm">
+                {computeStatus?.phase === 'unavailable' || !computeStatus ? (
+                  <span className="text-muted-foreground">Compute status unavailable</span>
+                ) : computeStatus.estimatedHourlyRateMicrodollars === null ? (
+                  <span className="text-muted-foreground">Compute pricing unavailable</span>
+                ) : (
+                  <>
+                    <div className="font-mono tabular-nums">
+                      Est. ${(computeStatus.estimatedHourlyRateMicrodollars / 1_000_000).toFixed(2)}{' '}
+                      / hour
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Estimated compute rate from the current billing plan.
+                    </p>
+                    {computeStatus.billingMode === 'shadow' && <p>Not currently charged</p>}
+                    <p className="text-muted-foreground text-xs">
+                      {computeStatus.attribution === 'payer_shared'
+                        ? 'This is a payer-level shared sandbox estimate, not a per-session charge.'
+                        : 'This estimate is attributed to this session.'}
+                    </p>
+                    {computeStatus.phase === 'stopping' || computeStatus.phase === 'settling' ? (
+                      <p className="text-muted-foreground text-xs">
+                        Saving and stopping compute. Final amount is not available yet.
+                      </p>
+                    ) : null}
+                  </>
+                )}
               </div>
             </div>
           </div>

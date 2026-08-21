@@ -1,5 +1,16 @@
 import { PublicErrorCodeSchema, type ClientError } from '@kilocode/worker-utils/client-error';
 import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
+import { z } from 'zod';
+
+const customerBillingFailureSchema = z
+  .object({
+    code: z.enum(['INSUFFICIENT_CREDITS', 'COMPUTE_STOPPING', 'BILLING_UNAVAILABLE']),
+    payer: z.object({ type: z.enum(['user', 'org']), id: z.string().min(1) }).strict(),
+    retryable: z.boolean(),
+    remainingMicrodollars: z.number().int().optional(),
+    minimumRequiredMicrodollars: z.number().int().positive().optional(),
+  })
+  .strict();
 
 const NON_RETRYABLE_CODES = new Set([
   'PARSE_ERROR',
@@ -61,6 +72,12 @@ function parseExplicitLegacyCause(cause: unknown): ExplicitLegacyCause | undefin
   return { error: parsedError.data, retryable: cause.retryable };
 }
 
+function parseBillingFailure(cause: unknown) {
+  if (!cause || typeof cause !== 'object' || !('billingFailure' in cause)) return undefined;
+  const parsed = customerBillingFailureSchema.safeParse(cause.billingFailure);
+  return parsed.success ? parsed.data : undefined;
+}
+
 export function createClientError(code: string, message: string, retryable?: boolean): ClientError {
   return {
     code,
@@ -75,6 +92,7 @@ export function projectTrpcErrorData(
   cause?: unknown
 ): TrpcErrorData & { clientError: ClientError } {
   const explicitCause = parseExplicitLegacyCause(cause);
+  const billingFailure = parseBillingFailure(cause);
   if (explicitCause) {
     const clientError = createClientError(explicitCause.error, message, explicitCause.retryable);
     return {
@@ -82,11 +100,13 @@ export function projectTrpcErrorData(
       error: explicitCause.error,
       retryable: clientError.retryable,
       clientError,
+      ...(billingFailure ? { billingFailure } : {}),
     };
   }
   return {
     ...data,
     clientError: createClientError(data.code, message),
+    ...(billingFailure ? { billingFailure } : {}),
   };
 }
 

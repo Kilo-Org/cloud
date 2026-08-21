@@ -605,6 +605,19 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.getSession(input.cloudAgentSessionId);
     }),
 
+  getComputeBillingStatus: organizationMemberProcedure
+    .input(GetSessionInput)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      return await createCloudAgentNextClient(
+        generateCloudAgentToken(ctx.user)
+      ).getComputeBillingStatus(input.cloudAgentSessionId);
+    }),
+
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {

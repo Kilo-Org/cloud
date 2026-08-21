@@ -168,6 +168,15 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
     toast.error('Preview unavailable');
   }
 
+  // A markdown tap during the presign sets `preview` before the URL lands.
+  // If the presign then fails, surface the failure instead of a silent no-op.
+  useEffect(() => {
+    if (preview !== null && resolved.status === 'error') {
+      toast.error('Could not load this file. Try again.');
+      setPreview(null);
+    }
+  }, [preview, resolved.status]);
+
   if (kind === 'image') {
     if (url) {
       if (imageFailed) {

@@ -111,7 +111,7 @@ export function cacheFilePart(
 /**
  * Replace a cached entry with a freshly resolved URL (e.g. a re-presigned
  * download URL). Preserves any attachment reference and clears the failed
- * mark. A `resolveCacheUrl` rejection returns without writing.
+ * mark. If `resolveCacheUrl` returns `undefined`, the entry is not written.
  */
 export function overwriteFilePartCacheEntry(
   partId: string,

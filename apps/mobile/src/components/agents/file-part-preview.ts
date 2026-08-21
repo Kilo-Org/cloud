@@ -4,8 +4,8 @@ import { isMarkdownPath } from './read-tool-markdown';
 export type CloudAgentAttachmentRef = { messageUuid: string; filename: string };
 
 // Persisted history and live events carry the wrapper's sandbox URL
-// `file:///tmp/attachments/<agentId>/<userId>/<messageUuid>/<filename>`
-// (`services/cloud-agent-next/wrapper/src/session-bootstrap.ts`).
+// `file:///tmp/attachments/<sessionId>/<userId>/<messageUuid>/<filename>`
+// (`services/cloud-agent-next/src/utils/attachment-download.ts`).
 // Removal condition: none — stored messages keep this form permanently.
 const CLOUD_AGENT_ATTACHMENT_URL =
   /^file:\/\/\/tmp\/attachments\/[^/]+\/[^/]+\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\/([^/]+)$/;

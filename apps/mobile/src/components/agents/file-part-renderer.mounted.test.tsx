@@ -6,7 +6,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FilePartRenderer } from './file-part-renderer';
-import { __resetFilePartCacheForTests, cacheFilePart } from './file-part-cache';
+import {
+  __resetFilePartCacheForTests,
+  cacheFilePart,
+  overwriteFilePartCacheEntry,
+} from './file-part-cache';
 import { __resetFilePartUrlResolverForTests } from './file-part-url-resolver';
 
 type FileInstance = {
@@ -889,6 +893,117 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     expect(texts(root)).toContain('This file is empty.');
+
+    await unmount(renderer);
+  });
+
+  it('re-presigns on image retry when the cache entry carries an attachment ref', async () => {
+    const uuid = '99999999-9999-4999-8999-999999999999';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    overwriteFilePartCacheEntry('part-1', {
+      url: 'https://r2.example/signed',
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+
+    const callsBefore = getAttachmentDownloadUrlMutate.mock.calls.length;
+    await press(first(pressableByLabel(root, 'Image unavailable, retry loading')));
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate.mock.calls.length).toBe(callsBefore + 1);
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    const reRendered = findByType(root, 'Image')[0];
+    expect(reRendered?.props.source).toEqual({ uri: 'https://r2.example/signed' });
+
+    await unmount(renderer);
+  });
+
+  it('re-renders the same URL on image retry when there is no attachment ref', async () => {
+    cacheFilePart('part-1', {
+      url: 'data:image/png;base64,QUJD',
+      mime: 'image/png',
+      filename: 'shot.png',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    expect(image.props.source).toEqual({ uri: 'file:///cache/session-file-parts/part-1-shot.png' });
+
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+
+    await press(first(pressableByLabel(root, 'Image unavailable, retry loading')));
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    const reRendered = findByType(root, 'Image')[0];
+    expect(reRendered?.props.source).toEqual({
+      uri: 'file:///cache/session-file-parts/part-1-shot.png',
+    });
+
+    await unmount(renderer);
+  });
+
+  it('toasts when a markdown tap during the presign is followed by a presign failure', async () => {
+    const uuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const presignHolder: { reject?: (error: Error) => void } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        presignHolder.reject = reject;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    expect(findByType(root, 'Modal')).toHaveLength(0);
+
+    await act(async () => {
+      presignHolder.reject?.(new Error('presign failed'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
+    expect(findByType(root, 'Modal')).toHaveLength(0);
 
     await unmount(renderer);
   });

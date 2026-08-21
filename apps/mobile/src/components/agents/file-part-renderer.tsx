@@ -185,7 +185,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
                 }
               })();
             }}
-            className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+            className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
             accessibilityRole="button"
             accessibilityLabel="Image unavailable, retry loading"
           >
@@ -249,7 +249,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           onPress={() => {
             resolved.retry?.();
           }}
-          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
           accessibilityRole="button"
           accessibilityLabel="Image unavailable, retry loading"
         >

@@ -18,6 +18,8 @@ import {
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import type { SessionMessageQueue } from './session-message-queue.js';
 import {
+  getSessionMessageState,
+  isTerminalMessageState,
   listMessagesForWrapperRun,
   listNonTerminalAcceptedMessages,
   type SessionMessageState,
@@ -148,7 +150,7 @@ export type WrapperSupervisor = {
   ): Promise<void>;
   observeFinalizing(wrapperRunId: string): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
-  onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
+  onTerminalEvent(params: WrapperTerminalEvent): Promise<boolean>;
   requestPhysicalWrapperStop(reason: WrapperStopReason, target?: WrapperStopTarget): Promise<void>;
   recheckExhaustedCleanup(): Promise<void>;
   clearDisconnectGrace(): Promise<void>;
@@ -198,6 +200,13 @@ export type WrapperSupervisorDependencies = {
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
   isSessionDeletionInProgress?: () => Promise<boolean>;
   getSessionIdForLogs: () => string | undefined;
+  /**
+   * Invoked after a disconnect-grace or liveness path terminalizes accepted
+   * work, so the DO can broadcast a `cloud.status: ready` event and re-enable
+   * client input. Not invoked for the normal terminal-event path, which
+   * broadcasts readiness from {@link handleWrapperTerminalEvent} directly.
+   */
+  onSessionTerminalized?: () => Promise<void>;
 };
 
 function matchesDisconnectGraceFence(
@@ -437,6 +446,7 @@ export function createWrapperSupervisor(
     requestAlarmAtOrBefore,
     isSessionDeletionInProgress,
     getSessionIdForLogs,
+    onSessionTerminalized,
   } = dependencies;
 
   async function readDisconnectGrace(): Promise<DisconnectGraceState | undefined> {
@@ -725,7 +735,8 @@ export function createWrapperSupervisor(
    */
   async function terminalizeAcceptedMessagesForDeadWrapper(
     acceptedMessages: SessionMessageState[],
-    fallbackParams: (message: SessionMessageState) => TerminalizeParams
+    fallbackParams: (message: SessionMessageState) => TerminalizeParams,
+    options?: { wrapperRunId?: string | null }
   ): Promise<void> {
     const metadata = await getMetadata();
     const kiloSessionId = metadata?.auth.kiloSessionId;
@@ -742,10 +753,51 @@ export function createWrapperSupervisor(
             )
           : null;
       if (reconciled) reconciledCount += 1;
-      await messageSettlementOutbox.terminalizeSessionMessageOnce(
-        message.messageId,
-        reconciled ?? fallbackParams(message)
-      );
+      try {
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(
+          message.messageId,
+          reconciled ?? fallbackParams(message)
+        );
+      } catch (terminalizeError) {
+        // terminalizeSessionMessageOnly only becomes fallible after the
+        // durable transition commits (event/callback effects). A throw while
+        // the message is still non-terminal means the durable write itself
+        // failed; re-throw so the wrapper runtime identity is preserved and
+        // maintenance can retry instead of orphaning still-accepted work.
+        let durableTransitionSucceeded = false;
+        let reReadFailed = false;
+        try {
+          const persistedState = await getSessionMessageState(storage, message.messageId);
+          durableTransitionSucceeded =
+            persistedState !== undefined && isTerminalMessageState(persistedState);
+        } catch {
+          // The re-read itself failed, so the durable outcome is unknown.
+          reReadFailed = true;
+        }
+        if (!durableTransitionSucceeded) {
+          if (reReadFailed) {
+            // The transition may actually have committed. If it did, the next
+            // maintenance pass sees an already-terminal message and never
+            // re-enters this path, so readiness would never be published.
+            // Publish it now: a duplicate `cloud.status: ready` is harmless,
+            // while a genuinely failed transition keeps the message accepted
+            // and supervised via the rethrow below.
+            await onSessionTerminalized?.();
+          }
+          throw terminalizeError;
+        }
+        logger
+          .withFields({
+            sessionId: getSessionIdForLogs(),
+            wrapperRunId: options?.wrapperRunId,
+            messageId: message.messageId,
+            error:
+              terminalizeError instanceof Error
+                ? terminalizeError.message
+                : String(terminalizeError),
+          })
+          .warn('Failed to apply terminal effects during unhealthy wrapper handling');
+      }
     }
     if (reconciledCount > 0) {
       logger
@@ -775,17 +827,22 @@ export function createWrapperSupervisor(
     await requestPhysicalWrapperStop('unhealthy-wrapper');
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
-    await terminalizeAcceptedMessagesForDeadWrapper(acceptedMessages, message => {
-      const activityObserved = message.agentActivityObservedAt !== undefined;
-      return {
-        kind: 'failed',
-        reason: 'wrapper_failure',
-        error,
-        completionSource: 'wrapper_failure',
-        failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
-      };
-    });
+    await terminalizeAcceptedMessagesForDeadWrapper(
+      acceptedMessages,
+      message => {
+        const activityObserved = message.agentActivityObservedAt !== undefined;
+        return {
+          kind: 'failed',
+          reason: 'wrapper_failure',
+          error,
+          completionSource: 'wrapper_failure',
+          failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+          failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
+        };
+      },
+      { wrapperRunId: state.wrapperRunId }
+    );
+    await onSessionTerminalized?.();
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
     if (isWrapperRunFinalizing(state) && state.wrapperRunId) {
       await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(state.wrapperRunId);
@@ -854,17 +911,22 @@ export function createWrapperSupervisor(
       .warn('Grace period expired - failing supervised wrapper work');
     await requestPhysicalWrapperStop('unhealthy-wrapper');
     await storage.delete(DISCONNECT_GRACE_KEY);
-    await terminalizeAcceptedMessagesForDeadWrapper(acceptedMessages, message => {
-      const activityObserved = message.agentActivityObservedAt !== undefined;
-      return {
-        kind: 'failed',
-        reason: 'wrapper_disconnected',
-        error: 'Wrapper disconnected',
-        completionSource: 'wrapper_failure',
-        failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : 'wrapper_disconnected',
-      };
-    });
+    await terminalizeAcceptedMessagesForDeadWrapper(
+      acceptedMessages,
+      message => {
+        const activityObserved = message.agentActivityObservedAt !== undefined;
+        return {
+          kind: 'failed',
+          reason: 'wrapper_disconnected',
+          error: 'Wrapper disconnected',
+          completionSource: 'wrapper_failure',
+          failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+          failureCode: activityObserved ? 'wrapper_error_after_activity' : 'wrapper_disconnected',
+        };
+      },
+      { wrapperRunId }
+    );
+    await onSessionTerminalized?.();
     await clearWrapperRuntimeIdentity(
       storage,
       {
@@ -878,7 +940,14 @@ export function createWrapperSupervisor(
 
   async function hasActiveWrapperWork(state: WrapperRuntimeState): Promise<boolean> {
     if (isWrapperRunFinalizing(state)) return true;
-    return (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0;
+    if ((await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0) {
+      return true;
+    }
+    // A gate-waiting idle batch is only released by this supervisor (or by a
+    // live wrapper terminal event). Keep supervision alive while it is
+    // pending so a failed release is retried instead of stranding the
+    // gate-waiting callback once all accepted messages are terminal.
+    return messageSettlementOutbox.isWaitingForWrapperTerminalGateResult();
   }
 
   /**
@@ -1610,7 +1679,7 @@ export function createWrapperSupervisor(
     );
   }
 
-  async function onTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
+  async function onTerminalEvent(params: WrapperTerminalEvent): Promise<boolean> {
     const {
       wrapperRunId,
       status,
@@ -1633,7 +1702,7 @@ export function createWrapperSupervisor(
       logger
         .withFields({ sessionId, wrapperRunId, status })
         .warn('Ignoring non-current wrapper terminal event');
-      return;
+      return false;
     }
 
     logger
@@ -1785,6 +1854,7 @@ export function createWrapperSupervisor(
     ) {
       await sessionMessageQueue.requestPendingDrainIfNeeded();
     }
+    return true;
   }
 
   async function runMaintenance(now: number): Promise<void> {

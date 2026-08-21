@@ -127,6 +127,7 @@ function createHarness(
     ) => Promise<void>;
     recordSharedSandboxFailover?: (routeKey: SandboxId) => Promise<void>;
     isSessionDeletionInProgress?: () => Promise<boolean>;
+    onSessionTerminalized?: () => Promise<void>;
   }
 ) {
   const getAssistantMessageForUserMessage =
@@ -168,6 +169,7 @@ function createHarness(
   const recordSharedSandboxFailover = vi.fn(
     options?.recordSharedSandboxFailover ?? (async () => {})
   );
+  const onSessionTerminalized = vi.fn(options?.onSessionTerminalized ?? (async () => {}));
   const supervisor = createWrapperSupervisor({
     storage,
     agentRuntime: {
@@ -191,6 +193,7 @@ function createHarness(
     },
     isSessionDeletionInProgress: options?.isSessionDeletionInProgress,
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
+    onSessionTerminalized,
   });
 
   return {
@@ -205,6 +208,7 @@ function createHarness(
     requestedAlarms,
     requestPendingDrainIfNeeded,
     recordSharedSandboxFailover,
+    onSessionTerminalized,
     settlementOutbox,
     supervisor,
   };
@@ -1309,6 +1313,266 @@ describe('WrapperSupervisor', () => {
       state: 'stop_needed',
       reason: 'unhealthy-wrapper',
     });
+  });
+
+  it('calls onSessionTerminalized after disconnect grace terminalizes accepted work', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 332_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(100_001);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_disconnected',
+    });
+    expect(harness.onSessionTerminalized).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onSessionTerminalized after liveness expiry terminalizes accepted work', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+    });
+    expect(harness.onSessionTerminalized).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves supervision when terminalization persistence fails', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    const originalPut = harness.storage.put.bind(harness.storage);
+    harness.storage.put = (async (key: string, value: unknown) => {
+      if (key.startsWith('session_message')) {
+        throw new Error('terminalize storage failure');
+      }
+      await originalPut(key, value);
+    }) as typeof harness.storage.put;
+
+    await expect(harness.supervisor.runMaintenance(noOutputDeadlineAt)).rejects.toThrow(
+      'terminalize storage failure'
+    );
+
+    // Readiness is not published because the durable transition failed
+    expect(harness.onSessionTerminalized).not.toHaveBeenCalled();
+    // Supervision is preserved — the wrapper runtime identity is not cleared
+    const runtimeState = await getWrapperRuntimeState(harness.storage);
+    expect(runtimeState.wrapperConnectionId).toBeDefined();
+    // The message remains accepted so maintenance can retry terminalization
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+  });
+
+  it('publishes readiness when terminal effects fail after the durable transition', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    // Let the durable terminal transition succeed (first session_message:
+    // state write), then fail on the subsequent terminal-effects write so the
+    // effect path throws while the message is already terminal.
+    let sessionMessageStatePutCount = 0;
+    const originalPut = harness.storage.put.bind(harness.storage);
+    harness.storage.put = (async (key: string, value: unknown) => {
+      if (key.startsWith('session_message:')) {
+        sessionMessageStatePutCount++;
+        if (sessionMessageStatePutCount > 1) {
+          throw new Error('terminal effects storage failure');
+        }
+      }
+      await originalPut(key, value);
+    }) as typeof harness.storage.put;
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    // Readiness is published because the durable transition succeeded
+    expect(harness.onSessionTerminalized).toHaveBeenCalledTimes(1);
+    // The message is terminal despite the effect failure
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+    });
+  });
+
+  it('publishes readiness when the terminal-state re-read fails after an ambiguous terminalization failure', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    // Let the durable terminal transition succeed (first state write), fail
+    // the subsequent terminal-effects write, and also fail the supervisor's
+    // verification re-read so the durable outcome is ambiguous.
+    const stateKey = `session_message:${MESSAGE_ID}`;
+    let sessionMessageStatePutCount = 0;
+    let effectsWriteFailed = false;
+    let verificationReadFailed = false;
+    const originalPut = harness.storage.put.bind(harness.storage);
+    const originalGet = harness.storage.get.bind(harness.storage);
+    harness.storage.put = (async (key: string, value: unknown) => {
+      if (key === stateKey) {
+        sessionMessageStatePutCount++;
+        if (sessionMessageStatePutCount > 1) {
+          effectsWriteFailed = true;
+          throw new Error('terminal effects storage failure');
+        }
+      }
+      await originalPut(key, value);
+    }) as typeof harness.storage.put;
+    harness.storage.get = (async (key: string) => {
+      if (effectsWriteFailed && !verificationReadFailed && key === stateKey) {
+        verificationReadFailed = true;
+        throw new Error('transient re-read failure');
+      }
+      return originalGet(key);
+    }) as typeof harness.storage.get;
+
+    await expect(harness.supervisor.runMaintenance(noOutputDeadlineAt)).rejects.toThrow(
+      'terminal effects storage failure'
+    );
+
+    // Readiness is published because the transition may have committed; the
+    // message is indeed terminal, so later maintenance would never re-enter
+    // the terminalization path to publish it.
+    expect(harness.onSessionTerminalized).toHaveBeenCalledTimes(1);
+    // Supervision is still preserved — the wrapper runtime identity is not cleared
+    const runtimeState = await getWrapperRuntimeState(harness.storage);
+    expect(runtimeState.wrapperConnectionId).toBeDefined();
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+    });
+  });
+
+  it('retries a failed gate-wait release instead of abandoning supervision', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness(
+      [
+        liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+        OWNED_WRAPPER_LEASE,
+      ],
+      {
+        metadata: {
+          ...createMetadata(),
+          finalization: { gateThreshold: 'warning' },
+        },
+      }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/gate-release-retry' },
+    });
+    // Settle the message as completed so its idle batch waits for a wrapper
+    // gate result that never arrives — the wrapper is about to go silent.
+    await harness.settlementOutbox.terminalizeSessionMessageOnce(MESSAGE_ID, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+    await expect(harness.settlementOutbox.isWaitingForWrapperTerminalGateResult()).resolves.toBe(
+      true
+    );
+
+    // Fail the gate-release write once; the first unhealthy-wrapper pass must
+    // propagate the failure without clearing supervision.
+    let releaseFailed = false;
+    const originalPut = harness.storage.put.bind(harness.storage);
+    harness.storage.put = (async (key: string, value: unknown) => {
+      if (!releaseFailed && key.startsWith('idle_batch_callback:')) {
+        releaseFailed = true;
+        throw new Error('gate release storage failure');
+      }
+      await originalPut(key, value);
+    }) as typeof harness.storage.put;
+
+    await expect(harness.supervisor.runMaintenance(noOutputDeadlineAt)).rejects.toThrow(
+      'gate release storage failure'
+    );
+    expect(harness.callbackJobs).toHaveLength(0);
+
+    // The next maintenance pass must retry the release even though every
+    // accepted message is already terminal.
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt + 1_000);
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'completed',
+    });
+    await expect(harness.settlementOutbox.isWaitingForWrapperTerminalGateResult()).resolves.toBe(
+      false
+    );
+  });
+
+  it('does not call onSessionTerminalized when disconnect grace expires for a stale wrapper run', async () => {
+    const harness = createHarness([
+      liveRuntimeState({
+        wrapperRunId: 'wr_newer_current',
+        wrapperGeneration: 5,
+        wrapperConnectionId: 'conn_newer',
+      }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000, {
+        wrapperRunId: 'wr_stale_run',
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      }),
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      wrapperRunId: 'wr_newer_current',
+    });
+
+    await harness.supervisor.runMaintenance(100_001);
+
+    await expect(harness.storage.get('disconnect_grace')).resolves.toBeUndefined();
+    expect(harness.onSessionTerminalized).not.toHaveBeenCalled();
+  });
+
+  it('calls onSessionTerminalized when liveness expiry abandons a finalizing run with no accepted messages', async () => {
+    const harness = createHarness([
+      liveRuntimeState({
+        finalizingWrapperRunId: WRAPPER_RUN_ID,
+        noOutputDeadlineAt: 9_000,
+        nextPingAt: 30_000,
+      }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      status: 'completed',
+      terminalAt: 3_000,
+      completionSource: 'assistant_message_event',
+    });
+
+    await harness.supervisor.runMaintenance(10_000);
+
+    expect(harness.onSessionTerminalized).toHaveBeenCalledTimes(1);
   });
 
   it('includes the disconnect grace expiry deadline even when the ping deadline is earlier', async () => {

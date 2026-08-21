@@ -119,4 +119,117 @@ describe('wrapper lifecycle drain races', () => {
     await wait(500);
     expect(events.filter(event => event.streamEventType === 'complete')).toHaveLength(1);
   }, 10_000);
+
+  it('delays close longer when aborted while disconnected to allow reconnect delivery', async () => {
+    const state = new WrapperState();
+    state.bindSession(sessionContext);
+    state.setSendToIngestFn(() => {});
+
+    let closed = false;
+    const lifecycle = createLifecycleManager(
+      { workspacePath: '/tmp' },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        closeConnections: async () => {
+          closed = true;
+        },
+        isConnected: () => false,
+        reconnectEventSubscription: () => {},
+      }
+    );
+
+    state.acceptMessage('message-1', {
+      autoCommit: false,
+      condenseOnComplete: false,
+    });
+    state.clearAllMessages();
+    lifecycle.setAborted();
+    lifecycle.triggerDrainAndClose();
+
+    await wait(500);
+    expect(closed).toBe(false);
+
+    await wait(2_000);
+    expect(closed).toBe(true);
+  }, 10_000);
+
+  it('closes immediately when reconnect restores during aborted drain', async () => {
+    const state = new WrapperState();
+    state.bindSession(sessionContext);
+    state.setSendToIngestFn(() => {});
+
+    let closeCount = 0;
+    const lifecycle = createLifecycleManager(
+      { workspacePath: '/tmp' },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        closeConnections: async () => {
+          closeCount++;
+        },
+        isConnected: () => false,
+        reconnectEventSubscription: () => {},
+      }
+    );
+
+    state.acceptMessage('message-1', {
+      autoCommit: false,
+      condenseOnComplete: false,
+    });
+    state.clearAllMessages();
+    lifecycle.setAborted();
+    lifecycle.triggerDrainAndClose();
+
+    await wait(300);
+    expect(closeCount).toBe(0);
+
+    lifecycle.onConnectionRestored();
+
+    await wait(100);
+    expect(closeCount).toBe(1);
+
+    await wait(2_000);
+    expect(closeCount).toBe(1);
+  }, 10_000);
+
+  it('defers close while reconnecting during aborted drain until reconnect gives up', async () => {
+    const state = new WrapperState();
+    state.bindSession(sessionContext);
+    state.setSendToIngestFn(() => {});
+
+    let closed = false;
+    let reconnecting = true;
+    const lifecycle = createLifecycleManager(
+      { workspacePath: '/tmp' },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        closeConnections: async () => {
+          closed = true;
+        },
+        isConnected: () => false,
+        isReconnecting: () => reconnecting,
+        reconnectEventSubscription: () => {},
+      }
+    );
+
+    state.acceptMessage('message-1', {
+      autoCommit: false,
+      condenseOnComplete: false,
+    });
+    state.clearAllMessages();
+    lifecycle.setAborted();
+    lifecycle.triggerDrainAndClose();
+
+    // Past the 2-second fallback ceiling the close is still deferred because a
+    // reconnect is in progress with a buffered terminal frame.
+    await wait(2_500);
+    expect(closed).toBe(false);
+
+    // Once the reconnect gives up the next poll closes.
+    reconnecting = false;
+    await wait(500);
+    expect(closed).toBe(true);
+  }, 10_000);
 });

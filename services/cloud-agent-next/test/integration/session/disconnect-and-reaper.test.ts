@@ -9,6 +9,7 @@ import {
   getWrapperRuntimeState,
 } from '../../../src/session/wrapper-runtime-state.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
+import { registerReadySession } from '../../helpers/session-setup.js';
 
 describe('Disconnect handling and compatibility execution RPCs', () => {
   it('alarm schedules the idle cadence when no current message deadlines exist', async () => {
@@ -250,5 +251,177 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
     expect(result.events.some(event => event.stream_event_type === 'wrapper_disconnected')).toBe(
       true
     );
+  });
+
+  it('broadcasts cloud.status: ready after a wrapper disconnect and grace expiry', async () => {
+    const userId = 'user_disconnect_ready';
+    const sessionId = 'agent_disconnect_ready';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'ses_disconnect_ready',
+        prompt: 'disconnect ready test',
+        mode: 'code',
+        model: 'test-model',
+      });
+
+      const now = Date.now();
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperRunId: 'wr_disconnect_ready',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_disconnect_ready',
+      });
+      await putSessionMessageState(state.storage, {
+        messageId: 'msg_018f1e2d3c4bDiscReadyABCDE',
+        status: 'accepted',
+        prompt: 'disconnect ready test',
+        createdAt: now,
+        acceptedAt: now,
+        wrapperRunId: 'wr_disconnect_ready',
+      });
+      await state.storage.put('disconnect_grace', {
+        wrapperRunId: 'wr_disconnect_ready',
+        disconnectedAt: now - 20_000,
+        wsCloseCode: 1006,
+        wsCloseReason: 'socket closed',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_disconnect_ready',
+      });
+
+      const broadcasted: Array<{ stream_event_type: string; payload: string }> = [];
+      instance.broadcastEvent = event => {
+        broadcasted.push({
+          stream_event_type: event.stream_event_type,
+          payload: event.payload,
+        });
+      };
+
+      await instance.alarm();
+      return { broadcasted };
+    });
+
+    const cloudStatusReady = result.broadcasted.filter(event => {
+      if (event.stream_event_type !== 'cloud.status') return false;
+      const payload = JSON.parse(event.payload) as { cloudStatus?: { type?: string } };
+      return payload.cloudStatus?.type === 'ready';
+    });
+    expect(cloudStatusReady).toHaveLength(1);
+  });
+
+  it('broadcasts cloud.status: ready after a failed wrapper terminal event', async () => {
+    const userId = 'user_terminal_ready';
+    const sessionId = 'agent_terminal_ready';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'ses_terminal_ready',
+        prompt: 'terminal ready test',
+        mode: 'code',
+        model: 'test-model',
+      });
+
+      const now = Date.now();
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperRunId: 'wr_terminal_ready',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_terminal_ready',
+      });
+      await putSessionMessageState(state.storage, {
+        messageId: 'msg_018f1e2d3c4bTermReadyABCDE',
+        status: 'accepted',
+        prompt: 'terminal ready test',
+        createdAt: now,
+        acceptedAt: now,
+        wrapperRunId: 'wr_terminal_ready',
+      });
+
+      const broadcasted: Array<{ stream_event_type: string; payload: string }> = [];
+      instance.broadcastEvent = event => {
+        broadcasted.push({
+          stream_event_type: event.stream_event_type,
+          payload: event.payload,
+        });
+      };
+
+      await instance.handleWrapperTerminalEvent({
+        wrapperRunId: 'wr_terminal_ready',
+        status: 'failed',
+        error: 'Assistant request failed',
+      });
+      return { broadcasted };
+    });
+
+    const cloudStatusReady = result.broadcasted.filter(event => {
+      if (event.stream_event_type !== 'cloud.status') return false;
+      const payload = JSON.parse(event.payload) as { cloudStatus?: { type?: string } };
+      return payload.cloudStatus?.type === 'ready';
+    });
+    expect(cloudStatusReady).toHaveLength(1);
+  });
+
+  it('does not broadcast cloud.status: ready for a stale wrapper terminal event', async () => {
+    const userId = 'user_stale_terminal';
+    const sessionId = 'agent_stale_terminal';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'ses_stale_terminal',
+        prompt: 'stale terminal test',
+        mode: 'code',
+        model: 'test-model',
+      });
+
+      const now = Date.now();
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperRunId: 'wr_current',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_current',
+      });
+      await putSessionMessageState(state.storage, {
+        messageId: 'msg_018f1e2d3c4bStaleTermABCDE',
+        status: 'accepted',
+        prompt: 'stale terminal test',
+        createdAt: now,
+        acceptedAt: now,
+        wrapperRunId: 'wr_current',
+      });
+
+      const broadcasted: Array<{ stream_event_type: string; payload: string }> = [];
+      instance.broadcastEvent = event => {
+        broadcasted.push({
+          stream_event_type: event.stream_event_type,
+          payload: event.payload,
+        });
+      };
+
+      await instance.handleWrapperTerminalEvent({
+        wrapperRunId: 'wr_stale',
+        status: 'failed',
+        error: 'Assistant request failed',
+      });
+      return { broadcasted };
+    });
+
+    const cloudStatusReady = result.broadcasted.filter(event => {
+      if (event.stream_event_type !== 'cloud.status') return false;
+      const payload = JSON.parse(event.payload) as { cloudStatus?: { type?: string } };
+      return payload.cloudStatus?.type === 'ready';
+    });
+    expect(cloudStatusReady).toHaveLength(0);
   });
 });

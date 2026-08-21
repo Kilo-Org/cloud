@@ -28,6 +28,7 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'wrapper_error_after_activity',
   'missing_assistant_reply',
   'payment_required',
+  'provider_error',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',
@@ -241,6 +242,7 @@ export function classifyCloudAgentFailure(
     case 'assistant_error':
     case 'payment_required':
     case 'model_missing':
+    case 'provider_error':
       return classifyAssistantFailure(input);
     case 'unclassified':
       return classified('unknown', 'unclassified');

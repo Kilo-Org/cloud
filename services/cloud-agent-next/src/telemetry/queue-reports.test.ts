@@ -83,13 +83,14 @@ describe('Cloud Agent report emitter', () => {
   });
 
   it.each([
-    ['agent_activity', 'payment_required', 'insufficient_credits'],
-    ['agent_activity', 'model_missing', 'model_unavailable'],
-    ['post_dispatch_no_activity', 'payment_required', 'insufficient_credits'],
-    ['post_dispatch_no_activity', 'model_missing', 'model_unavailable'],
+    ['agent_activity', 'payment_required', 'user', 'insufficient_credits'],
+    ['agent_activity', 'model_missing', 'user', 'model_unavailable'],
+    ['agent_activity', 'provider_error', 'unknown', 'assistant_unknown'],
+    ['post_dispatch_no_activity', 'payment_required', 'user', 'insufficient_credits'],
+    ['post_dispatch_no_activity', 'model_missing', 'user', 'model_unavailable'],
   ] as const)(
-    'preserves %s/%s with user reason %s',
-    async (failureStage, failureCode, expectedFailureReason) => {
+    'preserves %s/%s with %s reason %s',
+    async (failureStage, failureCode, expectedResponsibility, expectedFailureReason) => {
       const reports: CloudAgentQueueReport[] = [];
       await emitRunStateReport({
         queue: { send: async report => void reports.push(report) },
@@ -100,7 +101,7 @@ describe('Cloud Agent report emitter', () => {
       expect(reports[0]?.run).toMatchObject({
         failureStage,
         failureCode,
-        failureResponsibility: 'user',
+        failureResponsibility: expectedResponsibility,
         failureReason: expectedFailureReason,
       });
     }

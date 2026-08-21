@@ -65,6 +65,7 @@ const FAILURE_CODE_REASONS = {
   wrapper_error_before_activity: 'wrapper_failed',
   wrapper_error_after_activity: 'wrapper_failed',
   assistant_error: 'assistant_failed',
+  provider_error: 'assistant_failed',
   missing_assistant_reply: 'assistant_no_reply',
   payment_required: 'billing',
   user_interrupt: 'user_cancelled',

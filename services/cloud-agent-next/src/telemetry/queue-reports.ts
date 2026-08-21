@@ -47,6 +47,7 @@ const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   wrapper_error_after_activity: 'Wrapper failed after agent activity',
   missing_assistant_reply: 'No assistant reply was produced',
   payment_required: 'Model request failed: insufficient credits',
+  provider_error: 'Assistant provider returned an invalid response',
   unclassified: 'Run failed without a classified cause',
 };
 

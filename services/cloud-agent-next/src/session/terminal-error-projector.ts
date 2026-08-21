@@ -9,6 +9,7 @@ const NON_RETRYABLE_FAILURE_CODES = new Set<SessionMessageFailureCode>([
   'session_metadata_missing',
   'model_missing',
   'payment_required',
+  'provider_error',
   'user_interrupt',
 ]);
 

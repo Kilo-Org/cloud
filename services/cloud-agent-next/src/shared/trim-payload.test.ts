@@ -298,6 +298,73 @@ describe('trimPayload', () => {
       expect(result.properties.part.name).toBe('image.png');
     });
 
+    it('preserves a file:// url and strips only source.text.value', () => {
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'file',
+          url: 'file:///tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md',
+          name: 'brief.md',
+          source: {
+            text: { value: 'file content here', start: 0, end: 50 },
+            type: 'file',
+            path: '/tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md',
+          },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: {
+          part: {
+            url: string;
+            name: string;
+            source: {
+              text: { value: string; start: number; end: number };
+              type: string;
+              path: string;
+            };
+          };
+        };
+      };
+
+      expect(result.properties.part.url).toBe(
+        'file:///tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md'
+      );
+      expect(result.properties.part.source.text.value).toBe('');
+      expect(result.properties.part.name).toBe('brief.md');
+      expect(result.properties.part.source.type).toBe('file');
+      expect(result.properties.part.source.path).toBe(
+        '/tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md'
+      );
+    });
+
+    it('preserves an http(s) url and strips only source.text.value', () => {
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'file',
+          url: 'https://example.com/brief.md',
+          name: 'brief.md',
+          source: {
+            text: { value: 'file content here', start: 0, end: 50 },
+            type: 'file',
+            path: '/foo',
+          },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: {
+          part: {
+            url: string;
+            name: string;
+            source: { text: { value: string }; type: string; path: string };
+          };
+        };
+      };
+
+      expect(result.properties.part.url).toBe('https://example.com/brief.md');
+      expect(result.properties.part.source.text.value).toBe('');
+    });
+
     it('strips top-level url and source.text.value', () => {
       const data = {
         event: 'message.part.updated',

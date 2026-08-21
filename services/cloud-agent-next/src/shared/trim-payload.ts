@@ -14,7 +14,15 @@ function truncate(s: string, max: number): string {
 }
 
 function stripFilePartFields(part: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...part, url: '' };
+  // Preserve small, non-`data:` URLs (`file://` sandbox paths, `http(s)`).
+  // The mobile client captures the cloud-agent attachment reference from the
+  // raw `file://` URL before the SDK strip; the live stream must keep it.
+  // `data:` URLs carry inline base64 bytes and are stripped for size.
+  const url = part.url;
+  const out: Record<string, unknown> = {
+    ...part,
+    ...(typeof url === 'string' && url.startsWith('data:') ? { url: '' } : {}),
+  };
   const source = part.source;
   if (isRecord(source)) {
     const text = source.text;

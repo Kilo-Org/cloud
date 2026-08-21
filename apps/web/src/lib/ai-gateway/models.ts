@@ -47,7 +47,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 8,
+          weight: 7,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -61,6 +61,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
         } satisfies AutoFreeModel,
       ]
     : []),
+  {
+    model: 'poolside/laguna-s-2.1:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
   ...(longcat_2_free_model.status === 'public'
     ? [
         {

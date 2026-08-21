@@ -193,16 +193,18 @@ describe('isFreeModel', () => {
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'tencent/hy3:free': { enabled: true, effort: 'high' },
+        'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'meituan/longcat-2.0-free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights Auto Free models at 80% StepFun, 10% Hy3, and 10% LongCat', () => {
+    test('weights Auto Free models at 70% StepFun and 10% each for Hy3, Laguna, and LongCat', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
       ).toEqual({
-        'stepfun/step-3.7-flash:free': 8,
+        'stepfun/step-3.7-flash:free': 7,
         'tencent/hy3:free': 1,
+        'poolside/laguna-s-2.1:free': 1,
         'meituan/longcat-2.0-free': 1,
       });
     });

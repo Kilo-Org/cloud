@@ -1,6 +1,7 @@
 import {
   clearBillingContext,
   createContainerUsageClient,
+  DEFAULT_BILLING_HEARTBEAT_SECONDS,
   getBillingContext,
   installBillingHeartbeat,
   setBillingContext,
@@ -36,6 +37,12 @@ const BILLING_BLOCK_STORAGE_KEY = 'container-usage:budget-block:v1';
 const DESTROY_RECOVERY_MARKER_STORAGE_KEY_PREFIX = 'container-usage:destroy-recovery-marker:v1:';
 const BILLING_FORCE_STOP_SECONDS = 120;
 const BILLING_FORCE_STOP_RETRY_SECONDS = 5;
+
+export function billingHeartbeatSeconds(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_BILLING_HEARTBEAT_SECONDS;
+  const seconds = Number(value);
+  return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : DEFAULT_BILLING_HEARTBEAT_SECONDS;
+}
 
 // oxlint-disable-next-line no-empty-object-type -- Matches the Sandbox 0.12.1 constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
@@ -102,6 +109,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     this.billingHeartbeat = installBillingHeartbeat(this, {
       client: this.usageClient,
       storage: this.ctx.storage,
+      heartbeatSeconds: billingHeartbeatSeconds(env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
       stopOnStoppedState: false,
       deferBudgetStopFinalSettlement: true,
       beforeHeartbeatDelivery: context => this.ensureStartAcknowledged(context),

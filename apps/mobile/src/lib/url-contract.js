@@ -18,23 +18,23 @@ export const URL_SCHEMES = {
   eventServiceUrl: ['https:', 'wss:'],
 };
 
-/** Production host allowlist, seeded from the repo-documented production hosts
- *  api.kilo.ai and app.kilo.ai (ENVIRONMENT.md:399-400). If EXPO_TOKEN is
- *  available when this file is authored, complete the list from the EAS
- *  production environment
- *  (`pnpx eas-cli@21.8.0 env:list --environment production --format long`)
- *  by extracting the host of each URL value. Otherwise preflight is the
- *  completeness safety net: the release preflight runs assertProductionHost
- *  against the real production values, so an incomplete allowlist fails
- *  preflight before any build, never at runtime in a store build.
- *  cloud-agent-next.kilosessions.ai and ingest.kilosessions.ai come from the
- *  repo-documented extension defaults
- *  (apps/extension/src/shared/cloud-agent-config.ts:10-11). */
+/** Production host allowlist, seeded from the committed apps/mobile/.env
+ *  production defaults. The .env URL values include api.kilo.ai, app.kilo.ai,
+ *  cloud-agent-next.kilosessions.ai, ingest.kilosessions.ai, chat.kiloapps.io,
+ *  events.kiloapps.io, and notifications.kiloapps.io. url-contract.test.ts
+ *  asserts every committed .env URL value against this list, so a missing
+ *  host fails the test before any build. Preflight is the runtime safety net:
+ *  the release preflight runs assertProductionHost against the real production
+ *  values, so an incomplete allowlist fails preflight before any build, never
+ *  at runtime in a store build. */
 export const PRODUCTION_HOSTS = [
   'api.kilo.ai',
   'app.kilo.ai',
+  'chat.kiloapps.io',
   'cloud-agent-next.kilosessions.ai',
+  'events.kiloapps.io',
   'ingest.kilosessions.ai',
+  'notifications.kiloapps.io',
 ];
 
 /** Parse a URL value, throwing a clear error for a missing or malformed URL.

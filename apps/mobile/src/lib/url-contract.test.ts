@@ -11,6 +11,7 @@ import {
   PRODUCTION_HOSTS,
   URL_SCHEMES,
 } from '@/lib/url-contract';
+import { ENV_KEYS } from './env-keys';
 
 describe('assertUrlScheme', () => {
   const productionCases: { key: keyof typeof URL_SCHEMES; value: string }[] = [
@@ -138,6 +139,44 @@ describe('assertProductionHost', () => {
     expect(() => {
       assertProductionHost('apiBaseUrl', '', PRODUCTION_HOSTS);
     }).toThrow(/Missing URL for apiBaseUrl/);
+  });
+});
+
+// Host-contract guard over the committed apps/mobile/.env production defaults.
+// Every URL value must pass the scheme check and stay inside the allowlist, so
+// a missing host fails the test before any build.
+const envPath = fileURLToPath(new URL('../../.env', import.meta.url));
+const envSource = readFileSync(envPath, 'utf8');
+
+function parseEnv(source: string): Record<string, string> {
+  const entries: Record<string, string> = {};
+  for (const rawLine of source.split('\n')) {
+    const match = /^([A-Z0-9_]+)=(.*)$/.exec(rawLine.trim());
+    const name = match?.[1];
+    const value = match?.[2];
+    if (name !== undefined && value !== undefined) {
+      entries[name] = value;
+    }
+  }
+  return entries;
+}
+
+const committedEnv = parseEnv(envSource);
+const urlKeys = Object.keys(URL_SCHEMES) as (keyof typeof URL_SCHEMES)[];
+
+describe('committed .env production defaults (host contract)', () => {
+  it('accepts every committed URL value for scheme and production host', () => {
+    for (const key of urlKeys) {
+      const envVar = ENV_KEYS[key];
+      const value = committedEnv[envVar];
+      expect(value, `${envVar} must be present in the committed .env`).toBeTruthy();
+      expect(() => {
+        assertUrlScheme(key, value, URL_SCHEMES[key], { allowInsecure: false });
+      }).not.toThrow();
+      expect(() => {
+        assertProductionHost(key, value, PRODUCTION_HOSTS);
+      }).not.toThrow();
+    }
   });
 });
 

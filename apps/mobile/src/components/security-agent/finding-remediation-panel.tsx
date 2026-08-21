@@ -33,6 +33,22 @@ type FindingRemediationPanelProps = {
   onRetry: () => void;
 };
 
+// Local label map for the remediation timeline events, keyed on the audit
+// action values (same labels as the web audit report ACTION_LABELS).
+const REMEDIATION_TIMELINE_LABELS = {
+  'security.remediation.queued': 'Remediation requested',
+  'security.remediation.pr_opened': 'PR opened',
+  'security.remediation.failed': 'Remediation failed',
+  'security.remediation.blocked': 'Remediation blocked',
+  'security.remediation.no_changes_needed': 'No changes needed',
+  'security.remediation.cancelled': 'Cancelled',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
 // Ported from FindingDetailDialog.tsx:1849 (getRemediationPresentation) and
 // remediation-unavailable-copy.ts — capability/blocker, current summary, and
 // attempt history (already newest-first from the server) as plain facts.
@@ -79,7 +95,8 @@ export function FindingRemediationPanel({
     );
   }
 
-  const { remediationCapability, remediationSummary, remediationAttempts } = analysis;
+  const { remediationCapability, remediationSummary, remediationAttempts, remediationTimeline } =
+    analysis;
   const latestAttempt = remediationAttempts[0] ?? null;
   const summaryPrUrl = remediationSummary?.prUrl;
   const presentation = getRemediationStatusPresentation(remediationSummary?.status ?? null, {
@@ -194,6 +211,27 @@ export function FindingRemediationPanel({
             {remediationSummary.prNumber ? ` #${remediationSummary.prNumber}` : ''}
           </Text>
         </Button>
+      ) : null}
+
+      {remediationTimeline.length > 0 ? (
+        <View className="gap-1.5 rounded-lg bg-card p-3">
+          <Text className="text-xs font-medium">Progress</Text>
+          <View className="gap-1">
+            {remediationTimeline.map((event, index) => (
+              <View
+                key={`${event.action}-${event.occurredAt}-${index}`}
+                className="flex-row items-center justify-between"
+              >
+                <Text className="text-xs">
+                  {lookup(REMEDIATION_TIMELINE_LABELS, event.action) ?? event.action}
+                </Text>
+                <Text variant="muted" className="text-xs">
+                  {timeAgo(parseTimestamp(event.occurredAt))}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
       ) : null}
 
       {remediationAttempts.length > 0 ? (

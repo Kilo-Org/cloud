@@ -68,12 +68,16 @@ import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
   operation_ledgers,
   organizations,
+  security_audit_log,
   type OperationLedgerRow,
   type SecurityFinding,
 } from '@kilocode/db/schema';
-import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
+import {
+  buildSecurityFindingAuditHumanActor,
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+} from '@kilocode/worker-utils/security-finding-audit';
 import { db } from '@/lib/drizzle';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -716,6 +720,51 @@ function toFindingListItem(
   finding: SecurityFindingWithRemediation
 ): SecurityFindingWithRemediation {
   return { ...finding, raw_data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Remediation progress timeline (detail-only)
+// ---------------------------------------------------------------------------
+//
+// The remediation panel renders the ordered remediation audit events for one
+// finding. The list decorator stays lean (P2-GH-45a); this detail-only query
+// reads the audit log directly. Only the remediation members of
+// REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS are timeline events — finding
+// lifecycle events are not.
+
+// The remediation members of REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS are the
+// timeline events. Filtered from the worker-utils constant (not the
+// audit-log-service enum, which tests mock with a partial object) so the six
+// remediation action strings stay real.
+const REMEDIATION_TIMELINE_ACTIONS = REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS.filter(action =>
+  action.startsWith('security.remediation.')
+);
+
+type RemediationTimelineEvent = {
+  action: string;
+  occurredAt: string;
+};
+
+async function getRemediationTimeline(findingId: string): Promise<RemediationTimelineEvent[]> {
+  const effectiveAt = sql<string>`COALESCE(${security_audit_log.occurred_at}, ${security_audit_log.created_at})`;
+  const rows = await db
+    .select({
+      action: security_audit_log.action,
+      occurredAt: effectiveAt,
+    })
+    .from(security_audit_log)
+    .where(
+      and(
+        eq(security_audit_log.finding_id, findingId),
+        inArray(security_audit_log.action, [...REMEDIATION_TIMELINE_ACTIONS])
+      )
+    )
+    .orderBy(asc(effectiveAt));
+
+  return rows.map(row => ({
+    action: row.action,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -2011,11 +2060,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
 
         const owner = deps.resolveOwner(ctx, input);
-        const [configWithStatus, integration, remediationAttempts] = await Promise.all([
-          getSecurityAgentConfigWithStatus(owner),
-          deps.getIntegration(ctx, input),
-          getRemediationAttemptHistory(input.findingId),
-        ]);
+        const [configWithStatus, integration, remediationAttempts, remediationTimeline] =
+          await Promise.all([
+            getSecurityAgentConfigWithStatus(owner),
+            deps.getIntegration(ctx, input),
+            getRemediationAttemptHistory(input.findingId),
+            getRemediationTimeline(input.findingId),
+          ]);
         const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
         const decoratedFinding = await decorateFindingWithRemediation({
           finding,
@@ -2042,6 +2093,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           remediationSummary: decoratedFinding.remediationSummary ?? null,
           remediationCapability: decoratedFinding.remediationCapability,
           remediationAttempts,
+          remediationTimeline,
         };
       },
     },

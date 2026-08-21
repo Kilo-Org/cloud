@@ -190,7 +190,9 @@ export function useStartSecurityAnalysis(scope: string) {
       toast.error(error.message);
     },
     onSuccess: async (result, vars) => {
-      trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      if (result.commandId) {
+        trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      }
       if (isPersonalSecurityScope(scope)) {
         await Promise.all([
           queryClient.invalidateQueries({

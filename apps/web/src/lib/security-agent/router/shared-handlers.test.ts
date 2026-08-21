@@ -8,7 +8,13 @@ import type * as manualRemediationClientModule from '../services/manual-remediat
 import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { operation_ledgers, type OperationLedgerRow } from '@kilocode/db/schema';
+import {
+  operation_ledgers,
+  organizations,
+  security_audit_log,
+  type OperationLedgerRow,
+} from '@kilocode/db/schema';
+import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import type { SecurityFindingWithRemediation } from '../db/security-remediation';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
@@ -654,6 +660,136 @@ describe('getAnalysis', () => {
       },
       status: 'completed',
       remediationCapability: { startReason: 'finding_not_open' },
+    });
+  });
+});
+
+describe('getAnalysis remediation timeline', () => {
+  const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const orgId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  const finding = {
+    id: findingId,
+    status: 'open',
+    ignored_reason: null,
+    ignored_by: null,
+    fixed_at: null,
+    updated_at: '2026-06-17T11:45:00.000Z',
+    analysis_status: 'completed',
+    analysis_started_at: '2026-06-17T11:40:00.000Z',
+    analysis_completed_at: '2026-06-17T11:44:59.000Z',
+    analysis_error: null,
+    analysis: { analyzedAt: '2026-06-17T11:44:59.000Z' },
+    session_id: 'session-123',
+    cli_session_id: 'cli-session-123',
+  };
+  const decoratedFinding = {
+    ...finding,
+    remediationSummary: null,
+    remediationCapability: {
+      canStart: false,
+      startReason: 'finding_not_open',
+      canRetry: false,
+      retryReason: 'finding_not_open',
+      canCancel: false,
+      cancelAttemptId: null,
+    },
+  };
+
+  async function insertAuditRow(
+    action: SecurityAuditLogAction,
+    occurredAt: string | null,
+    createdAt: string
+  ) {
+    await db.insert(security_audit_log).values({
+      owned_by_organization_id: orgId,
+      owned_by_user_id: null,
+      action,
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      finding_id: findingId,
+      occurred_at: occurredAt,
+      created_at: createdAt,
+    });
+  }
+
+  beforeEach(async () => {
+    await db
+      .insert(organizations)
+      .values({ id: orgId, name: 'Timeline Test Org' })
+      .onConflictDoNothing();
+    await db.delete(security_audit_log).where(eq(security_audit_log.finding_id, findingId));
+    mockGetSecurityFindingById.mockResolvedValue(finding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(decoratedFinding);
+  });
+
+  afterAll(async () => {
+    await db.delete(security_audit_log).where(eq(security_audit_log.finding_id, findingId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  it('orders remediation events ascending by occurred_at with created_at fallback and normalizes to UTC ISO', async () => {
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationQueued,
+      '2026-04-29 01:16:12.945+00',
+      '2026-04-29 01:16:12.945+00'
+    );
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationPrOpened,
+      null,
+      '2026-04-29 02:00:00.000+00'
+    );
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationFailed,
+      '2026-04-29 01:30:00.000+00',
+      '2026-04-29 01:30:00.000+00'
+    );
+
+    const result = await createHandlers().getAnalysis.handler({
+      ctx: context,
+      input: { findingId },
+    });
+
+    expect(result.remediationTimeline).toEqual([
+      { action: 'security.remediation.queued', occurredAt: '2026-04-29T01:16:12.945Z' },
+      { action: 'security.remediation.failed', occurredAt: '2026-04-29T01:30:00.000Z' },
+      { action: 'security.remediation.pr_opened', occurredAt: '2026-04-29T02:00:00.000Z' },
+    ]);
+  });
+
+  it('returns only remediation actions, not finding lifecycle actions', async () => {
+    await insertAuditRow(
+      SecurityAuditLogAction.FindingCreated,
+      '2026-04-29 01:00:00.000+00',
+      '2026-04-29 01:00:00.000+00'
+    );
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationQueued,
+      '2026-04-29 01:10:00.000+00',
+      '2026-04-29 01:10:00.000+00'
+    );
+
+    const result = await createHandlers().getAnalysis.handler({
+      ctx: context,
+      input: { findingId },
+    });
+
+    expect(result.remediationTimeline.map(event => event.action)).toEqual([
+      'security.remediation.queued',
+    ]);
+  });
+
+  it('returns an empty timeline when no remediation audit rows exist, keeping the original shape valid', async () => {
+    const result = await createHandlers().getAnalysis.handler({
+      ctx: context,
+      input: { findingId },
+    });
+
+    expect(result.remediationTimeline).toEqual([]);
+    expect(result).toMatchObject({
+      findingState: { status: 'open' },
+      status: 'completed',
+      remediationAttempts: [],
     });
   });
 });

@@ -2,15 +2,48 @@ import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
+import {
+  assertProductionHost,
+  assertUrlScheme,
+  PRODUCTION_HOSTS,
+  URL_SCHEMES,
+} from './src/lib/url-contract';
 
+const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
+
+// Required env is fatal by build intent: a production build must never ship
+// with a missing value, so throw under EAS_BUILD_PROFILE === 'production'.
+// Otherwise keep the old behavior: warn under GITHUB_ACTIONS, throw locally.
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
   const message = `Missing required environment variables: ${missing.join(', ')}`;
-  if (process.env.GITHUB_ACTIONS) {
+  if (isProductionBuild) {
+    throw new Error(message);
+  } else if (process.env.GITHUB_ACTIONS) {
     console.warn(`⚠️  ${message}`);
   } else {
     throw new Error(message);
   }
+}
+
+// URL contract: every URL value must use its allowed scheme. Non-production
+// builds additionally permit http:/ws: for local development; production
+// builds also assert the host against the production allowlist.
+for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
+  const value = process.env[ENV_KEYS[key as keyof typeof ENV_KEYS]];
+  if (!value) continue;
+  assertUrlScheme(key, value, schemes, { allowInsecure: !isProductionBuild });
+  if (isProductionBuild) {
+    assertProductionHost(key, value, PRODUCTION_HOSTS);
+  }
+}
+
+// Source-map gate: an unauthenticated production artifact must never reach the
+// stores with silently missing symbolication.
+if (isProductionBuild && !process.env.SENTRY_AUTH_TOKEN) {
+  throw new Error(
+    'Missing SENTRY_AUTH_TOKEN: production builds require an authenticated Sentry source-map upload.'
+  );
 }
 
 // Google OAuth client IDs are public identifiers (committed .env, all EAS

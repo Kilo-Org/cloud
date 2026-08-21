@@ -1,5 +1,12 @@
 import expoConstants from 'expo-constants';
 import { type ENV_KEYS, type OPTIONAL_ENV_KEYS } from './env-keys';
+import { resolveSentryEnvironment } from '@/lib/sentry-environment';
+import {
+  assertProductionHost,
+  assertUrlScheme,
+  PRODUCTION_HOSTS,
+  URL_SCHEMES,
+} from '@/lib/url-contract';
 
 const extra = expoConstants.expoConfig?.extra;
 
@@ -36,6 +43,20 @@ export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
   'playIntegrityProjectNumber'
 );
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
+
+// URL contract at module evaluation. The `required` presence check above is
+// the old presence-only check; remove it when every build passes through the
+// config boundary in app.config.ts, which already throws on missing values.
+const sentryEnvironment = resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__);
+const runProductionHostCheck =
+  !__DEV__ && sentryEnvironment !== 'development' && sentryEnvironment !== 'preview';
+for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
+  const value = required(key as keyof typeof ENV_KEYS);
+  assertUrlScheme(key, value, schemes, { allowInsecure: __DEV__ });
+  if (runProductionHostCheck) {
+    assertProductionHost(key, value, PRODUCTION_HOSTS);
+  }
+}
 
 function optionalLatencyMs(key: keyof typeof OPTIONAL_ENV_KEYS): number {
   const parsed = Number.parseInt(optional(key) ?? '', 10);

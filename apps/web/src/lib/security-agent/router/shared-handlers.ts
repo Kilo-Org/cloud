@@ -1049,12 +1049,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           isNowRemediationIncludeExisting &&
           !!input.autoRemediationMinSeverity &&
           input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
+        const wasApprovalRequired =
+          existingConfig?.config.auto_remediation_require_approval ?? false;
+        const isNowApprovalRequired = input.autoRemediationRequireApproval ?? wasApprovalRequired;
+        const approvalJustTurnedOff = !isNowApprovalRequired && wasApprovalRequired;
 
         const shouldEnqueueRemediation =
           isAutoRemediationOn &&
           (remediationIncludeExistingJustTurnedOn ||
             autoRemediationReEnabled ||
-            remediationThresholdChanged);
+            remediationThresholdChanged ||
+            approvalJustTurnedOff);
 
         // Compare-and-set save: the config write, the include-existing analysis
         // enqueue, and the include-existing remediation command all commit in one

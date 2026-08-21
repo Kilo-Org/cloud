@@ -562,6 +562,48 @@ describe('saveConfig', () => {
       })
     );
   });
+
+  it('enqueues the include-existing remediation backlog when approval is turned off', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 2 });
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      storedConfig: {},
+      config: {
+        auto_remediation_enabled: true,
+        auto_remediation_include_existing: true,
+        auto_remediation_require_approval: true,
+      },
+    });
+
+    // First save: auto-remediation and include-existing are already on, with
+    // approval required. No bulk command is enqueued while approval is on.
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: {
+        expectedRevision: 1,
+        autoRemediationEnabled: true,
+        autoRemediationIncludeExisting: true,
+        autoRemediationRequireApproval: true,
+      },
+    });
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enqueueRemediation: undefined })
+    );
+
+    // Second save: approval turns off. The include-existing backlog is enqueued.
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 2, autoRemediationRequireApproval: false },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        enqueueRemediation: {
+          owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        },
+      })
+    );
+  });
 });
 
 describe('autoDismissEligible', () => {

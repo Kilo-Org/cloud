@@ -985,7 +985,8 @@ export type CustomerBillingFailure = z.infer<typeof customerBillingFailureSchema
 export function parseCustomerBillingFailure(error: unknown): CustomerBillingFailure | null {
   const parsed = errorShapeSchema.safeParse(error);
   if (!parsed.success) return null;
-  const source = parsed.data.data?.billingFailure ?? parsed.data.shape?.data?.billingFailure;
+  const source =
+    parsed.data.data?.['billingFailure'] ?? parsed.data.shape?.data?.['billingFailure'];
   const billingFailure = customerBillingFailureSchema.safeParse(source);
   return billingFailure.success ? billingFailure.data : null;
 }

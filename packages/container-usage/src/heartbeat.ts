@@ -24,6 +24,11 @@ export type BillingHeartbeatDependencies = {
   heartbeatSeconds?: number;
   /** Defer stopped-state closure to the container's authoritative onStop hook. */
   stopOnStoppedState?: boolean;
+  /**
+   * Let a producer that owns physical shutdown settle from its authoritative
+   * onStop hook instead of closing usage at a budget verdict.
+   */
+  deferBudgetStopFinalSettlement?: boolean;
   stoppedStateGraceSeconds?: number;
   stoppedStateAbandonSeconds?: number;
   beforeHeartbeatDelivery?: (context: BillingContext) => Promise<void>;
@@ -379,7 +384,9 @@ export function installBillingHeartbeat(
           generation: context.generation,
           startEpochMs: context.startEpochMs,
         });
-        await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+        if (!dependencies.deferBudgetStopFinalSettlement) {
+          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+        }
         return;
       }
       if (ack.budget.verdict === 'warn') {

@@ -7,6 +7,7 @@ import { Bubble } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
@@ -24,6 +25,7 @@ type MessageBubbleProps = {
   isLastAssistantMessage?: boolean;
   isSessionStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  modelOptions?: SessionModelOption[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
   /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
@@ -47,6 +49,7 @@ function MessageBubbleImpl({
   isLastAssistantMessage,
   isSessionStreaming,
   getChildMessages,
+  modelOptions,
   defaultReasoningExpanded,
   onOpenChildSession,
   deliveryState,
@@ -228,6 +231,7 @@ function MessageBubbleImpl({
                 getChildMessages={getChildMessages}
                 defaultReasoningExpanded={defaultReasoningExpanded}
                 onOpenChildSession={onOpenChildSession}
+                modelOptions={modelOptions}
               />
             ))}
           </View>

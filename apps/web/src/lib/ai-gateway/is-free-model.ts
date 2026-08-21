@@ -18,6 +18,7 @@ export async function isFreeModel(model: string): Promise<boolean> {
     model === KILO_AUTO_FREE_MODEL.id ||
     (model ?? '').endsWith(':free') ||
     model === 'openrouter/free' ||
+    model === 'stealth/ox-alpha' ||
     (await isPublicIdExperimented(model ?? ''))
   );
 }

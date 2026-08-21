@@ -1,5 +1,7 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
 import { MessageErrorBoundary } from './message-error-boundary';
@@ -23,6 +25,7 @@ type PartRendererProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function PartRenderer({
@@ -31,6 +34,7 @@ export function PartRenderer({
   getChildMessages,
   defaultReasoningExpanded,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<PartRendererProps>) {
   if (!partRendersContent(part)) {
     return null;
@@ -50,6 +54,7 @@ export function PartRenderer({
           getChildMessages={getChildMessages}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={onOpenChildSession}
+          modelOptions={modelOptions}
         />
       </MessageErrorBoundary>
     );

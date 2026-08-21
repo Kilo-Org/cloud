@@ -1,5 +1,7 @@
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
 import {
   ChildSessionSection,
   getTaskToolSessionId,
@@ -27,6 +29,7 @@ type ToolPartRendererProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   renderPart?: RenderPartFn;
   onOpenChildSession?: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function ToolPartRenderer({
@@ -34,6 +37,7 @@ export function ToolPartRenderer({
   getChildMessages,
   renderPart,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<ToolPartRendererProps>) {
   if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
     return null;
@@ -48,6 +52,7 @@ export function ToolPartRenderer({
         part={part}
         childMessages={childMessages}
         onOpenChildSession={onOpenChildSession}
+        modelOptions={modelOptions}
       />
     );
   }

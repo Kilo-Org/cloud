@@ -47,6 +47,7 @@ import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.share
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -203,6 +204,27 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
+function vertexByokModelNotFoundResponse(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[] | null
+) {
+  if (
+    userByokProviderIds === null ||
+    !userByokProviderIds.includes('vertex') ||
+    response.status !== 404
+  ) {
+    return undefined;
+  }
+
+  const error =
+    '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.';
+  warnExceptInTest(`Responding with ${response.status} ${error}`);
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: response.status }
+  );
+}
+
 const noAllowedProvidersErrorSchema = z.object({
   message: z.literal('No allowed providers are available for the selected model.'),
   code: z.literal(404),
@@ -251,19 +273,22 @@ export async function makeErrorReadable({
   requestedModel,
   request,
   response,
-  isUserByok,
+  userByokProviderIds,
 }: {
   providerId: ProviderId;
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
-  isUserByok: boolean;
+  userByokProviderIds: UserByokProviderId[] | null;
 }) {
   if (response.status < 400) {
     return undefined;
   }
 
-  if (isUserByok) {
+  const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
+  if (vertexByokResponse) return vertexByokResponse;
+
+  if (userByokProviderIds !== null) {
     const byokMessage = byokErrorMessage(response.status);
     if (byokMessage) {
       warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);

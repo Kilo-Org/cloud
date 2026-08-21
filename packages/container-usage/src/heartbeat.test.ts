@@ -152,6 +152,89 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
   });
 
+  it('keeps the default controller behavior of settling immediately after a budget stop', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+      intervalId: `${input.instanceId}:${input.startEpochMs}`,
+      durable: 'pg',
+      dedup: false,
+    }));
+    const client = new ContainerUsageClient(
+      {
+        recordStart: async () => ({
+          success: true,
+          ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+        }),
+        recordHeartbeat: async () => ({
+          intervalId: 'instance-1:123',
+          durable: 'pg',
+          dedup: false,
+          budget: { verdict: 'stop' },
+        }),
+        recordStop,
+      },
+      { service: 'gastown' }
+    );
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client, storage, enforceBudgetStop: vi.fn() }
+    );
+
+    await controller.billingHeartbeatTick();
+
+    expect(recordStop).toHaveBeenCalledOnce();
+    expect(await getBillingContext(storage)).toBeUndefined();
+  });
+
+  it('defers budget-stop settlement when the producer owns physical shutdown', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+      intervalId: `${input.instanceId}:${input.startEpochMs}`,
+      durable: 'pg',
+      dedup: false,
+    }));
+    const client = new ContainerUsageClient(
+      {
+        recordStart: async () => ({
+          success: true,
+          ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+        }),
+        recordHeartbeat: async () => ({
+          intervalId: 'instance-1:123',
+          durable: 'pg',
+          dedup: false,
+          budget: { verdict: 'stop' },
+        }),
+        recordStop,
+      },
+      { service: 'cloud-agent-next' }
+    );
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      {
+        client,
+        storage,
+        deferBudgetStopFinalSettlement: true,
+        enforceBudgetStop: vi.fn(),
+      }
+    );
+
+    await controller.billingHeartbeatTick();
+
+    expect(recordStop).not.toHaveBeenCalled();
+    expect(await getBillingContext(storage)).toBeDefined();
+  });
+
   it('defers stopped-state closure when the producer owns an authoritative stop hook', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

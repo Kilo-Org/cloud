@@ -90,6 +90,7 @@ async function checkDirectBYOK(
       apiUrl: directByok.base_url,
       apiUrlOverrides: directByok.base_url_overrides,
       apiKey: userByok[0].decryptedAPIKey,
+      apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,
       responseTransforms: null,
       async transformRequest(context) {
@@ -137,8 +138,10 @@ async function checkCustomLlm(
   }
 
   let apiKey: string;
-  if (parsedCredentials.data.type === 'api_key') {
+  let apiKeyHeader: 'x-api-key' | null = null;
+  if (parsedCredentials.data.type === 'api_key' || parsedCredentials.data.type === 'x-api-key') {
     apiKey = parsedCredentials.data.api_key;
+    apiKeyHeader = parsedCredentials.data.type === 'x-api-key' ? 'x-api-key' : null;
   } else {
     apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
   }
@@ -158,7 +161,8 @@ async function checkCustomLlm(
             ? 'responses'
             : 'chat_completions',
       ],
-      resolvedCustomLlm
+      resolvedCustomLlm,
+      apiKeyHeader
     ),
     userByok: null,
     bypassAccessCheck: true,
@@ -258,7 +262,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (selection?.status === 'active') {
       return {
         kind: 'provider',
-        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream),
+        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream, null),
         userByok: null,
         bypassAccessCheck: false,
         experiment: {

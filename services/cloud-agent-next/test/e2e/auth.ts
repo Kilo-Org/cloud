@@ -193,6 +193,6 @@ export function mintStreamTicket(
       nonce: randomUUID(),
     },
     nextAuthSecret,
-    { algorithm: 'HS256', expiresIn: expiresInSeconds }
+    { algorithm: 'HS256', expiresIn: expiresInSeconds, audience: 'cloud-agent-stream' }
   );
 }

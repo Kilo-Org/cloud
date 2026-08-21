@@ -4,7 +4,6 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { deepseek_v4_pro_discounted_model } from '@/lib/ai-gateway/providers/deepseek';
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
@@ -30,7 +29,6 @@ describe('OpenRouter Models Config', () => {
       'stealth/qwen3.6-plus',
       QWEN37_PLUS_MODEL_ID,
       'deepseek/deepseek-v4-pro',
-      deepseek_v4_pro_discounted_model.public_id,
     ];
 
     supersededModels.forEach(model => {

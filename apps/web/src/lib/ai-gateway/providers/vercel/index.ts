@@ -3,7 +3,9 @@ import type { VercelUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import {
   DirectUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
+  normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
+  VertexCredentialsSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
@@ -32,9 +34,12 @@ export function hasCompatibleVercelInferenceProvider(
     return true;
   }
 
-  return openRouterInferenceProviders.some(provider =>
-    vercelInferenceProviders.includes(openRouterToVercelInferenceProviderId(provider))
-  );
+  return openRouterInferenceProviders.some(provider => {
+    const vercelProviderId = openRouterToVercelInferenceProviderId(provider);
+    return vercelInferenceProviders
+      .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+      .includes(vercelProviderId);
+  });
 }
 
 export function getVercelInferenceProvidersExcludingIgnored(
@@ -47,9 +52,13 @@ export function getVercelInferenceProvidersExcludingIgnored(
     ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
     : null;
 
-  return vercelInferenceProviders.filter(
-    provider => !ignored.has(provider) && (!only || only.has(provider))
-  );
+  return [
+    ...new Set(
+      vercelInferenceProviders
+        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+        .filter(provider => !ignored.has(provider) && (!only || only.has(provider)))
+    ),
+  ];
 }
 
 export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
@@ -148,7 +157,7 @@ export function convertProviderOptions(
   return {
     gateway: {
       only,
-      order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
+      order: provider?.order?.map(openRouterToVercelInferenceProviderId),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
@@ -161,6 +170,14 @@ function parseAwsCredentials(input: string) {
     return AwsCredentialsSchema.parse(JSON.parse(input));
   } catch {
     throw new Error('Failed to parse AWS credentials');
+  }
+}
+
+function parseVertexCredentials(input: string) {
+  try {
+    return VertexCredentialsSchema.parse(JSON.parse(input));
+  } catch {
+    throw new Error('Failed to parse Google Vertex credentials');
   }
 }
 
@@ -205,6 +222,8 @@ export function getVercelInferenceProviderConfigForUserByok(
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
     list.push(parseAwsCredentials(provider.decryptedAPIKey));
+  } else if (key === VercelUserByokInferenceProviderIdSchema.enum.vertex) {
+    list.push(parseVertexCredentials(provider.decryptedAPIKey));
   } else {
     list.push({ apiKey: provider.decryptedAPIKey });
   }
@@ -250,8 +269,7 @@ export async function applyVercelSettings(
     const byokProviders =
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
-    // this is vercel specific BYOK configuration to force vercel gateway to use the BYOK API key
-    // for the user/org. If the key is invalid the request will faill - it will not fall back to bill our API key.
+    // Pass request-scoped credentials and restrict routing to the corresponding providers.
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),

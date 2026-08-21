@@ -2,6 +2,7 @@ import {
   billingActorSchema,
   billingSubjectSchema,
   usageContextSchema,
+  ContainerUsageAdmissionError,
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
@@ -38,9 +39,21 @@ export const SANDBOX_CAPACITIES: Record<
 };
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
+  enforcementRequested?: boolean;
 };
+export type SandboxBillingAdmissionResult =
+  | { success: true }
+  | {
+      success: false;
+      code: 'insufficient_credits' | 'meter_unavailable' | 'stopping';
+      message: string;
+      remainingMicrodollars?: number;
+      minimumRequiredMicrodollars?: number;
+    };
 export type MeteredSandboxInstance = SandboxInstance & {
   configureBilling(input: unknown): Promise<void>;
+  ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult>;
+  isBillingBlocked(): Promise<boolean>;
   isContainerRunning(): Promise<boolean>;
 };
 
@@ -65,6 +78,7 @@ const sandboxBillingInputEnvelopeSchema = z
         message: 'Metadata may contain at most 16 entries',
       })
       .optional(),
+    enforcementRequested: z.boolean().default(false),
   })
   .strict();
 
@@ -96,7 +110,8 @@ function isIsolatedSandbox(sandboxId: SandboxId): boolean {
 
 export function buildSandboxBillingInput(
   metadata: SessionMetadata,
-  sandboxId: SandboxId
+  sandboxId: SandboxId,
+  enforcementRequested = false
 ): SandboxBillingInput {
   const subject = metadata.identity.orgId
     ? { type: 'org' as const, id: metadata.identity.orgId }
@@ -108,6 +123,7 @@ export function buildSandboxBillingInput(
 
   return {
     sandboxId,
+    ...(enforcementRequested ? { enforcementRequested: true } : {}),
     subject,
     actor,
     ...(actor.type === 'bot' ? { onBehalfOf: subject } : {}),
@@ -120,7 +136,7 @@ export function buildSandboxBillingInput(
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
-  const { sandboxId, ...usageInput } = parsed;
+  const { sandboxId, enforcementRequested, ...usageInput } = parsed;
   const validated = usageContextSchema.parse({
     service: 'cloud-agent-next',
     instanceId: 'validation',
@@ -128,7 +144,7 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
     ...usageInput,
   });
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
-  return { sandboxId, ...billingInput };
+  return { sandboxId, enforcementRequested, ...billingInput };
 }
 
 export function assertSandboxBillingAllocation(
@@ -183,6 +199,71 @@ export async function configureSandboxBilling(
   sandboxId: SandboxId
 ): Promise<void> {
   await configureSandboxBillingInput(sandbox, buildSandboxBillingInput(metadata, sandboxId));
+}
+
+export async function ensureSandboxBillingAdmissionInput(
+  sandbox: SandboxInstance,
+  input: SandboxBillingInput
+): Promise<SandboxBillingAdmissionResult> {
+  const ensureBillingAdmission = (sandbox as Partial<MeteredSandboxInstance>)
+    .ensureBillingAdmission;
+  if (typeof ensureBillingAdmission !== 'function') {
+    return input.enforcementRequested
+      ? {
+          success: false,
+          code: 'meter_unavailable',
+          message: 'Container billing admission is unavailable',
+        }
+      : { success: true };
+  }
+  try {
+    return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
+  } catch (error) {
+    return {
+      success: false,
+      code: 'meter_unavailable',
+      message: error instanceof Error ? error.message : 'Container billing admission failed',
+    };
+  }
+}
+
+export function billingAdmissionFailureFromError(error: unknown): SandboxBillingAdmissionResult {
+  if (error instanceof ContainerUsageAdmissionError) {
+    if (error.code === 'insufficient_credits') {
+      return {
+        success: false,
+        code: 'insufficient_credits',
+        message: error.message,
+        ...(error.remainingMicrodollars === undefined
+          ? {}
+          : { remainingMicrodollars: error.remainingMicrodollars }),
+        ...(error.minimumRequiredMicrodollars === undefined
+          ? {}
+          : { minimumRequiredMicrodollars: error.minimumRequiredMicrodollars }),
+      };
+    }
+  }
+  return {
+    success: false,
+    code: 'meter_unavailable',
+    message: error instanceof Error ? error.message : 'Container billing meter is unavailable',
+  };
+}
+
+export async function isSandboxBillingBlocked(
+  sandbox: SandboxInstance,
+  enforcementRequested = false
+): Promise<boolean> {
+  const isBillingBlocked = (sandbox as Partial<MeteredSandboxInstance>).isBillingBlocked;
+  if (typeof isBillingBlocked !== 'function') return false;
+  try {
+    return await (sandbox as MeteredSandboxInstance).isBillingBlocked();
+  } catch (error) {
+    logger
+      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .warn('Container billing block check failed');
+    return enforcementRequested;
+  }
 }
 
 /**

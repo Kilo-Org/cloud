@@ -156,6 +156,7 @@ const provider = {
   apiUrl: 'https://openrouter.ai/api/v1',
   apiUrlOverrides: {},
   apiKey: 'test-key',
+  apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'responses', 'messages'],
   responseTransforms: null,
   transformRequest: jest.fn(),

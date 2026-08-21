@@ -28,12 +28,8 @@ import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import {
-  gpt_5_6_sol_discounted_model,
-  gpt_5_6_sol_stealth_model,
-} from '@/lib/ai-gateway/providers/openai-exclusive';
+import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -136,9 +132,7 @@ export function isKiloExclusiveRateLimitedModel(model: string): boolean {
 
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
-  ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
-  gpt_5_6_sol_stealth_model,
   gpt_5_6_sol_discounted_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

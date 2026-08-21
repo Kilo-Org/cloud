@@ -1,12 +1,12 @@
 // The cloud-agent leg of `useContinueSession`: one `prepareSession` call, its
 // hoisted operation key, and the contained post-success UI work. Split out of
-// `use-continue-session.ts` (which keeps the paging drain, destination
-// resolution, and the remote spawn leg) so each file stays under the
-// max-lines limit.
+// `use-continue-session.ts` (which keeps destination resolution) so each file
+// stays under the max-lines limit.
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
@@ -18,10 +18,15 @@ import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+// The full clone carries no transcript seed; the continuation turn is a fixed
+// confirmation that the cloned context is ready and waits for the next prompt.
+const CONTINUE_CLONE_PROMPT =
+  'Continue from the cloned session context. Confirm that the context is ready, then wait for the next instruction.';
+
 export function useContinueCloudCreate(
   organizationId: string | undefined
 ): (
-  seed: string,
+  sessionId: KiloSessionId,
   dest: { repo: string; model: string; variant: string },
   mode: string
 ) => Promise<void> {
@@ -41,9 +46,13 @@ export function useContinueCloudCreate(
   } = useMutationOutbox();
 
   return useCallback(
-    async (seed: string, dest: { repo: string; model: string; variant: string }, mode: string) => {
+    async (
+      sessionId: KiloSessionId,
+      dest: { repo: string; model: string; variant: string },
+      mode: string
+    ) => {
       const intentFingerprint = JSON.stringify({
-        seed,
+        cloneFromKiloSessionId: sessionId,
         repo: dest.repo,
         model: dest.model,
         variant: dest.variant || undefined,
@@ -64,7 +73,7 @@ export function useContinueCloudCreate(
         getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
       const initialMessageId = generateMessageId();
       const baseInput = {
-        prompt: seed,
+        prompt: CONTINUE_CLONE_PROMPT,
         initialMessageId,
         mode: normalizeAgentMode(mode),
         model: dest.model,
@@ -73,6 +82,7 @@ export function useContinueCloudCreate(
         autoCommit: false,
         autoInitiate: true,
         operationKey,
+        cloneFromKiloSessionId: sessionId,
       };
       try {
         // Persist the safe-retry row BEFORE the mutate so a crash mid-flight

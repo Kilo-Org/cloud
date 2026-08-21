@@ -1103,7 +1103,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
-      userByokProviderIds: effectiveProviderContext.userByok?.map(byok => byok.providerId) ?? null,
+      userByokProviderIds:
+        effectiveProviderContext.userByok === null
+          ? null
+          : effectiveProviderContext.userByok.map(byok => byok.providerId),
     });
     if (errorResponse) {
       await logUnrewrittenResponse({

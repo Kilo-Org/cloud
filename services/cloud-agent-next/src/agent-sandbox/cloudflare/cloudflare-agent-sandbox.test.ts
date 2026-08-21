@@ -1803,21 +1803,38 @@ describe('CloudflareAgentSandbox', () => {
   it('deletes session resources without destroying a shared sandbox', async () => {
     const destroy = vi.fn();
     const deleteSession = vi.fn().mockResolvedValue(undefined);
-    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
-      resolveSandbox: () =>
-        ({
-          getSession: vi.fn().mockResolvedValue({
-            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-          }),
-          deleteSession,
-          destroy,
-        }) as unknown as SandboxInstance,
-    });
+    const sandbox = new CloudflareAgentSandbox(
+      {} as Env,
+      metadata({ sandboxId: `usr-${'a'.repeat(48)}` as TestSandboxId }),
+      {
+        resolveSandbox: () =>
+          ({
+            getSession: vi.fn().mockResolvedValue({
+              exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+            }),
+            deleteSession,
+            destroy,
+          }) as unknown as SandboxInstance,
+      }
+    );
 
     await sandbox.delete('explicit');
 
     expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
     expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('destroys an isolated sandbox when deleting its only session', async () => {
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const deleteSession = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ destroy, deleteSession }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('explicit');
+
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(deleteSession).not.toHaveBeenCalled();
   });
 
   it('maps infrastructure recovery to destructive Cloudflare sandbox replacement', async () => {

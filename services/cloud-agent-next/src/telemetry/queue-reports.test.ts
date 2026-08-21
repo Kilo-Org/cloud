@@ -205,19 +205,25 @@ describe('Cloud Agent report emitter', () => {
     expect(JSON.stringify(reports)).not.toContain('unrelated secret-bearing failure text');
   });
 
-  it('emits a safe insufficient-credit diagnostic for the wrapper terminal text', async () => {
+  it('emits a safe insufficient-credit diagnostic for an appended gateway body', async () => {
     const reports: CloudAgentQueueReport[] = [];
+    const rawGatewayError =
+      'Payment Required: {"balance":-1.25,"url":"https://gateway.test/private","token":"secret"}';
     await emitRunStateReport({
       queue: { send: async report => void reports.push(report) },
       cloudAgentSessionId: 'agent_report',
-      state: { ...state, error: 'Insufficient credits' },
+      state: { ...state, error: rawGatewayError },
     });
 
     expect(reports[0]?.run.diagnostic).toEqual({
       errorMessageRedacted: 'Model request failed: insufficient credits',
       errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    expect(JSON.stringify(reports)).not.toContain('Insufficient credits');
+    const serialized = JSON.stringify(reports);
+    expect(serialized).not.toContain(rawGatewayError);
+    expect(serialized).not.toContain('-1.25');
+    expect(serialized).not.toContain('gateway.test');
+    expect(serialized).not.toContain('secret');
   });
 
   it.each(['Payment Required', 'pAyMeNt ReQuIrEd'])(

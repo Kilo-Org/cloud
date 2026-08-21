@@ -35,6 +35,10 @@ import { createProxyRequest } from '../../src/shared/http-proxy.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 import type { ToolCgroupHealth } from './tool-cgroup.js';
+import {
+  WRAPPER_HEALTH_CHECK_FAILED,
+  WRAPPER_REQUEST_ID_HEADER,
+} from '../../src/shared/wrapper-http.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -171,6 +175,22 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function errorResponse(error: string, message: string, status: number): Response {
   return jsonResponse({ error, message }, status);
+}
+
+function healthErrorResponse(requestId: string): Response {
+  return jsonResponse(
+    {
+      error: WRAPPER_HEALTH_CHECK_FAILED,
+      message: 'Wrapper health check failed',
+      requestId,
+    },
+    500
+  );
+}
+
+function requestCorrelationId(req: Request): string {
+  const supplied = req.headers.get(WRAPPER_REQUEST_ID_HEADER);
+  return supplied && /^[A-Za-z0-9_-]{1,128}$/.test(supplied) ? supplied : crypto.randomUUID();
 }
 
 function wrapperFinalizingResponse(state: WrapperState): Response {
@@ -1190,8 +1210,9 @@ export function createFetchHandler(
     const url = new URL(req.url);
     const method = req.method;
     const path = url.pathname;
+    const requestId = requestCorrelationId(req);
 
-    logToFile(`HTTP ${method} ${path}`);
+    logToFile(`HTTP ${method} ${path} requestId=${requestId}`);
 
     const ptyPath = parsePtyPath(path);
     if (ptyPath) {
@@ -1240,12 +1261,14 @@ export function createFetchHandler(
     try {
       return Promise.resolve(handler(req)).catch(error => {
         const msg = error instanceof Error ? error.message : String(error);
-        logToFile(`HTTP handler error: ${msg}`);
+        logToFile(`HTTP handler error: requestId=${requestId} path=${path} error=${msg}`);
+        if (path === '/health') return healthErrorResponse(requestId);
         return errorResponse('INTERNAL_ERROR', msg, 500);
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      logToFile(`HTTP handler error: ${msg}`);
+      logToFile(`HTTP handler error: requestId=${requestId} path=${path} error=${msg}`);
+      if (path === '/health') return healthErrorResponse(requestId);
       return errorResponse('INTERNAL_ERROR', msg, 500);
     }
   };

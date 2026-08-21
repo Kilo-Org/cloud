@@ -24,6 +24,7 @@ import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
   generateSandboxId,
   getSandboxNamespace,
+  isGeneratedSharedSandboxId,
   isOrgInList,
   MANAGED_SCM_OUTBOUND_HANDLER,
 } from '../../sandbox-id.js';
@@ -934,8 +935,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }
 
   async delete(reason: SandboxDeleteReason): Promise<void> {
-    const sandbox = await this.getSandbox();
-    if (reason === 'recovery') {
+    const sandboxId = await this.resolveSandboxId();
+    const sandbox = this.resolveSandbox(sandboxId);
+    if (reason === 'recovery' || !isGeneratedSharedSandboxId(sandboxId)) {
       await sandbox.destroy();
       return;
     }

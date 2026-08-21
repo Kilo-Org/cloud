@@ -935,10 +935,11 @@ export function createIngestHandler(
           const errorData = parsedError.data;
           if (errorData.fatal) {
             const fatalMessage = errorData.error ?? errorData.message ?? 'Fatal error';
-            const safeFatalMessage =
+            const assistantClassification =
               errorData.errorSource === 'assistant'
-                ? classifyAssistantFailureMessage(fatalMessage)
-                : 'Agent wrapper failed';
+                ? classifyAssistantFailure(fatalMessage)
+                : undefined;
+            const safeFatalMessage = assistantClassification?.safeMessage ?? 'Agent wrapper failed';
             const shouldForwardModelNotFoundDiagnostics =
               errorData.errorSource === 'assistant' &&
               safeFatalMessage === MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE;
@@ -989,7 +990,7 @@ export function createIngestHandler(
               ...(parsedDiagnostics?.success
                 ? { modelNotFoundRuntimeDiagnostics: parsedDiagnostics.data }
                 : {}),
-              failureCode: errorData.failureCode,
+              failureCode: errorData.failureCode ?? assistantClassification?.terminalCode,
             });
             logger
               .withFields({

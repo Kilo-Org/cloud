@@ -55,21 +55,30 @@ const preflightResult = (cmd: string): MockExecResult =>
     ? { exitCode: 0, stdout: '1.0.0' }
     : { exitCode: 0, stdout: 'ok' };
 
+/**
+ * Append the curl `-w` response-metadata marker the real exec transport
+ * produces, so mocks exercise the same parsing path as production.
+ */
+const withCurlMetadata = (cmd: string, result: MockExecResult): MockExecResult => {
+  if (result.exitCode !== 0) return result;
+  const marker = cmd.match(/__KILO_WRAPPER_RESPONSE_.+?__/)?.[0];
+  if (!marker || result.stdout?.includes(marker)) return result;
+  return { ...result, stdout: `${result.stdout ?? ''}\n${marker}200\tapplication/json` };
+};
+
 const createMockSession = (
-  execResult: MockExecResult | ((cmd: string) => MockExecResult)
+  execResult: MockExecResult | ((cmd: string) => MockExecResult),
+  options: { omitCurlMetadata?: boolean } = {}
 ): ExecutionSession => {
-  const execFn =
-    typeof execResult === 'function'
-      ? vi
-          .fn()
-          .mockImplementation((cmd: string) =>
-            Promise.resolve(isPreflightCommand(cmd) ? preflightResult(cmd) : execResult(cmd))
-          )
-      : vi
-          .fn()
-          .mockImplementation((cmd: string) =>
-            Promise.resolve(isPreflightCommand(cmd) ? preflightResult(cmd) : execResult)
-          );
+  const resolveResult = (cmd: string): MockExecResult => {
+    const result = isPreflightCommand(cmd)
+      ? preflightResult(cmd)
+      : typeof execResult === 'function'
+        ? execResult(cmd)
+        : execResult;
+    return options.omitCurlMetadata ? result : withCurlMetadata(cmd, result);
+  };
+  const execFn = vi.fn().mockImplementation((cmd: string) => Promise.resolve(resolveResult(cmd)));
 
   // Mock startProcess that returns a process with waitForPort and getLogs
   const startProcessFn = vi.fn().mockImplementation(() =>
@@ -360,7 +369,13 @@ describe('WrapperClient', () => {
       );
 
       expect(result.kiloSessionId).toBe('kilo_sess_1');
-      expect(transport.request).toHaveBeenNthCalledWith(1, 'POST', '/session/ready', readyRequest);
+      expect(transport.request).toHaveBeenNthCalledWith(
+        1,
+        'POST',
+        '/session/ready',
+        readyRequest,
+        expect.any(String)
+      );
       expect(transport.request).toHaveBeenNthCalledWith(
         2,
         'POST',
@@ -381,7 +396,8 @@ describe('WrapperClient', () => {
             condenseOnComplete: false,
           },
           session: binding,
-        })
+        }),
+        expect.any(String)
       );
       expect('executeSession' in client).toBe(false);
       expect(session.exec).not.toHaveBeenCalled();
@@ -2372,6 +2388,103 @@ describe('WrapperClient', () => {
       const client = new WrapperClient({ session, port: defaultPort });
 
       await expect(client.health()).rejects.toThrow(WrapperError);
+    });
+
+    it('fails as a diagnostic error when the curl metadata marker is missing', async () => {
+      const session = createMockSession(
+        { exitCode: 0, stdout: '{"status":"ready"}' },
+        { omitCurlMetadata: true }
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      // A missing marker means the true status is unknowable; the transport
+      // must surface a failure instead of silently reporting 200.
+      await expect(client.health()).rejects.toMatchObject({ code: 'PARSE_ERROR' });
+    });
+
+    it('retains the actual curl status and content type for malformed health diagnostics', async () => {
+      const session = createMockSession(command => {
+        const marker = command.match(/__KILO_WRAPPER_RESPONSE_[A-Za-z0-9-]+__/)?.[0];
+        if (!marker) throw new Error('Missing curl response metadata marker');
+        return {
+          exitCode: 0,
+          stdout: `<html>private-wrapper-error</html>\n${marker}500\ttext/html`,
+        };
+      });
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const logError = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.health()).rejects.toMatchObject({ code: 'PARSE_ERROR' });
+
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: '/health',
+          statusCode: 500,
+          contentType: 'text/html',
+        })
+      );
+      expect(JSON.stringify(withFields.mock.calls)).not.toContain('private-wrapper-error');
+      withFields.mockRestore();
+      logError.mockRestore();
+    });
+
+    it('fingerprints malformed health responses without retaining their body', async () => {
+      const body = '<html>token=secret-health-body</html>';
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          new Response(body, {
+            status: 500,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          })
+        ),
+      };
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const logError = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+      const client = new WrapperClient({
+        session: createMockSession(createSuccessResponse({})),
+        port: defaultPort,
+        transport,
+      });
+
+      const expectedHash = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))),
+        byte => byte.toString(16).padStart(2, '0')
+      ).join('');
+      let thrown: unknown;
+      try {
+        await client.health();
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toMatchObject({
+        message: 'Failed to parse wrapper response',
+        code: 'PARSE_ERROR',
+      });
+      expect(String(thrown)).not.toContain(body);
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'GET',
+          path: '/health',
+          requestId: expect.any(String),
+          contentType: 'text/html; charset=utf-8',
+          responseBytes: new TextEncoder().encode(body).byteLength,
+          responseSha256: expectedHash,
+          statusCode: 500,
+        })
+      );
+      expect(JSON.stringify(withFields.mock.calls)).not.toContain('secret-health-body');
+      expect(logError).toHaveBeenCalledWith('Failed to parse wrapper HTTP response');
+      expect(transport.request).toHaveBeenCalledWith(
+        'GET',
+        '/health',
+        undefined,
+        expect.any(String)
+      );
+
+      withFields.mockRestore();
+      logError.mockRestore();
     });
 
     it('handles curl exit codes', async () => {

@@ -16,7 +16,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
-import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
+import { and, eq } from 'drizzle-orm';
+import {
+  cloud_agent_session_runs,
+  computeDatabaseUrl,
+  createDrizzleClient,
+  kilocode_users,
+  sql,
+} from '@kilocode/db';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
@@ -143,6 +150,50 @@ export async function ensureTestUser(
       });
 
     return { id: userId, email, api_token_pepper: apiTokenPepper };
+  } finally {
+    await driver.pool.end().catch(() => {});
+  }
+}
+
+export type StoredRunFailure = {
+  status: string;
+  failureStage: string | null;
+  failureCode: string | null;
+  errorMessageRedacted: string | null;
+};
+
+export async function waitForStoredRunFailure(
+  databaseUrl: string | undefined,
+  cloudAgentSessionId: string,
+  messageId: string,
+  timeoutMs = 20_000
+): Promise<StoredRunFailure | null> {
+  const driver = createDrizzleClient({
+    connectionString: databaseUrl ?? computeDatabaseUrl(),
+    poolConfig: { application_name: 'cloud-agent-next-e2e-driver', max: 1 },
+  });
+  const deadline = Date.now() + timeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      const [row] = await driver.db
+        .select({
+          status: cloud_agent_session_runs.status,
+          failureStage: cloud_agent_session_runs.failure_stage,
+          failureCode: cloud_agent_session_runs.failure_code,
+          errorMessageRedacted: cloud_agent_session_runs.error_message_redacted,
+        })
+        .from(cloud_agent_session_runs)
+        .where(
+          and(
+            eq(cloud_agent_session_runs.cloud_agent_session_id, cloudAgentSessionId),
+            eq(cloud_agent_session_runs.message_id, messageId)
+          )
+        )
+        .limit(1);
+      if (row?.status === 'failed') return row;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return null;
   } finally {
     await driver.pool.end().catch(() => {});
   }

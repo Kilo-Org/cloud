@@ -1051,6 +1051,53 @@ describe('createIngestHandler', () => {
       );
     });
 
+    it.each([
+      {
+        source: 'Payment Required: {"balance":-0.25,"token":"secret"}',
+        failureCode: 'payment_required' as const,
+        safeFailureMessage: 'Assistant request failed: insufficient credits',
+      },
+      {
+        source: 'model_not_found: provider/private-model',
+        failureCode: 'model_missing' as const,
+        safeFailureMessage: 'Assistant request failed: model not found',
+      },
+    ])('preserves $failureCode from message.updated ingest', async classification => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+
+      await handler.handleIngestMessage(
+        createFakeWebSocket(makeNewPathAttachment()),
+        makeStreamMessage('kilocode', {
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'asst_classified',
+              role: 'assistant',
+              parentID: 'msg_classified',
+              error: classification.source,
+            },
+          },
+        })
+      );
+
+      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+        'msg_classified',
+        expect.objectContaining({
+          kind: 'failed',
+          failureCode: classification.failureCode,
+          safeFailureMessage: classification.safeFailureMessage,
+        }),
+        WRAPPER_RUN_ID
+      );
+    });
+
     it('publishes and persists a safe session error with session correlation intact', async () => {
       const eventQueries = createFakeEventQueries();
       const broadcast = vi.fn();
@@ -1421,6 +1468,7 @@ describe('createIngestHandler', () => {
         status: 'failed',
         error: rawError,
         errorSource: 'assistant',
+        failureCode: 'payment_required',
       });
     });
 
@@ -1482,6 +1530,7 @@ describe('createIngestHandler', () => {
         status: 'failed',
         error: 'Model not found: kilo/retired-model',
         errorSource: 'assistant',
+        failureCode: 'model_missing',
         modelNotFoundRuntimeDiagnostics: diagnostics,
       });
     });

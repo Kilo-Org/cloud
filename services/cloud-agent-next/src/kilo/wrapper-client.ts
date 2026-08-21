@@ -35,6 +35,7 @@ import {
 import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../shared/kilo-server-env.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../shared/tool-cgroup-env.js';
 import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js';
+import { WRAPPER_REQUEST_ID_HEADER } from '../shared/wrapper-http.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -180,7 +181,12 @@ export type WrapperContainerClientOptions = {
 };
 
 export type WrapperTransport = {
-  request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response>;
+  request(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    requestId?: string
+  ): Promise<Response>;
 };
 
 // ---------------------------------------------------------------------------
@@ -271,6 +277,11 @@ const KILO_SERVER_ENV_KEY_SET = new Set<string>(KILO_SERVER_ENV_KEYS);
  */
 const KILO_BASH_DEFAULT_TIMEOUT_MS = '240000';
 
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 function healthMatchesLease(
   health: WrapperHealthResponse,
   leasedInstance: WrapperInstanceLease | undefined,
@@ -342,14 +353,25 @@ class ExecCurlWrapperTransport implements WrapperTransport {
     this.shellQuote = options.shellQuote;
   }
 
-  async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response> {
+  async request(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    requestId?: string
+  ): Promise<Response> {
     const url = `${this.baseUrl}${path}`;
     let command = `curl -s -X ${method} -H 'Content-Type: application/json'`;
+    const responseMetadataMarker = `__KILO_WRAPPER_RESPONSE_${requestId ?? crypto.randomUUID()}__`;
+
+    if (requestId) {
+      command += ` -H ${this.shellQuote(`${WRAPPER_REQUEST_ID_HEADER}: ${requestId}`)}`;
+    }
 
     if (body) {
       command += ` -d ${this.shellQuote(JSON.stringify(body))}`;
     }
 
+    command += ` -w ${this.shellQuote(`\n${responseMetadataMarker}%{http_code}\t%{content_type}`)}`;
     command += ` ${this.shellQuote(url)}`;
 
     const result = await this.session.exec(command);
@@ -358,9 +380,29 @@ class ExecCurlWrapperTransport implements WrapperTransport {
       throw new WrapperError(`Request failed: ${stderr || 'curl error'}`, 'REQUEST_FAILED', 500);
     }
 
-    return new Response(result.stdout ?? '', {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+    const stdout = result.stdout ?? '';
+    const markerIndex = stdout.lastIndexOf(responseMetadataMarker);
+    if (markerIndex === -1) {
+      // The curl `-w` metadata is missing (truncated or hijacked output), so
+      // the real status is unknowable — fail loudly instead of faking a 200.
+      return new Response(stdout, {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const responseBody = stdout.slice(0, markerIndex).replace(/\n$/, '');
+    const [statusText, contentType] = stdout
+      .slice(markerIndex + responseMetadataMarker.length)
+      .split('\t', 2);
+    const parsedStatus = Number(statusText);
+    const status =
+      Number.isInteger(parsedStatus) && parsedStatus >= 200 && parsedStatus <= 599
+        ? parsedStatus
+        : 500;
+    return new Response(responseBody, {
+      status,
+      ...(contentType ? { headers: { 'Content-Type': contentType.trim() } } : {}),
     });
   }
 }
@@ -374,11 +416,19 @@ export class ContainerFetchWrapperTransport implements WrapperTransport {
     this.port = options.port;
   }
 
-  async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response> {
+  async request(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    requestId?: string
+  ): Promise<Response> {
     const url = new URL(`http://localhost:${this.port}${path}`);
     const request = new Request(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(requestId ? { [WRAPPER_REQUEST_ID_HEADER]: requestId } : {}),
+      },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     return this.sandbox.containerFetch(request, this.port);
@@ -540,8 +590,10 @@ export class WrapperClient {
    * Make an HTTP request to the wrapper.
    */
   private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
-    const response = await this.transport.request(method, path, body);
-    const responseText = await response.text();
+    const requestId = crypto.randomUUID();
+    const response = await this.transport.request(method, path, body, requestId);
+    const responseBytes = new Uint8Array(await response.arrayBuffer());
+    const responseText = new TextDecoder().decode(responseBytes);
 
     if (!responseText.trim()) {
       // Some endpoints return empty body
@@ -549,11 +601,23 @@ export class WrapperClient {
     }
 
     try {
-      const parsed = JSON.parse(responseText) as T & {
+      const raw: unknown = JSON.parse(responseText);
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        throw new Error('Invalid wrapper response object');
+      }
+      const parsed = raw as T & {
         error?: string;
         message?: string;
         wrapperRunId?: string;
       };
+      if (
+        (parsed.error !== undefined && typeof parsed.error !== 'string') ||
+        (parsed.message !== undefined && typeof parsed.message !== 'string') ||
+        (parsed.wrapperRunId !== undefined && typeof parsed.wrapperRunId !== 'string') ||
+        (!response.ok && parsed.error === undefined)
+      ) {
+        throw new Error('Invalid wrapper application-error response');
+      }
 
       // Check for error response
       if (parsed.error || !response.ok) {
@@ -569,6 +633,7 @@ export class WrapperClient {
             method,
             path,
             ...this.protocolDiagnosticFields(),
+            requestId,
             errorCode,
             statusCode,
           })
@@ -607,7 +672,10 @@ export class WrapperClient {
           method,
           path,
           ...this.protocolDiagnosticFields(),
-          responseBytes: responseText.length,
+          requestId,
+          contentType: response.headers.get('content-type'),
+          responseBytes: responseBytes.byteLength,
+          responseSha256: await sha256Hex(responseBytes),
           statusCode: response.status,
         })
         .error('Failed to parse wrapper HTTP response');

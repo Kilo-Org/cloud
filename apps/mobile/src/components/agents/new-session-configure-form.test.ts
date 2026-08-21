@@ -187,6 +187,29 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
   });
 
+  // ── Case 1b: ordered repository array passes through unchanged ──
+  it('passes the ordered repository array unchanged into NewSessionRepositorySection', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const orderedRepositories = [
+      { fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { fullName: 'octocat/Hello-World', isPrivate: false },
+      { fullName: 'acme/widgets', isPrivate: true },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      repositories: orderedRepositories,
+    }) as Node;
+
+    const section = findElementByType(element, 'NewSessionRepositorySection');
+    expect(section).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(section!.repositories).toEqual(orderedRepositories);
+  });
+
   // ── Case 2: Cloud, selector hidden ──
   it('renders prompt and repo, no run-target block, when cloud target with selector hidden', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');

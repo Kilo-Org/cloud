@@ -1,4 +1,5 @@
 import {
+  Brain,
   FileSliders,
   FolderGit2,
   Gauge,
@@ -31,12 +32,14 @@ export function buildOverviewRows({
   models,
   modelsLoading,
   onOpenModelPicker,
+  onOpenReviewMemory,
 }: {
   data: ReviewConfigData;
   capabilities: (typeof PLATFORM_CAPABILITIES)[keyof typeof PLATFORM_CAPABILITIES];
   models: ModelOption[];
   modelsLoading: boolean;
   onOpenModelPicker: () => void;
+  onOpenReviewMemory?: () => void;
 }): OverviewRow[] {
   return [
     {
@@ -90,6 +93,20 @@ export function buildOverviewRows({
           ? 'All repositories'
           : `${data.selectedRepositoryIds.length} selected`,
     },
+    // Review memory is GitHub-only and only offered when the caller wires the
+    // navigation callback (the overview screen pushes the scope-level route,
+    // not a per-platform settings field).
+    ...(onOpenReviewMemory
+      ? [
+          {
+            field: 'review-memory',
+            icon: Brain,
+            title: 'Review memory',
+            subtitle: 'Proposed REVIEW.md guidance',
+            onPress: onOpenReviewMemory,
+          },
+        ]
+      : []),
   ];
 }
 

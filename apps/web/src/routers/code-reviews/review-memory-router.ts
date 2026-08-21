@@ -71,6 +71,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         repoFullName: z.string().min(1).optional(),
         statuses: z.array(ProposalStatusSchema).optional(),
         limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -81,6 +82,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
         statuses: input.statuses,
         limit: input.limit,
+        cursor: input.cursor,
       });
     }),
 

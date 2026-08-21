@@ -451,6 +451,22 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
 
+  if (ledger) {
+    // Record the non-secret sandbox allocation before the ownership row is
+    // created so a same-key retry can reconcile the same allocation instead of
+    // deriving a second one. A failure here still fails the create at the
+    // sandbox stage and settles the admitted row.
+    try {
+      await recordOperationProgress(ledger.db, ledger.rowId, {
+        sandboxId,
+        sandboxProvider,
+        ...(sandboxRoute ? { sandboxRoute } : {}),
+      });
+    } catch (error) {
+      rethrowAllocationFailure(ledger, 'sandbox', error);
+    }
+  }
+
   logger.setTags({
     cloudAgentSessionId,
     kiloSessionId,
@@ -462,8 +478,10 @@ async function allocateNewSession(
 
   const defaultTitle = `New session - ${new Date().toISOString()}`;
   const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
+  const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
+  let ingestResult: Awaited<ReturnType<SessionService['createCliSessionViaSessionIngest']>>;
   try {
-    await sessionService.createCliSessionViaSessionIngest(
+    ingestResult = await sessionService.createCliSessionViaSessionIngest(
       kiloSessionId,
       cloudAgentSessionId,
       ctx.userId,
@@ -471,7 +489,8 @@ async function allocateNewSession(
       input.options?.kilocodeOrganizationId,
       createdOnPlatform,
       defaultTitle,
-      canonicalRepositoryUrl
+      canonicalRepositoryUrl,
+      cloneFromKiloSessionId
     );
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -483,7 +502,39 @@ async function allocateNewSession(
         ctx.env
       )
     );
+    if (cloneFromKiloSessionId) {
+      // A clone create must never settle the row failed on a thrown ingest
+      // outcome: the clone may have committed. Keep the row reconcile-pending
+      // and rethrow the raw error.
+      if (ledger) {
+        await ledger.onTransportFailure();
+      }
+      throw error;
+    }
     rethrowAllocationFailure(ledger, 'ownership_row', error);
+  }
+
+  if (cloneFromKiloSessionId) {
+    if (ingestResult === undefined) {
+      // Old worker with no clone acknowledgement: the clone outcome is unknown.
+      if (ledger) {
+        await ledger.onTransportFailure();
+      }
+      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'session_clone_unavailable' });
+    }
+    if (ingestResult.status === 'rejected') {
+      if (ledger) {
+        await ledger.onFailure('ownership_row', 'session_clone_failed');
+      }
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_clone_failed' });
+    }
+    if (ingestResult.status === 'in_progress') {
+      if (ledger) {
+        await ledger.onTransportFailure();
+      }
+      throw creationInProgressError();
+    }
+    // `ready` continues normally.
   }
 
   return {
@@ -497,9 +548,14 @@ async function allocateNewSession(
     sessionService,
     rollbackCliSession: async () => {
       try {
-        await sessionService.deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
-          onlyIfEmpty: true,
-        });
+        await sessionService.deleteCliSessionViaSessionIngest(
+          kiloSessionId,
+          ctx.userId,
+          ctx.env,
+          cloneFromKiloSessionId
+            ? { cloneSourceSessionId: cloneFromKiloSessionId }
+            : { onlyIfEmpty: true }
+        );
       } catch (rollbackError: unknown) {
         logger
           .withFields({
@@ -530,6 +586,7 @@ function buildSessionRegistrationCommand(
       kiloSessionId: allocation.kiloSessionId,
       kilocodeToken: ctx.authToken,
     },
+    clone: input.clone,
     message: {
       initialMessageId: allocation.initialTurn.messageId,
       turn: executionTurnSubmissionFromAcceptedTurn(allocation.initialTurn),
@@ -835,6 +892,9 @@ export async function sessionCreateIntentFingerprint(
   return sha256Hex(
     canonicalJson({
       initialTurn,
+      clone: input.clone
+        ? { cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId }
+        : undefined,
       agent: {
         mode: input.agent.mode,
         model: input.agent.model,

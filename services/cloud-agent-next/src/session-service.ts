@@ -39,6 +39,7 @@ import {
   updateGitRemoteUrl,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
+import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
 import { timedExec } from './sandbox-timeout-logging.js';
 import type {
   PersistenceEnv,
@@ -2914,10 +2915,11 @@ export class SessionService {
     organizationId: string | undefined,
     createdOnPlatform: string,
     title?: string,
-    gitUrl?: string
-  ): Promise<void> {
+    gitUrl?: string,
+    cloneFromKiloSessionId?: string
+  ): Promise<CreateSessionForCloudAgentResult | undefined> {
     try {
-      await env.SESSION_INGEST.createSessionForCloudAgent({
+      return await env.SESSION_INGEST.createSessionForCloudAgent({
         sessionId: kiloSessionId,
         kiloUserId,
         cloudAgentSessionId,
@@ -2925,6 +2927,7 @@ export class SessionService {
         createdOnPlatform,
         title,
         gitUrl,
+        cloneFromKiloSessionId,
       });
     } catch (error) {
       logger
@@ -2947,13 +2950,14 @@ export class SessionService {
     kiloSessionId: string,
     kiloUserId: string,
     env: PersistenceEnv,
-    opts?: { onlyIfEmpty?: boolean }
+    opts?: { onlyIfEmpty?: boolean; cloneSourceSessionId?: string }
   ): Promise<void> {
     try {
       await env.SESSION_INGEST.deleteSessionForCloudAgent({
         sessionId: kiloSessionId,
         kiloUserId,
         onlyIfEmpty: opts?.onlyIfEmpty,
+        cloneSourceSessionId: opts?.cloneSourceSessionId,
       });
     } catch (error) {
       logger

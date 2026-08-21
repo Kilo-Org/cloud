@@ -85,6 +85,7 @@ import {
   writeGlobalRules,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
+import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
 import {
   parseSessionMetadata,
   type CredentialContainment,
@@ -3284,6 +3285,77 @@ describe('SessionService session-ingest compatibility', () => {
     expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
       expect.not.objectContaining({ requireFullSessionReport: expect.anything() })
     );
+  });
+
+  it('forwards cloneFromKiloSessionId and returns the typed RPC result', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+    const readyResult: CreateSessionForCloudAgentResult = {
+      status: 'ready',
+      clone: { sessionId: 'ses_12345678901234567890123456', copiedItemCount: 3 },
+    };
+    vi.mocked(env.SESSION_INGEST.createSessionForCloudAgent).mockResolvedValue(readyResult);
+
+    const result = await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent',
+      undefined,
+      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
+
+    expect(result).toEqual(readyResult);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith({
+      sessionId: 'ses_12345678901234567890123456',
+      kiloUserId: 'user_test',
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      organizationId: undefined,
+      createdOnPlatform: 'cloud-agent',
+      title: undefined,
+      cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+  });
+
+  it('returns undefined when the old worker sends no clone acknowledgement', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    const result = await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent',
+      undefined,
+      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it('forwards cloneSourceSessionId on the matching-source delete', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.deleteCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'user_test',
+      env,
+      { cloneSourceSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' }
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.deleteSessionForCloudAgent).toHaveBeenCalledWith({
+      sessionId: 'ses_12345678901234567890123456',
+      kiloUserId: 'user_test',
+      onlyIfEmpty: undefined,
+      cloneSourceSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
   });
 });
 

@@ -818,12 +818,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    *   - GitLab forces `repository_selection_mode = 'selected'`
    *   - Bitbucket forces 'selected' + `gate_threshold = 'off'` +
    *     `disable_review_md = true` + `manually_added_repositories = []`
-   * The PATCH intentionally does NOT re-validate Bitbucket selections
-   * against the workspace cache (that's a save-level concern handled by
-   * the full save) and does NOT ensure the Bitbucket workspace webhook
-   * (also save-level). Callers that change `selectedRepositoryIds` for
-   * Bitbucket via PATCH are expected to have already saved a valid
-   * configuration.
+   * The PATCH re-validates Bitbucket selections against the workspace
+   * repository cache whenever the patch carries `selectedRepositoryIds` or
+   * `selectedRepositoryDelta`, mirroring the full save. It does NOT ensure
+   * the Bitbucket workspace webhook (that stays save-level).
    *
    * GitLab webhook sync runs ONLY when `selectedRepositoryIds` or
    * `selectedRepositoryDelta` is present in the patch, so an unrelated edit
@@ -997,6 +995,25 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             model_slug: override.modelSlug,
             thinking_effort: override.thinkingEffort ?? null,
           }));
+
+        // Bitbucket selections must be re-validated against the workspace
+        // repository cache before persisting, exactly like the full save. A
+        // delta (or full-array) input that would leave an invalid selection —
+        // unknown UUIDs, an empty result after removal, duplicates, or an
+        // unavailable cache — is rejected here rather than persisted.
+        if (
+          isBitbucket &&
+          (input.selectedRepositoryIds !== undefined || input.selectedRepositoryDelta !== undefined)
+        ) {
+          const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
+          requireBitbucketRepositorySelection(
+            {
+              repositorySelectionMode,
+              selectedRepositoryIds: effectiveSelectedRepositoryIds,
+            },
+            readiness
+          );
+        }
 
         await upsertAgentConfig({
           organizationId: input.organizationId,

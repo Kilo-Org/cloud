@@ -2,6 +2,8 @@ import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
 import {
   BashToolCard,
   EditToolCard,
@@ -104,6 +106,19 @@ function makeStoredMessage(): StoredMessage {
     parts: [],
   };
 }
+
+const modelOptions: SessionModelOption[] = [
+  {
+    id: 'kilo/model',
+    name: 'Test Model',
+    displayId: 'model',
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: false,
+    provider: { id: 'kilo', name: 'Kilo' },
+    modelRef: { providerID: 'kilo', modelID: 'model' },
+  },
+];
 
 function findAll(
   node: unknown,
@@ -232,5 +247,30 @@ describe('ToolPartRenderer child navigation seam', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartRenderer({ part: makeToolPart('task', taskCompletedState) });
     expect(findByType(root, TaskToolCard)).toHaveLength(1);
+  });
+
+  it('passes modelOptions through to ChildSessionSection for a task part', () => {
+    const childMessage = makeStoredMessage();
+    const getChildMessages = vi.fn((id: string) => (id === 'child-1' ? [childMessage] : []));
+    const renderPart = vi.fn();
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+    const part = makeToolPart('task', taskCompletedState);
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ToolPartRenderer({
+      part,
+      getChildMessages,
+      renderPart,
+      onOpenChildSession,
+      modelOptions,
+    });
+
+    const sections = findByType(root, ChildSessionSection);
+    expect(sections).toHaveLength(1);
+    const section = sections[0];
+    if (!section) {
+      throw new Error('expected ChildSessionSection');
+    }
+    expect(section.props).toMatchObject({ modelOptions });
   });
 });

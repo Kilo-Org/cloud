@@ -1,6 +1,10 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
+import {
+  ReasoningDetailsTransform,
+  type Provider,
+  type ProviderId,
+} from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
 export const OPENROUTER = {
@@ -66,7 +70,7 @@ export const LONGCAT = {
   apiKey: getEnvVariable('LONGCAT_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions'],
-  responseTransforms: null,
+  responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   async transformRequest(context) {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',

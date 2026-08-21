@@ -2121,7 +2121,8 @@ export class SessionService {
         : [];
 
     const promptAgent = normalizeAgentMode(agent.mode);
-    const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
+    const preferSnapshot =
+      metadata.clone !== undefined || metadata.lifecycle.preparedAt !== undefined;
     const readyRequest: WrapperSessionReadyRequest = {
       agentSessionId: sessionId,
       userId,
@@ -2139,6 +2140,7 @@ export class SessionService {
           metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt
         ),
         preferSnapshot,
+        requireSnapshot: metadata.clone !== undefined,
       },
       ...(repo ? { repo } : {}),
       ...(devcontainerRequested
@@ -2490,7 +2492,8 @@ export class SessionService {
         };
       }
 
-      const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
+      const preferSnapshot =
+        metadata.clone !== undefined || metadata.lifecycle.preparedAt !== undefined;
       onProgress?.('kilo_session', preferSnapshot ? 'Restoring session…' : 'Importing session…');
       await this.restoreOrBootstrapKiloSession(
         sandbox,
@@ -2498,6 +2501,7 @@ export class SessionService {
         metadata.auth.kiloSessionId,
         workspacePath,
         preferSnapshot,
+        metadata.clone !== undefined,
         {
           devcontainer,
           dockerEnv,
@@ -2745,6 +2749,7 @@ export class SessionService {
     kiloSessionId: string,
     workspacePath: string,
     preferSnapshot: boolean,
+    requireSnapshot: boolean,
     options: RestoreRuntimeOptions
   ): Promise<void> {
     if (preferSnapshot) {
@@ -2756,8 +2761,16 @@ export class SessionService {
         options
       );
       if (restored) return;
+      if (requireSnapshot) {
+        throw new SessionSnapshotRestoreError('Session snapshot required but not found');
+      }
     }
 
+    // Non-clone sessions keep the empty-import fallback on a 404. This mirrors
+    // the old empty-first-preparation behavior, where a first preparation
+    // without a clone bootstrapped an empty session instead of attempting
+    // snapshot restore. Remove this fallback only after old prepared sessions
+    // age out.
     await this.bootstrapKiloSession(sandbox, session, kiloSessionId, workspacePath, options);
   }
 

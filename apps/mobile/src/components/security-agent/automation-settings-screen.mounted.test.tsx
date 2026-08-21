@@ -36,7 +36,7 @@ const toggleRows = vi.hoisted(() => ({
   }[],
 }));
 const saveButton = vi.hoisted(() => ({
-  onSave: null as (() => void) | null,
+  onSave: null as (() => Promise<void>) | null,
 }));
 
 vi.mock('react-native', () => ({
@@ -56,14 +56,14 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
 vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
-  useSecurityAgentSettingsRedirect: () => {},
-  useSettingsBackGuard: () => ({ onBack: () => {}, skipNextGuardRef: { current: false } }),
+  useSecurityAgentSettingsRedirect: () => undefined,
+  useSettingsBackGuard: () => ({ onBack: () => undefined, skipNextGuardRef: { current: false } }),
 }));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
   PillGroup: () => null,
 }));
 vi.mock('@/components/security-agent/settings-save-button', () => ({
-  SettingsSaveButton: (props: { onSave: () => void }) => {
+  SettingsSaveButton: (props: { onSave: () => Promise<void> }) => {
     saveButton.onSave = props.onSave;
     return null;
   },

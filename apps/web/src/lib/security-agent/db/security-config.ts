@@ -7,6 +7,7 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { createSecurityAgentCommand, type SecurityAgentCommandOwner } from '@kilocode/db';
 import { agent_configs } from '@kilocode/db/schema';
+import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -284,7 +285,7 @@ export async function saveSecurityAgentConfigWithRevision(params: {
     let existingRemediationCommandId: string | undefined;
     if (params.enqueueRemediation) {
       const command = await createSecurityAgentCommand(tx, {
-        commandType: 'apply_auto_remediation',
+        commandType: 'apply_auto_remediation' satisfies SecurityCommandType,
         origin: 'settings_include_existing',
         owner: toCommandOwner(params.enqueueRemediation.owner),
       });

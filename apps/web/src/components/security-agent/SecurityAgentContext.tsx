@@ -12,7 +12,10 @@ import {
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
-import { getSecurityCommandFailureMessage } from '@kilocode/app-shared/security-agent';
+import {
+  getSecurityCommandFailureMessage,
+  type SecurityCommandType,
+} from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
@@ -203,7 +206,7 @@ const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositori
 
 export type SecurityAgentCommand = {
   id: string;
-  commandType: 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
+  commandType: SecurityCommandType;
   findingId: string | null;
   status: 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
   resultCode: string | null;

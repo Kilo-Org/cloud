@@ -7,6 +7,7 @@ import {
   type SecurityAgentCommandOwner,
 } from '@kilocode/db';
 import type { SecurityAgentCommand } from '@kilocode/db/schema';
+import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
 import type { SecurityReviewOwner } from '../core/types';
 
 function toCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {
@@ -60,7 +61,7 @@ export async function listActiveSecurityAgentCommands(
 
 export async function createApplyAutoRemediationCommand(owner: SecurityReviewOwner) {
   const command = await createSecurityAgentCommand(db, {
-    commandType: 'apply_auto_remediation',
+    commandType: 'apply_auto_remediation' satisfies SecurityCommandType,
     origin: 'settings_include_existing',
     owner: toCommandOwner(owner),
   });

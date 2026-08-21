@@ -448,7 +448,12 @@ export const codeReviewRouter = createTRPCRouter({
           }));
 
       return successResult({
-        review: { ...visibleReview, council_result, model: selectedModel ?? review.model },
+        review: {
+          ...visibleReview,
+          rawIdsRedacted: !canSeeRawIds,
+          council_result,
+          model: selectedModel ?? review.model,
+        },
         attempts: visibleAttempts,
         tokenUsage,
       });

@@ -550,6 +550,7 @@ describe('codeReviewRouter.get role-gated ids', () => {
       expect(memberResult.review.cli_session_id).toBeNull();
       expect(memberResult.review.dispatch_reservation_id).toBeNull();
       expect(memberResult.review.check_run_id).toBeNull();
+      expect(memberResult.review.rawIdsRedacted).toBe(true);
       expect(memberResult.review.total_cost_musd).toBe(500);
       expect(memberResult.attempts).toHaveLength(1);
       expect(memberResult.attempts[0]?.session_id).toBeNull();
@@ -564,6 +565,7 @@ describe('codeReviewRouter.get role-gated ids', () => {
       expect(ownerResult.review.cli_session_id).toBe('ses-get-ids');
       expect(ownerResult.review.dispatch_reservation_id).toBe('reservation-get-ids');
       expect(ownerResult.review.check_run_id).toBe(12345);
+      expect(ownerResult.review.rawIdsRedacted).toBe(false);
       expect(ownerResult.review.total_cost_musd).toBe(500);
       expect(ownerResult.attempts).toHaveLength(1);
       expect(ownerResult.attempts[0]?.session_id).toBe('agent-attempt-get-ids');

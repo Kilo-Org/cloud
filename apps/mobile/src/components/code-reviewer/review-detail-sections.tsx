@@ -81,14 +81,26 @@ export function CouncilSection({ councilResult }: Readonly<{ councilResult: Coun
 
 export function GateSection({
   checkRunId,
+  checkRunRedacted,
   statusLabel,
   gateThreshold,
-}: Readonly<{ checkRunId: number | null; statusLabel: string; gateThreshold?: string }>) {
+}: Readonly<{
+  checkRunId: number | null;
+  checkRunRedacted?: boolean;
+  statusLabel: string;
+  gateThreshold?: string;
+}>) {
+  let checkRunLabel = 'None';
+  if (checkRunId != null) {
+    checkRunLabel = `#${checkRunId}`;
+  } else if (checkRunRedacted) {
+    checkRunLabel = 'Hidden';
+  }
   return (
     <View className="gap-2">
       <Text className="text-sm font-medium">Gate</Text>
       <View className="gap-1 rounded-lg bg-secondary p-4">
-        <MetaRow label="Check run" value={checkRunId != null ? `#${checkRunId}` : 'None'} />
+        <MetaRow label="Check run" value={checkRunLabel} />
         <MetaRow label="Status" value={statusLabel} />
         {gateThreshold ? <MetaRow label="Threshold" value={gateThreshold} /> : null}
       </View>

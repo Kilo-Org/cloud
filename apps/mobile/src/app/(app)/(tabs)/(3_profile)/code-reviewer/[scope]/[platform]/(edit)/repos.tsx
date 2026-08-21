@@ -24,16 +24,16 @@ import {
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
-  useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 
 export default function ReposRoute() {
   const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
-  const readConfig = useReviewConfigCacheReader(scope, platform);
+  const toggleRepo = useRepoSelectionToggle(scope, platform);
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const mode = data?.repositorySelectionMode ?? 'all';
   const githubRepos = useGitHubRepositories(scope, platform === 'github' && mode === 'selected');
@@ -108,17 +108,6 @@ export default function ReposRoute() {
 
   const setMode = (nextMode: 'all' | 'selected') => {
     save.mutate({ repositorySelectionMode: nextMode });
-  };
-
-  const toggleRepo = (id: number | string) => {
-    // Read the cache at call time, not the render-time snapshot above, so
-    // two rapid taps each build the next array from the latest committed
-    // selection instead of dropping one another.
-    const current = readConfig()?.selectedRepositoryIds ?? [];
-    const next = current.includes(id)
-      ? current.filter(existing => existing !== id)
-      : [...current, id];
-    save.mutate({ selectedRepositoryIds: next });
   };
 
   return (

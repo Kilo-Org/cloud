@@ -18,6 +18,7 @@ import {
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { capitalize } from '@/lib/utils';
 
@@ -52,7 +53,8 @@ export function SettingsOverviewScreen({
 }: Readonly<{ scope: string; presentation?: SettingsOverviewPresentation }>) {
   const router = useRouter();
   const config = useSecurityAgentConfig(scope);
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  const committedConnectivity = useCommittedConnectivityStatus();
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -82,7 +84,26 @@ export function SettingsOverviewScreen({
       />
     );
   }
-  if (config.isLoading || !config.data) {
+  if (!config.data && config.fetchStatus === 'paused' && committedConnectivity === 'offline') {
+    return (
+      <PlatformErrorScreen
+        title="Settings"
+        variant="offline"
+        message="Could not load Security Agent settings"
+        onRetry={() => void config.refetch()}
+      />
+    );
+  }
+  if (capability.status === 'error') {
+    return (
+      <PlatformErrorScreen
+        title="Settings"
+        message="Could not load permissions"
+        onRetry={() => void capability.refetch()}
+      />
+    );
+  }
+  if (config.isLoading || !config.data || capability.status === 'loading') {
     return <SettingsOverviewSkeleton />;
   }
 
@@ -105,7 +126,8 @@ export function SettingsOverviewScreen({
   // offer a direct path to the repo picker. Hide the CTA only when the repo set
   // is settled and empty (nothing to select); a loading or failed repo query
   // keeps the CTA reachable.
-  const showRepoCta = !data.isEnabled && canManage && !hasEffectiveRepo && !repositoriesEmpty;
+  const showRepoCta =
+    !data.isEnabled && capability.canManage && !hasEffectiveRepo && !repositoriesEmpty;
   const repoCountLabel =
     data.repositorySelectionMode === 'all'
       ? 'All repositories'
@@ -155,7 +177,7 @@ export function SettingsOverviewScreen({
   // connected-but-disabled counterpart: settings-overview-screen is where
   // scope-entry redirects once the agent is disabled, so the same action
   // needs to be reachable here too.
-  const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
+  const auditAction = capability.canManage ? <AuditReportButton scope={scope} /> : null;
 
   // Render the disabled-agent copy in three states: a still-loading repo set
   // (skeleton), a failed repo set (error + Retry), or a settled set (copy).
@@ -180,7 +202,7 @@ export function SettingsOverviewScreen({
     }
     return (
       <Text variant="muted" className="text-xs">
-        {getDisabledCopy(canManage, hasEffectiveRepo)}
+        {getDisabledCopy(capability.canManage, hasEffectiveRepo)}
       </Text>
     );
   };
@@ -196,7 +218,7 @@ export function SettingsOverviewScreen({
               {data.isEnabled ? repoCountLabel : 'Disabled'}
             </Text>
           </View>
-          {canManage ? (
+          {capability.canManage ? (
             <Switch
               accessibilityLabel="Security Agent"
               value={data.isEnabled}

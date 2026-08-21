@@ -3,8 +3,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-import { OFFLINE_BANNER_SHOW_DELAY_MS } from '@/lib/offline-banner-state';
+import { type BannerState, OFFLINE_BANNER_SHOW_DELAY_MS } from '@/lib/offline-banner-state';
 
 type ConnectivityState = { isConnected: boolean | null; isInternetReachable: boolean | null };
 
@@ -30,9 +29,20 @@ vi.mock('@react-native-community/netinfo', () => ({
   addEventListener: netinfo.addEventListener,
 }));
 
-function Probe() {
-  const isOffline = useOfflineBannerState();
-  return createElement('ProbeText', null, String(isOffline));
+type Hooks = {
+  useOfflineBannerState: () => boolean;
+  useCommittedConnectivityStatus: () => BannerState;
+};
+
+async function loadHooks(): Promise<Hooks> {
+  const hooks = await import('@/lib/hooks/use-offline-banner-state');
+  return hooks;
+}
+
+function Probe({ hooks }: { hooks: Hooks }) {
+  const isOffline = hooks.useOfflineBannerState();
+  const status = hooks.useCommittedConnectivityStatus();
+  return createElement('ProbeText', null, `${String(isOffline)}:${status}`);
 }
 
 function textChildren(renderer: TestRenderer.ReactTestRenderer): string[] | null {
@@ -46,13 +56,13 @@ function textChildren(renderer: TestRenderer.ReactTestRenderer): string[] | null
   return json.children?.filter((child): child is string => typeof child === 'string') ?? null;
 }
 
-async function renderProbe(): Promise<TestRenderer.ReactTestRenderer> {
+async function renderProbe(hooks: Hooks): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
   };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(Probe));
+    rendererRef.current = TestRenderer.create(createElement(Probe, { hooks }));
   });
   const renderer = rendererRef.current;
   if (!renderer) {
@@ -61,57 +71,91 @@ async function renderProbe(): Promise<TestRenderer.ReactTestRenderer> {
   return renderer;
 }
 
-describe('useOfflineBannerState mounted', () => {
+describe('useOfflineBannerState and useCommittedConnectivityStatus mounted', () => {
   beforeEach(() => {
     // React 19 requires the act environment flag before `act` supports
     // updates scheduled from effects and external stores.
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    // A fresh module per test gives a fresh module-level store singleton.
+    vi.resetModules();
+    netinfo.listeners.clear();
   });
   afterEach(() => {
     netinfo.listeners.clear();
     vi.useRealTimers();
   });
 
-  it('subscribes once, shows after the delay, hides at once, and cleans up on unmount', async () => {
+  it('subscribes once, shows after the delay, hides at once, and reports the tri-state', async () => {
     vi.useFakeTimers();
 
-    const renderer = await renderProbe();
+    const hooks = await loadHooks();
+    const renderer = await renderProbe(hooks);
 
     expect(netinfo.listeners.size).toBe(1);
-    expect(textChildren(renderer)).toEqual(['false']);
+    expect(textChildren(renderer)).toEqual(['false:unknown']);
 
     act(() => {
       netinfo.emit({ isConnected: false, isInternetReachable: false });
     });
-    expect(textChildren(renderer)).toEqual(['false']);
+    expect(textChildren(renderer)).toEqual(['false:unknown']);
 
     act(() => {
       vi.advanceTimersByTime(OFFLINE_BANNER_SHOW_DELAY_MS);
     });
-    expect(textChildren(renderer)).toEqual(['true']);
+    expect(textChildren(renderer)).toEqual(['true:offline']);
 
     act(() => {
       netinfo.emit({ isConnected: true, isInternetReachable: true });
     });
-    expect(textChildren(renderer)).toEqual(['false']);
+    expect(textChildren(renderer)).toEqual(['false:online']);
+  });
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    try {
-      act(() => {
-        renderer.unmount();
-      });
+  it('reports the unknown → online edge even though the banner stays hidden', async () => {
+    vi.useFakeTimers();
 
-      expect(netinfo.listeners.size).toBe(0);
+    const hooks = await loadHooks();
+    const renderer = await renderProbe(hooks);
 
-      act(() => {
-        netinfo.emit({ isConnected: false, isInternetReachable: false });
-        vi.advanceTimersByTime(OFFLINE_BANNER_SHOW_DELAY_MS);
-      });
+    expect(textChildren(renderer)).toEqual(['false:unknown']);
 
-      expect(renderer.toJSON()).toBeNull();
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
+    act(() => {
+      netinfo.emit({ isConnected: true, isInternetReachable: true });
+    });
+    expect(textChildren(renderer)).toEqual(['false:online']);
+  });
+
+  it('shares one store and one NetInfo subscription across callers', async () => {
+    vi.useFakeTimers();
+
+    const hooks = await loadHooks();
+    const first = await renderProbe(hooks);
+    const second = await renderProbe(hooks);
+
+    expect(netinfo.listeners.size).toBe(1);
+
+    act(() => {
+      netinfo.emit({ isConnected: false, isInternetReachable: false });
+    });
+    act(() => {
+      vi.advanceTimersByTime(OFFLINE_BANNER_SHOW_DELAY_MS);
+    });
+
+    expect(textChildren(first)).toEqual(['true:offline']);
+    expect(textChildren(second)).toEqual(['true:offline']);
+  });
+
+  it('keeps the shared store alive after unmount (never destroyed)', async () => {
+    vi.useFakeTimers();
+
+    const hooks = await loadHooks();
+    const renderer = await renderProbe(hooks);
+
+    expect(netinfo.listeners.size).toBe(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+
+    expect(netinfo.listeners.size).toBe(1);
   });
 });

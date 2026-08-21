@@ -125,6 +125,8 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
       isError: false,
       isFetching: false,
       refetch: query.refetch,
+      hasData: true,
+      isPending: false,
     };
   }
   return {
@@ -133,16 +135,39 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
     isError: query.isError,
     isFetching: query.isFetching,
     refetch: query.refetch,
+    hasData: query.data !== undefined,
+    isPending: query.isPending,
   };
 }
 
 // Discriminated capability state for consumers (e.g. audit-report access)
 // that must distinguish "still loading"/"failed to load" from "resolved:
 // no access" instead of treating an undefined role as permission-denied.
+export type SecurityAgentCapabilityStatus = 'loading' | 'error' | 'denied' | 'allowed';
+
 export function useSecurityAgentCapability(scope: string) {
-  const { role, isLoading, isError, isFetching, refetch } = useSecurityAgentOrgRoleQuery(scope);
+  const { role, isLoading, isError, isFetching, refetch, hasData, isPending } =
+    useSecurityAgentOrgRoleQuery(scope);
+  const canManage = canManageSecurityAgent(scope, role);
+
+  let status: SecurityAgentCapabilityStatus = 'loading';
+  if (isPersonalSecurityScope(scope)) {
+    status = 'allowed';
+  } else if (hasData) {
+    // A settled role stays authoritative: a failed background refetch must
+    // never demote an already-resolved capability to 'error'.
+    status = canManage ? 'allowed' : 'denied';
+  } else if (isError) {
+    status = 'error';
+  } else if (isPending) {
+    // Covers an offline-paused cold launch: pending with no data yet.
+    status = 'loading';
+  }
+  // Any other unresolved combination keeps the initial 'loading'.
+
   return {
-    canManage: canManageSecurityAgent(scope, role),
+    canManage,
+    status,
     isLoading,
     isError,
     isFetching,

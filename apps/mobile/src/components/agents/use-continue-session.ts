@@ -72,7 +72,7 @@ export function useContinueSession(args: {
         });
 
         const dest: ContinuationDestination | undefined = destinations[0];
-        if (!dest || dest.kind !== 'cloud-agent') {
+        if (dest?.kind !== 'cloud-agent') {
           toast.error(FULL_CONTINUATION_UNAVAILABLE_TOAST);
           return;
         }

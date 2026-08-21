@@ -236,8 +236,7 @@ function usedCloudKeys(): (string | undefined)[] {
 }
 
 function mockRepositories() {
-  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-  queryClientFetchQuery.mockImplementation(() => Promise.resolve({ repositories: [] }));
+  queryClientFetchQuery.mockImplementation(async () => ({ repositories: [] }));
 }
 
 describe('useContinueSession cloud clone wiring', () => {

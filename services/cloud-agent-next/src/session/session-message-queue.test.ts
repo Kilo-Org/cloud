@@ -12,6 +12,7 @@ import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 import {
   createSessionMessageQueue,
   flushNextPendingSessionMessage,
+  type SessionMessageQueueDependencies,
   type SessionMessageQueueStorage,
 } from './session-message-queue.js';
 import {
@@ -130,6 +131,7 @@ function createQueueHarness(options?: {
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
   getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
   recoverExhaustedDeliveryBlock?: () => Promise<void>;
+  checkBillingAdmission?: SessionMessageQueueDependencies['checkBillingAdmission'];
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -167,6 +169,7 @@ function createQueueHarness(options?: {
       getDeliveryContext: async () => (metadata ? createContext(metadata) : null),
       getDeliveryBlock: options?.getDeliveryBlock ?? (async () => null),
       recoverExhaustedDeliveryBlock: options?.recoverExhaustedDeliveryBlock,
+      checkBillingAdmission: options?.checkBillingAdmission,
       deliver,
       ensureQueuedMessageEvent: event => {
         if (failQueuedEvent) {
@@ -620,6 +623,27 @@ describe('flushNextPendingSessionMessage', () => {
 });
 
 describe('SessionMessageQueue', () => {
+  it('rejects new work before persisting it when container billing is blocked', async () => {
+    const harness = createQueueHarness({
+      checkBillingAdmission: async () => ({
+        success: false,
+        code: 'PAYMENT_REQUIRED',
+        error: 'Container billing balance is too low',
+        failureBoundary: 'admission',
+      }),
+    });
+
+    await expect(
+      harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'do not enqueue this prompt' },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'PAYMENT_REQUIRED' });
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(harness.events).toHaveLength(0);
+    expect(harness.alarmDeadlines).toHaveLength(0);
+  });
+
   it('reports whether a message identity already has durable admission state', async () => {
     const harness = createQueueHarness();
 

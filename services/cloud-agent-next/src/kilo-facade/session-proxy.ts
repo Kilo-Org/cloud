@@ -4,7 +4,14 @@ import { requiresContainmentSandbox } from '../persistence/session-metadata.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 import { fetchSessionMetadata } from '../session-service.js';
 import type { Env, SandboxInstance, SandboxId, SessionId } from '../types.js';
-import { configureSandboxBilling } from '../container-usage-context.js';
+import {
+  buildSandboxBillingInput,
+  configureSandboxBillingInput,
+  ensureSandboxBillingAdmissionInput,
+  isSandboxBillingBlocked,
+} from '../container-usage-context.js';
+import type { SandboxBillingAdmissionResult } from '../container-usage-context.js';
+import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 
 export type SessionKiloFacadeDecision =
   | { kind: 'proxy-live-wrapper' }
@@ -23,6 +30,14 @@ export type LiveWrapperTarget = {
   sandbox: SandboxInstance;
   port: number;
 };
+
+export type LiveWrapperResolution =
+  | { kind: 'available'; target: LiveWrapperTarget }
+  | { kind: 'unavailable' }
+  | {
+      kind: 'billing-rejected';
+      admission: Extract<SandboxBillingAdmissionResult, { success: false }>;
+    };
 
 export function decideSessionKiloFacadeRoute(
   input: SessionKiloFacadePolicyInput
@@ -59,11 +74,11 @@ export async function resolveLiveWrapperTarget(params: {
   env: Env;
   userId: string;
   cloudAgentSessionId: string;
-}): Promise<LiveWrapperTarget | null> {
+}): Promise<LiveWrapperResolution> {
   const { env, userId, cloudAgentSessionId } = params;
   const metadata = await fetchSessionMetadata(env, userId, cloudAgentSessionId);
   if (!metadata) {
-    return null;
+    return { kind: 'unavailable' };
   }
 
   const sessionId = cloudAgentSessionId as SessionId;
@@ -86,11 +101,22 @@ export async function resolveLiveWrapperTarget(params: {
     }),
     sandboxId
   );
-  void configureSandboxBilling(sandbox, metadata, sandboxId);
+  const billingInput = buildSandboxBillingInput(
+    metadata,
+    sandboxId,
+    isCloudAgentContainerBillingEnabled(env, metadata.identity)
+  );
+  const billingBlocked = await isSandboxBillingBlocked(sandbox, billingInput.enforcementRequested);
+  if (billingInput.enforcementRequested || billingBlocked) {
+    const admission = await ensureSandboxBillingAdmissionInput(sandbox, billingInput);
+    if (!admission.success) return { kind: 'billing-rejected', admission };
+  } else {
+    void configureSandboxBillingInput(sandbox, billingInput);
+  }
   const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
   if (!wrapperInfo) {
-    return null;
+    return { kind: 'unavailable' };
   }
 
-  return { sandbox, port: wrapperInfo.port };
+  return { kind: 'available', target: { sandbox, port: wrapperInfo.port } };
 }

@@ -25,12 +25,15 @@ describe('wrapper lifecycle drain races', () => {
     state.bindSession(sessionContext);
     state.setSendToIngestFn(event => events.push(event));
 
+    let closeCalls = 0;
     const lifecycle = createLifecycleManager(
       { workspacePath: '/tmp' },
       {
         state,
         kiloClient: {} as WrapperKiloClient,
-        closeConnections: async () => {},
+        closeConnections: async () => {
+          closeCalls += 1;
+        },
         isConnected: () => true,
         reconnectEventSubscription: () => {},
       }
@@ -50,11 +53,44 @@ describe('wrapper lifecycle drain races', () => {
       condenseOnComplete: false,
     });
     await wait(300);
+    expect(closeCalls).toBe(0);
 
     lifecycle.onSessionIdle();
     await wait(3_050);
 
     expect(events.map(event => event.streamEventType)).toContain('complete');
+  });
+
+  it('does not complete, close, or clear a session when reset interrupts an active drain', async () => {
+    const state = new WrapperState();
+    const events: IngestEvent[] = [];
+    let closeCalls = 0;
+    state.bindSession(sessionContext);
+    state.setSendToIngestFn(event => events.push(event));
+    const lifecycle = createLifecycleManager(
+      { workspacePath: '/tmp' },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        closeConnections: async () => {
+          closeCalls += 1;
+        },
+        isConnected: () => true,
+        reconnectEventSubscription: () => {},
+      }
+    );
+
+    state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
+    state.clearAllMessages();
+    const drain = lifecycle.drainAndClose();
+    expect(events.map(event => event.streamEventType)).toContain('wrapper_finalizing');
+
+    lifecycle.reset();
+    await drain;
+
+    expect(events.map(event => event.streamEventType)).not.toContain('complete');
+    expect(closeCalls).toBe(0);
+    expect(state.currentSession).toEqual(sessionContext);
   });
 
   it('waits for three seconds of stable root idle before completing', async () => {

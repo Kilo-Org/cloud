@@ -61,6 +61,9 @@
     "TOOL_CGROUP_MODE": "enforce",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
+    "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
+    "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
+    "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
   },
   "placement": { "mode": "smart" },
   /**

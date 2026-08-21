@@ -50,8 +50,20 @@ export function getContainerUsageDb(env: Cloudflare.Env): WorkerDb {
 }
 
 export type StartSkuAdmission =
-  | { kind: 'applied'; dedup: boolean; billingMode: 'shadow' | 'paid' }
-  | { kind: 'rejected'; code: RecordStartFailureCode; message: string };
+  | { kind: 'applied'; dedup: boolean; billingMode: 'shadow' }
+  | { kind: 'applied'; dedup: boolean; billingMode: 'paid'; remainingMicrodollars: number }
+  | {
+      kind: 'rejected';
+      code: Exclude<RecordStartFailureCode, 'insufficient_credits'>;
+      message: string;
+    }
+  | {
+      kind: 'rejected';
+      code: 'insufficient_credits';
+      message: string;
+      remainingMicrodollars: number;
+      minimumRequiredMicrodollars: number;
+    };
 
 export type ApplyResult = {
   kind: 'applied';
@@ -365,7 +377,15 @@ export async function applyStartWithDb(
       .limit(1);
     if (existing) {
       assertMatchingContext(existing, input, contextFingerprint);
-      return { kind: 'applied', dedup: true, billingMode: existing.billing_mode };
+      if (existing.billing_mode === 'paid') {
+        return {
+          kind: 'applied',
+          dedup: true,
+          billingMode: 'paid',
+          remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
+        };
+      }
+      return { kind: 'applied', dedup: true, billingMode: 'shadow' };
     }
 
     const [sku] = await tx
@@ -420,6 +440,8 @@ export async function applyStartWithDb(
           kind: 'rejected',
           code: 'insufficient_credits',
           message: 'Container billing requires at least $5.00 in remaining credits',
+          remainingMicrodollars: remaining,
+          minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
         };
       }
     }
@@ -459,9 +481,25 @@ export async function applyStartWithDb(
         .limit(1);
       if (!winner) throw new Error('Container usage interval insert lost without a winner');
       assertMatchingContext(winner, input, contextFingerprint);
-      return { kind: 'applied', dedup: true, billingMode: winner.billing_mode };
+      if (winner.billing_mode === 'paid') {
+        return {
+          kind: 'applied',
+          dedup: true,
+          billingMode: 'paid',
+          remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
+        };
+      }
+      return { kind: 'applied', dedup: true, billingMode: 'shadow' };
     }
-    return { kind: 'applied', dedup: false, billingMode };
+    if (billingMode === 'paid') {
+      return {
+        kind: 'applied',
+        dedup: false,
+        billingMode: 'paid',
+        remainingMicrodollars: await balanceForSubject(tx, input.subject),
+      };
+    }
+    return { kind: 'applied', dedup: false, billingMode: 'shadow' };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }

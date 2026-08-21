@@ -98,6 +98,8 @@ export function createKiloAppQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also woke frozen background tabs.
+        refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           const code = (error as { data?: { code?: string } } | null)?.data?.code;
           if (code !== undefined && PERMANENT_CODES.has(code)) {

@@ -136,15 +136,15 @@ describe('IdleAuth SSO recovery', () => {
   });
 });
 
-describe('IdleAuth sign-in-or-create copy', () => {
-  it('shows the sign-in-or-create heading and a Continue button', async () => {
+describe('IdleAuth email continue copy', () => {
+  it('shows a Continue button with email accessibility', async () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    expect(texts(renderer.root)).toContain('Sign in or create an account');
     expect(texts(renderer.root)).toContain('Continue');
+    expect(texts(renderer.root)).not.toContain('Sign in or create an account');
 
-    const btn = findButton(renderer.root, 'Continue with email, sign in or create an account');
+    const btn = findButton(renderer.root, 'Continue with email');
     expect(btn).toBeTruthy();
 
     act(() => {

@@ -468,7 +468,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(showError).toHaveBeenCalledTimes(1);
     expect(showError).toHaveBeenCalledWith(
-      'This App Store subscription is linked to another Kilo account.'
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account.'
     );
   });
 
@@ -805,7 +805,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(result).toBe('failed');
     expect(showError).toHaveBeenCalledWith(
-      'This App Store subscription is linked to another Kilo account.'
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account.'
     );
   });
 
@@ -836,7 +836,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(restoreResult).toBe('failed');
     expect(showError).toHaveBeenCalledWith(
-      'This App Store subscription is linked to another Kilo account.'
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account.'
     );
   });
 

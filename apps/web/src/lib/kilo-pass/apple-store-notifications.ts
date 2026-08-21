@@ -389,23 +389,6 @@ function getRefundReversalDescription(kind: KiloPassIssuanceItemKind): string {
   return 'App Store Kilo Pass promo refund clawback';
 }
 
-function getAppleTransactionPriceMicrodollars(
-  transaction: AppleStoreDecodedTransaction
-): number | null {
-  if (transaction.currency !== 'USD') {
-    return null;
-  }
-  if (
-    typeof transaction.price !== 'number' ||
-    !Number.isFinite(transaction.price) ||
-    transaction.price <= 0
-  ) {
-    throw new Error('App Store refund transaction is missing a valid price');
-  }
-
-  return transaction.price * 1_000;
-}
-
 function getAppStoreProviderPaymentId(providerTransactionId: string): string {
   return `kilo-pass:${KiloPassPaymentProvider.AppStore}:${providerTransactionId}`;
 }
@@ -445,7 +428,6 @@ async function reverseAppStoreRefundCredits(
     throw new Error('App Store refund cannot find the subscribed user');
   }
 
-  const usdPriceMicrodollars = getAppleTransactionPriceMicrodollars(transaction);
   const ownedBaseCreditRows = await tx
     .select({
       creditTransactionId: credit_transactions.id,
@@ -472,28 +454,6 @@ async function reverseAppStoreRefundCredits(
 
   const ownedBaseCredit = ownedBaseCreditRows[0] ?? null;
 
-  let baseReversalMicrodollars: number | null;
-  if (usdPriceMicrodollars !== null) {
-    baseReversalMicrodollars = usdPriceMicrodollars;
-  } else if (ownedBaseCredit !== null) {
-    baseReversalMicrodollars = ownedBaseCredit.amountMicrodollars;
-  } else {
-    baseReversalMicrodollars = null;
-    captureException(
-      new Error(
-        'App Store non-USD refund: no stored purchase amount found, skipping base clawback'
-      ),
-      {
-        tags: { area: 'kilo-pass', operation: 'reverse-app-store-refund-credits' },
-        extra: {
-          transactionId: transaction.transactionId,
-          originalTransactionId: transaction.originalTransactionId,
-          currency: transaction.currency ?? null,
-        },
-      }
-    );
-  }
-
   const issueMonth = dayjs(storePurchase.purchased_at).utc().format('YYYY-MM-01');
   const issuance = await tx.query.kilo_pass_issuances.findFirst({
     where: and(
@@ -509,7 +469,7 @@ async function reverseAppStoreRefundCredits(
     isFree: boolean;
   }[] = [];
 
-  if (ownedBaseCredit && baseReversalMicrodollars !== null) {
+  if (ownedBaseCredit) {
     issuedItems.push({
       itemId: ownedBaseCredit.creditTransactionId,
       kind: KiloPassIssuanceItemKind.Base,
@@ -574,10 +534,10 @@ async function reverseAppStoreRefundCredits(
   const reversedItemKinds: KiloPassIssuanceItemKind[] = [];
   let totalReversalMicrodollars = 0;
   for (const item of issuedItems) {
-    const reversalAmountMicrodollars =
-      item.kind === KiloPassIssuanceItemKind.Base
-        ? (baseReversalMicrodollars ?? item.amountMicrodollars)
-        : item.amountMicrodollars;
+    // Reverse what Kilo granted, never the App Store price. Apple returns the full
+    // charge to the customer and reverses its own commission, so clawing back the
+    // store price would leave a customer who spent nothing at minus the store margin.
+    const reversalAmountMicrodollars = item.amountMicrodollars;
 
     if (reversalAmountMicrodollars <= 0) {
       continue;

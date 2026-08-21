@@ -139,7 +139,7 @@ export function useNativeAuth(): NativeAuthResult {
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
         if (parsed.created === true) {
-          announcingToast.success('Account created. Welcome to Kilo Code.');
+          announcingToast.success('Account created. Welcome to Kilo.');
         }
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(credential.email ?? '', result.ssoOrganizationId);
@@ -206,7 +206,7 @@ export function useNativeAuth(): NativeAuthResult {
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
         if (parsed.created === true) {
-          announcingToast.success('Account created. Welcome to Kilo Code.');
+          announcingToast.success('Account created. Welcome to Kilo.');
         }
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
@@ -304,7 +304,7 @@ export function useNativeAuth(): NativeAuthResult {
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
         if (parsed.created === true) {
-          announcingToast.success('Account created. Welcome to Kilo Code.');
+          announcingToast.success('Account created. Welcome to Kilo.');
         }
         return true;
       } catch (error) {

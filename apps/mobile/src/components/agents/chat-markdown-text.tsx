@@ -46,8 +46,8 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       if (!prReviewEnabled || !parseGitHubPrUrl(href)) {
         return false;
       }
-      // Tap on a PR link shows exactly three options: Review PR / Open in
-      // browser / Cancel. The richer Copy/Share sheet is long-press only.
+      // Tap on a PR link shows exactly four options: Review PR / Open in
+      // browser / Share / Cancel.
       const sheet = buildPrLinkTapActionSheet();
       showActionSheetWithOptions(
         {
@@ -68,6 +68,10 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
           }
           if (action === 'open') {
             void openExternalUrl(href, { label: 'link' });
+            return;
+          }
+          if (action === 'share') {
+            void performChatLinkAction('share', href);
           }
         }
       );

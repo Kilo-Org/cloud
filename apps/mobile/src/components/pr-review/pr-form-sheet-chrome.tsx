@@ -22,7 +22,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Keyboard, Platform, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
-import { cn } from '@/lib/utils';
 
 export function useFormSheetKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
@@ -63,14 +62,9 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
  * Trailing ScrollView footer for formSheets. No keyboard-height padding —
  * parent ScrollView automaticallyAdjustKeyboardInsets owns that.
  */
-export function PrFormSheetFooter(props: { children: ReactNode; className?: string }) {
+export function PrFormSheetFooter(props: { children: ReactNode }) {
   return (
-    <View
-      className={cn(
-        'mt-0.5 border-t-[0.5px] border-hair-soft bg-background px-6 pb-1.5 pt-1',
-        props.className
-      )}
-    >
+    <View className="mt-0.5 border-t-[0.5px] border-hair-soft bg-background px-6 pb-4 pt-3">
       {props.children}
     </View>
   );

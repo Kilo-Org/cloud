@@ -210,7 +210,6 @@ export function IdleAuth({
         </View>
       )}
 
-      <Text className="text-base font-semibold text-foreground">Sign in or create an account</Text>
       <FormField
         label="Email address"
         placeholder="you@example.com"
@@ -237,7 +236,7 @@ export function IdleAuth({
         className="flex-row gap-2"
         disabled={authBusy}
         onPress={() => void handleSendCode()}
-        accessibilityLabel="Continue with email, sign in or create an account"
+        accessibilityLabel="Continue with email"
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>Continue</Text>

@@ -22,7 +22,13 @@ export type EffectiveOrganizationModelPolicy = {
   organizationProviderCeiling?: string[];
   memberGrant:
     | { mode: 'unrestricted' }
-    | { mode: 'selected'; modelAllowList: string[]; providerAllowList: string[] };
+    | { mode: 'organization_baseline' }
+    | {
+        mode: 'selected';
+        includeOrganizationBaseline: boolean;
+        modelAllowList: string[];
+        providerAllowList: string[];
+      };
   dataCollection?: OrganizationSettings['data_collection'];
   policyRevision: number;
 };
@@ -61,27 +67,35 @@ export function evaluateEffectiveModelAccessPolicy(
     };
   }
 
-  const policies = [context.defaultPolicies, ...context.groupPolicies]
+  const defaultPolicy = context.defaultPolicies.find(policy => policy.type === 'model_access');
+  const groupPolicies = context.groupPolicies
     .flat()
     .filter(policy => policy.type === 'model_access');
-  if (policies.length === 0 || policies.some(policy => policy.data.mode === 'all')) {
+  const includeOrganizationBaseline =
+    !defaultPolicy ||
+    defaultPolicy.data.mode === 'all' ||
+    groupPolicies.some(policy => policy.data.mode === 'all');
+  const selectedPolicies = [defaultPolicy, ...groupPolicies].flatMap(policy =>
+    policy?.data.mode === 'selected' ? [policy] : []
+  );
+  if (selectedPolicies.length === 0 && includeOrganizationBaseline) {
     return {
       requireModelInCurrentSnapshot: true,
       organizationModelDenyList,
       organizationProviderCeiling,
-      memberGrant: { mode: 'unrestricted' },
+      memberGrant: { mode: 'organization_baseline' },
       dataCollection: context.organization.settings.data_collection,
       policyRevision: context.policyRevision,
     };
   }
 
-  const selectedPolicies = policies.filter(policy => policy.data.mode === 'selected');
   return {
     requireModelInCurrentSnapshot: true,
     organizationModelDenyList,
     organizationProviderCeiling,
     memberGrant: {
       mode: 'selected',
+      includeOrganizationBaseline,
       modelAllowList: [
         ...new Set(
           selectedPolicies.flatMap(policy =>
@@ -113,7 +127,10 @@ export async function getEffectiveModelDecision(
   if (await isModelRestrictionExempt(modelId)) {
     return { allowed: true };
   }
-  if (policy.organizationModelDenyList.includes(normalizedModelId)) {
+  if (
+    policy.memberGrant.mode === 'organization_baseline' &&
+    policy.organizationModelDenyList.includes(normalizedModelId)
+  ) {
     return { allowed: false, denialSource: 'organization_model' };
   }
   const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
@@ -127,7 +144,10 @@ export async function getEffectiveModelDecision(
     ? new Set(policy.organizationProviderCeiling)
     : undefined;
 
-  async function decisionWithinOrganizationCeiling(): Promise<EffectiveModelDecision> {
+  async function decisionWithinOrganizationBaseline(): Promise<EffectiveModelDecision> {
+    if (policy.organizationModelDenyList.includes(normalizedModelId)) {
+      return { allowed: false, denialSource: 'organization_model' };
+    }
     if (!organizationRoutes) return { allowed: true };
     const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
     if (modelProviders.size === 0) {
@@ -142,32 +162,37 @@ export async function getEffectiveModelDecision(
   }
 
   if (policy.memberGrant.mode === 'unrestricted') {
-    return await decisionWithinOrganizationCeiling();
+    return { allowed: true };
+  }
+  if (policy.memberGrant.mode === 'organization_baseline') {
+    return await decisionWithinOrganizationBaseline();
   }
   if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
-    return await decisionWithinOrganizationCeiling();
+    return { allowed: true };
   }
-  if (policy.memberGrant.providerAllowList.length === 0) {
-    return { allowed: false, denialSource: 'no_grant' };
+  if (policy.memberGrant.providerAllowList.length > 0) {
+    const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
+    const memberProviders = new Set(policy.memberGrant.providerAllowList);
+    const eligibleProviderRoutes = new Set(
+      [...modelProviders].filter(provider => memberProviders.has(provider))
+    );
+    if (eligibleProviderRoutes.size > 0) {
+      if (policy.memberGrant.includeOrganizationBaseline) {
+        const baselineDecision = await decisionWithinOrganizationBaseline();
+        if (baselineDecision.allowed && !baselineDecision.eligibleProviderRoutes) {
+          return baselineDecision;
+        }
+        baselineDecision.eligibleProviderRoutes?.forEach(provider =>
+          eligibleProviderRoutes.add(provider)
+        );
+      }
+      return { allowed: true, eligibleProviderRoutes };
+    }
   }
-  const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
-  if (modelProviders.size === 0) {
-    return { allowed: false, denialSource: 'group_provider' };
+  if (policy.memberGrant.includeOrganizationBaseline) {
+    return await decisionWithinOrganizationBaseline();
   }
-  const memberProviders = new Set(policy.memberGrant.providerAllowList);
-  const eligibleProviderRoutes = new Set(
-    [...modelProviders].filter(
-      provider =>
-        memberProviders.has(provider) && (!organizationRoutes || organizationRoutes.has(provider))
-    )
-  );
-  if (eligibleProviderRoutes.size === 0) {
-    return {
-      allowed: false,
-      denialSource: organizationRoutes ? 'organization_provider' : 'group_provider',
-    };
-  }
-  return { allowed: true, eligibleProviderRoutes };
+  return { allowed: false, denialSource: 'no_grant' };
 }
 
 export async function isModelRouteAllowed(
@@ -285,7 +310,7 @@ export function normalizeModelAccessPolicy(
 export async function getModelAccessPolicyEditorData(organizationId: string) {
   const [[organization], [catalog]] = await Promise.all([
     db
-      .select({ plan: organizations.plan, settings: organizations.settings })
+      .select({ plan: organizations.plan })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .limit(1),
@@ -307,7 +332,5 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
   return {
     policyType: 'model_access' as const,
     catalog: catalog.data,
-    modelDenyList: organization.settings.model_deny_list ?? [],
-    providerAllowList: organization.settings.provider_allow_list,
   };
 }

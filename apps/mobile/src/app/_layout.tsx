@@ -179,7 +179,7 @@ preloadThemePreference();
 preloadStartupFonts();
 
 function RootLayoutNav() {
-  const { token, isLoading: authLoading, signOut } = useAuth();
+  const { token, isLoading: authLoading, isSigningOut, signOut } = useAuth();
   const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
@@ -219,7 +219,9 @@ function RootLayoutNav() {
 
   useEffect(() => {
     let authState: 'error' | 'loading' | 'signed_in' | 'signed_out' = 'signed_out';
-    if (authLoading || userIdLoading) {
+    if (isSigningOut) {
+      authState = 'signed_out';
+    } else if (authLoading || userIdLoading) {
       authState = 'loading';
     } else if (userIdError) {
       authState = 'error';
@@ -234,6 +236,7 @@ function RootLayoutNav() {
   }, [
     authLoading,
     consentChecked,
+    isSigningOut,
     needsConsent,
     optionalConsent,
     token,

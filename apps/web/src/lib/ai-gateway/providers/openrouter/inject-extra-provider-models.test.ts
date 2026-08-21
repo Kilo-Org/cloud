@@ -99,4 +99,41 @@ describe('injectExtraProviderModels', () => {
     expect(modelTrains(nvidia, true)).toBe(true);
     expect(modelRetainsPrompts(nvidia, true)).toBe(true);
   });
+
+  test('injects offerings for providers outside the known provider registry', () => {
+    const model = nvidiaModel();
+    const providerModelData = [
+      {
+        provider: provider('nvidia', 'NVIDIA', {
+          training: true,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [model],
+      },
+      {
+        provider: provider('future-provider', 'Future Provider', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: model.name,
+        endpoints: [
+          { provider_name: 'nvidia' },
+          { provider_name: 'future-provider', context_length: 128_000 },
+        ],
+      },
+    };
+
+    injectExtraProviderModels(vercelModels, providerModelData);
+
+    expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
+    expect(providerModelData[1]?.models[0]?.context_length).toBe(128_000);
+  });
 });

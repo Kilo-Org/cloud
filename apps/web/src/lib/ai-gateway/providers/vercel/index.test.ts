@@ -79,6 +79,16 @@ describe('hasCompatibleVercelInferenceProvider', () => {
     );
   });
 
+  it('accepts Google Vertex preferences for Vertex Anthropic endpoint metadata', () => {
+    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['vertexAnthropic'])).toBe(true);
+  });
+
+  it('accepts providers outside the known provider registry', () => {
+    expect(hasCompatibleVercelInferenceProvider(['future-provider'], ['future-provider'])).toBe(
+      true
+    );
+  });
+
   it('rejects when none of the requested providers are available on Vercel', () => {
     expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['anthropic', 'bedrock'])).toBe(
       false
@@ -105,6 +115,15 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
     ).toEqual(['anthropic', 'vertex']);
   });
 
+  it('excludes normalized Vertex Anthropic endpoints for Google Vertex ignores', () => {
+    expect(
+      getVercelInferenceProvidersExcludingIgnored(['google-vertex'], undefined, [
+        'anthropic',
+        'vertexAnthropic',
+      ])
+    ).toEqual(['anthropic']);
+  });
+
   it('intersects the available providers with only before excluding ignored providers', () => {
     expect(
       getVercelInferenceProvidersExcludingIgnored(
@@ -122,6 +141,16 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
         'bedrock',
       ])
     ).toEqual([]);
+  });
+
+  it('preserves and filters providers outside the known provider registry', () => {
+    expect(
+      getVercelInferenceProvidersExcludingIgnored(['future-provider'], undefined, [
+        'anthropic',
+        'future-provider',
+        'another-future-provider',
+      ])
+    ).toEqual(['anthropic', 'another-future-provider']);
   });
 });
 
@@ -144,6 +173,25 @@ describe('convertProviderOptions', () => {
 
     expect(providerOptions.gateway?.only).toEqual(['anthropic']);
     expect(provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
+  });
+
+  it('passes providers outside the known provider registry through unchanged', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'future/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: {
+          only: ['future-provider'],
+          order: ['another-future-provider'],
+        },
+      },
+    };
+
+    expect(convertProviderOptions(request, null).gateway).toMatchObject({
+      only: ['future-provider'],
+      order: ['another-future-provider'],
+    });
   });
 });
 
@@ -239,6 +287,14 @@ describe('applyVercelSettings BYOK pinning', () => {
     secretAccessKey: 'secret',
     region: 'us-east-1',
   });
+  const vertexCredentials = JSON.stringify({
+    project: 'example-project',
+    location: 'us-east5',
+    googleCredentials: {
+      privateKey: '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n',
+      clientEmail: 'gateway@example-project.iam.gserviceaccount.com',
+    },
+  });
 
   it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
     const request = byokRequest(['anthropic']);
@@ -281,6 +337,38 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       anthropic: [{ apiKey: 'sk-anthropic' }],
     });
+  });
+
+  it('uses one Vertex credential key for Anthropic models served by Vertex', async () => {
+    const request = byokRequest([]);
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: vertexCredentials, providerId: 'vertex' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      vertex: [
+        {
+          project: 'example-project',
+          location: 'us-east5',
+          googleCredentials: {
+            privateKey: '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n',
+            clientEmail: 'gateway@example-project.iam.gserviceaccount.com',
+          },
+        },
+      ],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['vertex']);
+  });
+
+  it('rejects malformed Vertex credentials without including credential contents', async () => {
+    const request = byokRequest([]);
+
+    await expect(
+      applyVercelSettings('google/gemini-2.5-flash-lite', request, [
+        { decryptedAPIKey: '{"privateKey":"secret"}', providerId: 'vertex' },
+      ])
+    ).rejects.toThrow('Failed to parse Google Vertex credentials');
   });
 
   it('does not add managed OpenAI credentials to user BYOK settings', async () => {

@@ -26,6 +26,7 @@ type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
   onError?: ((message: string) => void) | undefined;
+  onChildSessionError?: ((sessionId: string, message: string) => void) | undefined;
   onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
   onQuestionResolved?: ((requestId: string) => void) | undefined;
   onPermissionAsked?:
@@ -108,6 +109,7 @@ function upsertByRequestId<T extends { requestId: string }>(
 }
 
 function createServiceState(config: ServiceStateConfig): ServiceState {
+  let rootSessionId = config.rootSessionId;
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
   let cloudStatus: CloudStatus | null = null;
@@ -134,7 +136,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function isRootSession(sessionId: string): boolean {
-    return sessionId === config.rootSessionId;
+    return sessionId === rootSessionId;
   }
 
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
@@ -230,6 +232,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processSessionError(event: Extract<ServiceEvent, { type: 'session.error' }>): void {
     if (terminated) return;
 
+    // Child session errors are scoped to the child. They must not touch the
+    // shared root status or onError, which drive the parent status indicator.
+    // Events without a sessionId keep the legacy root behavior.
+    if (event.sessionId !== undefined && !isRootSession(event.sessionId)) {
+      config.onChildSessionError?.(event.sessionId, event.error);
+      return;
+    }
+
     config.onError?.(event.error);
     status = { type: 'error', message: event.error };
 
@@ -237,6 +247,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function processSessionCreated(event: Extract<ServiceEvent, { type: 'session.created' }>): void {
+    if (event.info.parentID == null) {
+      rootSessionId = event.info.id;
+    }
     // Only track root session info
     if (isRootSession(event.info.id)) {
       sessionInfo = event.info;

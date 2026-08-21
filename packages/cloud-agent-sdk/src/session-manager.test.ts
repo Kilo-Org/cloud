@@ -128,6 +128,7 @@ const mockSessionCallbacks: {
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
   onError?: (message: string) => void;
+  onChildSessionError?: (sessionId: string, message: string) => void;
 } = {};
 
 let latestStorage: JotaiSessionStorage | null = null;
@@ -163,6 +164,7 @@ jest.mock('./session', () => ({
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
       onError?: (message: string) => void;
+      onChildSessionError?: (sessionId: string, message: string) => void;
       transport?: {
         userWebConnection?: unknown;
         fetchSnapshotPage?: (
@@ -232,6 +234,7 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
       mockSessionCallbacks.onMessageFailed = sessionConfig.onMessageFailed;
       mockSessionCallbacks.onError = sessionConfig.onError;
+      mockSessionCallbacks.onChildSessionError = sessionConfig.onChildSessionError;
       return mockSession;
     }
   ),
@@ -433,6 +436,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onMessageCompleted = undefined;
     mockSessionCallbacks.onMessageFailed = undefined;
     mockSessionCallbacks.onError = undefined;
+    mockSessionCallbacks.onChildSessionError = undefined;
   });
 
   // -------------------------------------------------------------------------
@@ -3019,6 +3023,58 @@ describe('createSessionManager', () => {
       expect(state('child-omit')).toEqual(
         expect.objectContaining({ status: 'ready', omittedItemCount: 5 })
       );
+    });
+  });
+
+  describe('child session errors', () => {
+    it('routes child session errors to the per-child atom without touching root atoms', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+
+      mockSessionCallbacks.onChildSessionError?.(
+        'child-1',
+        'Requests ending with a model turn are not supported.'
+      );
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
+      const childSessionError = atomValue<(childSessionId: string) => string | null>(
+        config.store,
+        mgr.atoms.childSessionError
+      );
+      expect(childSessionError('child-1')).toBe(
+        'Requests ending with a model turn are not supported.'
+      );
+      expect(childSessionError('other-child')).toBeNull();
+    });
+
+    it('clears child session errors when switching sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+
+      mockSessionCallbacks.onChildSessionError?.(
+        'child-1',
+        'Requests ending with a model turn are not supported.'
+      );
+
+      expect(
+        atomValue<(childSessionId: string) => string | null>(
+          config.store,
+          mgr.atoms.childSessionError
+        )('child-1')
+      ).toBe('Requests ending with a model turn are not supported.');
+
+      await mgr.switchSession(kiloId('ses-other'));
+
+      const childSessionError = atomValue<(childSessionId: string) => string | null>(
+        config.store,
+        mgr.atoms.childSessionError
+      );
+      expect(childSessionError('child-1')).toBeNull();
     });
   });
 

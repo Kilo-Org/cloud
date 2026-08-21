@@ -1907,6 +1907,53 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.failedPrompt)).toBeNull();
     });
 
+    it.each(['success', 'billing failure'] as const)(
+      'ignores stale %s state after switching sessions mid-send',
+      async outcome => {
+        let settleSend: ((value?: unknown) => void) | undefined;
+        const pendingSend = new Promise((resolve, reject) => {
+          settleSend = outcome === 'success' ? resolve : reject;
+        });
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        mockSession.send.mockReturnValueOnce(pendingSend);
+
+        const send = mgr.send({
+          payload: { type: 'prompt', prompt: 'Session A', mode: 'code' },
+        });
+        await mgr.switchSession(kiloId('ses-2'));
+        config.store.set(mgr.atoms.failedPrompt, 'Session B');
+        config.store.set(mgr.atoms.billingFailure, {
+          code: 'COMPUTE_STOPPING',
+          payer: { type: 'user', id: 'user-b' },
+          retryable: true,
+        });
+
+        settleSend?.(
+          outcome === 'success'
+            ? undefined
+            : {
+                data: {
+                  billingFailure: {
+                    code: 'BILLING_UNAVAILABLE',
+                    payer: { type: 'user', id: 'user-a' },
+                    retryable: true,
+                  },
+                },
+              }
+        );
+        await send;
+
+        expect(atomValue(config.store, mgr.atoms.failedPrompt)).toBe('Session B');
+        expect(atomValue(config.store, mgr.atoms.billingFailure)).toEqual({
+          code: 'COMPUTE_STOPPING',
+          payer: { type: 'user', id: 'user-b' },
+          retryable: true,
+        });
+      }
+    );
+
     it('restores the prompt and explains how to recover from unavailable-model rejection', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

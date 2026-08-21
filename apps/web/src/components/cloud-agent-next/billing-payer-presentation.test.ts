@@ -59,4 +59,22 @@ describe('billingPayerPresentation', () => {
       )
     ).toEqual({ payerName: 'Your account' });
   });
+
+  it.each(['COMPUTE_STOPPING', 'BILLING_UNAVAILABLE'] as const)(
+    'does not offer credit recovery for %s',
+    code => {
+      expect(
+        billingPayerPresentation(
+          { ...failure, code },
+          { organization: { id: 'org-1', name: 'Acme', role: 'billing_manager' } }
+        )
+      ).toEqual({ payerName: 'Acme' });
+      expect(
+        billingPayerPresentation(
+          { ...failure, code, payer: { type: 'user', id: 'user-1' } },
+          { currentUserId: 'user-1' }
+        )
+      ).toEqual({ payerName: 'Your account' });
+    }
+  );
 });

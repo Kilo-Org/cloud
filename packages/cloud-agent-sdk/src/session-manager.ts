@@ -1828,6 +1828,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // were current when the user pressed send, not the post-switch ones.
     const kiloSessionId = activeSessionId;
     const sessionType = activeSessionType;
+    const sessionAtSend = currentSession;
 
     // Client-side `/clear` for remote sessions: clear the local transcript view
     // only; never hit the transport (Decision 3/4).
@@ -1886,7 +1887,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
 
     try {
-      if (!currentSession) throw new Error('No active session');
+      if (!sessionAtSend) throw new Error('No active session');
       if (input.attachments && sessionType !== 'cloud-agent') {
         // The cloud-only `attachments` field is exclusive to cloud-agent
         // sessions. Remote CLI sessions (capable or not) go through the
@@ -1904,7 +1905,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           throw new Error('Only capable remote CLI sessions support attachments');
         }
       }
-      await currentSession.send({
+      await sessionAtSend.send({
         payload: transportPayload,
         messageId,
         ...(input.attachments ? { attachments: input.attachments } : {}),
@@ -1914,6 +1915,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           ? { attachmentParts: input.attachmentParts }
           : {}),
       });
+      if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return true;
       store.set(billingFailureAtom, null);
       store.set(failedPromptAtom, null);
 
@@ -1930,6 +1932,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return true;
     } catch (err) {
+      if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return false;
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const message = formatError(err);

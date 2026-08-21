@@ -505,6 +505,31 @@ function createBitbucketMetadata(
 
 const BITBUCKET_SANDBOX_ID = 'ses-bitbucket' as SandboxId;
 
+function createCloneMetadata(): CloudAgentSessionState {
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'agent_test',
+      userId: 'user_test',
+      createdOnPlatform: 'cloud-agent-web',
+    },
+    auth: {
+      kilocodeToken: 'kilo-token',
+      kiloSessionId: 'kilo-session',
+    },
+    repository: {
+      type: 'gitlab',
+      url: 'https://gitlab.com/acme/repo.git',
+      platform: 'gitlab',
+    },
+    clone: {
+      cloneFromKiloSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+    },
+    agent: { mode: 'code', model: 'kilo/test-model' },
+    lifecycle: { version: 1, timestamp: 1 },
+  });
+}
+
 describe('SessionService.resolveWorkspaceTokens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -720,6 +745,184 @@ describe('SessionService.prepareWorkspace', () => {
       gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
+  });
+
+  it('restores the destination snapshot for clone metadata on first preparation', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const progress = vi.fn();
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createCloneMetadata(),
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Restoring session…');
+    const restoreCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        !command.includes('--file')
+    );
+    expect(restoreCall).toBeDefined();
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeUndefined();
+  });
+
+  it('attempts snapshot restore for a first preparation with preparedAt and no clone', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const progress = vi.fn();
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createMetadata({ preparedAt: 1 }),
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Restoring session…');
+    const restoreCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        !command.includes('--file')
+    );
+    expect(restoreCall).toBeDefined();
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeUndefined();
+  });
+
+  it('fails instead of bootstrapping when the clone snapshot is missing', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        if (command.includes('--file')) {
+          return { exitCode: 0, stdout: JSON.stringify({ ok: true }), stderr: '' };
+        }
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            code: 404,
+            step: 'download',
+            error: 'snapshot not found (404)',
+          }),
+          stderr: '',
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'ses-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata: createCloneMetadata(),
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow('Session snapshot required but not found');
+
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeUndefined();
+  });
+
+  it('bootstraps an empty session for a first preparation without clone or preparedAt', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const progress = vi.fn();
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createMetadata(),
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Importing session…');
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeDefined();
+    expect(bootstrapCall?.[0]).toContain('/tmp/kilo-empty-session-kilo-session.json');
+  });
+
+  it('keeps the empty-import fallback for a non-clone prepared restore with a 404', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        if (command.includes('--file')) {
+          return { exitCode: 0, stdout: JSON.stringify({ ok: true }), stderr: '' };
+        }
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            code: 404,
+            step: 'download',
+            error: 'snapshot not found (404)',
+          }),
+          stderr: '',
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createMetadata({ preparedAt: 1 }),
+      kilocodeModel: 'test-model',
+    });
+
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeDefined();
+    expect(bootstrapCall?.[0]).toContain('/tmp/kilo-empty-session-kilo-session.json');
   });
 
   it('removes the managed Bitbucket token from origin after cold review branch setup', async () => {
@@ -1774,6 +1977,20 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       } satisfies FencedWrapperDispatchRequest,
     });
   }
+
+  it('prefers and requires snapshot restore in wrapper readiness for clone metadata', async () => {
+    const result = await buildPromptWrapperRequests(createCloneMetadata());
+
+    expect(result.readyRequest.workspace.preferSnapshot).toBe(true);
+    expect(result.readyRequest.workspace.requireSnapshot).toBe(true);
+  });
+
+  it('prefers but does not require snapshot restore in wrapper readiness for preparedAt-only metadata', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata({ preparedAt: 1 }));
+
+    expect(result.readyRequest.workspace.preferSnapshot).toBe(true);
+    expect(result.readyRequest.workspace.requireSnapshot).toBe(false);
+  });
 
   it('uses a containment sandbox with a Kilo capability and raw GitLab token for Kilo-only containment', async () => {
     const issueKiloSessionCapability = vi.fn().mockResolvedValue({

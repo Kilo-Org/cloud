@@ -844,6 +844,18 @@ async function restoreOrBootstrapKiloSession(
         result.detail
       );
     }
+    if (request.workspace.requireSnapshot) {
+      throw workspaceBootstrapError(
+        'kilo_import_failed',
+        'Session snapshot required but not found',
+        result.detail
+      );
+    }
+    // Non-clone sessions keep the empty-import fallback on a 404. This mirrors
+    // the old empty-first-preparation behavior, where a first preparation
+    // without a clone bootstrapped an empty session instead of attempting
+    // snapshot restore. Remove this fallback only after old prepared sessions
+    // age out.
     logToFile(
       `bootstrap snapshot missing; falling back to empty import kiloSessionId=${request.kiloSessionId}`
     );

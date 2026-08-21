@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
+import type { OrganizationWithMembersResponse } from '@/lib/organizations/organization-types';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
@@ -104,7 +104,7 @@ export function McpGatewayDetailContent({
       ? trpc.mcpGateway.getOrganization.queryOptions({ organizationId, configId })
       : trpc.mcpGateway.getPersonal.queryOptions({ configId })
   );
-  const membersQuery = useQuery<OrganizationWithMembers>({
+  const membersQuery = useQuery<OrganizationWithMembersResponse>({
     queryKey: organizationId
       ? trpc.organizations.withMembers.queryKey({ organizationId })
       : [['organizations', 'withMembers', 'disabled']],

@@ -9,7 +9,10 @@ import { timedUsageQuery } from '@/lib/usage-query';
 import { successResult } from '@/lib/maybe-result';
 import { captureMessage } from '@sentry/nextjs';
 import type {
+  MemberOrganizationWithMembers,
+  OrganizationSsoPolicyView,
   OrganizationWithMembers,
+  OrganizationWithMembersResponse,
   UserOrganizationWithInheritedChildren,
 } from '@/lib/organizations/organization-types';
 import {
@@ -120,20 +123,6 @@ function getDateThreshold(period: string): Date | null {
     default:
       return daysAgo(365); // Default to year
   }
-}
-
-/**
- * Returns a shallow copy of `obj` with `keys` deleted. The return type stays
- * `T` (the admin superset) because the narrowed member shape is pinned by the
- * key-set test rather than a separate response type; a union response type
- * would break member-facing consumers outside this slice.
- */
-function omitKeys<T extends object>(obj: T, keys: Array<keyof T>): T {
-  const copy: Record<string, unknown> = { ...obj } as Record<string, unknown>;
-  for (const key of keys) {
-    delete copy[key as string];
-  }
-  return copy as T;
 }
 
 export const organizationsRouter = createTRPCRouter({
@@ -326,7 +315,7 @@ export const organizationsRouter = createTRPCRouter({
 
   withMembers: baseProcedure
     .input(OrganizationIdInputSchema)
-    .query<OrganizationWithMembers>(async opts => {
+    .query<OrganizationWithMembersResponse>(async opts => {
       const organizationId = opts.input.organizationId;
       const callerRole = await ensureOrganizationAccess(opts.ctx, organizationId);
 
@@ -429,38 +418,53 @@ export const organizationsRouter = createTRPCRouter({
       // childOrganizationMemberships are kept for member-facing consumers
       // (OrganizationMembersCard, mobile members screen); remove when those
       // consumers migrate to organizations.members.listPublic.
-      const isMember = callerRole === 'member';
-      const organizationPayload = isMember
-        ? omitKeys(organization, ['stripe_customer_id'])
-        : organization;
-      const membersPayload = isMember
-        ? membersWithChildOrganizations.map(member =>
-            member.status === 'active'
-              ? omitKeys(member, ['currentDailyUsageUsd'])
-              : omitKeys(member, ['inviteToken', 'inviteUrl', 'currentDailyUsageUsd'])
-          )
-        : membersWithChildOrganizations;
+      const effectiveSsoPolicy: OrganizationSsoPolicyView =
+        ssoPolicy.status === 'required'
+          ? {
+              required: true,
+              source: ssoPolicy.source,
+              domain: ssoPolicy.domain,
+              configurationError: false,
+            }
+          : {
+              required: false,
+              source: null,
+              domain: null,
+              configurationError: ssoPolicy.status === 'misconfigured',
+            };
+
+      if (callerRole === 'member') {
+        const { stripe_customer_id: _stripeCustomerId, ...memberOrganization } = organization;
+        const memberPayload = membersWithChildOrganizations.map(member => {
+          if (member.status === 'active') {
+            const { currentDailyUsageUsd: _currentDailyUsageUsd, ...activeMember } = member;
+            return activeMember;
+          }
+          const {
+            inviteToken: _inviteToken,
+            inviteUrl: _inviteUrl,
+            currentDailyUsageUsd: _currentDailyUsageUsd,
+            ...invitedMember
+          } = member;
+          return invitedMember;
+        });
+
+        return {
+          ...memberOrganization,
+          callerRole,
+          members: memberPayload,
+          childOrganizations,
+          effectiveSsoPolicy,
+        } satisfies MemberOrganizationWithMembers;
+      }
 
       return {
-        ...organizationPayload,
+        ...organization,
         callerRole,
-        members: membersPayload,
+        members: membersWithChildOrganizations,
         childOrganizations,
-        effectiveSsoPolicy:
-          ssoPolicy.status === 'required'
-            ? {
-                required: true,
-                source: ssoPolicy.source,
-                domain: ssoPolicy.domain,
-                configurationError: false,
-              }
-            : {
-                required: false,
-                source: null,
-                domain: null,
-                configurationError: ssoPolicy.status === 'misconfigured',
-              },
-      };
+        effectiveSsoPolicy,
+      } satisfies OrganizationWithMembers;
     }),
 
   createChild: organizationAdminMutationProcedure

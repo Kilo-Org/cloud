@@ -8,13 +8,13 @@ import { getOrgTrialStatusFromDays } from '@/lib/organizations/trial-utils';
 import type {
   OrgTrialStatus,
   OrganizationRole,
-  OrganizationWithMembers,
+  OrganizationWithMembersResponse,
 } from '@/lib/organizations/organization-types';
 import { capitalize, cn } from '@/lib/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type FreeTrialWarningBannerProps = {
-  organization: OrganizationWithMembers;
+  organization: OrganizationWithMembersResponse;
   daysRemaining: number;
   userRole: OrganizationRole;
   onUpgradeClick: () => void;

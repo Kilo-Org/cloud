@@ -33,8 +33,8 @@ import { ErrorCard } from '../ErrorCard';
 import { LoadingCard } from '../LoadingCard';
 import type {
   OrganizationRole,
-  OrganizationMember,
-  OrganizationWithMembers,
+  OrganizationMemberResponse,
+  OrganizationWithMembersResponse,
 } from '@/lib/organizations/organization-types';
 import {
   useIsKiloAdmin,
@@ -60,7 +60,7 @@ const formatDate = (dateString: string) => {
 };
 
 type DailyUsageLimitDisplayProps = {
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
@@ -114,7 +114,7 @@ const canRemoveMember = (
 
 type DeleteMemberButtonProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function DeleteMemberButton({ organizationId, member }: DeleteMemberButtonProps) {
@@ -155,7 +155,7 @@ function DeleteMemberButton({ organizationId, member }: DeleteMemberButtonProps)
 
 type DeleteInvitationButtonProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButtonProps) {
@@ -197,7 +197,7 @@ function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButt
 }
 
 type InvitedBadgeProps = {
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function InvitedBadge({ member }: InvitedBadgeProps) {
@@ -221,6 +221,12 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // The member variant strips the invite URL, so the copy action is only
+    // available on the admin-and-above variant that still carries it.
+    if (!('inviteUrl' in member)) {
+      return;
+    }
 
     try {
       await navigator.clipboard.writeText(member.inviteUrl);
@@ -250,7 +256,7 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
 
 type ResendInvitationButtonProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
 };
 
 function ResendInvitationButton({ organizationId, member }: ResendInvitationButtonProps) {
@@ -305,8 +311,8 @@ function ResendInvitationButton({ organizationId, member }: ResendInvitationButt
 }
 
 type EditLimitButtonProps = {
-  organization: OrganizationWithMembers;
-  member: OrganizationMember;
+  organization: OrganizationWithMembersResponse;
+  member: OrganizationMemberResponse;
 };
 
 function EditLimitButton({ organization, member }: EditLimitButtonProps) {
@@ -364,8 +370,8 @@ function EditLimitButton({ organization, member }: EditLimitButtonProps) {
 }
 
 type ChildTeamsControlProps = {
-  organization: OrganizationWithMembers;
-  member: OrganizationMember;
+  organization: OrganizationWithMembersResponse;
+  member: OrganizationMemberResponse;
   editable: boolean;
   canOpenChildOrganizations: boolean;
 };

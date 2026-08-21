@@ -15,6 +15,8 @@ import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
+  isActiveOrgMember,
+  type OrgMember,
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
@@ -96,8 +98,9 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
-  const member = orgWithMembers.data?.members.find(
-    (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
+  const members: OrgMember[] = orgWithMembers.data?.members ?? [];
+  const member = members.find(
+    (m): m is ActiveOrgMember => isActiveOrgMember(m) && m.id === memberId
   );
 
   if (isResolving || orgWithMembers.isLoading) {

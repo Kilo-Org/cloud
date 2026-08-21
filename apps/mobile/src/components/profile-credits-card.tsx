@@ -1,8 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from '@/components/ui/icons';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,24 +29,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { bottom } = useSafeAreaInsets();
   const { organizationId, setOrganizationId } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
-  const queryClient = useQueryClient();
-
-  // Credits and pass state also change from webhooks (renewal, refund, expiry),
-  // which no client action invalidates. Refetching when the tab regains focus
-  // catches those without polling in the background. The first focus is the
-  // mount fetch, so it is skipped.
-  const tabFocusedBeforeRef = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (!tabFocusedBeforeRef.current) {
-        tabFocusedBeforeRef.current = true;
-        return;
-      }
-      void queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter());
-      void queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter());
-      void queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter());
-    }, [queryClient, trpc])
-  );
 
   const {
     data: balance,

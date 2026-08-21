@@ -1,11 +1,18 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/hooks/use-force-update.mounted.test.tsx) */
 import { createElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type * as TanStackReactQuery from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 const invalidateQueries = vi.hoisted(() => vi.fn());
+
+// When true, the mocked useQueryClient delegates to the real hook, so a probe
+// mounted under a real QueryClientProvider reads the provider's client. The
+// existing mocked blocks keep this false and get the pass-through spy.
+const useRealQueryClient = vi.hoisted(() => ({ value: false }));
 
 const appState = vi.hoisted(() => {
   const listeners = new Set<(state: string) => void>();
@@ -40,9 +47,14 @@ vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries }),
-}));
+vi.mock('@tanstack/react-query', async importOriginal => {
+  const actual = await importOriginal<typeof TanStackReactQuery>();
+  return {
+    ...actual,
+    useQueryClient: () =>
+      useRealQueryClient.value ? actual.useQueryClient() : { invalidateQueries },
+  };
+});
 
 vi.mock('expo-router', () => ({
   useIsFocused: () => focusState.isFocused,
@@ -69,6 +81,31 @@ async function renderProbe(
   await act(async () => {
     await Promise.resolve();
     rendererRef.current = TestRenderer.create(createElement(Probe, { queryKeys }));
+  });
+  const renderer = rendererRef.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  mountedRenderers.push(renderer);
+  return renderer;
+}
+
+async function renderProbeWithProvider(
+  queryClient: QueryClient,
+  queryKeys: readonly (readonly unknown[])[]
+): Promise<TestRenderer.ReactTestRenderer> {
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
+  await act(async () => {
+    await Promise.resolve();
+    rendererRef.current = TestRenderer.create(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(Probe, { queryKeys })
+      )
+    );
   });
   const renderer = rendererRef.current;
   if (!renderer) {
@@ -150,5 +187,50 @@ describe('useRouteForegroundRefresh mounted', () => {
     expect(invalidateQueries).toHaveBeenCalledTimes(2);
     expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: ['securityAgent'] });
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: ['organizations'] });
+  });
+});
+
+describe('useRouteForegroundRefresh key matching with a real QueryClient', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    focusState.isFocused = true;
+    focusEffect.effect = undefined;
+    useRealQueryClient.value = true;
+  });
+
+  afterEach(() => {
+    useRealQueryClient.value = false;
+    act(() => {
+      for (const renderer of mountedRenderers) {
+        renderer.unmount();
+      }
+    });
+    mountedRenderers.length = 0;
+    appState.listeners.clear();
+    focusEffect.effect = undefined;
+  });
+
+  it('invalidates a tRPC-shaped query key with the nested prefix form', async () => {
+    const queryClient = new QueryClient();
+    const queryFn = vi.fn().mockResolvedValue('sentinel');
+    await queryClient.prefetchQuery({ queryKey: [['user', 'getMe']], queryFn });
+
+    await renderProbeWithProvider(queryClient, [[['user']]]);
+
+    backgroundThenActive();
+
+    expect(queryClient.getQueryState([['user', 'getMe']])?.isInvalidated).toBe(true);
+  });
+
+  it('does not invalidate a tRPC-shaped query key with the flat prefix form', async () => {
+    const queryClient = new QueryClient();
+    const queryFn = vi.fn().mockResolvedValue('sentinel');
+    await queryClient.prefetchQuery({ queryKey: [['user', 'getMe']], queryFn });
+
+    await renderProbeWithProvider(queryClient, [['user']]);
+
+    backgroundThenActive();
+
+    expect(queryClient.getQueryState([['user', 'getMe']])?.isInvalidated).toBe(false);
   });
 });

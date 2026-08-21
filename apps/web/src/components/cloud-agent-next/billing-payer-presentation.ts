@@ -9,9 +9,16 @@ export type BillingPayerPresentation = {
 
 export function billingPayerPresentation(
   failure: CustomerBillingFailure,
-  surface: { organization?: { id: string; name: string; role: OrganizationRole } }
+  surface: {
+    currentUserId?: string;
+    organization?: { id: string; name: string; role: OrganizationRole };
+  }
 ): BillingPayerPresentation {
-  if (failure.payer.type === 'user' && !surface.organization) {
+  if (
+    failure.payer.type === 'user' &&
+    !surface.organization &&
+    failure.payer.id === surface.currentUserId
+  ) {
     return { payerName: 'Your account', action: { href: '/credits', label: 'Add credits' } };
   }
   const organization = surface.organization;

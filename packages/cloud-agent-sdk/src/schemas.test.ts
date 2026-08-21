@@ -14,10 +14,25 @@ describe('parseCustomerBillingFailure', () => {
   );
   it.each([
     { data: { billingFailure: { ...failure, payer: { type: 'org' } } } },
+    { data: { billingFailure: { ...failure, remainingMicrodollars: -1 } } },
     { data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 } },
   ])('omits malformed or legacy generic errors', error =>
     expect(parseCustomerBillingFailure(error)).toBeNull()
   );
+
+  it('preserves zero-valued customer billing balances from the Worker', () => {
+    expect(
+      parseCustomerBillingFailure({
+        data: {
+          billingFailure: {
+            ...failure,
+            remainingMicrodollars: 0,
+            minimumRequiredMicrodollars: 0,
+          },
+        },
+      })
+    ).toMatchObject({ remainingMicrodollars: 0, minimumRequiredMicrodollars: 0 });
+  });
 });
 
 describe('activeSessionSchema capabilities', () => {

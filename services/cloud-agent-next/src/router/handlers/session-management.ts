@@ -428,7 +428,7 @@ export function createSessionManagementHandlers() {
         const catalogSkuId = runtime ? SANDBOX_USAGE_SKUS[runtime.sandboxClassName] : undefined;
         const [catalog] = catalogSkuId
           ? await db
-              .select({ rate: cloud_billing_sku.rate_cents_per_unit })
+              .select({ rate: cloud_billing_sku.rate_cents_per_unit, unit: cloud_billing_sku.unit })
               .from(cloud_billing_sku)
               .where(eq(cloud_billing_sku.id, catalogSkuId))
               .limit(1)
@@ -469,11 +469,13 @@ export function createSessionManagementHandlers() {
         // interval. Paid intervals retain their admitted snapshot; shadow
         // intervals use today's catalog rate for the current runtime class.
         const hasCurrentInterval = interval?.status === 'open';
+        const catalogRate = catalog?.unit === 'second' ? catalog.rate : null;
+        // Paid interval rates are admitted snapshots for second-based container usage.
         const rate = hasCurrentInterval
           ? interval.billingMode === 'paid'
             ? interval.rate
-            : (catalog?.rate ?? null)
-          : (catalog?.rate ?? null);
+            : catalogRate
+          : catalogRate;
         const attribution =
           sandboxId && isGeneratedSharedSandboxId(sandboxId)
             ? ('payer_shared' as const)
@@ -488,6 +490,7 @@ export function createSessionManagementHandlers() {
                 : ('settling' as const)
             : ('idle' as const);
         const confirmedSeconds = hasCurrentInterval ? (interval?.confirmedSeconds ?? 0) : 0;
+        // This display-only elapsed estimate never drives settlement; the meter is authoritative.
         const observedSeconds =
           hasCurrentInterval && interval
             ? Math.max(

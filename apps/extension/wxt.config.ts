@@ -61,6 +61,8 @@ export default defineConfig({
       'apps/extension/tests/e2e/**',
       'packages/cloud-agent-sdk/package.json',
       'packages/cloud-agent-sdk/src/**',
+      'packages/container-usage/package.json',
+      'packages/container-usage/src/contracts.ts',
       'packages/app-shared/package.json',
       'packages/app-shared/src/**',
     ],

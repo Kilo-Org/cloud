@@ -181,6 +181,7 @@ DynamicMessages.displayName = 'DynamicMessages';
 const emptyQuestionRequestIds = new Map<string, string>();
 
 type CloudChatPageProps = {
+  currentUserId?: string;
   organizationId?: string;
   organizationName?: string;
   organizationRole?: OrganizationRole;
@@ -221,6 +222,7 @@ function TerminalPaneSlot({
 }
 
 export default function CloudChatPage({
+  currentUserId,
   organizationId,
   organizationName,
   organizationRole,
@@ -814,6 +816,7 @@ export default function CloudChatPage({
       tokenUsage={totalCost}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
+      sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
     />
   );
 
@@ -1016,6 +1019,7 @@ export default function CloudChatPage({
                                   <CloudAgentBillingError
                                     failure={billingFailure}
                                     presentation={billingPayerPresentation(billingFailure, {
+                                      currentUserId,
                                       organization:
                                         organizationId && organizationName && organizationRole
                                           ? {
@@ -1029,10 +1033,7 @@ export default function CloudChatPage({
                                 </div>
                               )}
                               {!billingFailure && statusIndicator?.type === 'error' && (
-                                <div
-                                  className="px-[max(1rem,calc(50%_-_27rem))] pb-2"
-                                  aria-live="polite"
-                                >
+                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2" role="alert">
                                   <SessionStatusIndicator indicator={statusIndicator} />
                                 </div>
                               )}

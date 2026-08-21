@@ -44,7 +44,19 @@ describe('billingPayerPresentation', () => {
 
   it('uses the personal credits action only on the personal surface', () => {
     expect(
-      billingPayerPresentation({ ...failure, payer: { type: 'user', id: 'user-1' } }, {})
+      billingPayerPresentation(
+        { ...failure, payer: { type: 'user', id: 'user-1' } },
+        { currentUserId: 'user-1' }
+      )
     ).toEqual({ payerName: 'Your account', action: { href: '/credits', label: 'Add credits' } });
+  });
+
+  it('does not expose a personal payment action for another payer', () => {
+    expect(
+      billingPayerPresentation(
+        { ...failure, payer: { type: 'user', id: 'other-user' } },
+        { currentUserId: 'user-1' }
+      )
+    ).toEqual({ payerName: 'Your account' });
   });
 });

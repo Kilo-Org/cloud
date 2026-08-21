@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ export function currentPaymentReturnPath(location: Pick<Location, 'pathname' | '
 }
 
 export function CloudAgentBillingError({ failure, presentation }: Props) {
+  const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
   const { payerName, action } = presentation;
   const content =
     failure.code === 'INSUFFICIENT_CREDITS'
@@ -31,7 +33,7 @@ export function CloudAgentBillingError({ failure, presentation }: Props) {
         ? 'Cloud Agent is saving and stopping compute. Your prompt has not started. Try again after shutdown completes.'
         : 'Cloud Agent cannot verify compute billing right now. Your prompt has not started and you have not been charged.';
   return (
-    <Alert variant="destructive" role="alert" className="min-w-0">
+    <Alert variant="destructive" className="min-w-0">
       <AlertCircle className="size-4" aria-hidden="true" />
       <AlertTitle>Compute billing</AlertTitle>
       <AlertDescription className="space-y-2">
@@ -55,17 +57,21 @@ export function CloudAgentBillingError({ failure, presentation }: Props) {
         )}
         {action && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild size="sm" variant="outline">
-              <Link
-                href={action.href}
-                onClick={async event => {
-                  event.preventDefault();
-                  await setReturnUrlAndRedirect(currentPaymentReturnPath(window.location));
-                  window.location.assign(action.href);
-                }}
-              >
-                {action.label}
-              </Link>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={redirecting}
+              onClick={async () => {
+                if (redirecting) return;
+                setRedirecting(true);
+                await setReturnUrlAndRedirect(currentPaymentReturnPath(window.location)).catch(
+                  () => undefined
+                );
+                router.push(action.href);
+                setRedirecting(false);
+              }}
+            >
+              {redirecting ? 'Redirecting…' : action.label}
             </Button>
             {action.memberGuidance && (
               <span className="text-muted-foreground text-xs">

@@ -11,6 +11,7 @@ import type { AgentMode } from '../schema.js';
 import type { Attachments } from '../router/schemas.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
+import type { CustomerBillingFailure } from '@kilocode/container-usage/contracts';
 
 // ---------------------------------------------------------------------------
 // Execution Modes
@@ -230,13 +231,7 @@ export type RetryableResultCode =
 
 export type PermanentDeliveryResultCode = 'SANDBOX_CAPABILITY_UNAVAILABLE';
 
-export type CustomerBillingFailure = {
-  code: 'INSUFFICIENT_CREDITS' | 'COMPUTE_STOPPING' | 'BILLING_UNAVAILABLE';
-  payer: { type: 'user' | 'org'; id: string };
-  retryable: boolean;
-  remainingMicrodollars?: number;
-  minimumRequiredMicrodollars?: number;
-};
+export type { CustomerBillingFailure } from '@kilocode/container-usage/contracts';
 
 export type AdmissionFailure = {
   success: false;

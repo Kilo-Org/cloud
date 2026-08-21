@@ -8,12 +8,14 @@ type CloudChatPageWrapperNextProps = {
   organizationId: string;
   organizationName?: string;
   organizationRole: OrganizationRole;
+  currentUserId: string;
 };
 
 export function CloudChatPageWrapperNext({
   organizationId,
   organizationName,
   organizationRole,
+  currentUserId,
 }: CloudChatPageWrapperNextProps) {
   return (
     <Suspense
@@ -23,6 +25,7 @@ export function CloudChatPageWrapperNext({
         organizationId={organizationId}
         organizationName={organizationName}
         organizationRole={organizationRole}
+        currentUserId={currentUserId}
       />
     </Suspense>
   );

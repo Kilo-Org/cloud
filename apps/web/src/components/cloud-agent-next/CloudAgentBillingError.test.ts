@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+
 import { CloudAgentBillingError, currentPaymentReturnPath } from './CloudAgentBillingError';
 
 type BillingErrorProps = ComponentProps<typeof CloudAgentBillingError>;
@@ -35,7 +38,6 @@ describe('CloudAgentBillingError', () => {
     expect(html).toContain('Your account needs more credits to start Cloud Agent compute.');
     expect(html).toContain('Available: $1.25 · Required: $2.00');
     expect(html).toContain('Your prompt did not start.');
-    expect(html).toContain('href="/credits"');
     expect(html).toContain('Add credits');
   });
 

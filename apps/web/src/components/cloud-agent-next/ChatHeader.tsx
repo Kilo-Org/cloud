@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +25,48 @@ function formatRate(microdollars: number | null): string {
     : `$${(microdollars / 1_000_000).toFixed(2)}/hour`;
 }
 
+export function computeBillingLabel(
+  computeStatus:
+    | {
+        billingMode: 'shadow' | 'paid' | null;
+        phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable';
+        attribution: 'payer_shared' | 'session';
+        estimatedHourlyRateMicrodollars: number | null;
+        estimatedIntervalAmountMicrodollars: number | null;
+      }
+    | null
+    | undefined
+): string | null {
+  if (computeStatus?.billingMode === 'shadow') {
+    return `Compute est. ${formatRate(computeStatus.estimatedHourlyRateMicrodollars)} · Not currently charged`;
+  }
+  if (computeStatus?.phase === 'active') {
+    const prefix =
+      computeStatus.attribution === 'payer_shared' ? 'Shared compute active' : 'Compute active';
+    return computeStatus.estimatedIntervalAmountMicrodollars === null
+      ? `${prefix} · pricing unavailable`
+      : `${prefix} · est. $${(computeStatus.estimatedIntervalAmountMicrodollars / 1_000_000).toFixed(2)}`;
+  }
+  if (computeStatus?.phase === 'stopping' || computeStatus?.phase === 'settling') {
+    return 'Saving and stopping compute';
+  }
+  if (computeStatus?.phase === 'idle') {
+    return computeStatus.estimatedHourlyRateMicrodollars === null
+      ? 'Compute pricing unavailable'
+      : `Compute est. ${formatRate(computeStatus.estimatedHourlyRateMicrodollars)}`;
+  }
+  return null;
+}
+
+export function computeBillingRefetchInterval(
+  sessionActive: boolean,
+  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable' | undefined
+): number | false {
+  return sessionActive || phase === 'active' || phase === 'stopping' || phase === 'settling'
+    ? 5_000
+    : false;
+}
+
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
   kiloSessionId?: string;
@@ -38,6 +80,7 @@ type ChatHeaderProps = {
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   sessionTitle?: string;
+  sessionActive: boolean;
 };
 
 export function ChatHeader({
@@ -53,6 +96,7 @@ export function ChatHeader({
   kiloSessionId,
   organizationId,
   sessionTitle,
+  sessionActive,
 }: ChatHeaderProps) {
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
@@ -66,25 +110,16 @@ export function ChatHeader({
       : trpc.cloudAgentNext.getComputeBillingStatus.queryOptions({ cloudAgentSessionId })),
     enabled: cloudAgentSessionId.startsWith('agent_'),
     refetchInterval: query => {
-      const phase = query.state.data?.phase;
-      return phase === 'active' || phase === 'stopping' || phase === 'settling' ? 5_000 : false;
+      return computeBillingRefetchInterval(sessionActive, query.state.data?.phase);
     },
   });
+  const wasSessionActive = useRef(sessionActive);
+  useEffect(() => {
+    if (sessionActive && !wasSessionActive.current) void computeQuery.refetch();
+    wasSessionActive.current = sessionActive;
+  }, [computeQuery.refetch, sessionActive]);
   const computeStatus = computeQuery.data;
-  const computeLabel =
-    computeStatus?.billingMode === 'shadow'
-      ? `Compute est. ${formatRate(computeStatus.estimatedHourlyRateMicrodollars)} · Not currently charged`
-      : computeStatus?.phase === 'active' && computeStatus.attribution === 'payer_shared'
-        ? `Shared compute active · est. $${((computeStatus.estimatedIntervalAmountMicrodollars ?? 0) / 1_000_000).toFixed(2)}`
-        : computeStatus?.phase === 'active'
-          ? `Compute active · est. $${((computeStatus.estimatedIntervalAmountMicrodollars ?? 0) / 1_000_000).toFixed(2)}`
-          : computeStatus?.phase === 'stopping' || computeStatus?.phase === 'settling'
-            ? 'Saving and stopping compute'
-            : computeStatus?.phase === 'idle'
-              ? computeStatus.estimatedHourlyRateMicrodollars === null
-                ? 'Compute pricing unavailable'
-                : `Compute est. ${formatRate(computeStatus.estimatedHourlyRateMicrodollars)}`
-              : null;
+  const computeLabel = computeBillingLabel(computeStatus);
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
   const repoUrl =
@@ -120,9 +155,12 @@ export function ChatHeader({
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              {computeStatus?.attribution === 'payer_shared'
-                ? 'Shared payer-level compute estimate. It is not attributed only to this session.'
-                : 'Estimated compute rate from the current billing plan.'}
+              <p>{computeLabel}</p>
+              <p>
+                {computeStatus?.attribution === 'payer_shared'
+                  ? 'Shared payer-level compute estimate. It is not attributed only to this session.'
+                  : 'Estimated compute rate from the current billing plan.'}
+              </p>
             </TooltipContent>
           </Tooltip>
         )}

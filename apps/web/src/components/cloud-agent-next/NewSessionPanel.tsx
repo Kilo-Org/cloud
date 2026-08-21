@@ -119,6 +119,7 @@ type Repository = {
 };
 
 type NewSessionPanelProps = {
+  currentUserId: string;
   organizationId?: string;
   organizationName?: string;
   organizationRole?: OrganizationRole;
@@ -133,6 +134,7 @@ type ContextualTipProps = {
 };
 
 export function NewSessionPanel({
+  currentUserId,
   organizationId,
   organizationName,
   organizationRole,
@@ -1238,6 +1240,7 @@ export function NewSessionPanel({
           <CloudAgentBillingError
             failure={billingFailure}
             presentation={billingPayerPresentation(billingFailure, {
+              currentUserId,
               organization:
                 organizationId && organizationName && organizationRole
                   ? { id: organizationId, name: organizationName, role: organizationRole }
@@ -1245,7 +1248,7 @@ export function NewSessionPanel({
             })}
           />
         )}
-        {/* Insufficient balance banner */}
+        {/* Organization members intentionally see the shared balance: the existing eligibility API returns it to members. */}
         {hasInsufficientBalance && eligibilityData && !hasLimitedAccess && (
           <InsufficientBalanceBanner
             balance={eligibilityData.balance}

@@ -4,7 +4,6 @@ import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySession
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { signInUrlWithCallbackPath } from '@/lib/user/server';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -30,9 +29,8 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
       <CloudChatPageWrapperNext
         organizationId={organizationId}
         organizationName={result.data.organization.name}
-        organizationRole={
-          (result.data.user.is_admin ? 'owner' : result.data.user.role) as OrganizationRole
-        }
+        organizationRole={result.data.user.role}
+        currentUserId={result.data.user.id}
       />
     );
   }

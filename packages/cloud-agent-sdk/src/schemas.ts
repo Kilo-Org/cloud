@@ -1,4 +1,8 @@
 import * as z from 'zod';
+import {
+  customerBillingFailureSchema,
+  type CustomerBillingFailure,
+} from '@kilocode/container-usage/contracts';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId } from './types';
 
@@ -970,16 +974,8 @@ export const errorShapeSchema = z
   .passthrough();
 export type ErrorShape = z.infer<typeof errorShapeSchema>;
 
-export const customerBillingFailureSchema = z
-  .object({
-    code: z.enum(['INSUFFICIENT_CREDITS', 'COMPUTE_STOPPING', 'BILLING_UNAVAILABLE']),
-    payer: z.object({ type: z.enum(['user', 'org']), id: z.string().min(1) }).strict(),
-    retryable: z.boolean(),
-    remainingMicrodollars: z.number().int().optional(),
-    minimumRequiredMicrodollars: z.number().int().positive().optional(),
-  })
-  .strict();
-export type CustomerBillingFailure = z.infer<typeof customerBillingFailureSchema>;
+export { customerBillingFailureSchema };
+export type { CustomerBillingFailure };
 
 /** Only accepts the explicit tRPC cause projection; generic 402s stay legacy. */
 export function parseCustomerBillingFailure(error: unknown): CustomerBillingFailure | null {

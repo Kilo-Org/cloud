@@ -64,6 +64,11 @@ export type MeteredSandboxInstance = SandboxInstance & {
   }>;
 };
 
+/** Optional while Worker and sandbox runtime deployments roll forward independently. */
+type BillingRuntimeStatusCapability = {
+  getBillingRuntimeStatus?: MeteredSandboxInstance['getBillingRuntimeStatus'];
+};
+
 const sandboxBillingInputEnvelopeSchema = z
   .object({
     sandboxId: z
@@ -307,9 +312,9 @@ export async function getSandboxBillingRuntimeStatus(sandbox: SandboxInstance): 
     }
   | undefined
 > {
-  const getStatus = (sandbox as Partial<MeteredSandboxInstance>).getBillingRuntimeStatus;
+  const getStatus = (sandbox as BillingRuntimeStatusCapability).getBillingRuntimeStatus;
   if (typeof getStatus !== 'function') return undefined;
-  return await (sandbox as MeteredSandboxInstance).getBillingRuntimeStatus();
+  return await getStatus.call(sandbox);
 }
 
 export async function configureSandboxBillingInput(

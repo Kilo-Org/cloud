@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   intervalId,
+  customerBillingFailureSchema,
   recordHeartbeatInputSchema,
   recordStartResultSchema,
   recordStopInputSchema,
@@ -140,5 +141,23 @@ describe('container usage contracts', () => {
         },
       })
     ).toMatchObject({ success: false, error: { code: 'insufficient_credits' } });
+  });
+
+  it('shares customer billing failures with zero-valued balances and rejects malformed values', () => {
+    const failure = {
+      code: 'INSUFFICIENT_CREDITS',
+      payer: { type: 'user', id: 'user-1' },
+      retryable: false,
+      remainingMicrodollars: 0,
+      minimumRequiredMicrodollars: 0,
+    };
+    expect(customerBillingFailureSchema.parse(failure)).toEqual(failure);
+    expect(
+      customerBillingFailureSchema.safeParse({ ...failure, remainingMicrodollars: -1 }).success
+    ).toBe(false);
+    expect(
+      customerBillingFailureSchema.safeParse({ ...failure, minimumRequiredMicrodollars: 0.5 })
+        .success
+    ).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
-import { Share, X } from '@/components/ui/icons';
-import { useEffect } from 'react';
+import { AlertCircle, Share, X } from '@/components/ui/icons';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -35,6 +35,8 @@ export function ImageViewerModal({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
+  const [imageError, setImageError] = useState(false);
+
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -62,6 +64,11 @@ export function ImageViewerModal({
       savedY.value = 0;
     }
   }, [visible, scale, savedScale, translateX, translateY, savedX, savedY]);
+
+  // A new image (or a reopen) retries the decode from a clean slate.
+  useEffect(() => {
+    setImageError(false);
+  }, [visible, uri]);
 
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pinch().
   const pinch = Gesture.Pinch()
@@ -147,12 +154,25 @@ export function ImageViewerModal({
             GestureHandlerRootView does not reach a Modal's native view hierarchy. */}
         <GestureHandlerRootView className="flex-1">
           <View className="flex-1 items-center justify-center overflow-hidden bg-black">
-            {uri ? (
+            {uri && !imageError ? (
               <GestureDetector gesture={zoomGesture}>
                 <Animated.View className="h-full w-full" style={imageStyle}>
-                  <Image source={{ uri }} className="h-full w-full" contentFit="contain" />
+                  <Image
+                    source={{ uri }}
+                    className="h-full w-full"
+                    contentFit="contain"
+                    onError={() => {
+                      setImageError(true);
+                    }}
+                  />
                 </Animated.View>
               </GestureDetector>
+            ) : null}
+            {uri && imageError ? (
+              <View className="flex-row items-center gap-2">
+                <AlertCircle size={14} color={colors.mutedForeground} />
+                <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+              </View>
             ) : null}
           </View>
         </GestureHandlerRootView>

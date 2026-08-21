@@ -36,8 +36,8 @@ describe('DEFAULT_SECURITY_AGENT_CONFIG', () => {
     expect(DEFAULT_SECURITY_AGENT_CONFIG.auto_analysis_min_severity).toBe('high');
   });
 
-  it('defaults auto-remediation approval to required', () => {
-    expect(DEFAULT_SECURITY_AGENT_CONFIG.auto_remediation_require_approval).toBe(true);
+  it('defaults auto-remediation approval to not required', () => {
+    expect(DEFAULT_SECURITY_AGENT_CONFIG.auto_remediation_require_approval).toBe(false);
   });
 });
 

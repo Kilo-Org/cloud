@@ -34,7 +34,7 @@ export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   auto_remediation_enabled: false,
   auto_remediation_min_severity: 'high',
   auto_remediation_include_existing: false,
-  auto_remediation_require_approval: true,
+  auto_remediation_require_approval: false,
   auto_remediation_enabled_at: null,
   remediation_model_slug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   ...DEFAULT_SECURITY_NOTIFICATION_POLICY,

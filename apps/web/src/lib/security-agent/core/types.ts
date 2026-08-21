@@ -73,7 +73,7 @@ export const SecurityAgentConfigSchema = z
     auto_remediation_enabled: z.boolean().default(false),
     auto_remediation_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
     auto_remediation_include_existing: z.boolean().default(false),
-    auto_remediation_require_approval: z.boolean().default(true),
+    auto_remediation_require_approval: z.boolean().default(false),
     auto_remediation_enabled_at: z.string().nullable().default(null),
     remediation_model_slug: z.string().optional(),
     sla_notifications_enabled: z

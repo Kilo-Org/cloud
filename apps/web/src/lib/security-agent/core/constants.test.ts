@@ -38,8 +38,8 @@ describe('security agent config', () => {
     expect(config.auto_remediation_min_severity).toBe('high');
   });
 
-  it('defaults auto-remediation approval to required', () => {
-    expect(parseSecurityAgentConfig({}).auto_remediation_require_approval).toBe(true);
+  it('defaults auto-remediation approval to not required for legacy config', () => {
+    expect(parseSecurityAgentConfig({}).auto_remediation_require_approval).toBe(false);
   });
 
   it('tolerates malformed notification fields during general config reads', () => {

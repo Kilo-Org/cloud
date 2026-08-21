@@ -61,11 +61,15 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
         } satisfies AutoFreeModel,
       ]
     : []),
-  {
-    model: 'poolside/laguna-s-2.1:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
+  ...(longcat_2_free_model.status === 'public'
+    ? [
+        {
+          model: longcat_2_free_model.public_id,
+          weight: 1,
+          reasoning: { enabled: true, effort: 'high' },
+        } satisfies AutoFreeModel,
+      ]
+    : []),
 ];
 
 export function selectAutoFreeCandidate(
@@ -91,7 +95,6 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels.map(({ model }) => model),
-  ...(longcat_2_free_model.status === 'public' ? [longcat_2_free_model.public_id] : []),
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,

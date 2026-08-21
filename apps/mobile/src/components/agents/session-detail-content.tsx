@@ -299,8 +299,8 @@ export function SessionDetailContent({
   });
   const modelOptions = sessionModels.options;
   const { continueSession, isContinuing } = useContinueSession({
+    sessionId,
     organizationId,
-    manager,
     models: modelOptions,
     modelsLoading: gatewayModelsLoading,
   });

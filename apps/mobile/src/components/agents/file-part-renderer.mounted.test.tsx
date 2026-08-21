@@ -523,6 +523,42 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
+  it('shares the source file from the header Share on an empty markdown preview', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    expect(texts(root)).toContain('This file is empty.');
+
+    const headers = findByType(root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(headers[0]?.props.onShare).toBeTypeOf('function');
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-readme.md',
+      { mimeType: 'text/markdown' }
+    );
+
+    await unmount(renderer);
+  });
+
   it('shows an error and retry when the text fails to load', async () => {
     expoFileSystemMock.fileText.mockRejectedValue(new Error('boom'));
     cacheFilePart('part-1', {

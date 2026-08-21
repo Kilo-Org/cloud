@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -459,9 +460,7 @@ function FilePreviewModal({
           onShare={onShare}
           sharing={sharing}
         />
-        {shareError ? (
-          <Text className="px-6 pt-2 text-sm text-destructive">{shareError}</Text>
-        ) : null}
+        <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
         <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
       </View>
     </Modal>

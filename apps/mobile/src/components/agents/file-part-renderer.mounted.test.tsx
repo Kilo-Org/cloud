@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ShareRemoteFileError } from '@/lib/share-remote-file';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FilePartRenderer } from './file-part-renderer';
 import {
   __resetFilePartCacheForTests,
@@ -104,9 +105,13 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
+  Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: vi.fn(),
 }));
 vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', File: 'File' }));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
@@ -213,6 +218,12 @@ function pressableByLabel(
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel === label
   );
+}
+
+function accessibleStatusNodes(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.type === AccessibleStatus);
 }
 
 function texts(root: TestRenderer.ReactTestInstance): string[] {
@@ -877,6 +888,13 @@ describe('FilePartRenderer mounted', () => {
     expect(texts(root)).toContain('Share failed');
     expect(toastMock.error).not.toHaveBeenCalled();
 
+    const statuses = accessibleStatusNodes(root);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('Share failed');
+    expect(statuses[0]?.props.className).toBe('px-6 pt-2 text-sm');
+    const statusText = findByType(first(statuses), 'Text');
+    expect(statusText[0]?.props.className).toContain('text-destructive');
+
     await unmount(renderer);
   });
 
@@ -967,6 +985,10 @@ describe('FilePartRenderer mounted', () => {
 
     expect(texts(root)).toContain('File sharing is not available on this device.');
     expect(toastMock.error).not.toHaveBeenCalled();
+
+    const statuses = accessibleStatusNodes(root);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('File sharing is not available on this device.');
 
     await unmount(renderer);
   });

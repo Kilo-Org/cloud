@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -182,9 +183,10 @@ export function ImageViewerModal({
             style={{ bottom: insets.bottom + 16 }}
           >
             <View className="rounded-md bg-neutral-900/90 px-4 py-2 dark:bg-neutral-100/90">
-              <Text className="text-center text-sm text-white dark:text-neutral-900">
-                {shareError}
-              </Text>
+              <AccessibleStatus
+                message={shareError}
+                className="text-center text-sm text-white dark:text-neutral-900"
+              />
             </View>
           </View>
         ) : null}

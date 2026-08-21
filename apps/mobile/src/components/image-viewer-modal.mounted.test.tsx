@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ImageViewerModal } from './image-viewer-modal';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 
 // A chainable gesture stub: each builder method returns the same object so the
 // modal's Pinch/Pan/Tap/Race/Simultaneous chains resolve without RNGH.
@@ -17,8 +18,12 @@ function makeGesture(): Record<string, unknown> {
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
+  Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   View: 'View',
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: vi.fn(),
 }));
 vi.mock('@/components/ui/icons', () => ({
   Share: 'Share',
@@ -121,6 +126,28 @@ describe('ImageViewerModal mounted', () => {
     expect(share).toBeDefined();
     expect(share?.props.disabled).toBe(false);
     expect(share?.props.accessibilityState).toEqual({ disabled: false, busy: false });
+
+    renderer.unmount();
+  });
+
+  it('renders the share error through AccessibleStatus with white pill text', async () => {
+    const renderer = await mountViewer({
+      shareError: 'Failed to share file. Please try again.',
+    });
+
+    const statuses = renderer.root.findAll(node => node.type === AccessibleStatus);
+    expect(statuses).toHaveLength(1);
+    const status = statuses[0];
+    if (!status) {
+      throw new Error('AccessibleStatus not found');
+    }
+    expect(status.props.message).toBe('Failed to share file. Please try again.');
+    expect(status.props.className).toBe('text-center text-sm text-white dark:text-neutral-900');
+
+    const text = findByType(status, 'Text');
+    expect(text).toHaveLength(1);
+    expect(text[0]?.props.className).toContain('text-white');
+    expect(text[0]?.props.className).not.toContain('text-destructive');
 
     renderer.unmount();
   });

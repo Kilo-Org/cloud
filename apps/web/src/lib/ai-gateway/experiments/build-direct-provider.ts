@@ -90,13 +90,15 @@ function sanitizeJsonRefToolResults(context: TransformRequestContext) {
 export function buildDirectProvider(
   id: 'custom' | 'experiment',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
-  upstream: ResolvedExperimentUpstream
+  upstream: ResolvedExperimentUpstream,
+  apiKeyHeader?: 'x-api-key'
 ): Provider {
   return {
     id,
     apiUrl: upstream.base_url,
     apiUrlOverrides: {},
     apiKey: upstream.api_key,
+    apiKeyHeader,
     supportedChatApis,
     responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {

@@ -2087,8 +2087,16 @@ export const CustomLlmApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmApiKeyCredentials = z.infer<typeof CustomLlmApiKeyCredentialsSchema>;
 
+export const CustomLlmXApiKeyCredentialsSchema = z.object({
+  type: z.literal('x-api-key'),
+  api_key: z.string().min(1),
+});
+
+export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
+  CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
 ]);
 

@@ -137,8 +137,10 @@ async function checkCustomLlm(
   }
 
   let apiKey: string;
-  if (parsedCredentials.data.type === 'api_key') {
+  let apiKeyHeader: 'x-api-key' | undefined;
+  if (parsedCredentials.data.type === 'api_key' || parsedCredentials.data.type === 'x-api-key') {
     apiKey = parsedCredentials.data.api_key;
+    apiKeyHeader = parsedCredentials.data.type === 'x-api-key' ? 'x-api-key' : undefined;
   } else {
     apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
   }
@@ -158,7 +160,8 @@ async function checkCustomLlm(
             ? 'responses'
             : 'chat_completions',
       ],
-      resolvedCustomLlm
+      resolvedCustomLlm,
+      apiKeyHeader
     ),
     userByok: null,
     bypassAccessCheck: true,

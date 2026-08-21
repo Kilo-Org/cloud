@@ -87,7 +87,7 @@ describe('isFreeModel', () => {
       expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
     });
 
-    test('registers LongCat 2.0 as a free preferred model', async () => {
+    test('registers LongCat 2.0 as an Auto Free model', async () => {
       expect(kiloExclusiveModels).toContain(longcat_2_free_model);
       expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBe(longcat_2_free_model);
       expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(true);
@@ -98,9 +98,7 @@ describe('isFreeModel', () => {
         max_completion_tokens: 131_072,
         status: 'public',
       });
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
-        longcat_2_free_model.public_id
-      );
+      expect(autoFreeModels.map(({ model }) => model)).toContain(longcat_2_free_model.public_id);
       expect(preferredModels).toContain(longcat_2_free_model.public_id);
       expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBeUndefined();
     });
@@ -196,16 +194,18 @@ describe('isFreeModel', () => {
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'tencent/hy3:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
+        'meituan/longcat-2.0-free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights Auto Free models at 80% StepFun, 10% Hy3, and 10% Laguna', () => {
+    test('weights Auto Free models at 70% StepFun and 10% each for Hy3, Laguna, and LongCat', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
       ).toEqual({
-        'stepfun/step-3.7-flash:free': 8,
+        'stepfun/step-3.7-flash:free': 7,
         'tencent/hy3:free': 1,
         'poolside/laguna-s-2.1:free': 1,
+        'meituan/longcat-2.0-free': 1,
       });
     });
 

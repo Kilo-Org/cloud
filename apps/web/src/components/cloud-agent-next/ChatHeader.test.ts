@@ -10,8 +10,8 @@ const active = {
 
 describe('computeBillingLabel', () => {
   it.each([
-    ['payer_shared', 'Shared compute active · pricing unavailable'],
-    ['session', 'Compute active · pricing unavailable'],
+    ['payer_shared', 'Shared compute so far · pricing unavailable'],
+    ['session', 'Compute so far · pricing unavailable'],
   ] as const)('does not show $0.00 when active %s pricing is unavailable', (attribution, label) => {
     expect(computeBillingLabel({ ...active, attribution })).toBe(label);
   });

@@ -106,17 +106,17 @@ export function SessionInfoDialog({
                       / hour
                     </div>
                     <p className="text-muted-foreground text-xs">
-                      Estimated compute rate from the current billing plan.
+                      Billed only while the sandbox runs.
                     </p>
                     {computeStatus.billingMode === 'shadow' && <p>Not currently charged</p>}
                     <p className="text-muted-foreground text-xs">
                       {computeStatus.attribution === 'payer_shared'
-                        ? 'This is a payer-level shared sandbox estimate, not a per-session charge.'
-                        : 'This estimate is attributed to this session.'}
+                        ? 'The estimate may include other sessions using this shared sandbox.'
+                        : 'The estimate is based on this sandbox’s runtime.'}
                     </p>
                     {computeStatus.phase === 'stopping' || computeStatus.phase === 'settling' ? (
                       <p className="text-muted-foreground text-xs">
-                        Saving and stopping compute. Final amount is not available yet.
+                        Saving and stopping. Final cost is confirmed after it stops.
                       </p>
                     ) : null}
                   </>

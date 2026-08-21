@@ -42,7 +42,7 @@ export function computeBillingLabel(
   }
   if (computeStatus?.phase === 'active') {
     const prefix =
-      computeStatus.attribution === 'payer_shared' ? 'Shared compute active' : 'Compute active';
+      computeStatus.attribution === 'payer_shared' ? 'Shared compute so far' : 'Compute so far';
     return computeStatus.estimatedIntervalAmountMicrodollars === null
       ? `${prefix} · pricing unavailable`
       : `${prefix} · est. $${(computeStatus.estimatedIntervalAmountMicrodollars / 1_000_000).toFixed(2)}`;
@@ -158,8 +158,8 @@ export function ChatHeader({
               <p>{computeLabel}</p>
               <p>
                 {computeStatus?.attribution === 'payer_shared'
-                  ? 'Shared payer-level compute estimate. It is not attributed only to this session.'
-                  : 'Estimated compute rate from the current billing plan.'}
+                  ? 'Based on how long the shared sandbox has run. It may include other sessions. Final after it stops.'
+                  : 'Based on how long this sandbox has run. Final after it stops.'}
               </p>
             </TooltipContent>
           </Tooltip>

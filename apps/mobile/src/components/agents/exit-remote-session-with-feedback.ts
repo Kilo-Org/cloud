@@ -5,7 +5,8 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 
 /** Structural subset of Expo Router's router used for post-exit navigation. */
 type ExitRemoteSessionRouter = {
-  dismissTo: (href: Href) => void;
+  dismissAll: () => void;
+  navigate: (href: Href) => void;
 };
 
 type ExitRemoteSessionWithFeedbackInput = {
@@ -112,10 +113,12 @@ export async function exitRemoteSessionWithFeedback({
 
     toast.success(SESSION_EXITED_MESSAGE);
     onAccepted();
-    // POP_TO pops the exited `agent-chat` route off the `(app)` stack and
-    // focuses the existing `(tabs)` entry, so back cannot return to the
-    // exited session.
-    router.dismissTo(SESSIONS_ROUTE);
+    // `dismissAll` pops the closest stack (the `(app)` stack) back to its
+    // first screen `(tabs)`, removing the exited `agent-chat` route. The
+    // follow-up `navigate` focuses the Agents tab, so back cannot return to
+    // the exited session.
+    router.dismissAll();
+    router.navigate(SESSIONS_ROUTE);
   };
 
   await runExit();

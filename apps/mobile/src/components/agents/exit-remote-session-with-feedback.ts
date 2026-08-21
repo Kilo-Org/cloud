@@ -1,12 +1,17 @@
 import { toast } from 'sonner-native';
 
-import { type AgentSessionRouterLike } from '@/components/agents/session-router-like';
+import { type Href } from 'expo-router';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
+
+/** Structural subset of Expo Router's router used for post-exit navigation. */
+type ExitRemoteSessionRouter = {
+  dismissTo: (href: Href) => void;
+};
 
 type ExitRemoteSessionWithFeedbackInput = {
   exit: () => Promise<void>;
   onAccepted: () => void;
-  router: AgentSessionRouterLike;
+  router: ExitRemoteSessionRouter;
   /**
    * The composer SubmitLock, exposed as a `{ current: boolean }` ref so the
    * retry action can re-acquire the same admission gate the initial send
@@ -107,7 +112,10 @@ export async function exitRemoteSessionWithFeedback({
 
     toast.success(SESSION_EXITED_MESSAGE);
     onAccepted();
-    router.replace(SESSIONS_ROUTE);
+    // POP_TO pops the exited `agent-chat` route off the `(app)` stack and
+    // focuses the existing `(tabs)` entry, so back cannot return to the
+    // exited session.
+    router.dismissTo(SESSIONS_ROUTE);
   };
 
   await runExit();

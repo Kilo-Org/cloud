@@ -8,6 +8,7 @@ import { captureException } from '@sentry/nextjs';
 
 import { db } from '@/lib/drizzle';
 import { APP_URL } from '@/lib/constants';
+import { settleCodeReviewLedgerRowOn } from '@/lib/code-reviews/code-review-ledger';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
 import { NON_TERMINAL_CODE_REVIEW_STATUSES } from '@/lib/code-reviews/dispatch/dispatch-constants';
 import { shouldPublishCodeReviewToProvider } from '@/lib/code-reviews/manual-config';
@@ -115,6 +116,12 @@ async function countRemainingStaleReviews(): Promise<number> {
  * On a successful claim the review's own non-terminal attempts are closed with
  * it, the same way the supersede path closes both tables together. Left open,
  * they would count as in-progress work forever in every attempt-level query.
+ *
+ * The ledger settle runs inside this transaction too. A transient settle
+ * failure throws, rolling back the terminalize so the review stays non-terminal
+ * and a later reaper run retries both; a missing admit row is not a failure and
+ * skips. Settling outside the transaction would lose the event permanently,
+ * because the selection predicate excludes terminal rows from every later run.
  */
 async function terminalizeReview(review: CloudAgentCodeReview): Promise<boolean> {
   const now = new Date().toISOString();
@@ -158,6 +165,15 @@ async function terminalizeReview(review: CloudAgentCodeReview): Promise<boolean>
           inArray(cloud_agent_code_review_attempts.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES])
         )
       );
+
+    // The review is now terminal in this transaction, so settle the ledger row
+    // atomically with the terminalize. A settle failure rolls back the claim.
+    await settleCodeReviewLedgerRowOn(tx, {
+      reviewId: review.id,
+      status: 'failed',
+      terminalReason: REAP_TERMINAL_REASON,
+      triggerSource: review.trigger_source,
+    });
 
     return true;
   });
@@ -238,7 +254,8 @@ export async function reapStaleCodeReviews(
 
   for (const review of stale) {
     // Claim first. Everything after this is best-effort cleanup, and a provider
-    // call that fails must not leave the row selectable forever.
+    // call that fails must not leave the row selectable forever. The ledger
+    // settle runs inside the claim transaction (see `terminalizeReview`).
     if (!(await terminalizeReview(review))) continue;
     summary.terminalized += 1;
 

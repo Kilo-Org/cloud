@@ -1,10 +1,13 @@
 import { db } from '@/lib/drizzle';
 import {
+  analytics_event_outbox,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
+  operation_ledgers,
   type User,
 } from '@kilocode/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
+import { admitOperation } from '@kilocode/db/operation-ledger';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { reapStaleCodeReviews } from './reap-stale-reviews';
@@ -34,6 +37,8 @@ describe('reapStaleCodeReviews against the database', () => {
         .delete(cloud_agent_code_reviews)
         .where(inArray(cloud_agent_code_reviews.id, createdReviewIds));
     }
+    await db.delete(analytics_event_outbox).where(sql`true`);
+    await db.delete(operation_ledgers).where(sql`true`);
   });
 
   async function insertReview(params: { status: string; hoursOld: number }): Promise<string> {
@@ -123,5 +128,30 @@ describe('reapStaleCodeReviews against the database', () => {
     // The second run may pick up other suites' fixtures, but not this row: its
     // status is terminal, so the selection predicate excludes it structurally.
     expect(secondRun.selected).toBeGreaterThanOrEqual(0);
+  });
+
+  it('settles the admitted ledger row and emits one code_review_settled outbox row', async () => {
+    await db.delete(analytics_event_outbox).where(sql`true`);
+    await db.delete(operation_ledgers).where(sql`true`);
+
+    const reviewId = await insertReview({ status: 'running', hoursOld: 72 });
+    await admitOperation(db, {
+      userId: user.id,
+      domain: 'code_review',
+      intent: 'manual',
+      operationKey: `review:${reviewId}`,
+      taxonomy: 'never-replay',
+      leaseSeconds: 60,
+    });
+
+    await reapStaleCodeReviews(500);
+
+    const rows = await db
+      .select()
+      .from(analytics_event_outbox)
+      .where(eq(analytics_event_outbox.event_name, 'code_review_settled'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.distinct_id).toBe(user.google_user_email);
+    expect(rows[0]?.properties).toMatchObject({ outcome: 'failed' });
   });
 });

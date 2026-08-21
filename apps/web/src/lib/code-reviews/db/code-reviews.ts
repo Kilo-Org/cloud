@@ -14,6 +14,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
+import { admitOperation, type LedgerDatabase } from '@kilocode/db/operation-ledger';
 import {
   eq,
   and,
@@ -30,8 +31,10 @@ import {
   getTableColumns,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import { logExceptInTest } from '@/lib/utils.server';
 import { CreateReviewParamsSchema, type CodeReviewListItem } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
+import { codeReviewLedgerIntent } from '../code-review-ledger';
 import type {
   CodeReviewPlatform,
   CreateReviewParams,
@@ -227,6 +230,37 @@ function codeReviewInsertValues(
 }
 
 /**
+ * Admits a `code_review`-domain ledger row for a newly created review. The
+ * terminal settle later joins by the operation key `review:<reviewId>`.
+ * Best-effort: the review row already committed, so a ledger write failure must
+ * not fail review creation; the terminal settle then skips on the missing row.
+ */
+async function admitCodeReviewLedgerRow(params: {
+  database: LedgerDatabase;
+  reviewId: string;
+  userId: string;
+  orgId?: string | null;
+  triggerSource: string | null;
+}): Promise<void> {
+  try {
+    await admitOperation(params.database, {
+      userId: params.userId,
+      orgId: params.orgId ?? null,
+      domain: 'code_review',
+      intent: codeReviewLedgerIntent(params.triggerSource),
+      operationKey: `review:${params.reviewId}`,
+      taxonomy: 'never-replay',
+      leaseSeconds: 60,
+    });
+  } catch (error) {
+    logExceptInTest('[code-review-ledger] Failed to admit code review ledger row', {
+      reviewId: params.reviewId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
  * Creates a new code review record
  * Returns the created review ID
  */
@@ -241,6 +275,16 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
       .insert(cloud_agent_code_reviews)
       .values(codeReviewInsertValues(params))
       .returning({ id: cloud_agent_code_reviews.id });
+
+    // Best-effort ledger admission (P1-A-07c): the review row already committed,
+    // so a ledger write failure must not fail review creation.
+    await admitCodeReviewLedgerRow({
+      database: db,
+      reviewId: review.id,
+      userId: params.owner.userId,
+      orgId: params.owner.type === 'org' ? params.owner.id : null,
+      triggerSource: params.triggerSource ?? null,
+    });
 
     return review.id;
   } catch (error) {
@@ -1537,7 +1581,18 @@ export async function createCodeReviewIfAbsentInTransaction(
     .values(codeReviewInsertValues(params))
     .onConflictDoNothing()
     .returning({ id: cloud_agent_code_reviews.id });
-  if (created) return { reviewId: created.id, created: true };
+  if (created) {
+    // Best-effort ledger admission (P1-A-07c): the review row already committed
+    // in this transaction, so a ledger write failure must not fail creation.
+    await admitCodeReviewLedgerRow({
+      database: tx,
+      reviewId: created.id,
+      userId: params.owner.userId,
+      orgId: params.owner.type === 'org' ? params.owner.id : null,
+      triggerSource: params.triggerSource ?? null,
+    });
+    return { reviewId: created.id, created: true };
+  }
 
   const existing =
     (await findExistingReviewWithDatabase(tx, scope, params.headSha)) ??

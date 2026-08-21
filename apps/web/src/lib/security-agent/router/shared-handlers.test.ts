@@ -697,6 +697,15 @@ describe('queue-backed handlers', () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
     mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
     mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'start_analysis',
+        resource_key:
+          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    });
 
     await expect(
       createHandlers().startAnalysis.handler({
@@ -717,6 +726,15 @@ describe('queue-backed handlers', () => {
     });
     mockCanStartAnalysis.mockResolvedValue({ allowed: false, currentCount: 3, limit: 3 });
     mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'start_analysis',
+        resource_key:
+          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    });
 
     await expect(
       createHandlers().startAnalysis.handler({

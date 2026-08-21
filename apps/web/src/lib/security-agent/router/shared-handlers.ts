@@ -293,14 +293,30 @@ async function assembleAuditReportResponse<TExtra>(params: {
 // (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
 // same-key retry re-submits instead of re-executing blind.
 
-type SecurityLedgerIntent = 'manual_sync' | 'dismiss_finding';
+type SecurityLedgerIntent =
+  | 'manual_sync'
+  | 'dismiss_finding'
+  | 'start_analysis'
+  | 'apply_auto_remediation';
+
+const SECURITY_LEDGER_INTENTS: readonly SecurityLedgerIntent[] = [
+  'manual_sync',
+  'dismiss_finding',
+  'start_analysis',
+  'apply_auto_remediation',
+];
+
+function isSecurityLedgerIntent(value: string): value is SecurityLedgerIntent {
+  return (SECURITY_LEDGER_INTENTS as readonly string[]).includes(value);
+}
 
 /** The Worker's acceptance receipt and correlation ids. */
 type AcceptedCommandIds = {
   accepted: true;
   commandId: string;
-  runId: string;
-  messageId: string;
+  /** Correlation ids are absent for intents without a queue run (analysis). */
+  runId?: string;
+  messageId?: string;
 };
 
 type SecurityCommandResult =
@@ -352,6 +368,91 @@ function securityDismissLedgerResourceKey(
   comment?: string
 ): string {
   return `security:dismiss_finding:${securityOwnerScopeKey(owner)}:${findingId}:${reason}:${normalizeDismissComment(comment)}`;
+}
+
+/** Security ledger resource identity for a manual analysis start. */
+function securityAnalysisLedgerResourceKey(owner: SecurityReviewOwner, findingId: string): string {
+  return `security:start_analysis:${securityOwnerScopeKey(owner)}:${findingId}`;
+}
+
+/** Security ledger resource identity for a remediation attempt. */
+function securityRemediationLedgerResourceKey(
+  owner: SecurityReviewOwner,
+  findingId: string
+): string {
+  return `security:apply_auto_remediation:${securityOwnerScopeKey(owner)}:${findingId}`;
+}
+
+/**
+ * The ledger user id for a security owner. Personal scope uses the owner user.
+ * Org scope has no single acting user, so it approximates with the
+ * organization's `created_by_kilo_user_id` (the `kilo_user_id` column is NOT
+ * NULL). Returns null when the org has no creator, in which case the admit is
+ * skipped and the terminal settle later skips on the missing row.
+ */
+async function resolveSecurityLedgerUserId(owner: SecurityReviewOwner): Promise<string | null> {
+  if (!('organizationId' in owner) || !owner.organizationId) {
+    return owner.userId ?? null;
+  }
+  const [org] = await db
+    .select({ createdBy: organizations.created_by_kilo_user_id })
+    .from(organizations)
+    .where(eq(organizations.id, owner.organizationId))
+    .limit(1);
+  return org?.createdBy ?? null;
+}
+
+/**
+ * Admits a `security`-domain ledger row for an already-created remediation
+ * attempt and records the attempt id as the provider reference. The Worker
+ * settles the row from the terminal callback. Best-effort: the remediation
+ * effect already committed, so a ledger write failure must not fail the
+ * request; the terminal settle then skips on the missing row.
+ */
+async function admitSecurityRemediationLedgerRow(params: {
+  owner: SecurityReviewOwner;
+  findingId: string;
+  attemptId: string;
+  remediationId: string;
+  attemptNumber: number;
+}): Promise<void> {
+  try {
+    const userId = await resolveSecurityLedgerUserId(params.owner);
+    if (!userId) {
+      console.error('Skipping security remediation ledger admission: no ledger user id', {
+        attemptId: params.attemptId,
+      });
+      return;
+    }
+    const admission = await admitOperation(db, {
+      userId,
+      orgId:
+        'organizationId' in params.owner && params.owner.organizationId
+          ? params.owner.organizationId
+          : null,
+      domain: 'security',
+      intent: 'apply_auto_remediation',
+      operationKey: `remediation:${params.attemptId}`,
+      resourceKey: securityRemediationLedgerResourceKey(params.owner, params.findingId),
+      taxonomy: 'reconcile-first',
+      leaseSeconds: 120,
+    });
+    if (admission.admission !== 'admitted') return;
+    await recordOperationAcceptance(db, {
+      rowId: admission.row.id,
+      providerRef: params.attemptId,
+      canonicalResult: {
+        attemptId: params.attemptId,
+        remediationId: params.remediationId,
+        attemptNumber: params.attemptNumber,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to admit the security remediation ledger row', {
+      attemptId: params.attemptId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -468,8 +569,8 @@ async function executeSecurityCommandSubmit(args: {
         providerRef: accepted.commandId,
         canonicalResult: {
           commandId: accepted.commandId,
-          runId: accepted.runId,
-          messageId: accepted.messageId,
+          ...(accepted.runId !== undefined ? { runId: accepted.runId } : {}),
+          ...(accepted.messageId !== undefined ? { messageId: accepted.messageId } : {}),
         },
       })) !== null
   );
@@ -578,7 +679,7 @@ async function settleSecurityLedgerForTerminalCommand(params: {
       )
       .limit(1);
     if (!row || isTerminalOperationStatus(row.status)) return;
-    if (row.intent !== 'manual_sync' && row.intent !== 'dismiss_finding') return;
+    if (!isSecurityLedgerIntent(row.intent)) return;
 
     await settleOperation(db, {
       rowId: row.id,
@@ -1676,21 +1777,41 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           }
         }
 
-        const queued = await submitManualAnalysisStart({
-          findingId: input.findingId,
+        // Analysis has no client `operationKey`, so each start attempt gets a
+        // fresh UUID key. The ledger row is admitted before submission and the
+        // Worker `commandId` is recorded as the provider reference, which the
+        // web observation settle later joins on to emit
+        // `security_command_settled` with the `start_analysis` intent.
+        const result: SecurityCommandResult = await runSecurityLedgerSubmit({
+          ctx,
           owner: securityOwner,
-          actorUserId: ctx.user.id,
-          requestedModels: {
-            model: input.model,
-            triageModel: input.triageModel,
-            analysisModel: input.analysisModel,
+          intent: 'start_analysis',
+          operationKey: crypto.randomUUID(),
+          resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
+          submit: async () => {
+            const { commandId } = await submitManualAnalysisStart({
+              findingId: input.findingId,
+              owner: securityOwner,
+              actorUserId: ctx.user.id,
+              requestedModels: {
+                model: input.model,
+                triageModel: input.triageModel,
+                analysisModel: input.analysisModel,
+              },
+              forceSandbox: input.forceSandbox,
+              retrySandboxOnly: input.retrySandboxOnly,
+              restartActive: input.restartActive,
+            });
+            return { accepted: true, commandId };
           },
-          forceSandbox: input.forceSandbox,
-          retrySandboxOnly: input.retrySandboxOnly,
-          restartActive: input.restartActive,
         });
 
-        return { success: true, ...queued };
+        if (result.kind === 'replayed') {
+          const commandId =
+            typeof result.canonical.commandId === 'string' ? result.canonical.commandId : undefined;
+          return { success: true, queued: true, commandId };
+        }
+        return { success: true, queued: true, commandId: result.accepted.commandId };
       },
     },
 
@@ -1730,6 +1851,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           actorUserId: ctx.user.id,
         });
         if (!queued.queued) return { success: false, ...queued };
+
+        // Admit the remediation ledger row after the attempt committed so the
+        // Worker's terminal callback can settle it. Best-effort: the attempt
+        // already exists, so a ledger write failure must not fail the request.
+        await admitSecurityRemediationLedgerRow({
+          owner: securityOwner,
+          findingId: input.findingId,
+          attemptId: queued.attemptId,
+          remediationId: queued.remediationId,
+          attemptNumber: queued.attemptNumber,
+        });
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
@@ -1779,6 +1911,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           retry: true,
         });
         if (!queued.queued) return { success: false, ...queued };
+
+        await admitSecurityRemediationLedgerRow({
+          owner: securityOwner,
+          findingId: input.findingId,
+          attemptId: queued.attemptId,
+          remediationId: queued.remediationId,
+          attemptNumber: queued.attemptNumber,
+        });
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,

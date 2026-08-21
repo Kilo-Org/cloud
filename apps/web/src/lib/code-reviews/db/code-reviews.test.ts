@@ -6,6 +6,7 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
+  operation_ledgers,
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
@@ -786,6 +787,39 @@ describe('review identity', () => {
       .from(cloud_agent_code_review_attempts)
       .where(inArray(cloud_agent_code_review_attempts.id, [queuedAttempt.id, runningAttempt.id]));
     expect(attempts.map(attempt => attempt.status)).toEqual(['cancelled', 'cancelled']);
+  });
+
+  it('admits a code_review ledger row with the mapped intent on create', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName: `${REPO}-ledger-admit`,
+      prNumber: 34,
+      prUrl: `https://github.com/${REPO}-ledger-admit/pull/34`,
+      prTitle: 'ledger admit',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/ledger-admit',
+      headSha: 'ledger-admit-head-sha',
+      platform: 'github',
+      triggerSource: 'webhook',
+    });
+    createdReviewIds.push(reviewId);
+
+    const [ledgerRow] = await db
+      .select({
+        domain: operation_ledgers.domain,
+        operationKey: operation_ledgers.operation_key,
+        intent: operation_ledgers.intent,
+      })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+
+    expect(ledgerRow).toEqual({
+      domain: 'code_review',
+      operationKey: `review:${reviewId}`,
+      intent: 'webhook',
+    });
   });
 });
 

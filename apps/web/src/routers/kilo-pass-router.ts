@@ -78,6 +78,7 @@ import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
+import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
 import {
   getAllMobileStoreKiloPassProducts,
   getMobileStoreKiloPassProductByAppleProductId,
@@ -2066,6 +2067,11 @@ export const kiloPassRouter = createTRPCRouter({
           reason: 'cancel_subscription',
         });
       }
+
+      await abandonCollectibleInvoicesForStripeSubscription({
+        stripe,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+      });
 
       await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
         cancel_at_period_end: true,

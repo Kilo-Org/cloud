@@ -109,6 +109,7 @@ function upsertByRequestId<T extends { requestId: string }>(
 }
 
 function createServiceState(config: ServiceStateConfig): ServiceState {
+  let rootSessionId = config.rootSessionId;
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
   let cloudStatus: CloudStatus | null = null;
@@ -135,7 +136,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function isRootSession(sessionId: string): boolean {
-    return sessionId === config.rootSessionId;
+    return sessionId === rootSessionId;
   }
 
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
@@ -246,6 +247,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function processSessionCreated(event: Extract<ServiceEvent, { type: 'session.created' }>): void {
+    if (event.info.parentID == null) {
+      rootSessionId = event.info.id;
+    }
     // Only track root session info
     if (isRootSession(event.info.id)) {
       sessionInfo = event.info;

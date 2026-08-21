@@ -322,6 +322,23 @@ describe('createServiceState', () => {
       });
     });
 
+    it('adopts the server-reported root session ID for errors', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.created', info: makeSession('server-root') });
+      state.process({
+        type: 'session.error',
+        error: 'Root session failed.',
+        sessionId: 'server-root',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Root session failed.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Root session failed.' });
+    });
+
     it('keeps events without a sessionId on the legacy root path', () => {
       const onError = jest.fn();
       const onChildSessionError = jest.fn();

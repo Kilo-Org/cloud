@@ -47,6 +47,35 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     findingId: nonEmptyStringSchema,
     scope: nonEmptyStringSchema,
   }),
+  // 1:1 map to SecurityAuditLogAction (packages/db/src/schema-types.ts):
+  // analysis_completed -> FindingAnalysisCompleted,
+  // analysis_failed -> FindingAnalysisFailed,
+  // remediation_queued -> RemediationQueued,
+  // remediation_pr_opened -> RemediationPrOpened,
+  // remediation_failed -> RemediationFailed,
+  // remediation_blocked -> RemediationBlocked,
+  // remediation_no_changes_needed -> RemediationNoChangesNeeded,
+  // remediation_cancelled -> RemediationCancelled.
+  // FindingCreated is intentionally unmapped: finding creation already sends
+  // the visible `security_finding` push, so a second visible push would
+  // double-notify.
+  z.object({
+    type: z.literal('security_lifecycle'),
+    event: z.enum([
+      'analysis_completed',
+      'analysis_failed',
+      'remediation_queued',
+      'remediation_pr_opened',
+      'remediation_failed',
+      'remediation_blocked',
+      'remediation_no_changes_needed',
+      'remediation_cancelled',
+    ]),
+    findingId: nonEmptyStringSchema,
+    scope: nonEmptyStringSchema,
+    remediationId: nonEmptyStringSchema.optional(),
+    prUrl: nonEmptyStringSchema.optional(),
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

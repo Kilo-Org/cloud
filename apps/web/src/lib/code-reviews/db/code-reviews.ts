@@ -34,7 +34,7 @@ import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
 import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
-import { codeReviewLedgerIntent } from '../code-review-ledger';
+import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';
 import type {
   CodeReviewPlatform,
   CreateReviewParams,
@@ -168,6 +168,7 @@ export type CancelledReviewRow = {
   platform: CodeReviewPlatform;
   platformProjectId: number | null;
   platformIntegrationId: string | null;
+  triggerSource: string | null;
 };
 
 type CodeReviewDatabase = typeof db | DrizzleTransaction;
@@ -1765,6 +1766,7 @@ type CancelledReviewDatabaseRow = {
   platform: CodeReviewPlatform;
   platform_project_id: number | null;
   platform_integration_id: string | null;
+  trigger_source: string | null;
 };
 
 function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReviewRow {
@@ -1778,6 +1780,7 @@ function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReview
     platform: row.platform,
     platformProjectId: row.platform_project_id,
     platformIntegrationId: row.platform_integration_id,
+    triggerSource: row.trigger_source,
   };
 }
 
@@ -1817,7 +1820,8 @@ async function cancelReviewsForPR(
         head_sha,
         platform,
         platform_project_id,
-        platform_integration_id
+        platform_integration_id,
+        trigger_source
       FROM ${cloud_agent_code_reviews}
       WHERE ${ownerCondition}
         AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
@@ -1856,7 +1860,8 @@ async function cancelReviewsForPR(
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
-      targets.platform_integration_id
+      targets.platform_integration_id,
+      targets.trigger_source
   `);
 
   return result.rows.map(mapCancelledReviewRow);
@@ -1887,7 +1892,8 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
         head_sha,
         platform,
         platform_project_id,
-        platform_integration_id
+        platform_integration_id,
+        trigger_source
       FROM ${cloud_agent_code_reviews}
       WHERE ${inArray(cloud_agent_code_reviews.id, reviewIds)}
         AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
@@ -1921,7 +1927,8 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
-      targets.platform_integration_id
+      targets.platform_integration_id,
+      targets.trigger_source
   `);
 
   return result.rows.map(mapCancelledReviewRow);
@@ -1956,7 +1963,8 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
         head_sha,
         platform,
         platform_project_id,
-        platform_integration_id
+        platform_integration_id,
+        trigger_source
       FROM ${cloud_agent_code_reviews}
       WHERE ${cloud_agent_code_reviews.owned_by_organization_id} = ${input.organizationId}
         AND ${cloud_agent_code_reviews.platform} = ${input.platform}
@@ -1992,21 +2000,43 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
-      targets.platform_integration_id
+      targets.platform_integration_id,
+      targets.trigger_source
   `);
 
   return result.rows.map(mapCancelledReviewRow);
+}
+
+/**
+ * Best-effort settles the admitted ledger rows for already-committed
+ * cancellations. A settle failure is logged by `settleCodeReviewLedgerRow` and
+ * never fails the cancel.
+ */
+async function settleCancelledReviews(
+  cancelled: CancelledReviewRow[],
+  terminalReason: 'superseded' | 'user_cancelled'
+): Promise<void> {
+  for (const row of cancelled) {
+    await settleCodeReviewLedgerRow({
+      reviewId: row.id,
+      status: 'cancelled',
+      terminalReason,
+      triggerSource: row.triggerSource,
+    });
+  }
 }
 
 export async function cancelActiveCodeReviewsForIntegration(
   input: IntegrationReviewCancellationInput
 ): Promise<CancelledReviewRow[]> {
   try {
-    return await cancelActiveCodeReviewsForIntegrationWithDatabase(
+    const cancelled = await cancelActiveCodeReviewsForIntegrationWithDatabase(
       db,
       input,
       'Platform integration disconnected'
     );
+    await settleCancelledReviews(cancelled, 'user_cancelled');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelActiveCodeReviewsForIntegration' },
@@ -2021,7 +2051,9 @@ export async function cancelActiveCodeReviewsById(
   errorMessage: string
 ): Promise<CancelledReviewRow[]> {
   try {
-    return await cancelActiveCodeReviewsByIdWithDatabase(db, reviewIds, errorMessage);
+    const cancelled = await cancelActiveCodeReviewsByIdWithDatabase(db, reviewIds, errorMessage);
+    await settleCancelledReviews(cancelled, 'superseded');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelActiveCodeReviewsById' },
@@ -2036,7 +2068,7 @@ export async function disableBitbucketCodeReviewerForIntegration(input: {
   integrationId: string;
 }): Promise<CancelledReviewRow[]> {
   try {
-    return await db.transaction(async tx => {
+    const cancelled = await db.transaction(async tx => {
       const lockKey = bitbucketCodeReviewerLifecycleLockKey(input.integrationId);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
       await tx
@@ -2058,6 +2090,10 @@ export async function disableBitbucketCodeReviewerForIntegration(input: {
         'Bitbucket Code Reviewer disabled'
       );
     });
+    // Settle best-effort after commit: a settle failure must not roll back the
+    // disable or the cancel.
+    await settleCancelledReviews(cancelled, 'user_cancelled');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'disableBitbucketCodeReviewerForIntegration' },
@@ -2072,7 +2108,9 @@ export async function cancelSupersededReviewsForPR(
   excludeSha: string
 ): Promise<CancelledReviewRow[]> {
   try {
-    return await cancelReviewsForPR(db, scope, excludeSha);
+    const cancelled = await cancelReviewsForPR(db, scope, excludeSha);
+    await settleCancelledReviews(cancelled, 'superseded');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelSupersededReviewsForPR' },

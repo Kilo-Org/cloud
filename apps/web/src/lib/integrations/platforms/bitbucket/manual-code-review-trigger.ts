@@ -17,6 +17,7 @@ import {
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { getBitbucketCodeReviewerReadiness } from './workspace-access-token-repository-cache';
@@ -261,6 +262,17 @@ async function interruptCancelledReviews(cancelledReviews: CancelledReviewRow[])
   );
 }
 
+async function settleCancelledReviews(cancelledReviews: CancelledReviewRow[]): Promise<void> {
+  for (const review of cancelledReviews) {
+    await settleCodeReviewLedgerRow({
+      reviewId: review.id,
+      status: 'cancelled',
+      terminalReason: 'superseded',
+      triggerSource: review.triggerSource,
+    });
+  }
+}
+
 export async function triggerManualBitbucketCodeReview(input: {
   organizationId: string;
   pullRequestUrl: string;
@@ -483,6 +495,7 @@ export async function triggerManualBitbucketCodeReview(input: {
   }
 
   await interruptCancelledReviews(transactionResult.cancelledReviews);
+  await settleCancelledReviews(transactionResult.cancelledReviews);
   if (transactionResult.created) {
     // Best-effort ledger admission (P1-A-07c): the review row already
     // committed, so a ledger write failure must not fail the manual trigger.

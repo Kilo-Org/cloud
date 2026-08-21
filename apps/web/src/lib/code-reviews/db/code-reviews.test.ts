@@ -705,6 +705,12 @@ describe('review identity', () => {
     expect(review?.status).toBe('cancelled');
     expect(storedAttempt?.status).toBe('cancelled');
 
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('no_op');
+
     await db
       .delete(agent_configs)
       .where(
@@ -790,6 +796,39 @@ describe('review identity', () => {
       .from(cloud_agent_code_review_attempts)
       .where(inArray(cloud_agent_code_review_attempts.id, [queuedAttempt.id, runningAttempt.id]));
     expect(attempts.map(attempt => attempt.status)).toEqual(['cancelled', 'cancelled']);
+  });
+
+  it('settles the admitted ledger row for user-cancelled reviews', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organizationId, userId: firstUser.id },
+      platformIntegrationId: organizationIntegrationId,
+      repoFullName: `${REPO}-ledger-user-cancel`,
+      prNumber: 36,
+      prUrl: `https://github.com/${REPO}-ledger-user-cancel/pull/36`,
+      prTitle: 'ledger user cancel settle',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/ledger-user-cancel-settle',
+      headSha: 'ledger-user-cancel-settle-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    createdReviewIds.push(reviewId);
+
+    const cancelled = await cancelActiveCodeReviewsForIntegration({
+      organizationId,
+      platform: 'github',
+      integrationId: organizationIntegrationId,
+    });
+
+    expect(cancelled.map(row => row.id)).toContain(reviewId);
+    expect(cancelled.find(row => row.id === reviewId)?.triggerSource).toBe('manual');
+
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('no_op');
   });
 
   it('admits a code_review ledger row with the mapped intent on create', async () => {
@@ -1246,6 +1285,44 @@ describe('cancelSupersededReviewsForPR', () => {
       .where(eq(cloud_agent_code_reviews.id, otherRepoId))
       .limit(1);
     expect(otherRepoRow?.status).toBe('pending');
+  });
+
+  it('settles the admitted ledger row for superseded reviews', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platformIntegrationId: githubIntegrationId,
+      repoFullName: repo,
+      prNumber: 46,
+      prUrl: `https://github.com/${repo}/pull/46`,
+      prTitle: 'ledger superseded settle',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/ledger-superseded-settle',
+      headSha: 'sha-ledger-superseded-settle',
+      platform: 'github',
+      triggerSource: 'webhook',
+    });
+    createdReviewIds.push(reviewId);
+
+    const cancelled = await cancelSupersededReviewsForPR(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'github',
+        repoFullName: repo,
+        prNumber: 46,
+        platformIntegrationId: githubIntegrationId,
+      },
+      'sha-ledger-superseded-settle-new'
+    );
+
+    expect(cancelled.map(row => row.id)).toEqual([reviewId]);
+    expect(cancelled[0]?.triggerSource).toBe('webhook');
+
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('superseded');
   });
 });
 

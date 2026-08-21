@@ -22,6 +22,8 @@ export const createSessionForCloudAgentSchema = z.object({
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
+  // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
+  gitUrl: z.string().optional(),
 });
 export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCloudAgentSchema>;
 

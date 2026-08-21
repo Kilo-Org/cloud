@@ -153,6 +153,11 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return;
     }
     if (resolved.status === 'resolving') {
+      // A markdown chip tapped while the presign is in flight opens the
+      // modal as soon as the URL lands; the modal render is gated on `url`.
+      if (kind === 'markdown') {
+        setPreview('markdown');
+      }
       return;
     }
     if (resolved.status === 'error') {

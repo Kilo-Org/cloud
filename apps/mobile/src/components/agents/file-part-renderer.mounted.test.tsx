@@ -644,6 +644,50 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
+  it('opens the markdown modal after a tap during the presign resolves', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '33333333-3333-4333-8333-333333333333';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const presignHolder: {
+      resolve?: (value: { signedUrl: string; key: string; expiresAt: string }) => void;
+    } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise(resolve => {
+        presignHolder.resolve = resolve;
+      })
+    );
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    // The presign is still in flight, so the chip is busy. A tap during that
+    // window must open the modal once the URL lands, without a second tap.
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    expect(findByType(root, 'Modal')).toHaveLength(0);
+
+    await act(async () => {
+      presignHolder.resolve?.({
+        signedUrl: 'https://r2.example/signed',
+        key: 'k',
+        expiresAt: '2026-01-01T00:00:00Z',
+      });
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(renderer);
+  });
+
   it('shows a retry toast when the presign fails, then opens after a successful retry', async () => {
     expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
     const uuid = '22222222-2222-4222-8222-222222222222';

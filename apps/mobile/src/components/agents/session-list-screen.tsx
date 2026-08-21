@@ -27,16 +27,12 @@ import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
-import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useNavigation, useRouter } from 'expo-router';
 
 export function AgentSessionListScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const queryClient = useQueryClient();
-  const isFocused = useIsFocused();
-  const focusedRef = useRef(isFocused);
-  useEffect(() => {
-    focusedRef.current = isFocused;
-  }, [isFocused]);
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -111,10 +107,11 @@ export function AgentSessionListScreen() {
   // stored refetch serialized by the shared operation coordinator (backfill
   // and departure never overlap a refetch). A frozen (unfocused) Agents tab
   // must NOT refetch on foreground: only the focused tab refreshes the stored
-  // list and invalidates the active-sessions tray.
+  // list and invalidates the active-sessions tray. Focus is read live via
+  // `navigation.isFocused()` because a frozen tree does not re-render.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active' && focusedRef.current) {
+      if (nextState === 'active' && navigation.isFocused()) {
         void refetchRef.current();
         void queryClient.invalidateQueries({ queryKey: [['activeSessions']] });
       }
@@ -122,7 +119,7 @@ export function AgentSessionListScreen() {
     return () => {
       subscription.remove();
     };
-  }, [queryClient]);
+  }, [queryClient, navigation]);
 
   const showSearchBusy = selectShowSearchBusy({
     awaitingCommit,

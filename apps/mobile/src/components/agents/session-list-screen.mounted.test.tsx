@@ -48,7 +48,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
 vi.mock('expo-router', () => ({
-  useIsFocused: () => focusState.current,
+  useNavigation: () => ({ isFocused: () => focusState.current }),
   useFocusEffect: (effect: () => void) => {
     focusCallback.current = effect;
   },
@@ -207,7 +207,7 @@ describe('AgentSessionListScreen foreground refresh', () => {
   });
 
   it('does not refetch or invalidate on foreground after focus is lost post-mount', async () => {
-    const renderer = await renderScreen();
+    await renderScreen();
 
     // The route-focus refetch fires once on mount focus.
     act(() => {
@@ -215,11 +215,9 @@ describe('AgentSessionListScreen foreground refresh', () => {
     });
     expect(refetchSpy).toHaveBeenCalledTimes(1);
 
-    // Blur the tab after mount. The sync effect must move focusedRef to false.
-    act(() => {
-      focusState.current = false;
-      renderer.update(createElement(AgentSessionListScreen));
-    });
+    // Blur the tab after mount WITHOUT re-rendering: a frozen (unfocused) tab
+    // does not re-render, so the AppState callback must read focus live.
+    focusState.current = false;
 
     act(() => {
       appState.emit('background');

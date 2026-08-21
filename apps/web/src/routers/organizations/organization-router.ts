@@ -122,6 +122,20 @@ function getDateThreshold(period: string): Date | null {
   }
 }
 
+/**
+ * Returns a shallow copy of `obj` with `keys` deleted. The return type stays
+ * `T` (the admin superset) because the narrowed member shape is pinned by the
+ * key-set test rather than a separate response type; a union response type
+ * would break member-facing consumers outside this slice.
+ */
+function omitKeys<T extends object>(obj: T, keys: Array<keyof T>): T {
+  const copy: Record<string, unknown> = { ...obj } as Record<string, unknown>;
+  for (const key of keys) {
+    delete copy[key as string];
+  }
+  return copy as T;
+}
+
 export const organizationsRouter = createTRPCRouter({
   members: organizationsMembersRouter,
   subscription: organizationsSubscriptionRouter,
@@ -402,10 +416,35 @@ export const organizationsRouter = createTRPCRouter({
         };
       });
 
+      // Role-gated DTO: ordinary members must not receive the Stripe customer
+      // id or the invitation secret. Admin-and-above keep the full shape.
+      //
+      // Stripped for member:
+      // - organization.stripe_customer_id (payment identifier; rendered only in
+      //   the admin dashboard, OrganizationInfoCard.tsx).
+      // - invited member inviteToken/inviteUrl (the accept-invite secret).
+      // - member currentDailyUsageUsd (no member-role consumer).
+      //
+      // Compatibility: inviteId, dailyUsageLimitUsd, emailStatus, and
+      // childOrganizationMemberships are kept for member-facing consumers
+      // (OrganizationMembersCard, mobile members screen); remove when those
+      // consumers migrate to organizations.members.listPublic.
+      const isMember = callerRole === 'member';
+      const organizationPayload = isMember
+        ? omitKeys(organization, ['stripe_customer_id'])
+        : organization;
+      const membersPayload = isMember
+        ? membersWithChildOrganizations.map(member =>
+            member.status === 'active'
+              ? omitKeys(member, ['currentDailyUsageUsd'])
+              : omitKeys(member, ['inviteToken', 'inviteUrl', 'currentDailyUsageUsd'])
+          )
+        : membersWithChildOrganizations;
+
       return {
-        ...organization,
+        ...organizationPayload,
         callerRole,
-        members: membersWithChildOrganizations,
+        members: membersPayload,
         childOrganizations,
         effectiveSsoPolicy:
           ssoPolicy.status === 'required'

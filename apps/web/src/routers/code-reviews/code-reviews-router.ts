@@ -248,8 +248,30 @@ export const codeReviewRouter = createTRPCRouter({
           }),
         ]);
 
+        // Role-gated DTO: raw ledger/transaction identifiers are admin+ only.
+        // Per-field decision:
+        // - session_id: internal cloud agent session id -> null for non-admin.
+        // - cli_session_id: internal CLI session id used to look up the billing
+        //   ledger (getSessionUsageFromBilling) -> null for non-admin.
+        // - dispatch_reservation_id: internal dispatch reservation id -> null
+        //   for non-admin.
+        // - check_run_id: internal GitHub Check Run ID -> null for non-admin.
+        // total_cost_musd (display cost) is retained: the mobile review detail
+        // screen renders it (review-detail-screen.tsx).
+        const callerRole = await ensureOrganizationAccess(ctx, fullInput.organizationId);
+        const canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
+        const visibleReviews = canSeeRawIds
+          ? reviews
+          : reviews.map(review => ({
+              ...review,
+              session_id: null,
+              cli_session_id: null,
+              dispatch_reservation_id: null,
+              check_run_id: null,
+            }));
+
         const response: ListCodeReviewsResponse = {
-          reviews,
+          reviews: visibleReviews,
           total,
           hasMore: offset + reviews.length < total,
         };

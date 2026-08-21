@@ -84,6 +84,7 @@ import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@/lib/organizations/organizations';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -382,6 +383,96 @@ describe('codeReviewRouter.cancel', () => {
       expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
       'lite'
     );
+  });
+});
+
+describe('codeReviewRouter.listForOrganization role-gated ids', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser({
+      google_user_email: 'list-ids-owner@example.com',
+      google_user_name: 'List Ids Owner',
+      is_admin: false,
+    });
+    memberUser = await insertTestUser({
+      google_user_email: 'list-ids-member@example.com',
+      google_user_name: 'List Ids Member',
+      is_admin: false,
+    });
+    organization = await createTestOrganization('List Ids Org', ownerUser.id, 0, {}, false);
+    await addUserToOrganization(organization.id, memberUser.id, 'member');
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, memberUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, ownerUser.id));
+  });
+
+  it('nulls raw ledger/transaction ids for members and keeps them for owners', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/list-ids-repo',
+        pr_number: 1,
+        pr_url: 'https://github.com/test-org/list-ids-repo/pull/1',
+        pr_title: 'List ids PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/list-ids',
+        head_sha: 'sha-list-ids',
+        status: 'completed',
+        session_id: 'agent-session-list-ids',
+        cli_session_id: 'ses-list-ids',
+        dispatch_reservation_id: 'reservation-list-ids',
+        check_run_id: 12345,
+        total_cost_musd: 500,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    try {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const memberResult = await memberCaller.codeReviews.listForOrganization({
+        organizationId: organization.id,
+      });
+      expect(memberResult.success).toBe(true);
+      if (!memberResult.success) throw new Error('expected member list success');
+      const memberReview = memberResult.reviews.find(r => r.id === review.id);
+      expect(memberReview).toBeDefined();
+      expect(memberReview?.session_id).toBeNull();
+      expect(memberReview?.cli_session_id).toBeNull();
+      expect(memberReview?.dispatch_reservation_id).toBeNull();
+      expect(memberReview?.check_run_id).toBeNull();
+      expect(memberReview?.total_cost_musd).toBe(500);
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.listForOrganization({
+        organizationId: organization.id,
+      });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner list success');
+      const ownerReview = ownerResult.reviews.find(r => r.id === review.id);
+      expect(ownerReview).toBeDefined();
+      expect(ownerReview?.session_id).toBe('agent-session-list-ids');
+      expect(ownerReview?.cli_session_id).toBe('ses-list-ids');
+      expect(ownerReview?.dispatch_reservation_id).toBe('reservation-list-ids');
+      expect(ownerReview?.check_run_id).toBe(12345);
+      expect(ownerReview?.total_cost_musd).toBe(500);
+    } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
   });
 });
 

@@ -180,6 +180,31 @@ export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
 
 export const PublicOrganizationMembersSchema = z.array(PublicOrganizationMemberSchema);
 
+// Member-visible variants returned by `organizations.withMembers` for `member`
+// callers. The response type stays `OrganizationWithMembers` (the admin
+// superset) because member-facing consumers (OrganizationMembersCard, the
+// mobile members screen) read the remaining fields and cannot migrate in this
+// PR. The key-set test in organization-router.test.ts pins the exact member
+// shape.
+export const MemberOrganizationSchema = OrganizationSchema.omit({
+  stripe_customer_id: true,
+});
+
+export const MemberInvitedOrganizationMemberSchema = InvitedOrganizationMemberSchema.omit({
+  inviteToken: true,
+  inviteUrl: true,
+  currentDailyUsageUsd: true,
+});
+
+export const MemberActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
+  currentDailyUsageUsd: true,
+});
+
+export const MemberOrganizationMemberSchema = z.discriminatedUnion('status', [
+  MemberActiveOrganizationMemberSchema,
+  MemberInvitedOrganizationMemberSchema,
+]);
+
 export const OrganizationWithMembersSchema = OrganizationSchema.extend({
   members: z.array(OrganizationMemberSchema),
 });

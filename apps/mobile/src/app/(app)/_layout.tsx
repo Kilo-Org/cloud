@@ -82,17 +82,26 @@ function PushRegistrationMount() {
   return null;
 }
 
-/** TEMP-DEBUG: log the (app) stack routes on every change. */
+/** TEMP-DEBUG: log the full navigation state on every change. */
 function ExitDebugMount() {
   const rootNavState = useRootNavigationState();
   useEffect(() => {
-    const appRoute = rootNavState?.routes?.find(r => r.name === '(app)');
-    console.log(
-      '[exit-debug] app stack (layout):',
-      JSON.stringify(
-        appRoute?.state?.routes?.map(r => ({ name: r.name, params: r.params }))
-      )
-    );
+    const dump = (s: unknown): unknown => {
+      if (!s || typeof s !== 'object') return s;
+      const st = s as {
+        index?: number;
+        routes?: Array<{ name?: string; params?: unknown; state?: unknown }>;
+      };
+      return {
+        index: st.index,
+        routes: st.routes?.map(r => ({
+          name: r.name,
+          params: r.params,
+          children: dump(r.state),
+        })),
+      };
+    };
+    console.log('[exit-debug] state (layout):', JSON.stringify(dump(rootNavState)));
   }, [rootNavState]);
   return null;
 }

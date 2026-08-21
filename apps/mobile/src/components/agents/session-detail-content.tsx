@@ -163,16 +163,25 @@ export function SessionDetailContent({
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
-  // TEMP-DEBUG: observe the (app) stack routes across the exit flow.
+  // TEMP-DEBUG: observe the full navigation state across the exit flow.
   const rootNavState = useRootNavigationState();
   useEffect(() => {
-    const appRoute = rootNavState?.routes?.find(r => r.name === '(app)');
-    console.log(
-      '[exit-debug] app stack:',
-      JSON.stringify(
-        appRoute?.state?.routes?.map(r => ({ name: r.name, params: r.params }))
-      )
-    );
+    const dump = (s: unknown): unknown => {
+      if (!s || typeof s !== 'object') return s;
+      const st = s as {
+        index?: number;
+        routes?: Array<{ name?: string; params?: unknown; state?: unknown }>;
+      };
+      return {
+        index: st.index,
+        routes: st.routes?.map(r => ({
+          name: r.name,
+          params: r.params,
+          children: dump(r.state),
+        })),
+      };
+    };
+    console.log('[exit-debug] state:', JSON.stringify(dump(rootNavState)));
   }, [rootNavState]);
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,

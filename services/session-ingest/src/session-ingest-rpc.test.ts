@@ -61,7 +61,9 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, or } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
+import { notifyUserSessionEvent } from './session-events';
 import { canCreateCliSessionForUser } from './services/user-session-admission';
 
 const sdkSessionInfoFixture = {
@@ -145,8 +147,9 @@ function makeRootWriteDb(params: {
     limit: vi.fn(() => select),
     for: vi.fn(async () => (params.existing ? [params.existing] : [])),
   };
+  const updateSet = vi.fn((_values: unknown) => update);
   const update = {
-    set: vi.fn(() => update),
+    set: updateSet,
     where: vi.fn(() => update),
     returning: vi.fn(async () => (params.existing ? [params.existing] : [])),
   };
@@ -158,6 +161,7 @@ function makeRootWriteDb(params: {
   return {
     db: { transaction: vi.fn(async callback => callback(tx)) },
     values,
+    updateSet,
   };
 }
 
@@ -294,6 +298,115 @@ describe('createSessionForCloudAgent', () => {
 
     await expect(rpc.createSessionForCloudAgent(personalParams)).resolves.toBeUndefined();
     expect(fake.values).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists a normalized git_url on first insert', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' });
+
+    expect(fake.values).toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: 'https://github.com/acme/repo' })
+    );
+  });
+
+  it('accepts an identical repository retry without rewriting git_url', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' })
+    ).resolves.toBeUndefined();
+    expect(fake.values).toHaveBeenCalledTimes(1);
+    const setArg = fake.updateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).not.toHaveProperty('git_url');
+  });
+
+  it('leaves an existing repository unchanged when old workers omit gitUrl', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toBeUndefined();
+    expect(fake.values).toHaveBeenCalledTimes(1);
+    const setArg = fake.updateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).not.toHaveProperty('git_url');
+  });
+
+  it('heals a null repository URL to the input URL and invalidates the access cache', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const cacheRemove = vi.fn(async () => undefined);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ remove: cacheRemove } as never);
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' });
+
+    expect(fake.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: 'https://github.com/acme/repo' })
+    );
+    expect(cacheRemove).toHaveBeenCalledWith(params.sessionId);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      params.kiloUserId,
+      expect.objectContaining({ type: 'session.updated' }),
+      expect.anything()
+    );
+  });
+
+  it('rejects a conflicting repository URL', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/other/repo' })
+    ).rejects.toThrow('Cloud Agent root session identity conflict');
   });
 });
 

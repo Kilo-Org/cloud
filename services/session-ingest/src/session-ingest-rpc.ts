@@ -30,7 +30,7 @@ import {
 import type { Env } from './env';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
-import { withDORetry } from '@kilocode/worker-utils';
+import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
 import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
 import {
@@ -75,6 +75,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    */
   async createSessionForCloudAgent(params: CreateSessionForCloudAgentParams): Promise<void> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
+    const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
@@ -93,6 +94,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           organization_id: parsed.organizationId ?? null,
           created_on_platform: parsed.createdOnPlatform,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+          ...(inputGitUrl !== undefined ? { git_url: inputGitUrl } : {}),
           version: 0,
         })
         .onConflictDoNothing({
@@ -123,10 +125,21 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         throw new Error('Cloud Agent root session identity conflict');
       }
 
+      // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
+      const repositoryHealed = inputGitUrl !== undefined && existing.git_url == null;
+      if (
+        inputGitUrl !== undefined &&
+        existing.git_url != null &&
+        existing.git_url !== inputGitUrl
+      ) {
+        throw new Error('Cloud Agent root session identity conflict');
+      }
+
       const [updated] = await tx
         .update(cli_sessions_v2)
         .set({
           cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
+          ...(repositoryHealed ? { git_url: inputGitUrl } : {}),
         })
         .where(
           and(
@@ -139,7 +152,8 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     });
 
     const hasMeaningfulChange = existingRow
-      ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId
+      ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId ||
+        (inputGitUrl !== undefined && existingRow.git_url == null)
       : true;
 
     if (existingRow && hasMeaningfulChange && persistedRow) {

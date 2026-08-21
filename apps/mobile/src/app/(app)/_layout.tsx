@@ -1,4 +1,4 @@
-import { Stack, useRootNavigationState } from 'expo-router';
+import { Stack, useNavigationContainerRef } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
@@ -82,9 +82,9 @@ function PushRegistrationMount() {
   return null;
 }
 
-/** TEMP-DEBUG: log the full navigation state on every change. */
+/** TEMP-DEBUG: log the full navigation state and dispatch stack on every change. */
 function ExitDebugMount() {
-  const rootNavState = useRootNavigationState();
+  const navigationRef = useNavigationContainerRef();
   useEffect(() => {
     const dump = (s: unknown): unknown => {
       if (!s || typeof s !== 'object') return s;
@@ -101,8 +101,13 @@ function ExitDebugMount() {
         })),
       };
     };
-    console.log('[exit-debug] state (layout):', JSON.stringify(dump(rootNavState)));
-  }, [rootNavState]);
+    const unsubscribe = navigationRef.addListener('state', () => {
+      const state = navigationRef.getRootState();
+      console.log('[exit-debug] state (layout):', JSON.stringify(dump(state)));
+      console.log('[exit-debug] stack:', new Error().stack);
+    });
+    return unsubscribe;
+  }, [navigationRef]);
   return null;
 }
 

@@ -525,6 +525,8 @@ function RootLayoutNav() {
     if (pendingDeepLink === null || !isShellReady) {
       return;
     }
+    // TEMP-DEBUG: log the pending deep-link consumption.
+    console.log('[exit-debug] pending deep link:', pendingDeepLink, new Error().stack);
     const navigation = resolvePendingNavigation(getPendingDeepLink());
     if (navigation) {
       router.navigate(navigation.href as Href);

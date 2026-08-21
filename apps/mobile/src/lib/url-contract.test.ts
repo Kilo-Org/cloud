@@ -146,6 +146,8 @@ describe('assertProductionHost', () => {
 // fatal-by-intent throw and Sentry source-map gate.
 const configPath = fileURLToPath(new URL('../../app.config.ts', import.meta.url));
 const configSource = readFileSync(configPath, 'utf8');
+const configTsPath = fileURLToPath(new URL('config.ts', import.meta.url));
+const configTsSource = readFileSync(configTsPath, 'utf8');
 
 // Removes `//` line comments and `/* */` block comments while preserving line
 // breaks, so a comment mentioning a gate cannot satisfy the assertion.
@@ -156,6 +158,7 @@ function stripComments(source: string): string {
 }
 
 const configCodeSource = stripComments(configSource);
+const configTsCodeSource = stripComments(configTsSource);
 
 describe('app.config.ts config boundary (text contract)', () => {
   it('skips absent URL values instead of asserting them', () => {
@@ -168,5 +171,13 @@ describe('app.config.ts config boundary (text contract)', () => {
 
   it('keeps the Sentry source-map upload gate', () => {
     expect(configCodeSource).toMatch(/SENTRY_AUTH_TOKEN/);
+  });
+
+  it('bakes isProductionBuild into the extra block', () => {
+    expect(configCodeSource).toMatch(/extra:\s*\{[\s\S]*?isProductionBuild,/);
+  });
+
+  it('gates the runtime production host check on the baked flag', () => {
+    expect(configTsCodeSource).toContain('extra?.isProductionBuild === true');
   });
 });

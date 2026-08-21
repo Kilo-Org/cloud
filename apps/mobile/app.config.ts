@@ -255,6 +255,7 @@ const config: ExpoConfig = {
       Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
     ),
     router: {},
+    isProductionBuild,
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
     },

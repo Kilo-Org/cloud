@@ -878,30 +878,7 @@ describe('makeErrorReadable', () => {
   });
 
   it('explains a missing model for a Vertex user BYOK request', async () => {
-    const response = Response.json(
-      {
-        error: { message: 'AI_APICallError' },
-        providerMetadata: {
-          gateway: {
-            routing: {
-              modelAttempts: [
-                {
-                  providerAttempts: [
-                    {
-                      provider: 'vertexAnthropic',
-                      credentialType: 'byok',
-                      success: false,
-                      statusCode: 404,
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      },
-      { status: 404 }
-    );
+    const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
 
     const result = await makeErrorReadable({
       providerId: 'vercel',
@@ -909,6 +886,7 @@ describe('makeErrorReadable', () => {
       request,
       response,
       isUserByok: true,
+      hasVertexUserByok: true,
     });
 
     expect(result?.status).toBe(404);
@@ -921,103 +899,8 @@ describe('makeErrorReadable', () => {
     });
   });
 
-  it('does not label other Vercel BYOK 404 responses as Vertex errors', async () => {
-    const response = Response.json(
-      {
-        providerMetadata: {
-          gateway: {
-            routing: {
-              modelAttempts: [
-                {
-                  providerAttempts: [{ provider: 'anthropic', credentialType: 'byok' }],
-                },
-              ],
-            },
-          },
-        },
-      },
-      { status: 404 }
-    );
-
-    await expect(
-      makeErrorReadable({
-        providerId: 'vercel',
-        requestedModel: 'anthropic/claude-sonnet-5',
-        request,
-        response,
-        isUserByok: true,
-      })
-    ).resolves.toBeUndefined();
-  });
-
-  it('ignores unrelated attempts while matching a failed Vertex BYOK 404', async () => {
-    const response = Response.json(
-      {
-        providerMetadata: {
-          gateway: {
-            routing: {
-              modelAttempts: [
-                {},
-                {
-                  providerAttempts: [
-                    { provider: 'anthropic' },
-                    {
-                      provider: 'vertex',
-                      credentialType: 'byok',
-                      success: false,
-                      statusCode: 404,
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      },
-      { status: 404 }
-    );
-
-    const result = await makeErrorReadable({
-      providerId: 'vercel',
-      requestedModel: 'google/gemini-3.5-flash',
-      request,
-      response,
-      isUserByok: true,
-    });
-
-    expect((await result?.json()).error_type).toBe('byok_error');
-  });
-
-  it('does not use the Vertex model hint when another attempt produced the 404', async () => {
-    const response = Response.json(
-      {
-        providerMetadata: {
-          gateway: {
-            routing: {
-              modelAttempts: [
-                {
-                  providerAttempts: [
-                    {
-                      provider: 'vertexAnthropic',
-                      credentialType: 'byok',
-                      success: false,
-                      statusCode: 403,
-                    },
-                    {
-                      provider: 'anthropic',
-                      credentialType: 'system',
-                      success: false,
-                      statusCode: 404,
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      },
-      { status: 404 }
-    );
+  it('does not label other user BYOK 404 responses as Vertex errors', async () => {
+    const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
 
     await expect(
       makeErrorReadable({

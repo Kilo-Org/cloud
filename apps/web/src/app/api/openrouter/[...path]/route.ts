@@ -1104,6 +1104,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!effectiveProviderContext.userByok,
+      hasVertexUserByok:
+        effectiveProviderContext.userByok?.some(byok => byok.providerId === 'vertex') ?? false,
     });
     if (errorResponse) {
       await logUnrewrittenResponse({

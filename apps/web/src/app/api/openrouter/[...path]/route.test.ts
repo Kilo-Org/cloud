@@ -27,6 +27,7 @@ import {
   logFreeModelRequest,
 } from '@/lib/free-model-rate-limiter';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
 import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
@@ -526,8 +527,12 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('stepfun/step-3.7-flash:free');
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('stepfun/step-3.7-flash');
+    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe(
+      longcat_2_free_model.public_id
+    );
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
+      longcat_2_free_model.internal_id
+    );
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,
       abuse_downgraded_from: 'openai/gpt-4o',

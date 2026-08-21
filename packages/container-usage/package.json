@@ -6,8 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./contracts": "./src/contracts.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",
@@ -19,11 +18,6 @@
   },
   "peerDependencies": {
     "@cloudflare/containers": ">=0.1.1"
-  },
-  "peerDependenciesMeta": {
-    "@cloudflare/containers": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@cloudflare/containers": "0.3.7",

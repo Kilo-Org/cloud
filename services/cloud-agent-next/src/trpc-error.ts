@@ -1,6 +1,17 @@
 import { PublicErrorCodeSchema, type ClientError } from '@kilocode/worker-utils/client-error';
-import { customerBillingFailureSchema } from '@kilocode/container-usage/contracts';
 import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
+import { z } from 'zod';
+
+// Keep aligned with packages/cloud-agent-sdk/src/schemas.ts.
+const customerBillingFailureSchema = z
+  .object({
+    code: z.enum(['INSUFFICIENT_CREDITS', 'COMPUTE_STOPPING', 'BILLING_UNAVAILABLE']),
+    payer: z.object({ type: z.enum(['user', 'org']), id: z.string().min(1) }).strict(),
+    retryable: z.boolean(),
+    remainingMicrodollars: z.number().int().nonnegative().optional(),
+    minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 
 const NON_RETRYABLE_CODES = new Set([
   'PARSE_ERROR',

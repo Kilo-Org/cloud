@@ -25,7 +25,6 @@
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
-    "@kilocode/container-usage": "workspace:*",
     "jotai": "2.18.1",
     "zod": "catalog:"
   },

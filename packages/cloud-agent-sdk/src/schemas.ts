@@ -1,8 +1,4 @@
 import * as z from 'zod';
-import {
-  customerBillingFailureSchema,
-  type CustomerBillingFailure,
-} from '@kilocode/container-usage/contracts';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId } from './types';
 
@@ -974,8 +970,17 @@ export const errorShapeSchema = z
   .passthrough();
 export type ErrorShape = z.infer<typeof errorShapeSchema>;
 
-export { customerBillingFailureSchema };
-export type { CustomerBillingFailure };
+// Keep aligned with the customer-safe projection in services/cloud-agent-next/src/trpc-error.ts.
+export const customerBillingFailureSchema = z
+  .object({
+    code: z.enum(['INSUFFICIENT_CREDITS', 'COMPUTE_STOPPING', 'BILLING_UNAVAILABLE']),
+    payer: z.object({ type: z.enum(['user', 'org']), id: z.string().min(1) }).strict(),
+    retryable: z.boolean(),
+    remainingMicrodollars: z.number().int().nonnegative().optional(),
+    minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type CustomerBillingFailure = z.infer<typeof customerBillingFailureSchema>;
 
 /** Only accepts the explicit tRPC cause projection; generic 402s stay legacy. */
 export function parseCustomerBillingFailure(error: unknown): CustomerBillingFailure | null {

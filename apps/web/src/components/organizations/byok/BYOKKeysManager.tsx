@@ -604,7 +604,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       placeholder={
                         selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
                           ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
-                          : '{"project": "...", "location": "us-east5", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                          : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                       }
                       className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                       rows={6}
@@ -669,7 +669,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <p>Enter your Google Cloud project, Vertex location, and service account:</p>
                       <code className="mt-1 block text-xs break-all">
                         {
-                          '{"project": "...", "location": "us-east5", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                          '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                         }
                       </code>
                       <p className="mt-1">

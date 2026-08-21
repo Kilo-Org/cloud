@@ -177,6 +177,6 @@ describe('model access predicates', () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
 
     await expect(isAllowed('openai/gpt-5.6-sol-discounted')).resolves.toBe(true);
-    await expect(isAllowed('stealth/gpt-5.6-sol')).resolves.toBe(false);
+    await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

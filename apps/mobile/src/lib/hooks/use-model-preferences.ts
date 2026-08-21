@@ -1,8 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -38,6 +42,7 @@ export function useModelPreferences(organizationId: string | undefined) {
     async (update: (favorites: string[]) => string[]) => {
       const queryKey = trpc.modelPreferences.get.queryKey(input);
       await queryClient.cancelQueries({ queryKey });
+      const generation = nextMutationGeneration(hashKey(queryKey));
       const previous = queryClient.getQueryData<ModelPreferences>(queryKey);
       if (previous) {
         queryClient.setQueryData(queryKey, {
@@ -45,15 +50,19 @@ export function useModelPreferences(organizationId: string | undefined) {
           favorites: update(previous.favorites),
         });
       }
-      return { previous };
+      return { previous, generation };
     },
     [queryClient, trpc.modelPreferences.get, input]
   );
 
   const rollbackFavorites = useCallback(
-    (error: { message: string }, context: { previous?: ModelPreferences } | undefined) => {
-      if (context?.previous) {
-        queryClient.setQueryData(trpc.modelPreferences.get.queryKey(input), context.previous);
+    (
+      error: { message: string },
+      context: { previous?: ModelPreferences; generation: number } | undefined
+    ) => {
+      const queryKey = trpc.modelPreferences.get.queryKey(input);
+      if (context?.previous && isLatestMutationGeneration(hashKey(queryKey), context.generation)) {
+        queryClient.setQueryData(queryKey, context.previous);
       }
       setFavoritesError(error.message || 'Could not update favorites');
     },
@@ -79,6 +88,8 @@ export function useModelPreferences(organizationId: string | undefined) {
   // out of order and the earlier response can stomp the later one's result.
   // Chaining onto the prior in-flight request keeps them in order — simple
   // FIFO, no dedupe/coalescing (see save-chain.ts).
+  // onError policy: roll back the onMutate snapshot (latest generation only);
+  // the caller renders the error inline (no toast).
   const addFavorite = useMutation({
     mutationFn: (vars: { model: string }) =>
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -97,6 +108,8 @@ export function useModelPreferences(organizationId: string | undefined) {
   });
 
   const removeFavorite = useMutation({
+    // onError policy: roll back the onMutate snapshot (latest generation only);
+    // the caller renders the error inline (no toast).
     mutationFn: (vars: { model: string }) =>
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       chainSave(FAVORITES_CHAIN_KEY, () => trpcClient.modelPreferences.removeFavorite.mutate(vars)),

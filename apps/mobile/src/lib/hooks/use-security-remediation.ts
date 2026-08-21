@@ -5,9 +5,13 @@ import {
   getRemediationUnavailableCopy,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
@@ -141,6 +145,8 @@ function getSecurityAnalysisQueryKey(
 export function useCancelSecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { attemptId: string; findingId: string }) =>
@@ -153,6 +159,7 @@ export function useCancelSecurityRemediation(scope: string) {
     onMutate: async vars => {
       const analysisQueryKey = getSecurityAnalysisQueryKey(trpc, scope, vars.findingId);
       await queryClient.cancelQueries({ queryKey: analysisQueryKey });
+      const generation = nextMutationGeneration(hashKey(analysisQueryKey));
       const previous = queryClient.getQueryData<SecurityAnalysis>(analysisQueryKey);
       queryClient.setQueryData<SecurityAnalysis>(analysisQueryKey, old =>
         old
@@ -166,10 +173,13 @@ export function useCancelSecurityRemediation(scope: string) {
             }
           : old
       );
-      return { previous, analysisQueryKey };
+      return { previous, analysisQueryKey, generation };
     },
     onError: (error, _vars, context) => {
-      if (context?.previous) {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(context.analysisQueryKey), context.generation)
+      ) {
         queryClient.setQueryData(context.analysisQueryKey, context.previous);
       }
       toast.error(error.message);

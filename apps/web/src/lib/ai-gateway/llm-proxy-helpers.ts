@@ -208,7 +208,13 @@ function vertexByokModelNotFoundResponse(
   response: Response,
   userByokProviderIds: UserByokProviderId[] | null
 ) {
-  if (!userByokProviderIds?.includes('vertex') || response.status !== 404) return undefined;
+  if (
+    userByokProviderIds === null ||
+    !userByokProviderIds.includes('vertex') ||
+    response.status !== 404
+  ) {
+    return undefined;
+  }
 
   const error =
     '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.';

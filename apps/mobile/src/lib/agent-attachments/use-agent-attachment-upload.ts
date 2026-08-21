@@ -384,14 +384,12 @@ export function useAgentAttachmentUpload(
         return;
       }
       commitAttachments(current => [...current, ...additions]);
-      for (const addition of additions) {
-        liveIdsRef.current.add(addition.id);
-      }
       // Step 2: images upload at selection time. Documents stay deferred to
       // send (`uploadPending`). The upload is fire-and-forget: the chip flips
       // to `uploading` synchronously in `startUpload`, and success/error
       // states already exist in that path.
       for (const addition of additions) {
+        liveIdsRef.current.add(addition.id);
         if (addition.kind === 'image') {
           void startUpload(addition, pathRef.current);
         }

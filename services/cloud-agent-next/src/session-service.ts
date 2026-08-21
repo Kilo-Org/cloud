@@ -2913,7 +2913,8 @@ export class SessionService {
     env: PersistenceEnv,
     organizationId: string | undefined,
     createdOnPlatform: string,
-    title?: string
+    title?: string,
+    gitUrl?: string
   ): Promise<void> {
     try {
       await env.SESSION_INGEST.createSessionForCloudAgent({
@@ -2923,6 +2924,7 @@ export class SessionService {
         organizationId,
         createdOnPlatform,
         title,
+        gitUrl,
       });
     } catch (error) {
       logger

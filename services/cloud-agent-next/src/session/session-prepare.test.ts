@@ -317,6 +317,80 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  it('passes a normalized GitHub repository URL to the session-ingest create call', async () => {
+    const ctx = makeContext(makeDoStub());
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: { operationKey: OPERATION_KEY },
+        repository: { type: 'github', repo: 'acme/widgets.git' },
+      })
+    );
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      'https://github.com/acme/widgets'
+    );
+  });
+
+  it('passes a normalized GitLab repository URL to the session-ingest create call', async () => {
+    const ctx = makeContext(makeDoStub());
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: { operationKey: OPERATION_KEY },
+        repository: { type: 'gitlab', url: 'https://gitlab.com/acme/widgets.git' },
+      })
+    );
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      'https://gitlab.com/acme/widgets'
+    );
+  });
+
+  it('passes a normalized Bitbucket repository URL to the session-ingest create call', async () => {
+    const ctx = makeContext(makeDoStub());
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: { operationKey: OPERATION_KEY },
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/widgets.git',
+          workspaceUuid: 'workspace-1',
+          repositoryUuid: 'repo-1',
+        },
+      })
+    );
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      'https://bitbucket.org/acme/widgets'
+    );
+  });
+
   it('settles failed with the allocation stage when a pre-DO step fails', async () => {
     createSessionReportMock.mockRejectedValueOnce(new Error('report store unavailable'));
     const ctx = makeContext(makeDoStub());

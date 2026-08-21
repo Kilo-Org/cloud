@@ -27,6 +27,7 @@ import {
   type SettleOperationInput,
 } from '@kilocode/db/operation-ledger';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
+import { normalizeGitUrl } from '@kilocode/worker-utils';
 
 import type { Env, SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
@@ -335,6 +336,18 @@ async function recordPostSetupFailure(record: () => Promise<void>): Promise<void
   }
 }
 
+/**
+ * Canonical repository URL for the session-ingest ownership row. GitHub builds
+ * the URL from the `owner/repo` slug; every other provider already carries a
+ * URL. The value is normalized before it leaves this module.
+ */
+function deriveCanonicalRepositoryUrl(repository: SessionRepositoryRequest): string | undefined {
+  if (repository.type === 'github') {
+    return normalizeGitUrl(`https://github.com/${repository.repo}`);
+  }
+  return normalizeGitUrl(repository.url);
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -448,6 +461,7 @@ async function allocateNewSession(
   logger.info('Creating new session ownership row');
 
   const defaultTitle = `New session - ${new Date().toISOString()}`;
+  const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
   try {
     await sessionService.createCliSessionViaSessionIngest(
       kiloSessionId,
@@ -456,7 +470,8 @@ async function allocateNewSession(
       ctx.env,
       input.options?.kilocodeOrganizationId,
       createdOnPlatform,
-      defaultTitle
+      defaultTitle,
+      canonicalRepositoryUrl
     );
   } catch (error) {
     await recordPostSetupFailure(() =>

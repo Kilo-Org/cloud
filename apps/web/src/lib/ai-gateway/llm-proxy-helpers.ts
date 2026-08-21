@@ -203,6 +203,68 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
+const vercelVertexByokErrorSchema = z.object({
+  providerMetadata: z.object({
+    gateway: z.object({
+      routing: z.object({
+        modelAttempts: z.array(
+          z.object({
+            providerAttempts: z
+              .array(
+                z.object({
+                  provider: z.string().optional(),
+                  credentialType: z.string().optional(),
+                  success: z.boolean().optional(),
+                  statusCode: z.number().optional(),
+                })
+              )
+              .optional(),
+          })
+        ),
+      }),
+    }),
+  }),
+});
+
+async function vertexByokModelNotFoundResponse(
+  providerId: ProviderId,
+  response: Response,
+  isUserByok: boolean
+) {
+  if (providerId !== 'vercel' || !isUserByok || response.status !== 404) return undefined;
+
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return undefined;
+  }
+
+  const parsedBody = vercelVertexByokErrorSchema.safeParse(body);
+  if (!parsedBody.success) return undefined;
+
+  const hasVertexByokAttempt = parsedBody.data.providerMetadata.gateway.routing.modelAttempts.some(
+    modelAttempt =>
+      modelAttempt.providerAttempts?.some(
+        providerAttempt =>
+          (providerAttempt.provider === 'vertex' ||
+            providerAttempt.provider === 'vertexAnthropic') &&
+          providerAttempt.credentialType === 'byok' &&
+          providerAttempt.success === false &&
+          providerAttempt.statusCode === 404
+      ) === true
+  );
+  if (!hasVertexByokAttempt) return undefined;
+
+  const error =
+    '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.';
+  warnExceptInTest(`Responding with ${response.status} ${error}`);
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: response.status }
+  );
+}
+
 const noAllowedProvidersErrorSchema = z.object({
   message: z.literal('No allowed providers are available for the selected model.'),
   code: z.literal(404),
@@ -262,6 +324,13 @@ export async function makeErrorReadable({
   if (response.status < 400) {
     return undefined;
   }
+
+  const vertexByokResponse = await vertexByokModelNotFoundResponse(
+    providerId,
+    response,
+    isUserByok
+  );
+  if (vertexByokResponse) return vertexByokResponse;
 
   if (isUserByok) {
     const byokMessage = byokErrorMessage(response.status);

@@ -6,7 +6,7 @@
 // paginated happy list. The query layer is mocked so each state is driven
 // directly through the screen JSX.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -101,9 +101,9 @@ vi.mock('react-native', () => ({
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data?: unknown[];
-    renderItem?: (info: { item: unknown; index: number }) => unknown;
-    ListEmptyComponent?: unknown;
-    ListFooterComponent?: unknown;
+    renderItem?: (info: { item: unknown; index: number }) => ReactNode;
+    ListEmptyComponent?: ReactNode;
+    ListFooterComponent?: ReactNode;
     onEndReached?: () => void;
   }) => {
     flashList.onEndReached = props.onEndReached ?? null;

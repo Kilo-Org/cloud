@@ -8,6 +8,7 @@ export const OPENROUTER = {
   apiUrl: 'https://openrouter.ai/api/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('OPENROUTER_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'messages', 'responses'],
   responseTransforms: null,
   async transformRequest() {},
@@ -18,6 +19,7 @@ export const ALIBABA = {
   apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('ALIBABA_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: [
     'chat_completions',
     // 'responses', // supported, not tested
@@ -33,6 +35,7 @@ export const SEED = {
   apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: [
     'chat_completions',
     // 'responses', // supported, not tested
@@ -61,6 +64,7 @@ export const LONGCAT = {
   apiUrl: 'https://api.longcat.ai/openai/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('LONGCAT_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: ['chat_completions'],
   responseTransforms: null,
   async transformRequest(context) {
@@ -79,6 +83,7 @@ export const MARTIAN = {
   apiUrl: 'https://api.withmartian.com/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('MARTIAN_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'responses', 'messages'],
   responseTransforms: null,
   async transformRequest(context) {
@@ -91,6 +96,7 @@ export const MISTRAL = {
   apiUrl: 'https://api.mistral.ai/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('MISTRAL_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: [],
   responseTransforms: null,
   async transformRequest() {},
@@ -101,6 +107,7 @@ export const STREAMLAKE = {
   apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: ['chat_completions'],
   responseTransforms: null,
   async transformRequest(context) {
@@ -113,6 +120,7 @@ export const VERCEL_AI_GATEWAY = {
   apiUrl: 'https://ai-gateway.vercel.sh/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'messages', 'responses'],
   responseTransforms: null,
   async transformRequest(context) {

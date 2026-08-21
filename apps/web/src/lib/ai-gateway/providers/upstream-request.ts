@@ -218,7 +218,11 @@ export async function upstreamRequest({
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
   }
-  headers.set('Authorization', `Bearer ${provider.apiKey}`);
+  if (provider.apiKeyHeader === 'x-api-key') {
+    headers.set('x-api-key', provider.apiKey);
+  } else {
+    headers.set('Authorization', `Bearer ${provider.apiKey}`);
+  }
   headers.set('Content-Type', 'application/json');
 
   Object.entries(extraHeaders).forEach(([key, value]) => {

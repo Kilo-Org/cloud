@@ -26,6 +26,7 @@ type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
   onError?: ((message: string) => void) | undefined;
+  onChildSessionError?: ((sessionId: string, message: string) => void) | undefined;
   onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
   onQuestionResolved?: ((requestId: string) => void) | undefined;
   onPermissionAsked?:
@@ -229,6 +230,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
   function processSessionError(event: Extract<ServiceEvent, { type: 'session.error' }>): void {
     if (terminated) return;
+
+    // Child session errors are scoped to the child. They must not touch the
+    // shared root status or onError, which drive the parent status indicator.
+    // Events without a sessionId keep the legacy root behavior.
+    if (event.sessionId !== undefined && !isRootSession(event.sessionId)) {
+      config.onChildSessionError?.(event.sessionId, event.error);
+      return;
+    }
 
     config.onError?.(event.error);
     status = { type: 'error', message: event.error };

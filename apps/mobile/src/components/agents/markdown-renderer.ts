@@ -11,7 +11,6 @@ import {
   type GestureResponderEvent,
   type ImageStyle,
   Pressable,
-  StyleSheet,
   Text,
   type TextStyle,
   View,
@@ -201,12 +200,10 @@ export class MarkdownRenderer extends Renderer {
   // in markdown-palette.ts). Rewrite the leading block's vertical margin so
   // loose and tight items start their first line at the row top alike.
   override listItem(children: ReactNode[], styles?: ViewStyle): ReactNode {
-    const first = Array.isArray(children) ? children[0] : undefined;
+    const first = children[0];
     if (isValidElement(first) && first.type === View) {
-      const styleProp = (first.props as { style?: ViewStyle | ViewStyle[] }).style;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- StyleSheet.flatten(undefined) returns undefined at runtime; the RN type says non-null
-      const flat = StyleSheet.flatten(styleProp) ?? {};
-      const { marginVertical, marginBottom, ...rest } = flat;
+      const styleProp = (first.props as { style?: ViewStyle }).style;
+      const { marginVertical, marginBottom, ...rest } = styleProp ?? {};
       const adjusted: ViewStyle = {
         ...rest,
         marginTop: 0,
@@ -215,7 +212,7 @@ export class MarkdownRenderer extends Renderer {
       return super.listItem(
         [
           // eslint-disable-next-line react/no-clone-element -- listItem must rewrite the leading paragraph View's style in place; cloning preserves the element's key and the renderer's key sequence
-          cloneElement(first as ReactElement<{ style?: ViewStyle | ViewStyle[] }>, {
+          cloneElement(first as ReactElement<{ style?: ViewStyle }>, {
             style: adjusted,
           }),
           ...children.slice(1),

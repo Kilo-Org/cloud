@@ -13,18 +13,32 @@ import { FindingRemediationPanel } from './finding-remediation-panel';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
+const mocks = vi.hoisted(() => ({
+  routerPush: vi.fn(),
+  prReviewEnabled: true,
+  openExternalUrl: vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
-  Linking: { openURL: vi.fn() },
+}));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
+  useFeatureFlag: () => mocks.prReviewEnabled,
+}));
+vi.mock('@/lib/external-link', () => ({
+  openExternalUrl: mocks.openExternalUrl,
 }));
 vi.mock('@/components/ui/icons', () => ({
   Wrench: 'Wrench',
 }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
-  CollapsibleSection: () => null,
+  CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
@@ -114,6 +128,17 @@ function renderPanel(analysis: SecurityAnalysis): R {
   return r;
 }
 
+function pressButtons(r: R): void {
+  act(() => {
+    for (const node of r.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Button'
+    )) {
+      const onPress = node.props.onPress as (() => void) | undefined;
+      onPress?.();
+    }
+  });
+}
+
 describe('FindingRemediationPanel remediation timeline', () => {
   beforeEach(() => {
     texts.items = [];
@@ -161,5 +186,118 @@ describe('FindingRemediationPanel remediation timeline', () => {
 
     expect(texts.items).not.toContain('Progress');
     expect(texts.items).not.toContain('Remediation requested');
+  });
+});
+
+describe('FindingRemediationPanel pull request navigation', () => {
+  beforeEach(() => {
+    texts.items = [];
+    mocks.routerPush.mockReset();
+    mocks.openExternalUrl.mockReset();
+    mocks.prReviewEnabled = true;
+  });
+
+  it('navigates in-app for a github.com PR URL when the flag is on', () => {
+    const r = renderPanel(
+      analysisFixture({
+        remediationSummary: {
+          status: 'pr_opened',
+          prUrl: 'https://github.com/kilo/kilo/pull/123',
+          prNumber: 123,
+          prDraft: false,
+          outcomeSummary: null,
+        },
+      })
+    );
+
+    pressButtons(r);
+
+    expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/kilo/123');
+    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the browser when the flag is off', () => {
+    mocks.prReviewEnabled = false;
+    const r = renderPanel(
+      analysisFixture({
+        remediationSummary: {
+          status: 'pr_opened',
+          prUrl: 'https://github.com/kilo/kilo/pull/123',
+          prNumber: 123,
+          prDraft: false,
+          outcomeSummary: null,
+        },
+      })
+    );
+
+    pressButtons(r);
+
+    expect(mocks.routerPush).not.toHaveBeenCalled();
+    expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/kilo/kilo/pull/123', {
+      label: 'pull request',
+    });
+  });
+
+  it('falls back to the browser for a non-GitHub URL', () => {
+    const r = renderPanel(
+      analysisFixture({
+        remediationSummary: {
+          status: 'pr_opened',
+          prUrl: 'https://gitlab.com/kilo/kilo/-/merge_requests/123',
+          prNumber: 123,
+          prDraft: false,
+          outcomeSummary: null,
+        },
+      })
+    );
+
+    pressButtons(r);
+
+    expect(mocks.routerPush).not.toHaveBeenCalled();
+    expect(mocks.openExternalUrl).toHaveBeenCalledWith(
+      'https://gitlab.com/kilo/kilo/-/merge_requests/123',
+      { label: 'pull request' }
+    );
+  });
+
+  it('routes both the summary and attempt buttons in-app', () => {
+    const r = renderPanel(
+      analysisFixture({
+        remediationSummary: {
+          status: 'pr_opened',
+          prUrl: 'https://github.com/kilo/kilo/pull/123',
+          prNumber: 123,
+          prDraft: false,
+          outcomeSummary: null,
+        },
+        remediationAttempts: [
+          {
+            id: 'attempt-1',
+            attemptNumber: 1,
+            status: 'pr_opened',
+            prUrl: 'https://github.com/kilo/kilo/pull/456',
+            prNumber: 456,
+            prDraft: false,
+            origin: 'manual',
+            remediationModelSlug: 'gpt-5',
+            branchName: 'fix/thing',
+            updatedAt: '2026-04-29T02:00:00.000Z',
+            cancellationRequestedAt: null,
+            validationEvidence: [],
+            riskNotes: null,
+            draftReason: null,
+            blockedReason: null,
+            lastErrorRedacted: null,
+          },
+        ],
+      })
+    );
+
+    pressButtons(r);
+
+    expect(mocks.routerPush).toHaveBeenCalledTimes(2);
+    expect(mocks.routerPush).toHaveBeenNthCalledWith(1, '/(app)/pr-review/kilo/kilo/123');
+    expect(mocks.routerPush).toHaveBeenNthCalledWith(2, '/(app)/pr-review/kilo/kilo/456');
+    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
   });
 });

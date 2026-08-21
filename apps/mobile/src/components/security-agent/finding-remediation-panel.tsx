@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the panel composes the status card, remediation controls, summary PR button, timeline, and attempt history; each is a small rendered surface that mirrors the shared remediation pattern. Splitting would re-encode the same hooks. */
 import {
   formatRemediationOrigin,
   formatValidationEvidenceEntry,
@@ -5,7 +6,8 @@ import {
   getRemediationUnavailableCopy,
 } from '@kilocode/app-shared/security-agent';
 import { Wrench } from '@/components/ui/icons';
-import { ActivityIndicator, Alert, Linking, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
@@ -15,12 +17,16 @@ import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
+import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
+import { openExternalUrl } from '@/lib/external-link';
 import {
   useCancelSecurityRemediation,
   useRetrySecurityRemediation,
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -63,9 +69,20 @@ export function FindingRemediationPanel({
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
   const colors = useThemeColors();
+  const router = useRouter();
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
+
+  const openPullRequest = (url: string) => {
+    const destination = resolveCodeReviewerOpenPrDestination(url, prReviewEnabled);
+    if (destination.kind === 'in-app') {
+      router.push(getPrReviewPath(destination.owner, destination.repo, destination.number));
+      return;
+    }
+    void openExternalUrl(url, { label: 'pull request' });
+  };
 
   if (isLoading && !analysis) {
     return (
@@ -203,7 +220,7 @@ export function FindingRemediationPanel({
         <Button
           variant="outline"
           onPress={() => {
-            void Linking.openURL(summaryPrUrl);
+            openPullRequest(summaryPrUrl);
           }}
         >
           <Text>
@@ -296,7 +313,7 @@ export function FindingRemediationPanel({
                       variant="ghost"
                       size="sm"
                       onPress={() => {
-                        void Linking.openURL(attemptUrl);
+                        openPullRequest(attemptUrl);
                       }}
                     >
                       <Text>

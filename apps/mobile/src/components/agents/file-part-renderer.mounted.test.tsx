@@ -790,7 +790,9 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
-    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new ShareRemoteFileError('boom'));
+    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(
+      new ShareRemoteFileError('download-failed')
+    );
 
     const viewers = findByType(root, 'ImageViewerModal');
     await act(async () => {

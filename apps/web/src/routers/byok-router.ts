@@ -18,6 +18,7 @@ import {
   ListBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
+  FetchManualByokModelsInputSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/ai-gateway/byok/types';
 import {
@@ -41,11 +42,63 @@ import {
   createAiSdkProvider,
   formatDirectByokModelId,
 } from '@/lib/ai-gateway/providers/direct-byok';
+import {
+  formatManualByokProviderId,
+  isManualByokEnabled,
+  ManualByokProviderIdSchema,
+  safeParseManualByokProviderDefinition,
+} from '@/lib/ai-gateway/providers/direct-byok/manual-byok';
+import {
+  ManualByokModelSchema,
+  type ManualByokApiKind,
+  type ManualByokProviderDefinition,
+} from '@kilocode/db/schema-types';
+import { parseOpenAICompatibleProviderModels } from '@/lib/ai-gateway/providers/direct-byok/openai-compatible-models';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
+
+function requireManualByokEnabled() {
+  if (!isManualByokEnabled()) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Manual BYOK providers are unavailable on Vercel deployments.',
+    });
+  }
+}
+
+function getProviderName(providerId: string, settings: ManualByokProviderDefinition | null) {
+  return ManualByokProviderIdSchema.safeParse(providerId).success && settings
+    ? settings.name
+    : providerId;
+}
+
+function manualByokUrl(baseUrl: string, path: string) {
+  return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+}
+
+function testManualProvider(
+  baseUrl: string,
+  apiKind: ManualByokApiKind,
+  model: string,
+  apiKey: string,
+  useXApiKey: boolean
+) {
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  headers.set(useXApiKey ? 'X-Api-Key' : 'Authorization', useXApiKey ? apiKey : `Bearer ${apiKey}`);
+  const body =
+    apiKind === 'responses'
+      ? { model, input: 'Say hi', max_output_tokens: 1 }
+      : { model, messages: [{ role: 'user', content: 'Say hi' }], max_tokens: 1 };
+  const path = apiKind === 'chat_completions' ? 'chat/completions' : apiKind;
+  return fetch(manualByokUrl(baseUrl, path), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
 
 function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
   if (managementSource === 'coding_plan') {
@@ -111,6 +164,38 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 }
 
 export const byokRouter = createTRPCRouter({
+  manualProvidersEnabled: baseProcedure.output(z.boolean()).query(isManualByokEnabled),
+
+  fetchManualModels: baseProcedure
+    .input(FetchManualByokModelsInputSchema)
+    .output(z.array(ManualByokModelSchema))
+    .mutation(async ({ input }) => {
+      requireManualByokEnabled();
+      const headers = new Headers();
+      headers.set(
+        input.use_x_api_key ? 'X-Api-Key' : 'Authorization',
+        input.use_x_api_key ? input.api_key : `Bearer ${input.api_key}`
+      );
+      const response = await fetch(manualByokUrl(input.base_url, '/models'), { headers });
+      if (!response.ok) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Failed to load models: ${response.status} ${response.statusText}`,
+        });
+      }
+      return parseOpenAICompatibleProviderModels(await response.json()).map(model => ({
+        id: model.id,
+        ...(model.name ? { name: model.name } : {}),
+        ...(model.context_length ? { context_length: model.context_length } : {}),
+        ...(model.max_completion_tokens
+          ? { max_completion_tokens: model.max_completion_tokens }
+          : {}),
+        ...(model.input_modalities
+          ? { supports_image_input: model.input_modalities.includes('image') }
+          : {}),
+      }));
+    }),
+
   listSupportedModels: baseProcedure
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
@@ -120,10 +205,12 @@ export const byokRouter = createTRPCRouter({
     .output(z.array(BYOKApiKeyResponseSchema))
     .query(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
       const { organizationId } = input;
+      let canViewProviderSettings = true;
 
       // If organizationId provided, verify membership; otherwise use user's own keys
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId);
+        const role = await ensureOrganizationAccess(ctx, organizationId);
+        canViewProviderSettings = role === 'owner' || role === 'billing_manager';
       }
 
       const keys = await db
@@ -135,6 +222,7 @@ export const byokRouter = createTRPCRouter({
           created_by: byok_api_keys.created_by,
           management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
+          provider_settings: byok_api_keys.provider_settings,
         })
         .from(byok_api_keys)
         .where(
@@ -144,17 +232,35 @@ export const byokRouter = createTRPCRouter({
         );
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
-      return keys.map(key => ({
-        ...key,
-        provider_name: key.provider_id,
-      }));
+      return keys.flatMap(key => {
+        const manualId = ManualByokProviderIdSchema.safeParse(key.provider_id);
+        if (manualId.success && !isManualByokEnabled()) return [];
+        const parsedSettings = manualId.success
+          ? safeParseManualByokProviderDefinition(key.provider_settings)
+          : null;
+        if (parsedSettings && !parsedSettings.success) return [];
+        const settings = parsedSettings?.data ?? null;
+        return [
+          {
+            ...key,
+            provider_settings: canViewProviderSettings ? settings : null,
+            provider_name: getProviderName(key.provider_id, settings),
+          },
+        ];
+      });
     }),
 
   create: baseProcedure
     .input(CreateBYOKKeyInputSchema)
     .output(BYOKApiKeyResponseSchema)
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
-      const { organizationId, provider_id, api_key } = input;
+      const { organizationId, api_key } = input;
+      const isManual = 'provider_code' in input;
+      if (isManual) requireManualByokEnabled();
+      const provider_id = isManual
+        ? formatManualByokProviderId(input.provider_code)
+        : input.provider_id;
+      const providerSettings = isManual ? input.provider_settings : null;
 
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
@@ -172,6 +278,7 @@ export const byokRouter = createTRPCRouter({
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
           encrypted_api_key: encrypted,
+          provider_settings: providerSettings,
           created_by: ctx.user.id,
         })
         .returning({
@@ -182,6 +289,7 @@ export const byokRouter = createTRPCRouter({
           created_by: byok_api_keys.created_by,
           management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
+          provider_settings: byok_api_keys.provider_settings,
         });
 
       // Create audit log only for organization keys
@@ -198,7 +306,7 @@ export const byokRouter = createTRPCRouter({
 
       return {
         ...newKey,
-        provider_name: provider_id,
+        provider_name: getProviderName(provider_id, providerSettings),
       };
     }),
 
@@ -206,7 +314,7 @@ export const byokRouter = createTRPCRouter({
     .input(UpdateBYOKKeyInputSchema)
     .output(BYOKApiKeyResponseSchema)
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
-      const { organizationId, id, api_key } = input;
+      const { organizationId, id, api_key, provider_settings } = input;
 
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
@@ -220,6 +328,7 @@ export const byokRouter = createTRPCRouter({
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
           management_source: byok_api_keys.management_source,
+          provider_settings: byok_api_keys.provider_settings,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -250,10 +359,26 @@ export const byokRouter = createTRPCRouter({
 
       rejectManagedKeyMutation(existingKey.management_source);
 
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const manualProvider = ManualByokProviderIdSchema.safeParse(existingKey.provider_id);
+      if (manualProvider.success) {
+        requireManualByokEnabled();
+      } else if (provider_settings) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Provider settings can only be changed for manual providers.',
+        });
+      }
+      if (!api_key && !provider_settings) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No changes were provided.' });
+      }
+
+      const encrypted = api_key ? encryptApiKey(api_key, BYOK_ENCRYPTION_KEY) : undefined;
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encrypted })
+        .set({
+          ...(encrypted ? { encrypted_api_key: encrypted } : {}),
+          ...(provider_settings ? { provider_settings } : {}),
+        })
         .where(eq(byok_api_keys.id, id))
         .returning({
           id: byok_api_keys.id,
@@ -263,6 +388,7 @@ export const byokRouter = createTRPCRouter({
           created_by: byok_api_keys.created_by,
           management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
+          provider_settings: byok_api_keys.provider_settings,
         });
 
       if (!updatedKey) {
@@ -283,7 +409,7 @@ export const byokRouter = createTRPCRouter({
 
       return {
         ...updatedKey,
-        provider_name: updatedKey.provider_id,
+        provider_name: getProviderName(updatedKey.provider_id, updatedKey.provider_settings),
       };
     }),
 
@@ -332,6 +458,10 @@ export const byokRouter = createTRPCRouter({
 
       rejectManagedKeyMutation(existingKey.management_source);
 
+      if (ManualByokProviderIdSchema.safeParse(existingKey.provider_id).success) {
+        requireManualByokEnabled();
+      }
+
       const [updatedKey] = await db
         .update(byok_api_keys)
         .set({
@@ -346,6 +476,7 @@ export const byokRouter = createTRPCRouter({
           created_by: byok_api_keys.created_by,
           management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
+          provider_settings: byok_api_keys.provider_settings,
         });
 
       if (existingKey.organization_id) {
@@ -361,7 +492,7 @@ export const byokRouter = createTRPCRouter({
 
       return {
         ...updatedKey,
-        provider_name: updatedKey.provider_id,
+        provider_name: getProviderName(updatedKey.provider_id, updatedKey.provider_settings),
       };
     }),
 
@@ -382,6 +513,7 @@ export const byokRouter = createTRPCRouter({
           provider_id: byok_api_keys.provider_id,
           encrypted_api_key: byok_api_keys.encrypted_api_key,
           management_source: byok_api_keys.management_source,
+          provider_settings: byok_api_keys.provider_settings,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -401,6 +533,35 @@ export const byokRouter = createTRPCRouter({
       }
 
       const decryptedKey = decryptByokRow(existingKey);
+
+      const manualProviderId = ManualByokProviderIdSchema.safeParse(existingKey.provider_id);
+      if (manualProviderId.success) {
+        requireManualByokEnabled();
+        const parsedSettings = safeParseManualByokProviderDefinition(existingKey.provider_settings);
+        if (!parsedSettings.success) {
+          return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+        }
+        const settings = parsedSettings.data;
+        const model = settings.models[0];
+        const apiKind = settings.supported_apis[0];
+        try {
+          const response = await testManualProvider(
+            settings.base_url,
+            apiKind,
+            model.id,
+            decryptedKey.decryptedAPIKey,
+            settings.use_x_api_key
+          );
+          return response.ok
+            ? { success: true, message: `API key test success. Model: ${model.id}.` }
+            : { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+        } catch {
+          logByokWarning('Manual BYOK key test request failed', {
+            providerId: existingKey.provider_id,
+          });
+          return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+        }
+      }
 
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
       // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).
@@ -523,6 +684,10 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
+
+      if (ManualByokProviderIdSchema.safeParse(existingKey.provider_id).success) {
+        requireManualByokEnabled();
+      }
 
       // Delete from database
       await db.delete(byok_api_keys).where(eq(byok_api_keys.id, id));

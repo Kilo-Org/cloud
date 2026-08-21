@@ -1,5 +1,9 @@
 import * as z from 'zod';
 import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
+import {
+  ManualByokProviderIdSchema,
+  type ManualByokProviderId,
+} from '@/lib/ai-gateway/providers/direct-byok/manual-byok';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -132,6 +136,12 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 );
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
+
+export const StoredUserByokProviderIdSchema = UserByokProviderIdSchema.or(
+  ManualByokProviderIdSchema
+);
+
+export type StoredUserByokProviderId = UserByokProviderId | ManualByokProviderId;
 
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',

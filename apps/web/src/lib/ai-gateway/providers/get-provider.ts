@@ -21,7 +21,10 @@ import {
   tryGetProviderById,
   VERCEL_AI_GATEWAY,
 } from '@/lib/ai-gateway/providers/provider-definitions';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokModel,
+  getManualByokCredential,
+} from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
@@ -99,6 +102,39 @@ async function checkDirectBYOK(
       },
     } satisfies Provider,
     userByok,
+    bypassAccessCheck: true,
+  };
+}
+
+async function checkManualBYOK(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  organizationId: string | undefined
+): Promise<GetProviderProviderResult | null> {
+  const credential = await getManualByokCredential(
+    requestedModel,
+    organizationId ? { organizationId } : { userId: user.id }
+  );
+  if (!credential) return null;
+  return {
+    kind: 'provider',
+    provider: {
+      id: 'direct-byok',
+      apiUrl: credential.definition.base_url,
+      apiUrlOverrides: {},
+      apiKey: credential.byok.decryptedAPIKey,
+      apiKeyHeader: credential.definition.use_x_api_key ? 'x-api-key' : null,
+      supportedChatApis: credential.definition.supported_apis,
+      responseTransforms: null,
+      async transformRequest(context) {
+        const body = context.request.body as Record<string, unknown>;
+        for (const key of credential.definition.remove_from_body ?? []) delete body[key];
+        Object.assign(body, credential.definition.extra_body ?? {});
+        Object.assign(context.extraHeaders, credential.definition.extra_headers ?? {});
+        context.request.body.model = credential.model.id;
+      },
+    },
+    userByok: [credential.byok],
     bypassAccessCheck: true,
   };
 }
@@ -218,6 +254,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     machineId,
     getRoutingProviderConfig,
   } = input;
+
+  const manualByok = await checkManualBYOK(user, requestedModel, organizationId);
+  if (manualByok) return manualByok;
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {

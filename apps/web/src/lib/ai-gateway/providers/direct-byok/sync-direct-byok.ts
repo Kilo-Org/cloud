@@ -16,27 +16,13 @@ import {
   getFallbackModelVariants,
   REASONING_VARIANTS_BINARY,
 } from '@/lib/ai-gateway/providers/variants';
-
-const DEFAULT_CONTENT_LENGTH = 200_000;
-const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
-
-const ModalitySchema = z
-  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
-  .catch('unknown');
-
-const OpenAICompatibleModelsResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string().optional(),
-      context_length: z.number().nullish(),
-      max_model_len: z.number().optional(),
-      max_output_length: z.number().optional(),
-      input_modalities: z.array(ModalitySchema).optional(),
-      supported_features: z.array(z.string()).optional(),
-    })
-  ),
-});
+import { DEFAULT_BYOK_CONTEXT_LENGTH, DEFAULT_BYOK_MAX_COMPLETION_TOKENS } from './constants';
+import {
+  ByokModelModalitySchema,
+  OpenAICompatibleModelsResponseSchema,
+  parseOpenAICompatibleProviderModels,
+} from './openai-compatible-models';
+export { parseOpenAICompatibleProviderModels } from './openai-compatible-models';
 
 const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('toggle') }),
@@ -60,8 +46,8 @@ const ModelsDevModelSchema = z.object({
     .optional(),
   modalities: z
     .object({
-      input: z.array(ModalitySchema).optional(),
-      output: z.array(ModalitySchema).optional(),
+      input: z.array(ByokModelModalitySchema).optional(),
+      output: z.array(ByokModelModalitySchema).optional(),
     })
     .optional(),
   tool_call: z.boolean().optional(),
@@ -75,12 +61,12 @@ const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
 type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
-type RawModel = {
+export type RawModel = {
   id: string;
   name?: string;
   context_length?: number;
   max_completion_tokens?: number;
-  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
+  input_modalities?: ReadonlyArray<z.infer<typeof ByokModelModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
   variants?: OpenCodeSettings['variants'];
 };
@@ -119,20 +105,6 @@ function openAICompatibleFetcher(options: {
       return parseOpenAICompatibleProviderModels(await response.json());
     },
   };
-}
-
-export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] {
-  const parsed = OpenAICompatibleModelsResponseSchema.parse(entry);
-  return parsed.data
-    .filter(model => !model.supported_features || model.supported_features.includes('tools'))
-    .map(model => ({
-      id: model.id,
-      name: shortenDisplayName(model.name),
-      context_length: model.context_length ?? model.max_model_len,
-      max_completion_tokens: model.max_output_length,
-      input_modalities: model.input_modalities,
-      flags: ['reasoning'],
-    }));
 }
 
 function modelsDevReasoningOptionsToVariants(
@@ -308,11 +280,11 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
 
   for (const raw of fetched) {
     const name = raw.name ?? shortenDisplayName(raw.id);
-    const context_length = raw.context_length ?? DEFAULT_CONTENT_LENGTH;
+    const context_length = raw.context_length ?? DEFAULT_BYOK_CONTEXT_LENGTH;
     const flags = new Set(raw.flags);
     if (raw.input_modalities?.includes('image')) flags.add('vision');
     const max_completion_tokens = Math.min(
-      raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      raw.max_completion_tokens ?? DEFAULT_BYOK_MAX_COMPLETION_TOKENS,
       context_length
     );
     models.push({

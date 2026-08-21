@@ -1,0 +1,1 @@
+ALTER TABLE "byok_api_keys" ADD COLUMN "provider_settings" jsonb;

@@ -1,4 +1,4 @@
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { StoredUserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import {
@@ -27,7 +27,7 @@ export type ProviderId =
 
 export type BYOKResult = {
   decryptedAPIKey: string;
-  providerId: UserByokProviderId;
+  providerId: StoredUserByokProviderId;
 };
 
 export type TransformRequestContext = {

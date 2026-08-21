@@ -48,7 +48,16 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
+import { INITIAL_MANUAL_BYOK_SETTINGS, ManualByokProviderFields } from './ManualByokProviderFields';
+import {
+  ManualByokProviderCodeSchema,
+  ManualByokProviderIdSchema,
+  ValidatedManualByokProviderDefinitionSchema,
+} from '@/lib/ai-gateway/providers/direct-byok/manual-byok';
+import type { ManualByokProviderDefinition } from '@kilocode/db/schema-types';
 import * as z from 'zod';
+
+const MANUAL_PROVIDER_OPTION = 'manual-provider';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
 // clause forces new entries here whenever a provider is added to
@@ -84,10 +93,6 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
 const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
   a.name.localeCompare(b.name)
 );
-const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
-  provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
-);
-
 function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
   return (
     <div className="text-muted-foreground space-y-2">
@@ -152,6 +157,9 @@ type BYOKDialogState = {
   apiKey: string;
   showApiKey: boolean;
   awsCredentialError: string | null;
+  manualProviderCode: string;
+  manualProviderSettings: ManualByokProviderDefinition;
+  manualJsonValid: boolean;
 };
 
 const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
@@ -161,6 +169,9 @@ const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
   apiKey: '',
   showApiKey: false,
   awsCredentialError: null,
+  manualProviderCode: '',
+  manualProviderSettings: INITIAL_MANUAL_BYOK_SETTINGS,
+  manualJsonValid: true,
 };
 
 function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialogState>) {
@@ -172,15 +183,30 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     updateBYOKDialogState,
     INITIAL_BYOK_DIALOG_STATE
   );
-  const { isDialogOpen, editingKeyId, selectedProvider, apiKey, showApiKey, awsCredentialError } =
-    dialogState;
+  const {
+    isDialogOpen,
+    editingKeyId,
+    selectedProvider,
+    apiKey,
+    showApiKey,
+    awsCredentialError,
+    manualProviderCode,
+    manualProviderSettings,
+    manualJsonValid,
+  } = dialogState;
   const setIsDialogOpen = (isDialogOpen: boolean) => updateDialogState({ isDialogOpen });
   const setEditingKeyId = (editingKeyId: string | null) => updateDialogState({ editingKeyId });
-  const setSelectedProvider = (selectedProvider: string) => updateDialogState({ selectedProvider });
+  const setSelectedProvider = (selectedProvider: string) =>
+    updateDialogState({ selectedProvider, manualJsonValid: true });
   const setApiKey = (apiKey: string) => updateDialogState({ apiKey });
   const setShowApiKey = (showApiKey: boolean) => updateDialogState({ showApiKey });
   const setAwsCredentialError = (awsCredentialError: string | null) =>
     updateDialogState({ awsCredentialError });
+  const setManualProviderCode = (manualProviderCode: string) =>
+    updateDialogState({ manualProviderCode });
+  const setManualProviderSettings = (manualProviderSettings: ManualByokProviderDefinition) =>
+    updateDialogState({ manualProviderSettings });
+  const setManualJsonValid = (manualJsonValid: boolean) => updateDialogState({ manualJsonValid });
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -193,6 +219,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
+  const { data: manualProvidersEnabled = false } = useQuery(
+    trpc.byok.manualProvidersEnabled.queryOptions()
+  );
+  const isManualProvider = selectedProvider === MANUAL_PROVIDER_OPTION;
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
@@ -296,9 +326,45 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setApiKey('');
     setShowApiKey(false);
     setAwsCredentialError(null);
+    setManualProviderCode('');
+    setManualProviderSettings(INITIAL_MANUAL_BYOK_SETTINGS);
+    setManualJsonValid(true);
   };
 
   const handleSave = () => {
+    if (isManualProvider) {
+      if (!manualJsonValid) {
+        toast.error('Fix invalid JSON fields before saving.');
+        return;
+      }
+      const code = ManualByokProviderCodeSchema.safeParse(manualProviderCode);
+      const settings =
+        ValidatedManualByokProviderDefinitionSchema.safeParse(manualProviderSettings);
+      if (!code.success) {
+        toast.error(code.error.issues[0]?.message ?? 'Enter a valid provider code.');
+        return;
+      }
+      if (!settings.success) {
+        toast.error(z.prettifyError(settings.error));
+        return;
+      }
+      if (editingKeyId) {
+        updateMutation.mutate({
+          ...(organizationId && { organizationId }),
+          id: editingKeyId,
+          ...(apiKey ? { api_key: apiKey } : {}),
+          provider_settings: settings.data,
+        });
+      } else {
+        createMutation.mutate({
+          ...(organizationId && { organizationId }),
+          provider_code: code.data,
+          provider_settings: settings.data,
+          api_key: apiKey,
+        });
+      }
+      return;
+    }
     if (selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
       const error = validateAwsCredentials(apiKey);
       setAwsCredentialError(error);
@@ -326,9 +392,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const handleEdit = (keyId: string) => {
     setEditingKeyId(keyId);
-    const key = keys?.find((k: { id: string; provider_id: string }) => k.id === keyId);
+    const key = keys?.find(k => k.id === keyId);
     if (key) {
-      setSelectedProvider(key.provider_id);
+      const manualId = ManualByokProviderIdSchema.safeParse(key.provider_id);
+      if (manualId.success && key.provider_settings) {
+        setSelectedProvider(MANUAL_PROVIDER_OPTION);
+        setManualProviderCode(manualId.data.slice('manual:'.length));
+        setManualProviderSettings(key.provider_settings);
+      } else {
+        setSelectedProvider(key.provider_id);
+      }
     }
     setIsDialogOpen(true);
   };
@@ -376,7 +449,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   }
 
   // Map provider IDs to display names
-  const getProviderDisplayName = (providerId: string) => {
+  const getProviderDisplayName = (providerId: string, providerName?: string) => {
+    if (ManualByokProviderIdSchema.safeParse(providerId).success && providerName) {
+      return providerName;
+    }
     const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
     return provider?.name || providerId;
   };
@@ -384,6 +460,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const getProviderModels = (providerId: string): string[] => {
     return supportedModels?.[providerId] ?? [];
   };
+  const providerOptions = [
+    ...(manualProvidersEnabled ? [{ id: MANUAL_PROVIDER_OPTION, name: 'Manual provider' }] : []),
+    ...BYOK_PROVIDERS,
+  ];
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -410,100 +490,95 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {keys.map(
-                    (key: {
-                      id: string;
-                      provider_id: string;
-                      created_at: string;
-                      management_source: 'user' | 'coding_plan';
-                      is_enabled: boolean;
-                    }) => {
-                      const isManaged = !organizationId && key.management_source === 'coding_plan';
-                      return (
-                        <tr
-                          key={key.id}
-                          className={
-                            !key.is_enabled
-                              ? 'bg-muted/20 border-b last:border-0'
-                              : 'border-b last:border-0'
-                          }
-                        >
-                          <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
-                            <div>{getProviderDisplayName(key.provider_id)}</div>
-                            {isManaged ? (
-                              <p className="text-muted-foreground mt-1 text-xs">
-                                {getCodingPlanManagedKeyLabel(
-                                  getProviderDisplayName(key.provider_id)
-                                )}
-                              </p>
-                            ) : null}
-                            <SupportedModelsList models={getProviderModels(key.provider_id)} />
-                          </td>
-                          <td className="text-muted-foreground p-4">
-                            {new Date(key.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              {!isManaged ? (
-                                <Switch
-                                  checked={key.is_enabled}
-                                  onCheckedChange={isEnabled =>
-                                    handleToggleEnabled(key.id, isEnabled)
-                                  }
-                                  disabled={setEnabledMutation.isPending}
-                                  aria-label={`Toggle ${getProviderDisplayName(key.provider_id)} BYOK key`}
-                                />
-                              ) : null}
-                              <span className="text-sm">
-                                {key.is_enabled ? 'Enabled' : 'Disabled'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="space-x-2 p-4 text-right">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() =>
-                                testMutation.mutate({
-                                  ...(organizationId && { organizationId }),
-                                  id: key.id,
-                                })
-                              }
-                              disabled={testMutation.isPending}
-                              title="Test API key"
-                              aria-label={`Test ${getProviderDisplayName(key.provider_id)} API key`}
-                            >
-                              <FlaskConical className="size-4" />
-                            </Button>
+                  {keys.map(key => {
+                    const isManaged = !organizationId && key.management_source === 'coding_plan';
+                    return (
+                      <tr
+                        key={key.id}
+                        className={
+                          !key.is_enabled
+                            ? 'bg-muted/20 border-b last:border-0'
+                            : 'border-b last:border-0'
+                        }
+                      >
+                        <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
+                          <div>{getProviderDisplayName(key.provider_id, key.provider_name)}</div>
+                          {isManaged ? (
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              {getCodingPlanManagedKeyLabel(
+                                getProviderDisplayName(key.provider_id, key.provider_name)
+                              )}
+                            </p>
+                          ) : null}
+                          <SupportedModelsList models={getProviderModels(key.provider_id)} />
+                        </td>
+                        <td className="text-muted-foreground p-4">
+                          {new Date(key.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
                             {!isManaged ? (
-                              <>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => handleEdit(key.id)}
-                                  disabled={updateMutation.isPending}
-                                  aria-label={`Update ${getProviderDisplayName(key.provider_id)} API key`}
-                                >
-                                  <Edit className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleDelete(key.id, getProviderDisplayName(key.provider_id))
-                                  }
-                                  disabled={deleteMutation.isPending}
-                                  aria-label={`Delete ${getProviderDisplayName(key.provider_id)} API key`}
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </>
+                              <Switch
+                                checked={key.is_enabled}
+                                onCheckedChange={isEnabled =>
+                                  handleToggleEnabled(key.id, isEnabled)
+                                }
+                                disabled={setEnabledMutation.isPending}
+                                aria-label={`Toggle ${getProviderDisplayName(key.provider_id, key.provider_name)} BYOK key`}
+                              />
                             ) : null}
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
+                            <span className="text-sm">
+                              {key.is_enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="space-x-2 p-4 text-right">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              testMutation.mutate({
+                                ...(organizationId && { organizationId }),
+                                id: key.id,
+                              })
+                            }
+                            disabled={testMutation.isPending}
+                            title="Test API key"
+                            aria-label={`Test ${getProviderDisplayName(key.provider_id, key.provider_name)} API key`}
+                          >
+                            <FlaskConical className="size-4" />
+                          </Button>
+                          {!isManaged ? (
+                            <>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleEdit(key.id)}
+                                disabled={updateMutation.isPending}
+                                aria-label={`Update ${getProviderDisplayName(key.provider_id, key.provider_name)} API key`}
+                              >
+                                <Edit className="size-4" />
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  handleDelete(
+                                    key.id,
+                                    getProviderDisplayName(key.provider_id, key.provider_name)
+                                  )
+                                }
+                                disabled={deleteMutation.isPending}
+                                aria-label={`Delete ${getProviderDisplayName(key.provider_id, key.provider_name)} API key`}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -516,7 +591,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         </CardContent>
 
         <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingKeyId ? 'Update API Key' : 'Add API Key'}</DialogTitle>
             </DialogHeader>
@@ -533,8 +608,17 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(editingKeyId ? BYOK_PROVIDERS : ADD_BYOK_PROVIDERS).map(provider => {
-                      const isDisabled = !editingKeyId && hasExistingKey(provider.id);
+                    {(editingKeyId
+                      ? providerOptions
+                      : providerOptions.filter(
+                          provider =>
+                            provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
+                        )
+                    ).map(provider => {
+                      const isDisabled =
+                        provider.id !== MANUAL_PROVIDER_OPTION &&
+                        !editingKeyId &&
+                        hasExistingKey(provider.id);
                       return (
                         <SelectItem
                           key={provider.id}
@@ -634,7 +718,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   <Alert>
                     <Lock className="size-4" />
                     <AlertDescription>
-                      An API key is already saved for this provider. Enter a new key to replace it.
+                      An API key is already saved for this provider. Enter a new key to replace it
+                      {isManualProvider ? ', or leave this blank to keep the existing key' : ''}.
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -647,6 +732,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </Alert>
                 )}
               </div>
+
+              {isManualProvider ? (
+                <ManualByokProviderFields
+                  code={manualProviderCode}
+                  settings={manualProviderSettings}
+                  apiKey={apiKey}
+                  editing={!!editingKeyId}
+                  onCodeChange={setManualProviderCode}
+                  onSettingsChange={setManualProviderSettings}
+                  onJsonValidityChange={setManualJsonValid}
+                />
+              ) : null}
 
               {selectedProvider && getProviderModels(selectedProvider).length > 0 && (
                 <div className="space-y-2">
@@ -665,6 +762,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               {selectedProvider &&
                 (() => {
+                  if (isManualProvider) {
+                    return (
+                      <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="size-4 text-amber-500" />
+                        <AlertDescription>
+                          Manual providers can send requests to arbitrary upstream URLs. They are
+                          available only in local development and dedicated deployments, never on
+                          Vercel-hosted Kilo Cloud.
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
                   const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
                     p => p.id === selectedProvider
                   );
@@ -721,7 +830,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 onClick={handleSave}
                 disabled={
                   !selectedProvider ||
-                  !apiKey ||
+                  (!editingKeyId && !apiKey) ||
+                  (!!editingKeyId && !isManualProvider && !apiKey) ||
+                  (isManualProvider && !manualJsonValid) ||
                   (selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock &&
                     !!awsCredentialError) ||
                   createMutation.isPending ||

@@ -100,6 +100,9 @@ function createUserWebConnection() {
     destroy: jest.fn(),
     isConnected: jest.fn(() => false),
     onConnectionChange: jest.fn(() => jest.fn()),
+    isReconnectExhausted: jest.fn(() => false),
+    onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+    retryConnection: jest.fn(),
     subscribeToCliSession: jest.fn(() => jest.fn()),
     sendCommand: jest.fn((_sessionId: string, command: string) =>
       Promise.resolve(

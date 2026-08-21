@@ -2,9 +2,9 @@
 
 // Review-memory screen state contract: loading skeleton, retryable summary and
 // proposals errors, the feature-disabled off-state (enable CTA for billing
-// roles, static text with no CTA for a plain member), the empty state, and the
-// paginated happy list. The query layer is mocked so each state is driven
-// directly through the screen JSX.
+// roles and for a loading/error permission, static text with no CTA for a
+// plain member), the empty state, and the paginated happy list. The query
+// layer is mocked so each state is driven directly through the screen JSX.
 
 import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -249,6 +249,24 @@ describe('ReviewMemoryScreen feature disabled', () => {
       buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
     ).toBeUndefined();
   });
+
+  it.each(['loading', 'error'] as const)(
+    'shows the enable CTA instead of the member copy when permission is %s',
+    status => {
+      summary.data = { enabled: false, repositories: [], openProposalCount: 0 };
+      permission.status = status;
+      permission.canEdit = false;
+
+      const renderer = renderScreen();
+
+      expect(
+        buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
+      ).toBeDefined();
+      expect(collectText(renderer.toJSON())).not.toContain(
+        'Only organization owners and billing managers can enable review memory.'
+      );
+    }
+  );
 });
 
 describe('ReviewMemoryScreen proposals', () => {

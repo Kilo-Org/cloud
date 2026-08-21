@@ -51,7 +51,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     [proposalsQuery.data?.pages]
   );
 
-  const canEdit = permission.status === 'ready' && permission.canEdit;
+  const readOnly = permission.status === 'ready' && !permission.canEdit;
   const hasLoadedPages = (proposalsQuery.data?.pages.length ?? 0) > 0;
   const firstPageError = proposalsQuery.isError && !hasLoadedPages;
   const laterPageError = proposalsQuery.isError && hasLoadedPages;
@@ -131,7 +131,11 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
                   Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md
                   guidance.
                 </Text>
-                {canEdit ? (
+                {readOnly ? (
+                  <Text variant="muted" className="text-center text-xs">
+                    Only organization owners and billing managers can enable review memory.
+                  </Text>
+                ) : (
                   <Button
                     onPress={() => {
                       setEnabled.mutate(true);
@@ -141,10 +145,6 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
                   >
                     <Text>Enable review memory</Text>
                   </Button>
-                ) : (
-                  <Text variant="muted" className="text-center text-xs">
-                    Only organization owners and billing managers can enable review memory.
-                  </Text>
                 )}
               </View>
             )}

@@ -42,6 +42,7 @@ export function SheetHeader({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={`Share ${title}`}
+            accessibilityState={{ disabled: false, busy: sharing }}
             className="absolute left-0 px-2 py-2 active:opacity-70 disabled:opacity-50"
           >
             <Share size={20} color={colors.foreground} />

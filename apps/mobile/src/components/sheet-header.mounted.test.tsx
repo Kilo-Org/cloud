@@ -56,6 +56,7 @@ describe('SheetHeader share action', () => {
     expect(shares).toHaveLength(1);
     expect(shares[0]?.props.accessibilityRole).toBe('button');
     expect(shares[0]?.props.disabled).toBe(false);
+    expect(shares[0]?.props.accessibilityState).toEqual({ disabled: false, busy: false });
 
     renderer.unmount();
   });
@@ -71,6 +72,7 @@ describe('SheetHeader share action', () => {
     const shares = pressablesByLabel(renderer.root, 'Share report.pdf');
     expect(shares).toHaveLength(1);
     expect(shares[0]?.props.disabled).toBe(true);
+    expect(shares[0]?.props.accessibilityState).toEqual({ disabled: false, busy: true });
 
     renderer.unmount();
   });

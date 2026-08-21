@@ -2,8 +2,9 @@
 
 // Finding-remediation progress timeline: the panel renders the ordered
 // remediation audit events (queued → pr_opened, or a terminal event) above the
-// attempt history. The server always returns `remediationTimeline` and the
-// query is not persisted, so the field is always present.
+// attempt history. A separately released client can talk to an old backend
+// that omits `remediationTimeline`, so the panel treats a missing field as an
+// empty list.
 
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -184,6 +185,14 @@ describe('FindingRemediationPanel remediation timeline', () => {
   it('renders nothing extra when the timeline is empty', () => {
     renderPanel(analysisFixture({ remediationTimeline: [] }));
 
+    expect(texts.items).not.toContain('Progress');
+    expect(texts.items).not.toContain('Remediation requested');
+  });
+
+  it('renders without throwing when the response omits remediationTimeline', () => {
+    const r = renderPanel(analysisFixture({ remediationTimeline: undefined }));
+
+    expect(r.toJSON()).not.toBeNull();
     expect(texts.items).not.toContain('Progress');
     expect(texts.items).not.toContain('Remediation requested');
   });

@@ -112,8 +112,11 @@ export function FindingRemediationPanel({
     );
   }
 
-  const { remediationCapability, remediationSummary, remediationAttempts, remediationTimeline } =
-    analysis;
+  const { remediationCapability, remediationSummary, remediationAttempts } = analysis;
+  // A separately released client can talk to an old backend that omits the new
+  // `remediationTimeline` field, so the non-nullable type is not a runtime guarantee.
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+  const remediationTimeline = analysis.remediationTimeline ?? [];
   const latestAttempt = remediationAttempts[0] ?? null;
   const summaryPrUrl = remediationSummary?.prUrl;
   const presentation = getRemediationStatusPresentation(remediationSummary?.status ?? null, {

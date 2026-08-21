@@ -1,5 +1,5 @@
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { trpcClient } from '@/lib/trpc';
 
@@ -36,7 +36,6 @@ export type ResolvedFilePartUrl = {
  */
 export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
   const cached = useFilePartCache(part.id);
-  const [attempt, setAttempt] = useState(0);
 
   const url = cached?.url ?? (isUsableFilePartUrl(part.url) ? part.url : undefined);
   const ref = cached?.attachmentRef ?? parseCloudAgentAttachmentUrl(part.url);
@@ -69,7 +68,7 @@ export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
         inFlight.delete(part.id);
       }
     })();
-  }, [part.id, part.url, part.mime, part.filename, cached, attempt]);
+  }, [part.id, part.url, part.mime, part.filename, cached]);
 
   if (url !== undefined) {
     return { status: 'ready', url, ...(ref ? { attachmentRef: ref } : {}) };
@@ -83,7 +82,6 @@ export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
       attachmentRef: ref,
       retry: () => {
         clearFilePartResolveFailed(part.id);
-        setAttempt(a => a + 1);
       },
     };
   }

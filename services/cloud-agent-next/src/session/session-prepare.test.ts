@@ -18,6 +18,7 @@ import type { SessionMessageAdmissionResult } from '../execution/types.js';
 import type { SessionCreateRequest } from './session-requests.js';
 import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
+import type * as MessageIdModule from './message-id.js';
 import {
   createSessionWithLedger,
   sessionCreateIntentFingerprint,
@@ -26,6 +27,7 @@ import {
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
   type SessionRegistrationContext,
 } from './session-registration.js';
+import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
 
 const {
   admitOperationMock,
@@ -91,9 +93,13 @@ vi.mock('../utils/kilo-session-id.js', () => ({
   generateKiloSessionId: () => generateKiloSessionIdMock(),
 }));
 
-vi.mock('./message-id.js', () => ({
-  createMessageId: () => 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-}));
+vi.mock('./message-id.js', async importOriginal => {
+  const actual = await importOriginal<typeof MessageIdModule>();
+  return {
+    ...actual,
+    createMessageId: () => 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+  };
+});
 
 vi.mock('../sandbox-id.js', async importOriginal => {
   const actual = await importOriginal<typeof SandboxIdModule>();
@@ -1714,5 +1720,32 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       replayed: true,
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+});
+
+describe('prepareInputToSessionCreateRequest clone mapping', () => {
+  const SOURCE_SESSION_ID = 'agent_12345678-1234-1234-1234-123456789abc';
+
+  it('maps cloneFromKiloSessionId into the grouped clone object', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Continue from the cloned session context.',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      cloneFromKiloSessionId: SOURCE_SESSION_ID,
+    });
+
+    expect(request.clone).toEqual({ cloneFromKiloSessionId: SOURCE_SESSION_ID });
+  });
+
+  it('omits clone when cloneFromKiloSessionId is absent', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Continue',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(request.clone).toBeUndefined();
   });
 });

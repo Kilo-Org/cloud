@@ -568,6 +568,14 @@ export const PrepareSessionInput = z
       'Initial message ID for correlation with external systems'
     ),
     /**
+     * Optional source Kilo session to clone into this Cloud Agent session.
+     * Old clients omit this field and keep the empty-session bootstrap; remove
+     * the fallback only after old prepared sessions age out.
+     */
+    cloneFromKiloSessionId: sessionIdSchema
+      .optional()
+      .describe('Source Kilo session ID to clone into this Cloud Agent session'),
+    /**
      * When `true`, `prepareSession` also enqueues the initial user message
      * (mirroring the unified `start` endpoint) so callers that navigate
      * straight to the session UI after prepare — apps/web NewSessionPanel,

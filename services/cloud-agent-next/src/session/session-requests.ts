@@ -51,6 +51,9 @@ export type SessionCreateRequest = {
   agent: AgentSelection;
   repository: SessionRepositoryRequest;
   runtime?: SessionRuntimeIntent;
+  clone?: {
+    cloneFromKiloSessionId: string;
+  };
   profile?: {
     id?: string;
     overrides?: ProfileOverrides;

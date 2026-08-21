@@ -270,6 +270,9 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     },
     repository,
     runtime: input.devcontainer ? { devcontainer: true } : undefined,
+    clone: input.cloneFromKiloSessionId
+      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      : undefined,
     profile: {
       id: input.profileId,
       overrides: {

@@ -318,6 +318,37 @@ describe('legacy live attachment input compatibility', () => {
   });
 });
 
+describe('prepareSession clone source forwarding', () => {
+  const basePrepareInput = {
+    prompt: 'Continue from the cloned session context.',
+    mode: 'code',
+    model: 'claude-sonnet-4-5-20250929',
+    githubRepo: 'acme/repo',
+  };
+
+  it('accepts an optional cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePrepareInput,
+        cloneFromKiloSessionId: validSessionId,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects a malformed cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePrepareInput,
+        cloneFromKiloSessionId: 'agent_invalid',
+      }).success
+    ).toBe(false);
+  });
+
+  it('keeps old inputs without the field unchanged', () => {
+    expect(PrepareSessionInput.safeParse(basePrepareInput).success).toBe(true);
+  });
+});
+
 describe('sendMessageV2 input compatibility', () => {
   it('normalizes nested prompt payloads with document attachments from web callers', () => {
     const result = SendMessageV2Input.safeParse({

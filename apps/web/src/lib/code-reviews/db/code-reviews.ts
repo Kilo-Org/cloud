@@ -230,28 +230,46 @@ function codeReviewInsertValues(
 }
 
 /**
- * Admits a `code_review`-domain ledger row for a newly created review. The
- * terminal settle later joins by the operation key `review:<reviewId>`.
- * Best-effort: the review row already committed, so a ledger write failure must
- * not fail review creation; the terminal settle then skips on the missing row.
+ * Admits a `code_review`-domain ledger row for a newly created review using
+ * `database` (a pool or an open transaction). The terminal settle later joins
+ * by the operation key `review:<reviewId>`. A failure throws so the caller can
+ * roll back an enclosing transaction; callers whose review row already
+ * committed must use the best-effort `admitCodeReviewLedgerRow` wrapper.
  */
-async function admitCodeReviewLedgerRow(params: {
-  database: LedgerDatabase;
+async function admitCodeReviewLedgerRowOn(
+  database: LedgerDatabase,
+  params: {
+    reviewId: string;
+    userId: string;
+    orgId?: string | null;
+    triggerSource: string | null;
+  }
+): Promise<void> {
+  await admitOperation(database, {
+    userId: params.userId,
+    orgId: params.orgId ?? null,
+    domain: 'code_review',
+    intent: codeReviewLedgerIntent(params.triggerSource),
+    operationKey: `review:${params.reviewId}`,
+    taxonomy: 'never-replay',
+    leaseSeconds: 60,
+  });
+}
+
+/**
+ * Admits a `code_review`-domain ledger row for a newly created review using the
+ * pool `db`. Best-effort: the review row already committed, so a ledger write
+ * failure must not fail review creation; the terminal settle then skips on the
+ * missing row. A ledger write failure is logged and never thrown.
+ */
+export async function admitCodeReviewLedgerRow(params: {
   reviewId: string;
   userId: string;
   orgId?: string | null;
   triggerSource: string | null;
 }): Promise<void> {
   try {
-    await admitOperation(params.database, {
-      userId: params.userId,
-      orgId: params.orgId ?? null,
-      domain: 'code_review',
-      intent: codeReviewLedgerIntent(params.triggerSource),
-      operationKey: `review:${params.reviewId}`,
-      taxonomy: 'never-replay',
-      leaseSeconds: 60,
-    });
+    await admitCodeReviewLedgerRowOn(db, params);
   } catch (error) {
     logExceptInTest('[code-review-ledger] Failed to admit code review ledger row', {
       reviewId: params.reviewId,
@@ -279,7 +297,6 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
     // Best-effort ledger admission (P1-A-07c): the review row already committed,
     // so a ledger write failure must not fail review creation.
     await admitCodeReviewLedgerRow({
-      database: db,
       reviewId: review.id,
       userId: params.owner.userId,
       orgId: params.owner.type === 'org' ? params.owner.id : null,
@@ -1593,15 +1610,6 @@ export async function createCodeReviewIfAbsentInTransaction(
     .onConflictDoNothing()
     .returning({ id: cloud_agent_code_reviews.id });
   if (created) {
-    // Best-effort ledger admission (P1-A-07c): the review row already committed
-    // in this transaction, so a ledger write failure must not fail creation.
-    await admitCodeReviewLedgerRow({
-      database: tx,
-      reviewId: created.id,
-      userId: params.owner.userId,
-      orgId: params.owner.type === 'org' ? params.owner.id : null,
-      triggerSource: params.triggerSource ?? null,
-    });
     return { reviewId: created.id, created: true };
   }
 

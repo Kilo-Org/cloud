@@ -824,6 +824,44 @@ describe('review identity', () => {
       intent: 'webhook',
     });
   });
+
+  it('does not admit a code_review ledger row inside the creation transaction', async () => {
+    const repoFullName = `${REPO}-ledger-transaction-no-admit`;
+    const result = await db.transaction(tx =>
+      createCodeReviewIfAbsentInTransaction(
+        tx,
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platform: 'github',
+          repoFullName,
+          prNumber: 35,
+        },
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platformIntegrationId: firstIntegrationId,
+          repoFullName,
+          prNumber: 35,
+          prUrl: `https://github.com/${repoFullName}/pull/35`,
+          prTitle: 'ledger transaction no admit',
+          prAuthor: 'octocat',
+          baseRef: 'main',
+          headRef: 'feature/ledger-transaction-no-admit',
+          headSha: 'ledger-transaction-no-admit-head-sha',
+          platform: 'github',
+          triggerSource: 'webhook',
+        }
+      )
+    );
+    expect(result.created).toBe(true);
+    createdReviewIds.push(result.reviewId);
+
+    const ledgerRows = await db
+      .select({ id: operation_ledgers.id })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${result.reviewId}`));
+
+    expect(ledgerRows).toHaveLength(0);
+  });
 });
 
 describe('cancelSupersededReviewsForPR', () => {

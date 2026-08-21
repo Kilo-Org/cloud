@@ -41,6 +41,7 @@ import {
   agent_configs,
   cloud_agent_code_reviews,
   kilocode_users,
+  operation_ledgers,
   organization_memberships,
   organizations,
   platform_integrations,
@@ -49,7 +50,7 @@ import {
   type PlatformIntegration,
   type User,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import {
@@ -301,6 +302,18 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
   });
 
   afterEach(async () => {
+    const reviewIds = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    if (reviewIds.length > 0) {
+      await db.delete(operation_ledgers).where(
+        inArray(
+          operation_ledgers.operation_key,
+          reviewIds.map(review => `review:${review.id}`)
+        )
+      );
+    }
     await db
       .delete(webhook_events)
       .where(eq(webhook_events.owned_by_organization_id, organization.id));
@@ -645,5 +658,31 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
     expect((await organizationWebhookEvents())[0]?.processed).toBe(true);
     expect(mockCancelReview).toHaveBeenCalledWith(reviewId, expect.any(String), undefined);
     expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('admits the code_review ledger row after the review transaction commits', async () => {
+    const integration = await insertIntegrationAndConfig();
+
+    const response = await callWebhook(integration, webhookRequest(integration));
+
+    expect(response.status).toBe(202);
+    const reviews = await organizationReviews();
+    expect(reviews).toHaveLength(1);
+    const reviewId = reviews[0].id;
+
+    const [ledgerRow] = await db
+      .select({
+        domain: operation_ledgers.domain,
+        operationKey: operation_ledgers.operation_key,
+        intent: operation_ledgers.intent,
+      })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+
+    expect(ledgerRow).toEqual({
+      domain: 'code_review',
+      operationKey: `review:${reviewId}`,
+      intent: 'webhook',
+    });
   });
 });

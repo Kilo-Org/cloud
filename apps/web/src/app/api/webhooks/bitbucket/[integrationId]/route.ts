@@ -8,6 +8,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { getUnblockedBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
+  admitCodeReviewLedgerRow,
   bitbucketCodeReviewerLifecycleLockKey,
   cancelActiveReviewsForPRInTransaction,
   cancelSupersededReviewsForPRInTransaction,
@@ -546,6 +547,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   await interruptCancelledReviews(transactionResult.cancelledReviews);
   if (transactionResult.created) {
+    if (transactionResult.reviewId) {
+      // Best-effort ledger admission (P1-A-07c): the review row already
+      // committed, so a ledger write failure must not fail the webhook.
+      await admitCodeReviewLedgerRow({
+        reviewId: transactionResult.reviewId,
+        userId: ownerWithBot.userId,
+        orgId: ownerWithBot.type === 'org' ? ownerWithBot.id : null,
+        triggerSource: 'webhook',
+      });
+    }
     try {
       await tryDispatchPendingReviews(ownerWithBot);
     } catch {

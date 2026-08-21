@@ -8,6 +8,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { getUnblockedBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
+  admitCodeReviewLedgerRow,
   bitbucketCodeReviewerLifecycleLockKey,
   cancelSupersededReviewsForPRInTransaction,
   createCodeReviewIfAbsentInTransaction,
@@ -483,6 +484,14 @@ export async function triggerManualBitbucketCodeReview(input: {
 
   await interruptCancelledReviews(transactionResult.cancelledReviews);
   if (transactionResult.created) {
+    // Best-effort ledger admission (P1-A-07c): the review row already
+    // committed, so a ledger write failure must not fail the manual trigger.
+    await admitCodeReviewLedgerRow({
+      reviewId: transactionResult.reviewId,
+      userId: ownerWithBot.userId,
+      orgId: ownerWithBot.type === 'org' ? ownerWithBot.id : null,
+      triggerSource: 'manual',
+    });
     try {
       await tryDispatchPendingReviews(ownerWithBot);
     } catch {

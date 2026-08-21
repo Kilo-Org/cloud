@@ -17,3 +17,27 @@ export function useUserWebConnectionState(): boolean {
     () => connection.isConnected()
   );
 }
+
+type UserWebConnectionHealth = {
+  isConnected: boolean;
+  reconnectExhausted: boolean;
+};
+
+/**
+ * Reactive binding to both user-web transport signals: readiness and
+ * reconnect exhaustion. Readiness keeps driving the automatic
+ * `Reconnecting…` / `Connecting…` labels; exhaustion drives the explicit
+ * recovery UI (`Connection lost` + `Retry`).
+ */
+export function useUserWebConnectionHealth(): UserWebConnectionHealth {
+  const connection = useUserWebConnection();
+  const isConnected = useSyncExternalStore(
+    listener => connection.onConnectionChange(listener),
+    () => connection.isConnected()
+  );
+  const reconnectExhausted = useSyncExternalStore(
+    listener => connection.onReconnectExhaustionChange(listener),
+    () => connection.isReconnectExhausted()
+  );
+  return { isConnected, reconnectExhausted };
+}

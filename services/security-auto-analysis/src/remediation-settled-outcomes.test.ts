@@ -1146,3 +1146,128 @@ describe('processRemediationAttempt pre-initiation cancellation settle', () => {
     );
   });
 });
+
+// ----- processRemediationAttempt lifecycle emit wiring ----------------------
+
+const lifecycleEnv = {
+  HYPERDRIVE: { connectionString: 'postgres://worker' },
+  KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+  INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+} as unknown as CloudflareEnv;
+
+function postedLifecycleEvents(fetchMock: ReturnType<typeof vi.fn>): string[] {
+  return fetchMock.mock.calls
+    .map(call => {
+      const init = call[1] as RequestInit | undefined;
+      if (!init?.body) return null;
+      try {
+        return (JSON.parse(init.body as string) as { event?: string }).event ?? null;
+      } catch {
+        return null;
+      }
+    })
+    .filter((event): event is string => event !== null);
+}
+
+describe('processRemediationAttempt lifecycle emit wiring', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 200 }))
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('emits remediation_blocked when the attempt is blocked before launch', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(eligibleAutoPolicyFinding());
+    vi.mocked(settleOperation).mockResolvedValue({
+      settled: true,
+      row: { id: 'ledger-row-1' },
+    } as never);
+
+    const db = ledgerCapturingDb({
+      attempt: launchingAttempt(),
+      ledgerRows: [{ id: 'ledger-row-1' }],
+      userRows: [{ email: 'owner@example.com' }],
+      agentConfigs: [{ config: autoPolicyRuntimeConfig(), is_enabled: false }],
+      integrations: [{ repositories: [{ id: 1, full_name: 'kilo/repo' }] }],
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const result = await processRemediationAttempt({
+      env: lifecycleEnv,
+      attemptId: ATTEMPT_ID,
+      dispatchId: 'dispatch-1',
+    });
+
+    expect(result).toBe('skipped');
+    expect(postedLifecycleEvents(vi.mocked(fetch))).toEqual(['remediation_blocked']);
+  });
+
+  it('emits remediation_failed when launch fails terminally', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(eligibleAutoPolicyFinding());
+    vi.mocked(getAnalysisActorById).mockResolvedValue(null);
+    vi.mocked(settleOperation).mockResolvedValue({
+      settled: true,
+      row: { id: 'ledger-row-1' },
+    } as never);
+
+    const db = ledgerCapturingDb({
+      attempt: launchingAttempt(),
+      ledgerRows: [{ id: 'ledger-row-1' }],
+      userRows: [{ email: 'owner@example.com' }],
+      agentConfigs: [{ config: autoPolicyRuntimeConfig(), is_enabled: true }],
+      integrations: [{ repositories: [{ id: 1, full_name: 'kilo/repo' }] }],
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const result = await processRemediationAttempt({
+      env: lifecycleEnv,
+      attemptId: ATTEMPT_ID,
+      dispatchId: 'dispatch-1',
+    });
+
+    expect(result).toBe('failed');
+    expect(postedLifecycleEvents(vi.mocked(fetch))).toEqual(['remediation_failed']);
+  });
+
+  it('does not emit when a retryable launch failure re-queues the attempt', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(eligibleAutoPolicyFinding());
+    vi.mocked(getAnalysisActorById).mockResolvedValue({
+      id: 'user-1',
+      api_token_pepper: null,
+    } as never);
+    vi.mocked(settleOperation).mockResolvedValue({
+      settled: true,
+      row: { id: 'ledger-row-1' },
+    } as never);
+
+    const db = ledgerCapturingDb({
+      attempt: launchingAttempt({ launch_attempt_count: 1 }),
+      ledgerRows: [{ id: 'ledger-row-1' }],
+      userRows: [{ email: 'owner@example.com' }],
+      agentConfigs: [{ config: autoPolicyRuntimeConfig(), is_enabled: true }],
+      integrations: [{ repositories: [{ id: 1, full_name: 'kilo/repo' }] }],
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const result = await processRemediationAttempt({
+      env: {
+        ...lifecycleEnv,
+        CLOUD_AGENT_NEXT: {
+          fetch: vi.fn(async () => {
+            throw new Error('upstream 5xx');
+          }),
+        },
+      } as unknown as CloudflareEnv,
+      attemptId: ATTEMPT_ID,
+      dispatchId: 'dispatch-1',
+    });
+
+    expect(result).toBe('failed');
+    expect(postedLifecycleEvents(vi.mocked(fetch))).toEqual([]);
+  });
+});

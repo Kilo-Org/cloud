@@ -5,6 +5,7 @@ import {
   agent_configs,
   kilocode_users,
   operation_ledgers,
+  organization_memberships,
   organizations,
   platform_integrations,
   security_audit_log,
@@ -916,7 +917,7 @@ async function transitionAttemptLaunchFailure(params: {
   failureCode: string;
   errorMessage: string;
   retryable: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   const terminal =
     !params.retryable || params.attempt.launch_attempt_count >= REMEDIATION_LAUNCH_MAX_ATTEMPTS;
   await params.db.transaction(async tx => {
@@ -972,6 +973,7 @@ async function transitionAttemptLaunchFailure(params: {
       terminalStatus: 'failed',
     });
   }
+  return terminal;
 }
 
 async function blockAttempt(params: {
@@ -1328,6 +1330,12 @@ export async function processRemediationAttempt(params: {
       reason: decision.reason.toUpperCase(),
       summary: `Remediation no longer eligible: ${decision.reason}`,
     });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      db,
+      attempt,
+      status: 'blocked',
+    });
     return 'skipped';
   }
   if (
@@ -1340,6 +1348,12 @@ export async function processRemediationAttempt(params: {
       finding,
       reason: 'COVERED_BY_EXISTING_REMEDIATION_PR',
       summary: 'Another open remediation PR covers same package and manifest',
+    });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      db,
+      attempt,
+      status: 'blocked',
     });
     return 'skipped';
   }
@@ -1354,9 +1368,9 @@ export async function processRemediationAttempt(params: {
       errorMessage: 'Remediation actor unavailable',
       retryable: false,
     });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return 'failed';
   }
-
   try {
     await launchAttempt({ db, env: params.env, attempt, finding, owner, actor });
     try {
@@ -1381,7 +1395,7 @@ export async function processRemediationAttempt(params: {
     }
     return 'launched';
   } catch (error) {
-    await transitionAttemptLaunchFailure({
+    const terminal = await transitionAttemptLaunchFailure({
       db,
       attempt,
       finding,
@@ -1390,6 +1404,14 @@ export async function processRemediationAttempt(params: {
       errorMessage: error instanceof Error ? error.message : String(error),
       retryable: !(error instanceof InsufficientCreditsError),
     });
+    if (terminal) {
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'failed',
+      });
+    }
     return 'failed';
   }
 }
@@ -1896,6 +1918,134 @@ async function settleAdmittedLedgerRowBestEffort(params: {
   }
 }
 
+// ----- security lifecycle push producers (P2-GH-48b) ---------------------
+//
+// These emit the `security_lifecycle` push after a terminal persist commits.
+// They run post-commit and best-effort: a push failure must never roll back
+// or fail the persist, so every path below catches and logs.
+
+// 1:1 map to the `security_lifecycle` event enum in
+// `packages/notifications/src/push-data.ts`. The service cannot import that
+// package, so the union is declared here.
+export type SecurityLifecycleEvent =
+  | 'analysis_completed'
+  | 'analysis_failed'
+  | 'remediation_queued'
+  | 'remediation_pr_opened'
+  | 'remediation_failed'
+  | 'remediation_blocked'
+  | 'remediation_no_changes_needed'
+  | 'remediation_cancelled';
+
+/** Maps a terminal remediation attempt status to its lifecycle push event. */
+export function remediationTerminalLifecycleEvent(status: string): SecurityLifecycleEvent | null {
+  switch (status) {
+    case 'pr_opened':
+      return 'remediation_pr_opened';
+    case 'failed':
+      return 'remediation_failed';
+    case 'blocked':
+      return 'remediation_blocked';
+    case 'no_changes_needed':
+      return 'remediation_no_changes_needed';
+    case 'cancelled':
+      return 'remediation_cancelled';
+    default:
+      return null;
+  }
+}
+
+async function resolveSecurityLifecycleRecipientUserIds(
+  db: WorkerDb,
+  finding: SecurityFindingRecord
+): Promise<string[]> {
+  if (finding.owned_by_user_id) return [finding.owned_by_user_id];
+  if (!finding.owned_by_organization_id) return [];
+  const rows = await db
+    .select({ userId: organization_memberships.kilo_user_id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, finding.owned_by_organization_id),
+        eq(organization_memberships.role, 'owner')
+      )
+    );
+  return [...new Set(rows.map(row => row.userId))];
+}
+
+/**
+ * Best-effort, post-commit security lifecycle push. Resolves recipients
+ * (personal scope → the owner user; org scope → org owners, mirroring the
+ * finding push), then POSTs the web internal notifications route. Never
+ * throws: a push failure must not roll back or fail the terminal persist.
+ */
+export async function dispatchSecurityLifecycleEventForFinding(params: {
+  env: CloudflareEnv;
+  db: WorkerDb;
+  findingId: string;
+  event: SecurityLifecycleEvent;
+  remediationId?: string;
+  prUrl?: string;
+}): Promise<void> {
+  try {
+    const finding = await getSecurityFindingById(params.db, params.findingId);
+    if (!finding) return;
+    const recipientUserIds = await resolveSecurityLifecycleRecipientUserIds(params.db, finding);
+    if (recipientUserIds.length === 0) return;
+    const backendUrl = params.env.KILOCODE_BACKEND_BASE_URL;
+    const internalSecret = await params.env.INTERNAL_API_SECRET.get();
+    if (!backendUrl || !internalSecret) return;
+    const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Secret': internalSecret,
+      },
+      body: JSON.stringify({
+        event: params.event,
+        findingId: params.findingId,
+        scope: finding.owned_by_organization_id ?? 'personal',
+        ...(params.remediationId !== undefined ? { remediationId: params.remediationId } : {}),
+        ...(params.prUrl !== undefined ? { prUrl: params.prUrl } : {}),
+        recipientUserIds,
+      }),
+    });
+    if (!response.ok) {
+      logger.warn('Security lifecycle push dispatch returned non-OK status', {
+        finding_id: params.findingId,
+        event: params.event,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    logger.warn('Security lifecycle push dispatch failed', {
+      finding_id: params.findingId,
+      event: params.event,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function emitRemediationTerminalLifecycleEvent(params: {
+  env: CloudflareEnv;
+  db: WorkerDb;
+  attempt: SecurityRemediationAttempt;
+  status: string;
+  prUrl?: string | null;
+}): Promise<void> {
+  const event = remediationTerminalLifecycleEvent(params.status);
+  if (!event) return;
+  await dispatchSecurityLifecycleEventForFinding({
+    env: params.env,
+    db: params.db,
+    findingId: params.attempt.finding_id,
+    event,
+    remediationId: params.attempt.remediation_id,
+    prUrl: params.prUrl ?? undefined,
+  });
+}
+
 export async function finalizeRemediationCallbackFromEnv(params: {
   env: CloudflareEnv;
   attemptId: string;
@@ -1949,6 +2099,12 @@ export async function finalizeRemediationCallbackFromEnv(params: {
         attempt,
         terminalStatus: 'cancelled',
       });
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'cancelled',
+      });
       return { status: 'cancelled-finalized' };
     }
     await finalizeAttemptAsFailed({
@@ -1959,6 +2115,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       message: params.payload.errorMessage ?? 'Cloud Agent interrupted',
     });
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return { status: 'failed-finalized' };
   }
 
@@ -1971,6 +2128,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       message: params.payload.errorMessage ?? 'Cloud Agent failed',
     });
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return { status: 'failed-finalized' };
   }
 
@@ -1993,6 +2151,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
         : 'Remediation result block missing or malformed',
     });
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return { status: 'failed-finalized' };
   }
   await finalizeAttemptOutcome({
@@ -2004,6 +2163,13 @@ export async function finalizeRemediationCallbackFromEnv(params: {
     actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   });
   await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: result.status });
+  await emitRemediationTerminalLifecycleEvent({
+    env: params.env,
+    db,
+    attempt,
+    status: result.status,
+    prUrl: result.prUrl,
+  });
   return { status: `${result.status}-finalized` };
 }
 
@@ -2037,6 +2203,13 @@ export async function startManualRemediation(params: {
     await markAttemptQueueAdmissionFailed(db, result.attemptId);
     throw error;
   }
+  await dispatchSecurityLifecycleEventForFinding({
+    env: params.env,
+    db,
+    findingId: params.request.findingId,
+    event: 'remediation_queued',
+    remediationId: result.remediationId,
+  });
   if (params.request.retry) {
     const finding = await getSecurityFindingById(db, params.request.findingId);
     if (finding) {
@@ -2109,6 +2282,7 @@ export async function applyAutoRemediationCommand(params: {
     scanLimit: APPLY_AUTO_REMEDIATION_SCAN_LIMIT,
     truncated,
   };
+  const lifecycleDispatchPromises: Promise<void>[] = [];
   for (const row of findings) {
     counts.scanned += 1;
     try {
@@ -2124,6 +2298,17 @@ export async function applyAutoRemediationCommand(params: {
       if (result.admitted) {
         counts.admitted += 1;
         await enqueueRemediationAttempt(params.env, result.attemptId, params.command.commandId);
+        // Fire the push concurrently: the dispatcher is bounded by its own 10s
+        // abort, so a hanging backend must not serialize to scan-limit × 10s.
+        lifecycleDispatchPromises.push(
+          dispatchSecurityLifecycleEventForFinding({
+            env: params.env,
+            db,
+            findingId: row.id,
+            event: 'remediation_queued',
+            remediationId: result.remediationId,
+          })
+        );
       } else {
         counts.skipped += 1;
       }
@@ -2136,6 +2321,7 @@ export async function applyAutoRemediationCommand(params: {
       });
     }
   }
+  await Promise.all(lifecycleDispatchPromises);
   await transitionSecurityAgentCommand(db, {
     commandId: params.command.commandId,
     fromStatuses: ['accepted', 'running'],
@@ -2181,6 +2367,13 @@ export async function maybeAdmitAutoRemediationForCompletedAnalysis(params: {
     }
     throw error;
   }
+  await dispatchSecurityLifecycleEventForFinding({
+    env: params.env,
+    db: params.db,
+    findingId: params.findingId,
+    event: 'remediation_queued',
+    remediationId: result.remediationId,
+  });
   return result;
 }
 
@@ -2219,6 +2412,12 @@ export async function cancelRemediation(params: {
         finding,
         attempt,
         terminalStatus: 'cancelled',
+      });
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'cancelled',
       });
     } else {
       await db.transaction(async tx => {

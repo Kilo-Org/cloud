@@ -289,8 +289,38 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
   typeof internalDispatchSecurityFindingRequestSchema
 >;
 
+// 1:1 map to the `security_lifecycle` event enum in `push-data.ts` (which in
+// turn maps to SecurityAuditLogAction). Kept as a standalone enum here because
+// the push-data variant declares the enum inline and this package must not
+// import it back.
+export const securityLifecycleEventSchema = z.enum([
+  'analysis_completed',
+  'analysis_failed',
+  'remediation_queued',
+  'remediation_pr_opened',
+  'remediation_failed',
+  'remediation_blocked',
+  'remediation_no_changes_needed',
+  'remediation_cancelled',
+]);
+export type SecurityLifecycleEvent = z.infer<typeof securityLifecycleEventSchema>;
+
+export const internalDispatchSecurityLifecycleRequestSchema = z.object({
+  kind: z.literal('security_lifecycle'),
+  event: securityLifecycleEventSchema,
+  findingId: z.string().min(1),
+  scope: z.string().min(1),
+  remediationId: z.string().min(1).optional(),
+  prUrl: z.string().min(1).optional(),
+  recipientUserIds: z.array(z.string().min(1)).min(1),
+});
+export type InternalDispatchSecurityLifecycleRequest = z.infer<
+  typeof internalDispatchSecurityLifecycleRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
+  internalDispatchSecurityLifecycleRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

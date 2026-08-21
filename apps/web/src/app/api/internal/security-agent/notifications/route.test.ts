@@ -31,6 +31,7 @@ jest.mock('@/lib/email', () => {
 
 jest.mock('@/lib/notifications-worker-client', () => ({
   dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
+  dispatchSecurityLifecyclePush: jest.fn().mockResolvedValue(undefined),
   dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -51,10 +52,14 @@ jest.mock('next/server', () => {
 });
 
 import { POST } from './route';
-import { dispatchSecurityFindingPush } from '@/lib/notifications-worker-client';
+import {
+  dispatchSecurityFindingPush,
+  dispatchSecurityLifecyclePush,
+} from '@/lib/notifications-worker-client';
 
 const mockSendEmail = jest.mocked(sendEmail);
 const mockDispatchSecurityFindingPush = jest.mocked(dispatchSecurityFindingPush);
+const mockDispatchSecurityLifecyclePush = jest.mocked(dispatchSecurityLifecyclePush);
 
 async function drainAfterCallbacks(): Promise<void> {
   const mock = after as typeof after & { pending: Promise<unknown>[] };
@@ -469,5 +474,116 @@ describe('POST /api/internal/security-agent/notifications', () => {
         )
       );
     expect(row).toBeDefined();
+  });
+
+  it('dispatches lifecycle push only: no email and no notification-row read', async () => {
+    const findingId = crypto.randomUUID();
+    const response = await POST(
+      createRawRequest({
+        event: 'remediation_pr_opened',
+        findingId,
+        scope: 'personal',
+        remediationId: crypto.randomUUID(),
+        prUrl: 'https://github.com/acme/api/pull/42',
+        recipientUserIds: ['user-a', 'user-b'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ outcome: 'sent' });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockDispatchSecurityFindingPush).not.toHaveBeenCalled();
+    // Push is scheduled via after() so it does not block the route response.
+    expect(jest.mocked(after)).toHaveBeenCalledTimes(1);
+    await drainAfterCallbacks();
+    expect(mockDispatchSecurityLifecyclePush).toHaveBeenCalledTimes(1);
+    expect(mockDispatchSecurityLifecyclePush).toHaveBeenCalledWith({
+      event: 'remediation_pr_opened',
+      findingId,
+      scope: 'personal',
+      remediationId: expect.any(String),
+      prUrl: 'https://github.com/acme/api/pull/42',
+      recipientUserIds: ['user-a', 'user-b'],
+    });
+  });
+
+  it('keeps sent response when lifecycle push dispatch rejects', async () => {
+    mockDispatchSecurityLifecyclePush.mockRejectedValueOnce(new Error('push worker down'));
+    const findingId = crypto.randomUUID();
+    const response = await POST(
+      createRawRequest({
+        event: 'analysis_completed',
+        findingId,
+        scope: 'personal',
+        recipientUserIds: ['user-a'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ outcome: 'sent' });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    await drainAfterCallbacks();
+    expect(mockDispatchSecurityLifecyclePush).toHaveBeenCalledWith({
+      event: 'analysis_completed',
+      findingId,
+      scope: 'personal',
+      remediationId: undefined,
+      prUrl: undefined,
+      recipientUserIds: ['user-a'],
+    });
+  });
+
+  it('dispatches lifecycle push for the minimal analysis event shape', async () => {
+    const findingId = crypto.randomUUID();
+    const response = await POST(
+      createRawRequest({
+        event: 'analysis_failed',
+        findingId,
+        scope: 'personal',
+        recipientUserIds: ['user-a'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ outcome: 'sent' });
+    await drainAfterCallbacks();
+    expect(mockDispatchSecurityLifecyclePush).toHaveBeenCalledWith({
+      event: 'analysis_failed',
+      findingId,
+      scope: 'personal',
+      remediationId: undefined,
+      prUrl: undefined,
+      recipientUserIds: ['user-a'],
+    });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects lifecycle bodies with an unknown event', async () => {
+    const response = await POST(
+      createRawRequest({
+        event: 'finding_created',
+        findingId: crypto.randomUUID(),
+        scope: 'personal',
+        recipientUserIds: ['user-a'],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockDispatchSecurityLifecyclePush).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects lifecycle bodies with an empty recipient list', async () => {
+    const response = await POST(
+      createRawRequest({
+        event: 'analysis_completed',
+        findingId: crypto.randomUUID(),
+        scope: 'personal',
+        recipientUserIds: [],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockDispatchSecurityLifecyclePush).not.toHaveBeenCalled();
   });
 });

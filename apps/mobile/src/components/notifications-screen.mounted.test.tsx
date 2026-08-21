@@ -381,7 +381,12 @@ describe('NotificationsScreen category availability', () => {
     );
     const { renderer } = await renderScreen();
 
-    await waitFor(() => switchesByLabel(renderer.root, 'Balance alerts').length === 1);
+    // Wait for an available sibling row to be enabled first: the master gate
+    // disables every row until the permission/device-token/push-token queries
+    // settle, so the unavailable row is disabled from the first render. Waiting
+    // on the sibling proves the gate settled and capabilities loaded, so the
+    // Balance alerts `disabled` below is the unavailable state, not the gate.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(

@@ -36,13 +36,14 @@ export function useSessionMutations() {
 
   const snapshotAndUpdate = async (
     update: (data: SessionsListData) => SessionsListData
-  ): Promise<{ previous: SessionsListSnapshot }> => {
+  ): Promise<{ previous: SessionsListSnapshot; generation: number }> => {
     await queryClient.cancelQueries({ queryKey: listKey });
+    const generation = nextMutationGeneration(hashKey(listKey));
     const previous = queryClient.getQueriesData<SessionsListData>({ queryKey: listKey });
     queryClient.setQueriesData<SessionsListData>({ queryKey: listKey }, old =>
       old ? update(old) : old
     );
-    return { previous };
+    return { previous, generation };
   };
 
   /**
@@ -70,8 +71,9 @@ export function useSessionMutations() {
   const deleteSessionMutation = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions({
       onMutate: async ({ session_id }) => {
-        const generation = nextMutationGeneration(hashKey(listKey));
-        const { previous } = await snapshotAndUpdate(data => removeStoredSession(data, session_id));
+        const { previous, generation } = await snapshotAndUpdate(data =>
+          removeStoredSession(data, session_id)
+        );
         return { previous, generation };
       },
       onError: (error, _input, context) => {
@@ -89,8 +91,7 @@ export function useSessionMutations() {
   const renameSessionMutation = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions({
       onMutate: async ({ session_id, title }) => {
-        const generation = nextMutationGeneration(hashKey(listKey));
-        const { previous } = await snapshotAndUpdate(data =>
+        const { previous, generation } = await snapshotAndUpdate(data =>
           mapStoredSessions(data, session_id, session => ({ ...session, title }))
         );
         const previousActive = await snapshotAndUpdateActive(session_id, title);

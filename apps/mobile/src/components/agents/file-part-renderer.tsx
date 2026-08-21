@@ -22,8 +22,8 @@ import {
 } from '@/lib/share-remote-file';
 
 import { ChatMarkdownText } from './chat-markdown-text';
-import { isUsableFilePartUrl, useFilePartCache } from './file-part-cache';
 import { getFilePartAccessibilityLabel, getFilePartKind } from './file-part-preview';
+import { refreshFilePartUrl, useResolvedFilePartUrl } from './file-part-url-resolver';
 import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
 const CACHE_DIR_NAME = 'session-file-parts';
@@ -94,24 +94,12 @@ type FilePartRendererProps = {
 
 type PreviewMode = 'markdown' | 'text';
 
-/** Prefer the captured cache URL, falling back to the part's own URL. The
- *  cached URL is produced by our cache and is always trusted. */
-function resolveUsableUrl(cachedUrl: string | undefined, partUrl: string): string | undefined {
-  if (cachedUrl) {
-    return cachedUrl;
-  }
-  if (isUsableFilePartUrl(partUrl)) {
-    return partUrl;
-  }
-  return undefined;
-}
-
 export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
 
-  const cached = useFilePartCache(part.id);
-  const url = resolveUsableUrl(cached?.url, part.url);
+  const resolved = useResolvedFilePartUrl(part);
+  const url = resolved.status === 'ready' ? resolved.url : undefined;
   const kind = getFilePartKind({ mime: part.mime, filename: part.filename });
 
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -141,30 +129,38 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   }
 
   function handleChipTap() {
-    if (!url) {
-      toast.error('Preview unavailable');
-      return;
-    }
-    if (kind === 'markdown') {
-      setPreview('markdown');
-      return;
-    }
-    showActionSheetWithOptions(
-      {
-        options: ['Open as text', 'Open in external app', 'Cancel'],
-        cancelButtonIndex: 2,
-      },
-      index => {
-        if (index === undefined || index === 2) {
-          return;
-        }
-        if (index === 0) {
-          setPreview('text');
-        } else if (index === 1) {
-          void handleShare();
-        }
+    if (url) {
+      if (kind === 'markdown') {
+        setPreview('markdown');
+        return;
       }
-    );
+      showActionSheetWithOptions(
+        {
+          options: ['Open as text', 'Open in external app', 'Cancel'],
+          cancelButtonIndex: 2,
+        },
+        index => {
+          if (index === undefined || index === 2) {
+            return;
+          }
+          if (index === 0) {
+            setPreview('text');
+          } else if (index === 1) {
+            void handleShare();
+          }
+        }
+      );
+      return;
+    }
+    if (resolved.status === 'resolving') {
+      return;
+    }
+    if (resolved.status === 'error') {
+      resolved.retry?.();
+      toast.error('Could not load this file. Try again.');
+      return;
+    }
+    toast.error('Preview unavailable');
   }
 
   if (kind === 'image') {
@@ -173,7 +169,16 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
         return (
           <Pressable
             onPress={() => {
-              setImageFailed(false);
+              if (!resolved.attachmentRef) {
+                setImageFailed(false);
+                return;
+              }
+              void (async () => {
+                const ok = await refreshFilePartUrl(part.id);
+                if (ok) {
+                  setImageFailed(false);
+                }
+              })();
             }}
             className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
             accessibilityRole="button"
@@ -222,6 +227,32 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
         </>
       );
     }
+    if (resolved.status === 'resolving') {
+      return (
+        <View
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+          accessibilityLabel="Loading image"
+        >
+          <ActivityIndicator size="small" />
+          <Text className="text-xs text-muted-foreground">Loading image</Text>
+        </View>
+      );
+    }
+    if (resolved.status === 'error') {
+      return (
+        <Pressable
+          onPress={() => {
+            resolved.retry?.();
+          }}
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+          accessibilityRole="button"
+          accessibilityLabel="Image unavailable, retry loading"
+        >
+          <AlertCircle size={14} color={colors.mutedForeground} />
+          <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+        </Pressable>
+      );
+    }
     return (
       <View className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
         <AlertCircle size={14} color={colors.mutedForeground} />
@@ -235,12 +266,16 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       <Pressable
         onPress={handleChipTap}
         disabled={sharing}
-        accessibilityState={{ busy: sharing }}
+        accessibilityState={{ busy: sharing || resolved.status === 'resolving' }}
         accessibilityRole="button"
         accessibilityLabel={getFilePartAccessibilityLabel(kind, part.filename)}
         className="my-1 flex-row items-center gap-2 rounded-lg bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
       >
-        {sharing ? <ActivityIndicator /> : <FileIcon size={14} color={colors.mutedForeground} />}
+        {sharing || resolved.status === 'resolving' ? (
+          <ActivityIndicator />
+        ) : (
+          <FileIcon size={14} color={colors.mutedForeground} />
+        )}
         <Text className="text-sm text-muted-foreground" numberOfLines={1}>
           {part.filename ?? 'File'}
         </Text>
@@ -250,6 +285,14 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           mode={preview}
           url={url}
           part={part}
+          onRetry={
+            resolved.attachmentRef
+              ? async () => {
+                  const ok = await refreshFilePartUrl(part.id);
+                  return ok;
+                }
+              : undefined
+          }
           onClose={() => {
             setPreview(null);
           }}
@@ -263,10 +306,11 @@ type FilePreviewModalProps = {
   mode: PreviewMode;
   url: string;
   part: FilePart;
+  onRetry?: () => Promise<boolean>;
   onClose: () => void;
 };
 
-function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModalProps>) {
+function FilePreviewModal({ mode, url, part, onRetry, onClose }: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
@@ -306,7 +350,19 @@ function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModa
           <Text className="text-sm text-muted-foreground">Could not load this file.</Text>
           <Pressable
             onPress={() => {
-              setAttempt(prev => prev + 1);
+              if (!onRetry) {
+                setAttempt(prev => prev + 1);
+                return;
+              }
+              setStatus('loading');
+              void (async () => {
+                const ok = await onRetry();
+                if (!ok) {
+                  setStatus('error');
+                } else {
+                  setAttempt(prev => prev + 1);
+                }
+              })();
             }}
             accessibilityRole="button"
             accessibilityLabel="Retry loading file"

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FilePartRenderer } from './file-part-renderer';
 import { __resetFilePartCacheForTests, cacheFilePart } from './file-part-cache';
+import { __resetFilePartUrlResolverForTests } from './file-part-url-resolver';
 
 type FileInstance = {
   uri: string;
@@ -84,6 +85,16 @@ const toastMock = vi.hoisted(() => ({
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 
+const getAttachmentDownloadUrlMutate = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: {
+      getAttachmentDownloadUrl: { mutate: getAttachmentDownloadUrlMutate },
+    },
+  },
+}));
+
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
@@ -122,6 +133,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   fileInstances.length = 0;
   __resetFilePartCacheForTests();
+  __resetFilePartUrlResolverForTests();
+  getAttachmentDownloadUrlMutate.mockReset();
+  getAttachmentDownloadUrlMutate.mockResolvedValue({
+    signedUrl: 'https://r2.example/signed',
+    key: 'k',
+    expiresAt: '2026-01-01T00:00:00Z',
+  });
   expoFileSystemMock.fileText.mockReset();
   shareRemoteFileMock.getSafeCacheFilename.mockImplementation(
     ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`
@@ -591,6 +609,176 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     expect(toastMock.error).toHaveBeenCalledWith('File sharing is not available on this device.');
+
+    await unmount(renderer);
+  });
+
+  it('presigns a markdown attachment and previews its text', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledWith({
+      messageUuid: uuid,
+      filename: `${uuid}.md`,
+    });
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+    expect(toastMock.error).not.toHaveBeenCalledWith('Preview unavailable');
+
+    await unmount(renderer);
+  });
+
+  it('shows a retry toast when the presign fails, then opens after a successful retry', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '22222222-2222-4222-8222-222222222222';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    getAttachmentDownloadUrlMutate.mockRejectedValueOnce(new Error('presign failed'));
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+
+    expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
+    expect(findByType(root, 'Modal')).toHaveLength(0);
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(renderer);
+  });
+
+  it('presigns an image attachment and renders the inline image', async () => {
+    const uuid = '33333333-3333-4333-8333-333333333333';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    expect(image.props.source).toEqual({ uri: 'https://r2.example/signed' });
+
+    await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    expect(viewers).toHaveLength(1);
+    expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://r2.example/signed' });
+
+    await unmount(renderer);
+  });
+
+  it('toasts "Preview unavailable" for a part with no URL and no cache entry', async () => {
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'application/pdf', filename: 'report.pdf', url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+
+    expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
+    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('re-presigns on modal Retry after a download failure', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '44444444-4444-4444-8444-444444444444';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    shareRemoteFileMock.downloadRemoteFile.mockRejectedValueOnce(new Error('R2 404'));
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    expect(texts(root)).toContain('Could not load this file.');
+    const retryButtons = pressableByLabel(root, 'Retry loading file');
+    expect(retryButtons).toHaveLength(1);
+
+    const callsBefore = getAttachmentDownloadUrlMutate.mock.calls.length;
+    await press(first(retryButtons));
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate.mock.calls.length).toBe(callsBefore + 1);
+
+    const markdown = findByType(root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(renderer);
+  });
+
+  it('shows "This file is empty." for an empty markdown attachment', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('');
+    const uuid = '55555555-5555-4555-8555-555555555555';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    expect(texts(root)).toContain('This file is empty.');
 
     await unmount(renderer);
   });

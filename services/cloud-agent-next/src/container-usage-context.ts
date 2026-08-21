@@ -312,9 +312,9 @@ export async function getSandboxBillingRuntimeStatus(sandbox: SandboxInstance): 
     }
   | undefined
 > {
-  const getStatus = (sandbox as BillingRuntimeStatusCapability).getBillingRuntimeStatus;
-  if (typeof getStatus !== 'function') return undefined;
-  return await getStatus.call(sandbox);
+  const capability = sandbox as BillingRuntimeStatusCapability;
+  if (typeof capability.getBillingRuntimeStatus !== 'function') return undefined;
+  return await capability.getBillingRuntimeStatus();
 }
 
 export async function configureSandboxBillingInput(

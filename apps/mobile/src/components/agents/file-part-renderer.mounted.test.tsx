@@ -808,6 +808,47 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
+  it('toasts a share failure that lands after the viewer closed', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const shareHolder: { reject?: (error: Error) => void } = {};
+    shareRemoteFileMock.shareRemoteFile.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        shareHolder.reject = reject;
+      })
+    );
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+
+    // Close the viewer while the share is in flight.
+    const openViewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(openViewers).props.onClose as () => void)();
+    });
+
+    await act(async () => {
+      shareHolder.reject?.(new Error('boom'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Share failed');
+
+    await unmount(renderer);
+  });
+
   it('renders share failures inline in the Markdown preview instead of toasting', async () => {
     expoFileSystemMock.fileText.mockResolvedValue('# Hello');
     cacheFilePart('part-1', {

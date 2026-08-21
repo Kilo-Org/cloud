@@ -2,7 +2,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -108,6 +108,17 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
+  const viewerVisibleRef = useRef(viewerVisible);
+  const previewRef = useRef(preview);
+
+  useEffect(() => {
+    viewerVisibleRef.current = viewerVisible;
+  }, [viewerVisible]);
+
+  useEffect(() => {
+    previewRef.current = preview;
+  }, [preview]);
+
   async function handleShare() {
     if (!url) {
       return;
@@ -124,7 +135,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       } else if (error instanceof ShareRemoteFileError) {
         message = 'Failed to share file. Please try again.';
       }
-      if (viewerVisible || preview) {
+      if (viewerVisibleRef.current || previewRef.current) {
         setShareError(message);
       } else {
         toast.error(message);

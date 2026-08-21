@@ -118,7 +118,13 @@ describe('agent attachment picker', () => {
     const candidates = await pickWithSheetSelection(1);
 
     expect(candidates).toHaveLength(1);
-    expect(Sentry.captureException).toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'write-picker-launch-context',
+      },
+      extra: { source: 'library', surface: 'agent-chat', hasSession: true },
+    });
   });
 });
 

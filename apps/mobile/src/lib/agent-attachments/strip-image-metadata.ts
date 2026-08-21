@@ -43,8 +43,15 @@ export async function stripImageMetadata(
       format: saveFormatFor(extension),
     });
     return result.uri;
-  } catch (error) {
-    Sentry.captureException(error);
+  } catch {
+    Sentry.captureException(new Error('Attachment image metadata strip failed'), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'strip-image-metadata',
+      },
+      extra: { outputExtension: strippedExtension(extension) },
+      fingerprint: ['agent-attachments-strip-image-metadata'],
+    });
     return uri;
   }
 }

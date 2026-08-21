@@ -417,7 +417,7 @@ describe('unsupported serialization boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+        tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
       })
     );
     await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
@@ -432,7 +432,8 @@ describe('unsupported serialization boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+        tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
+        fingerprint: ['draft-write-unsupported-value'],
       })
     );
     await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
@@ -456,15 +457,13 @@ describe('corrupt read', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('reports the scope and entity key to Sentry', async () => {
+  it('reports safe fixed context without overriding native error grouping', async () => {
     seedStoredValue('draft:u1', 'k', 'not-json{{{');
     await loadDraft('u1', 'k', isStringDraft);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
-      })
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'read' },
+    });
   });
 });
 
@@ -491,15 +490,14 @@ describe('shape validation', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('reports the scope and entity key for a shape mismatch', async () => {
+  it('uses a fixed fingerprint for a recognized shape mismatch', async () => {
     seedStoredValue('draft:u1', 'k', '{}');
     await loadDraft('u1', 'k', isStringDraft);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
-      })
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'read' },
+      fingerprint: ['draft-read-shape-mismatch'],
+    });
   });
 });
 
@@ -512,7 +510,7 @@ describe('write rejection boundary', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ scope: 'draft:u1', entityKey: 'k' }),
+        tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
       })
     );
   });

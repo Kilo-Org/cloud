@@ -61,8 +61,15 @@ function deleteCacheOwnedFile(localUri: string): void {
     if (file.exists) {
       file.delete();
     }
-  } catch (error) {
-    Sentry.captureException(error);
+  } catch {
+    Sentry.captureException(new Error('Attachment cache file delete failed'), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'delete-cache-file',
+      },
+      extra: { cacheOwned: true },
+      fingerprint: ['agent-attachments-delete-cache-file'],
+    });
   }
 }
 

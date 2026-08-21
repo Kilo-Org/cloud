@@ -196,10 +196,17 @@ describe('initAppsFlyer purchase connector', () => {
       expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     });
 
-    const captured = vi.mocked(Sentry.captureException).mock.calls[0]?.[0];
-    expect(captured).toBeInstanceOf(Error);
-    expect((captured as Error).message).toContain('AppsFlyer purchase connector failed');
-    expect((captured as Error).message).toContain('native bridge down');
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'AppsFlyer create-purchase-connector failed' }),
+      {
+        tags: {
+          'error.subsystem': 'appsflyer',
+          'error.operation': 'create-purchase-connector',
+        },
+        extra: { platform: 'ios' },
+        fingerprint: ['appsflyer', 'create-purchase-connector'],
+      }
+    );
   });
 });
 
@@ -264,9 +271,14 @@ describe('AppsFlyer event reporting', () => {
     initAppsFlyer();
 
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    const captured = vi.mocked(Sentry.captureException).mock.calls[0]?.[0];
-    expect((captured as Error).message).toContain('AppsFlyer init failed');
-    expect((captured as Error).message).toContain('Invalid dev key');
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'AppsFlyer init-sdk failed' }),
+      {
+        tags: { 'error.subsystem': 'appsflyer', 'error.operation': 'init-sdk' },
+        extra: { platform: 'ios' },
+        fingerprint: ['appsflyer', 'init-sdk'],
+      }
+    );
   });
 });
 

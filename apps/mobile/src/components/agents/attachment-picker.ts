@@ -150,7 +150,13 @@ export function pickAgentAttachments(
         } catch (error) {
           // A store write failure must not block the picker launch; the
           // recovery hook simply finds no context and nothing is attached.
-          Sentry.captureException(error);
+          Sentry.captureException(error, {
+            tags: {
+              'error.subsystem': 'agent-attachments',
+              'error.operation': 'write-picker-launch-context',
+            },
+            extra: { source, surface: context.surface, hasSession: context.sessionId !== null },
+          });
         }
       }
       const result = await pickFromSource(source);

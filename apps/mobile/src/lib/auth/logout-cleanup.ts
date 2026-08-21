@@ -131,11 +131,15 @@ export async function runLogoutCleanup(): Promise<void> {
     } catch (error) {
       // A tombstone write failure is reported but never blocks logout: the
       // push row stays removable on the next successful unregister.
-      Sentry.captureException(error);
+      Sentry.captureException(error, {
+        tags: { 'error.subsystem': 'auth', 'error.operation': 'write_logout_tombstone' },
+      });
     }
   } catch (error) {
     // Never throw by contract: an unexpected failure anywhere in the gather
     // phase must not abort sign-out.
-    Sentry.captureException(error);
+    Sentry.captureException(error, {
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'run_logout_cleanup' },
+    });
   }
 }

@@ -192,7 +192,9 @@ describe('runLogoutCleanup', () => {
     vi.mocked(setItemAsync).mockRejectedValueOnce(new Error('secure store down'));
 
     await expect(runLogoutCleanup()).resolves.toBeUndefined();
-    expect(captureException).toHaveBeenCalledWith(expect.any(Error));
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'write_logout_tombstone' },
+    });
   });
 
   it('never throws when the push outcome lookup itself throws', async () => {

@@ -40,7 +40,13 @@ export function useMarkRead(client: KiloChatClient) {
     // toast for a background failure is noise. Retry happens naturally on the
     // next mark-read trigger; just log so we can see failure rates.
     onError: error => {
-      Sentry.captureException(error);
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'kilo-chat',
+          'error.operation': 'mark-conversation-read',
+        },
+        extra: { hasUser: userId !== null },
+      });
     },
     onMutate: () => ({ startBadgeFreshnessEpoch: advanceBadgeFreshnessEpoch() }),
     onSuccess: (result, _variables, context) => {

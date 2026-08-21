@@ -52,6 +52,13 @@ describe('stripImageMetadata', () => {
     const result = await stripImageMetadata('file:///cache/original.png', 'png');
 
     expect(result).toBe('file:///cache/original.png');
-    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'strip-image-metadata',
+      },
+      extra: { outputExtension: 'png' },
+      fingerprint: ['agent-attachments-strip-image-metadata'],
+    });
   });
 });

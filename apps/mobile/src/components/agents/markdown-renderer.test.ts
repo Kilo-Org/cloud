@@ -707,4 +707,30 @@ describe('MarkdownRenderer list marker alignment', () => {
     assertItemTextMetrics(mounted, ['one', 'two']);
     await unmountMarkdown(mounted);
   });
+
+  it('keeps a leading blockquote margin in a list item', async () => {
+    const mounted = await mountMarkdown('- > quoted text');
+    const rows = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item');
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    if (!row) {
+      throw new Error('list item row missing');
+    }
+    const contentViews = viewChildren(row);
+    expect(contentViews).toHaveLength(1);
+    const contentView = contentViews[0];
+    if (!contentView) {
+      throw new Error('list item content View missing');
+    }
+    const blockquotes = viewChildren(contentView);
+    expect(blockquotes).toHaveLength(1);
+    const blockquote = blockquotes[0];
+    if (!blockquote) {
+      throw new Error('blockquote View missing');
+    }
+    const blockquoteStyle = flattenStyle(propOf(blockquote, 'style'));
+    expect(blockquoteStyle.marginVertical).toBe(4);
+    expect(blockquoteStyle.marginTop).toBeUndefined();
+    await unmountMarkdown(mounted);
+  });
 });

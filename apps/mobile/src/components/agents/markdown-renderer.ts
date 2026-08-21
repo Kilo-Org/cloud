@@ -197,28 +197,35 @@ export class MarkdownRenderer extends Renderer {
   // text in a paragraph View (marked rewrites item `text` tokens to
   // `paragraph` tokens). That paragraph's top margin pushes the first line
   // below the marker, which sits at the row top (see the `list` style note
-  // in markdown-palette.ts). Rewrite the leading block's vertical margin so
-  // loose and tight items start their first line at the row top alike.
+  // in markdown-palette.ts). Rewrite the leading paragraph View's vertical
+  // margin so loose and tight items start their first line at the row top
+  // alike. A leading blockquote or hr View has border properties but no
+  // `paddingVertical`, so it keeps its own spacing.
   override listItem(children: ReactNode[], styles?: ViewStyle): ReactNode {
     const first = children[0];
     if (isValidElement(first) && first.type === View) {
       const styleProp = (first.props as { style?: ViewStyle }).style;
-      const { marginVertical, marginBottom, ...rest } = styleProp ?? {};
-      const adjusted: ViewStyle = {
-        ...rest,
-        marginTop: 0,
-        marginBottom: marginBottom ?? marginVertical,
-      };
-      return super.listItem(
-        [
-          // eslint-disable-next-line react/no-clone-element -- listItem must rewrite the leading paragraph View's style in place; cloning preserves the element's key and the renderer's key sequence
-          cloneElement(first as ReactElement<{ style?: ViewStyle }>, {
-            style: adjusted,
-          }),
-          ...children.slice(1),
-        ],
-        styles
-      );
+      // The paragraph View is the only leading View whose style carries the
+      // paragraph's `paddingVertical` (palette paragraph is
+      // { marginVertical: 2, paddingVertical: 0 }).
+      if (styleProp !== undefined && 'paddingVertical' in styleProp) {
+        const { marginVertical, marginBottom, ...rest } = styleProp;
+        const adjusted: ViewStyle = {
+          ...rest,
+          marginTop: 0,
+          marginBottom: marginBottom ?? marginVertical,
+        };
+        return super.listItem(
+          [
+            // eslint-disable-next-line react/no-clone-element -- listItem must rewrite the leading paragraph View's style in place; cloning preserves the element's key and the renderer's key sequence
+            cloneElement(first as ReactElement<{ style?: ViewStyle }>, {
+              style: adjusted,
+            }),
+            ...children.slice(1),
+          ],
+          styles
+        );
+      }
     }
     return super.listItem(children, styles);
   }

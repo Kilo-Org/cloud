@@ -459,10 +459,10 @@ function FilePreviewModal({
           onShare={onShare}
           sharing={sharing}
         />
-        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-          {shareError ? <Text className="mb-2 text-sm text-destructive">{shareError}</Text> : null}
-          {renderBody()}
-        </ScrollView>
+        {shareError ? (
+          <Text className="px-6 pt-2 text-sm text-destructive">{shareError}</Text>
+        ) : null}
+        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
       </View>
     </Modal>
   );

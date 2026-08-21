@@ -103,11 +103,14 @@ describe('ImageViewerModal mounted', () => {
 
     // The zoomable image is replaced by the fallback.
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
-    expect(findByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    const alert = findByType(renderer.root, 'AlertCircle');
+    expect(alert).toHaveLength(1);
+    expect(alert[0]?.props.color).toBe('#ffffff');
     const unavailable = findByType(renderer.root, 'Text').filter(
       node => node.props.children === 'Image unavailable'
     );
     expect(unavailable).toHaveLength(1);
+    expect(unavailable[0]?.props.className).toContain('text-white');
 
     // The Share header pressable stays enabled when onShare exists.
     const share = findByType(renderer.root, 'Pressable').find(

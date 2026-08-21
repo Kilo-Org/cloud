@@ -170,8 +170,8 @@ export function ImageViewerModal({
             ) : null}
             {uri && imageError ? (
               <View className="flex-row items-center gap-2">
-                <AlertCircle size={14} color={colors.mutedForeground} />
-                <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+                <AlertCircle size={14} color="#ffffff" />
+                <Text className="text-xs text-white">Image unavailable</Text>
               </View>
             ) : null}
           </View>

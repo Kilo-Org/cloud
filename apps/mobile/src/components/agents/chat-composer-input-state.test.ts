@@ -12,6 +12,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -39,6 +40,7 @@ describe('resolveChatComposerControlState', () => {
         hasText: true,
         isFocused: false,
         isSending: override.isSending,
+        isUploading: false,
         voiceInputActive: false,
       });
 
@@ -59,6 +61,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -78,6 +81,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -96,6 +100,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -113,6 +118,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -130,6 +136,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -147,10 +154,29 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
     expect(state.canSend).toBe(true);
+  });
+
+  it('blocks send while an upload is in flight, even with text and sendable attachments', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 1,
+      sendableAttachmentsCount: 1,
+      attachmentMax: 5,
+      disabled: false,
+      hasText: true,
+      isFocused: false,
+      isSending: false,
+      isUploading: true,
+      voiceInputActive: false,
+    });
+
+    expect(state.canSend).toBe(false);
+    expect(state.toolbarDisabled).toBe(false);
+    expect(state.inputEditable).toBe(true);
   });
 
   it('keeps the toolbar visible when focused, has text, has attachments, or voice is active', () => {
@@ -162,6 +188,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     };
 
@@ -185,6 +212,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -200,6 +228,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: true,
+      isUploading: false,
       voiceInputActive: false,
     });
 
@@ -215,6 +244,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: true,
     });
 
@@ -232,6 +262,7 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
+      isUploading: false,
       voiceInputActive: false,
     });
 

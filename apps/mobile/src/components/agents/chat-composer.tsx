@@ -515,6 +515,7 @@ export function ChatComposer({
     hasText,
     isFocused,
     isSending,
+    isUploading: upload.isUploading,
     voiceInputActive: voiceInput.isActive,
   });
 

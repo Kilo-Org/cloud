@@ -7,6 +7,8 @@ type ChatComposerControlInput = {
   hasText: boolean;
   isFocused: boolean;
   isSending: boolean;
+  /** True while an attachment upload is in flight; blocks send until it settles. */
+  isUploading: boolean;
   voiceInputActive: boolean;
 };
 
@@ -46,13 +48,15 @@ export function resolveChatComposerControlState(
     hasText,
     isFocused,
     isSending,
+    isUploading,
     voiceInputActive,
   } = input;
   // Streaming is intentionally NOT a composer gate. The user must be able to
   // type and send while the agent runs (plan §3.3): the row component chooses
   // Stop vs Send based on `isStreaming` + `hasText`. The session manager, the
-  // parent, and `disabled` already cover every other lock (read-only, missing
-  // model, blocking interaction, upload-in-progress, interrupt-in-flight).
+  // parent, and `disabled` cover every other lock (read-only, missing model,
+  // blocking interaction, interrupt-in-flight); `isUploading` covers the
+  // upload-in-progress lock.
   const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
   const paperclipDisabled =
@@ -60,7 +64,7 @@ export function resolveChatComposerControlState(
   const inputEditable = !toolbarDisabled && !voiceInputActive;
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
   return {
-    canSend: (hasText || sendableAttachmentsCount > 0) && !disabled && !isSending,
+    canSend: (hasText || sendableAttachmentsCount > 0) && !disabled && !isSending && !isUploading,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,
     paperclipDisabled,

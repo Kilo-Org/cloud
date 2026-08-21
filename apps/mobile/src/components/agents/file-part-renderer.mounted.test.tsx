@@ -880,6 +880,39 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
+  it('renders the share error outside the scroll view, directly under the header', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('Share failed');
+    const scrollViews = findByType(root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(texts(first(scrollViews))).not.toContain('Share failed');
+
+    await unmount(renderer);
+  });
+
   it('renders the retryable share error inline in the image viewer', async () => {
     cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
     const renderer = await mount(

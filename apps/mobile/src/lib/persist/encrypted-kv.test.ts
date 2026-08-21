@@ -281,6 +281,11 @@ describe('SQLCipher presence', () => {
     await expect(clearScope('s')).rejects.toThrow(MissingSQLCipherError);
     expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(MissingSQLCipherError), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+      fingerprint: ['encrypted-kv-missing-sqlcipher'],
+    });
   });
 });
 
@@ -370,6 +375,10 @@ describe('open failure recovery', () => {
       expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
       expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
       expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+        level: 'warning',
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+      });
 
       // The store works on the recovered database.
       await expect(getItem('s', 'a')).resolves.toBe('x');

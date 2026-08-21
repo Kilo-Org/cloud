@@ -32,9 +32,16 @@ const pendingEvents: PendingEvent[] = [];
 
 const CONNECTOR_ALREADY_CONFIGURED = 'Connector already configured';
 
-function handleError(message: string) {
-  return (details: unknown) => {
-    Sentry.captureException(new Error(`${message}: ${String(details)}`));
+function handleError(operation: 'init-sdk' | 'create-purchase-connector') {
+  return (_details: unknown) => {
+    Sentry.captureException(new Error(`AppsFlyer ${operation} failed`), {
+      tags: {
+        'error.subsystem': 'appsflyer',
+        'error.operation': operation,
+      },
+      extra: { platform: Platform.OS },
+      fingerprint: ['appsflyer', operation],
+    });
   };
 }
 
@@ -102,7 +109,7 @@ async function createPurchaseConnector(): Promise<boolean> {
     if (isConnectorAlreadyConfigured(error)) {
       return true;
     }
-    handleError('AppsFlyer purchase connector failed')(error);
+    handleError('create-purchase-connector')(error);
     return false;
   }
 }
@@ -199,7 +206,7 @@ export function initAppsFlyer(): void {
       });
       drainPendingEvents();
     },
-    handleError('AppsFlyer init failed')
+    handleError('init-sdk')
   );
 }
 

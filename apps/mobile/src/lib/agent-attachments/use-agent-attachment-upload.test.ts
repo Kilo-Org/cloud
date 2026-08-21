@@ -34,12 +34,13 @@ const hoisted = vi.hoisted(() => {
     measureLocalSize: vi.fn(),
     cancelAsync: vi.fn(),
     fileDelete: vi.fn(),
+    captureException: vi.fn(),
     deletedUris: new Set<string>(),
   };
 });
 
 vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
-vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureException }));
 vi.mock('expo-file-system/legacy', () => ({ deleteAsync: vi.fn() }));
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
@@ -491,6 +492,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     hoisted.measureLocalSize.mockReset();
     hoisted.cancelAsync.mockReset();
     hoisted.fileDelete.mockReset();
+    hoisted.captureException.mockReset();
     hoisted.deletedUris.clear();
     hoisted.measureLocalSize.mockResolvedValue(1024);
     resolveUpload = undefined;
@@ -640,6 +642,33 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('reports a cache file delete failure with safe context', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+    hoisted.fileDelete.mockImplementationOnce(() => {
+      throw new Error('delete failed');
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'delete-cache-file',
+      },
+      extra: { cacheOwned: true },
+      fingerprint: ['agent-attachments-delete-cache-file'],
+    });
     renderer.unmount();
   });
 

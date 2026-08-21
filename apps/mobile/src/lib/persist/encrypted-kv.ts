@@ -183,7 +183,8 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       // existing file may hold the user's drafts. Fail loud, touch nothing.
       Sentry.captureException(openError, {
         level: 'error',
-        extra: { database: DATABASE_NAME, reason: 'encrypted-kv build has no SQLCipher' },
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+        fingerprint: ['encrypted-kv-missing-sqlcipher'],
       });
       throw openError;
     }
@@ -201,7 +202,7 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       await probeAndMigrate(reopened);
       Sentry.captureException(openError, {
         level: 'warning',
-        extra: { database: DATABASE_NAME, reason: 'encrypted-kv reset after failed probe' },
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
       });
       return reopened;
     } catch (resetError) {
@@ -215,7 +216,7 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       }
       Sentry.captureException(resetError, {
         level: 'error',
-        extra: { database: DATABASE_NAME, reason: 'encrypted-kv reset failed' },
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
       });
       throw resetError;
     }

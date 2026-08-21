@@ -232,6 +232,7 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
 type GroupedRegisterSessionInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
+  clone?: SessionMetadata['clone'];
   message: {
     initialMessageId?: string;
     turn: ExecutionTurnSubmission;
@@ -2195,6 +2196,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       metadataSchemaVersion: 2,
       identity: input.identity,
       auth: input.auth,
+      // Metadata without clone remains an empty-session bootstrap; remove
+      // this fallback only after old prepared sessions age out.
+      clone: input.clone,
       repository,
       initialMessage: {
         id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,

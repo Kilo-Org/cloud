@@ -150,6 +150,34 @@ describe('session metadata boundary', () => {
     expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
   });
 
+  it('parses and serializes clone source metadata', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+      auth: {},
+      clone: {
+        cloneFromKiloSessionId: 'agent_12345678-1234-1234-1234-123456789012',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+  });
+
+  it('keeps metadata without clone as an empty-session bootstrap', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_no_clone', userId: 'user_no_clone' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current)).not.toHaveProperty('clone');
+  });
+
   it('rejects shared route metadata without a compatible assigned sandbox', () => {
     const base = {
       metadataSchemaVersion: 2 as const,

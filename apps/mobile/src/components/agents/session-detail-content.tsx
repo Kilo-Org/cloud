@@ -4,7 +4,7 @@ import {
   type KiloSessionId,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useIsFocused, useRootNavigationState, useRouter } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -163,6 +163,14 @@ export function SessionDetailContent({
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
+  // TEMP-DEBUG: observe the root stack routes across the exit flow.
+  const rootNavState = useRootNavigationState();
+  useEffect(() => {
+    console.log(
+      '[exit-debug] root routes:',
+      JSON.stringify(rootNavState?.routes?.map(r => r.name))
+    );
+  }, [rootNavState]);
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,

@@ -28,6 +28,7 @@ import {
 import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
   getSecurityAgentCommandStatus,
+  getSecurityAgentCommandStatuses,
   listActiveSecurityAgentCommands,
   markApplyAutoRemediationCommandAdmissionFailed,
   type SecurityAgentCommandStatusResponse,
@@ -85,6 +86,7 @@ import {
   CancelRemediationInputSchema,
   GetAnalysisInputSchema,
   GetCommandStatusInputSchema,
+  GetCommandStatusesInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
   TrackSecurityAgentUiInteractionInputSchema,
@@ -100,6 +102,7 @@ import {
   type CancelRemediationInput,
   type GetAnalysisInput,
   type GetCommandStatusInput,
+  type GetCommandStatusesInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
   type TrackSecurityAgentUiInteractionInput,
@@ -1902,6 +1905,29 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
         await settleSecurityLedgerForTerminalCommand({ ctx, command });
         return command;
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // getCommandStatuses (batch)
+    // -----------------------------------------------------------------------
+    // Compatibility: getCommandStatus (single) kept for older mobile clients; remove when all shipped clients call getCommandStatuses.
+    getCommandStatuses: {
+      inputSchema: GetCommandStatusesInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: GetCommandStatusesInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const commands = await getSecurityAgentCommandStatuses(securityOwner, input.commandIds);
+        for (const command of commands) {
+          await settleSecurityLedgerForTerminalCommand({ ctx, command });
+        }
+        return commands;
       },
     },
 

@@ -6,7 +6,7 @@ import type * as manualDismissClientModule from '../services/manual-dismiss-clie
 import type * as manualAnalysisClientModule from '../services/manual-analysis-client';
 import type * as manualRemediationClientModule from '../services/manual-remediation-client';
 import { randomUUID } from 'crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { operation_ledgers, type OperationLedgerRow } from '@kilocode/db/schema';
 
@@ -68,6 +68,7 @@ const mockMarkReconcilePending = jest.fn<(...args: unknown[]) => Promise<unknown
 const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -138,6 +139,7 @@ jest.mock('../db/security-remediation', () => ({
 }));
 jest.mock('../db/security-commands', () => ({
   getSecurityAgentCommandStatus: mockGetSecurityAgentCommandStatus,
+  getSecurityAgentCommandStatuses: mockGetSecurityAgentCommandStatuses,
   listActiveSecurityAgentCommands: jest.fn(),
 }));
 jest.mock('../db/dashboard-stats', () => ({ getDashboardStats: jest.fn() }));
@@ -1486,5 +1488,106 @@ describe('terminal command ledger settle', () => {
 
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe('getCommandStatuses', () => {
+  const batchCommandId = 'aaaabbbb-cccc-4ddd-8eee-ffff00002222';
+
+  function terminalCommand(overrides: Record<string, unknown> = {}) {
+    return {
+      id: batchCommandId,
+      commandType: 'sync',
+      origin: 'dashboard_refresh',
+      findingId: null,
+      repoFullName: 'kilo/repo',
+      status: 'succeeded',
+      resultCode: 'SYNC_COMPLETED',
+      resultMetadata: null,
+      lastErrorRedacted: null,
+      acceptedAt: '2026-06-17T10:00:00.000Z',
+      startedAt: '2026-06-17T10:00:01.000Z',
+      completedAt: '2026-06-17T10:00:09.000Z',
+      updatedAt: '2026-06-17T10:00:09.000Z',
+      ...overrides,
+    };
+  }
+
+  async function insertLedgerRow(overrides: Partial<OperationLedgerRow> = {}) {
+    const [row] = await db
+      .insert(operation_ledgers)
+      .values({
+        operation_key: `settle-key-${randomUUID()}`,
+        domain: 'security',
+        intent: 'manual_sync',
+        kilo_user_id: 'user-123',
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        provider_ref: batchCommandId,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+        ...overrides,
+      })
+      .returning();
+    return row!;
+  }
+
+  beforeEach(async () => {
+    await db.delete(operation_ledgers).where(sql`true`);
+  });
+
+  afterAll(async () => {
+    await db.delete(operation_ledgers).where(sql`true`);
+  });
+
+  it('rejects an empty array, a non-uuid id, and more than 100 ids at the schema boundary', () => {
+    const schema = createHandlers().getCommandStatuses.inputSchema;
+    const ids = Array.from({ length: 101 }, () => '00000000-0000-4000-8000-000000000000');
+
+    expect(schema.safeParse({ commandIds: [] }).success).toBe(false);
+    expect(schema.safeParse({ commandIds: ['not-a-uuid'] }).success).toBe(false);
+    expect(schema.safeParse({ commandIds: ids }).success).toBe(false);
+    expect(schema.safeParse({ commandIds: ids.slice(0, 100) }).success).toBe(true);
+  });
+
+  it('returns only the commands the db layer resolved and never throws for unknown ids', async () => {
+    mockGetSecurityAgentCommandStatuses.mockResolvedValue([terminalCommand()]);
+
+    await expect(
+      createHandlers().getCommandStatuses.handler({
+        ctx: context,
+        input: { commandIds: [batchCommandId, '00000000-0000-4000-8000-000000000000'] },
+      })
+    ).resolves.toEqual([terminalCommand()]);
+
+    expect(mockGetSecurityAgentCommandStatuses).toHaveBeenCalledWith(
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      [batchCommandId, '00000000-0000-4000-8000-000000000000']
+    );
+  });
+
+  it('settles a terminal command exactly once across repeated batch calls', async () => {
+    const row = await insertLedgerRow();
+    mockGetSecurityAgentCommandStatuses.mockResolvedValue([terminalCommand()]);
+    mockSettleOperation.mockImplementationOnce(async () => {
+      await db
+        .update(operation_ledgers)
+        .set({ status: 'completed' })
+        .where(eq(operation_ledgers.id, row.id));
+      return { settled: true };
+    });
+
+    const handlers = createHandlers();
+    await handlers.getCommandStatuses.handler({
+      ctx: context,
+      input: { commandIds: [batchCommandId] },
+    });
+    await handlers.getCommandStatuses.handler({
+      ctx: context,
+      input: { commandIds: [batchCommandId] },
+    });
+
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
   });
 });

@@ -229,6 +229,18 @@ export async function getSecurityAgentCommandForOwner(
   return command ?? null;
 }
 
+export async function getSecurityAgentCommandsForOwner(
+  db: SecurityAgentCommandDb,
+  owner: SecurityAgentCommandOwner,
+  ids: string[]
+): Promise<SecurityAgentCommand[]> {
+  if (ids.length === 0) return [];
+  return db
+    .select()
+    .from(security_agent_commands)
+    .where(and(ownerWhere(owner), inArray(security_agent_commands.id, ids)));
+}
+
 export async function listActiveSecurityAgentCommandsForOwner(
   db: SecurityAgentCommandDb,
   owner: SecurityAgentCommandOwner,

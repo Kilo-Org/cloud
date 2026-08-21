@@ -2,6 +2,7 @@ import { db } from '@/lib/drizzle';
 import {
   createSecurityAgentCommand,
   getSecurityAgentCommandForOwner,
+  getSecurityAgentCommandsForOwner,
   listActiveSecurityAgentCommandsForOwner,
   markSecurityAgentCommandQueueAdmissionFailed,
   type SecurityAgentCommandOwner,
@@ -50,6 +51,14 @@ export async function getSecurityAgentCommandStatus(
 ): Promise<SecurityAgentCommandStatusResponse | null> {
   const command = await getSecurityAgentCommandForOwner(db, toCommandOwner(owner), commandId);
   return command ? serializeSecurityAgentCommand(command) : null;
+}
+
+export async function getSecurityAgentCommandStatuses(
+  owner: SecurityReviewOwner,
+  commandIds: string[]
+): Promise<SecurityAgentCommandStatusResponse[]> {
+  const commands = await getSecurityAgentCommandsForOwner(db, toCommandOwner(owner), commandIds);
+  return commands.map(serializeSecurityAgentCommand);
 }
 
 export async function listActiveSecurityAgentCommands(

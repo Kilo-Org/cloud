@@ -12,12 +12,17 @@ async function transformRequest(
   request: GatewayRequest,
   options: Partial<Omit<CustomLlmApiConfig, 'internal_id' | 'base_url'>> = {}
 ) {
-  const provider = buildDirectProvider('custom', ['chat_completions'], {
-    internal_id: 'upstream-model',
-    base_url: 'https://llm.example.com/v1',
-    api_key: 'test-key',
-    ...options,
-  });
+  const provider = buildDirectProvider(
+    'custom',
+    ['chat_completions'],
+    {
+      internal_id: 'upstream-model',
+      base_url: 'https://llm.example.com/v1',
+      api_key: 'test-key',
+      ...options,
+    },
+    null
+  );
 
   await provider.transformRequest({
     provider,
@@ -98,22 +103,32 @@ describe('custom LLM Gemini reasoning transform configuration', () => {
 
 describe('buildDirectProvider response transforms', () => {
   it('enables Gemini thought content rewriting when the transform is enabled', () => {
-    const provider = buildDirectProvider('custom', ['chat_completions'], {
-      internal_id: 'upstream-model',
-      base_url: 'https://llm.example.com/v1',
-      api_key: 'test-key',
-      reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
-    });
+    const provider = buildDirectProvider(
+      'custom',
+      ['chat_completions'],
+      {
+        internal_id: 'upstream-model',
+        base_url: 'https://llm.example.com/v1',
+        api_key: 'test-key',
+        reasoning_details_transform: ReasoningDetailsTransform.GeminiThought,
+      },
+      null
+    );
 
     expect(provider.responseTransforms).toBe(ReasoningDetailsTransform.GeminiThought);
   });
 
   it('sets response transforms to null when the transform is not enabled', () => {
-    const provider = buildDirectProvider('custom', ['chat_completions'], {
-      internal_id: 'upstream-model',
-      base_url: 'https://llm.example.com/v1',
-      api_key: 'test-key',
-    });
+    const provider = buildDirectProvider(
+      'custom',
+      ['chat_completions'],
+      {
+        internal_id: 'upstream-model',
+        base_url: 'https://llm.example.com/v1',
+        api_key: 'test-key',
+      },
+      null
+    );
 
     expect(provider.responseTransforms).toBeNull();
   });

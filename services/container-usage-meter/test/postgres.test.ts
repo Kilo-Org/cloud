@@ -44,6 +44,8 @@ const paidBillingConfig: BillingConfig = {
   services: new Set(['cloud-agent-next']),
   userIds: new Set([userId]),
   orgIds: new Set([organizationId]),
+  cloudAgentUserIds: new Set([userId]),
+  cloudAgentOrgIds: new Set([organizationId]),
   warnRemainingMicrodollars: 10_000_000,
   enabled: true,
 };
@@ -247,7 +249,27 @@ describe('container usage PostgreSQL application', () => {
         startEpochMs,
         paidBillingConfig
       )
-    ).resolves.toEqual({ kind: 'applied', dedup: false, billingMode: 'paid' });
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_050_000,
+    });
+    await expect(
+      applyStartWithDb(
+        client.db,
+        start,
+        paidIntervalId,
+        paidFingerprint,
+        startEpochMs + 1,
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: true,
+      billingMode: 'paid',
+      remainingMicrodollars: 10_050_000,
+    });
 
     const heartbeat = {
       service: paidContext.service,
@@ -344,7 +366,12 @@ describe('container usage PostgreSQL application', () => {
         startEpochMs + 1,
         paidBillingConfig
       )
-    ).resolves.toMatchObject({ kind: 'rejected', code: 'insufficient_credits' });
+    ).resolves.toMatchObject({
+      kind: 'rejected',
+      code: 'insufficient_credits',
+      remainingMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+      minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
+    });
   });
 
   it('settles paid organization usage against its aggregate wallet', async () => {
@@ -365,22 +392,29 @@ describe('container usage PostgreSQL application', () => {
       startEpochMs,
       1
     );
-    await applyStartWithDb(
-      client.db,
-      {
-        ...organizationContext,
+    await expect(
+      applyStartWithDb(
+        client.db,
+        {
+          ...organizationContext,
+          startEpochMs,
+          idempotencyKey: startIdempotencyKey(
+            organizationContext.service,
+            organizationContext.instanceId,
+            startEpochMs
+          ),
+        },
+        organizationIntervalId,
+        organizationFingerprint,
         startEpochMs,
-        idempotencyKey: startIdempotencyKey(
-          organizationContext.service,
-          organizationContext.instanceId,
-          startEpochMs
-        ),
-      },
-      organizationIntervalId,
-      organizationFingerprint,
-      startEpochMs,
-      paidBillingConfig
-    );
+        paidBillingConfig
+      )
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'paid',
+      remainingMicrodollars: 5_100_000,
+    });
     await expect(
       applyHeartbeatWithDb(
         client.db,
@@ -517,6 +551,7 @@ describe('container usage PostgreSQL application', () => {
       kind: 'applied',
       dedup: false,
       billingMode: 'paid',
+      remainingMicrodollars: 20_000_000,
     });
     await client.db
       .delete(container_usage_interval)

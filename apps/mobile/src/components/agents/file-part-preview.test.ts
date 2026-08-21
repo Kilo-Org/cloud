@@ -4,7 +4,52 @@ import {
   getFilePartAccessibilityLabel,
   getFilePartKind,
   isMarkdownFilePart,
+  parseCloudAgentAttachmentUrl,
 } from './file-part-preview';
+
+describe('parseCloudAgentAttachmentUrl', () => {
+  const UUID = '11111111-2222-4333-8444-555555555555';
+
+  it('parses a sandbox URL for .md, .mdx, and .png filenames', () => {
+    for (const filename of ['notes.md', 'docs.mdx', 'shot.png']) {
+      expect(
+        parseCloudAgentAttachmentUrl(`file:///tmp/attachments/agent-1/user-1/${UUID}/${filename}`)
+      ).toEqual({ messageUuid: UUID, filename });
+    }
+  });
+
+  it('returns undefined for a non-attachment file:// URL', () => {
+    expect(parseCloudAgentAttachmentUrl('file:///etc/passwd')).toBeUndefined();
+  });
+
+  it('returns undefined for an empty string', () => {
+    expect(parseCloudAgentAttachmentUrl('')).toBeUndefined();
+  });
+
+  it('returns undefined for http(s) and data: URLs', () => {
+    expect(parseCloudAgentAttachmentUrl('http://example.com/a.md')).toBeUndefined();
+    expect(parseCloudAgentAttachmentUrl('https://example.com/a.md')).toBeUndefined();
+    expect(parseCloudAgentAttachmentUrl('data:text/markdown;base64,QUJD')).toBeUndefined();
+  });
+
+  it('returns undefined for extra path segments after the uuid', () => {
+    expect(
+      parseCloudAgentAttachmentUrl(`file:///tmp/attachments/agent-1/user-1/${UUID}/notes.md/extra`)
+    ).toBeUndefined();
+  });
+
+  it('returns undefined for a trailing slash', () => {
+    expect(
+      parseCloudAgentAttachmentUrl(`file:///tmp/attachments/agent-1/user-1/${UUID}/notes.md/`)
+    ).toBeUndefined();
+  });
+
+  it('returns undefined when the uuid segment is not a uuid', () => {
+    expect(
+      parseCloudAgentAttachmentUrl('file:///tmp/attachments/agent-1/user-1/not-a-uuid/notes.md')
+    ).toBeUndefined();
+  });
+});
 
 describe('isMarkdownFilePart', () => {
   it('is true for .md and .mdx filenames', () => {

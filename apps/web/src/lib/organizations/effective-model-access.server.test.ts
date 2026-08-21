@@ -340,11 +340,7 @@ describe('effective organization model access', () => {
       'openai/gpt-5.6-sol-discounted',
       emptySnapshot
     );
-    const unrestricted = await getEffectiveModelDecision(
-      policy,
-      'stealth/gpt-5.6-sol',
-      emptySnapshot
-    );
+    const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);
 
     expect(restricted.allowed).toBe(true);
     expect([...restricted.eligibleProviderRoutes!]).toEqual(['openai']);

@@ -44,6 +44,7 @@ import {
   UserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
+  VertexCredentialsSchema,
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
@@ -66,6 +67,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   moonshotai: 'Moonshot AI',
   novita: 'Novita',
   perplexity: 'Perplexity',
+  vertex: 'Google Vertex AI',
   xai: 'SpaceXAI',
   xiaomi: 'Xiaomi (pay as you go)',
   zai: 'Z.ai (pay as you go)',
@@ -151,7 +153,7 @@ type BYOKDialogState = {
   selectedProvider: string;
   apiKey: string;
   showApiKey: boolean;
-  awsCredentialError: string | null;
+  credentialError: string | null;
 };
 
 const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
@@ -160,7 +162,7 @@ const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
   selectedProvider: '',
   apiKey: '',
   showApiKey: false,
-  awsCredentialError: null,
+  credentialError: null,
 };
 
 function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialogState>) {
@@ -172,15 +174,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     updateBYOKDialogState,
     INITIAL_BYOK_DIALOG_STATE
   );
-  const { isDialogOpen, editingKeyId, selectedProvider, apiKey, showApiKey, awsCredentialError } =
+  const { isDialogOpen, editingKeyId, selectedProvider, apiKey, showApiKey, credentialError } =
     dialogState;
   const setIsDialogOpen = (isDialogOpen: boolean) => updateDialogState({ isDialogOpen });
   const setEditingKeyId = (editingKeyId: string | null) => updateDialogState({ editingKeyId });
   const setSelectedProvider = (selectedProvider: string) => updateDialogState({ selectedProvider });
   const setApiKey = (apiKey: string) => updateDialogState({ apiKey });
   const setShowApiKey = (showApiKey: boolean) => updateDialogState({ showApiKey });
-  const setAwsCredentialError = (awsCredentialError: string | null) =>
-    updateDialogState({ awsCredentialError });
+  const setCredentialError = (credentialError: string | null) =>
+    updateDialogState({ credentialError });
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -274,17 +276,28 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     return keys?.some(k => k.provider_id === providerSlug) ?? false;
   };
 
-  const validateAwsCredentials = (value: string): string | null => {
+  const validateStructuredCredentials = (providerId: string, value: string): string | null => {
     if (!value) return null;
+    const schema =
+      providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+        ? AwsCredentialsSchema
+        : providerId === VercelUserByokInferenceProviderIdSchema.enum.vertex
+          ? VertexCredentialsSchema
+          : null;
+    if (!schema) return null;
     let parsed: unknown;
     try {
       parsed = JSON.parse(value);
     } catch {
-      return 'Invalid JSON — please enter a valid JSON object.';
+      return 'Invalid JSON. Enter a valid JSON object.';
     }
-    const result = AwsCredentialsSchema.safeParse(parsed);
+    const result = schema.safeParse(parsed);
     if (!result.success) {
-      return `Invalid AWS credentials:\n${z.prettifyError(result.error)}`;
+      const providerName =
+        providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+          ? 'AWS'
+          : 'Google Vertex';
+      return `Invalid ${providerName} credentials:\n${z.prettifyError(result.error)}`;
     }
     return null;
   };
@@ -295,15 +308,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setSelectedProvider('');
     setApiKey('');
     setShowApiKey(false);
-    setAwsCredentialError(null);
+    setCredentialError(null);
   };
 
   const handleSave = () => {
-    if (selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
-      const error = validateAwsCredentials(apiKey);
-      setAwsCredentialError(error);
-      if (error) return;
-    }
+    const error = validateStructuredCredentials(selectedProvider, apiKey);
+    setCredentialError(error);
+    if (error) return;
     if (editingKeyId) {
       updateMutation.mutate({
         ...(organizationId && { organizationId }),
@@ -526,7 +537,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 <Label htmlFor="provider">Provider</Label>
                 <Select
                   value={selectedProvider}
-                  onValueChange={setSelectedProvider}
+                  onValueChange={providerId => {
+                    setSelectedProvider(providerId);
+                    setCredentialError(null);
+                  }}
                   disabled={!!editingKeyId}
                 >
                   <SelectTrigger id="provider">
@@ -568,26 +582,44 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 <Label htmlFor="apiKey">
                   {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
                     ? 'AWS Credentials'
-                    : 'API Key'}
+                    : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex
+                      ? 'Google Vertex Credentials'
+                      : 'API Key'}
                 </Label>
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock ? (
+                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock ||
+                selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex ? (
                   <>
                     <textarea
                       id="apiKey"
                       value={apiKey}
                       onChange={e => {
                         setApiKey(e.target.value);
-                        setAwsCredentialError(validateAwsCredentials(e.target.value));
+                        setCredentialError(null);
                       }}
-                      placeholder='{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
+                      onBlur={e =>
+                        setCredentialError(
+                          validateStructuredCredentials(selectedProvider, e.target.value)
+                        )
+                      }
+                      placeholder={
+                        selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                          ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
+                          : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                      }
                       className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                      rows={4}
-                      aria-label="AWS credentials"
+                      rows={6}
+                      aria-label={
+                        selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                          ? 'AWS credentials'
+                          : 'Google Vertex credentials'
+                      }
+                      aria-invalid={credentialError ? true : undefined}
+                      aria-describedby={credentialError ? 'credential-error' : undefined}
                     />
-                    {awsCredentialError && (
-                      <Alert variant="destructive">
+                    {credentialError && (
+                      <Alert id="credential-error" variant="destructive">
                         <AlertDescription className="whitespace-break-spaces">
-                          {awsCredentialError}
+                          {credentialError}
                         </AlertDescription>
                       </Alert>
                     )}
@@ -626,6 +658,23 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         Your IAM user needs <code className="text-xs">bedrock:InvokeModel</code> and{' '}
                         <code className="text-xs">bedrock:InvokeModelWithResponseStream</code>{' '}
                         permissions.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex && (
+                  <Alert>
+                    <Info className="size-4" />
+                    <AlertDescription>
+                      <p>Enter your Google Cloud project, Vertex location, and service account:</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {
+                          '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                        }
+                      </code>
+                      <p className="mt-1">
+                        Enable the Vertex AI API and grant the service account permission to invoke
+                        the models you use. Claude models may also require access in Model Garden.
                       </p>
                     </AlertDescription>
                   </Alert>
@@ -722,8 +771,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 disabled={
                   !selectedProvider ||
                   !apiKey ||
-                  (selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock &&
-                    !!awsCredentialError) ||
+                  !!credentialError ||
                   createMutation.isPending ||
                   updateMutation.isPending
                 }

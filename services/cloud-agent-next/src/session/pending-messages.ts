@@ -96,6 +96,7 @@ const PendingFlushFailureCodeSchema = z.enum([
   'SANDBOX_CAPABILITY_UNAVAILABLE',
   'NOT_FOUND',
   'BAD_REQUEST',
+  'PAYMENT_REQUIRED',
   'INTERNAL',
   'PENDING_QUEUE_FULL',
   'MODEL_MISSING',
@@ -535,6 +536,7 @@ export async function recordPendingFlushFailure(
       | 'WRAPPER_CLEANUP_EXHAUSTED'
       | 'NOT_FOUND'
       | 'BAD_REQUEST'
+      | 'PAYMENT_REQUIRED'
       | 'INTERNAL'
       | 'PENDING_QUEUE_FULL'
       | 'MODEL_MISSING'
@@ -630,6 +632,7 @@ function isRetryableFlushCode(
     | 'WRAPPER_CLEANUP_EXHAUSTED'
     | 'NOT_FOUND'
     | 'BAD_REQUEST'
+    | 'PAYMENT_REQUIRED'
     | 'INTERNAL'
     | 'PENDING_QUEUE_FULL'
     | 'MODEL_MISSING'

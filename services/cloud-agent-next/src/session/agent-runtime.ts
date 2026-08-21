@@ -12,6 +12,7 @@ import type {
   FencedWrapperDispatchRequest,
   MessageDeliveryRequest,
   MessageDeliveryResult,
+  AdmissionFailure,
   WorkspaceReady,
 } from '../execution/types.js';
 import { logger } from '../logger.js';
@@ -91,6 +92,7 @@ export type AgentRuntimeDependencies = {
   createAgentSandbox?: (metadata: SessionMetadata) => AgentSandbox;
   discoverSessionWrappers?: (metadata: SessionMetadata) => Promise<WrapperObservation>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
+  checkBillingAdmission?: () => Promise<AdmissionFailure | null>;
 };
 
 function cleanupBlockedError(lease: WrapperLease): WrapperCleanupBlockedError {
@@ -319,6 +321,8 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) {
       return { success: false, code: 'INTERNAL', error: 'Session deletion is in progress' };
     }
+    const billingFailure = await dependencies.checkBillingAdmission?.();
+    if (billingFailure) return billingFailure;
     const { sessionId } = plan.scope;
     const { turn, agent } = plan;
     const currentRuntimeState = await getWrapperRuntimeState(storage);

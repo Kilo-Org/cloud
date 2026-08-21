@@ -9,10 +9,13 @@ import * as React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
 import { PartRenderer } from './part-renderer';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { PatchToolCardBody } from './tool-cards/patch-tool-card';
+import { ToolPartRenderer } from './tool-part-renderer';
 
 vi.mock('./child-session-section', () => ({}));
 vi.mock('./compaction-separator', () => ({
@@ -175,6 +178,38 @@ async function mountPatchBody(part: ToolPart): Promise<TestRenderer.ReactTestRen
   return renderer;
 }
 
+function makeToolPart(): ToolPart {
+  return {
+    id: 'tool-1',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool',
+    callID: 'call-1',
+    tool: 'bash',
+    state: {
+      status: 'completed',
+      input: { command: 'echo hi' },
+      output: 'hi',
+      title: 'bash',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+const modelOptions: SessionModelOption[] = [
+  {
+    id: 'kilo/model',
+    name: 'Test Model',
+    displayId: 'model',
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: false,
+    provider: { id: 'kilo', name: 'Kilo' },
+    modelRef: { providerID: 'kilo', modelID: 'model' },
+  },
+];
+
 describe('PartRenderer', () => {
   it('does not mount a completed empty reasoning part', () => {
     const part = makeReasoningPart('', true);
@@ -236,6 +271,20 @@ describe('PartRenderer', () => {
     ).props.children;
     expect(textElement.type).toBe(TextPartRenderer);
     expect(textElement.props).toMatchObject({ text: 'Hello world' });
+  });
+
+  it('passes modelOptions through to ToolPartRenderer for a tool part', () => {
+    const part = makeToolPart();
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part, modelOptions });
+    expect(result).not.toBeNull();
+    const toolElement = (
+      result as unknown as {
+        props: { children: { type: unknown; props: Record<string, unknown> } };
+      }
+    ).props.children;
+    expect(toolElement.type).toBe(ToolPartRenderer);
+    expect(toolElement.props).toMatchObject({ modelOptions });
   });
 });
 

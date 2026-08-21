@@ -443,6 +443,23 @@ export function CustomLlmsContent() {
                   }}
                 />
               </div>
+              {!editor.credentialsJson.trim() && (
+                <div className="bg-muted text-muted-foreground mt-2 rounded-md p-3 text-xs">
+                  <p>Add an API key using one of these credential formats:</p>
+                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
+                    {`{
+  "type": "api_key",
+  "api_key": "YOUR_API_KEY"
+}`}
+                  </pre>
+                  <p className="mt-2">
+                    Use{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
+                    instead when the provider expects an{' '}
+                    <code className="text-foreground">x-api-key</code> header.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>

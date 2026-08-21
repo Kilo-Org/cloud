@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive unit suite for the file-part cache: capture, overwrite, resolve-failed, and hook-subscription paths share one mock harness */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React trees under vitest (same pattern as src/components/agents/attachment-preview-strip.mounted.test.tsx) */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -6,8 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetFilePartCacheForTests,
   cacheFilePart,
+  clearFilePartResolveFailed,
   getFilePartCacheEntry,
   isUsableFilePartUrl,
+  markFilePartResolveFailed,
+  overwriteFilePartCacheEntry,
   useFilePartCache,
 } from '@/components/agents/file-part-cache';
 
@@ -188,6 +192,150 @@ describe('cacheFilePart', () => {
     expect(fileInstances).toHaveLength(0);
     expect(getFilePartCacheEntry('part-1')).toBeUndefined();
   });
+
+  it('stores a ref-only entry for a cloud-agent attachment file:// URL', () => {
+    const uuid = '11111111-2222-4333-8444-555555555555';
+    cacheFilePart('part-attach', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+
+    expect(fileInstances).toHaveLength(0);
+    expect(getFilePartCacheEntry('part-attach')).toEqual({
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+    expect(getFilePartCacheEntry('part-attach')).not.toHaveProperty('url');
+  });
+});
+
+describe('overwriteFilePartCacheEntry', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('replaces url, preserves attachmentRef, and emits', async () => {
+    cacheFilePart('part-overwrite', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    const renderer = await mountProbe('part-overwrite');
+
+    await act(async () => {
+      await Promise.resolve();
+      overwriteFilePartCacheEntry('part-overwrite', {
+        url: 'https://r2.example/signed',
+        mime: 'text/markdown',
+        filename: `${uuid}.md`,
+      });
+    });
+
+    expect(textOf(renderer)).toBe('https://r2.example/signed|ok');
+    expect(getFilePartCacheEntry('part-overwrite')).toEqual({
+      url: 'https://r2.example/signed',
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+    renderer.unmount();
+  });
+
+  it('keeps attachmentRef and clears resolveFailed after a failed resolve', () => {
+    cacheFilePart('part-overwrite-failed', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+    markFilePartResolveFailed('part-overwrite-failed');
+
+    overwriteFilePartCacheEntry('part-overwrite-failed', {
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: 'fresh.md',
+    });
+
+    expect(getFilePartCacheEntry('part-overwrite-failed')).toEqual({
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: 'fresh.md',
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+    expect(getFilePartCacheEntry('part-overwrite-failed')).not.toHaveProperty('resolveFailed');
+  });
+
+  it('does not overwrite or emit when the payload URL is unusable', async () => {
+    cacheFilePart('part-overwrite-unusable', {
+      url: 'https://example.com/keep.md',
+      mime: 'text/markdown',
+      filename: 'keep.md',
+    });
+    const before = getFilePartCacheEntry('part-overwrite-unusable');
+
+    const onRender = vi.fn<() => void>();
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      ref.current = TestRenderer.create(
+        createElement(CountingProbe, { partId: 'part-overwrite-unusable', onRender })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const rendersBefore = onRender.mock.calls.length;
+    expect(textOf(renderer)).toBe('https://example.com/keep.md');
+
+    await act(async () => {
+      await Promise.resolve();
+      overwriteFilePartCacheEntry('part-overwrite-unusable', {
+        url: 'file:///etc/passwd',
+        mime: 'text/plain',
+        filename: 'x.txt',
+      });
+    });
+
+    expect(getFilePartCacheEntry('part-overwrite-unusable')).toBe(before);
+    expect(textOf(renderer)).toBe('https://example.com/keep.md');
+    expect(onRender.mock.calls.length).toBe(rendersBefore);
+
+    renderer.unmount();
+  });
+});
+
+describe('markFilePartResolveFailed / clearFilePartResolveFailed', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('marks on a new identity, clears the key, and emits', async () => {
+    cacheFilePart('part-fail', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/x.md`,
+      mime: 'text/markdown',
+      filename: 'x.md',
+    });
+    const before = getFilePartCacheEntry('part-fail');
+    const renderer = await mountProbe('part-fail');
+
+    await act(async () => {
+      await Promise.resolve();
+      markFilePartResolveFailed('part-fail');
+    });
+    const marked = getFilePartCacheEntry('part-fail');
+    expect(marked?.resolveFailed).toBe(true);
+    expect(marked).not.toBe(before);
+    expect(textOf(renderer)).toBe('none|failed');
+
+    await act(async () => {
+      await Promise.resolve();
+      clearFilePartResolveFailed('part-fail');
+    });
+    const cleared = getFilePartCacheEntry('part-fail');
+    expect(cleared).not.toHaveProperty('resolveFailed');
+    expect(cleared).not.toBe(marked);
+    expect(textOf(renderer)).toBe('none|ok');
+
+    renderer.unmount();
+  });
 });
 
 describe('isUsableFilePartUrl', () => {
@@ -207,6 +355,30 @@ describe('isUsableFilePartUrl', () => {
 function Probe({ partId }: { partId: string }) {
   const entry = useFilePartCache(partId);
   return createElement('Text', null, entry?.url ?? 'none');
+}
+
+function EntryProbe({ partId }: { partId: string }) {
+  const entry = useFilePartCache(partId);
+  const failed = entry?.resolveFailed === true ? 'failed' : 'ok';
+  return createElement('Text', null, `${entry?.url ?? 'none'}|${failed}`);
+}
+
+function CountingProbe({ partId, onRender }: { partId: string; onRender: () => void }) {
+  const entry = useFilePartCache(partId);
+  onRender();
+  return createElement('Text', null, entry?.url ?? 'none');
+}
+
+async function mountProbe(partId: string): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    await Promise.resolve();
+    ref.current = TestRenderer.create(createElement(EntryProbe, { partId }));
+  });
+  if (!ref.current) {
+    throw new Error('renderer was not created');
+  }
+  return ref.current;
 }
 
 function textOf(renderer: TestRenderer.ReactTestRenderer): string | undefined {

@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';
 
+import { type CloudAgentAttachmentRef, parseCloudAgentAttachmentUrl } from './file-part-preview';
 import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
 const CACHE_DIR_NAME = 'session-file-parts';
@@ -11,9 +12,13 @@ const CACHE_DIR_NAME = 'session-file-parts';
  *  small `file://` URI; `http(s)` URLs are stored as-is. No bytes are
  *  downloaded. */
 export type FilePartCacheEntry = {
-  url: string;
+  // resolved usable URL; ABSENT on ref-only entries
+  url?: string;
   mime: string;
   filename?: string;
+  attachmentRef?: CloudAgentAttachmentRef;
+  // last on-demand presign failed; cleared on success/retry
+  resolveFailed?: boolean;
 };
 
 /** Reactive map of partId → captured FilePart entry. First write wins. */
@@ -77,13 +82,25 @@ function resolveCacheUrl(
 /**
  * Record a captured FilePart URL. A `data:` URL is written to disk and stored
  * as a `file://` URI; an `http(s)` URL is stored as-is. Never downloads bytes.
- * First write wins: a later call for the same `partId` is a no-op.
+ * A cloud-agent sandbox `file://` attachment URL stores a ref-only entry (no
+ * `url` key) for later on-demand presigning. First write wins: a later call
+ * for the same `partId` is a no-op.
  */
 export function cacheFilePart(
   partId: string,
   payload: Readonly<{ url: string; mime: string; filename?: string }>
 ): void {
   if (entriesByPartId.has(partId)) {
+    return;
+  }
+  const ref = parseCloudAgentAttachmentUrl(payload.url);
+  if (ref) {
+    entriesByPartId.set(partId, {
+      mime: payload.mime,
+      ...(payload.filename ? { filename: payload.filename } : {}),
+      attachmentRef: ref,
+    });
+    emitChange();
     return;
   }
   const url = resolveCacheUrl(partId, payload);
@@ -95,6 +112,50 @@ export function cacheFilePart(
     mime: payload.mime,
     ...(payload.filename ? { filename: payload.filename } : {}),
   });
+  emitChange();
+}
+
+/**
+ * Replace a cached entry with a freshly resolved URL (e.g. a re-presigned
+ * download URL). Preserves any attachment reference and clears the failed
+ * mark. A `resolveCacheUrl` rejection returns without writing.
+ */
+export function overwriteFilePartCacheEntry(
+  partId: string,
+  payload: Readonly<{ url: string; mime: string; filename?: string }>
+): void {
+  const url = resolveCacheUrl(partId, payload);
+  if (url === undefined) {
+    return;
+  }
+  entriesByPartId.set(partId, {
+    url,
+    mime: payload.mime,
+    ...(payload.filename ? { filename: payload.filename } : {}),
+    attachmentRef: entriesByPartId.get(partId)?.attachmentRef,
+  });
+  emitChange();
+}
+
+/** Mark an existing entry's last on-demand presign as failed. */
+export function markFilePartResolveFailed(partId: string): void {
+  const entry = entriesByPartId.get(partId);
+  if (!entry) {
+    return;
+  }
+  entriesByPartId.set(partId, { ...entry, resolveFailed: true });
+  emitChange();
+}
+
+/** Clear the failed mark from an existing entry. */
+export function clearFilePartResolveFailed(partId: string): void {
+  const entry = entriesByPartId.get(partId);
+  if (!entry) {
+    return;
+  }
+  const next = { ...entry };
+  delete next.resolveFailed;
+  entriesByPartId.set(partId, next);
   emitChange();
 }
 

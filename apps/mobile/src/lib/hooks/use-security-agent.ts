@@ -143,7 +143,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
 // Discriminated capability state for consumers (e.g. audit-report access)
 // that must distinguish "still loading"/"failed to load" from "resolved:
 // no access" instead of treating an undefined role as permission-denied.
-export type SecurityAgentCapabilityStatus = 'loading' | 'error' | 'denied' | 'allowed';
+type SecurityAgentCapabilityStatus = 'loading' | 'error' | 'denied' | 'allowed';
 
 export function useSecurityAgentCapability(scope: string) {
   const { role, isLoading, isError, isFetching, refetch, hasData, isPending } =

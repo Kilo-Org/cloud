@@ -579,6 +579,52 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       connection.destroy();
     });
+
+    it('reaches the cap for a live session whose reconnects all go through refreshAndConnect', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const onReconnectExhaustionChange = jest.fn();
+      const { connection } = createTestConnection({
+        refreshAuth,
+        shouldRefreshAuthBeforeConnect: () => true,
+        maxReconnectAttempts: 2,
+        onReconnectExhaustionChange,
+      });
+
+      connection.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      connectSocket(0);
+
+      // Live session loses its server. Every reconnect now goes through
+      // refreshAndConnect because shouldRefreshAuthBeforeConnect is true.
+      closeSocket(0);
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      closeSocket(1);
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      closeSocket(2);
+
+      expect(onReconnectExhaustionChange).toHaveBeenCalledTimes(1);
+      expect(onReconnectExhaustionChange).toHaveBeenCalledWith(true);
+
+      // The attempt counter now accumulates through refreshAndConnect, so the
+      // socket count grows past the cap attempt (2).
+      expect(sockets.length).toBeGreaterThan(2);
+
+      // A recovery path resets the counter and fires false.
+      connection.retryReconnect();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(onReconnectExhaustionChange).toHaveBeenLastCalledWith(false);
+
+      connection.destroy();
+    });
   });
 
   describe('onReconnected vs onConnected', () => {

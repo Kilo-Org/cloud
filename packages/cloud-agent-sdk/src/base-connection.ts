@@ -146,7 +146,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  async function refreshAndConnect(expectedGeneration: number): Promise<void> {
+  async function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
     preconnectAuthRefreshAttempted = true;
 
     try {
@@ -166,7 +166,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         // refresh resolves.
         if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
       }
-      connectInternal(0, expectedGeneration, true);
+      connectInternal(attempt, expectedGeneration, true);
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;
@@ -205,7 +205,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       !skipAuthRefresh &&
       !preconnectAuthRefreshAttempted
     ) {
-      void refreshAndConnect(expectedGeneration);
+      void refreshAndConnect(expectedGeneration, attempt);
       return;
     }
 

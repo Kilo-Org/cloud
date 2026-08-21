@@ -1103,9 +1103,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
-      isUserByok: !!effectiveProviderContext.userByok,
-      hasVertexUserByok:
-        effectiveProviderContext.userByok?.some(byok => byok.providerId === 'vertex') ?? false,
+      userByokProviderIds: effectiveProviderContext.userByok?.map(byok => byok.providerId) ?? null,
     });
     if (errorResponse) {
       await logUnrewrittenResponse({

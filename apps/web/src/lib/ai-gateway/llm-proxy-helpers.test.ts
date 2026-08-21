@@ -872,7 +872,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'anything',
       request,
       response,
-      isUserByok: false,
+      userByokProviderIds: null,
     });
     expect(result).toBeUndefined();
   });
@@ -885,8 +885,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response,
-      isUserByok: true,
-      hasVertexUserByok: true,
+      userByokProviderIds: ['vertex'],
     });
 
     expect(result?.status).toBe(404);
@@ -908,7 +907,36 @@ describe('makeErrorReadable', () => {
         requestedModel: 'anthropic/claude-sonnet-5',
         request,
         response,
-        isUserByok: true,
+        userByokProviderIds: ['anthropic'],
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    [401, []],
+    [402, ['anthropic']],
+    [403, []],
+    [429, ['anthropic']],
+  ] as const)('treats a non-null provider set as user BYOK for status %i', async (status, ids) => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response: Response.json({}, { status }),
+      userByokProviderIds: [...ids],
+    });
+
+    expect((await result?.json()).error_type).toBe('byok_error');
+  });
+
+  it('does not use generic BYOK errors for a null provider set', async () => {
+    await expect(
+      makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'anthropic/claude-sonnet-5',
+        request,
+        response: Response.json({}, { status: 401 }),
+        userByokProviderIds: null,
       })
     ).resolves.toBeUndefined();
   });
@@ -931,7 +959,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'qwen/qwen3.7-plus',
       request,
       response,
-      isUserByok: false,
+      userByokProviderIds: null,
     });
 
     expect(result?.status).toBe(404);
@@ -963,7 +991,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'qwen/qwen3.7-plus',
       request,
       response,
-      isUserByok: false,
+      userByokProviderIds: null,
     });
 
     expect(result).toBeDefined();
@@ -991,7 +1019,7 @@ describe('makeErrorReadable', () => {
         requestedModel: 'anything',
         request,
         response,
-        isUserByok: false,
+        userByokProviderIds: null,
       })
     ).resolves.toBeUndefined();
   });
@@ -1017,7 +1045,7 @@ describe('makeErrorReadable', () => {
           requestedModel: 'anything',
           request,
           response,
-          isUserByok: false,
+          userByokProviderIds: null,
         })
       ).resolves.toBeUndefined();
     }
@@ -1034,7 +1062,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'kilo-internal/custom-endpoint',
       request,
       response,
-      isUserByok: false,
+      userByokProviderIds: null,
     });
 
     expect(result).toBeUndefined();
@@ -1051,7 +1079,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'experiment/test-model',
       request,
       response,
-      isUserByok: false,
+      userByokProviderIds: null,
     });
 
     expect(result).toBeDefined();
@@ -1074,7 +1102,7 @@ describe('makeErrorReadable', () => {
       requestedModel: 'stealth/claude-opus-4.7',
       request,
       response,
-      isUserByok: false,
+      userByokProviderIds: null,
     });
 
     expect(result).toBeDefined();

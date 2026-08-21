@@ -3,6 +3,7 @@
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 import { AGENT_ATTACHMENT_MAX_BYTES } from './constants';
 import {
@@ -406,7 +407,7 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
-describe('addCandidates performs no upload', () => {
+describe('addCandidates defers document uploads', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
     hoisted.measureLocalSize.mockReset();
@@ -479,6 +480,98 @@ describe('uploadPending', () => {
         files: [{ remoteName: 'doc.pdf', originalName: 'doc.pdf', size: 1024 }],
       },
     });
+    renderer.unmount();
+  });
+});
+
+describe('selection-time image upload (Step 2)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
+    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+      uri: 'file:///cache/stripped.jpg',
+      width: 100,
+      height: 100,
+    });
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  it('starts the upload for an image at selection time and flips the chip to uploaded', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploading');
+    // The strip mock re-encodes HEIC to JPEG, proving the Step 1 pipeline.
+    expect(chip?.extension).toBe('jpg');
+    expect(chip?.mimeType).toBe('image/jpeg');
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/img.jpg' });
+      await settle();
+    });
+
+    const uploaded = hookApi().attachments[0];
+    expect(uploaded?.status).toBe('uploaded');
+    expect(uploaded?.progress).toBe(1);
+    expect(uploaded?.remoteFilename).toBe('img.jpg');
+    renderer.unmount();
+  });
+
+  it('marks a selection-time upload rejection as a retryable error', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(false);
+    renderer.unmount();
+  });
+
+  it('returns ok from uploadPending after the image pre-uploaded without a second uploadOne call', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/img.jpg' });
+      await settle();
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+
+    let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+    await act(async () => {
+      result = await hookApi().uploadPending();
+    });
+
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 });

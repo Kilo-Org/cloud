@@ -153,7 +153,10 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
   // The org procedure is `organizationBillingProcedure`, which rejects
   // viewers without the owner/billing_manager role. That denial is
   // non-retryable: retrying cannot change the viewer's role.
-  const forbidden = query.isError && (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED');
+  const forbidden =
+    !isPersonalSecurityScope(scope) &&
+    query.isError &&
+    (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED');
 
   return (
     <View className="flex-1 bg-background">

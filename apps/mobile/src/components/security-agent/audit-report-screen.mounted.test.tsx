@@ -260,6 +260,17 @@ describe('AuditReportScreen states', () => {
     expect(findByType(root.root, 'QueryError')).toHaveLength(0);
   });
 
+  it('treats a personal UNAUTHORIZED as a retryable session error', () => {
+    setQueryState({ isError: true, error: { data: { code: 'UNAUTHORIZED' } } });
+    const root = renderScreen('personal');
+
+    const errors = findByType(root.root, 'QueryError');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.message).toBe('Could not load the audit report');
+    expect(typeof errors[0]?.props.onRetry).toBe('function');
+    expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
+  });
+
   it('renders EmptyState for an empty period', () => {
     setQueryState({
       data: {

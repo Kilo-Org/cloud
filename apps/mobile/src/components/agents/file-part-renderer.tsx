@@ -118,26 +118,52 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   const [imageFailed, setImageFailed] = useState(false);
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   async function handleShare() {
     if (!url) {
       return;
     }
     setSharing(true);
+    setShareError(null);
     try {
       await shareFilePart(url, part);
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
+      let message = 'Share failed';
       if (reason === 'sharing-unavailable') {
-        toast.error('File sharing is not available on this device.');
+        message = 'File sharing is not available on this device.';
       } else if (error instanceof ShareRemoteFileError) {
-        toast.error('Failed to share file. Please try again.');
+        message = 'Failed to share file. Please try again.';
+      }
+      if (viewerVisible || preview) {
+        setShareError(message);
       } else {
-        toast.error('Share failed');
+        toast.error(message);
       }
     } finally {
       setSharing(false);
     }
+  }
+
+  function openViewer() {
+    setShareError(null);
+    setViewerVisible(true);
+  }
+
+  function closeViewer() {
+    setShareError(null);
+    setViewerVisible(false);
+  }
+
+  function openPreview(mode: PreviewMode) {
+    setShareError(null);
+    setPreview(mode);
+  }
+
+  function closePreview() {
+    setShareError(null);
+    setPreview(null);
   }
 
   function handleChipTap() {
@@ -146,7 +172,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return;
     }
     if (kind === 'markdown') {
-      setPreview('markdown');
+      openPreview('markdown');
       return;
     }
     showActionSheetWithOptions(
@@ -159,7 +185,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           return;
         }
         if (index === 0) {
-          setPreview('text');
+          openPreview('text');
         } else if (index === 1) {
           void handleShare();
         }
@@ -187,9 +213,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return (
         <>
           <Pressable
-            onPress={() => {
-              setViewerVisible(true);
-            }}
+            onPress={openViewer}
             className="my-1 overflow-hidden rounded-lg active:opacity-80"
             accessibilityRole="button"
             accessibilityLabel={getFilePartAccessibilityLabel('image', part.filename)}
@@ -214,9 +238,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
               visible={viewerVisible}
               uri={url}
               filename={part.filename ?? 'File'}
-              onClose={() => {
-                setViewerVisible(false);
+              onShare={() => {
+                void handleShare();
               }}
+              sharing={sharing}
+              shareError={shareError}
+              onClose={closeViewer}
             />
           )}
         </>
@@ -250,9 +277,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           mode={preview}
           url={url}
           part={part}
-          onClose={() => {
-            setPreview(null);
+          onShare={() => {
+            void handleShare();
           }}
+          sharing={sharing}
+          shareError={shareError}
+          onClose={closePreview}
         />
       ) : null}
     </>
@@ -264,9 +294,20 @@ type FilePreviewModalProps = {
   url: string;
   part: FilePart;
   onClose: () => void;
+  onShare?: () => void;
+  sharing?: boolean;
+  shareError?: string | null;
 };
 
-function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModalProps>) {
+function FilePreviewModal({
+  mode,
+  url,
+  part,
+  onClose,
+  onShare,
+  sharing = false,
+  shareError = null,
+}: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
@@ -329,8 +370,17 @@ function FilePreviewModal({ mode, url, part, onClose }: Readonly<FilePreviewModa
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View className="flex-1 bg-background">
-        <SheetHeader title={part.filename ?? 'File'} onDone={onClose} doneLabel="Done" />
-        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
+        <SheetHeader
+          title={part.filename ?? 'File'}
+          onDone={onClose}
+          doneLabel="Done"
+          onShare={onShare}
+          sharing={sharing}
+        />
+        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+          {shareError ? <Text className="mb-2 text-sm text-destructive">{shareError}</Text> : null}
+          {renderBody()}
+        </ScrollView>
       </View>
     </Modal>
   );

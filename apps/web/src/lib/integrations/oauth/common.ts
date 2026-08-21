@@ -2,6 +2,7 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
+import { TRPCError } from '@trpc/server';
 import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -10,6 +11,20 @@ import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-sta
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { RetainedOAuthPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
+
+/**
+ * Maps an organization-access denial to a user-facing OAuth error code.
+ * `ensureOrganizationAccess` throws the same UNAUTHORIZED code for both
+ * "no membership" and "insufficient role", so the message distinguishes them.
+ * Returns null when the error is not an expected access denial.
+ */
+export function organizationAccessDenialErrorCode(error: unknown): string | null {
+  if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') return null;
+  if (error.message === 'You do not have access to this organization') {
+    return 'organization_access_required';
+  }
+  return 'permission_required';
+}
 
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 

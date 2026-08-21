@@ -187,6 +187,36 @@ describe('createOfflineBannerStore', () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
+  it('flapping unknown → offline → online → offline shows only after the debounce and hides immediately on online', () => {
+    const { store, source, timer } = createStore();
+    const listener = vi.fn(() => undefined);
+    store.subscribe(listener);
+
+    source.emit(unknownState);
+    timer.firePending();
+    expect(store.isOffline()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+
+    source.emit(offlineState);
+    // Not committed yet: the banner waits out the show delay.
+    expect(store.isOffline()).toBe(false);
+    expect(timer.scheduled[0]?.delayMs).toBe(OFFLINE_BANNER_SHOW_DELAY_MS);
+
+    source.emit(onlineState);
+    // Hides immediately: the pending offline commit was cancelled.
+    expect(store.isOffline()).toBe(false);
+    expect(store.state()).toBe('online');
+
+    source.emit(offlineState);
+    timer.firePending();
+    expect(store.isOffline()).toBe(true);
+    expect(store.state()).toBe('offline');
+
+    // One notification for the unknown → online commit, one for the final
+    // offline commit.
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
   it('destroy with a pending commit cancels the timer and unsubscribes the source', () => {
     const { store, source, timer } = createStore();
     const listener = vi.fn(() => undefined);

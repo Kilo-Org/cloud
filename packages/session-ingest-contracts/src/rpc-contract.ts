@@ -67,6 +67,10 @@ export const deleteSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
   kiloUserId: z.string().min(1),
   onlyIfEmpty: z.boolean().optional(),
+  // When set, the delete is a clone rollback: the destination row, clone DO
+  // stage, and its R2 bodies are cleared only when the destination clone
+  // matches this source. Never clears a session that belongs to another source.
+  cloneSourceSessionId: sessionIdSchema.optional(),
 });
 export type DeleteSessionForCloudAgentParams = z.input<typeof deleteSessionForCloudAgentSchema>;
 

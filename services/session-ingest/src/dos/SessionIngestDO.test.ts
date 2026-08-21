@@ -1818,6 +1818,48 @@ describe('SessionIngestDO clone primitives', () => {
     expect(harness.items[0].item_id).toBe('message/a');
   });
 
+  it('reports whether a mismatched stage was complete or in_progress', () => {
+    const harness = makeCloneHarness();
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src-a',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-a',
+      copiedItemCount: 1,
+    });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src-b',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'mismatch', storedStage: 'in_progress' });
+
+    harness.durableObject.finalizeCloneStage({
+      sourceSessionId: 'src-a',
+      destinationSessionId: 'dst',
+      finalDigest: 'digest-a',
+      finalItemCount: 1,
+    });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src-b',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'mismatch', storedStage: 'complete' });
+  });
+
   it('is idempotent when re-staging the same batch and re-finalizing the same source', async () => {
     const harness = makeCloneHarness();
     const params = {

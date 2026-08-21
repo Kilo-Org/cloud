@@ -315,6 +315,7 @@ export type InspectCloneStageResult =
       status: 'mismatch';
       storedSourceSessionId: string | null;
       storedDestinationSessionId: string | null;
+      storedStage: 'complete' | 'in_progress';
     };
 
 export type FinalizeCloneStageParams = {
@@ -1367,6 +1368,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         status: 'mismatch',
         storedSourceSessionId: stage.sourceSessionId,
         storedDestinationSessionId: stage.destinationSessionId,
+        storedStage: stage.kind === 'complete' ? 'complete' : 'in_progress',
       };
     }
 

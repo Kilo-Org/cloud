@@ -22,10 +22,10 @@ export function ReviewEventChips(props: {
 }) {
   return (
     <View className="gap-1.5">
-      <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
         Review event
       </Text>
-      <RadioGroup label="Review event" className="flex-row flex-wrap gap-1.5">
+      <RadioGroup label="Review event" className="flex-row flex-wrap gap-2">
         {EVENT_OPTIONS.map(option => {
           const active = props.value === option.value;
           return (
@@ -38,14 +38,14 @@ export function ReviewEventChips(props: {
               }}
               {...radioItemA11y({ label: option.label, checked: active, disabled: props.disabled })}
               className={cn(
-                'min-h-9 items-center justify-center rounded-full border px-3 py-1.5 active:opacity-70',
+                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
                 active ? 'border-primary bg-primary' : 'bg-secondary',
                 !active && (props.disabled ? 'border-hair-soft' : 'border-border')
               )}
             >
               <Text
                 className={cn(
-                  'text-xs font-medium',
+                  'text-sm font-medium',
                   active ? 'text-primary-foreground' : 'text-foreground',
                   !active && props.disabled && 'text-muted-foreground'
                 )}

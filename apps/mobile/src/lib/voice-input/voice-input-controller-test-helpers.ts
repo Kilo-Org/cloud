@@ -14,6 +14,7 @@ type AnyListener = (event: VoiceInputNativeEvent[keyof VoiceInputNativeEvent]) =
 export type VoiceInputNativeControls = {
   isAvailable: boolean;
   supportsContinuous: boolean;
+  supportsOnDevice: boolean;
   permissionGranted: boolean;
   permissionCanAskAgain: boolean;
   permissionRestricted: boolean;
@@ -82,6 +83,7 @@ function buildNative(
     },
     isRecognitionAvailable: () => controls.isAvailable,
     supportsContinuousRecognition: () => controls.supportsContinuous,
+    supportsOnDevice: () => controls.supportsOnDevice,
     start: (options): void => {
       mocks.start(options);
     },
@@ -100,6 +102,7 @@ export function createVoiceInputNativeHarness(
   const controls: VoiceInputNativeControls = {
     isAvailable: true,
     supportsContinuous: true,
+    supportsOnDevice: true,
     permissionGranted: true,
     permissionCanAskAgain: true,
     permissionRestricted: false,
@@ -164,6 +167,7 @@ export function makeStartOptions(
     onDraftChange: (): void => undefined,
     onFeedback: (): void => undefined,
     owner: 'owner1',
+    requiresOnDeviceRecognition: false,
     ...overrides,
   };
 }

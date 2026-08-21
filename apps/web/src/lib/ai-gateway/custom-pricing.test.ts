@@ -1,8 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
+import {
+  FRIENDLI_GLM_PUBLIC_ID,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/partner/constants';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,

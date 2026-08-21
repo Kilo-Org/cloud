@@ -43,10 +43,12 @@ describe('runClaimedDeletionTask', () => {
     const result = await runClaimedDeletionTask({
       stepId,
       claimToken,
-      deadlineAt: started + 40,
+      // Keep the budget comfortably above the claim/request lookup overhead so
+      // the handler always starts before the deadline fires.
+      deadlineAt: started + 500,
     });
 
-    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(Date.now() - started).toBeLessThan(2_000);
     expect(result.kind).toBe('applied');
     if (result.kind === 'applied') {
       expect(result.effectiveOutcome).toEqual({
@@ -129,20 +131,25 @@ describe('runClaimedDeletionTask', () => {
     const { stepId, claimToken, requestId } = await claimRunningStep();
     const late = new Error('late handler rejection');
     getDeletionHandlerMock.mockReturnValue(
-      (() =>
+      (({ context }) =>
         new Promise((_resolve, reject) => {
-          setTimeout(() => reject(late), 80);
+          // Reject a fixed delay after the deadline so the timeout always wins
+          // regardless of how long the claim/request lookups took.
+          const msUntilDeadline = Math.max(0, context.deadlineAt - Date.now());
+          setTimeout(() => reject(late), msUntilDeadline + 200);
         })) as DeletionHandler
     );
 
+    // Keep the budget comfortably above the claim/request lookup overhead so
+    // the handler always starts before the deadline fires.
     const result = await runClaimedDeletionTask({
       stepId,
       claimToken,
-      deadlineAt: Date.now() + 20,
+      deadlineAt: Date.now() + 500,
     });
 
     expect(result.kind).toBe('applied');
-    await new Promise(resolve => setTimeout(resolve, 120));
+    await new Promise(resolve => setTimeout(resolve, 500));
     expect(captureExceptionMock).toHaveBeenCalledWith(late, {
       tags: { source: 'user-deletion-handler' },
       extra: {

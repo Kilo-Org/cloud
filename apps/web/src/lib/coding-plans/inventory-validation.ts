@@ -19,7 +19,7 @@ import {
 } from '@/lib/coding-plans/byteplus-control-plane';
 import type { CodingPlanId, CodingPlanProviderId } from '@/lib/coding-plans/pricing';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logWarning = sentryLogger('coding-plans-inventory-validation', 'warning');
@@ -72,7 +72,7 @@ async function validateMiniMaxCodingPlanCredential(
   });
 
   const output = await generateText({
-    model: createGateway({ apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey })(
+    model: createGateway({ apiKey: VERCEL_AI_GATEWAY.apiKey })(
       UserByokTestModels[MINIMAX_PROVIDER_ID]
     ),
     prompt: 'Say hi',

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Check, Share as ShareIcon } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { upsertRecentPr } from '@/lib/pr-review/recent-prs';
+import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -84,9 +84,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // a single network round-trip even though both components subscribe.
   const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
 
-  // Recents title backfill. S4b left the title empty so the recents row
-  // can be written before the PR loads. Once we have the real title,
-  // upsert it so the recents list shows it next time.
+  // Recents backfill. This is the ONLY writer that creates an entry: a
+  // successful load upserts the real title with `lastResult: 'ok'`, which
+  // also clears any previous `'failed'` marker. A never-authorized PR
+  // (no successful load) never gets an entry.
   useEffect(() => {
     const data = pr.data;
     if (!data?.title) {
@@ -98,8 +99,27 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       number,
       title: data.title,
       lastOpenedAt: Date.now(),
+      lastResult: 'ok',
     });
   }, [pr.data, owner, repo, number]);
+
+  // Mark an existing recents entry as failed exactly once per error. The
+  // ref guards against re-writing on re-render; `markRecentPrFailed` is a
+  // no-op when no entry exists, so a never-authorized PR stays out of
+  // recents. A success (isError false) or a PR identity change resets the
+  // guard so a later error marks the entry failed again.
+  const markedFailedRef = useRef(false);
+  useEffect(() => {
+    if (!pr.isError) {
+      markedFailedRef.current = false;
+      return;
+    }
+    if (markedFailedRef.current) {
+      return;
+    }
+    markedFailedRef.current = true;
+    void markRecentPrFailed({ owner, repo, number });
+  }, [pr.isError, owner, repo, number]);
 
   // Share the PR's public GitHub URL via the native share sheet. The URL comes
   // from the route params, so this works before the PR query resolves; the title

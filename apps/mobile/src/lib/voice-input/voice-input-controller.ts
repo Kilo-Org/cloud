@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the controller owns the full start/stop/abort lifecycle and session state machine. */
 import { type ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition';
 
 import {
@@ -42,6 +43,7 @@ export type VoiceInputNativeStartOptions = {
   interimResults: true;
   lang: string;
   maxAlternatives: 1;
+  requiresOnDeviceRecognition: boolean;
 };
 
 export type VoiceInputNative = {
@@ -53,6 +55,7 @@ export type VoiceInputNative = {
   requestPermissions(): Promise<VoiceInputNativePermission>;
   isRecognitionAvailable(): boolean;
   supportsContinuousRecognition(): boolean;
+  supportsOnDevice(): boolean;
   start(options: VoiceInputNativeStartOptions): void;
   stop(): void;
   abort(): void;
@@ -70,6 +73,7 @@ export type VoiceInputStartOptions = {
   onDraftChange: (nextDraft: string) => void;
   onFeedback: (feedback: VoiceInputFeedback) => void;
   owner: string;
+  requiresOnDeviceRecognition: boolean;
 };
 
 export function createVoiceInputController(native: VoiceInputNative) {
@@ -217,6 +221,7 @@ export function createVoiceInputController(native: VoiceInputNative) {
         interimResults: true,
         lang: options.languageTag,
         maxAlternatives: 1,
+        requiresOnDeviceRecognition: options.requiresOnDeviceRecognition,
       });
     } catch {
       reportClientAndTerminalize(next);
@@ -324,5 +329,6 @@ export function createVoiceInputController(native: VoiceInputNative) {
     start,
     stop,
     subscribe,
+    supportsOnDevice: () => native.supportsOnDevice(),
   };
 }

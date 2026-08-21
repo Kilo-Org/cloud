@@ -16,7 +16,7 @@ import type {
   OpenRouterGeneration,
 } from './providers/openrouter/types';
 import { fetchGeneration } from './providers/upstream-request';
-import PROVIDERS from './providers/provider-definitions';
+import { OPENROUTER, VERCEL_AI_GATEWAY } from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -1231,12 +1231,11 @@ export async function processTokenData(
   }
 
   const timer = createTimer();
-  const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
+  const generationProvider = await getGenerationLookupProvider(usageStats, usageContext);
   const generation =
-    provider &&
-    (await useGenerationLookup(usageStats, usageContext)) &&
+    generationProvider &&
     usageStats.messageId &&
-    (await fetchGeneration(usageStats.messageId, provider));
+    (await fetchGeneration(usageStats.messageId, generationProvider));
   if (usageStats.messageId) {
     timer.log(`fetch generation for message ${usageStats.messageId}`);
   }
@@ -1318,15 +1317,19 @@ export async function processTokenData(
   return logMicrodollarUsage(usageStats, usageContext);
 }
 
-async function useGenerationLookup(
+async function getGenerationLookupProvider(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-): Promise<boolean> {
-  const isGatewayProvider =
-    usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
+): Promise<typeof OPENROUTER | typeof VERCEL_AI_GATEWAY | undefined> {
+  const provider =
+    usageContext.provider === 'openrouter'
+      ? OPENROUTER
+      : usageContext.provider === 'vercel'
+        ? VERCEL_AI_GATEWAY
+        : undefined;
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
-  if (!isGatewayProvider || !isSuccessStatusCode) {
-    return false;
+  if (!provider || !isSuccessStatusCode) {
+    return undefined;
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
@@ -1335,18 +1338,18 @@ async function useGenerationLookup(
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
   if (!hasOutputTokens) {
-    console.debug('[useGenerationLookup] token stats are missing');
-    return true;
+    console.debug('[getGenerationLookupProvider] token stats are missing');
+    return provider;
   }
   if (!hasCostWhenPaid) {
-    console.debug('[useGenerationLookup] cost is missing');
-    return true;
+    console.debug('[getGenerationLookupProvider] cost is missing');
+    return provider;
   }
   if (!hasInferenceProvider) {
-    console.debug('[useGenerationLookup] inference provider is missing');
-    return true;
+    console.debug('[getGenerationLookupProvider] inference provider is missing');
+    return provider;
   }
-  return false;
+  return undefined;
 }
 
 export const mapToUsageStats = (

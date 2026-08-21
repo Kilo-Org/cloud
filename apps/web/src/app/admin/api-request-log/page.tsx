@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
 
+const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
+
 export default function ApiRequestLogPage() {
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -22,7 +24,7 @@ export default function ApiRequestLogPage() {
   const [errorsOnly, setErrorsOnly] = useState(false);
 
   const trpc = useTRPC();
-  const oldestEntryQuery = useQuery(trpc.admin.apiRequestLog.getOldestEntry.queryOptions());
+  const summaryQuery = useQuery(trpc.admin.apiRequestLog.getSummary.queryOptions());
 
   function handleDownload() {
     const params = new URLSearchParams();
@@ -54,15 +56,22 @@ export default function ApiRequestLogPage() {
       breadcrumbs={<BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>}
     >
       <div className="w-full max-w-xl space-y-4">
-        {oldestEntryQuery.data && (
-          <p className="text-muted-foreground text-sm">
-            Oldest entry is{' '}
-            <span title={new Date(oldestEntryQuery.data.created_at).toLocaleString()}>
-              {formatDistanceToNow(new Date(oldestEntryQuery.data.created_at), {
-                addSuffix: true,
-              })}
-            </span>
-            .
+        {summaryQuery.data && (
+          <p className="text-muted-foreground text-sm tabular-nums">
+            {summaryQuery.data.recordCount.toLocaleString()}{' '}
+            {summaryQuery.data.recordCount === 1 ? 'record' : 'records'} ·{' '}
+            {(summaryQuery.data.sizeBytes / BYTES_PER_GIGABYTE).toFixed(2)} GB
+            {summaryQuery.data.oldestCreatedAt && (
+              <>
+                {' '}
+                · oldest entry{' '}
+                <span title={new Date(summaryQuery.data.oldestCreatedAt).toLocaleString()}>
+                  {formatDistanceToNow(new Date(summaryQuery.data.oldestCreatedAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </>
+            )}
           </p>
         )}
         <Card>

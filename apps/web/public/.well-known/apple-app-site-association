@@ -4,9 +4,12 @@
       {
         "appIDs": ["X96D76J65Z.com.kilocode.kiloapp"],
         "components": [
+          { "/": "/home" },
           { "/": "/profile" },
+          { "/": "/profile/preferences" },
           { "/": "/claw" },
           { "/": "/cloud/sessions" },
+          { "/": "/cloud/sessions/*" },
           { "/": "/security-agent" },
           { "/": "/security-agent/findings" },
           { "/": "/code-reviews" },

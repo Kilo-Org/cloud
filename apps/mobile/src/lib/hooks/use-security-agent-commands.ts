@@ -11,6 +11,8 @@ import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityCommand } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -49,7 +51,9 @@ function invalidateSecurityQueryScopes(
   if (isPersonalSecurityScope(scope)) {
     const agent = trpc.securityAgent;
     if (scopeSet.has('findings')) {
-      void queryClient.invalidateQueries({ queryKey: agent.listFindings.queryKey() });
+      scheduleCacheMaintenance(() => {
+        reconcileFirstPage(queryClient, agent.listFindings.queryKey());
+      });
     }
     if (scopeSet.has('findingDetails')) {
       void queryClient.invalidateQueries({ queryKey: agent.getFinding.queryKey() });
@@ -78,7 +82,9 @@ function invalidateSecurityQueryScopes(
   const agent = trpc.organizations.securityAgent;
   const ownerInput = { organizationId: scope };
   if (scopeSet.has('findings')) {
-    void queryClient.invalidateQueries({ queryKey: agent.listFindings.queryKey(ownerInput) });
+    scheduleCacheMaintenance(() => {
+      reconcileFirstPage(queryClient, agent.listFindings.queryKey(ownerInput));
+    });
   }
   if (scopeSet.has('findingDetails')) {
     void queryClient.invalidateQueries({ queryKey: agent.getFinding.queryKey(ownerInput) });

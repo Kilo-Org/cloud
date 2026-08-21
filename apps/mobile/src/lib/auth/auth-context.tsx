@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
+import { z } from 'zod';
 import {
   createContext,
   type ReactNode,
@@ -14,6 +15,7 @@ import {
 
 import { discardPostHog } from '@/lib/analytics/posthog';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
+import { clearPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
@@ -54,6 +56,8 @@ import {
   LEGACY_EXCHANGE_DONE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
+  PENDING_DEEP_LINK_KEY,
+  PICKER_LAUNCH_CONTEXT_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -65,6 +69,35 @@ import { AppState } from 'react-native';
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+
+const jwtPayloadSchema = z.object({ kiloUserId: z.string().optional() });
+
+/**
+ * Best-effort read of the signed-in user id from a Kilo bearer token. The
+ * token is a JWT whose payload carries `kiloUserId` (see `generateApiToken`
+ * in apps/web/src/lib/tokens.ts). Decode-only: the server already accepted
+ * the token, so the id is read without verifying the signature (the app has
+ * no signing secret). Returns null for a non-JWT or malformed token so a
+ * decode failure can never break sign-in.
+ */
+function readUserIdFromToken(token: string): string | null {
+  try {
+    const segments = token.split('.');
+    if (segments.length !== 3) {
+      return null;
+    }
+    const payloadSegment = segments[1];
+    if (payloadSegment === undefined) {
+      return null;
+    }
+    const base64 = payloadSegment.replaceAll('-', '+').replaceAll('_', '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const parsed = jwtPayloadSchema.safeParse(JSON.parse(atob(padded)));
+    return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
+  } catch {
+    return null;
+  }
+}
 
 type AuthContextValue = {
   token: string | undefined;
@@ -165,6 +198,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       await chainSave('auth-transition', async () => {
         bumpAuthEpoch();
         setAuthEpoch(currentAuthEpoch());
+        // Bind the pending deep-link slot to the new user id at the same
+        // place the auth epoch advances, so a destination captured while this
+        // account is signed in restores only for this account.
+        setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
         const epoch = currentAuthEpoch();
         const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
           expiresIn,
@@ -217,6 +254,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // the read-cache mount unsubscribes and cannot resubscribe while the old
       // user id is still cached.
       setSignOutActive(true);
+      // Drop the pending deep-link destination synchronously, before the
+      // first await, so a different account signed in later in this process
+      // cannot navigate to the previous account's destination. The in-memory
+      // clear is synchronous; the persisted delete chains behind any
+      // in-flight persist.
+      clearPendingDeepLink();
       try {
         // Close ownership persistence before any await so a late list
         // response cannot write the previous account's answer during
@@ -249,6 +292,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // after it).
         bumpAuthEpoch();
         setAuthEpoch(currentAuthEpoch());
+        // The signed-out session owns no user id: a destination captured
+        // during teardown is recorded as "captured while signed out".
+        setCurrentDeepLinkUserId(null);
         clearActiveToken();
         try {
           // Independent local cleanup, concurrent via allSettled: a
@@ -269,6 +315,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             deleteAccountMetadata(SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
+            deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
+            deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that

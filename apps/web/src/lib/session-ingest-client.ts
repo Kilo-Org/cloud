@@ -221,6 +221,9 @@ const SharedSessionMetadataResponseSchema = z
     success: z.literal(true),
     title: z.string().nullable(),
     owner_name: z.string().nullable(),
+    git_url: z.string().nullable().optional(),
+    git_branch: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
   })
   .strict();
 
@@ -304,6 +307,14 @@ export async function unshareSession(sessionId: string, userId: string): Promise
   }
 }
 
+export type SharedSessionMetadata = {
+  title: string | null;
+  ownerName: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  createdAt: string | null;
+};
+
 /**
  * Resolve the metadata for a public session share token without downloading
  * the session snapshot. The token is intentionally never included in errors
@@ -311,7 +322,7 @@ export async function unshareSession(sessionId: string, userId: string): Promise
  */
 export async function fetchSharedSessionMetadata(
   shareToken: string
-): Promise<{ title: string | null; ownerName: string | null } | null> {
+): Promise<SharedSessionMetadata | null> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
@@ -346,7 +357,55 @@ export async function fetchSharedSessionMetadata(
     throw error;
   }
 
-  return { title: parsed.data.title, ownerName: parsed.data.owner_name };
+  return {
+    title: parsed.data.title,
+    ownerName: parsed.data.owner_name,
+    gitUrl: parsed.data.git_url ?? null,
+    gitBranch: parsed.data.git_branch ?? null,
+    createdAt: parsed.data.created_at ?? null,
+  };
+}
+
+/**
+ * Fetch the public session snapshot for a share token. The token is
+ * intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSessionSnapshot(
+  shareToken: string
+): Promise<SessionSnapshot | null> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}`;
+  const response = await fetch(url, { cache: 'no-store' });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      `Session ingest snapshot failed: ${response.status} ${response.statusText}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+      extra: { status: response.status },
+    });
+    throw error;
+  }
+
+  const parsed = SessionSnapshotSchema.safeParse(await response.json().catch(() => undefined));
+  if (!parsed.success) {
+    const error = new Error('Session ingest snapshot response was malformed');
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'shared-snapshot' },
+      extra: { status: response.status, issues: parsed.error.issues },
+    });
+    throw error;
+  }
+
+  return parsed.data;
 }
 
 // ---------------------------------------------------------------------------

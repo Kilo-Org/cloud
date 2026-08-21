@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the comment composer owns the durable comment draft (load, save, seed, clear) beside the existing create/edit form; the draft wiring stays with the form it persists */
 // Comment-composer content. Two modes:
 //   - create: Comment now + Add to review + Insert suggestion (needs headSha).
 //   - edit: single Save updating a queued PendingReviewItem (local-only).
@@ -29,6 +30,10 @@ import {
   ensureTermsAcceptedOutcome,
   TERMS_OUTDATED_COPY,
 } from '@/components/pr-review/discussion/reply-input';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { clearDraft, prCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
@@ -73,6 +78,18 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const createComment = useCreateReviewCommentMutation({ owner, repo, number });
   const isEdit = mode.kind === 'edit';
 
+  // Durable comment draft (create mode only). Edit mode edits an already-queued
+  // item, durable through the pending-review provider, so no draft there.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const commentDraftKey = prCommentDraftKey(owner, repo, number, path, side, line, startLine);
+  const draftUserId = isEdit ? undefined : userId;
+  const draft = useFencedDraftLoad({
+    userId: draftUserId,
+    isIdentityLoading,
+    entityKey: commentDraftKey,
+  });
+  useDraftFlushOnBackground(draftUserId, commentDraftKey, true);
+
   // Edit mode ignores the bridge so editing A never shows B's path/lines.
   const selection = isEdit ? null : getDiffSelection({ owner, repo, number });
 
@@ -82,6 +99,17 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const bodyInputRef = useRef<TextInput | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const [hasBody, setHasBody] = useState(() => initialBody.trim().length > 0);
+  // Seed the refs from the settled draft once per identity/destination, before
+  // the body field mounts (create mode only). Re-seeding on a key change (and
+  // resetting to the initial body when there is no draft) keeps a reused
+  // instance from showing or saving the previous account's or position's text.
+  const draftSeedKeyRef = useRef<string | null>(null);
+  const draftSeedKey = `${draftUserId ?? 'anonymous'}\u0000${commentDraftKey}`;
+  if (!isEdit && draft.settled && draftSeedKeyRef.current !== draftSeedKey) {
+    draftSeedKeyRef.current = draftSeedKey;
+    bodyRef.current = draft.value ?? initialBody;
+    bodyBaselineRef.current = draft.value ?? initialBody;
+  }
   const {
     inlineError,
     inlineErrorKind,
@@ -113,6 +141,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     bodyRef.current = value;
     setHasBody(value.trim().length > 0);
     clearBadRequestOnBodyEdit();
+    if (draftUserId) {
+      saveDraft(draftUserId, commentDraftKey, value);
+    }
   }
 
   function handleAddToReview() {
@@ -137,6 +168,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       body,
       commitSha: mode.headSha,
     });
+    if (draftUserId) {
+      void clearDraft(draftUserId, commentDraftKey);
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
@@ -177,6 +211,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         ...(startLine !== undefined ? { startLine, startSide: side } : {}),
         commitSha: mode.headSha,
       });
+      if (draftUserId) {
+        void clearDraft(draftUserId, commentDraftKey);
+      }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDismiss();
     } catch {
@@ -207,7 +244,16 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (dirty) {
       Alert.alert('Discard comment?', 'Your draft will be lost.', [
         { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: onDismiss },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            if (draftUserId) {
+              void clearDraft(draftUserId, commentDraftKey);
+            }
+            onDismiss();
+          },
+        },
       ]);
       return;
     }
@@ -225,6 +271,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     bodyRef.current = block;
     setHasBody(block.trim().length > 0);
     clearBadRequestOnBodyEdit();
+    // Persist the inserted suggestion like a typed change, so a process kill
+    // after Insert (with no later keystroke) does not lose the suggestion.
+    if (draftUserId) {
+      saveDraft(draftUserId, commentDraftKey, block);
+    }
     bodyInputRef.current?.setNativeProps({
       text: block,
       selection: { start: block.length, end: block.length },
@@ -268,7 +319,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-1.5 px-6 pt-1.5">
+        <View className="gap-4 px-6 pt-4">
           <ContextPreview
             selection={selection}
             fallbackPath={path}
@@ -277,13 +328,15 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             preferFallback={isEdit}
           />
           <View className="gap-1">
-            <Text className="text-xs font-medium text-foreground">Comment</Text>
-            <CommentBodyField
-              inputRef={bodyInputRef}
-              isDisabled={isSubmitting}
-              defaultValue={initialBody}
-              onChangeText={handleBodyChange}
-            />
+            <Text className="text-sm font-medium text-foreground">Comment</Text>
+            {isEdit || draft.settled ? (
+              <CommentBodyField
+                inputRef={bodyInputRef}
+                isDisabled={isSubmitting}
+                defaultValue={bodyRef.current}
+                onChangeText={handleBodyChange}
+              />
+            ) : null}
             {showInsertSuggestion ? (
               <Button
                 variant="ghost"

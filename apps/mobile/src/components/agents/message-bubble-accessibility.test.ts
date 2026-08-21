@@ -53,6 +53,7 @@ vi.mock('./part-renderer', () => ({
 vi.mock('./part-types', () => ({
   isFilePart: () => false,
   isTextPart: () => false,
+  firstHumanText: () => '',
 }));
 vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),
@@ -153,8 +154,9 @@ describe('MessageBubble long-press details', () => {
     });
     const { MessageBubble } = await import('./message-bubble');
     const message = userMessage('m-long');
+    // MessageBubble is wrapped in React.memo; invoke its inner component.
     // eslint-disable-next-line new-cap
-    const tree = MessageBubble({ message, onLongPressDetails });
+    const tree = MessageBubble.type({ message, onLongPressDetails });
     const props = pressableProps(tree);
     expect(props).not.toBeNull();
     const handler = props === null ? undefined : props.onLongPress;

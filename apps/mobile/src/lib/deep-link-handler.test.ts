@@ -6,9 +6,11 @@ import { redirectSystemPath } from './deep-link-handler';
 import {
   _resetDeepLinkLaunchForTests,
   _setGetLinkingURLForTests,
+  _setSecureStoreForTests,
   captureLaunchDeepLink,
   getPendingDeepLink,
 } from './deep-link-launch';
+import { _resetDevSessionInjectForTests, consumePendingDevSession } from './dev-session-inject';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +22,10 @@ vi.mock('expo-router', () => ({
   router: {
     navigate: mocks.navigate,
   },
+}));
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
 }));
 
 vi.mock('@kilocode/app-shared/universal-links', async importOriginal => {
@@ -37,8 +43,20 @@ vi.mock('@kilocode/app-shared/universal-links', async importOriginal => {
 
 const MAPPED_CASES = [
   {
+    path: 'https://app.kilo.ai/home',
+    href: '/(app)/(tabs)/(0_home)',
+  },
+  {
     path: 'https://app.kilo.ai/profile',
     href: '/(app)/(tabs)/(3_profile)',
+  },
+  {
+    path: 'https://app.kilo.ai/profile/preferences',
+    href: '/(app)/(tabs)/(3_profile)/preferences',
+  },
+  {
+    path: 'https://app.kilo.ai/cloud/sessions/ses_1',
+    href: '/(app)/agent-chat/ses_1',
   },
   {
     path: 'https://app.kilo.ai/security-agent/findings',
@@ -53,15 +71,31 @@ const MAPPED_CASES = [
 describe('redirectSystemPath', () => {
   beforeEach(() => {
     _resetDeepLinkLaunchForTests();
+    _setSecureStoreForTests({
+      setItemAsync: async () => {
+        await Promise.resolve();
+      },
+      deleteItemAsync: async () => {
+        await Promise.resolve();
+      },
+      getItemAsync: async () => {
+        await Promise.resolve();
+        return null;
+      },
+    });
+    _resetDevSessionInjectForTests();
     setGitHubInstallReturnOutcome(null);
     mocks.navigate.mockReset();
     mocks.shouldThrow = false;
+    vi.stubGlobal('__DEV__', true);
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
+    _resetDevSessionInjectForTests();
     setGitHubInstallReturnOutcome(null);
     mocks.shouldThrow = false;
+    vi.unstubAllGlobals();
   });
 
   describe('cold invariant', () => {
@@ -101,6 +135,21 @@ describe('redirectSystemPath', () => {
       expect(warm).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dev session inject', () => {
+    it('stashes credentials from a kiloapp URL in a dev build', () => {
+      const path =
+        'kiloapp:///home?dev_session_token=tok&dev_session_refresh=ref&dev_session_expires_in=3600';
+      const result = redirectSystemPath({ path, initial: true });
+      expect(result).toBeNull();
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(0_home)');
+      expect(consumePendingDevSession()).toEqual({
+        token: 'tok',
+        refreshToken: 'ref',
+        expiresIn: 3600,
+      });
     });
   });
 

@@ -94,4 +94,23 @@ describe('uploadOne', () => {
     const mutate = vi.mocked(trpcClient.cloudAgentNext.getAttachmentUploadUrl.mutate);
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ extension: 'bin' }));
   });
+
+  it('does not create an upload task when cancelled after the presign', async () => {
+    const { createUploadTask } = await import('expo-file-system/legacy');
+
+    await expect(
+      uploadOne({
+        attachmentId: 'att-3',
+        path: 'path-3',
+        extension: 'pdf',
+        contentType: 'application/pdf',
+        contentLength: 100,
+        localUri: 'file:///cache/doc.pdf',
+        onProgress: () => undefined,
+        isCancelled: () => true,
+      })
+    ).rejects.toThrow('Upload cancelled');
+
+    expect(createUploadTask).not.toHaveBeenCalled();
+  });
 });

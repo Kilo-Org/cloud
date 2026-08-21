@@ -33,6 +33,8 @@ export function resolveNewSessionSubmitEnabled({
   model: string;
   selectedRepo: string;
 }): boolean {
+  // `attachmentsIsUploading` means "an upload is in flight". Attached-but-not-
+  // uploaded chips no longer block Start: they upload during the create call.
   const canCreate =
     hasPrompt &&
     Boolean(selectedRepo) &&

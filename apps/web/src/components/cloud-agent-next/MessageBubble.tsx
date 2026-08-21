@@ -20,6 +20,7 @@ import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
+import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
 
 import LinkifyIt from 'linkify-it';
@@ -33,16 +34,21 @@ function TextWithLinks({ text }: { text: string }) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
+    const safeHref = toSafeHttpUrl(match.url);
     parts.push(
-      <a
-        key={match.index}
-        href={match.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline opacity-80 hover:opacity-100"
-      >
-        {match.text}
-      </a>
+      safeHref ? (
+        <a
+          key={match.index}
+          href={safeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline opacity-80 hover:opacity-100"
+        >
+          {match.text}
+        </a>
+      ) : (
+        match.text
+      )
     );
     lastIndex = match.lastIndex;
   }

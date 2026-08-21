@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- the submit sheet composes the event radio, summary, pending-comments list, and the stale/fresh partition in one cohesive surface. */
 // Review-submit content: event radio, optional summary, pending-comments
-// list (view/edit/delete), and one batched submitReview call. Queue is
-// cleared on success and retained on failure.
+// list (view/edit/delete), and one batched submitReview call. On success the
+// fresh comments are removed and stale comments stay queued; on failure the
+// whole queue is retained.
 //
 // Disable lifetime: bad-request clears on event/summary change; forbidden
 // stays for the rest of the sheet session. Toasts paint behind formSheets
@@ -40,7 +42,12 @@ import {
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
+import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import {
+  selectPartialSubmitMessage,
+  selectSubmitCtaLabel,
+} from '@/components/pr-review/pr-review-submit-view';
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 
@@ -66,6 +73,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
   >(null);
+  const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
@@ -73,11 +81,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
-  const hasStaleItems = pending.items.some(item => item.commitSha !== headSha);
+  const { fresh, stale } = partitionPendingItems(pending.items, headSha);
+  const staleIds = new Set(stale.map(item => item.id));
   const blockReason = reviewSubmitBlockReason({
     event,
     hasSummary,
-    commentCount: queuedCount,
+    commentCount: fresh.length,
+  });
+  const submitLabel = selectSubmitCtaLabel({
+    freshCount: fresh.length,
+    totalCount: pending.items.length,
   });
 
   useEffect(() => {
@@ -130,6 +143,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   async function handleSubmit() {
     setInlineError(null);
     setInlineErrorKind(null);
+    setPartialResult(null);
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
       setInlineError(TERMS_OUTDATED_COPY);
@@ -149,12 +163,20 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           event,
           ...(body.length > 0 ? { body } : {}),
           commitSha: headSha,
-          items: pending.items,
+          items: fresh,
         })
       );
-      pending.clear();
+      pending.removeComments(fresh.map(item => item.id));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onDismiss();
+      if (stale.length > 0) {
+        // Stale items stay queued: keep the sheet open and report the partial
+        // result instead of dismissing, so the user can edit or delete them.
+        setPartialResult(
+          selectPartialSubmitMessage({ freshCount: fresh.length, staleCount: stale.length })
+        );
+      } else {
+        onDismiss();
+      }
     } catch {
       // Classified into inlineError by the effect above.
     }
@@ -212,8 +234,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   let queueHint: ReactNode = null;
   if (blockReason !== null) {
     queueHint = <AccessibleStatus message={blockReason} tone="status" className="text-xs" />;
-  } else if (!keyboardVisible && (queuedCount === 0 || hasStaleItems)) {
-    queueHint = <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />;
+  } else if (!keyboardVisible && (queuedCount === 0 || stale.length > 0)) {
+    queueHint = <PendingQueueHint queuedCount={queuedCount} staleCount={stale.length} />;
   }
 
   // PickerSheet invariant: [header, ScrollView]; footer is trailing content.
@@ -228,7 +250,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-2 px-6 pt-2">
+        <View className="gap-4 px-6 pt-4">
           <ReviewEventChips
             value={event}
             disabled={isSubmitting}
@@ -262,6 +284,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                   <PrReviewPendingCommentRow
                     key={item.id}
                     item={item}
+                    stale={staleIds.has(item.id)}
                     disabled={isSubmitting}
                     onPress={() => {
                       openEditComposer(item);
@@ -273,6 +296,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                 ))
               : null}
           </View>
+
+          {partialResult ? (
+            <AccessibleStatus message={partialResult} tone="status" className="text-xs" />
+          ) : null}
 
           {inlineError && inlineErrorKind !== 'reconnect' ? (
             <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-2">
@@ -300,9 +327,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             }}
             loading={isSubmitting}
             disabled={submitDisabled}
-            accessibilityLabel="Submit review"
+            accessibilityLabel={submitLabel}
           >
-            <Text>Submit review</Text>
+            <Text>{submitLabel}</Text>
           </Button>
           <Button
             variant="ghost"
@@ -312,7 +339,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               }
             }}
             disabled={isSubmitting}
-            className="mt-1"
+            className="mt-2"
             accessibilityLabel="Cancel"
           >
             <Text>Cancel</Text>

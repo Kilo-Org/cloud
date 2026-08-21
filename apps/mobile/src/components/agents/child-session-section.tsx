@@ -12,6 +12,7 @@ import {
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
   type ChildSessionCardState,
@@ -19,6 +20,8 @@ import {
   getChildSessionCardState,
   getTaskToolSessionId,
 } from './child-session-card-state';
+import { getChildSessionModelLabel } from './child-session-model';
+import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { isToolPart } from './part-types';
 
@@ -38,12 +41,14 @@ type ChildSessionSectionProps = {
   part: ToolPart;
   childMessages: StoredMessage[];
   onOpenChildSession: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function ChildSessionSection({
   part,
   childMessages,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<ChildSessionSectionProps>) {
   const colors = useThemeColors();
 
@@ -52,6 +57,7 @@ export function ChildSessionSection({
     childMessages
   );
   const latestActivityLabel = getChildSessionActivityLabel(latestActivity);
+  const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 
   const { status } = part.state;
   const isRunning = status === 'running' || status === 'pending';
@@ -75,7 +81,7 @@ export function ChildSessionSection({
         }}
         disabled={!sessionId}
         accessibilityRole="button"
-        accessibilityLabel={`${agentName}, ${taskName}, ${latestActivityLabel}, ${status}`}
+        accessibilityLabel={`${agentName}, ${taskName}${modelLabel ? `, ${modelLabel}` : ''}, ${latestActivityLabel}, ${status}`}
         accessibilityHint={sessionId ? 'Open subagent session' : undefined}
         accessibilityState={{ disabled: !sessionId }}
       >
@@ -94,6 +100,7 @@ export function ChildSessionSection({
           <Text className="text-sm leading-5 text-foreground" numberOfLines={1}>
             {taskName}
           </Text>
+          {modelLabel ? <ChildSessionModelLabel modelLabel={modelLabel} /> : null}
           <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
             {
               // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
@@ -121,12 +128,14 @@ export function ChildSessionMessage({
   getChildMessages,
   renderPart,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<{
   message: StoredMessage;
   depth: number;
   getChildMessages: (sessionId: string) => StoredMessage[];
   renderPart: RenderPartFn;
   onOpenChildSession: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 }>) {
   if (depth >= MAX_NESTING_DEPTH) {
     return <Text className="text-xs text-muted-foreground">Maximum nesting depth reached.</Text>;
@@ -145,6 +154,7 @@ export function ChildSessionMessage({
               part={p}
               childMessages={nestedMessages}
               onOpenChildSession={onOpenChildSession}
+              modelOptions={modelOptions}
             />
           );
         }

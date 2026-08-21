@@ -52,8 +52,9 @@ type CopyState = {
   sourcePublicId: string;
   publicId: string;
   displayName: string;
+  internalId: string;
   validationError: {
-    field: 'publicId' | 'displayName' | null;
+    field: 'publicId' | 'displayName' | 'internalId' | null;
     message: string;
   } | null;
 };
@@ -116,14 +117,18 @@ export function CustomLlmsContent() {
     setEditor(initialEditorState);
   }, []);
 
-  const openCopy = useCallback((sourcePublicId: string, sourceDisplayName: string) => {
-    setCopy({
-      sourcePublicId,
-      publicId: sourcePublicId,
-      displayName: sourceDisplayName,
-      validationError: null,
-    });
-  }, []);
+  const openCopy = useCallback(
+    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string) => {
+      setCopy({
+        sourcePublicId,
+        publicId: sourcePublicId,
+        displayName: sourceDisplayName,
+        internalId: sourceInternalId,
+        validationError: null,
+      });
+    },
+    []
+  );
 
   const closeCopy = useCallback(() => {
     setCopy(null);
@@ -134,6 +139,7 @@ export function CustomLlmsContent() {
 
     const publicId = copy.publicId.trim();
     const displayName = copy.displayName.trim();
+    const internalId = copy.internalId.trim();
 
     if (!publicId) {
       setCopy(prev =>
@@ -174,11 +180,24 @@ export function CustomLlmsContent() {
       return;
     }
 
+    if (!internalId) {
+      setCopy(prev =>
+        prev
+          ? {
+              ...prev,
+              validationError: { field: 'internalId', message: 'New internal ID is required' },
+            }
+          : prev
+      );
+      return;
+    }
+
     try {
       await copyMutation.mutateAsync({
         source_public_id: copy.sourcePublicId,
         public_id: publicId,
         display_name: displayName,
+        internal_id: internalId,
       });
       toast.success('Custom LLM copied');
       closeCopy();
@@ -335,7 +354,13 @@ export function CustomLlmsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => openCopy(item.public_id, item.definition.display_name)}
+                      onClick={() =>
+                        openCopy(
+                          item.public_id,
+                          item.definition.display_name,
+                          item.definition.internal_id
+                        )
+                      }
                       aria-label={`Copy ${item.public_id}`}
                       title="Copy custom LLM"
                     >
@@ -418,6 +443,23 @@ export function CustomLlmsContent() {
                   }}
                 />
               </div>
+              {!editor.credentialsJson.trim() && (
+                <div className="bg-muted text-muted-foreground mt-2 rounded-md p-3 text-xs">
+                  <p>Add an API key using one of these credential formats:</p>
+                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
+                    {`{
+  "type": "api_key",
+  "api_key": "YOUR_API_KEY"
+}`}
+                  </pre>
+                  <p className="mt-2">
+                    Use{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
+                    instead when the provider expects an{' '}
+                    <code className="text-foreground">x-api-key</code> header.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -478,7 +520,7 @@ export function CustomLlmsContent() {
             <DialogDescription>
               Copy the definition and encrypted credentials from{' '}
               <code className="font-mono">{copy?.sourcePublicId}</code>. Enter a new public ID and
-              display name for the copy.
+              adjust the display name and internal ID for the copy.
             </DialogDescription>
           </DialogHeader>
 
@@ -518,6 +560,27 @@ export function CustomLlmsContent() {
                 aria-invalid={copy?.validationError?.field === 'displayName'}
                 aria-describedby={
                   copy?.validationError?.field === 'displayName'
+                    ? 'copy-validation-error'
+                    : undefined
+                }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="copy-internal-id">New Internal ID</Label>
+              <Input
+                id="copy-internal-id"
+                value={copy?.internalId ?? ''}
+                onChange={event =>
+                  setCopy(prev =>
+                    prev ? { ...prev, internalId: event.target.value, validationError: null } : prev
+                  )
+                }
+                placeholder="e.g. copied-model"
+                className="font-mono"
+                aria-invalid={copy?.validationError?.field === 'internalId'}
+                aria-describedby={
+                  copy?.validationError?.field === 'internalId'
                     ? 'copy-validation-error'
                     : undefined
                 }

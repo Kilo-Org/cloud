@@ -19,6 +19,7 @@ vi.mock('expo-speech-recognition', () => ({
   },
 }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
+vi.mock('expo-secure-store', () => ({}));
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
   Alert: alertMock,

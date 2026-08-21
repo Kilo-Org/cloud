@@ -2,19 +2,24 @@ import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
+  FRIENDLI_GLM_PUBLIC_ID,
+  PERPLEXITY_KIMI_PUBLIC_ID,
+} from '@/lib/ai-gateway/providers/partner/constants';
+import {
+  FRIENDLI_GLM_PROVIDER,
+  PERPLEXITY_KIMI_PROVIDER,
+} from '@/lib/ai-gateway/providers/partner/providers';
+import {
   selectPercentageRoutedPartnerProvider,
   type PercentageRoutedPartnerInput,
-} from '@/lib/ai-gateway/providers/partner-routing';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+} from '@/lib/ai-gateway/providers/partner/routing';
 import type { RuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/zai';
 
-const originalFriendliApiKey = PROVIDERS.FRIENDLI_GLM.apiKey;
-const originalPerplexityApiKey = PROVIDERS.PERPLEXITY_KIMI.apiKey;
+const originalFriendliApiKey = FRIENDLI_GLM_PROVIDER.apiKey;
+const originalPerplexityApiKey = PERPLEXITY_KIMI_PROVIDER.apiKey;
 
 function setApiKey(
-  provider: typeof PROVIDERS.FRIENDLI_GLM | typeof PROVIDERS.PERPLEXITY_KIMI,
+  provider: typeof FRIENDLI_GLM_PROVIDER | typeof PERPLEXITY_KIMI_PROVIDER,
   value: string
 ) {
   Object.defineProperty(provider, 'apiKey', {
@@ -26,13 +31,13 @@ function setApiKey(
 }
 
 beforeEach(() => {
-  setApiKey(PROVIDERS.FRIENDLI_GLM, 'test-friendli-key');
-  setApiKey(PROVIDERS.PERPLEXITY_KIMI, 'test-perplexity-key');
+  setApiKey(FRIENDLI_GLM_PROVIDER, 'test-friendli-key');
+  setApiKey(PERPLEXITY_KIMI_PROVIDER, 'test-perplexity-key');
 });
 
 afterAll(() => {
-  setApiKey(PROVIDERS.FRIENDLI_GLM, originalFriendliApiKey);
-  setApiKey(PROVIDERS.PERPLEXITY_KIMI, originalPerplexityApiKey);
+  setApiKey(FRIENDLI_GLM_PROVIDER, originalFriendliApiKey);
+  setApiKey(PERPLEXITY_KIMI_PROVIDER, originalPerplexityApiKey);
 });
 
 function request(
@@ -78,14 +83,14 @@ function selectPartner(
 
 describe('getPercentageRoutedPartnerProvider', () => {
   it.each([
-    [FRIENDLI_GLM_PUBLIC_ID, PROVIDERS.FRIENDLI_GLM],
-    [PERPLEXITY_KIMI_PUBLIC_ID, PROVIDERS.PERPLEXITY_KIMI],
+    [FRIENDLI_GLM_PUBLIC_ID, FRIENDLI_GLM_PROVIDER],
+    [PERPLEXITY_KIMI_PUBLIC_ID, PERPLEXITY_KIMI_PROVIDER],
   ])('routes exact model %s', (model, expectedProvider) => {
     expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
   });
 
   it('routes chat completions requests', () => {
-    expect(selectPartner()).toBe(PROVIDERS.FRIENDLI_GLM);
+    expect(selectPartner()).toBe(FRIENDLI_GLM_PROVIDER);
   });
 
   it.each(['messages', 'responses'] as const)('does not route untested %s requests', kind => {
@@ -93,14 +98,12 @@ describe('getPercentageRoutedPartnerProvider', () => {
   });
 
   it('allows an empty provider object', () => {
-    expect(selectPartner({ request: request('chat_completions', {}) })).toBe(
-      PROVIDERS.FRIENDLI_GLM
-    );
+    expect(selectPartner({ request: request('chat_completions', {}) })).toBe(FRIENDLI_GLM_PROVIDER);
   });
 
   it.each([
-    [FRIENDLI_GLM_PUBLIC_ID, 'friendli', PROVIDERS.FRIENDLI_GLM],
-    [PERPLEXITY_KIMI_PUBLIC_ID, 'perplexity', PROVIDERS.PERPLEXITY_KIMI],
+    [FRIENDLI_GLM_PUBLIC_ID, 'friendli', FRIENDLI_GLM_PROVIDER],
+    [PERPLEXITY_KIMI_PUBLIC_ID, 'perplexity', PERPLEXITY_KIMI_PROVIDER],
   ])('honors provider filters for %s', (requestedModel, providerId, expectedProvider) => {
     expect(
       selectPartner({
@@ -126,8 +129,8 @@ describe('getPercentageRoutedPartnerProvider', () => {
   });
 
   it.each([
-    [FRIENDLI_GLM_PUBLIC_ID, { data_collection: 'deny' } as const, PROVIDERS.FRIENDLI_GLM],
-    [PERPLEXITY_KIMI_PUBLIC_ID, { zdr: true } as const, PROVIDERS.PERPLEXITY_KIMI],
+    [FRIENDLI_GLM_PUBLIC_ID, { data_collection: 'deny' } as const, FRIENDLI_GLM_PROVIDER],
+    [PERPLEXITY_KIMI_PUBLIC_ID, { zdr: true } as const, PERPLEXITY_KIMI_PROVIDER],
   ])('routes ZDR model %s with data policy options', (requestedModel, provider, expected) => {
     expect(selectPartner({ requestedModel, request: request('chat_completions', provider) })).toBe(
       expected
@@ -137,7 +140,7 @@ describe('getPercentageRoutedPartnerProvider', () => {
   it.each(['openrouter', 'vercel'] as const)(
     'routes from managed provider %s',
     sourceProviderId => {
-      expect(selectPartner({ sourceProviderId })).toBe(PROVIDERS.FRIENDLI_GLM);
+      expect(selectPartner({ sourceProviderId })).toBe(FRIENDLI_GLM_PROVIDER);
     }
   );
 
@@ -153,7 +156,7 @@ describe('getPercentageRoutedPartnerProvider', () => {
   });
 
   it('does not route without a non-empty partner API key', () => {
-    setApiKey(PROVIDERS.FRIENDLI_GLM, '  ');
+    setApiKey(FRIENDLI_GLM_PROVIDER, '  ');
 
     expect(selectPartner()).toBeNull();
   });

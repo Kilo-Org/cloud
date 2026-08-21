@@ -1,5 +1,6 @@
-// Pure/hook selection for the connect-gate's platform branch. Extracted so
-// the platform choice (which browser launcher + which refetch trigger) can
+// Pure/hook selection for every external-auth flow's platform branch (PR
+// review connect gate, security-agent setup, provider connect card). Extracted
+// so the platform choice (which browser launcher + which refetch trigger) can
 // be unit-tested without pulling in the full React component tree.
 
 import * as WebBrowser from 'expo-web-browser';

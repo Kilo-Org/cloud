@@ -12,7 +12,11 @@ import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconn
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
+import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import {
@@ -157,6 +161,25 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
   >(null);
   const [resetKey, setResetKey] = useState(0);
 
+  // Durable reply draft, keyed by account and thread. Nothing is saved or
+  // restored while the user id is unknown.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const replyDraftKey = prReplyDraftKey(owner, repo, number, commentId);
+  const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: replyDraftKey });
+  useDraftFlushOnBackground(userId, replyDraftKey, true);
+
+  // Seed the field once per identity/thread, during render, before the input
+  // mounts. The settled gate already unmounts the field on an identity/entity
+  // change, so re-seeding here (and resetting to empty when there is no draft)
+  // keeps a reused instance from showing or saving the previous account's or
+  // thread's text under the new key.
+  const replySeedKey = `${userId ?? 'anonymous'}\u0000${replyDraftKey}`;
+  const seededKeyRef = useRef<string | null>(null);
+  if (draft.settled && seededKeyRef.current !== replySeedKey) {
+    seededKeyRef.current = replySeedKey;
+    bodyRef.current = draft.value ?? '';
+  }
+
   // Mirror mutation error into the inline box. Reply is NOT
   // optimistic, so the user can hit the inline error and retry
   // without waiting for a re-fetch.
@@ -225,6 +248,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       {
         onSuccess: () => {
           bodyRef.current = '';
+          if (userId) {
+            void clearDraft(userId, replyDraftKey);
+          }
           setResetKey(prev => prev + 1);
         },
       }
@@ -233,25 +259,30 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
 
   return (
     <View className="gap-2">
-      <TextInput
-        key={resetKey}
-        ref={inputRef}
-        defaultValue=""
-        editable={!reply.isPending}
-        placeholder={REPLY_PLACEHOLDER}
-        placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Reply body"
-        onChangeText={value => {
-          bodyRef.current = value;
-          if (inlineError) {
-            setInlineError(null);
-            setInlineErrorKind(null);
-          }
-        }}
-        multiline
-        textAlignVertical="top"
-        className="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
-      />
+      {draft.settled ? (
+        <TextInput
+          key={resetKey}
+          ref={inputRef}
+          defaultValue={bodyRef.current}
+          editable={!reply.isPending}
+          placeholder={REPLY_PLACEHOLDER}
+          placeholderTextColor={colors.mutedForeground}
+          accessibilityLabel="Reply body"
+          onChangeText={value => {
+            bodyRef.current = value;
+            if (userId) {
+              saveDraft(userId, replyDraftKey, value);
+            }
+            if (inlineError) {
+              setInlineError(null);
+              setInlineErrorKind(null);
+            }
+          }}
+          multiline
+          textAlignVertical="top"
+          className="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
+        />
+      ) : null}
       {inlineError && inlineErrorKind !== 'reconnect' ? (
         <Text className="text-xs text-destructive">{inlineError}</Text>
       ) : null}
@@ -262,6 +293,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           variant="outline"
           loading={reply.isPending}
           disabled={
+            !draft.settled ||
             reply.isPending ||
             inlineErrorKind === 'bad-request' ||
             inlineErrorKind === 'forbidden' ||

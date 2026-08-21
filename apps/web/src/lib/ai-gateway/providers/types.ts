@@ -1,6 +1,12 @@
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { FraudDetectionHeaders } from '@/lib/utils';
+import {
+  ReasoningDetailsTransform,
+  type ReasoningDetailsTransform as ReasoningDetailsTransformType,
+} from '@kilocode/db';
+
+export { ReasoningDetailsTransform };
 
 export type ProviderId =
   | 'openrouter'
@@ -40,16 +46,15 @@ export type GatewayChatApiKind = GatewayRequest['kind'];
 
 export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind, string>>>;
 
-export type ProviderResponseTransforms = {
-  mapGeminiThoughtContent: boolean;
-  mapReasoningContentToDetails: boolean;
-};
+export type ProviderResponseTransforms = ReasoningDetailsTransformType;
 
 export type Provider = {
   id: ProviderId;
   apiUrl: string;
   apiUrlOverrides: ProviderApiUrlOverrides;
   apiKey: string;
+  /** Uses bearer authorization unless the provider requires an x-api-key header. */
+  apiKeyHeader: 'x-api-key' | null;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;

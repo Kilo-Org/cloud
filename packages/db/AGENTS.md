@@ -34,6 +34,15 @@ When adding user or account PII to shared PostgreSQL, update `softDeleteUser` in
 `apps/web/src/lib/user/index.ts` to delete or anonymize it and add corresponding
 coverage in `apps/web/src/lib/user/index.test.ts`.
 
+## User IDs
+
+A user ID is NOT always a UUID. It is an arbitrary string that may be a UUID or
+another format; OAuth user IDs usually start with the prefix `oauth/`. This is
+why `kilocode_users.id` and every user-ID reference (for example
+`kilo_user_id`, `user_id`) is a `text()` column rather than `uuid()`. Do not
+assume the UUID shape: avoid UUID validation, parsing, or `uuid()`-typed
+columns and `::uuid` casts on user IDs, since they break for OAuth users.
+
 ## Timestamp boundaries
 
 Drizzle/PostgreSQL `timestamp({ withTimezone: true, mode: 'string' })` values

@@ -147,9 +147,10 @@ export function OrganizationDashboard({
             <LockableContainer>
               <OrganizationInfoCard organizationId={organizationId} />
             </LockableContainer>
-            {canManageOrganizationBilling(currentRole) && (
-              <OrganizationChildOrganizationsCard organizationId={organizationId} />
-            )}
+            {canManageOrganizationBilling(currentRole) &&
+              organizationData?.parent_organization_id === null && (
+                <OrganizationChildOrganizationsCard organizationId={organizationId} />
+              )}
             {organizationData && (
               <>
                 {organizationData.plan === 'teams' ? (

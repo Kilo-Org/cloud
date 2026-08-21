@@ -9269,6 +9269,9 @@ export const user_push_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
+    // App version at token registration. Null for tokens registered by clients
+    // that predate channel creation; the push DO gates Android channelId on it.
+    app_version: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9300,6 +9303,8 @@ export const user_notification_preferences = pgTable('user_notification_preferen
   kiloclaw_activity_enabled: boolean().default(true).notNull(),
   balance_alerts_enabled: boolean().default(true).notNull(),
   security_findings_enabled: boolean().default(true).notNull(),
+  // 'generic' hides lock-screen content; 'full' shows the message text.
+  notification_previews: text().$type<'generic' | 'full'>().default('generic').notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp({ withTimezone: true, mode: 'string' })
     .defaultNow()

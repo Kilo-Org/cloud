@@ -92,6 +92,12 @@ export type KiloPassNativeIapContextValue = {
   clearError: () => void;
   /** True when the App Store account already owns a pass on another Kilo account. */
   ownedByAnotherAccount: boolean;
+  /** Apple product ID of a Kilo Pass this device already owns, if any. */
+  ownedAppleProductId: string | null;
+  /** Original transaction ID of that owned purchase, for server-side preflight. */
+  ownedOriginalTransactionId: string | null;
+  /** False until StoreKit has answered once with what this device owns. */
+  ownershipChecked: boolean;
 };
 
 const KiloPassNativeIapContext = createContext<KiloPassNativeIapContextValue | null>(null);
@@ -120,6 +126,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const clearError = useCallback(() => {
     setErrorMessage(null);
   }, []);
+  const [ownershipChecked, setOwnershipChecked] = useState(false);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
   const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
@@ -154,6 +161,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       }
 
       if (activePurchaseRequestRef.current?.sku !== purchase.productId) {
+        // StoreKit answered the in-flight request with a transaction for another
+        // SKU (an upgrade it refused re-delivers the current subscription), and no
+        // purchase error follows. Release the request or the screen keeps its
+        // "Completing purchase" state forever. The recovery effect below still
+        // completes this transaction if it is not yet linked.
+        releasePurchaseRequest();
         return;
       }
 
@@ -172,6 +185,10 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     finishTransaction,
     requestPurchase,
     restorePurchases: restoreStorePurchases,
+    // The hook's own fetch is the only one that publishes into `availablePurchases`.
+    // The module-level `getAvailablePurchases` returns the list without touching
+    // hook state, which left every ownership check blind until a manual restore.
+    getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
 
   // Server-backed fallback for the recovery SKU list: when the StoreKit fetch
@@ -188,6 +205,21 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     }
     return serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [];
   }, [productsQuery.products, serverProductsQuery.data]);
+
+  const ownedPurchase = useMemo(() => {
+    if (Platform.OS !== 'ios') {
+      return null;
+    }
+    return (
+      availablePurchases.find(purchase =>
+        isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)
+      ) ?? null
+    );
+  }, [availablePurchases, enabledAppleProductIds]);
+  const ownedAppleProductId = ownedPurchase?.productId ?? null;
+  const ownedOriginalTransactionId =
+    (ownedPurchase as { originalTransactionIdentifierIOS?: string | null } | null)
+      ?.originalTransactionIdentifierIOS ?? null;
 
   const ownedByAnotherAccount = useMemo(
     () =>
@@ -300,12 +332,25 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   }, [authEpoch, queryClient]);
 
   useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      setOwnershipChecked(true);
+      return;
+    }
     if (!connected) {
       return;
     }
 
-    void getAvailableIapPurchases();
-  }, [connected]);
+    void (async () => {
+      try {
+        await refreshAvailablePurchases();
+      } finally {
+        // Purchases are only known after StoreKit answers. Until then the screen
+        // must not start a purchase: a device subscription owned by another Kilo
+        // account would otherwise charge the user before any check can see it.
+        setOwnershipChecked(true);
+      }
+    })();
+  }, [connected, refreshAvailablePurchases]);
 
   useEffect(() => {
     if (availablePurchases.length === 0 || enabledAppleProductIds.length === 0) {
@@ -356,6 +401,9 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       errorMessage,
       clearError,
       ownedByAnotherAccount,
+      ownedAppleProductId,
+      ownedOriginalTransactionId,
+      ownershipChecked,
     }),
     [
       clearError,
@@ -363,7 +411,10 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       errorMessage,
       isRequestingPurchase,
       isRestoringPurchases,
+      ownedAppleProductId,
       ownedByAnotherAccount,
+      ownedOriginalTransactionId,
+      ownershipChecked,
       productsQuery.errorMessage,
       productsQuery.isLoading,
       productsQuery.isRefetching,

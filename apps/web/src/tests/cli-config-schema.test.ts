@@ -157,9 +157,9 @@ describe('kilo config.json schema merge', () => {
     expect(permissionObject.properties.read).toBeDefined();
   });
 
-  test('adds kilo experimental keys without dropping upstream', () => {
+  test('merges kilo experimental keys without restoring retired keys', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
-    expect(exp.properties.codebase_search).toBeDefined();
+    expect(exp.properties.codebase_search).toBeUndefined();
     expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })
@@ -196,7 +196,7 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.build).toBeDefined();
 
     const experimental = props.experimental as { properties: Record<string, unknown> };
-    expect(experimental.properties.codebase_search).toBeDefined();
+    expect(experimental.properties.codebase_search).toBeUndefined();
     expect(experimental.properties.batch_tool).toBeDefined();
     expect(config.additionalProperties).toBe(false);
     expect(out.properties).toBeUndefined();

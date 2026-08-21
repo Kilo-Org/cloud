@@ -6,6 +6,7 @@ describe('redactSensitiveHeaders', () => {
     const input = {
       authorization: 'Bearer secret-jwt',
       'proxy-authorization': 'Basic cHJveHk6c2VjcmV0',
+      'x-api-key': 'provider-secret',
       cookie: 'session=abc123',
       'set-cookie': 'session=abc123; Path=/',
       'x-gitlab-token': 'glpat-secret',
@@ -20,6 +21,7 @@ describe('redactSensitiveHeaders', () => {
     expect(result).toEqual({
       authorization: '[REDACTED]',
       'proxy-authorization': '[REDACTED]',
+      'x-api-key': '[REDACTED]',
       cookie: '[REDACTED]',
       'set-cookie': '[REDACTED]',
       'x-gitlab-token': '[REDACTED]',

@@ -1201,6 +1201,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
             organizationId={organizationId}
             isCheckingConnection={isCheckingConnection}
             onCheckConnection={() => void checkSourceControlConnection()}
+            returnTo={organizationId ? `/organizations/${organizationId}/cloud` : '/cloud'}
           />
         </div>
       </div>

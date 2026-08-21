@@ -46,8 +46,8 @@ type BuildSubmitReviewInputArgs = {
 
 /**
  * Pure mapper from the pending-review queue + review event to the
- * `submitReview` tRPC input. The submission always uses the latest head SHA;
- * queued `commitSha` values are only used for the "may be outdated" hint.
+ * `submitReview` tRPC input. The caller passes only the fresh items (those
+ * whose `commitSha` matches the current head); stale items are never sent.
  *
  * Per the S3 contract, `startLine` and `startSide` must be supplied together
  * or omitted together.

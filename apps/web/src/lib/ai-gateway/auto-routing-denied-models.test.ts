@@ -89,21 +89,21 @@ describe('deniedModelIdsForCandidates', () => {
   it('keeps the exact denied candidate id, including suffixes', () => {
     expect(
       deniedModelIdsForCandidates(
-        policy({ organizationProviderCeiling: ['deepseek'] }),
-        ['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-pro:discounted'],
-        modelId => modelId !== 'deepseek/deepseek-v4-pro:discounted'
+        policy({ organizationProviderCeiling: ['example'] }),
+        ['example/model', 'example/model:suffix'],
+        modelId => modelId !== 'example/model:suffix'
       )
-    ).toEqual(['deepseek/deepseek-v4-pro:discounted']);
+    ).toEqual(['example/model:suffix']);
   });
 
   it('expands a normalized deny-list entry to matching suffixed candidates', () => {
     expect(
       deniedModelIdsForCandidates(
-        policy({ organizationModelDenyList: ['deepseek/deepseek-v4-pro'] }),
-        ['anthropic/claude', 'deepseek/deepseek-v4-pro:discounted'],
+        policy({ organizationModelDenyList: ['example/model'] }),
+        ['anthropic/claude', 'example/model:suffix'],
         () => true
       )
-    ).toEqual(['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-pro:discounted']);
+    ).toEqual(['example/model', 'example/model:suffix']);
   });
 
   it('denies a custom-pool-only model excluded by a selected member grant', () => {

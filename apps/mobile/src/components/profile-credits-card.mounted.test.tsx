@@ -22,6 +22,11 @@ const balanceQuery = vi.hoisted(() => ({
 vi.mock('@tanstack/react-query', () => ({
   keepPreviousData: (value: unknown) => value,
   useQuery: () => balanceQuery,
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
+
+vi.mock('expo-router', () => ({
+  useFocusEffect: () => undefined,
 }));
 
 vi.mock('@/lib/trpc', () => ({

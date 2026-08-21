@@ -8,6 +8,10 @@ import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
+import {
+  attemptPushRegistrationReconciliation,
+  subscribeToPushTokenRotation,
+} from '@/lib/auth/push-registration-reconciliation';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -44,6 +48,40 @@ function LogoutReconciliationMount() {
   return null;
 }
 
+/**
+ * Ensures the signed-in user owns the device's Expo push token on every
+ * authenticated opportunity: once `user.getMe` has resolved on the
+ * authenticated mount, on each AppState return to `active`, and on each push
+ * token rotation. The attempt itself is single-flight with 60 s spacing, so
+ * foreground flaps do not hammer the server and a transient failure retries
+ * on the next foreground.
+ */
+function PushRegistrationMount() {
+  const { userId, isLoading, isError } = useCurrentUserId();
+
+  useEffect(() => {
+    if (!userId || isLoading || isError) {
+      return undefined;
+    }
+
+    void attemptPushRegistrationReconciliation(userId);
+
+    const appState = AppState.addEventListener('change', next => {
+      if (next === 'active') {
+        void attemptPushRegistrationReconciliation(userId);
+      }
+    });
+    const unsubscribeRotation = subscribeToPushTokenRotation(userId);
+
+    return () => {
+      appState.remove();
+      unsubscribeRotation();
+    };
+  }, [userId, isLoading, isError]);
+
+  return null;
+}
+
 export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
@@ -53,6 +91,7 @@ export default function AppLayout() {
       <ActiveSessionsLiveSyncMount />
       <CachePersistenceMount />
       <LogoutReconciliationMount />
+      <PushRegistrationMount />
       <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>

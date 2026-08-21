@@ -7,6 +7,7 @@ import {
   isLifecycleIngestEvent,
   prepareIngestFrame,
 } from './ingest-frame.js';
+import { MAX_INLINE_FILE_URL_LENGTH } from './trim-payload.js';
 import type { IngestEvent } from './protocol.js';
 
 describe('prepareIngestFrame', () => {
@@ -23,8 +24,32 @@ describe('prepareIngestFrame', () => {
     expect(frame.bytes).toBeLessThanOrEqual(MAX_INGEST_EVENT_BYTES);
   });
 
-  it('applies payload trimming to file parts before serialization', () => {
+  it('preserves a small inline data: URL on a top-level file part and strips source.text.value', () => {
     const rawDataUrl = 'data:image/png;base64,wrapper-private-image';
+    const rawSourceText = 'wrapper private source text';
+
+    const frame = prepareIngestFrame({
+      streamEventType: 'kilocode',
+      data: {
+        event: 'message.part.updated',
+        type: 'message.part.updated',
+        part: {
+          type: 'file',
+          url: rawDataUrl,
+          source: { text: { value: rawSourceText } },
+        },
+      },
+      timestamp: '2026-04-14T08:00:00.000Z',
+    });
+
+    expect(frame.kind).toBe('send');
+    if (frame.kind !== 'send') return;
+    expect(frame.serialized).toContain(rawDataUrl);
+    expect(frame.serialized).not.toContain(rawSourceText);
+  });
+
+  it('strips a large inline data: URL from a top-level file part and strips source.text.value', () => {
+    const rawDataUrl = 'data:image/png;base64,' + 'x'.repeat(MAX_INLINE_FILE_URL_LENGTH);
     const rawSourceText = 'wrapper private source text';
 
     const frame = prepareIngestFrame({

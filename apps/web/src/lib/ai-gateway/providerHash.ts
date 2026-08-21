@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { type Provider } from '@/lib/ai-gateway/providers/types';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { getEnvVariable } from '@/lib/dotenvx';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
@@ -26,11 +26,11 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
 }
 
 export function generateOpenRouterDownstreamSafetyIdentifier(userId: string): string {
-  return generateProviderSpecificHash(userId, PROVIDERS.OPENROUTER);
+  return generateProviderSpecificHash(userId, OPENROUTER);
 }
 
 export function generateVercelDownstreamSafetyIdentifier(userId: string): string {
-  return generateProviderSpecificHash(userId, PROVIDERS.VERCEL_AI_GATEWAY);
+  return generateProviderSpecificHash(userId, VERCEL_AI_GATEWAY);
 }
 
 export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): string | null {

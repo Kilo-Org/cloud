@@ -5,16 +5,20 @@ const tokenPairSchema = z.object({
   token: z.string().min(1),
   refreshToken: z.string().min(1).optional(),
   expiresIn: z.number().positive().optional(),
+  created: z.boolean().optional(),
 });
 const emailCodeResponseSchema = z.object({
   success: z.literal(true),
   challengeId: z.uuid().optional(),
 });
-const errorResponseSchema = z.object({ error: z.string() });
+const errorResponseSchema = z.object({
+  error: z.string(),
+  ssoOrganizationId: z.string().min(1).optional(),
+});
 
 export type TokenPair =
-  | { token: string; refreshToken: string; expiresIn: number }
-  | { token: string; refreshToken?: undefined; expiresIn?: undefined };
+  | { token: string; refreshToken: string; expiresIn: number; created?: boolean }
+  | { token: string; refreshToken?: undefined; expiresIn?: undefined; created?: boolean };
 
 export function parseTokenResponse(value: unknown): { token: string } | null {
   const result = tokenResponseSchema.safeParse(value);
@@ -26,11 +30,11 @@ export function parseTokenPair(value: unknown): TokenPair | null {
   if (!result.success) {
     return null;
   }
-  const { token, refreshToken, expiresIn } = result.data;
+  const { token, refreshToken, expiresIn, created } = result.data;
   if (refreshToken && expiresIn) {
-    return { token, refreshToken, expiresIn };
+    return { token, refreshToken, expiresIn, created };
   }
-  return { token };
+  return { token, created };
 }
 
 const deviceAuthTokenStatusSchema = z.enum(['pending', 'approved', 'denied', 'expired']);
@@ -112,9 +116,14 @@ export function parseEmailCodeResponse(value: unknown) {
   return result.success ? result.data : null;
 }
 
-export function parseAuthErrorCode(value: unknown): string | undefined {
+export function parseAuthError(
+  value: unknown
+): { code: string; ssoOrganizationId?: string } | undefined {
   const result = errorResponseSchema.safeParse(value);
-  return result.success ? result.data.error : undefined;
+  if (!result.success) {
+    return undefined;
+  }
+  return { code: result.data.error, ssoOrganizationId: result.data.ssoOrganizationId };
 }
 
 export type ChallengeEntry = { email: string; challengeId: string };

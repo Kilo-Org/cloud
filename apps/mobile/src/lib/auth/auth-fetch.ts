@@ -2,13 +2,14 @@ import { z } from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
 import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
-import { parseAuthErrorCode } from '@/lib/auth/native-auth-contract';
+import { parseAuthError } from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 
 const stringCodeErrorSchema = z.object({ code: z.string() });
 
 /**
  * Minimal fetch helper for auth endpoints. Returns success with parsed body
- * or failure with an optional error code.
+ * or failure with an optional error code and SSO organization id.
  *
  * Every native auth POST routes through here, so this is also where a refused
  * admission drops the stored App Attest key id. Putting it here rather than at
@@ -17,11 +18,14 @@ const stringCodeErrorSchema = z.object({ code: z.string() });
 export async function postAuth(
   path: string,
   body: unknown
-): Promise<{ ok: true; data: unknown } | { ok: false; errorCode: string | undefined }> {
+): Promise<
+  | { ok: true; data: unknown }
+  | { ok: false; errorCode: string | undefined; ssoOrganizationId: string | undefined }
+> {
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
       body: JSON.stringify(body),
     });
 
@@ -33,14 +37,14 @@ export async function postAuth(
     }
 
     if (!response.ok) {
-      const errorCode = parseAuthErrorCode(json);
-      await clearAttestKeyOnRefusal(errorCode);
-      return { ok: false, errorCode };
+      const parsed = parseAuthError(json);
+      await clearAttestKeyOnRefusal(parsed?.code);
+      return { ok: false, errorCode: parsed?.code, ssoOrganizationId: parsed?.ssoOrganizationId };
     }
 
     return { ok: true, data: json };
   } catch {
-    return { ok: false, errorCode: undefined };
+    return { ok: false, errorCode: undefined, ssoOrganizationId: undefined };
   }
 }
 

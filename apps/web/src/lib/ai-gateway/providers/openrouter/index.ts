@@ -4,7 +4,7 @@ import {
   preferredModels,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -203,10 +203,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
  * Use this for syncing model stats where you need complete data including :free variants
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(`${PROVIDERS.OPENROUTER.apiUrl}/models`, {
+  const response = await fetch(`${OPENROUTER.apiUrl}/models`, {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${PROVIDERS.OPENROUTER.apiKey}`,
+      Authorization: `Bearer ${OPENROUTER.apiKey}`,
       ...ATTRIBUTION_HEADERS,
     },
     next: { revalidate: 60 },
@@ -263,17 +263,14 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
  * Fetch speech-to-text models from the OpenRouter API.
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(
-    `${PROVIDERS.OPENROUTER.apiUrl}/models?output_modalities=transcription`,
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${PROVIDERS.OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      next: { revalidate: 60 },
-    }
-  );
+  const response = await fetch(`${OPENROUTER.apiUrl}/models?output_modalities=transcription`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${OPENROUTER.apiKey}`,
+      ...ATTRIBUTION_HEADERS,
+    },
+    next: { revalidate: 60 },
+  });
 
   if (!response.ok) {
     const errorMessage = `Failed to fetch OpenRouter transcription models: ${response.status} ${response.statusText}`;

@@ -7,6 +7,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, useColorScheme, View } from 'react-native';
 import { toast } from 'sonner-native';
+import * as WebBrowser from 'expo-web-browser';
 
 import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
@@ -14,10 +15,11 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
 export function IdleAuth({
   start,
-}: Readonly<{ start: (mode: 'signin' | 'signup') => Promise<void> }>) {
+}: Readonly<{ start: (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void> }>) {
   const colorScheme = useColorScheme();
   const {
     busy,
@@ -26,6 +28,8 @@ export function IdleAuth({
     signInWithGoogle,
     requestEmailCode,
     verifyEmailCode,
+    ssoRecovery,
+    clearSsoRecovery,
   } = useNativeAuth();
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -56,6 +60,15 @@ export function IdleAuth({
     };
   }, []);
 
+  // A verify-step SSO_ERROR sets ssoRecovery while the user is on the OTP view,
+  // which hides the recovery block. Return to the main view so the block (and
+  // its "Continue with SSO" control) becomes visible.
+  useEffect(() => {
+    if (ssoRecovery) {
+      setView('main');
+    }
+  }, [ssoRecovery]);
+
   const handleSendCode = async () => {
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
@@ -75,6 +88,20 @@ export function IdleAuth({
     setBrowserAuthStarting(true);
     try {
       await start('signin');
+    } finally {
+      browserAuthStartingRef.current = false;
+      setBrowserAuthStarting(false);
+    }
+  };
+
+  const startSsoAuth = async (email: string) => {
+    if (browserAuthStartingRef.current) {
+      return;
+    }
+    browserAuthStartingRef.current = true;
+    setBrowserAuthStarting(true);
+    try {
+      await start('sso', email);
     } finally {
       browserAuthStartingRef.current = false;
       setBrowserAuthStarting(false);
@@ -106,6 +133,32 @@ export function IdleAuth({
 
   return (
     <View className="gap-3">
+      {ssoRecovery && (
+        <View className="gap-2 rounded-md border border-border bg-card p-3">
+          <Text>Your organization uses single sign-on.</Text>
+          <Button
+            size="lg"
+            className="flex-row gap-2"
+            disabled={authBusy}
+            onPress={() => void startSsoAuth(ssoRecovery.email)}
+            accessibilityLabel="Continue with SSO"
+          >
+            {browserAuthStarting ? <ActivityIndicator size="small" /> : null}
+            <Text>Continue with SSO</Text>
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={authBusy}
+            onPress={() => {
+              clearSsoRecovery();
+            }}
+            accessibilityLabel="Use a different email"
+          >
+            <Text>Use a different email</Text>
+          </Button>
+        </View>
+      )}
+
       {showApple && (
         <View
           className={authBusy ? 'opacity-50' : undefined}
@@ -166,7 +219,7 @@ export function IdleAuth({
         autoComplete="email"
         textContentType="emailAddress"
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
-        // the same way the "Send code" button does, instead of only
+        // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
         returnKeyType="go"
         onSubmitEditing={() => {
@@ -183,11 +236,28 @@ export function IdleAuth({
         className="flex-row gap-2"
         disabled={authBusy}
         onPress={() => void handleSendCode()}
-        accessibilityLabel="Send sign-in code"
+        accessibilityLabel="Continue with email"
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text>Send code</Text>
+        <Text>Continue</Text>
       </Button>
+      <Text className="text-xs text-muted-foreground">
+        By continuing you agree to our{' '}
+        <Text
+          className="text-xs text-primary underline"
+          onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
+        >
+          Terms
+        </Text>{' '}
+        and{' '}
+        <Text
+          className="text-xs text-primary underline"
+          onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
+        >
+          Privacy Policy
+        </Text>
+        .
+      </Text>
       <Button
         variant="ghost"
         disabled={authBusy}

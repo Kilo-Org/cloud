@@ -83,13 +83,17 @@ export function getAppStoreKiloPassOwnershipPreflight(params: {
   }
 
   const enabledAppleProductIds = new Set(params.enabledAppleProductIds);
+  // StoreKit returns `Transaction.appAccountToken` as an uppercase `UUID.uuidString`,
+  // while the backend stores the lowercase Postgres uuid. Compare case-insensitively
+  // or every restore on a device that already owns the pass reads as another owner.
+  const currentAppAccountToken = params.currentAppAccountToken.toLowerCase();
   const hasDifferentOwnerPurchase = params.availablePurchases.some(
     purchase =>
       purchase.store === 'apple' &&
       purchase.purchaseState !== 'pending' &&
       enabledAppleProductIds.has(purchase.productId) &&
       Boolean(purchase.appAccountToken) &&
-      purchase.appAccountToken !== params.currentAppAccountToken
+      purchase.appAccountToken?.toLowerCase() !== currentAppAccountToken
   );
 
   return hasDifferentOwnerPurchase ? 'owned-by-another-account' : null;

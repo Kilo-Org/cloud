@@ -1,5 +1,10 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { createOperationCoordinator } from '@/components/agents/use-history-backfill';
@@ -15,12 +20,18 @@ import {
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
 import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
+import {
+  resolveStoredSessionsHold,
+  type StoredSessionsHold,
+} from '@/lib/agent-session-render-hold';
 import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
 import {
   type AgentSessionSortBy,
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
+import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 
@@ -100,17 +111,19 @@ export function buildStoredSessionsQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
   options?: UseAgentSessionsOptions
 ) {
-  return trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
-    staleTime: 30_000,
-    enabled: options?.enabled,
-    getNextPageParam: lastPage => lastPage.nextCursor,
-    // Native window-focus refetch stays on by default so Home and the Share
-    // Gate keep their OS-foreground refresh. The Agents list opts out: its
-    // screen runs an AppState 'active' callback through the wrapped refetch,
-    // so the native query lifecycle must not start a stored refetch that
-    // bypasses the operation coordinator shared with backfill and departure.
-    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
-  });
+  return withInfiniteRetention(
+    trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
+      staleTime: 30_000,
+      enabled: options?.enabled,
+      getNextPageParam: lastPage => lastPage.nextCursor,
+      // Native window-focus refetch stays on by default so Home and the Share
+      // Gate keep their OS-foreground refresh. The Agents list opts out: its
+      // screen runs an AppState 'active' callback through the wrapped refetch,
+      // so the native query lifecycle must not start a stored refetch that
+      // bypasses the operation coordinator shared with backfill and departure.
+      refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
+    })
+  );
 }
 
 function useStoredSessions(options?: UseAgentSessionsOptions) {
@@ -162,6 +175,25 @@ type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
 };
 
 /**
+ * Build the server-side session-search infinite-query options. Extracted as a
+ * pure builder (mirroring `buildStoredSessionsQueryOptions`) so the options
+ * are executable-tested without mounting the hook.
+ */
+export function buildAgentSessionSearchQueryOptions(
+  trpc: ReturnType<typeof useTRPC>,
+  options: UseAgentSessionSearchOptions
+) {
+  return withInfiniteRetention(
+    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
+      staleTime: 30_000,
+      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
+      placeholderData: keepPreviousData,
+      getNextPageParam: lastPage => lastPage.nextCursor,
+    })
+  );
+}
+
+/**
  * Server-side session search, now cursor-paginated for consistent
  * page size and dedupe across pages. Uses `useInfiniteQuery` with
  * `keepPreviousData` so stale rows stay visible during a search-text
@@ -171,14 +203,7 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const trpc = useTRPC();
   const sortBy = resolveSortBy(options.sortBy);
 
-  const query = useInfiniteQuery(
-    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
-      staleTime: 30_000,
-      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
-      placeholderData: keepPreviousData,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-    })
-  );
+  const query = useInfiniteQuery(buildAgentSessionSearchQueryOptions(trpc, options));
 
   const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
   const dateGroups = useMemo(() => groupAgentSessionsByDate(sessions, sortBy), [sessions, sortBy]);
@@ -201,6 +226,8 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
 
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const sortBy = resolveSortBy(options?.sortBy);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const stored = useStoredSessions(options);
   const active = useActiveSessions(options);
 
@@ -226,6 +253,27 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // load (the cursor follows the selected sort field). Dedupe by session_id
   // using the shared collection helper.
   const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
+
+  // Render hold: `reconcileFirstPage` (departure effect below, mutation
+  // settle via `invalidateAgentSessionQueries`) empties the cached pages
+  // before refetching page one. Keep rendering the last non-empty rows for
+  // the same query key until the refetch delivers, so the SectionList never
+  // unmounts and scroll survives. A key change (filter/sort) or a settled
+  // empty result releases the hold.
+  const storedQueryKeyJson = JSON.stringify(
+    trpc.cliSessionsV2.list.infiniteQueryKey(buildAgentSessionListInput(options ?? {}))
+  );
+  const storedHoldRef = useRef<StoredSessionsHold<StoredSession> | null>(null);
+  const resolvedStored = resolveStoredSessionsHold({
+    current: storedSessions,
+    isFetching: stored.isFetching,
+    queryKeyJson: storedQueryKeyJson,
+    previousHold: storedHoldRef.current,
+  });
+  useEffect(() => {
+    storedHoldRef.current = resolvedStored.hold;
+  }, [resolvedStored.hold]);
+  const renderedStoredSessions = resolvedStored.sessions;
 
   // The server already filters by context; this covers the window where a WS
   // heartbeat has introduced a row the client has not enriched yet (see
@@ -256,21 +304,23 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   );
 
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(storedSessions, sortBy),
-    [storedSessions, sortBy]
+    () => groupAgentSessionsByDate(renderedStoredSessions, sortBy),
+    [renderedStoredSessions, sortBy]
   );
 
-  // Departure-triggered stored refetch. Only the active poll has a refetch
+  // Departure-triggered stored reset. Only the active poll has a refetch
   // interval (10s); the stored/history list does not. When a session id
   // leaves the active set, the just-terminated session has not yet shown up
-  // in history, so refetching once makes it reappear. We use `refetch()` so
-  // the fresh fetch bypasses the 30s `staleTime` that would otherwise keep
-  // the cached page hidden. The refetch only refreshes loaded pages —
-  // sufficient because a just-terminated session always lands on page 1.
+  // in history, so resetting the stored list to page one and refetching makes
+  // it reappear. `reconcileFirstPage` empties the cached pages and invalidates
+  // the prefix, so the refetch starts from `initialPageParam` (page one). A
+  // plain `refetch()` would only refresh pages still in cache, and after
+  // `maxPages` evicts page one the newest session never reappears.
   //
   // The guard is strictly "id present before, absent now": the empty→populated
   // transition (first poll) is ignored, and the initial mount with a non-empty
-  // set is ignored (no "before" to compare against).
+  // set is ignored (no "before" to compare against). The render hold above
+  // keeps the last rows visible while this reset refetches page one.
   const previousActiveIdsRef = useRef<Set<string> | null>(null);
   useEffect(() => {
     const previous = previousActiveIdsRef.current;
@@ -286,12 +336,14 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
       }
     }
     if (departedId) {
-      void storedRefetch();
+      scheduleCacheMaintenance(() => {
+        reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+      });
     }
-  }, [activeSessionIds, storedRefetch]);
+  }, [activeSessionIds, queryClient, trpc]);
 
   return {
-    storedSessions,
+    storedSessions: renderedStoredSessions,
     activeSessions,
     activeSessionIds,
     activeExclusionIds,

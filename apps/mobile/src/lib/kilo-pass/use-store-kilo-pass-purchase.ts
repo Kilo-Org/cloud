@@ -24,9 +24,9 @@ const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
 const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
   "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
 const APP_STORE_SUBSCRIPTION_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
-  'This App Store subscription is linked to another Kilo account.';
+  'The Kilo Pass on this Apple Account belongs to a different Kilo account.';
 const APP_STORE_PURCHASE_NOT_LINKED_USER_MESSAGE =
-  "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple ID used for the purchase, then try again.";
+  "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.";
 const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
 const RESTORE_PURCHASES_ERROR_MESSAGE = 'Failed to restore purchases. Try again.';
 

@@ -9,16 +9,17 @@ const alertMock = vi.hoisted(() => vi.fn());
 const dispatchMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
-const beforeRemoveHolder = vi.hoisted(() => ({
-  handler: undefined as ((event: BeforeRemoveEvent) => void) | undefined,
+type Action = { type: string };
+
+const usePreventRemoveHolder = vi.hoisted(() => ({
+  preventRemove: undefined as boolean | undefined,
+  callback: undefined as ((options: { data: { action: Action } }) => void) | undefined,
 }));
 
-const addListenerMock = vi.hoisted(() =>
-  vi.fn((event: string, handler: (e: BeforeRemoveEvent) => void) => {
-    if (event === 'beforeRemove') {
-      beforeRemoveHolder.handler = handler;
-    }
-    return () => undefined;
+const usePreventRemoveMock = vi.hoisted(() =>
+  vi.fn((preventRemove: boolean, handler: (options: { data: { action: Action } }) => void) => {
+    usePreventRemoveHolder.preventRemove = preventRemove;
+    usePreventRemoveHolder.callback = handler;
   })
 );
 
@@ -31,13 +32,12 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ addListener: addListenerMock, dispatch: dispatchMock }),
+  useNavigation: () => ({ dispatch: dispatchMock }),
 }));
 
-type BeforeRemoveEvent = {
-  preventDefault: () => void;
-  data: { action: { type: string } };
-};
+vi.mock('@/lib/navigation/prevent-remove', () => ({
+  usePreventRemove: usePreventRemoveMock,
+}));
 
 type AlertButton = { text: string; style?: string; onPress?: () => void };
 
@@ -70,11 +70,10 @@ function mountGuard(dirty: boolean, onDiscard: () => Promise<void>) {
   return { renderer: ref.current, skipRef };
 }
 
-function triggerBeforeRemove(): { preventDefault: () => void; action: { type: string } } {
-  const preventDefault = vi.fn<() => void>();
+function triggerPreventRemove(): Action {
   const action = { type: 'GO_BACK' };
-  beforeRemoveHolder.handler?.({ preventDefault, data: { action } });
-  return { preventDefault, action };
+  usePreventRemoveHolder.callback?.({ data: { action } });
+  return action;
 }
 
 function lastAlertButtons(): AlertButton[] | undefined {
@@ -94,15 +93,18 @@ describe('useNewSessionDiscardGuard', () => {
     alertMock.mockReset();
     dispatchMock.mockReset();
     toastErrorMock.mockReset();
-    addListenerMock.mockReset();
-    beforeRemoveHolder.handler = undefined;
+    usePreventRemoveMock.mockReset();
+    usePreventRemoveHolder.preventRemove = undefined;
+    usePreventRemoveHolder.callback = undefined;
   });
 
   it('shows the confirm when the prompt is non-empty', () => {
     const { renderer } = mountGuard(true, noOpDiscard);
 
-    const { preventDefault } = triggerBeforeRemove();
-    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    triggerPreventRemove();
     expect(alertMock).toHaveBeenCalledTimes(1);
     expect(alertMock.mock.calls[0]?.[0]).toBe('Discard draft?');
     expect(lastAlertButtons()?.map(button => button.text)).toEqual(['Keep editing', 'Discard']);
@@ -115,8 +117,11 @@ describe('useNewSessionDiscardGuard', () => {
   it('leaves with no alert when the prompt is empty', () => {
     const { renderer } = mountGuard(false, noOpDiscard);
 
-    const { preventDefault } = triggerBeforeRemove();
-    expect(preventDefault).not.toHaveBeenCalled();
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(false);
+
+    // The hook never invokes the callback when the boolean is false, so the
+    // guard delegates the decision to the hook and nothing else fires.
     expect(alertMock).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
 
@@ -129,10 +134,14 @@ describe('useNewSessionDiscardGuard', () => {
     const { renderer, skipRef } = mountGuard(true, noOpDiscard);
     skipRef.current = true;
 
-    const { preventDefault } = triggerBeforeRemove();
-    expect(preventDefault).not.toHaveBeenCalled();
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    const action = triggerPreventRemove();
+    // The removal was already prevented, so the guard replays the action.
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
     expect(alertMock).not.toHaveBeenCalled();
-    expect(dispatchMock).not.toHaveBeenCalled();
     // The bypass is one-shot: consumed on the removal it armed.
     expect(skipRef.current).toBe(false);
 
@@ -151,7 +160,7 @@ describe('useNewSessionDiscardGuard', () => {
       order.push('discard');
     });
     const { renderer } = mountGuard(true, onDiscard);
-    triggerBeforeRemove();
+    triggerPreventRemove();
 
     const discard = lastAlertButtons()?.find(button => button.text === 'Discard');
     expect(discard?.onPress).toBeDefined();
@@ -176,7 +185,7 @@ describe('useNewSessionDiscardGuard', () => {
       await Promise.reject(new Error('storage failure'));
     });
     const { renderer } = mountGuard(true, onDiscard);
-    triggerBeforeRemove();
+    triggerPreventRemove();
 
     const discard = lastAlertButtons()?.find(button => button.text === 'Discard');
     expect(discard?.onPress).toBeDefined();
@@ -201,7 +210,7 @@ describe('useNewSessionDiscardGuard', () => {
       await Promise.resolve();
     });
     const { renderer } = mountGuard(true, onDiscard);
-    triggerBeforeRemove();
+    triggerPreventRemove();
 
     const keep = lastAlertButtons()?.find(button => button.text === 'Keep editing');
     // The cancel button carries no handler: dismissing it must not clear or leave.

@@ -58,6 +58,12 @@ export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
  * of the same account, matching `CONSENT_USER_KEY_PREFIX`.
  */
 export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
+/**
+ * Encrypted-KV scope for the durable session-attention ack store (P1-F-48a).
+ * Holds one serialized blob of `{ sessionId, raiseId, status, ackedAt,
+ * expiresAt }` entries; ids and timestamps only, no secrets.
+ */
+export const SESSION_ATTENTION_KEY = 'session-attention';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

@@ -11,12 +11,15 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { Bot } from '@/components/ui/icons';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
   ChildSessionMessage,
   type OpenChildSession,
   type RenderPartFn,
 } from './child-session-section';
+import { getChildSessionModelLabel } from './child-session-model';
+import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { getChildSessionSheetState } from './child-session-sheet-state';
@@ -41,6 +44,7 @@ type ChildSessionSheetProps = {
   onClose: () => void;
   /** Fires on iOS after the native pageSheet dismiss animation completes. */
   onDismiss?: () => void;
+  modelOptions?: SessionModelOption[];
 };
 
 export function ChildSessionSheet({
@@ -60,9 +64,11 @@ export function ChildSessionSheet({
   onRetry,
   onClose,
   onDismiss,
+  modelOptions,
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length);
+  const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
   // always propagate the home-indicator inset), so we floor the value with
   // a comfortable constant to keep the last row / working indicator clear
@@ -91,6 +97,7 @@ export function ChildSessionSheet({
                 getChildMessages={getChildMessages}
                 renderPart={renderPart}
                 onOpenChildSession={onOpenChildSession}
+                modelOptions={modelOptions}
               />
             </View>
           </MessageErrorBoundary>
@@ -137,6 +144,11 @@ export function ChildSessionSheet({
     >
       <View className="flex-1 bg-background">
         <SheetHeader title={title} onDone={onClose} />
+        {modelLabel ? (
+          <View className="border-b border-border px-4 py-2">
+            <ChildSessionModelLabel modelLabel={modelLabel} />
+          </View>
+        ) : null}
         <PartDetailSheetHost messages={messages}>{content}</PartDetailSheetHost>
       </View>
     </Modal>

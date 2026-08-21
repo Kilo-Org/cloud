@@ -787,6 +787,7 @@ export function SessionDetailContent({
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
           getChildMessages={getChildMessages}
+          modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
@@ -801,6 +802,7 @@ export function SessionDetailContent({
       lastAssistantMessageId,
       isStreaming,
       getChildMessages,
+      modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
@@ -1178,6 +1180,7 @@ export function SessionDetailContent({
             }}
             onClose={handleCloseChildSession}
             onDismiss={handleChildSheetDismiss}
+            modelOptions={modelOptions}
           />
         ) : null}
 

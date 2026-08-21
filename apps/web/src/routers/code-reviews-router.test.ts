@@ -476,6 +476,105 @@ describe('codeReviewRouter.listForOrganization role-gated ids', () => {
   });
 });
 
+describe('codeReviewRouter.get role-gated ids', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser({
+      google_user_email: 'get-ids-owner@example.com',
+      google_user_name: 'Get Ids Owner',
+      is_admin: false,
+    });
+    memberUser = await insertTestUser({
+      google_user_email: 'get-ids-member@example.com',
+      google_user_name: 'Get Ids Member',
+      is_admin: false,
+    });
+    organization = await createTestOrganization('Get Ids Org', ownerUser.id, 0, {}, false);
+    await addUserToOrganization(organization.id, memberUser.id, 'member');
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, memberUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, ownerUser.id));
+  });
+
+  it('nulls raw identifiers for members and keeps them for owners', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/get-ids-repo',
+        pr_number: 1,
+        pr_url: 'https://github.com/test-org/get-ids-repo/pull/1',
+        pr_title: 'Get ids PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/get-ids',
+        head_sha: 'sha-get-ids',
+        status: 'completed',
+        session_id: 'agent-session-get-ids',
+        cli_session_id: 'ses-get-ids',
+        dispatch_reservation_id: 'reservation-get-ids',
+        check_run_id: 12345,
+        total_cost_musd: 500,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'completed',
+      session_id: 'agent-attempt-get-ids',
+      cli_session_id: 'ses-attempt-get-ids',
+      execution_id: 'exec-attempt-get-ids',
+    });
+
+    try {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const memberResult = await memberCaller.codeReviews.get({ reviewId: review.id });
+      expect(memberResult.success).toBe(true);
+      if (!memberResult.success) throw new Error('expected member get success');
+      expect(memberResult.review.session_id).toBeNull();
+      expect(memberResult.review.cli_session_id).toBeNull();
+      expect(memberResult.review.dispatch_reservation_id).toBeNull();
+      expect(memberResult.review.check_run_id).toBeNull();
+      expect(memberResult.review.total_cost_musd).toBe(500);
+      expect(memberResult.attempts).toHaveLength(1);
+      expect(memberResult.attempts[0]?.session_id).toBeNull();
+      expect(memberResult.attempts[0]?.cli_session_id).toBeNull();
+      expect(memberResult.attempts[0]?.execution_id).toBeNull();
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.get({ reviewId: review.id });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner get success');
+      expect(ownerResult.review.session_id).toBe('agent-session-get-ids');
+      expect(ownerResult.review.cli_session_id).toBe('ses-get-ids');
+      expect(ownerResult.review.dispatch_reservation_id).toBe('reservation-get-ids');
+      expect(ownerResult.review.check_run_id).toBe(12345);
+      expect(ownerResult.review.total_cost_musd).toBe(500);
+      expect(ownerResult.attempts).toHaveLength(1);
+      expect(ownerResult.attempts[0]?.session_id).toBe('agent-attempt-get-ids');
+      expect(ownerResult.attempts[0]?.cli_session_id).toBe('ses-attempt-get-ids');
+      expect(ownerResult.attempts[0]?.execution_id).toBe('exec-attempt-get-ids');
+    } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+});
+
 describe('personalReviewAgent.createManualReviewJob', () => {
   let testUser: User;
   let fetchSpy: jest.SpiedFunction<typeof fetch> | null = null;

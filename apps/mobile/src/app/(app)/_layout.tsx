@@ -1,4 +1,4 @@
-import { Stack, useNavigationContainerRef, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
@@ -82,54 +82,6 @@ function PushRegistrationMount() {
   return null;
 }
 
-/** TEMP-DEBUG: log the full navigation state and dispatch stack on every change. */
-function ExitDebugMount() {
-  const navigationRef = useNavigationContainerRef();
-  const router = useRouter();
-  useEffect(() => {
-    const dump = (s: unknown): unknown => {
-      if (!s || typeof s !== 'object') return s;
-      const st = s as {
-        index?: number;
-        routes?: Array<{ name?: string; params?: unknown; state?: unknown }>;
-      };
-      return {
-        index: st.index,
-        routes: st.routes?.map(r => ({
-          name: r.name,
-          params: r.params,
-          children: dump(r.state),
-        })),
-      };
-    };
-    const unsubscribe = navigationRef.addListener('state', () => {
-      const state = navigationRef.getRootState();
-      console.log('[exit-debug] state (layout):', JSON.stringify(dump(state)));
-      console.log('[exit-debug] stack:', new Error().stack);
-    });
-    // TEMP-DEBUG: wrap router methods to capture the dispatch call site.
-    const methods = ['push', 'navigate', 'replace', 'dismissTo', 'dismissAll', 'dismiss'] as const;
-    const originals = methods.map(method => [method, router[method]] as const);
-    for (const [method] of originals) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TEMP-DEBUG wrapper
-      (router as any)[method] = (...args: any[]) => {
-        console.log(`[exit-debug] router.${method}:`, JSON.stringify(args[0]), new Error().stack);
-        const original = originals.find(([name]) => name === method)?.[1];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TEMP-DEBUG wrapper
-        return (original as any)(...args);
-      };
-    }
-    return () => {
-      unsubscribe();
-      for (const [method, original] of originals) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TEMP-DEBUG restore
-        (router as any)[method] = original;
-      }
-    };
-  }, [navigationRef, router]);
-  return null;
-}
-
 export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
@@ -140,7 +92,6 @@ export default function AppLayout() {
       <CachePersistenceMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
-      <ExitDebugMount />
       <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>

@@ -115,10 +115,7 @@ export async function exitRemoteSessionWithFeedback({
     // `dismissTo` dispatches POP_TO, which finds the existing `(tabs)` route
     // at the stack root and truncates the stack so a back gesture cannot
     // return to the exited `agent-chat` route.
-    // TEMP-DEBUG: observe the runtime stack around the dismiss.
-    console.log('[exit-debug] before dismissTo', SESSIONS_ROUTE);
     router.dismissTo(SESSIONS_ROUTE);
-    console.log('[exit-debug] after dismissTo');
   };
 
   await runExit();

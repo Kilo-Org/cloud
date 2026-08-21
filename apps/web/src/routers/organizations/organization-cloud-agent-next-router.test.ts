@@ -109,8 +109,19 @@ const mockFetchGitLabRepositoriesForOrganization = jest.fn<
     repositories: unknown[];
     integrationInstalled: boolean;
     syncedAt: null;
+    instanceUrl?: string;
   }>
 >();
+const mockOrderRepositoriesByUsage =
+  jest.fn<
+    <T extends { fullName: string }>(params: {
+      userId: string;
+      organizationId: string | null;
+      platform: 'github' | 'gitlab' | 'bitbucket';
+      repositories: T[];
+      gitlabInstanceUrl?: string;
+    }) => Promise<T[]>
+  >();
 const mockEnsureOrganizationAccess = jest.fn<(userId: string, organizationId: string) => void>();
 
 jest.mock('@/lib/tokens', () => ({
@@ -150,6 +161,10 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   buildGitLabCloneUrl: jest.fn(),
   fetchGitLabRepositoriesForOrganization: mockFetchGitLabRepositoriesForOrganization,
   getGitLabInstanceUrlForOrganization: jest.fn(),
+}));
+
+jest.mock('@/lib/cloud-agent/order-repositories', () => ({
+  orderRepositoriesByUsage: mockOrderRepositoriesByUsage,
 }));
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({
@@ -470,6 +485,7 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) => repositories);
   });
 
   it.each([
@@ -512,11 +528,11 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
   });
 
   it.each([
-    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForOrganization],
-    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForOrganization],
+    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForOrganization, 'github'],
+    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForOrganization, 'gitlab'],
   ] as const)(
     'lists organization %s repositories without creating a runtime client',
-    async (platform, method, fetchRepositories) => {
+    async (platform, method, fetchRepositories, platformKey) => {
       const repositories = {
         repositories: [],
         integrationInstalled: true,
@@ -541,9 +557,80 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
           true
         );
       }
+      expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({
+        userId: 'member-user',
+        organizationId: ORGANIZATION_ID,
+        platform: platformKey,
+        repositories: [],
+      });
       expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects organization repository listing before ranking when membership is denied', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(() => {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      });
+    });
+    const caller = createCaller({ user: { id: 'non-member', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
+    ).rejects.toThrow('You do not have access to this organization');
+    expect(mockFetchGitHubRepositoriesForOrganization).not.toHaveBeenCalled();
+    expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
+
+  it('passes the organization GitLab instance URL to repository ranking', async () => {
+    const repositories = [{ id: 1, name: 'repo', fullName: 'acme/repo', private: false }];
+    mockFetchGitLabRepositoriesForOrganization.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+      instanceUrl: 'https://gitlab.example.com',
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await caller.listGitLabRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false });
+
+    expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({
+      userId: 'member-user',
+      organizationId: ORGANIZATION_ID,
+      platform: 'gitlab',
+      repositories,
+      gitlabInstanceUrl: 'https://gitlab.example.com',
+    });
+  });
+
+  it('does not expose the organization GitLab instance URL in the output shape', async () => {
+    mockFetchGitLabRepositoriesForOrganization.mockResolvedValue({
+      repositories: [],
+      integrationInstalled: true,
+      syncedAt: null,
+      instanceUrl: 'https://gitlab.example.com',
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    const result = await caller.listGitLabRepositories({
+      organizationId: ORGANIZATION_ID,
+      forceRefresh: false,
+    });
+
+    expect(result).toEqual({ repositories: [], integrationInstalled: true, syncedAt: null });
+    expect(result).not.toHaveProperty('instanceUrl');
+  });
+
+  it('propagates organization provider fetch errors without swallowing them', async () => {
+    mockFetchGitHubRepositoriesForOrganization.mockRejectedValueOnce(new Error('provider down'));
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
+    ).rejects.toThrow('provider down');
+    expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
 });
 
 describe('organizationCloudAgentNextRouter terminal ownership', () => {
@@ -807,6 +894,8 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
 describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) => repositories);
   });
 
   it('forwards exact organization ownership without forcing provider refresh by default', async () => {
@@ -828,6 +917,12 @@ describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => 
       'member-1',
       false
     );
+    expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({
+      userId: 'member-1',
+      organizationId: ORGANIZATION_ID,
+      platform: 'bitbucket',
+      repositories: [],
+    });
   });
 
   it('lets organization members force-refresh Bitbucket repositories through listing', async () => {
@@ -862,5 +957,19 @@ describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => 
         organizationId: ORGANIZATION_ID,
       })
     ).resolves.toEqual(result);
+    expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
+
+  it('keeps non-available Bitbucket results exact without ranking', async () => {
+    const result = { status: 'not_connected' as const };
+    mockFetchBitbucketRepositoriesForOrganization.mockResolvedValue(result);
+    const caller = createCaller({ user: { id: 'member-1', is_admin: false } as User });
+
+    await expect(
+      caller.listBitbucketRepositories({
+        organizationId: ORGANIZATION_ID,
+      })
+    ).resolves.toEqual(result);
+    expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
   });
 });

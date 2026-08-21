@@ -54,7 +54,7 @@ export type Provider = {
   apiUrlOverrides: ProviderApiUrlOverrides;
   apiKey: string;
   /** Uses bearer authorization unless the provider requires an x-api-key header. */
-  apiKeyHeader?: 'x-api-key';
+  apiKeyHeader: 'x-api-key' | null;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;

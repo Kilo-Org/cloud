@@ -91,7 +91,7 @@ export function buildDirectProvider(
   id: 'custom' | 'experiment',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: ResolvedExperimentUpstream,
-  apiKeyHeader?: 'x-api-key'
+  apiKeyHeader: 'x-api-key' | null
 ): Provider {
   return {
     id,

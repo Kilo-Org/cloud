@@ -74,17 +74,10 @@ export function SettingsOverviewScreen({
     trackRef.current({ interaction: 'settings_config_viewed' });
   }, []);
 
-  if (config.isError && !config.data) {
-    return (
-      <PlatformErrorScreen
-        title="Settings"
-        variant="offline"
-        message="Could not load Security Agent settings"
-        onRetry={() => void config.refetch()}
-      />
-    );
-  }
-  if (!config.data && config.fetchStatus === 'paused' && committedConnectivity === 'offline') {
+  if (
+    !config.data &&
+    (config.isError || (config.fetchStatus === 'paused' && committedConnectivity === 'offline'))
+  ) {
     return (
       <PlatformErrorScreen
         title="Settings"

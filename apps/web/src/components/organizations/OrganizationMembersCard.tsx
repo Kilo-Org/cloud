@@ -216,7 +216,7 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
   const isFailed = member.emailStatus === 'failed';
   const variant = isFailed ? 'destructive' : 'secondary';
 
-  const canCopy = canManageMembers(currentUserRole, isKiloAdmin);
+  const canCopy = canManageMembers(currentUserRole, isKiloAdmin) && 'inviteUrl' in member;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();

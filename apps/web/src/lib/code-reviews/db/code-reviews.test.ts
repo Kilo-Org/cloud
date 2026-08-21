@@ -10,9 +10,10 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
+import type { CodeReviewCouncilResult, ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import {
   bitbucketCodeReviewerLifecycleLockKey,
   cancelActiveCodeReviewsById,
@@ -27,8 +28,10 @@ import {
   findActiveReviewsForPR,
   findExistingReview,
   getCodeReviewAttemptForReview,
+  getCodeReviewCouncilResult,
   getSessionUsageFromBilling,
   listCodeReviewAttempts,
+  listCodeReviews,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
@@ -1851,5 +1854,113 @@ describe('resetCodeReviewForRetry', () => {
       where: eq(cloud_agent_code_reviews.id, reviewId),
     });
     expect(stored?.status).toBe('pending');
+  });
+});
+
+describe('listCodeReviews narrows the list DTO', () => {
+  let testUser: User;
+  let integrationId: string;
+  const createdReviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `narrow-list-${Date.now()}`,
+        platform_account_id: 'narrow-list',
+        platform_account_login: 'narrow-list',
+        repository_access: 'all',
+        integration_status: 'active',
+      })
+      .returning({ id: platform_integrations.id });
+    if (!integration) {
+      throw new Error('Expected narrow-list integration');
+    }
+    integrationId = integration.id;
+  });
+
+  afterAll(async () => {
+    for (const id of createdReviewIds) {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
+    }
+    await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createReviewWithHeavyFields() {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platformIntegrationId: integrationId,
+      repoFullName: `${REPO}-narrow-list`,
+      prNumber: 61,
+      prUrl: `https://github.com/${REPO}-narrow-list/pull/61`,
+      prTitle: 'narrow list DTO',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/narrow-list',
+      headSha: 'narrow-list-head-sha',
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        council_result: {
+          decision: 'pass',
+          aggregationStrategy: 'unanimous',
+          specialists: [],
+        } as CodeReviewCouncilResult,
+        manual_config: {
+          outputMode: 'kilo',
+          instructions: null,
+          agentConfig: { model_slug: 'test-model' },
+        } as ManualCodeReviewConfig,
+        previous_summary_body: 'previous summary body',
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    return reviewId;
+  }
+
+  it('omits council_result, manual_config, and previous_summary_body from list rows', async () => {
+    const reviewId = await createReviewWithHeavyFields();
+
+    const rows = await listCodeReviews({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      limit: 50,
+      offset: 0,
+    });
+
+    const row = rows.find(r => r.id === reviewId);
+    expect(row).toBeDefined();
+    if (!row) {
+      throw new Error('Expected narrow-list row');
+    }
+    expect(row).not.toHaveProperty('council_result');
+    expect(row).not.toHaveProperty('manual_config');
+    expect(row).not.toHaveProperty('previous_summary_body');
+
+    const {
+      council_result: _councilResult,
+      manual_config: _manualConfig,
+      previous_summary_body: _previousSummaryBody,
+      ...listColumns
+    } = getTableColumns(cloud_agent_code_reviews);
+    expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());
+  });
+
+  it('keeps council_result available to the detail getter', async () => {
+    const reviewId = await createReviewWithHeavyFields();
+
+    const councilResult = await getCodeReviewCouncilResult(reviewId);
+
+    expect(councilResult).toEqual({
+      decision: 'pass',
+      aggregationStrategy: 'unanimous',
+      specialists: [],
+    });
   });
 });

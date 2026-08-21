@@ -32,7 +32,7 @@ import {
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
-import { CreateReviewParamsSchema, type CodeReviewListItem } from '../core';
+import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import { codeReviewLedgerIntent } from '../code-review-ledger';
 import type {
@@ -1398,7 +1398,12 @@ export async function updateRepositoryReviewInstructionsMetadata(
  * Supports filtering by status and repository
  * Returns reviews sorted by creation date (newest first)
  */
-export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListItem[]> {
+export type CodeReviewListRow = Omit<
+  CloudAgentCodeReview,
+  'council_result' | 'manual_config' | 'previous_summary_body'
+>;
+
+export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListRow[]> {
   try {
     const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
@@ -1434,9 +1439,15 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
       conditions.push(eq(cloud_agent_code_reviews.platform, platform));
     }
 
-    // Select every column except the heavy `council_result` (see CodeReviewListItem).
-    const { council_result: _councilResult, ...listColumns } =
-      getTableColumns(cloud_agent_code_reviews);
+    // Select every column except the heavy JSONB/text fields no list UI reads
+    // (council_result, manual_config, previous_summary_body). The review-detail
+    // path still returns them. total_cost_musd stays: the mobile detail renders it.
+    const {
+      council_result: _councilResult,
+      manual_config: _manualConfig,
+      previous_summary_body: _previousSummaryBody,
+      ...listColumns
+    } = getTableColumns(cloud_agent_code_reviews);
     const reviews = await db
       .select(listColumns)
       .from(cloud_agent_code_reviews)

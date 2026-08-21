@@ -47,7 +47,6 @@ import {
   CancelCodeReviewInputSchema,
   RetriggerCodeReviewInputSchema,
   type Owner,
-  type ListCodeReviewsResponse,
 } from '@/lib/code-reviews/core';
 import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
 import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
@@ -270,7 +269,7 @@ export const codeReviewRouter = createTRPCRouter({
               check_run_id: null,
             }));
 
-        const response: ListCodeReviewsResponse = {
+        const response = {
           reviews: visibleReviews,
           total,
           hasMore: offset + reviews.length < total,
@@ -317,7 +316,7 @@ export const codeReviewRouter = createTRPCRouter({
           }),
         ]);
 
-        const response: ListCodeReviewsResponse = {
+        const response = {
           reviews,
           total,
           hasMore: offset + reviews.length < total,

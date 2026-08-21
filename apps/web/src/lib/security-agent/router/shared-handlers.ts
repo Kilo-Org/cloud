@@ -38,6 +38,7 @@ import {
   decorateFindingWithRemediation,
   decorateFindingsWithRemediation,
   getRemediationAttemptHistory,
+  type SecurityFindingWithRemediation,
 } from '@/lib/security-agent/db/security-remediation';
 import {
   SecurityAgentAuditReportInputSchema,
@@ -698,6 +699,23 @@ async function settleSecurityLedgerForTerminalCommand(params: {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Findings list DTO
+// ---------------------------------------------------------------------------
+//
+// The list response nulls `raw_data`, the raw Dependabot alert JSON. It is the
+// only heavy field no list UI reads. The detail procedure `getFinding` still
+// returns it. The web detail dialog is fed from the list
+// and reads `analysis` and `remediationSummary` (including `latestAttempt`),
+// so both stay fully intact. The decorator needs the full row, so the SQL
+// select stays untouched and the response nulls `raw_data` after decoration.
+
+function toFindingListItem(
+  finding: SecurityFindingWithRemediation
+): SecurityFindingWithRemediation {
+  return { ...finding, raw_data: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -1400,7 +1418,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         return {
-          findings: decoratedFindings,
+          findings: decoratedFindings.map(toFindingListItem),
           totalCount,
           runningCount: concurrencyCheck.currentCount,
           concurrencyLimit: concurrencyCheck.limit,

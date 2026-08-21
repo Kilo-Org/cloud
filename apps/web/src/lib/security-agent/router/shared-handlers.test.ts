@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { operation_ledgers, type OperationLedgerRow } from '@kilocode/db/schema';
+import type { SecurityFindingWithRemediation } from '../db/security-remediation';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -30,6 +31,7 @@ const mockSubmitRemediationCancellation = jest.fn() as jest.MockedFunction<
   typeof manualRemediationClientModule.submitRemediationCancellation
 >;
 const mockGetSecurityFindingById = jest.fn<() => Promise<unknown>>();
+const mockListSecurityFindings = jest.fn<() => Promise<unknown>>();
 const mockCanStartAnalysis = jest.fn<(owner: unknown) => Promise<unknown>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
@@ -125,7 +127,7 @@ jest.mock('../db/security-config', () => ({
   setSecurityAgentEnabled: mockSetSecurityAgentEnabled,
 }));
 jest.mock('../db/security-findings', () => ({
-  listSecurityFindings: jest.fn(),
+  listSecurityFindings: mockListSecurityFindings,
   getSecurityFindingById: mockGetSecurityFindingById,
   getSecurityFindingsSummary: jest.fn(),
   getLastSyncTime: jest.fn(),
@@ -1660,5 +1662,165 @@ describe('getCommandStatuses', () => {
     });
 
     expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('findings list DTO narrowing', () => {
+  function makeFullDecoratedFinding(): SecurityFindingWithRemediation {
+    return {
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      owned_by_user_id: null,
+      platform_integration_id: null,
+      repo_full_name: 'kilo/repo',
+      source: 'dependabot',
+      source_id: '42',
+      severity: 'high',
+      ghsa_id: 'GHSA-xxxx-yyyy-zzzz',
+      cve_id: 'CVE-2026-0001',
+      package_name: 'lodash',
+      package_ecosystem: 'npm',
+      vulnerable_version_range: '<4.17.21',
+      patched_version: '4.17.21',
+      manifest_path: 'package.json',
+      title: 'Prototype Pollution in lodash',
+      description: 'A prototype pollution vulnerability',
+      status: 'open',
+      ignored_reason: null,
+      ignored_by: null,
+      fixed_at: null,
+      sla_due_at: '2026-08-21T00:00:00.000Z',
+      dependabot_html_url: 'https://github.com/kilo/repo/security/dependabot/42',
+      cwe_ids: ['CWE-1321'],
+      cvss_score: '7.5',
+      dependency_scope: 'runtime',
+      session_id: null,
+      cli_session_id: null,
+      analysis_status: 'completed',
+      analysis_started_at: '2026-08-20T00:00:00.000Z',
+      analysis_completed_at: '2026-08-20T00:05:00.000Z',
+      analysis_error: null,
+      analysis: {
+        analyzedAt: '2026-08-20T00:05:00.000Z',
+        rawMarkdown: 'heavy analysis markdown',
+        modelUsed: 'analysis-model',
+        triage: {
+          needsSandboxAnalysis: true,
+          needsSandboxReasoning: 'needs sandbox',
+          suggestedAction: 'analyze_codebase',
+          confidence: 'high',
+          triageAt: '2026-08-20T00:04:00.000Z',
+        },
+        sandboxAnalysis: {
+          isExploitable: 'unknown',
+          extractionStatus: 'failed',
+          exploitabilityReasoning: 'sandbox reasoning',
+          usageLocations: ['index.js'],
+          suggestedFix: 'upgrade lodash',
+          suggestedAction: 'monitor',
+          summary: 'sandbox summary',
+          rawMarkdown: 'sandbox markdown',
+          analysisAt: '2026-08-20T00:05:00.000Z',
+          modelUsed: 'sandbox-model',
+        },
+      },
+      raw_data: { number: 42, state: 'open' },
+      first_detected_at: '2026-08-01T00:00:00.000Z',
+      last_synced_at: '2026-08-20T00:00:00.000Z',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-20T00:05:00.000Z',
+      remediationSummary: {
+        id: 'remediation-id',
+        status: 'pr_opened',
+        latestAttemptId: 'attempt-id',
+        prUrl: 'https://github.com/kilo/repo/pull/99',
+        prNumber: 99,
+        prDraft: false,
+        prHeadBranch: 'fix/lodash',
+        prBaseBranch: 'main',
+        failureCode: null,
+        blockedReason: null,
+        outcomeSummary: 'PR opened',
+        completedAt: null,
+        updatedAt: '2026-08-20T00:10:00.000Z',
+        latestAttempt: {
+          id: 'attempt-id',
+          status: 'pr_opened',
+          origin: 'manual',
+          attemptNumber: 1,
+          requestedByUserId: 'user-123',
+          remediationModelSlug: 'remediation-model',
+          branchName: 'fix/lodash',
+          prUrl: 'https://github.com/kilo/repo/pull/99',
+          prNumber: 99,
+          prDraft: false,
+          prHeadBranch: 'fix/lodash',
+          prBaseBranch: 'main',
+          failureCode: null,
+          blockedReason: null,
+          lastErrorRedacted: null,
+          validationEvidence: null,
+          riskNotes: null,
+          draftReason: null,
+          cancellationRequestedAt: null,
+          queuedAt: '2026-08-20T00:06:00.000Z',
+          launchedAt: '2026-08-20T00:07:00.000Z',
+          completedAt: '2026-08-20T00:09:00.000Z',
+          createdAt: '2026-08-20T00:06:00.000Z',
+          updatedAt: '2026-08-20T00:09:00.000Z',
+        },
+      },
+      remediationCapability: {
+        canStart: false,
+        startReason: 'finding_not_open',
+        canRetry: false,
+        retryReason: 'finding_not_open',
+        canCancel: false,
+        cancelAttemptId: null,
+      },
+    } as SecurityFindingWithRemediation;
+  }
+
+  it('returns list rows with raw_data nulled', async () => {
+    const decoratedFinding = makeFullDecoratedFinding();
+    mockListSecurityFindings.mockResolvedValue({ findings: [decoratedFinding], totalCount: 1 });
+    mockDecorateFindingsWithRemediation.mockResolvedValue([decoratedFinding]);
+    mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
+
+    const result = await createHandlers().listFindings.handler({
+      ctx: context,
+      input: { sortBy: 'severity_desc', limit: 10, offset: 0 },
+    });
+
+    const row = result.findings[0]!;
+    expect(row.raw_data).toBeNull();
+
+    // Exact key set: the full decorated row; nothing else added or dropped.
+    const expectedKeys = Object.keys(decoratedFinding).sort();
+    expect(Object.keys(row).sort()).toEqual(expectedKeys);
+
+    // analysis stays fully intact, including the heavy payloads the web
+    // detail dialog reads.
+    expect(row.analysis).toEqual(decoratedFinding.analysis);
+
+    // remediationSummary stays fully intact, including latestAttempt.
+    expect(row.remediationSummary).toEqual(decoratedFinding.remediationSummary);
+    expect(row.remediationSummary?.latestAttempt).toBeDefined();
+  });
+
+  it('keeps the heavy fields on the detail getFinding response', async () => {
+    const decoratedFinding = makeFullDecoratedFinding();
+    mockGetSecurityFindingById.mockResolvedValue(decoratedFinding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(decoratedFinding);
+
+    const result = await createHandlers().getFinding.handler({
+      ctx: context,
+      input: { id: decoratedFinding.id },
+    });
+
+    expect(result).toEqual(decoratedFinding);
+    expect(result.raw_data).toBeDefined();
+    expect(result.analysis).toEqual(decoratedFinding.analysis);
+    expect(result.remediationSummary?.latestAttempt).toBeDefined();
   });
 });

@@ -94,7 +94,7 @@ function scheduleSend(sender: RepoSelectionSender): void {
  * cache: the delta is a diff, not a config field, so it must never be merged
  * into the cached `ReviewConfigData` the way a full-array `ConfigPatch` is.
  */
-export function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
+function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope, platform);
   const webhookWarningQueryKey = gitLabWebhookWarningQueryKey(scope, platform);

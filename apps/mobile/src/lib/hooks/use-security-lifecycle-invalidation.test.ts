@@ -66,6 +66,7 @@ type TrpcStub = {
   securityAgent: {
     listFindings: { queryKey: () => string[] };
     getFinding: { queryKey: () => string[] };
+    getAnalysis: { queryKey: () => string[] };
     getCommandStatuses: { queryKey: () => string[] };
     listActiveCommands: { queryKey: () => string[] };
   };
@@ -73,6 +74,7 @@ type TrpcStub = {
     securityAgent: {
       listFindings: { queryKey: OrgKey };
       getFinding: { queryKey: OrgKey };
+      getAnalysis: { queryKey: OrgKey };
       getCommandStatuses: { queryKey: () => string[] };
       listActiveCommands: { queryKey: () => string[] };
     };
@@ -91,6 +93,7 @@ function makeTrpcStub(): TrpcStub {
     securityAgent: {
       listFindings: { queryKey: () => ['securityAgent', 'listFindings'] },
       getFinding: { queryKey: () => ['securityAgent', 'getFinding'] },
+      getAnalysis: { queryKey: () => ['securityAgent', 'getAnalysis'] },
       getCommandStatuses: { queryKey: () => ['securityAgent', 'getCommandStatuses'] },
       listActiveCommands: { queryKey: () => ['securityAgent', 'listActiveCommands'] },
     },
@@ -98,6 +101,7 @@ function makeTrpcStub(): TrpcStub {
       securityAgent: {
         listFindings: { queryKey: orgKey('listFindings') },
         getFinding: { queryKey: orgKey('getFinding') },
+        getAnalysis: { queryKey: orgKey('getAnalysis') },
         getCommandStatuses: {
           queryKey: () => ['organizations', 'securityAgent', 'getCommandStatuses'],
         },
@@ -127,15 +131,17 @@ describe('invalidateSecurityLifecycleScope', () => {
       scope: 'personal',
       findingsKey: ['securityAgent', 'listFindings'],
       findingKey: ['securityAgent', 'getFinding'],
+      analysisKey: ['securityAgent', 'getAnalysis'],
     },
     {
       scope: 'org_1',
       findingsKey: ['organizations', 'securityAgent', 'listFindings', { organizationId: 'org_1' }],
       findingKey: ['organizations', 'securityAgent', 'getFinding', { organizationId: 'org_1' }],
+      analysisKey: ['organizations', 'securityAgent', 'getAnalysis', { organizationId: 'org_1' }],
     },
   ])(
-    'invalidates the $scope findings, finding-details, and command-status queries',
-    ({ scope, findingsKey, findingKey }) => {
+    'invalidates the $scope findings, finding-details, analysis, and command-status queries',
+    ({ scope, findingsKey, findingKey, analysisKey }) => {
       const trpc = makeTrpcStub();
       const queryClient = makeQueryClient();
       const deps = { trpc, queryClient };
@@ -144,6 +150,7 @@ describe('invalidateSecurityLifecycleScope', () => {
 
       expect(mocks.reconcileFirstPage).toHaveBeenCalledWith(queryClient, findingsKey);
       expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: findingKey });
+      expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: analysisKey });
       expect(mocks.invalidateSecurityAgentCommandObserver).toHaveBeenCalledWith(
         queryClient,
         trpc,
@@ -165,30 +172,24 @@ describe('invalidateAllSecurityLifecycleScopes', () => {
       'securityAgent',
       'listFindings',
     ]);
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['securityAgent', 'getFinding'],
-    });
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['securityAgent', 'getCommandStatuses'],
-    });
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['securityAgent', 'listActiveCommands'],
-    });
-
     expect(mocks.reconcileFirstPage).toHaveBeenCalledWith(queryClient, [
       'organizations',
       'securityAgent',
       'listFindings',
     ]);
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['organizations', 'securityAgent', 'getFinding'],
-    });
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['organizations', 'securityAgent', 'getCommandStatuses'],
-    });
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['organizations', 'securityAgent', 'listActiveCommands'],
-    });
+
+    for (const queryKey of [
+      ['securityAgent', 'getFinding'],
+      ['securityAgent', 'getAnalysis'],
+      ['securityAgent', 'getCommandStatuses'],
+      ['securityAgent', 'listActiveCommands'],
+      ['organizations', 'securityAgent', 'getFinding'],
+      ['organizations', 'securityAgent', 'getAnalysis'],
+      ['organizations', 'securityAgent', 'getCommandStatuses'],
+      ['organizations', 'securityAgent', 'listActiveCommands'],
+    ]) {
+      expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey });
+    }
   });
 });
 

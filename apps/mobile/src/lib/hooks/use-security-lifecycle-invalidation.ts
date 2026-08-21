@@ -29,7 +29,11 @@ export function invalidateSecurityLifecycleScope(
 ): void {
   const { trpc, queryClient } = deps;
 
-  invalidateSecurityQueryScopes({ trpc, queryClient }, scope, ['findings', 'findingDetails']);
+  invalidateSecurityQueryScopes({ trpc, queryClient }, scope, [
+    'findings',
+    'findingDetails',
+    'analysis',
+  ]);
   invalidateSecurityAgentCommandObserver(queryClient, trpc, scope);
 }
 
@@ -48,6 +52,7 @@ export function invalidateAllSecurityLifecycleScopes(
     reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
   });
   void queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() });
+  void queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getAnalysis.queryKey() });
   void queryClient.invalidateQueries({
     queryKey: trpc.securityAgent.getCommandStatuses.queryKey(),
   });
@@ -60,6 +65,9 @@ export function invalidateAllSecurityLifecycleScopes(
   });
   void queryClient.invalidateQueries({
     queryKey: trpc.organizations.securityAgent.getFinding.queryKey(),
+  });
+  void queryClient.invalidateQueries({
+    queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey(),
   });
   void queryClient.invalidateQueries({
     queryKey: trpc.organizations.securityAgent.getCommandStatuses.queryKey(),

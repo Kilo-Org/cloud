@@ -2,9 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Contract values mirrored from app.config.ts and src/lib/env-keys.js. The
-// script runs the full evaluated config, so these must match the resolved
-// build-time output, not the raw app.config.ts source.
+import { ENV_KEYS } from '../src/lib/env-keys.js';
+
+// Contract values mirrored from app.config.ts (bundle id, package, scheme,
+// associated domain, blocked permissions, and Sentry plugin). ENV_KEYS is
+// imported live from src/lib/env-keys.js. The script runs the full evaluated
+// config, so these must match the resolved build-time output, not the raw
+// app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
@@ -15,18 +19,6 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_AUDIO',
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
-const ENV_KEYS = [
-  'apiBaseUrl',
-  'webBaseUrl',
-  'cloudAgentWsUrl',
-  'sessionIngestWsUrl',
-  'appsFlyerDevKey',
-  'appsFlyerAppId',
-  'kiloChatUrl',
-  'eventServiceUrl',
-  'notificationsUrl',
-  'posthogApiKey',
-];
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -86,7 +78,7 @@ const pluginNames = (config.plugins ?? []).map(plugin =>
 check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGIN}"`);
 
 const extra = config.extra ?? {};
-for (const key of ENV_KEYS) {
+for (const key of Object.keys(ENV_KEYS)) {
   const value = extra[key];
   if (value === undefined || value === null || value === '') {
     failures.push(`extra.${key} must be present and non-empty`);

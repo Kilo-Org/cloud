@@ -526,8 +526,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('stepfun/step-3.7-flash:free');
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('stepfun/step-3.7-flash');
+    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('meituan/longcat-2.0-free');
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('LongCat-2.0');
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,
       abuse_downgraded_from: 'openai/gpt-4o',

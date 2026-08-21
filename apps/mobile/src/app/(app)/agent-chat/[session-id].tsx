@@ -12,16 +12,18 @@ import { SessionContextMetrics } from '@/components/agents/session-context-metri
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { parseParam } from '@/lib/route-params';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
   const {
-    'session-id': sessionId,
+    'session-id': rawSessionId,
     organizationId: routeOrganizationId,
     via,
     spawned,
@@ -48,6 +50,10 @@ export default function SessionDetailScreen() {
     /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
     mode?: string;
   }>();
+  // `session-id` is required: a malformed deep link can hand us `undefined`
+  // or a `string[]`, both of which parseParam rejects. Optional params keep
+  // the existing first-element unwrapping below.
+  const sessionId = parseParam(rawSessionId);
   // Param can be string | string[] depending on how the route was opened.
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
@@ -56,7 +62,7 @@ export default function SessionDetailScreen() {
   const router = useRouter();
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
-      { session_id: sessionId },
+      { session_id: sessionId ?? '' },
       {
         retry: (failureCount, error) =>
           shouldRetryNotFoundOnSpawnedRoute({
@@ -85,8 +91,12 @@ export default function SessionDetailScreen() {
         retryDelay: 1000,
       }
     ),
-    enabled: routeOrganizationId === undefined,
+    enabled: routeOrganizationId === undefined && sessionId !== null,
   });
+
+  if (sessionId === null) {
+    return <InvalidRouteState backTo={'/(app)' as Href} />;
+  }
 
   if (routeOrganizationId === undefined && sessionQuery.isPending) {
     return (

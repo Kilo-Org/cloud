@@ -133,6 +133,13 @@ const PatchReviewConfigInputSchema = z.object({
     .optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
+  // Compatibility: selectedRepositoryIds full-array input kept for web save and mobile clients before delta support; remove when web and all shipped mobile clients send deltas.
+  selectedRepositoryDelta: z
+    .object({
+      add: z.array(z.number()).max(500),
+      remove: z.array(z.number()).max(500),
+    })
+    .optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
   repositoryModelOverrides: z
     .array(RepositoryModelOverrideInputSchema)
@@ -142,8 +149,9 @@ const PatchReviewConfigInputSchema = z.object({
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks. Only consulted when
-  // `selectedRepositoryIds` is also present in the patch (we only re-sync
-  // webhooks in that case, matching the full-save gating).
+  // `selectedRepositoryIds` or `selectedRepositoryDelta` is also present in
+  // the patch (we only re-sync webhooks in that case, matching the
+  // full-save gating).
   autoConfigureWebhooks: z.boolean().optional(),
 });
 
@@ -453,9 +461,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
    *
    * Platform forcing from the full save is re-applied post-merge (GitLab
    * forces `repository_selection_mode = 'selected'`). GitLab webhook sync
-   * runs ONLY when `selectedRepositoryIds` is present in the patch, so an
-   * unrelated edit (e.g. `modelSlug` only) never touches integration
-   * metadata.
+   * runs ONLY when `selectedRepositoryIds` or `selectedRepositoryDelta` is
+   * present in the patch, so an unrelated edit (e.g. `modelSlug` only)
+   * never touches integration metadata.
    *
    * `preserveCodeReviewFeatureSettings: true` keeps `review_memory_enabled`
    * and `review_analytics_enabled` on the row even when the patch supplies
@@ -471,6 +479,16 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform;
 
+        if (
+          input.selectedRepositoryIds !== undefined &&
+          input.selectedRepositoryDelta !== undefined
+        ) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Send either selectedRepositoryIds or selectedRepositoryDelta, not both.',
+          });
+        }
+
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
         if (!previousConfig) {
           throw new TRPCError({
@@ -483,6 +501,18 @@ export const personalReviewAgentRouter = createTRPCRouter({
           ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
             | Array<number | string>
             | undefined) || [];
+
+        // Delta repository selection: `selectedRepositoryDelta` computes
+        // next = (stored ∪ add) \ remove, with remove winning on overlap.
+        // The full-array `selectedRepositoryIds` input is kept for
+        // compatibility and flows through the merge helper unchanged.
+        let selectedRepositoryIdsFromDelta: Array<number | string> | undefined;
+        if (input.selectedRepositoryDelta !== undefined) {
+          const remove = new Set<number | string>(input.selectedRepositoryDelta.remove);
+          selectedRepositoryIdsFromDelta = [
+            ...new Set([...previousRepoIds, ...input.selectedRepositoryDelta.add]),
+          ].filter(repositoryId => !remove.has(repositoryId));
+        }
 
         // Convert the stored snake_case config to a camelCase snapshot for
         // the merge helper. Mirrors the field mapping used in
@@ -511,10 +541,17 @@ export const personalReviewAgentRouter = createTRPCRouter({
         // Field-merge: every key absent from `input` is preserved from
         // `stored`. `null` is an explicit "clear" (e.g. customInstructions).
         // Council-related keys aren't accepted by the personal input schema
-        // so they can never reach this handler.
-        const { platform: _ignored, ...rest } = input;
+        // so they can never reach this handler. `selectedRepositoryDelta` is
+        // stripped — the patch helper only accepts known config keys; the
+        // delta is applied separately above.
+        const { platform: _ignored, selectedRepositoryDelta: _delta, ...rest } = input;
         const patch: CodeReviewFieldMergePatch = rest;
         const merged = applyCodeReviewConfigPatch(stored, patch);
+
+        // Effective selected repository ids: a delta input computes the next
+        // array above; a full-array input flows through the merge helper.
+        const effectiveSelectedRepositoryIds: Array<number | string> =
+          selectedRepositoryIdsFromDelta ?? merged.selectedRepositoryIds ?? [];
 
         // Re-apply platform forcing post-merge. GitLab only supports
         // 'selected' repo mode server-side, so an omitted or 'all'
@@ -547,7 +584,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinking_effort: merged.thinkingEffort ?? null,
             gate_threshold: merged.gateThreshold ?? 'off',
             repository_selection_mode: repositorySelectionMode,
-            selected_repository_ids: (merged.selectedRepositoryIds ?? []).filter(
+            selected_repository_ids: effectiveSelectedRepositoryIds.filter(
               (repositoryId): repositoryId is number => typeof repositoryId === 'number'
             ),
             manually_added_repositories: merged.manuallyAddedRepositories ?? [],
@@ -566,14 +603,15 @@ export const personalReviewAgentRouter = createTRPCRouter({
         });
 
         // GitLab webhook sync runs ONLY when the patch actually carries
-        // `selectedRepositoryIds`. A patch that doesn't touch selection
-        // (e.g. mobile updating `focusAreas`) must not mutate integration
-        // metadata. Auto-configure is honored when present, defaulting to
-        // true to match the full-save default.
+        // `selectedRepositoryIds` or `selectedRepositoryDelta`. A patch that
+        // doesn't touch selection (e.g. mobile updating `focusAreas`) must
+        // not mutate integration metadata. Auto-configure is honored when
+        // present, defaulting to true to match the full-save default.
         let webhookSyncResult = null;
         if (
           isGitLab &&
-          input.selectedRepositoryIds !== undefined &&
+          (input.selectedRepositoryIds !== undefined ||
+            input.selectedRepositoryDelta !== undefined) &&
           (input.autoConfigureWebhooks ?? true) &&
           repositorySelectionMode === 'selected'
         ) {
@@ -592,7 +630,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
                   userId: ctx.user.id,
                 });
 
-                const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
+                const selectedRepositoryIds = effectiveSelectedRepositoryIds.filter(
                   (repositoryId): repositoryId is number => typeof repositoryId === 'number'
                 );
                 const previousSelectedRepositoryIds = previousRepoIds.filter(

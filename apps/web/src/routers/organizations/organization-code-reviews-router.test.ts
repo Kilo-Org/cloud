@@ -1,10 +1,31 @@
+const mockSyncWebhooksForRepositories = jest.fn();
+const mockGetValidGitLabToken = jest.fn();
+
+jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
+  syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+}));
+
+// NOTE: `jest` is intentionally NOT imported from '@jest/globals' here. The
+// @swc/jest transform only hoists `jest.mock(...)` above the static imports
+// when `jest` is the global binding; importing it as a local binding disables
+// that hoist, so the mocks below would register AFTER `createCallerForUser`
+// pulls in the real gitlab-service. Using global `jest` keeps the mocks hoisted.
 import { afterAll, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { db } from '@/lib/drizzle';
-import { agent_configs, organization_audit_logs, organizations } from '@kilocode/db/schema';
+import {
+  agent_configs,
+  organization_audit_logs,
+  organizations,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 const createdOrganizationIds: string[] = [];
 
@@ -451,6 +472,162 @@ describe('organization review agent router: patchReviewConfig', () => {
         skip_bot_pull_requests: false,
       })
     );
+  });
+
+  // P2-GH-45c: delta repository save on the org surface. Mirrors the
+  // personal contract: next = (stored ∪ add) \ remove, remove wins on
+  // overlap, and a both-fields patch is rejected.
+  async function seedOrgSelection(
+    organization: { id: string },
+    owner: { id: string },
+    selectedRepositoryIds: Array<number | string>
+  ): Promise<void> {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: selectedRepositoryIds,
+      },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+  }
+
+  it('applies a delta add to the stored org selection', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202]);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202, 303] })
+    );
+  });
+
+  it('lets remove win over add on an overlapping org delta', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202]);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      selectedRepositoryDelta: { add: [202, 303], remove: [202] },
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('applies a delta add to an empty stored org selection', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, []);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      selectedRepositoryDelta: { add: [505], remove: [] },
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [505] }));
+  });
+
+  it('rejects an org patch carrying both selectedRepositoryIds and selectedRepositoryDelta', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202]);
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform: 'github',
+        selectedRepositoryIds: [101],
+        selectedRepositoryDelta: { add: [303], remove: [] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202] })
+    );
+  });
+
+  // P2-GH-45c: the org webhook-sync delta path. A delta-only GitLab patch
+  // must drive syncWebhooksForRepositories with the computed next array
+  // ((stored ∪ add) \ remove) and the previous stored array.
+  it('runs GitLab webhook sync with computed next/previous arrays on a delta-only patch', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      selectedRepositoryDelta: { add: [303], remove: [101] },
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+    }
   });
 });
 

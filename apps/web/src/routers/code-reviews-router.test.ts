@@ -2569,6 +2569,25 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     });
   }
 
+  // Seeds a minimal personal config with an explicit selected_repository_ids
+  // array, used by the delta repository save tests (P2-GH-45c).
+  async function seedPersonalSelection(selectedRepositoryIds: number[]) {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: selectedRepositoryIds,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+  }
+
   it('returns NOT_FOUND when no stored personal config exists', async () => {
     const caller = await createCallerForUser(testUser.id);
 
@@ -2809,6 +2828,157 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         gate_threshold: 'off',
         disable_review_md: true,
       })
+    );
+  });
+
+  // P2-GH-45c: delta repository save. The mobile delta sender lands later;
+  // these tests pin the server contract: next = (stored ∪ add) \ remove,
+  // remove wins on overlap, both-fields is rejected, and a delta-only patch
+  // drives the GitLab webhook sync with computed next/previous arrays.
+  it('applies a delta add to the stored selection', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202, 303] })
+    );
+  });
+
+  it('applies a delta remove to the stored selection', async () => {
+    await seedPersonalSelection([101, 202, 303]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [], remove: [202] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('lets remove win over add on an overlapping delta', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [202, 303], remove: [202] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('applies a delta add to an empty stored selection', async () => {
+    await seedPersonalSelection([]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [505], remove: [] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [505] }));
+  });
+
+  it('rejects a patch carrying both selectedRepositoryIds and selectedRepositoryDelta', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.personalReviewAgent.patchReviewConfig({
+        platform: 'github',
+        selectedRepositoryIds: [101],
+        selectedRepositoryDelta: { add: [303], remove: [] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202] })
+    );
+  });
+
+  it('runs GitLab webhook sync with computed next/previous arrays on a delta-only patch', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      selectedRepositoryDelta: { add: [303], remove: [101] },
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
     );
   });
 });

@@ -91,6 +91,26 @@ describe('upstreamRequest timeout', () => {
     expect(headers.has('authorization')).toBe(false);
   });
 
+  it('does not add authorization when x-api-key is supplied as an extra header', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+    global.fetch = mockFetch;
+
+    const result = await upstreamRequest({
+      chatApi: 'messages',
+      reasoningEffort: null,
+      search: '',
+      method: 'POST',
+      body: { model: 'test-model', messages: [], max_tokens: 100 },
+      extraHeaders: { 'x-api-key': 'custom-key' },
+      provider: OPENROUTER,
+    });
+
+    expect(result.type).toBe('success');
+    const headers = mockFetch.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get('x-api-key')).toBe('custom-key');
+    expect(headers.has('authorization')).toBe(false);
+  });
+
   it.each(['xhigh', 'max'])(
     'reports a client disconnect without advice for %s effort when the caller aborts',
     async reasoningEffort => {

@@ -222,9 +222,10 @@ export async function upstreamRequest({
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
   }
+  const hasExplicitXApiKey = new Headers(extraHeaders).has('x-api-key');
   if (provider.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', provider.apiKey);
-  } else {
+  } else if (!hasExplicitXApiKey) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
   }
   headers.set('Content-Type', 'application/json');

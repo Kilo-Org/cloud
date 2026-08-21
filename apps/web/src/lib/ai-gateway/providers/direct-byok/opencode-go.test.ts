@@ -60,6 +60,7 @@ describe('OpenCode Go session headers', () => {
     expect(first.extraHeaders['x-api-key']).toBe(
       request.kind === 'messages' ? 'test-api-key' : undefined
     );
+    expect(first.provider.apiKeyHeader).toBeNull();
   });
 
   test.each([{ session_id: 'conversation-2' }, { kilo_user_id: 'oauth/another-user' }])(

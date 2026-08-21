@@ -1270,4 +1270,41 @@ describe('processRemediationAttempt lifecycle emit wiring', () => {
     expect(result).toBe('failed');
     expect(postedLifecycleEvents(vi.mocked(fetch))).toEqual([]);
   });
+
+  it('emits remediation_failed when a retryable launch failure exhausts its attempts', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(eligibleAutoPolicyFinding());
+    vi.mocked(getAnalysisActorById).mockResolvedValue({
+      id: 'user-1',
+      api_token_pepper: null,
+    } as never);
+    vi.mocked(settleOperation).mockResolvedValue({
+      settled: true,
+      row: { id: 'ledger-row-1' },
+    } as never);
+
+    const db = ledgerCapturingDb({
+      attempt: launchingAttempt({ launch_attempt_count: 3 }),
+      ledgerRows: [{ id: 'ledger-row-1' }],
+      userRows: [{ email: 'owner@example.com' }],
+      agentConfigs: [{ config: autoPolicyRuntimeConfig(), is_enabled: true }],
+      integrations: [{ repositories: [{ id: 1, full_name: 'kilo/repo' }] }],
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const result = await processRemediationAttempt({
+      env: {
+        ...lifecycleEnv,
+        CLOUD_AGENT_NEXT: {
+          fetch: vi.fn(async () => {
+            throw new Error('upstream 5xx');
+          }),
+        },
+      } as unknown as CloudflareEnv,
+      attemptId: ATTEMPT_ID,
+      dispatchId: 'dispatch-1',
+    });
+
+    expect(result).toBe('failed');
+    expect(postedLifecycleEvents(vi.mocked(fetch))).toEqual(['remediation_failed']);
+  });
 });

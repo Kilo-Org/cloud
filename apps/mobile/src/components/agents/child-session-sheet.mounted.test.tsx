@@ -131,6 +131,7 @@ function buildProps({
     title: 'Subagent',
     getChildMessages,
     hydrationState,
+    sessionError: null,
     isStreaming: false,
     hasOlderMessages: false,
     isLoadingOlderMessages: false,

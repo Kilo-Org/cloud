@@ -189,6 +189,8 @@ export function SessionMessageList<T>({
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        // Android Fabric can race clipped-view reattachment with rapid transcript updates.
+        removeClippedSubviews={false}
         onScroll={handleScroll}
         onScrollBeginDrag={handleScrollBeginDrag}
         onScrollEndDrag={handleScrollEndDrag}

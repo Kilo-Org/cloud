@@ -184,7 +184,10 @@ describe('saveSecurityAgentConfigWithRevision', () => {
 
     expect(outcome.existingRemediationCommandId).toBeDefined();
     const commands = await db
-      .select({ id: security_agent_commands.id, command_type: security_agent_commands.command_type })
+      .select({
+        id: security_agent_commands.id,
+        command_type: security_agent_commands.command_type,
+      })
       .from(security_agent_commands)
       .where(eq(security_agent_commands.owned_by_user_id, user.id));
     expect(commands).toHaveLength(1);

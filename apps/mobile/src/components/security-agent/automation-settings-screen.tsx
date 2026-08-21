@@ -149,7 +149,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       'Security Agent will open remediation PRs automatically for eligible exploitable findings.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Enable', onPress: () => { setAutoRemediationEnabled(true); } },
+        {
+          text: 'Enable',
+          onPress: () => {
+            setAutoRemediationEnabled(true);
+          },
+        },
       ]
     );
   };

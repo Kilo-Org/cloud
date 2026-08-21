@@ -11,10 +11,7 @@ import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
-import {
-  useReviewerPermission,
-  useSetReviewMemoryEnabled,
-} from '@/lib/hooks/use-code-reviewer';
+import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 

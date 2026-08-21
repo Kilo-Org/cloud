@@ -151,9 +151,6 @@ describe('review memory listProposalsPage pagination', () => {
 
     const proposals = await caller.reviewMemory.listProposals({ platform: 'github', limit: 2 });
     expect(Array.isArray(proposals)).toBe(true);
-    expect(proposals.map(proposal => proposal.repo_full_name)).toEqual([
-      'acme/five',
-      'acme/four',
-    ]);
+    expect(proposals.map(proposal => proposal.repo_full_name)).toEqual(['acme/five', 'acme/four']);
   });
 });

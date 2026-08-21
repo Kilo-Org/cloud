@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  basePrepareSessionNextSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
@@ -7,6 +8,7 @@ import {
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
+const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 
 describe('cloudAgentGetAttachmentUploadUrlSchema', () => {
   it('preserves the legacy 9-MIME contract when extension is absent', () => {
@@ -170,5 +172,42 @@ describe('cloudAgentGetAttachmentDownloadUrlSchema', () => {
       filename: 'not-a-uuid.exe',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('basePrepareSessionNextSchema cloneFromKiloSessionId', () => {
+  const validInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Continue the clone',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+
+  it('accepts an optional cloneFromKiloSessionId', () => {
+    const result = basePrepareSessionNextSchema.safeParse({
+      ...validInput,
+      cloneFromKiloSessionId: KILO_SESSION_ID,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cloneFromKiloSessionId).toBe(KILO_SESSION_ID);
+    }
+  });
+
+  it('rejects a malformed cloneFromKiloSessionId', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        ...validInput,
+        cloneFromKiloSessionId: 'agent_invalid',
+      }).success
+    ).toBe(false);
+  });
+
+  it('still accepts an input without cloneFromKiloSessionId', () => {
+    const result = basePrepareSessionNextSchema.safeParse(validInput);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cloneFromKiloSessionId).toBeUndefined();
+    }
   });
 });

@@ -391,6 +391,11 @@ export const basePrepareSessionNextSchema = z
     devcontainer: z.boolean().optional(),
     /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
     operationKey: z.string().uuid().optional(),
+    /**
+     * Optional source Kilo session to clone into this Cloud Agent session.
+     * Old callers omit the field and create an empty destination session.
+     */
+    cloneFromKiloSessionId: z.string().startsWith('ses_').length(30).optional(),
   })
   .refine(
     data =>

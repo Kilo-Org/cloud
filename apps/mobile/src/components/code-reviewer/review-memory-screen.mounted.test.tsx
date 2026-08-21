@@ -6,11 +6,12 @@
 // paginated happy list. The query layer is mocked so each state is driven
 // directly through the screen JSX.
 
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReviewMemoryScreen } from './review-memory-screen';
+import { collectAccessibilityLabels, collectText } from './review-memory-screen.test-helpers';
 
 const summary = vi.hoisted(() => ({
   isPending: false,
@@ -67,7 +68,7 @@ vi.mock('@/lib/trpc', () => ({
         queryOptions: () => ({}),
         queryKey: () => ['summary'],
       },
-      listProposals: {
+      listProposalsPage: {
         infiniteQueryOptions: () => ({}),
       },
       setEnabled: {
@@ -83,6 +84,7 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useReviewerPermission: () => permission,
+  useSetReviewMemoryEnabled: () => setEnabled,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -101,11 +103,11 @@ vi.mock('react-native', () => ({
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data?: unknown[];
-    renderItem?: (info: { item: unknown; index: number }) => ReactNode;
-    ListEmptyComponent?: ReactNode;
-    ListFooterComponent?: ReactNode;
+    renderItem?: (info: { item: unknown; index: number }) => ReactElement;
+    ListEmptyComponent?: ReactElement;
+    ListFooterComponent?: ReactElement | null;
     onEndReached?: () => void;
-  }) => {
+  }): ReactElement | null => {
     flashList.onEndReached = props.onEndReached ?? null;
     const data = props.data ?? [];
     if (data.length === 0) {
@@ -145,37 +147,6 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain' }));
-
-function collectText(node: unknown): string[] {
-  if (node == null) {
-    return [];
-  }
-  if (typeof node === 'string') {
-    return [node];
-  }
-  if (Array.isArray(node)) {
-    return node.flatMap(n => collectText(n));
-  }
-  if (typeof node === 'object' && 'children' in node) {
-    return collectText((node as { children?: unknown }).children);
-  }
-  return [];
-}
-
-function collectAccessibilityLabels(node: unknown): string[] {
-  if (node == null) {
-    return [];
-  }
-  if (Array.isArray(node)) {
-    return node.flatMap(n => collectAccessibilityLabels(n));
-  }
-  if (typeof node === 'object') {
-    const obj = node as { props?: { accessibilityLabel?: string }; children?: unknown };
-    const own = obj.props?.accessibilityLabel ? [obj.props.accessibilityLabel] : [];
-    return [...own, ...collectAccessibilityLabels(obj.children)];
-  }
-  return [];
-}
 
 function renderScreen(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -262,7 +233,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
         enableButton.onPress?.();
       });
     }
-    expect(setEnabled.mutate).toHaveBeenCalledWith({ platform: 'github', enabled: true });
+    expect(setEnabled.mutate).toHaveBeenCalledWith(true);
   });
 
   it('shows static off-state text with no CTA for a plain member', () => {

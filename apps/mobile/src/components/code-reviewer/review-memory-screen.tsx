@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -10,9 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
-import { useReviewerPermission } from '@/lib/hooks/use-code-reviewer';
+import {
+  useReviewerPermission,
+  useSetReviewMemoryEnabled,
+} from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
@@ -28,7 +30,6 @@ function reviewMemoryOwnerInput(scope: string) {
 
 export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
@@ -37,7 +38,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const enabled = summaryQuery.data?.enabled === true;
 
   const proposalsQuery = useInfiniteQuery(
-    trpc.reviewMemory.listProposals.infiniteQueryOptions(
+    trpc.reviewMemory.listProposalsPage.infiniteQueryOptions(
       { ...ownerInput, limit: PAGE_SIZE },
       {
         enabled,
@@ -46,18 +47,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     )
   );
 
-  const setEnabled = useMutation(
-    trpc.reviewMemory.setEnabled.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
-        });
-      },
-      onError: error => {
-        announcingToast.error(error.message);
-      },
-    })
-  );
+  const setEnabled = useSetReviewMemoryEnabled(scope);
 
   const proposals = useMemo(
     () => (proposalsQuery.data?.pages ?? []).flatMap(page => page.proposals),
@@ -147,7 +137,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
                 {canEdit ? (
                   <Button
                     onPress={() => {
-                      setEnabled.mutate({ ...ownerInput, enabled: true });
+                      setEnabled.mutate(true);
                     }}
                     loading={setEnabled.isPending}
                     accessibilityLabel="Enable review memory"

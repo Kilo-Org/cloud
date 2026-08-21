@@ -376,3 +376,31 @@ export function useConnectBitbucket(scope: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 }
+
+// Review memory only exists for GitHub, so the owner input pins the platform
+// and only varies the scope segment (personal vs. an organization id).
+function reviewMemoryOwnerInput(scope: string) {
+  return isPersonal(scope)
+    ? ({ platform: 'github' as const })
+    : ({ organizationId: scope, platform: 'github' as const });
+}
+
+export function useSetReviewMemoryEnabled(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+
+  return useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (enabled: boolean) =>
+      trpcClient.reviewMemory.setEnabled.mutate({ ...ownerInput, enabled }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+      });
+    },
+    onError: error => {
+      announcingToast.error(error.message);
+    },
+  });
+}

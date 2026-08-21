@@ -1,10 +1,17 @@
-import { createElement, isValidElement, type ReactNode } from 'react';
+import {
+  cloneElement,
+  createElement,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import {
   type AccessibilityActionEvent,
   type AccessibilityRole,
   type GestureResponderEvent,
   type ImageStyle,
   Pressable,
+  StyleSheet,
   Text,
   type TextStyle,
   View,
@@ -185,6 +192,38 @@ export class MarkdownRenderer extends Renderer {
         maxLength: MARKDOWN_CODE_CHARACTER_CAP,
       })
     );
+  }
+
+  // Loose Markdown lists — any blank line between items — wrap every item's
+  // text in a paragraph View (marked rewrites item `text` tokens to
+  // `paragraph` tokens). That paragraph's top margin pushes the first line
+  // below the marker, which sits at the row top (see the `list` style note
+  // in markdown-palette.ts). Rewrite the leading block's vertical margin so
+  // loose and tight items start their first line at the row top alike.
+  override listItem(children: ReactNode[], styles?: ViewStyle): ReactNode {
+    const first = Array.isArray(children) ? children[0] : undefined;
+    if (isValidElement(first) && first.type === View) {
+      const styleProp = (first.props as { style?: ViewStyle | ViewStyle[] }).style;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- StyleSheet.flatten(undefined) returns undefined at runtime; the RN type says non-null
+      const flat = StyleSheet.flatten(styleProp) ?? {};
+      const { marginVertical, marginBottom, ...rest } = flat;
+      const adjusted: ViewStyle = {
+        ...rest,
+        marginTop: 0,
+        marginBottom: marginBottom ?? marginVertical,
+      };
+      return super.listItem(
+        [
+          // eslint-disable-next-line react/no-clone-element -- listItem must rewrite the leading paragraph View's style in place; cloning preserves the element's key and the renderer's key sequence
+          cloneElement(first as ReactElement<{ style?: ViewStyle | ViewStyle[] }>, {
+            style: adjusted,
+          }),
+          ...children.slice(1),
+        ],
+        styles
+      );
+    }
+    return super.listItem(children, styles);
   }
 
   override escape(text: string, styles?: TextStyle): ReactNode {

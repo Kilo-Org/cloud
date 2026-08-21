@@ -105,7 +105,14 @@ export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
       paddingLeft: 12,
       marginVertical: 4,
     },
-    list: { marginVertical: 2 },
+    // react-native-marked maps `list` onto each item's marker box
+    // (MDList → markerBoxStyle), not a list container. A top margin shifts
+    // every marker below its item's first text line (tight lists) or pairs
+    // with the loose-list paragraph margin by accident. Keep this margin
+    // bottom-only; the old form was `marginVertical: 2`. `marginBottom: 4`
+    // preserves the current 28px row height (24px text + 4px gap) that
+    // spaces list items.
+    list: { marginBottom: 4 },
     li: { color: textColor, fontSize: 16, lineHeight: 24 },
     hr: {
       borderBottomWidth: 1,

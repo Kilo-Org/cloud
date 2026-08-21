@@ -4,6 +4,15 @@ export const MAX_TOOL_OUTPUT_LENGTH = 10_000;
 export const MAX_RAW_INPUT_LENGTH = 10_000;
 export const MAX_STDOUT_LENGTH = 10_000;
 
+/**
+ * Inline `data:` URLs up to this length are preserved on top-level file parts
+ * so the mobile client can render small inlined images live. Half the 1 MiB
+ * ingest-frame budget (`MAX_INGEST_EVENT_BYTES` in `ingest-frame.ts`), so a
+ * single inline file part never alone exceeds it. Larger `data:` URLs are
+ * stripped for size.
+ */
+export const MAX_INLINE_FILE_URL_LENGTH = 512 * 1024;
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
@@ -13,15 +22,24 @@ function truncate(s: string, max: number): string {
   return s.slice(0, max) + '\n\n[…truncated]';
 }
 
-function stripFilePartFields(part: Record<string, unknown>): Record<string, unknown> {
-  // Preserve small, non-`data:` URLs (`file://` sandbox paths, `http(s)`).
-  // The mobile client captures the cloud-agent attachment reference from the
-  // raw `file://` URL before the SDK strip; the live stream must keep it.
-  // `data:` URLs carry inline base64 bytes and are stripped for size.
+function stripFilePartFields(
+  part: Record<string, unknown>,
+  options?: { preserveSmallDataUrls?: boolean }
+): Record<string, unknown> {
+  // Preserve small, non-`data:` URLs (`file://` sandbox paths, `http(s)`) and,
+  // on top-level file parts, small inline `data:` URLs. The mobile client
+  // captures the cloud-agent attachment reference from the raw `file://` URL
+  // before the SDK strip, and renders small inline `data:` images directly;
+  // the live stream must keep both. Large `data:` URLs carry inline base64
+  // bytes and are stripped for size.
   const url = part.url;
+  const stripDataUrl =
+    typeof url === 'string' &&
+    url.startsWith('data:') &&
+    (!options?.preserveSmallDataUrls || url.length > MAX_INLINE_FILE_URL_LENGTH);
   const out: Record<string, unknown> = {
     ...part,
-    ...(typeof url === 'string' && url.startsWith('data:') ? { url: '' } : {}),
+    ...(stripDataUrl ? { url: '' } : {}),
   };
   const source = part.source;
   if (isRecord(source)) {
@@ -63,7 +81,7 @@ function trimPart(part: Record<string, unknown>): Record<string, unknown> {
   }
 
   if (partType === 'file') {
-    return stripFilePartFields(part);
+    return stripFilePartFields(part, { preserveSmallDataUrls: true });
   }
 
   if (partType === 'tool') {

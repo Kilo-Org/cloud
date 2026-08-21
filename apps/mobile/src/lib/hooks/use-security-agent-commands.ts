@@ -81,8 +81,9 @@ export function invalidateSecurityAgentCommandObserver(
 // Invalidates only the query families mapped to `scopes`, branching on
 // personal vs. organization procedures (their input shapes are nominally
 // distinct, so each branch stays fully separate rather than sharing a
-// polymorphic "agent" reference).
-function invalidateSecurityQueryScopes(
+// polymorphic "agent" reference). Exported so the `security_lifecycle` push
+// consumer reuses the same scope-key invalidation instead of duplicating it.
+export function invalidateSecurityQueryScopes(
   deps: { trpc: ReturnType<typeof useTRPC>; queryClient: QueryClient },
   scope: string,
   scopes: readonly SecurityQueryScope[]

@@ -15,6 +15,7 @@ import {
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 
 /**
@@ -85,6 +86,7 @@ function PushRegistrationMount() {
 export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
+  useSecurityLifecycleInvalidation();
 
   return (
     <UserWebConnectionProvider>

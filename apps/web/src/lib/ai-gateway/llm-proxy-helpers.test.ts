@@ -926,7 +926,9 @@ describe('makeErrorReadable', () => {
       userByokProviderIds: [...ids],
     });
 
-    expect((await result?.json()).error_type).toBe('byok_error');
+    expect(result).toBeDefined();
+    if (!result) throw new Error('Expected a readable BYOK error response');
+    expect((await result.json()).error_type).toBe('byok_error');
   });
 
   it('does not use generic BYOK errors for a null provider set', async () => {

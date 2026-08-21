@@ -15,6 +15,8 @@ type ChatComposerControlInput = {
 type ChatComposerControlState = {
   /** Backend accepts an empty prompt when at least one attachment is sendable. */
   canSend: boolean;
+  /** True when there is text or a sendable attachment, regardless of upload/send locks. */
+  hasSendableContent: boolean;
   /** Mirrors `editable` on the text input. */
   inputEditable: boolean;
   /** Mirrors `accessibilityState.disabled` on the text input. */
@@ -63,8 +65,10 @@ export function resolveChatComposerControlState(
     toolbarDisabled || voiceInputActive || attachmentsCount >= attachmentMax;
   const inputEditable = !toolbarDisabled && !voiceInputActive;
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
+  const hasSendableContent = hasText || sendableAttachmentsCount > 0;
   return {
-    canSend: (hasText || sendableAttachmentsCount > 0) && !disabled && !isSending && !isUploading,
+    canSend: hasSendableContent && !disabled && !isSending && !isUploading,
+    hasSendableContent,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,
     paperclipDisabled,

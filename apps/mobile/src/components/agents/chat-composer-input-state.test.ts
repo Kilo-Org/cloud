@@ -18,6 +18,7 @@ describe('resolveChatComposerControlState', () => {
 
     expect(state).toEqual({
       canSend: true,
+      hasSendableContent: true,
       inputEditable: true,
       inputAccessibilityDisabled: false,
       paperclipDisabled: false,
@@ -45,6 +46,7 @@ describe('resolveChatComposerControlState', () => {
       });
 
       expect(state.canSend).toBe(false);
+      expect(state.hasSendableContent).toBe(true);
       expect(state.toolbarDisabled).toBe(true);
       expect(state.voiceDisabled).toBe(true);
       expect(state.inputEditable).toBe(false);
@@ -70,6 +72,7 @@ describe('resolveChatComposerControlState', () => {
     expect(state.toolbarDisabled).toBe(false);
     expect(state.voiceDisabled).toBe(false);
     expect(state.canSend).toBe(true);
+    expect(state.hasSendableContent).toBe(true);
   });
 
   it('keeps the input editable while streaming with an empty draft (canSend stays false)', () => {
@@ -89,6 +92,7 @@ describe('resolveChatComposerControlState', () => {
     expect(state.inputAccessibilityDisabled).toBe(false);
     expect(state.toolbarDisabled).toBe(false);
     expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(false);
   });
 
   it('still blocks send mid-stream when the parent disabled flag is on (e.g. read-only or capability gate)', () => {
@@ -105,6 +109,7 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(true);
     expect(state.inputEditable).toBe(false);
     expect(state.toolbarDisabled).toBe(true);
   });
@@ -123,6 +128,7 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(false);
     expect(state.toolbarDisabled).toBe(false);
     expect(state.showToolbar).toBe(true);
   });
@@ -141,6 +147,7 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.canSend).toBe(true);
+    expect(state.hasSendableContent).toBe(true);
     expect(state.toolbarDisabled).toBe(false);
     expect(state.showToolbar).toBe(true);
   });
@@ -159,6 +166,7 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.canSend).toBe(true);
+    expect(state.hasSendableContent).toBe(true);
   });
 
   it('blocks send while an upload is in flight, even with text and sendable attachments', () => {
@@ -175,6 +183,7 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(true);
     expect(state.toolbarDisabled).toBe(false);
     expect(state.inputEditable).toBe(true);
   });

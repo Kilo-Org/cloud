@@ -2,6 +2,7 @@ import {
   type CompactionPart,
   type FilePart,
   type Part,
+  type PatchPart,
   type ReasoningPart,
   type TextPart,
   type ToolPart,
@@ -32,6 +33,10 @@ export function isToolPart(part: Part): part is ToolPart {
 
 export function isFilePart(part: Part): part is FilePart {
   return part.type === 'file';
+}
+
+export function isPatchPart(part: Part): part is PatchPart {
+  return part.type === 'patch';
 }
 
 export function isReasoningPart(part: Part): part is ReasoningPart {

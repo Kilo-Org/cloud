@@ -3,6 +3,7 @@ import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
   isCompactionPart,
   isFilePart,
+  isPatchPart,
   isReasoningPart,
   isSnapshotProgressPart,
   isTextPart,
@@ -34,7 +35,7 @@ export function partRendersContent(part: Part): boolean {
     // property of the part, not of the stream.
     return shouldRenderReasoningPart(part, false);
   }
-  return isFilePart(part) || isCompactionPart(part);
+  return isFilePart(part) || isCompactionPart(part) || (isPatchPart(part) && part.files.length > 0);
 }
 
 /**

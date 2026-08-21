@@ -21,6 +21,8 @@ const registerTokenMutationFn = vi.hoisted(() => vi.fn());
 const getNotificationPermissionStatus = vi.hoisted(() => vi.fn());
 const getDevicePushToken = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
+const registerTokenOptions = vi.hoisted(() => vi.fn());
+const setPreferenceOptions = vi.hoisted(() => vi.fn());
 
 const useKiloClawTabVisible = vi.hoisted(() => vi.fn(() => true));
 vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
@@ -87,18 +89,24 @@ vi.mock('@/lib/trpc', () => ({
         queryOptions: () => ({ queryKey: ['getNotificationPreferences'], queryFn: prefsQueryFn }),
       },
       registerPushToken: {
-        mutationOptions: (opts: object) => ({
-          ...opts,
-          mutationFn: registerTokenMutationFn,
-          mutationKey: ['registerPushToken'],
-        }),
+        mutationOptions: (opts: object) => {
+          registerTokenOptions(opts);
+          return {
+            ...opts,
+            mutationFn: registerTokenMutationFn,
+            mutationKey: ['registerPushToken'],
+          };
+        },
       },
       setNotificationPreferences: {
-        mutationOptions: (opts: object) => ({
-          ...opts,
-          mutationFn: setPreferenceMutationFn,
-          mutationKey: ['setNotificationPreferences'],
-        }),
+        mutationOptions: (opts: object) => {
+          setPreferenceOptions(opts);
+          return {
+            ...opts,
+            mutationFn: setPreferenceMutationFn,
+            mutationKey: ['setNotificationPreferences'],
+          };
+        },
       },
     },
   }),
@@ -317,5 +325,63 @@ describe('NotificationsScreen KiloClaw activity row', () => {
 
     expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
     expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
+  });
+});
+
+describe('NotificationsScreen mutation serialization (scope.id + generation guard)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('scopes both mutations to their fixed cache entries', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(registerTokenOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: { id: 'push-tokens' } })
+    );
+    expect(setPreferenceOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: { id: 'notification-preferences' } })
+    );
+  });
+
+  it('a failing older category mutation does not roll back while a newer one owns the cache', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs({ chatMessages: true, agentAttention: true }));
+    const { renderer, queryClient } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    const opts = setPreferenceOptions.mock.calls[0]?.[0] as
+      | {
+          onMutate?: (vars: Record<string, unknown>) => Promise<unknown>;
+          onError?: (error: Error, vars: Record<string, unknown>, context: unknown) => void;
+        }
+      | undefined;
+    if (!opts?.onMutate || !opts.onError) {
+      throw new Error('setNotificationPreferences options not captured');
+    }
+
+    const older = await opts.onMutate({ chatMessages: false });
+    const newer = await opts.onMutate({ agentAttention: false });
+
+    // The older failure must not restore its snapshot over the newer write.
+    opts.onError(new Error('boom'), { chatMessages: false }, older);
+    const afterOlder = queryClient.getQueryData<Record<string, unknown>>([
+      'getNotificationPreferences',
+    ]);
+    expect(afterOlder?.agentAttention).toBe(false);
+
+    // The newer failure (latest generation) rolls back its own snapshot.
+    opts.onError(new Error('boom'), { agentAttention: false }, newer);
+    const afterNewer = queryClient.getQueryData<Record<string, unknown>>([
+      'getNotificationPreferences',
+    ]);
+    expect(afterNewer?.agentAttention).toBe(true);
+    expect(toastError).toHaveBeenCalledTimes(2);
   });
 });

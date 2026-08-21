@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
@@ -7,6 +13,10 @@ import {
   type ReviewConfigData,
   type ReviewerPlatform,
 } from '@/lib/code-reviewer-config';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
@@ -141,40 +151,51 @@ export function useReviewConfigCacheReader(scope: string, platform: ReviewerPlat
 export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope, platform);
+  const toggleChainKey = `${scope}:${platform}`;
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
-    mutationFn: async (vars: { isEnabled: boolean }) => {
-      const result = isPersonal(scope)
-        ? await trpcClient.personalReviewAgent.toggleReviewAgent.mutate({
-            platform: toPersonalPlatform(platform),
-            isEnabled: vars.isEnabled,
-          })
-        : await trpcClient.organizations.reviewAgent.toggleReviewAgent.mutate({
-            organizationId: scope,
-            platform,
-            isEnabled: vars.isEnabled,
-          });
-      // The output type widens `success` to `boolean` (not a `true`
-      // literal), so a domain failure here must not be treated as a
-      // resolved mutation — throwing routes it to onError (toast) instead
-      // of letting callers' onSuccess fire haptics/navigation as if it worked.
-      if (!result.success) {
-        throw new Error('Failed to update reviewer');
-      }
-      return result;
-    },
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (vars: { isEnabled: boolean }) =>
+      // The toggle joins the same chain key the config save uses, so a toggle
+      // and a save for the same scope+platform serialize their network calls.
+      chainSave(toggleChainKey, async () => {
+        const result = isPersonal(scope)
+          ? await trpcClient.personalReviewAgent.toggleReviewAgent.mutate({
+              platform: toPersonalPlatform(platform),
+              isEnabled: vars.isEnabled,
+            })
+          : await trpcClient.organizations.reviewAgent.toggleReviewAgent.mutate({
+              organizationId: scope,
+              platform,
+              isEnabled: vars.isEnabled,
+            });
+        // The output type widens `success` to `boolean` (not a `true`
+        // literal), so a domain failure here must not be treated as a
+        // resolved mutation — throwing routes it to onError (toast) instead
+        // of letting callers' onSuccess fire haptics/navigation as if it worked.
+        if (!result.success) {
+          throw new Error('Failed to update reviewer');
+        }
+        return result;
+      }),
     onMutate: async vars => {
       await queryClient.cancelQueries({ queryKey });
+      const generation = nextMutationGeneration(hashKey(queryKey));
       const previous = queryClient.getQueryData<ReviewConfigData>(queryKey);
       queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
         old ? { ...old, isEnabled: vars.isEnabled } : old
       );
-      return { previous };
+      return { previous, generation };
     },
     onError: (error, _vars, context) => {
-      queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
-        old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
-      );
+      if (context?.previous && isLatestMutationGeneration(hashKey(queryKey), context.generation)) {
+        const previous = context.previous;
+        queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
+          old ? { ...old, isEnabled: previous.isEnabled } : old
+        );
+      }
       announcingToast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -215,6 +236,8 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   const webhookWarningQueryKey = gitLabWebhookWarningQueryKey(scope, platform);
   const saveChainKey = `${scope}:${platform}`;
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: ConfigPatch) =>
@@ -315,14 +338,15 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
       }),
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey });
+      const generation = nextMutationGeneration(hashKey(queryKey));
       const previous = queryClient.getQueryData<ReviewConfigData>(queryKey);
       queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
         old ? { ...old, ...patch } : old
       );
-      return { previous, patch };
+      return { previous, patch, generation };
     },
     onError: (error, _patch, context) => {
-      if (context?.previous) {
+      if (context?.previous && isLatestMutationGeneration(hashKey(queryKey), context.generation)) {
         const keys = Object.keys(context.patch) as (keyof ConfigPatch)[];
         const restoredFields = pick(context.previous, keys);
         queryClient.setQueryData<ReviewConfigData>(queryKey, old =>

@@ -38,6 +38,11 @@ import { toast } from 'sonner-native';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
@@ -59,6 +64,11 @@ function useDiscussionKeys() {
     listReviewThreadsPath: trpc.githubPrReview.listReviewThreads.pathFilter(),
   };
 }
+
+// Every discussion mutation snapshots the same procedure-wide
+// `listReviewThreads` cache through its path filter, so one shared generation
+// key guards all rollbacks across resolve/unresolve/reaction writes.
+const LIST_REVIEW_THREADS_GENERATION_KEY = 'githubPrReview.listReviewThreads';
 
 async function invalidateDiscussionCaches(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -110,71 +120,83 @@ export function useReplyToCommentMutation() {
 // ── Resolve / unresolve (optimistic) ──────────────────────────────────
 
 export function useResolveThreadMutation() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
 
-  return useMutation(
-    trpc.githubPrReview.resolveThread.mutationOptions({
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
+  return useMutation({
+    mutationFn: (vars: { threadId: string }) =>
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      onMutate: async ({ threadId }) => {
-        await queryClient.cancelQueries(keys.listReviewThreadsPath);
-        const previous = queryClient.getQueriesData<ReviewThreadsInfiniteData>(
-          keys.listReviewThreadsPath
-        );
-        queryClient.setQueriesData<ReviewThreadsInfiniteData>(keys.listReviewThreadsPath, old =>
-          applyResolveToggle(old, threadId, true)
-        );
-        return { previous };
-      },
-      onError: (error, _input, context) => {
-        const previous = context?.previous;
-        if (previous) {
-          for (const [key, data] of previous) {
-            queryClient.setQueryData<ReviewThreadsInfiniteData>(key, data);
-          }
+      chainSave(`pr-thread:${vars.threadId}`, () =>
+        trpcClient.githubPrReview.resolveThread.mutate(vars)
+      ),
+    onMutate: async ({ threadId }) => {
+      await queryClient.cancelQueries(keys.listReviewThreadsPath);
+      const generation = nextMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY);
+      const previous = queryClient.getQueriesData<ReviewThreadsInfiniteData>(
+        keys.listReviewThreadsPath
+      );
+      queryClient.setQueriesData<ReviewThreadsInfiniteData>(keys.listReviewThreadsPath, old =>
+        applyResolveToggle(old, threadId, true)
+      );
+      return { previous, generation };
+    },
+    onError: (error, _input, context) => {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY, context.generation)
+      ) {
+        for (const [key, data] of context.previous) {
+          queryClient.setQueryData<ReviewThreadsInfiniteData>(key, data);
         }
-        toast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidateDiscussionCaches(queryClient, keys);
-      },
-    })
-  );
+      }
+      toast.error(error.message);
+    },
+    onSettled: async () => {
+      await invalidateDiscussionCaches(queryClient, keys);
+    },
+  });
 }
 
 export function useUnresolveThreadMutation() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
 
-  return useMutation(
-    trpc.githubPrReview.unresolveThread.mutationOptions({
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
+  return useMutation({
+    mutationFn: (vars: { threadId: string }) =>
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      onMutate: async ({ threadId }) => {
-        await queryClient.cancelQueries(keys.listReviewThreadsPath);
-        const previous = queryClient.getQueriesData<ReviewThreadsInfiniteData>(
-          keys.listReviewThreadsPath
-        );
-        queryClient.setQueriesData<ReviewThreadsInfiniteData>(keys.listReviewThreadsPath, old =>
-          applyResolveToggle(old, threadId, false)
-        );
-        return { previous };
-      },
-      onError: (error, _input, context) => {
-        const previous = context?.previous;
-        if (previous) {
-          for (const [key, data] of previous) {
-            queryClient.setQueryData<ReviewThreadsInfiniteData>(key, data);
-          }
+      chainSave(`pr-thread:${vars.threadId}`, () =>
+        trpcClient.githubPrReview.unresolveThread.mutate(vars)
+      ),
+    onMutate: async ({ threadId }) => {
+      await queryClient.cancelQueries(keys.listReviewThreadsPath);
+      const generation = nextMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY);
+      const previous = queryClient.getQueriesData<ReviewThreadsInfiniteData>(
+        keys.listReviewThreadsPath
+      );
+      queryClient.setQueriesData<ReviewThreadsInfiniteData>(keys.listReviewThreadsPath, old =>
+        applyResolveToggle(old, threadId, false)
+      );
+      return { previous, generation };
+    },
+    onError: (error, _input, context) => {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY, context.generation)
+      ) {
+        for (const [key, data] of context.previous) {
+          queryClient.setQueryData<ReviewThreadsInfiniteData>(key, data);
         }
-        toast.error(error.message);
-      },
-      onSettled: async () => {
-        await invalidateDiscussionCaches(queryClient, keys);
-      },
-    })
-  );
+      }
+      toast.error(error.message);
+    },
+    onSettled: async () => {
+      await invalidateDiscussionCaches(queryClient, keys);
+    },
+  });
 }
 
 // ── Reactions (optimistic) ────────────────────────────────────────────
@@ -188,11 +210,14 @@ export function useAddReactionMutation(threadId: string) {
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation(
     trpc.githubPrReview.addReaction.mutationOptions({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       onMutate: async ({ commentNodeId, content }) => {
         await queryClient.cancelQueries(keys.listReviewThreadsPath);
+        const generation = nextMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY);
         const previous = queryClient.getQueriesData<ReviewThreadsInfiniteData>(
           keys.listReviewThreadsPath
         );
@@ -204,12 +229,14 @@ export function useAddReactionMutation(threadId: string) {
             content: content as ReviewReactionContent,
           })
         );
-        return { previous };
+        return { previous, generation };
       },
       onError: (error, _input, context) => {
-        const previous = context?.previous;
-        if (previous) {
-          for (const [key, data] of previous) {
+        if (
+          context?.previous &&
+          isLatestMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY, context.generation)
+        ) {
+          for (const [key, data] of context.previous) {
             queryClient.setQueryData<ReviewThreadsInfiniteData>(key, data);
           }
         }
@@ -218,6 +245,10 @@ export function useAddReactionMutation(threadId: string) {
       onSettled: async () => {
         await invalidateDiscussionCaches(queryClient, keys);
       },
+      // The reaction DTO carries only {commentNodeId, content}; the owning
+      // threadId comes from the hook closure, so scope.id serializes network
+      // calls per thread (rule 2).
+      scope: { id: `pr-thread:${threadId}` },
     })
   );
 }
@@ -227,11 +258,14 @@ export function useRemoveReactionMutation(threadId: string) {
   const queryClient = useQueryClient();
   const keys = useDiscussionKeys();
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation(
     trpc.githubPrReview.removeReaction.mutationOptions({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       onMutate: async ({ commentNodeId, content }) => {
         await queryClient.cancelQueries(keys.listReviewThreadsPath);
+        const generation = nextMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY);
         const previous = queryClient.getQueriesData<ReviewThreadsInfiniteData>(
           keys.listReviewThreadsPath
         );
@@ -243,12 +277,14 @@ export function useRemoveReactionMutation(threadId: string) {
             content: content as ReviewReactionContent,
           })
         );
-        return { previous };
+        return { previous, generation };
       },
       onError: (error, _input, context) => {
-        const previous = context?.previous;
-        if (previous) {
-          for (const [key, data] of previous) {
+        if (
+          context?.previous &&
+          isLatestMutationGeneration(LIST_REVIEW_THREADS_GENERATION_KEY, context.generation)
+        ) {
+          for (const [key, data] of context.previous) {
             queryClient.setQueryData<ReviewThreadsInfiniteData>(key, data);
           }
         }
@@ -257,6 +293,10 @@ export function useRemoveReactionMutation(threadId: string) {
       onSettled: async () => {
         await invalidateDiscussionCaches(queryClient, keys);
       },
+      // The reaction DTO carries only {commentNodeId, content}; the owning
+      // threadId comes from the hook closure, so scope.id serializes network
+      // calls per thread (rule 2).
+      scope: { id: `pr-thread:${threadId}` },
     })
   );
 }

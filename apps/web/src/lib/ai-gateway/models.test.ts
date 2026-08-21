@@ -87,22 +87,22 @@ describe('isFreeModel', () => {
       expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
     });
 
-    test('retains the disabled LongCat 2.0 configuration for later enablement', async () => {
+    test('registers LongCat 2.0 as a free preferred model', async () => {
       expect(kiloExclusiveModels).toContain(longcat_2_free_model);
-      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBeNull();
-      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(false);
+      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBe(longcat_2_free_model);
+      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(true);
       expect(longcat_2_free_model).toMatchObject({
         internal_id: 'LongCat-2.0',
         gateway: 'longcat',
         context_length: 1_048_756,
         max_completion_tokens: 131_072,
-        status: 'disabled',
+        status: 'public',
       });
       expect(autoFreeModels.map(({ model }) => model)).not.toContain(
         longcat_2_free_model.public_id
       );
-      expect(preferredModels).not.toContain(longcat_2_free_model.public_id);
-      expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBe('openai-compatible');
+      expect(preferredModels).toContain(longcat_2_free_model.public_id);
+      expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBeUndefined();
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {

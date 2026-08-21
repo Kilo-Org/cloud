@@ -63,7 +63,7 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
   const summary = summaryQuery.data;
   const memoryEnabled = summary?.enabled ?? false;
   const repositories = summary?.repositories ?? [];
-  const proposals = proposalsQuery.data?.proposals ?? [];
+  const proposals = proposalsQuery.data ?? [];
   const selectedProposal = proposals.find(proposal => proposal.id === selectedProposalId) ?? null;
   const canEditSelectedProposal = selectedProposal
     ? selectedProposal.status === 'open' ||

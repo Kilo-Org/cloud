@@ -231,7 +231,7 @@ export type ReviewMemoryProposalPage = {
 const PROPOSAL_CURSOR_SEPARATOR = '|';
 const PROPOSAL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Keyset pagination cursor for `listProposals`. The list orders by
+// Keyset pagination cursor for `listProposalsPage`. The list orders by
 // `updated_at` desc with `id` desc as the deterministic tie-breaker, so the
 // cursor encodes the last row's `(updated_at, id)`. `updated_at` is a
 // PostgreSQL timestamptz returned as text with microsecond precision (e.g.
@@ -253,7 +253,23 @@ function decodeProposalCursor(cursor: string): { updatedAt: string; id: string }
   return { updatedAt, id };
 }
 
+// Compatibility: the array-shaped `listProposals` is the deployed contract
+// (`origin/main` returns `CodeReviewMemoryProposal[]`); the web panel and
+// stale client bundles call it. Keep it, and serve the paginated shape
+// through the additive `listProposalsPage`.
 export async function listProposals(input: {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  repoFullName?: string;
+  statuses?: ReviewMemoryProposalStatus[];
+  limit?: number;
+  database?: ReviewMemoryDatabase;
+}): Promise<CodeReviewMemoryProposal[]> {
+  const page = await listProposalsPage(input);
+  return page.proposals;
+}
+
+export async function listProposalsPage(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
   repoFullName?: string;

@@ -5,11 +5,11 @@ import { code_review_memory_proposals, kilocode_users } from '@kilocode/db/schem
 
 import { createCallerForUser } from '@/routers/test-utils';
 
-// Keyset pagination contract for `listProposals`: the cursor encodes the last
+// Keyset pagination contract for `listProposalsPage`: the cursor encodes the last
 // row's `(updated_at, id)` and the list orders by `updated_at` desc with `id`
 // desc as the deterministic tie-breaker. A mid-list cursor resumes exactly
 // after the last row; the final page returns `nextCursor: null`.
-describe('review memory listProposals pagination', () => {
+describe('review memory listProposalsPage pagination', () => {
   let userId: string;
 
   beforeEach(async () => {
@@ -52,14 +52,14 @@ describe('review memory listProposals pagination', () => {
 
     const caller = await createCallerForUser(userId);
 
-    const page1 = await caller.reviewMemory.listProposals({ platform: 'github', limit: 2 });
+    const page1 = await caller.reviewMemory.listProposalsPage({ platform: 'github', limit: 2 });
     expect(page1.proposals.map(proposal => proposal.repo_full_name)).toEqual([
       'acme/five',
       'acme/four',
     ]);
     expect(page1.nextCursor).not.toBeNull();
 
-    const page2 = await caller.reviewMemory.listProposals({
+    const page2 = await caller.reviewMemory.listProposalsPage({
       platform: 'github',
       limit: 2,
       cursor: page1.nextCursor!,
@@ -70,7 +70,7 @@ describe('review memory listProposals pagination', () => {
     ]);
     expect(page2.nextCursor).not.toBeNull();
 
-    const page3 = await caller.reviewMemory.listProposals({
+    const page3 = await caller.reviewMemory.listProposalsPage({
       platform: 'github',
       limit: 2,
       cursor: page2.nextCursor!,
@@ -87,8 +87,8 @@ describe('review memory listProposals pagination', () => {
 
     const caller = await createCallerForUser(userId);
 
-    const page1 = await caller.reviewMemory.listProposals({ platform: 'github', limit: 2 });
-    const page2 = await caller.reviewMemory.listProposals({
+    const page1 = await caller.reviewMemory.listProposalsPage({ platform: 'github', limit: 2 });
+    const page2 = await caller.reviewMemory.listProposalsPage({
       platform: 'github',
       limit: 2,
       cursor: page1.nextCursor!,
@@ -115,11 +115,11 @@ describe('review memory listProposals pagination', () => {
 
     const caller = await createCallerForUser(userId);
 
-    const page1 = await caller.reviewMemory.listProposals({ platform: 'github', limit: 1 });
+    const page1 = await caller.reviewMemory.listProposalsPage({ platform: 'github', limit: 1 });
     expect(page1.proposals.map(proposal => proposal.id)).toEqual([a.id]);
     expect(page1.nextCursor).not.toBeNull();
 
-    const page2 = await caller.reviewMemory.listProposals({
+    const page2 = await caller.reviewMemory.listProposalsPage({
       platform: 'github',
       limit: 1,
       cursor: page1.nextCursor!,
@@ -132,14 +132,28 @@ describe('review memory listProposals pagination', () => {
     const caller = await createCallerForUser(userId);
 
     await expect(
-      caller.reviewMemory.listProposals({ platform: 'github', cursor: 'not-a-cursor' })
+      caller.reviewMemory.listProposalsPage({ platform: 'github', cursor: 'not-a-cursor' })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     await expect(
-      caller.reviewMemory.listProposals({
+      caller.reviewMemory.listProposalsPage({
         platform: 'github',
         cursor: '2026-06-05T00:00:00.000Z|not-a-uuid',
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('keeps the deployed array shape on listProposals for old clients', async () => {
+    await seedProposal('2026-06-05T00:00:00.000Z', 'acme/five');
+    await seedProposal('2026-06-04T00:00:00.000Z', 'acme/four');
+
+    const caller = await createCallerForUser(userId);
+
+    const proposals = await caller.reviewMemory.listProposals({ platform: 'github', limit: 2 });
+    expect(Array.isArray(proposals)).toBe(true);
+    expect(proposals.map(proposal => proposal.repo_full_name)).toEqual([
+      'acme/five',
+      'acme/four',
+    ]);
   });
 });

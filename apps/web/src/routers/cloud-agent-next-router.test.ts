@@ -154,6 +154,7 @@ let createCaller: (ctx: { user: User }) => {
     autoInitiate: boolean;
     devcontainer: boolean;
     images?: { path: string; files: string[] };
+    cloneFromKiloSessionId?: string;
   }) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
@@ -639,5 +640,26 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       isFree: false,
       hasUserByokAvailable: false,
     });
+  });
+
+  it('forwards cloneFromKiloSessionId to the Worker', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1', is_admin: false } as User,
+    });
+    const cloneFromKiloSessionId = 'ses_12345678901234567890123456';
+
+    await caller.prepareSession({
+      prompt: 'Continue the clone',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      devcontainer: false,
+      cloneFromKiloSessionId,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloneFromKiloSessionId })
+    );
   });
 });

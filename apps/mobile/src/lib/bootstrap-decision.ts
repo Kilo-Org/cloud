@@ -40,13 +40,6 @@ export type BootstrapDecision = {
   hasUserBootstrapError: boolean;
   hasConsentBootstrapError: boolean;
   hasBootstrapError: boolean;
-  consentLoading: boolean;
-  needsForceUpdate: boolean;
-  showingForceUpdate: boolean;
-  needsAuth: boolean;
-  needsAppRedirect: boolean;
-  needsConsentRedirect: boolean;
-  needsRedirect: boolean;
   hidden: boolean;
 };
 
@@ -111,13 +104,6 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
     hasUserBootstrapError,
     hasConsentBootstrapError,
     hasBootstrapError,
-    consentLoading,
-    needsForceUpdate,
-    showingForceUpdate,
-    needsAuth,
-    needsAppRedirect,
-    needsConsentRedirect,
-    needsRedirect,
     hidden,
   };
 }

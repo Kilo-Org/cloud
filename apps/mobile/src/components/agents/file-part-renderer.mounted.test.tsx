@@ -751,6 +751,72 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
+  it('reuses the cached presigned URL after an unmount and remount', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Attachment');
+    const uuid = '77777777-7777-4777-8777-777777777777';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+
+    const remounted = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: `${uuid}.md`, url: '' })
+    );
+    await flushAsync();
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+
+    await press(first(pressableByLabel(remounted.root, `Preview ${uuid}.md`)));
+    await flushAsync();
+
+    const markdown = findByType(remounted.root, 'ChatMarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Attachment');
+
+    await unmount(remounted);
+  });
+
+  it('retries the presign after an image presign failure', async () => {
+    const uuid = '88888888-8888-4888-8888-888888888888';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    getAttachmentDownloadUrlMutate.mockRejectedValueOnce(new Error('presign failed'));
+
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' })
+    );
+    const root = renderer.root;
+
+    await flushAsync();
+
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+    expect(texts(root)).toContain('Image unavailable');
+
+    await press(first(pressableByLabel(root, 'Image unavailable, retry loading')));
+    await flushAsync();
+
+    const image = findByType(root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    expect(image.props.source).toEqual({ uri: 'https://r2.example/signed' });
+
+    await unmount(renderer);
+  });
+
   it('toasts "Preview unavailable" for a part with no URL and no cache entry', async () => {
     const renderer = await mount(
       makeFilePart({ id: 'part-1', mime: 'application/pdf', filename: 'report.pdf', url: '' })

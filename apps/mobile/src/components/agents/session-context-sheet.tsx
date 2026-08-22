@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
@@ -29,6 +29,7 @@ import {
   type SessionCostBreakdownModel,
 } from './session-cost-breakdown';
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
+import { SessionPageSheet } from './session-page-sheet';
 
 type SessionContextSheetProps = {
   visible: boolean;
@@ -88,135 +89,128 @@ export function SessionContextSheet({
   );
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 bg-background">
-        <SheetHeader title="Context usage" onDone={onClose} doneLabel="Done" />
+    <SessionPageSheet visible={visible} onClose={onClose}>
+      <SheetHeader title="Context usage" onDone={onClose} doneLabel="Done" />
 
-        {/* Rows below are exposed individually to screen readers; collapsing
-            them behind a single ScrollView accessibilityLabel would shadow the
-            natural read order. */}
-        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-          <View className="items-center gap-3 pt-2">
-            <ContextUsageRing
-              size={SHEET_RING_SIZE}
-              strokeWidth={SHEET_RING_STROKE}
-              arcFraction={arcFraction}
-              tone={tone}
-              testID="session-context-sheet-ring"
-            />
-            {content.percentage ? (
-              <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
-                {content.percentage}
-              </Text>
-            ) : (
-              <Text className="text-base text-muted-foreground">
-                {content.windowUnavailableLabel}
-              </Text>
-            )}
-          </View>
+      {/* Rows below are exposed individually to screen readers; collapsing
+          them behind a single ScrollView accessibilityLabel would shadow the
+          natural read order. */}
+      <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+        <View className="items-center gap-3 pt-2">
+          <ContextUsageRing
+            size={SHEET_RING_SIZE}
+            strokeWidth={SHEET_RING_STROKE}
+            arcFraction={arcFraction}
+            tone={tone}
+            testID="session-context-sheet-ring"
+          />
+          {content.percentage ? (
+            <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
+              {content.percentage}
+            </Text>
+          ) : (
+            <Text className="text-base text-muted-foreground">
+              {content.windowUnavailableLabel}
+            </Text>
+          )}
+        </View>
 
-          <View className="mt-6 gap-4">
-            <Row label="Used">
+        <View className="mt-6 gap-4">
+          <Row label="Used">
+            <Text className="text-base font-medium text-foreground tabular-nums">
+              {content.usedTokens}
+              {content.capacityKnown && content.windowTokens ? (
+                <Text className="text-sm text-muted-foreground">
+                  {' '}
+                  of {content.windowTokens} tokens
+                </Text>
+              ) : (
+                <Text className="text-sm text-muted-foreground"> tokens</Text>
+              )}
+            </Text>
+          </Row>
+
+          {content.capacityKnown ? (
+            <Row label="Remaining">
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.usedTokens}
-                {content.capacityKnown && content.windowTokens ? (
-                  <Text className="text-sm text-muted-foreground">
-                    {' '}
-                    of {content.windowTokens} tokens
-                  </Text>
-                ) : (
-                  <Text className="text-sm text-muted-foreground"> tokens</Text>
-                )}
+                {content.remainingTokens}
+                <Text className="text-sm text-muted-foreground">
+                  {' '}
+                  tokens ({content.remainingPercentage})
+                </Text>
               </Text>
             </Row>
+          ) : null}
 
-            {content.capacityKnown ? (
-              <Row label="Remaining">
-                <Text className="text-base font-medium text-foreground tabular-nums">
-                  {content.remainingTokens}
-                  <Text className="text-sm text-muted-foreground">
-                    {' '}
-                    tokens ({content.remainingPercentage})
-                  </Text>
-                </Text>
-              </Row>
-            ) : null}
+          <Row label="Model">
+            <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
+          </Row>
 
-            <Row label="Model">
-              <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
+          <Row label="Provider">
+            <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
+          </Row>
+
+          {content.cost !== null ? (
+            <Row label="Total cost">
+              <Text className="text-base font-medium text-foreground tabular-nums">
+                {content.cost}
+              </Text>
             </Row>
+          ) : null}
 
-            <Row label="Provider">
-              <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
+          <Text className="text-xs text-muted-foreground">
+            Usage reflects the latest completed assistant response.
+          </Text>
+        </View>
+
+        <View className="mt-8 gap-4">
+          <Text className="text-sm font-semibold text-foreground">Token usage</Text>
+          <View className="gap-3">
+            <TokenRow label="Input" value={breakdown.totals.input} />
+            <TokenRow label="Output" value={breakdown.totals.output} />
+            <TokenRow label="Reasoning" value={breakdown.totals.reasoning} />
+            <TokenRow label="Cache read" value={breakdown.totals.cacheRead} />
+            <TokenRow label="Cache write" value={breakdown.totals.cacheWrite} />
+            <TokenRow label="Total" value={breakdown.totals.total} />
+            <Row label="Cache rate">
+              <Text className="text-base font-medium text-foreground tabular-nums">
+                {breakdown.totals.cacheRatePct === null
+                  ? '-'
+                  : `${breakdown.totals.cacheRatePct.toFixed(1)}%`}
+              </Text>
             </Row>
+          </View>
+        </View>
 
-            {content.cost !== null ? (
-              <Row label="Total cost">
-                <Text className="text-base font-medium text-foreground tabular-nums">
-                  {content.cost}
-                </Text>
-              </Row>
-            ) : null}
-
-            <Text className="text-xs text-muted-foreground">
-              Usage reflects the latest completed assistant response.
+        {modelsSectionCount > 0 ? (
+          <View className="mt-8 gap-3">
+            <Text className="text-sm font-semibold text-foreground">
+              Models ({modelsSectionCount})
+            </Text>
+            <View className="gap-2">
+              {visibleModels.map(model => (
+                <ModelRow
+                  key={`${model.providerID}:${model.modelID}`}
+                  model={model}
+                  modelOptions={modelOptions}
+                />
+              ))}
+              {breakdown.subagentCostUsd > 0 ? (
+                <SubagentRow costUsd={breakdown.subagentCostUsd} />
+              ) : null}
+              {olderActivityCostUsd > 0 ? (
+                <OlderActivityRow costUsd={olderActivityCostUsd} />
+              ) : null}
+            </View>
+            <Text className="mt-1 text-xs text-muted-foreground">
+              Token totals cover this session only and exclude subagent/child-session tokens.
             </Text>
           </View>
+        ) : null}
+      </ScrollView>
 
-          <View className="mt-8 gap-4">
-            <Text className="text-sm font-semibold text-foreground">Token usage</Text>
-            <View className="gap-3">
-              <TokenRow label="Input" value={breakdown.totals.input} />
-              <TokenRow label="Output" value={breakdown.totals.output} />
-              <TokenRow label="Reasoning" value={breakdown.totals.reasoning} />
-              <TokenRow label="Cache read" value={breakdown.totals.cacheRead} />
-              <TokenRow label="Cache write" value={breakdown.totals.cacheWrite} />
-              <TokenRow label="Total" value={breakdown.totals.total} />
-              <Row label="Cache rate">
-                <Text className="text-base font-medium text-foreground tabular-nums">
-                  {breakdown.totals.cacheRatePct === null
-                    ? '-'
-                    : `${breakdown.totals.cacheRatePct.toFixed(1)}%`}
-                </Text>
-              </Row>
-            </View>
-          </View>
-
-          {modelsSectionCount > 0 ? (
-            <View className="mt-8 gap-3">
-              <Text className="text-sm font-semibold text-foreground">
-                Models ({modelsSectionCount})
-              </Text>
-              <View className="gap-2">
-                {visibleModels.map(model => (
-                  <ModelRow
-                    key={`${model.providerID}:${model.modelID}`}
-                    model={model}
-                    modelOptions={modelOptions}
-                  />
-                ))}
-                {breakdown.subagentCostUsd > 0 ? (
-                  <SubagentRow costUsd={breakdown.subagentCostUsd} />
-                ) : null}
-                {olderActivityCostUsd > 0 ? (
-                  <OlderActivityRow costUsd={olderActivityCostUsd} />
-                ) : null}
-              </View>
-              <Text className="mt-1 text-xs text-muted-foreground">
-                Token totals cover this session only and exclude subagent/child-session tokens.
-              </Text>
-            </View>
-          ) : null}
-        </ScrollView>
-
-        <View style={{ height: insets.bottom }} className="bg-background" />
-      </View>
-    </Modal>
+      <View style={{ height: insets.bottom }} className="bg-background" />
+    </SessionPageSheet>
   );
 }
 

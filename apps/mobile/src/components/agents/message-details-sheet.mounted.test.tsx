@@ -17,6 +17,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate: vi.fn() }),
@@ -32,7 +34,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',

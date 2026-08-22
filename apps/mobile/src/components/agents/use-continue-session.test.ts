@@ -169,6 +169,7 @@ type ContinueSessionArgs = {
   sessionId?: KiloSessionId;
   organizationId?: string;
   models?: SessionModelOption[];
+  modelsLoading?: boolean;
   sleep?: (ms: number) => Promise<void>;
 };
 
@@ -230,7 +231,7 @@ function mountContinueSession(args: ContinueSessionArgs): ContinueSessionMount {
         sessionId: renderArgs.sessionId ?? SESSION_ID,
         organizationId: renderArgs.organizationId,
         models: renderArgs.models ?? [],
-        modelsLoading: false,
+        modelsLoading: renderArgs.modelsLoading ?? false,
         sleep: renderArgs.sleep ?? sleepMock,
       });
     } finally {
@@ -520,6 +521,18 @@ describe('useContinueSession loading and guidance states', () => {
     const after = mount.rerender();
     expect(after.isContinuing).toBe(false);
     expect(after.guidance).toEqual({ kind: 'retry', message: expect.any(String) });
+  });
+
+  it('keeps Continue enabled with retry guidance while models are loading', async () => {
+    const mount = mountContinueSession({ organizationId: 'org-1', modelsLoading: true });
+
+    await mount.result.continueSession(FIELDS);
+
+    const after = mount.rerender();
+    expect(after.isContinuing).toBe(false);
+    expect(after.guidance).toEqual({ kind: 'retry', message: expect.any(String) });
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(queryClientFetchQuery).not.toHaveBeenCalled();
   });
 
   it('surfaces persistent terminal guidance with the back-to-sessions action', async () => {

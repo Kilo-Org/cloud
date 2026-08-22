@@ -1322,11 +1322,11 @@ export function SessionDetailContent({
                 <Button
                   variant="outline"
                   size="sm"
-                  accessibilityLabel="Cloning session"
+                  accessibilityLabel={isContinuing ? 'Cloning session' : 'Continue'}
                   loading={isContinuing}
                   onPress={handleContinueInNewSession}
                 >
-                  <Text>Cloning session</Text>
+                  <Text>{isContinuing ? 'Cloning session' : 'Continue'}</Text>
                 </Button>
               </>
             )}

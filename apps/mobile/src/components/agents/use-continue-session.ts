@@ -71,6 +71,13 @@ export function useContinueSession(args: {
       busyRef.current = true;
       setGuidance(null);
       try {
+        if (args.modelsLoading) {
+          // The destination model cannot resolve until the catalog loads.
+          // Return retry guidance so Continue stays enabled; never resolve a
+          // destination against an empty model list.
+          setGuidance({ kind: 'retry', message: CONTINUE_RETRY_MESSAGE });
+          return;
+        }
         let repoData: RepositoriesResult | undefined = undefined;
         try {
           repoData = await queryClient.fetchQuery({
@@ -95,7 +102,7 @@ export function useContinueSession(args: {
           model: fields.model,
           variant: fields.variant,
           repositories: repoData.repositories,
-          models: args.modelsLoading ? [] : args.models,
+          models: args.models,
         });
 
         if (resolution.kind === 'unmatched-repository') {

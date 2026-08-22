@@ -16,6 +16,7 @@ import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { useTRPC } from '@/lib/trpc';
 
@@ -105,6 +106,7 @@ function AppWideFreshnessMount() {
 export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
+  useSecurityLifecycleInvalidation();
 
   return (
     <UserWebConnectionProvider>
@@ -161,15 +163,6 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/instance-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/continue-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],

@@ -232,7 +232,13 @@ export type PermanentDeliveryResultCode = 'SANDBOX_CAPABILITY_UNAVAILABLE';
 
 export type AdmissionFailure = {
   success: false;
-  code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
+  code:
+    | 'NOT_FOUND'
+    | 'BAD_REQUEST'
+    | 'INTERNAL'
+    | 'PAYMENT_REQUIRED'
+    | 'PENDING_QUEUE_FULL'
+    | RetryableResultCode;
   error: string;
   failureBoundary?: 'registration' | 'admission';
 };

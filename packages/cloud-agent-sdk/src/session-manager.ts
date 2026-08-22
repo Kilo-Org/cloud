@@ -367,6 +367,7 @@ type SessionManagerAtoms = {
   contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
+  childSessionError: Atom<(childSessionId: string) => string | null>;
   /** True when the latest page left a non-null cursor (more history to load). */
   hasOlderMessages: W<boolean>;
   /** True while `loadOlderMessages()` is fetching a page. */
@@ -642,6 +643,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsAtom = atom<SlashCommandInfo[]>([]);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
+  const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
   const hasOlderMessagesAtom = atom<boolean>(false);
   const isLoadingOlderMessagesAtom = atom<boolean>(false);
   const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
@@ -725,6 +727,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const states = get(childSessionHydrationStatesAtom);
     return (childSessionId: string): ChildSessionHydrationState =>
       states.get(childSessionId) ?? IDLE_CHILD_SESSION_HYDRATION_STATE;
+  });
+  const childSessionErrorAtom = atom(get => {
+    const errors = get(childSessionErrorsAtom);
+    return (childSessionId: string): string | null => errors.get(childSessionId) ?? null;
   });
 
   // Private mutable state
@@ -853,6 +859,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(failedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
+    store.set(childSessionErrorsAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
     store.set(hasOlderMessagesAtom, false);
@@ -1690,6 +1697,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         store.set(errorAtom, message);
       },
+      onChildSessionError: (childSessionId, message) => {
+        const next = new Map(store.get(childSessionErrorsAtom));
+        next.set(childSessionId, message);
+        store.set(childSessionErrorsAtom, next);
+      },
       onMessageFailed: (_messageId, deliveryState) => {
         if (deliveryState.reason !== 'exhausted') return;
         setIndicator({
@@ -2188,6 +2200,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
+      childSessionError: childSessionErrorAtom,
       hasOlderMessages: hasOlderMessagesAtom,
       isLoadingOlderMessages: isLoadingOlderMessagesAtom,
       olderMessagesError: olderMessagesErrorAtom,

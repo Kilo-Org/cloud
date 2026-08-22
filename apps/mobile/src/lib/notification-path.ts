@@ -16,8 +16,12 @@ export function notificationPathForData(data: PushData): string {
     case 'low_balance': {
       return `/(app)/(tabs)/(3_profile)/organization/credit-activity?org=${data.organizationId}&via=push`;
     }
-    case 'security_finding': {
+    case 'security_finding':
+    case 'security_lifecycle': {
       // getSecurityAgentPath returns Href; coerce to string for query append (cast style of security-agent.ts).
+      // security_lifecycle reuses the finding detail path: every WS1 event
+      // value carries findingId + scope, and finding creation keeps the
+      // visible security_finding push.
       const base = getSecurityAgentPath(data.scope, `findings/${data.findingId}`) as string;
       return `${base}?via=push`;
     }

@@ -14,6 +14,10 @@ import {
   COUNCIL_RESULT_MARKER_TAG,
   COUNCIL_VERDICT_BLOCK_START,
 } from '@kilocode/worker-utils/code-review-council';
+import { sql } from 'drizzle-orm';
+import { db } from '@/lib/drizzle';
+import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
+import { admitOperation } from '@kilocode/db/operation-ledger';
 
 // --- Mock functions ---
 
@@ -3902,6 +3906,98 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
       expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('code_review_settled outbox emission', () => {
+    beforeEach(async () => {
+      await db.delete(analytics_event_outbox).where(sql`true`);
+      await db.delete(operation_ledgers).where(sql`true`);
+    });
+
+    afterAll(async () => {
+      await db.delete(analytics_event_outbox).where(sql`true`);
+      await db.delete(operation_ledgers).where(sql`true`);
+    });
+
+    async function admitReview(userId = 'user-1') {
+      return admitOperation(db, {
+        userId,
+        domain: 'code_review',
+        intent: 'manual',
+        operationKey: `review:${REVIEW_ID}`,
+        taxonomy: 'never-replay',
+        leaseSeconds: 60,
+      });
+    }
+
+    it('emits one code_review_settled row from the analytics completion branch', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ analytics_enabled_at_dispatch: true })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'completed', intent: 'manual' });
+    });
+
+    it('emits one code_review_settled row from the model-not-found terminal branch', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'no_op' });
+    });
+
+    it('emits one code_review_settled row from the generic terminal branch', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'completed' });
+    });
+
+    it('settles on the terminal short-circuit when a terminal callback is redelivered', async () => {
+      await admitReview();
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'failed', terminal_reason: 'timeout' })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Execution exceeded maximum runtime' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        message: 'Review already in terminal state',
+      });
+      const rows = await db.select().from(analytics_event_outbox);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.event_name).toBe('code_review_settled');
+      expect(rows[0]?.properties).toMatchObject({ outcome: 'failed' });
     });
   });
 });

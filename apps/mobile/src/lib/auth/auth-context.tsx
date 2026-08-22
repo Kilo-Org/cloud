@@ -1,5 +1,4 @@
 import * as SecureStore from 'expo-secure-store';
-import * as Sentry from '@sentry/react-native';
 import { z } from 'zod';
 import {
   createContext,
@@ -63,6 +62,7 @@ import {
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
 import { clearTelemetryDecision } from '@/lib/telemetry/controller';
+import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
 
@@ -266,7 +266,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // teardown.
         gateKiloClawOwned();
         clearTelemetryDecision();
-        Sentry.setUser(null);
+        clearSentryUser();
         // SDK teardown — drop queues, do not flush them. Must happen before
         // any SecureStore or cache awaits so optional analytics cannot
         // transmit during the teardown window. Each step is individually

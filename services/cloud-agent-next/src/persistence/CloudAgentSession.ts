@@ -155,6 +155,7 @@ import {
 } from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
 import { createAgentSandbox, createAgentSandboxLifecycle } from '../agent-sandbox/factory.js';
+import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import type {
   AgentSandboxLifecycle,
   SandboxDeleteReason,
@@ -231,7 +232,9 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
 type GroupedRegisterSessionInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
-  message: {
+  clone?: SessionMetadata['clone'];
+  /** Omitted for a clone-only create: no synthetic initial turn is registered. */
+  message?: {
     initialMessageId?: string;
     turn: ExecutionTurnSubmission;
   };
@@ -731,6 +734,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               ? Promise.resolve({ status: 'absent' })
               : createAgentSandbox(this.env, metadata).discoverSessionWrappers(),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
       });
     }
 
@@ -743,6 +747,34 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   private async canUseSandboxRuntime(): Promise<boolean> {
     return !(await this.hasDeletionIntent());
+  }
+
+  private async containerBillingAdmissionFailure(): Promise<Extract<
+    SessionMessageAdmissionResult,
+    { success: false }
+  > | null> {
+    const metadata = await this.getMetadata();
+    if (!metadata) return null;
+    if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;
+    const admission = await createAgentSandbox(this.env, metadata).ensureBillingAdmission();
+    if (admission.success) return null;
+    const paymentRequired =
+      admission.code === 'insufficient_credits' || admission.code === 'stopping';
+    return {
+      success: false,
+      code: paymentRequired ? 'PAYMENT_REQUIRED' : 'INTERNAL',
+      error: paymentRequired
+        ? 'Container billing requires additional credits'
+        : 'Container billing admission is temporarily unavailable',
+      failureBoundary: 'admission',
+    };
+  }
+
+  private async isContainerBillingBlocked(): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCloudAgentContainerBillingEnabled(this.env, metadata.identity))
+      return false;
+    return createAgentSandbox(this.env, metadata).isBillingBlocked(true);
   }
 
   private getSandboxLifecycle(): AgentSandboxLifecycle {
@@ -885,6 +917,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>
           isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
+        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
         ensureQueuedMessageEvent: event => {
           this.ensureQueuedMessageEvent({
             executionId: '' as EventSourceId,
@@ -941,8 +974,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         wrapperSupervisor: this.getWrapperSupervisor(),
         handleWrapperTerminalEvent: params => this.handleWrapperTerminalEvent(params),
         keepContainerAlive: () => {
-          void this.keepContainerAlive();
+          void this.keepContainerAliveIfBillingAllowed();
         },
+        isBillingBlocked: () => this.isContainerBillingBlocked(),
         observeCorrelatedAgentActivity: messageId => this.recordCorrelatedAgentActivity(messageId),
         terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
           await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
@@ -977,6 +1011,18 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       this.ingestHandlerSessionId = sessionId;
     }
     return this.ingestHandler;
+  }
+
+  private async keepContainerAliveIfBillingAllowed(): Promise<void> {
+    try {
+      if (await this.isContainerBillingBlocked()) return;
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId, skipped: 'billing-state-unavailable' })
+        .warn('Cloud agent skipped sandbox keepalive');
+      return;
+    }
+    await this.keepContainerAlive();
   }
 
   // ---------------------------------------------------------------------------
@@ -2147,34 +2193,41 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       };
     }
 
+    const initialMessage: SessionMetadata['initialMessage'] = input.message
+      ? {
+          id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,
+          prompt:
+            input.message.turn.type === 'prompt'
+              ? input.message.turn.prompt
+              : input.message.turn.arguments.length > 0
+                ? `/${input.message.turn.command} ${input.message.turn.arguments}`
+                : `/${input.message.turn.command}`,
+          attachments:
+            input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
+          turn:
+            input.message.turn.type === 'prompt'
+              ? {
+                  type: 'prompt',
+                  prompt: input.message.turn.prompt,
+                  attachments: input.message.turn.attachments,
+                }
+              : {
+                  type: 'command',
+                  command: input.message.turn.command,
+                  arguments: input.message.turn.arguments,
+                },
+        }
+      : undefined;
+
     const metadata: SessionMetadata = {
       metadataSchemaVersion: 2,
       identity: input.identity,
       auth: input.auth,
+      // Metadata without clone remains an empty-session bootstrap; remove
+      // this fallback only after old prepared sessions age out.
+      clone: input.clone,
       repository,
-      initialMessage: {
-        id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,
-        prompt:
-          input.message.turn.type === 'prompt'
-            ? input.message.turn.prompt
-            : input.message.turn.arguments.length > 0
-              ? `/${input.message.turn.command} ${input.message.turn.arguments}`
-              : `/${input.message.turn.command}`,
-        attachments:
-          input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
-        turn:
-          input.message.turn.type === 'prompt'
-            ? {
-                type: 'prompt',
-                prompt: input.message.turn.prompt,
-                attachments: input.message.turn.attachments,
-              }
-            : {
-                type: 'command',
-                command: input.message.turn.command,
-                arguments: input.message.turn.arguments,
-              },
-      },
+      ...(initialMessage ? { initialMessage } : {}),
       agent: {
         mode: input.agent.mode,
         model: input.agent.model,

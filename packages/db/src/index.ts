@@ -43,6 +43,7 @@ export {
   createSecurityAgentCommand,
   deleteRetainedSecurityAgentCommands,
   getSecurityAgentCommandForOwner,
+  getSecurityAgentCommandsForOwner,
   isTerminalSecurityAgentCommandTransitionOutcome,
   listActiveSecurityAgentCommandsForOwner,
   markSecurityAgentCommandQueueAdmissionFailed,

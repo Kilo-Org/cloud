@@ -28,9 +28,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
+import { formatMicrodollars } from '@/lib/cloud-billing-sku';
 import type { ReconciliationStatus } from '@/routers/admin/cloud-billing-skus-router';
 
-type SearchKind = 'interval' | 'user' | 'org';
+type SearchKind = 'interval' | 'session' | 'user' | 'org';
 type CloseReason =
   | 'exit'
   | 'runtime_signal'
@@ -48,6 +49,15 @@ type SearchRequest =
   | {
       kind: 'interval';
       value: string;
+      status?: 'open' | 'closed';
+      closeReason?: CloseReason;
+      skuId?: string;
+    }
+  | {
+      kind: 'session';
+      value: string;
+      summaryStart: string;
+      summaryEnd: string;
       status?: 'open' | 'closed';
       closeReason?: CloseReason;
       skuId?: string;
@@ -284,23 +294,40 @@ export default function UsageRecordsContent() {
   const pathname = usePathname();
   const trpc = useTRPC();
   const catalog = useQuery(trpc.admin.cloudBillingSkus.list.queryOptions());
-  const [kind, setKind] = useState<SearchKind>('user');
-  const [value, setValue] = useState('');
+  const intervalIdParam = searchParams.get('intervalId');
+  const sessionIdParam = searchParams.get('sessionId');
+  const initialSummaryStart = toDateTimeLocalValue(
+    new Date(Date.now() - (sessionIdParam ? 7 : 1) * 24 * 60 * 60 * 1_000)
+  );
+  const initialSummaryEnd = toDateTimeLocalValue(new Date());
+  const [kind, setKind] = useState<SearchKind>(
+    sessionIdParam ? 'session' : intervalIdParam ? 'interval' : 'user'
+  );
+  const [value, setValue] = useState(sessionIdParam ?? intervalIdParam ?? '');
   const [status, setStatus] = useState<'all' | 'open' | 'closed'>('all');
   const urlCloseReason = parseCloseReason(searchParams.get('closeReason'));
   const [closeReason, setCloseReason] = useState<'all' | CloseReason>(urlCloseReason ?? 'all');
   const [skuId, setSkuId] = useState('all');
-  const [submitted, setSubmitted] = useState<SearchRequest>({
-    kind: 'recent',
-    closeReason: closeReason === 'all' ? undefined : closeReason,
+  const [submitted, setSubmitted] = useState<SearchRequest>(() => {
+    const closeReasonValue = closeReason === 'all' ? undefined : closeReason;
+    if (sessionIdParam) {
+      return {
+        kind: 'session',
+        value: sessionIdParam,
+        summaryStart: new Date(initialSummaryStart).toISOString(),
+        summaryEnd: new Date(initialSummaryEnd).toISOString(),
+        closeReason: closeReasonValue,
+      };
+    }
+    if (intervalIdParam)
+      return { kind: 'interval', value: intervalIdParam, closeReason: closeReasonValue };
+    return { kind: 'recent', closeReason: closeReasonValue };
   });
   const [cursor, setCursor] = useState<Cursor | undefined>();
   const [previousCursors, setPreviousCursors] = useState<Array<Cursor | undefined>>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [summaryStart, setSummaryStart] = useState(() =>
-    toDateTimeLocalValue(new Date(Date.now() - 24 * 60 * 60 * 1_000))
-  );
-  const [summaryEnd, setSummaryEnd] = useState(() => toDateTimeLocalValue(new Date()));
+  const [summaryStart, setSummaryStart] = useState(initialSummaryStart);
+  const [summaryEnd, setSummaryEnd] = useState(initialSummaryEnd);
   const [summaryRequest, setSummaryRequest] = useState<UsageSummaryRequest | null>(null);
   const [summaryInputError, setSummaryInputError] = useState<string | null>(null);
   const [rawResponseOpen, setRawResponseOpen] = useState(false);
@@ -312,13 +339,20 @@ export default function UsageRecordsContent() {
         ? ({ kind: 'recent' } as const)
         : submitted.kind === 'interval'
           ? ({ kind: 'interval', id: submitted.value } as const)
-          : ({
-              kind: 'subject',
-              subjectType: submitted.kind,
-              subjectId: submitted.value,
-              start: submitted.summaryStart ?? '',
-              end: submitted.summaryEnd ?? '',
-            } as const),
+          : submitted.kind === 'session'
+            ? ({
+                kind: 'session',
+                id: submitted.value,
+                start: submitted.summaryStart,
+                end: submitted.summaryEnd,
+              } as const)
+            : ({
+                kind: 'subject',
+                subjectType: submitted.kind,
+                subjectId: submitted.value,
+                start: submitted.summaryStart ?? '',
+                end: submitted.summaryEnd ?? '',
+              } as const),
     status: submitted.status,
     closeReason: submitted.closeReason,
     skuId: submitted.skuId,
@@ -361,14 +395,6 @@ export default function UsageRecordsContent() {
     setExpandedId(null);
   };
 
-  const replaceCloseReasonParam = (reason: CloseReason | undefined) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (reason) params.set('closeReason', reason);
-    else params.delete('closeReason');
-    const query = params.toString();
-    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-  };
-
   useEffect(() => {
     const next = urlCloseReason ?? 'all';
     setCloseReason(next);
@@ -404,7 +430,7 @@ export default function UsageRecordsContent() {
               const trimmed = value.trim();
               if (!trimmed) return;
               let summaryWindow: { summaryStart?: string; summaryEnd?: string } = {};
-              if (kind === 'user' || kind === 'org') {
+              if (kind === 'user' || kind === 'org' || kind === 'session') {
                 const start = new Date(summaryStart);
                 const end = new Date(summaryEnd);
                 const windowMs = end.getTime() - start.getTime();
@@ -422,26 +448,43 @@ export default function UsageRecordsContent() {
                   summaryEnd: end.toISOString(),
                 };
               }
-              const next: SearchRequest = {
-                kind,
+              const common = {
                 value: trimmed,
                 status: status === 'all' ? undefined : status,
                 closeReason: closeReason === 'all' ? undefined : closeReason,
                 skuId: skuId === 'all' ? undefined : skuId,
-                ...summaryWindow,
               };
+              const next: SearchRequest =
+                kind === 'interval'
+                  ? { kind, ...common }
+                  : kind === 'session'
+                    ? {
+                        kind,
+                        ...common,
+                        summaryStart: summaryWindow.summaryStart ?? '',
+                        summaryEnd: summaryWindow.summaryEnd ?? '',
+                      }
+                    : { kind, ...common, ...summaryWindow };
               const submittedValue = submitted.kind === 'recent' ? undefined : submitted.value;
-              const nextValue = next.kind === 'recent' ? undefined : next.value;
+              const nextValue = next.value;
               const nextSummaryStart =
-                next.kind === 'user' || next.kind === 'org' ? next.summaryStart : undefined;
+                next.kind === 'user' || next.kind === 'org' || next.kind === 'session'
+                  ? next.summaryStart
+                  : undefined;
               const nextSummaryEnd =
-                next.kind === 'user' || next.kind === 'org' ? next.summaryEnd : undefined;
+                next.kind === 'user' || next.kind === 'org' || next.kind === 'session'
+                  ? next.summaryEnd
+                  : undefined;
               const submittedSummaryStart =
-                submitted.kind === 'user' || submitted.kind === 'org'
+                submitted.kind === 'user' ||
+                submitted.kind === 'org' ||
+                submitted.kind === 'session'
                   ? submitted.summaryStart
                   : undefined;
               const submittedSummaryEnd =
-                submitted.kind === 'user' || submitted.kind === 'org'
+                submitted.kind === 'user' ||
+                submitted.kind === 'org' ||
+                submitted.kind === 'session'
                   ? submitted.summaryEnd
                   : undefined;
               const unchanged =
@@ -470,7 +513,14 @@ export default function UsageRecordsContent() {
               // Sync the URL to the applied filter (not the draft dropdown value) so a
               // submitted search can be bookmarked/deep-linked without re-triggering a
               // search merely from changing the Close reason dropdown before submitting.
-              replaceCloseReasonParam(next.closeReason);
+              const params = new URLSearchParams(searchParams.toString());
+              if (next.closeReason) params.set('closeReason', next.closeReason);
+              else params.delete('closeReason');
+              if (next.kind === 'interval') params.set('intervalId', next.value);
+              else params.delete('intervalId');
+              if (next.kind === 'session') params.set('sessionId', next.value);
+              else params.delete('sessionId');
+              router.replace(`${pathname}?${params.toString()}`, { scroll: false });
               setSubmitted(next);
               resetResultNavigation();
               if (unchanged) void results.refetch();
@@ -490,6 +540,7 @@ export default function UsageRecordsContent() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="interval">Interval ID</SelectItem>
+                    <SelectItem value="session">Cloud Agent session ID</SelectItem>
                     <SelectItem value="user">User ID</SelectItem>
                     <SelectItem value="org">Organization ID</SelectItem>
                   </SelectContent>
@@ -501,8 +552,14 @@ export default function UsageRecordsContent() {
                   id="usage-search-value"
                   value={value}
                   required
-                  maxLength={kind === 'interval' ? 512 : 256}
-                  placeholder={kind === 'interval' ? 'service:instance:startEpochMs' : 'Exact ID'}
+                  maxLength={kind === 'interval' || kind === 'session' ? 512 : 256}
+                  placeholder={
+                    kind === 'interval'
+                      ? 'service:instance:startEpochMs'
+                      : kind === 'session'
+                        ? 'agent_… or ses_…'
+                        : 'Exact ID'
+                  }
                   onChange={event => setValue(event.target.value)}
                 />
               </div>
@@ -528,7 +585,12 @@ export default function UsageRecordsContent() {
                       setRawCopyStatus('idle');
                       setSummaryRequest(null);
                       setSubmitted({ kind: 'recent' });
-                      replaceCloseReasonParam(undefined);
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.delete('closeReason');
+                      params.delete('intervalId');
+                      params.delete('sessionId');
+                      const query = params.toString();
+                      router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
                       resetResultNavigation();
                     }}
                   >
@@ -608,7 +670,7 @@ export default function UsageRecordsContent() {
                   </SelectContent>
                 </Select>
               </div>
-              {(kind === 'user' || kind === 'org') && (
+              {(kind === 'user' || kind === 'org' || kind === 'session') && (
                 <div className="w-full space-y-1.5 sm:w-auto">
                   <Label>Usage window</Label>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -1081,7 +1143,7 @@ export default function UsageRecordsContent() {
                       <TableHead>Interval</TableHead>
                       <TableHead>Subject</TableHead>
                       <TableHead>SKU / status</TableHead>
-                      <TableHead>Usage</TableHead>
+                      <TableHead>Usage / settlement</TableHead>
                       <TableHead>Lifecycle</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1113,6 +1175,14 @@ export default function UsageRecordsContent() {
                               <p className="text-muted-foreground type-label">
                                 {interval.service} · {interval.instance_id}
                               </p>
+                              {interval.session_id && (
+                                <Link
+                                  href={`/admin/session-traces?sessionId=${encodeURIComponent(interval.session_id)}`}
+                                  className="block break-all text-link underline decoration-current/40 underline-offset-4 type-code"
+                                >
+                                  {interval.session_id}
+                                </Link>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1158,6 +1228,19 @@ export default function UsageRecordsContent() {
                           </TableCell>
                           <TableCell className="tabular-nums">
                             <p className="type-code">{interval.confirmed_seconds}s</p>
+                            <p className="text-muted-foreground type-label">
+                              {interval.billing_mode === 'paid'
+                                ? `Paid · ${interval.settled_billable_seconds}s settled`
+                                : 'Shadow estimate only'}
+                            </p>
+                            {interval.rate_cents_per_unit && (
+                              <p className="text-muted-foreground type-label">
+                                Settled amount: {interval.rate_cents_per_unit}¢/s ·{' '}
+                                {interval.settled_amount_microdollars === null
+                                  ? '—'
+                                  : formatMicrodollars(interval.settled_amount_microdollars)}
+                              </p>
+                            )}
                             <p className="text-muted-foreground type-label">
                               Seq {interval.last_heartbeat_seq}
                             </p>

@@ -6,7 +6,6 @@
  */
 
 import * as z from 'zod';
-import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import {
   CODE_REVIEW_PLATFORMS,
   ManualCodeReviewConfigSchema,
@@ -235,16 +234,3 @@ export type CreateReviewParams = z.infer<typeof CreateReviewParamsSchema>;
 export type UpdateReviewStatusParams = z.infer<typeof UpdateReviewStatusParamsSchema>;
 export type ListReviewsParams = z.infer<typeof ListReviewsParamsSchema>;
 export type TriggerReviewParams = z.infer<typeof TriggerReviewParamsSchema>;
-
-/**
- * Response type for list code reviews
- */
-// List rows exclude the potentially large `council_result` JSONB — the jobs list is
-// polled frequently and never renders council results (only the review-detail path does).
-export type CodeReviewListItem = Omit<CloudAgentCodeReview, 'council_result'>;
-
-export type ListCodeReviewsResponse = {
-  reviews: CodeReviewListItem[];
-  total: number;
-  hasMore: boolean;
-};

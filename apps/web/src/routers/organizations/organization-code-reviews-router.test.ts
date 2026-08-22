@@ -1,10 +1,37 @@
+const mockSyncWebhooksForRepositories = jest.fn();
+const mockGetValidGitLabToken = jest.fn();
+const mockGetBitbucketCodeReviewerReadiness = jest.fn();
+
+jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
+  syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+}));
+
+jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache', () => ({
+  getBitbucketCodeReviewerReadiness: (...args: unknown[]) =>
+    mockGetBitbucketCodeReviewerReadiness(...args),
+}));
+
+// NOTE: `jest` is intentionally NOT imported from '@jest/globals' here. The
+// @swc/jest transform only hoists `jest.mock(...)` above the static imports
+// when `jest` is the global binding; importing it as a local binding disables
+// that hoist, so the mocks below would register AFTER `createCallerForUser`
+// pulls in the real gitlab-service. Using global `jest` keeps the mocks hoisted.
 import { afterAll, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { db } from '@/lib/drizzle';
-import { agent_configs, organization_audit_logs, organizations } from '@kilocode/db/schema';
+import {
+  agent_configs,
+  organization_audit_logs,
+  organizations,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 const createdOrganizationIds: string[] = [];
 
@@ -451,6 +478,330 @@ describe('organization review agent router: patchReviewConfig', () => {
         skip_bot_pull_requests: false,
       })
     );
+  });
+
+  // P2-GH-45c: delta repository save on the org surface. Mirrors the
+  // personal contract: next = (stored ∪ add) \ remove, remove wins on
+  // overlap, and a both-fields patch is rejected.
+  async function seedOrgSelection(
+    organization: { id: string },
+    owner: { id: string },
+    selectedRepositoryIds: Array<number | string>
+  ): Promise<void> {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: selectedRepositoryIds,
+      },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+  }
+
+  it('applies a delta add to the stored org selection', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202]);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202, 303] })
+    );
+  });
+
+  it('lets remove win over add on an overlapping org delta', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202]);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      selectedRepositoryDelta: { add: [202, 303], remove: [202] },
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('applies a delta add to an empty stored org selection', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, []);
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      selectedRepositoryDelta: { add: [505], remove: [] },
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [505] }));
+  });
+
+  it('rejects an org patch carrying both selectedRepositoryIds and selectedRepositoryDelta', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202]);
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform: 'github',
+        selectedRepositoryIds: [101],
+        selectedRepositoryDelta: { add: [303], remove: [] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202] })
+    );
+  });
+
+  // P2-GH-45c: the org webhook-sync delta path. A delta-only GitLab patch
+  // must drive syncWebhooksForRepositories with the computed next array
+  // ((stored ∪ add) \ remove) and the previous stored array.
+  it('runs GitLab webhook sync with computed next/previous arrays on a delta-only patch', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      selectedRepositoryDelta: { add: [303], remove: [101] },
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+    }
+  });
+});
+
+describe('organization review agent router: patchReviewConfig Bitbucket validation', () => {
+  const REPO_A = '11111111-1111-4111-8111-111111111111';
+  const REPO_B = '22222222-2222-4222-9222-222222222222';
+  const UNKNOWN_REPO = '99999999-9999-4999-a999-999999999999';
+
+  function bitbucketReadiness(
+    overrides: {
+      repositoryCache?: {
+        status: 'available' | 'uninitialized' | 'temporarily_unavailable';
+        repositories: Array<{ id: string; fullName: string }>;
+        syncedAt: string | null;
+      };
+    } = {}
+  ) {
+    return {
+      connected: true,
+      ready: true,
+      integrationId: 'integration-id',
+      workspace: {
+        uuid: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        slug: 'acme',
+        displayName: 'Acme Workspace',
+      },
+      missingRequiredScopes: [],
+      repositoryCache: {
+        status: 'available' as const,
+        repositories: [
+          { id: REPO_A, fullName: 'acme/api' },
+          { id: REPO_B, fullName: 'acme/web' },
+        ],
+        syncedAt: '2026-06-24T08:00:00.000Z',
+        ...overrides.repositoryCache,
+      },
+    };
+  }
+
+  async function seedOrgBitbucketConfig(
+    organization: { id: string },
+    owner: { id: string },
+    selectedRepositoryIds: string[]
+  ): Promise<void> {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'bitbucket',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: selectedRepositoryIds,
+        gate_threshold: 'off',
+        disable_review_md: true,
+        manually_added_repositories: [],
+        council: null,
+        council_enabled_repository_ids: [],
+      },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+  }
+
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  it('rejects a Bitbucket delta add with a repository UUID missing from the cache', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgBitbucketConfig(organization, owner, [REPO_A]);
+    mockGetBitbucketCodeReviewerReadiness.mockResolvedValue(bitbucketReadiness());
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform: 'bitbucket',
+        selectedRepositoryDelta: {
+          add: [UNKNOWN_REPO],
+          remove: [],
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message:
+        'Every selected Bitbucket repository must exactly match the current repository cache',
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'bitbucket');
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [REPO_A] }));
+  });
+
+  it('rejects a Bitbucket delta that removes the last selected repository', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgBitbucketConfig(organization, owner, [REPO_A]);
+    mockGetBitbucketCodeReviewerReadiness.mockResolvedValue(bitbucketReadiness());
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform: 'bitbucket',
+        selectedRepositoryDelta: { add: [], remove: [REPO_A] },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Select at least one cached Bitbucket repository',
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'bitbucket');
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [REPO_A] }));
+  });
+
+  it('rejects duplicate Bitbucket repository IDs in a full-array patch', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgBitbucketConfig(organization, owner, [REPO_A]);
+    mockGetBitbucketCodeReviewerReadiness.mockResolvedValue(bitbucketReadiness());
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform: 'bitbucket',
+        selectedRepositoryIds: [REPO_A, REPO_A],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Bitbucket repository selections must be unique',
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'bitbucket');
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [REPO_A] }));
+  });
+
+  it('rejects a Bitbucket delta when the repository cache is unavailable', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgBitbucketConfig(organization, owner, [REPO_A]);
+    mockGetBitbucketCodeReviewerReadiness.mockResolvedValue(
+      bitbucketReadiness({
+        repositoryCache: {
+          status: 'temporarily_unavailable',
+          repositories: [],
+          syncedAt: null,
+        },
+      })
+    );
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform: 'bitbucket',
+        selectedRepositoryDelta: { add: [REPO_B], remove: [] },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Refresh the Bitbucket repository cache before configuring Code Reviewer',
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'bitbucket');
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [REPO_A] }));
   });
 });
 

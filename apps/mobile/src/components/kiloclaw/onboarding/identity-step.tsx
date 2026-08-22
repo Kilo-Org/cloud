@@ -198,7 +198,13 @@ export function IdentityStep({
         setLocationFeedback({ message: result.currentWeatherText, status: result.status });
         setValidatedLocation(result.location);
       } catch (validateError) {
-        Sentry.captureException(validateError);
+        Sentry.captureException(validateError, {
+          tags: {
+            'error.subsystem': 'kiloclaw-onboarding',
+            'error.operation': 'validate-gps-location',
+          },
+          extra: { coordinatePrecision: GPS_COORDINATE_PRECISION },
+        });
         applyLocationText(coords);
         setValidatedLocation(null);
         setLocationFeedback({

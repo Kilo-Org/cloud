@@ -23,7 +23,7 @@ function policy(
 const owner = { userId: 'user-1', organizationId: 'org-1' };
 
 describe('policyNeedsCandidateEvaluation', () => {
-  it('is false for an unrestricted policy with only a deny list', () => {
+  it('is false for an unrestricted policy with an inactive baseline deny list', () => {
     expect(
       policyNeedsCandidateEvaluation(policy({ organizationModelDenyList: ['openai/gpt-4o'] }))
     ).toBe(false);
@@ -41,11 +41,18 @@ describe('policyNeedsCandidateEvaluation', () => {
         policy({
           memberGrant: {
             mode: 'selected',
+            includeOrganizationBaseline: false,
             modelAllowList: ['anthropic/claude'],
             providerAllowList: [],
           },
         })
       )
+    ).toBe(true);
+  });
+
+  it('is true for an organization baseline grant', () => {
+    expect(
+      policyNeedsCandidateEvaluation(policy({ memberGrant: { mode: 'organization_baseline' } }))
     ).toBe(true);
   });
 
@@ -63,14 +70,14 @@ describe('collectDeniedAutoRoutingModelIds', () => {
 });
 
 describe('deniedModelIdsForCandidates', () => {
-  it('returns the normalized organization deny list and matching candidates', () => {
+  it('does not apply the organization deny list to an unrestricted grant', () => {
     expect(
       deniedModelIdsForCandidates(
         policy({ organizationModelDenyList: ['openai/gpt-4o:free'] }),
         ['anthropic/claude'],
         () => true
       )
-    ).toEqual(['openai/gpt-4o']);
+    ).toEqual([]);
   });
 
   it('adds models that fail the effective access policy', () => {
@@ -79,6 +86,7 @@ describe('deniedModelIdsForCandidates', () => {
         policy({
           organizationProviderCeiling: ['anthropic'],
           organizationModelDenyList: ['openai/o3'],
+          memberGrant: { mode: 'organization_baseline' },
         }),
         ['anthropic/claude', 'google/gemini-2.5-flash', 'kilo-auto/efficient'],
         modelId => modelId !== 'google/gemini-2.5-flash'
@@ -89,21 +97,24 @@ describe('deniedModelIdsForCandidates', () => {
   it('keeps the exact denied candidate id, including suffixes', () => {
     expect(
       deniedModelIdsForCandidates(
-        policy({ organizationProviderCeiling: ['deepseek'] }),
-        ['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-pro:discounted'],
-        modelId => modelId !== 'deepseek/deepseek-v4-pro:discounted'
+        policy({ organizationProviderCeiling: ['example'] }),
+        ['example/model', 'example/model:suffix'],
+        modelId => modelId !== 'example/model:suffix'
       )
-    ).toEqual(['deepseek/deepseek-v4-pro:discounted']);
+    ).toEqual(['example/model:suffix']);
   });
 
   it('expands a normalized deny-list entry to matching suffixed candidates', () => {
     expect(
       deniedModelIdsForCandidates(
-        policy({ organizationModelDenyList: ['deepseek/deepseek-v4-pro'] }),
-        ['anthropic/claude', 'deepseek/deepseek-v4-pro:discounted'],
+        policy({
+          organizationModelDenyList: ['example/model'],
+          memberGrant: { mode: 'organization_baseline' },
+        }),
+        ['anthropic/claude', 'example/model:suffix'],
         () => true
       )
-    ).toEqual(['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-pro:discounted']);
+    ).toEqual(['example/model', 'example/model:suffix']);
   });
 
   it('denies a custom-pool-only model excluded by a selected member grant', () => {
@@ -112,6 +123,7 @@ describe('deniedModelIdsForCandidates', () => {
         policy({
           memberGrant: {
             mode: 'selected',
+            includeOrganizationBaseline: false,
             modelAllowList: ['anthropic/claude'],
             providerAllowList: [],
           },

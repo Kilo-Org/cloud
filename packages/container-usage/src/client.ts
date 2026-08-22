@@ -44,12 +44,21 @@ const DEFAULT_INITIAL_RETRY_DELAY_MS = 100;
 const DEFAULT_MAXIMUM_RETRY_DELAY_MS = 1_000;
 
 export class ContainerUsageAdmissionError extends Error {
+  readonly remainingMicrodollars: number | undefined;
+  readonly minimumRequiredMicrodollars: number | undefined;
+
   constructor(
     readonly code: RecordStartFailureCode,
-    message: string
+    message: string,
+    details?: {
+      remainingMicrodollars?: number;
+      minimumRequiredMicrodollars?: number;
+    }
   ) {
     super(message);
     this.name = 'ContainerUsageAdmissionError';
+    this.remainingMicrodollars = details?.remainingMicrodollars;
+    this.minimumRequiredMicrodollars = details?.minimumRequiredMicrodollars;
   }
 }
 
@@ -90,16 +99,21 @@ export class ContainerUsageClient {
   }
 
   async recordStart(input: ClientRecordStartInput): Promise<RecordAck> {
-    const request = {
-      ...input,
-      service: this.service,
-      idempotencyKey: startIdempotencyKey(this.service, input.instanceId, input.startEpochMs),
-    } satisfies RecordStartInput;
+    const request = this.startRequest(input);
     const result = await this.withRetry(async () =>
       recordStartResultSchema.parse(await this.binding.recordStart(request))
     );
     if (!result.success) {
-      throw new ContainerUsageAdmissionError(result.error.code, result.error.message);
+      throw new ContainerUsageAdmissionError(
+        result.error.code,
+        result.error.message,
+        result.error.code === 'insufficient_credits'
+          ? {
+              remainingMicrodollars: result.error.remainingMicrodollars,
+              minimumRequiredMicrodollars: result.error.minimumRequiredMicrodollars,
+            }
+          : undefined
+      );
     }
     return result.ack;
   }
@@ -147,6 +161,14 @@ export class ContainerUsageClient {
       }
     }
     throw lastError;
+  }
+
+  private startRequest(input: ClientRecordStartInput): RecordStartInput {
+    return {
+      ...input,
+      service: this.service,
+      idempotencyKey: startIdempotencyKey(this.service, input.instanceId, input.startEpochMs),
+    };
   }
 }
 

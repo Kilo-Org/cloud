@@ -6,6 +6,7 @@ import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
+import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
@@ -31,6 +32,7 @@ const mobileRouter = createTRPCRouter({
   cloudAgentNext: cloudAgentNextRouter,
   githubApps: githubAppsRouter,
   codeReviews: codeReviewRouter,
+  reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   securityAgent: securityAgentRouter,
   kiloPass: kiloPassRouter,

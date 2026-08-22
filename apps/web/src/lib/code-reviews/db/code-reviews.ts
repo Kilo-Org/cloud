@@ -14,6 +14,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
+import { admitOperation, type LedgerDatabase } from '@kilocode/db/operation-ledger';
 import {
   eq,
   and,
@@ -30,8 +31,10 @@ import {
   getTableColumns,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { CreateReviewParamsSchema, type CodeReviewListItem } from '../core';
+import { logExceptInTest } from '@/lib/utils.server';
+import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
+import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';
 import type {
   CodeReviewPlatform,
   CreateReviewParams,
@@ -165,6 +168,7 @@ export type CancelledReviewRow = {
   platform: CodeReviewPlatform;
   platformProjectId: number | null;
   platformIntegrationId: string | null;
+  triggerSource: string | null;
 };
 
 type CodeReviewDatabase = typeof db | DrizzleTransaction;
@@ -227,6 +231,55 @@ function codeReviewInsertValues(
 }
 
 /**
+ * Admits a `code_review`-domain ledger row for a newly created review using
+ * `database` (a pool or an open transaction). The terminal settle later joins
+ * by the operation key `review:<reviewId>`. A failure throws so the caller can
+ * roll back an enclosing transaction; callers whose review row already
+ * committed must use the best-effort `admitCodeReviewLedgerRow` wrapper.
+ */
+async function admitCodeReviewLedgerRowOn(
+  database: LedgerDatabase,
+  params: {
+    reviewId: string;
+    userId: string;
+    orgId?: string | null;
+    triggerSource: string | null;
+  }
+): Promise<void> {
+  await admitOperation(database, {
+    userId: params.userId,
+    orgId: params.orgId ?? null,
+    domain: 'code_review',
+    intent: codeReviewLedgerIntent(params.triggerSource),
+    operationKey: `review:${params.reviewId}`,
+    taxonomy: 'never-replay',
+    leaseSeconds: 60,
+  });
+}
+
+/**
+ * Admits a `code_review`-domain ledger row for a newly created review using the
+ * pool `db`. Best-effort: the review row already committed, so a ledger write
+ * failure must not fail review creation; the terminal settle then skips on the
+ * missing row. A ledger write failure is logged and never thrown.
+ */
+export async function admitCodeReviewLedgerRow(params: {
+  reviewId: string;
+  userId: string;
+  orgId?: string | null;
+  triggerSource: string | null;
+}): Promise<void> {
+  try {
+    await admitCodeReviewLedgerRowOn(db, params);
+  } catch (error) {
+    logExceptInTest('[code-review-ledger] Failed to admit code review ledger row', {
+      reviewId: params.reviewId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
  * Creates a new code review record
  * Returns the created review ID
  */
@@ -241,6 +294,15 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
       .insert(cloud_agent_code_reviews)
       .values(codeReviewInsertValues(params))
       .returning({ id: cloud_agent_code_reviews.id });
+
+    // Best-effort ledger admission (P1-A-07c): the review row already committed,
+    // so a ledger write failure must not fail review creation.
+    await admitCodeReviewLedgerRow({
+      reviewId: review.id,
+      userId: params.owner.userId,
+      orgId: params.owner.type === 'org' ? params.owner.id : null,
+      triggerSource: params.triggerSource ?? null,
+    });
 
     return review.id;
   } catch (error) {
@@ -1354,7 +1416,12 @@ export async function updateRepositoryReviewInstructionsMetadata(
  * Supports filtering by status and repository
  * Returns reviews sorted by creation date (newest first)
  */
-export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListItem[]> {
+export type CodeReviewListRow = Omit<
+  CloudAgentCodeReview,
+  'council_result' | 'manual_config' | 'previous_summary_body'
+>;
+
+export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListRow[]> {
   try {
     const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
@@ -1390,9 +1457,15 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
       conditions.push(eq(cloud_agent_code_reviews.platform, platform));
     }
 
-    // Select every column except the heavy `council_result` (see CodeReviewListItem).
-    const { council_result: _councilResult, ...listColumns } =
-      getTableColumns(cloud_agent_code_reviews);
+    // Select every column except the heavy JSONB/text fields no list UI reads
+    // (council_result, manual_config, previous_summary_body). The review-detail
+    // path still returns them. total_cost_musd stays: the mobile detail renders it.
+    const {
+      council_result: _councilResult,
+      manual_config: _manualConfig,
+      previous_summary_body: _previousSummaryBody,
+      ...listColumns
+    } = getTableColumns(cloud_agent_code_reviews);
     const reviews = await db
       .select(listColumns)
       .from(cloud_agent_code_reviews)
@@ -1537,7 +1610,9 @@ export async function createCodeReviewIfAbsentInTransaction(
     .values(codeReviewInsertValues(params))
     .onConflictDoNothing()
     .returning({ id: cloud_agent_code_reviews.id });
-  if (created) return { reviewId: created.id, created: true };
+  if (created) {
+    return { reviewId: created.id, created: true };
+  }
 
   const existing =
     (await findExistingReviewWithDatabase(tx, scope, params.headSha)) ??
@@ -1691,6 +1766,7 @@ type CancelledReviewDatabaseRow = {
   platform: CodeReviewPlatform;
   platform_project_id: number | null;
   platform_integration_id: string | null;
+  trigger_source: string | null;
 };
 
 function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReviewRow {
@@ -1704,6 +1780,7 @@ function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReview
     platform: row.platform,
     platformProjectId: row.platform_project_id,
     platformIntegrationId: row.platform_integration_id,
+    triggerSource: row.trigger_source,
   };
 }
 
@@ -1743,7 +1820,8 @@ async function cancelReviewsForPR(
         head_sha,
         platform,
         platform_project_id,
-        platform_integration_id
+        platform_integration_id,
+        trigger_source
       FROM ${cloud_agent_code_reviews}
       WHERE ${ownerCondition}
         AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
@@ -1782,7 +1860,8 @@ async function cancelReviewsForPR(
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
-      targets.platform_integration_id
+      targets.platform_integration_id,
+      targets.trigger_source
   `);
 
   return result.rows.map(mapCancelledReviewRow);
@@ -1813,7 +1892,8 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
         head_sha,
         platform,
         platform_project_id,
-        platform_integration_id
+        platform_integration_id,
+        trigger_source
       FROM ${cloud_agent_code_reviews}
       WHERE ${inArray(cloud_agent_code_reviews.id, reviewIds)}
         AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
@@ -1847,7 +1927,8 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
-      targets.platform_integration_id
+      targets.platform_integration_id,
+      targets.trigger_source
   `);
 
   return result.rows.map(mapCancelledReviewRow);
@@ -1882,7 +1963,8 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
         head_sha,
         platform,
         platform_project_id,
-        platform_integration_id
+        platform_integration_id,
+        trigger_source
       FROM ${cloud_agent_code_reviews}
       WHERE ${cloud_agent_code_reviews.owned_by_organization_id} = ${input.organizationId}
         AND ${cloud_agent_code_reviews.platform} = ${input.platform}
@@ -1918,21 +2000,43 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
       targets.head_sha,
       targets.platform,
       targets.platform_project_id,
-      targets.platform_integration_id
+      targets.platform_integration_id,
+      targets.trigger_source
   `);
 
   return result.rows.map(mapCancelledReviewRow);
+}
+
+/**
+ * Best-effort settles the admitted ledger rows for already-committed
+ * cancellations. A settle failure is logged by `settleCodeReviewLedgerRow` and
+ * never fails the cancel.
+ */
+async function settleCancelledReviews(
+  cancelled: CancelledReviewRow[],
+  terminalReason: 'superseded' | 'user_cancelled'
+): Promise<void> {
+  for (const row of cancelled) {
+    await settleCodeReviewLedgerRow({
+      reviewId: row.id,
+      status: 'cancelled',
+      terminalReason,
+      triggerSource: row.triggerSource,
+    });
+  }
 }
 
 export async function cancelActiveCodeReviewsForIntegration(
   input: IntegrationReviewCancellationInput
 ): Promise<CancelledReviewRow[]> {
   try {
-    return await cancelActiveCodeReviewsForIntegrationWithDatabase(
+    const cancelled = await cancelActiveCodeReviewsForIntegrationWithDatabase(
       db,
       input,
       'Platform integration disconnected'
     );
+    await settleCancelledReviews(cancelled, 'user_cancelled');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelActiveCodeReviewsForIntegration' },
@@ -1947,7 +2051,9 @@ export async function cancelActiveCodeReviewsById(
   errorMessage: string
 ): Promise<CancelledReviewRow[]> {
   try {
-    return await cancelActiveCodeReviewsByIdWithDatabase(db, reviewIds, errorMessage);
+    const cancelled = await cancelActiveCodeReviewsByIdWithDatabase(db, reviewIds, errorMessage);
+    await settleCancelledReviews(cancelled, 'superseded');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelActiveCodeReviewsById' },
@@ -1962,7 +2068,7 @@ export async function disableBitbucketCodeReviewerForIntegration(input: {
   integrationId: string;
 }): Promise<CancelledReviewRow[]> {
   try {
-    return await db.transaction(async tx => {
+    const cancelled = await db.transaction(async tx => {
       const lockKey = bitbucketCodeReviewerLifecycleLockKey(input.integrationId);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
       await tx
@@ -1984,6 +2090,10 @@ export async function disableBitbucketCodeReviewerForIntegration(input: {
         'Bitbucket Code Reviewer disabled'
       );
     });
+    // Settle best-effort after commit: a settle failure must not roll back the
+    // disable or the cancel.
+    await settleCancelledReviews(cancelled, 'user_cancelled');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'disableBitbucketCodeReviewerForIntegration' },
@@ -1998,7 +2108,9 @@ export async function cancelSupersededReviewsForPR(
   excludeSha: string
 ): Promise<CancelledReviewRow[]> {
   try {
-    return await cancelReviewsForPR(db, scope, excludeSha);
+    const cancelled = await cancelReviewsForPR(db, scope, excludeSha);
+    await settleCancelledReviews(cancelled, 'superseded');
+    return cancelled;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelSupersededReviewsForPR' },

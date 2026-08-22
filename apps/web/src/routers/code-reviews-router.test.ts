@@ -84,6 +84,7 @@ import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@/lib/organizations/organizations';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -382,6 +383,197 @@ describe('codeReviewRouter.cancel', () => {
       expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
       'lite'
     );
+  });
+});
+
+describe('codeReviewRouter.listForOrganization role-gated ids', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser({
+      google_user_email: 'list-ids-owner@example.com',
+      google_user_name: 'List Ids Owner',
+      is_admin: false,
+    });
+    memberUser = await insertTestUser({
+      google_user_email: 'list-ids-member@example.com',
+      google_user_name: 'List Ids Member',
+      is_admin: false,
+    });
+    organization = await createTestOrganization('List Ids Org', ownerUser.id, 0, {}, false);
+    await addUserToOrganization(organization.id, memberUser.id, 'member');
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, memberUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, ownerUser.id));
+  });
+
+  it('nulls raw ledger/transaction ids for members and keeps them for owners', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/list-ids-repo',
+        pr_number: 1,
+        pr_url: 'https://github.com/test-org/list-ids-repo/pull/1',
+        pr_title: 'List ids PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/list-ids',
+        head_sha: 'sha-list-ids',
+        status: 'completed',
+        session_id: 'agent-session-list-ids',
+        cli_session_id: 'ses-list-ids',
+        dispatch_reservation_id: 'reservation-list-ids',
+        check_run_id: 12345,
+        total_cost_musd: 500,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    try {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const memberResult = await memberCaller.codeReviews.listForOrganization({
+        organizationId: organization.id,
+      });
+      expect(memberResult.success).toBe(true);
+      if (!memberResult.success) throw new Error('expected member list success');
+      const memberReview = memberResult.reviews.find(r => r.id === review.id);
+      expect(memberReview).toBeDefined();
+      expect(memberReview?.session_id).toBeNull();
+      expect(memberReview?.cli_session_id).toBeNull();
+      expect(memberReview?.dispatch_reservation_id).toBeNull();
+      expect(memberReview?.check_run_id).toBeNull();
+      expect(memberReview?.total_cost_musd).toBe(500);
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.listForOrganization({
+        organizationId: organization.id,
+      });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner list success');
+      const ownerReview = ownerResult.reviews.find(r => r.id === review.id);
+      expect(ownerReview).toBeDefined();
+      expect(ownerReview?.session_id).toBe('agent-session-list-ids');
+      expect(ownerReview?.cli_session_id).toBe('ses-list-ids');
+      expect(ownerReview?.dispatch_reservation_id).toBe('reservation-list-ids');
+      expect(ownerReview?.check_run_id).toBe(12345);
+      expect(ownerReview?.total_cost_musd).toBe(500);
+    } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+});
+
+describe('codeReviewRouter.get role-gated ids', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser({
+      google_user_email: 'get-ids-owner@example.com',
+      google_user_name: 'Get Ids Owner',
+      is_admin: false,
+    });
+    memberUser = await insertTestUser({
+      google_user_email: 'get-ids-member@example.com',
+      google_user_name: 'Get Ids Member',
+      is_admin: false,
+    });
+    organization = await createTestOrganization('Get Ids Org', ownerUser.id, 0, {}, false);
+    await addUserToOrganization(organization.id, memberUser.id, 'member');
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, memberUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, ownerUser.id));
+  });
+
+  it('nulls raw identifiers for members and keeps them for owners', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/get-ids-repo',
+        pr_number: 1,
+        pr_url: 'https://github.com/test-org/get-ids-repo/pull/1',
+        pr_title: 'Get ids PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/get-ids',
+        head_sha: 'sha-get-ids',
+        status: 'completed',
+        session_id: 'agent-session-get-ids',
+        cli_session_id: 'ses-get-ids',
+        dispatch_reservation_id: 'reservation-get-ids',
+        check_run_id: 12345,
+        total_cost_musd: 500,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'completed',
+      session_id: 'agent-attempt-get-ids',
+      cli_session_id: 'ses-attempt-get-ids',
+      execution_id: 'exec-attempt-get-ids',
+    });
+
+    try {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const memberResult = await memberCaller.codeReviews.get({ reviewId: review.id });
+      expect(memberResult.success).toBe(true);
+      if (!memberResult.success) throw new Error('expected member get success');
+      expect(memberResult.review.session_id).toBeNull();
+      expect(memberResult.review.cli_session_id).toBeNull();
+      expect(memberResult.review.dispatch_reservation_id).toBeNull();
+      expect(memberResult.review.check_run_id).toBeNull();
+      expect(memberResult.review.rawIdsRedacted).toBe(true);
+      expect(memberResult.review.total_cost_musd).toBe(500);
+      expect(memberResult.attempts).toHaveLength(1);
+      expect(memberResult.attempts[0]?.session_id).toBeNull();
+      expect(memberResult.attempts[0]?.cli_session_id).toBeNull();
+      expect(memberResult.attempts[0]?.execution_id).toBeNull();
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.get({ reviewId: review.id });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner get success');
+      expect(ownerResult.review.session_id).toBe('agent-session-get-ids');
+      expect(ownerResult.review.cli_session_id).toBe('ses-get-ids');
+      expect(ownerResult.review.dispatch_reservation_id).toBe('reservation-get-ids');
+      expect(ownerResult.review.check_run_id).toBe(12345);
+      expect(ownerResult.review.rawIdsRedacted).toBe(false);
+      expect(ownerResult.review.total_cost_musd).toBe(500);
+      expect(ownerResult.attempts).toHaveLength(1);
+      expect(ownerResult.attempts[0]?.session_id).toBe('agent-attempt-get-ids');
+      expect(ownerResult.attempts[0]?.cli_session_id).toBe('ses-attempt-get-ids');
+      expect(ownerResult.attempts[0]?.execution_id).toBe('exec-attempt-get-ids');
+    } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
   });
 });
 
@@ -2478,6 +2670,25 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     });
   }
 
+  // Seeds a minimal personal config with an explicit selected_repository_ids
+  // array, used by the delta repository save tests (P2-GH-45c).
+  async function seedPersonalSelection(selectedRepositoryIds: number[]) {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: selectedRepositoryIds,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+  }
+
   it('returns NOT_FOUND when no stored personal config exists', async () => {
     const caller = await createCallerForUser(testUser.id);
 
@@ -2718,6 +2929,157 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         gate_threshold: 'off',
         disable_review_md: true,
       })
+    );
+  });
+
+  // P2-GH-45c: delta repository save. The mobile delta sender lands later;
+  // these tests pin the server contract: next = (stored ∪ add) \ remove,
+  // remove wins on overlap, both-fields is rejected, and a delta-only patch
+  // drives the GitLab webhook sync with computed next/previous arrays.
+  it('applies a delta add to the stored selection', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202, 303] })
+    );
+  });
+
+  it('applies a delta remove to the stored selection', async () => {
+    await seedPersonalSelection([101, 202, 303]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [], remove: [202] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('lets remove win over add on an overlapping delta', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [202, 303], remove: [202] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 303] })
+    );
+  });
+
+  it('applies a delta add to an empty stored selection', async () => {
+    await seedPersonalSelection([]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      selectedRepositoryDelta: { add: [505], remove: [] },
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [505] }));
+  });
+
+  it('rejects a patch carrying both selectedRepositoryIds and selectedRepositoryDelta', async () => {
+    await seedPersonalSelection([101, 202]);
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.personalReviewAgent.patchReviewConfig({
+        platform: 'github',
+        selectedRepositoryIds: [101],
+        selectedRepositoryDelta: { add: [303], remove: [] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202] })
+    );
+  });
+
+  it('runs GitLab webhook sync with computed next/previous arrays on a delta-only patch', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      selectedRepositoryDelta: { add: [303], remove: [101] },
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
     );
   });
 });

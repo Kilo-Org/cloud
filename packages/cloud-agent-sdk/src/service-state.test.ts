@@ -284,6 +284,73 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'error', message: 'Something went wrong' });
     });
 
+    it('scopes child errors to onChildSessionError without touching root state', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({
+        type: 'session.error',
+        error: 'Requests ending with a model turn are not supported.',
+        sessionId: 'child-1',
+      });
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(onChildSessionError).toHaveBeenCalledWith(
+        'child-1',
+        'Requests ending with a model turn are not supported.'
+      );
+    });
+
+    it('keeps root session errors on onError and root status', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({
+        type: 'session.error',
+        error: 'Requests ending with a model turn are not supported.',
+        sessionId: 'root-1',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Requests ending with a model turn are not supported.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Requests ending with a model turn are not supported.',
+      });
+    });
+
+    it('adopts the server-reported root session ID for errors', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.created', info: makeSession('server-root') });
+      state.process({
+        type: 'session.error',
+        error: 'Root session failed.',
+        sessionId: 'server-root',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Root session failed.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Root session failed.' });
+    });
+
+    it('keeps events without a sessionId on the legacy root path', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.error', error: 'Something went wrong' });
+
+      expect(onError).toHaveBeenCalledWith('Something went wrong');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Something went wrong' });
+    });
+
     it('is suppressed after stopped(error) — aftershock absorption', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));

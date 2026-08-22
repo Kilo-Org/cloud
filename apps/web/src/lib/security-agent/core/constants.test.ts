@@ -31,6 +31,17 @@ describe('security agent config', () => {
     expect(parseSecurityAgentConfig({}).sla_notifications_enabled).toBe(false);
   });
 
+  it('pins the high-confidence automation defaults', () => {
+    const config = parseSecurityAgentConfig({});
+    expect(config.auto_dismiss_confidence_threshold).toBe('high');
+    expect(config.auto_analysis_min_severity).toBe('high');
+    expect(config.auto_remediation_min_severity).toBe('high');
+  });
+
+  it('defaults auto-remediation approval to not required for legacy config', () => {
+    expect(parseSecurityAgentConfig({}).auto_remediation_require_approval).toBe(false);
+  });
+
   it('tolerates malformed notification fields during general config reads', () => {
     expect(() =>
       parseSecurityAgentConfig({

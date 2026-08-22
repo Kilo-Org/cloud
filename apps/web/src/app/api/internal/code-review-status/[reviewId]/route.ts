@@ -30,6 +30,7 @@ import {
   createInfraRetryAttemptIfMissing,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
@@ -1187,6 +1188,18 @@ export async function POST(
       });
 
       if (completionResult.outcome !== 'applied') {
+        // The completion claim did not commit here (redelivery, stale, or
+        // already-terminal). Settle the ledger row anyway: a transient settle
+        // failure on the first attempt would otherwise lose the terminal event
+        // forever, because redelivery short-circuits on this path. The CAS in
+        // settleOperation makes the retry safe, and a non-terminal review is a
+        // no-op.
+        await settleCodeReviewLedgerRow({
+          reviewId,
+          status: review.status,
+          terminalReason: review.terminal_reason,
+          triggerSource: review.trigger_source,
+        });
         return NextResponse.json({
           success: true,
           message:
@@ -1203,6 +1216,15 @@ export async function POST(
 
       attempt = latestAttempt;
       analyticsCompletionApplied = true;
+      // The completion claim committed, so settle the ledger row. Best-effort:
+      // a settle failure must not fail the callback, and a missing admit row
+      // skips with a log.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status: 'completed',
+        terminalReason: null,
+        triggerSource: review.trigger_source,
+      });
     } else {
       attempt = await updateCodeReviewAttemptForCallback({
         codeReviewId: reviewId,
@@ -1249,6 +1271,16 @@ export async function POST(
         reviewId,
         currentStatus: review.status,
         requestedStatus: status,
+      });
+      // Settle on this short-circuit path too: a transient settle failure on
+      // the first attempt would otherwise lose the terminal event forever,
+      // because redelivery lands here before any settle site. The CAS in
+      // settleOperation makes the retry safe.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status: review.status,
+        terminalReason: review.terminal_reason,
+        triggerSource: review.trigger_source,
       });
       return NextResponse.json({
         success: true,
@@ -1494,8 +1526,25 @@ export async function POST(
           diagnostics: modelNotFoundRuntimeDiagnostics,
         });
       }
+      // The terminal claim committed, so settle the ledger row once.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status,
+        terminalReason: terminalReason ?? null,
+        triggerSource: review.trigger_source,
+      });
     } else {
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+      // Settle idempotently: a cross-request redelivery of this terminal
+      // callback settles through the terminal short-circuit above, where the
+      // compare-and-set and the deterministic event uuid make the repeat a
+      // no-op. Non-terminal statuses (running) are a no-op.
+      await settleCodeReviewLedgerRow({
+        reviewId,
+        status,
+        terminalReason: terminalReason ?? null,
+        triggerSource: review.trigger_source,
+      });
     }
 
     let providerTerminalReason = terminalReason;

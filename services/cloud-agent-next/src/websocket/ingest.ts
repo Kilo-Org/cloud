@@ -257,6 +257,7 @@ export type IngestDOContext = {
   >;
   handleWrapperTerminalEvent: (params: WrapperTerminalEvent) => Promise<void>;
   keepContainerAlive?: () => void;
+  isBillingBlocked?: () => Promise<boolean>;
   observeCorrelatedAgentActivity?: (messageId: string) => Promise<void>;
   terminalizeSessionMessageOnce: (
     messageId: string,
@@ -404,6 +405,13 @@ export function createIngestHandler(
           'wrapperGeneration and wrapperConnectionId are required with wrapperRunId',
           { status: 400 }
         );
+      }
+
+      if (await doContext.isBillingBlocked?.()) {
+        logger
+          .withFields({ sessionId, wrapperRunId, wrapperGeneration, wrapperConnectionId })
+          .warn('Wrapper ingest rejected: container billing is blocked');
+        return new Response('Container billing is blocked', { status: 409 });
       }
 
       const reconnectDecision = await doContext.wrapperSupervisor.checkReconnect({

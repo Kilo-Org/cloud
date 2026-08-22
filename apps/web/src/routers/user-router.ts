@@ -36,8 +36,9 @@ import {
   kiloclaw_subscriptions,
   user_notification_preferences,
   user_push_tokens,
+  agent_configs,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -54,6 +55,7 @@ import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { resolveStripeReceiptUrl } from '@/lib/credits';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -370,6 +372,87 @@ async function enrichDeductionsWithInstanceNames(
       kind: getDeductionKind(d.credit_category),
     };
   });
+}
+
+// The seven notification category keys are owned by the mobile app:
+// `NOTIFICATION_CATEGORY_KEYS` / `NotificationCategoryKey` in
+// `apps/mobile/src/lib/hooks/agent-push-preference.ts`. The server hard-codes
+// the same string literals; do not define a duplicate server category-key type.
+const NOTIFICATION_CATEGORY_KEYS = [
+  'chatMessages',
+  'agentAttention',
+  'agentUpdates',
+  'sessionStatus',
+  'kiloclawActivity',
+  'balanceAlerts',
+  'securityFindings',
+] as const;
+
+type NotificationCapability = { available: boolean; unavailableReason: string | null };
+type NotificationCapabilities = Record<
+  (typeof NOTIFICATION_CATEGORY_KEYS)[number],
+  NotificationCapability
+>;
+
+const ALWAYS_AVAILABLE_CAPABILITY: NotificationCapability = {
+  available: true,
+  unavailableReason: null,
+};
+
+function unavailableCapability(reason: string): NotificationCapability {
+  return { available: false, unavailableReason: reason };
+}
+
+/**
+ * Compute the per-category availability map for the signed-in user. The four
+ * always-on categories need no data; the three gated categories each run one
+ * read-only existence check.
+ */
+async function computeNotificationCapabilities(userId: string): Promise<NotificationCapabilities> {
+  const organizations = await getUserOrganizationsWithSeats(userId);
+  const organizationIds = organizations.map(organization => organization.organizationId);
+
+  const [securityConfigs, kiloclawInstances] = await Promise.all([
+    db
+      .select({ id: agent_configs.id })
+      .from(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'security_scan'),
+          eq(agent_configs.is_enabled, true),
+          or(
+            eq(agent_configs.owned_by_user_id, userId),
+            inArray(agent_configs.owned_by_organization_id, organizationIds)
+          )
+        )
+      )
+      .limit(1),
+    db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+      .limit(1),
+  ]);
+
+  const hasOrganization = organizations.length > 0;
+  const hasSecurityConfig = securityConfigs.length > 0;
+  const hasKiloclawInstance = kiloclawInstances.length > 0;
+
+  return {
+    chatMessages: ALWAYS_AVAILABLE_CAPABILITY,
+    agentAttention: ALWAYS_AVAILABLE_CAPABILITY,
+    agentUpdates: ALWAYS_AVAILABLE_CAPABILITY,
+    sessionStatus: ALWAYS_AVAILABLE_CAPABILITY,
+    balanceAlerts: hasOrganization
+      ? ALWAYS_AVAILABLE_CAPABILITY
+      : unavailableCapability('Join an organization to get balance alerts.'),
+    securityFindings: hasSecurityConfig
+      ? ALWAYS_AVAILABLE_CAPABILITY
+      : unavailableCapability('Enable Kilo Security Agent on a scope to get security findings.'),
+    kiloclawActivity: hasKiloclawInstance
+      ? ALWAYS_AVAILABLE_CAPABILITY
+      : unavailableCapability('Start a KiloClaw instance to get KiloClaw activity.'),
+  };
 }
 
 export const userRouter = createTRPCRouter({
@@ -1115,6 +1198,7 @@ export const userRouter = createTRPCRouter({
     // `agentUpdates` and legacy `agentPushEnabled` both map to the same physical
     // column `agent_push_enabled`; ship both keys for shipped-client compat.
     const agentPushEnabled = row?.agent_push_enabled ?? true;
+    const capabilities = await computeNotificationCapabilities(ctx.user.id);
     return {
       chatMessages: row?.chat_messages_enabled ?? true,
       agentAttention: row?.agent_attention_enabled ?? true,
@@ -1125,6 +1209,7 @@ export const userRouter = createTRPCRouter({
       securityFindings: row?.security_findings_enabled ?? true,
       notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
+      capabilities,
     };
   }),
 

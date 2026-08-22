@@ -9,6 +9,8 @@ const hasSessions = vi.hoisted(() => ({ value: true }));
 const activeIsError = vi.hoisted(() => ({ value: false }));
 const storedIsError = vi.hoisted(() => ({ value: false }));
 const storedIsSuccess = vi.hoisted(() => ({ value: true }));
+const sessionsLoading = vi.hoisted(() => ({ value: false }));
+const orgLoaded = vi.hoisted(() => ({ value: true }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
@@ -37,6 +39,9 @@ vi.mock('@/components/home/greeting', () => ({
 vi.mock('@/components/home/new-task-button', () => ({
   NewTaskButton: 'NewTaskButton',
 }));
+vi.mock('@/components/home/product-choices', () => ({
+  ProductChoices: 'ProductChoices',
+}));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
 }));
@@ -52,7 +57,7 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useAgentSessions: () => ({
     activeSessions: [],
-    isLoading: false,
+    isLoading: sessionsLoading.value,
     storedSessions: [{}],
     storedIsError: storedIsError.value,
     storedIsSuccess: storedIsSuccess.value,
@@ -61,7 +66,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   }),
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: orgLoaded.value }),
 }));
 
 function nodeCount(root: TestRenderer.ReactTestInstance, type: string): number {
@@ -94,9 +99,12 @@ async function mountHome(): Promise<TestRenderer.ReactTestRenderer> {
 describe('HomeScreen composition', () => {
   it('renders the sessions section and new-task button when sessions are present', async () => {
     hasSessions.value = true;
+    sessionsLoading.value = false;
+    orgLoaded.value = true;
     const renderer = await mountHome();
     expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(1);
     expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(1);
+    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
 
     await act(async () => {
@@ -110,11 +118,14 @@ describe('HomeScreen composition', () => {
     storedIsError.value = false;
     storedIsSuccess.value = true;
     activeIsError.value = false;
+    sessionsLoading.value = false;
+    orgLoaded.value = true;
     const renderer = await mountHome();
     expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(1);
     expect(nodeCount(renderer.root, 'QueryError')).toBe(0);
     expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
     expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(0);
+    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
 
     await act(async () => {
       await Promise.resolve();
@@ -127,6 +138,8 @@ describe('HomeScreen composition', () => {
     storedIsError.value = false;
     storedIsSuccess.value = true;
     activeIsError.value = true;
+    sessionsLoading.value = false;
+    orgLoaded.value = true;
     const renderer = await mountHome();
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError).toBeDefined();
@@ -135,6 +148,21 @@ describe('HomeScreen composition', () => {
     expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(0);
     expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
     expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(0);
+    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
+
+  it('does not render product choices while loading', async () => {
+    sessionsLoading.value = true;
+    orgLoaded.value = true;
+    const renderer = await mountHome();
+    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(0);
+    expect(nodeCount(renderer.root, 'Skeleton')).toBeGreaterThan(0);
+    sessionsLoading.value = false;
 
     await act(async () => {
       await Promise.resolve();

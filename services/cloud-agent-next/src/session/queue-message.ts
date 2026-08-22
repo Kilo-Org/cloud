@@ -43,6 +43,7 @@ type TRPCCodeName = ConstructorParameters<typeof TRPCError>[0]['code'];
 const ADMISSION_CODE_TO_TRPC: Record<NonTransientExecutionCode, TRPCCodeName> = {
   NOT_FOUND: 'NOT_FOUND',
   BAD_REQUEST: 'BAD_REQUEST',
+  PAYMENT_REQUIRED: 'PAYMENT_REQUIRED',
   PENDING_QUEUE_FULL: 'TOO_MANY_REQUESTS',
   INTERNAL: 'INTERNAL_SERVER_ERROR',
 };

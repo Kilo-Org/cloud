@@ -100,9 +100,17 @@ export function useOrgWithMembers(organizationId: string | null) {
 }
 
 export type OrgWithMembers = NonNullable<ReturnType<typeof useOrgWithMembers>['data']>;
-type OrgMember = OrgWithMembers['members'][number];
+export type OrgMember = OrgWithMembers['members'][number];
 export type ActiveOrgMember = Extract<OrgMember, { status: 'active' }>;
 export type InvitedOrgMember = Extract<OrgMember, { status: 'invited' }>;
+
+export function isActiveOrgMember(member: OrgMember): member is ActiveOrgMember {
+  return member.status === 'active';
+}
+
+export function isInvitedOrgMember(member: OrgMember): member is InvitedOrgMember {
+  return member.status === 'invited';
+}
 
 /**
  * Parent organization's Kilo Pass for Orgs summary. The API is restricted to

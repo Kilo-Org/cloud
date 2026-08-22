@@ -30,12 +30,25 @@ const actionSheetMock = vi.hoisted(() => {
   return { showActionSheetWithOptions };
 });
 
+const reactNativeMock = vi.hoisted(() => ({
+  Platform: { OS: 'ios' as string },
+  useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
+}));
+const safeAreaMock = vi.hoisted(() => ({
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
+}));
+
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  Platform: reactNativeMock.Platform,
+  useWindowDimensions: reactNativeMock.useWindowDimensions,
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -159,6 +172,13 @@ function nodesByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
+function findByTestID(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.props.testID === testID);
+}
+
 async function pressBody(root: TestRenderer.ReactTestInstance): Promise<void> {
   const body = chipBody(root);
   await act(async () => {
@@ -208,6 +228,9 @@ function markdownAttachment(): AgentAttachment {
 beforeEach(() => {
   vi.clearAllMocks();
   fileText.mockResolvedValue('# Hello');
+  reactNativeMock.Platform.OS = 'ios';
+  reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
+  safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0 });
 });
 
 describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
@@ -577,6 +600,165 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     expect(toast.error).toHaveBeenCalledWith('Failed to open file. Please try again.');
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — text preview sheet surface', () => {
+  async function openMarkdownPreview(): Promise<TestRenderer.ReactTestRenderer> {
+    const renderer = await mount([markdownAttachment()]);
+    await pressBody(renderer.root);
+    return renderer;
+  }
+
+  it('renders the native pageSheet Modal on iOS', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const modals = nodesByType(renderer.root, 'Modal');
+    expect(modals).toHaveLength(1);
+    expect(modals[0]?.props.animationType).toBe('slide');
+    expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
+    expect(modals[0]?.props.transparent).toBeUndefined();
+    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const previewScrollView = nodesByType(renderer.root, 'ScrollView').find(
+      node => node.props.contentContainerClassName === 'px-6 pb-6 pt-2'
+    );
+    expect(previewScrollView?.props.className).toBe('flex-1');
+
+    renderer.unmount();
+  });
+
+  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
+
+    const renderer = await openMarkdownPreview();
+
+    const modals = nodesByType(renderer.root, 'Modal');
+    expect(modals).toHaveLength(1);
+    expect(modals[0]?.props.transparent).toBeUndefined();
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+
+    // The insets.bottom spacer clears the Android navigation bar.
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.style as { height?: number } | undefined)?.height === 34 &&
+        node.props.className === 'bg-background'
+    );
+    expect(spacers).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('closes the preview when Android Back fires onRequestClose', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await openMarkdownPreview();
+
+    const modal = nodesByType(renderer.root, 'Modal')[0];
+    if (!modal) {
+      throw new Error('Modal not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (modal.props.onRequestClose as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Modal')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('closes the preview when Done is pressed', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const header = nodesByType(renderer.root, 'SheetHeader')[0];
+    if (!header) {
+      throw new Error('SheetHeader not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (header.props.onDone as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Modal')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — thumbnail decode fallback', () => {
+  it('shows the AlertCircle fallback while the upload spinner still renders', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        kind: 'image',
+        filename: 'photo.png',
+        status: 'uploading',
+        progress: null,
+      }),
+    ]);
+
+    const images = nodesByType(renderer.root, 'Image');
+    expect(images).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    const image = images[0];
+    if (!image) {
+      throw new Error('thumbnail Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    // The upload overlay is driven by status alone and stays unchanged.
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('shows the AlertCircle fallback with no spinner for an uploaded image', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        kind: 'image',
+        filename: 'photo.png',
+        status: 'uploaded',
+        progress: 1,
+      }),
+    ]);
+
+    const images = nodesByType(renderer.root, 'Image');
+    expect(images).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+
+    const image = images[0];
+    if (!image) {
+      throw new Error('thumbnail Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
 
     renderer.unmount();
   });

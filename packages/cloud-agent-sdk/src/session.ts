@@ -56,6 +56,7 @@ type CloudAgentSessionConfig = {
   websocketBaseUrl?: string;
   storage?: SessionStorage;
   onError?: (message: string) => void;
+  onChildSessionError?: (sessionId: string, message: string) => void;
   onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
   onPermissionAsked?: (
@@ -229,6 +230,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   const serviceState = createServiceState({
     rootSessionId: config.kiloSessionId,
     onError: config.onError,
+    onChildSessionError: config.onChildSessionError,
     onQuestionAsked: config.onQuestionAsked,
     onQuestionResolved: config.onQuestionResolved,
     onPermissionAsked: config.onPermissionAsked,

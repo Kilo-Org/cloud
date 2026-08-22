@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { agent_configs, type User } from '@kilocode/db/schema';
+import { agent_configs, security_agent_commands, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
@@ -28,6 +28,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   user = await insertTestUser();
   await db.delete(agent_configs).where(sql`true`);
+  await db.delete(security_agent_commands).where(sql`true`);
 });
 
 function owner() {
@@ -153,5 +154,43 @@ describe('saveSecurityAgentConfigWithRevision', () => {
     expect(enqueueTx).toBeDefined();
     expect(mockResetOwnerAutoAnalysisEnabledAt).toHaveBeenCalledTimes(1);
     expect(mockResetOwnerAutoAnalysisEnabledAt.mock.calls[0]?.[1]).toBe(enqueueTx);
+  });
+
+  it('skips the include-existing remediation command when approval is required', async () => {
+    const outcome = await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { auto_remediation_enabled: true, auto_remediation_require_approval: true },
+      createdBy: user.id,
+      expectedRevision: null,
+      enqueueRemediation: { owner: { userId: user.id } },
+    });
+
+    expect(outcome.existingRemediationCommandId).toBeUndefined();
+    const commands = await db
+      .select({ id: security_agent_commands.id })
+      .from(security_agent_commands)
+      .where(eq(security_agent_commands.owned_by_user_id, user.id));
+    expect(commands).toHaveLength(0);
+  });
+
+  it('creates the include-existing remediation command when approval is not required', async () => {
+    const outcome = await saveSecurityAgentConfigWithRevision({
+      owner: owner(),
+      config: { auto_remediation_enabled: true, auto_remediation_require_approval: false },
+      createdBy: user.id,
+      expectedRevision: null,
+      enqueueRemediation: { owner: { userId: user.id } },
+    });
+
+    expect(outcome.existingRemediationCommandId).toBeDefined();
+    const commands = await db
+      .select({
+        id: security_agent_commands.id,
+        command_type: security_agent_commands.command_type,
+      })
+      .from(security_agent_commands)
+      .where(eq(security_agent_commands.owned_by_user_id, user.id));
+    expect(commands).toHaveLength(1);
+    expect(commands[0]?.command_type).toBe('apply_auto_remediation');
   });
 });

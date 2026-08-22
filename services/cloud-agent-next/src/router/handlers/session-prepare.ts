@@ -246,20 +246,22 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
   }
 
   const initialTurn: SessionCreateRequest['initialTurn'] =
-    input.initialPayload?.type === 'command'
-      ? {
-          type: 'command',
-          id: input.initialMessageId,
-          command: input.initialPayload.command,
-          arguments: input.initialPayload.arguments,
-          attachments: input.attachments ?? input.images,
-        }
-      : {
-          type: 'prompt',
-          prompt: input.prompt,
-          attachments: input.attachments ?? input.images,
-          id: input.initialMessageId,
-        };
+    input.cloneFromKiloSessionId !== undefined
+      ? undefined
+      : input.initialPayload?.type === 'command'
+        ? {
+            type: 'command',
+            id: input.initialMessageId,
+            command: input.initialPayload.command,
+            arguments: input.initialPayload.arguments,
+            attachments: input.attachments ?? input.images,
+          }
+        : {
+            type: 'prompt',
+            prompt: input.prompt,
+            attachments: input.attachments ?? input.images,
+            id: input.initialMessageId,
+          };
 
   return {
     initialTurn,
@@ -270,6 +272,9 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     },
     repository,
     runtime: input.devcontainer ? { devcontainer: true } : undefined,
+    clone: input.cloneFromKiloSessionId
+      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      : undefined,
     profile: {
       id: input.profileId,
       overrides: {
@@ -340,6 +345,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       );
 
       if (
+        requestWithProfile.initialTurn !== undefined &&
         requestWithProfile.initialTurn.type === 'command' &&
         requestWithProfile.initialTurn.attachments !== undefined
       ) {
@@ -356,7 +362,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
       }
 
-      if (requestWithProfile.initialTurn.type === 'prompt') {
+      if (requestWithProfile.initialTurn?.type === 'prompt') {
         await assertKiloModelAvailable({
           env: ctx.env,
           submittedModel: requestWithProfile.agent.model,

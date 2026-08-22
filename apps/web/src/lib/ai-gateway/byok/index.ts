@@ -6,7 +6,7 @@ import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
   UserByokProviderIdSchema,
-  VercelUserByokInferenceProviderIdSchema,
+  getVercelUserByokProviderIdForEndpoint,
   type UserByokProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
@@ -22,10 +22,13 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];
   }
-  const providers: UserByokProviderId[] =
-    vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
-      .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.provider_name ?? ep.tag).data)
-      .filter(providerId => providerId !== undefined) ?? [];
+  const providers: UserByokProviderId[] = [
+    ...new Set(
+      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+        .map(ep => getVercelUserByokProviderIdForEndpoint(ep.provider_name ?? ep.tag))
+        .filter(providerId => providerId !== undefined) ?? []
+    ),
+  ];
   if (providers.length === 0) {
     console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
     return [];

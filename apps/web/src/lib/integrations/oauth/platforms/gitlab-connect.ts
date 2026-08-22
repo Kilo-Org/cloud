@@ -15,8 +15,11 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import {
   buildIntegrationOAuthConnectErrorPath,
+  organizationAccessDenialErrorCode,
   redirectToSignInForOAuthConnect,
 } from '@/lib/integrations/oauth/common';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
 
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
@@ -78,16 +81,23 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
   } catch (error) {
     console.error('Error initiating GitLab OAuth:', error);
 
-    captureException(error, {
-      tags: {
-        endpoint: 'gitlab/connect',
-        source: 'gitlab_oauth',
-      },
-    });
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: 'gitlab/connect',
+          source: 'gitlab_oauth',
+        },
+      });
+    }
 
     return NextResponse.redirect(
       new URL(
-        buildIntegrationOAuthConnectErrorPath(PLATFORM.GITLAB, organizationId, 'oauth_init_failed'),
+        buildIntegrationOAuthConnectErrorPath(
+          PLATFORM.GITLAB,
+          organizationId,
+          denialCode ?? 'oauth_init_failed'
+        ),
         request.url
       )
     );
@@ -129,16 +139,23 @@ export async function handleGitLabOAuthConnectPost(request: NextRequest): Promis
   } catch (error) {
     console.error('Error initiating GitLab OAuth:', error);
 
-    captureException(error, {
-      tags: {
-        endpoint: 'gitlab/connect',
-        source: 'gitlab_oauth',
-      },
-      extra: {
-        organizationId,
-        hasCustomCredentials: Boolean(clientId && clientSecret),
-      },
-    });
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: 'gitlab/connect',
+          source: 'gitlab_oauth',
+        },
+        extra: {
+          organizationId,
+          hasCustomCredentials: Boolean(clientId && clientSecret),
+        },
+      });
+    }
+
+    if (denialCode) {
+      return NextResponse.json({ error: denialCode }, { status: 403 });
+    }
 
     return NextResponse.json({ error: 'oauth_init_failed' }, { status: 500 });
   }
@@ -195,6 +212,13 @@ async function resolveGitLabOAuthOwner(
     return { type: 'user', id: user.id };
   }
 
-  await ensureOrganizationAccess({ user }, organizationId);
+  // Replacing an existing org GitLab integration is a billing-scoped action;
+  // a first-time connect keeps member-level access.
+  const existingIntegration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
+  await ensureOrganizationAccess(
+    { user },
+    organizationId,
+    existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
+  );
   return { type: 'org', id: organizationId };
 }

@@ -142,11 +142,18 @@ const CATEGORY_META: readonly CategoryMeta[] = [
   },
 ] as const;
 
+/** Per-category availability from the preferences response `capabilities` map. */
+type NotificationCategoryCapability = Readonly<{
+  available: boolean;
+  unavailableReason: string | null;
+}>;
+
 type CategoryRowProps = Readonly<{
   meta: CategoryMeta;
   queryKey: readonly unknown[];
   queryClient: ReturnType<typeof useQueryClient>;
   preferences: NotificationPreferences | undefined;
+  capability: NotificationCategoryCapability | undefined;
   disabled: boolean;
   isPending: boolean;
   onChange: (next: boolean) => void;
@@ -157,6 +164,7 @@ function CategoryRow({
   queryKey,
   queryClient,
   preferences,
+  capability,
   disabled,
   isPending,
   onChange,
@@ -170,7 +178,12 @@ function CategoryRow({
     ? readAgentPushPreference(queryClient, queryKey, meta.key)
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
-  const isDisabled = disabled || !editable;
+  // An unavailable category is a terminal, non-retryable state: the switch is
+  // disabled and the server reason replaces the subtitle. A missing entry (the
+  // `noUncheckedIndexedAccess` widening) defaults to available.
+  const unavailable = capability?.available === false;
+  const isDisabled = disabled || !editable || unavailable;
+  const subtitle = unavailable ? (capability.unavailableReason ?? meta.subtitle) : meta.subtitle;
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -182,7 +195,7 @@ function CategoryRow({
           {meta.title}
         </Text>
         <Text variant="muted" className="mt-0.5 text-xs">
-          {meta.subtitle}
+          {subtitle}
         </Text>
       </View>
       {isPending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
@@ -654,6 +667,16 @@ export function NotificationsScreen() {
                   queryKey={preferencesQueryKey}
                   queryClient={queryClient}
                   preferences={preferences}
+                  capability={
+                    // The server type marks `capabilities` required, but a
+                    // backend that predates the field returns none. The guard
+                    // keeps the old response on the always-available path.
+                    // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+                    preferences.capabilities?.[meta.key] ?? {
+                      available: true,
+                      unavailableReason: null,
+                    }
+                  }
                   disabled={!notificationsEnabled}
                   isPending={pendingCategories.has(meta.key)}
                   onChange={next => {

@@ -6,12 +6,14 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
+  operation_ledgers,
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
+import type { CodeReviewCouncilResult, ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import {
   bitbucketCodeReviewerLifecycleLockKey,
   cancelActiveCodeReviewsById,
@@ -26,8 +28,10 @@ import {
   findActiveReviewsForPR,
   findExistingReview,
   getCodeReviewAttemptForReview,
+  getCodeReviewCouncilResult,
   getSessionUsageFromBilling,
   listCodeReviewAttempts,
+  listCodeReviews,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
@@ -701,6 +705,12 @@ describe('review identity', () => {
     expect(review?.status).toBe('cancelled');
     expect(storedAttempt?.status).toBe('cancelled');
 
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('no_op');
+
     await db
       .delete(agent_configs)
       .where(
@@ -786,6 +796,110 @@ describe('review identity', () => {
       .from(cloud_agent_code_review_attempts)
       .where(inArray(cloud_agent_code_review_attempts.id, [queuedAttempt.id, runningAttempt.id]));
     expect(attempts.map(attempt => attempt.status)).toEqual(['cancelled', 'cancelled']);
+  });
+
+  it('settles the admitted ledger row for user-cancelled reviews', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organizationId, userId: firstUser.id },
+      platformIntegrationId: organizationIntegrationId,
+      repoFullName: `${REPO}-ledger-user-cancel`,
+      prNumber: 36,
+      prUrl: `https://github.com/${REPO}-ledger-user-cancel/pull/36`,
+      prTitle: 'ledger user cancel settle',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/ledger-user-cancel-settle',
+      headSha: 'ledger-user-cancel-settle-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    createdReviewIds.push(reviewId);
+
+    const cancelled = await cancelActiveCodeReviewsForIntegration({
+      organizationId,
+      platform: 'github',
+      integrationId: organizationIntegrationId,
+    });
+
+    expect(cancelled.map(row => row.id)).toContain(reviewId);
+    expect(cancelled.find(row => row.id === reviewId)?.triggerSource).toBe('manual');
+
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('no_op');
+  });
+
+  it('admits a code_review ledger row with the mapped intent on create', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName: `${REPO}-ledger-admit`,
+      prNumber: 34,
+      prUrl: `https://github.com/${REPO}-ledger-admit/pull/34`,
+      prTitle: 'ledger admit',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/ledger-admit',
+      headSha: 'ledger-admit-head-sha',
+      platform: 'github',
+      triggerSource: 'webhook',
+    });
+    createdReviewIds.push(reviewId);
+
+    const [ledgerRow] = await db
+      .select({
+        domain: operation_ledgers.domain,
+        operationKey: operation_ledgers.operation_key,
+        intent: operation_ledgers.intent,
+      })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+
+    expect(ledgerRow).toEqual({
+      domain: 'code_review',
+      operationKey: `review:${reviewId}`,
+      intent: 'webhook',
+    });
+  });
+
+  it('does not admit a code_review ledger row inside the creation transaction', async () => {
+    const repoFullName = `${REPO}-ledger-transaction-no-admit`;
+    const result = await db.transaction(tx =>
+      createCodeReviewIfAbsentInTransaction(
+        tx,
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platform: 'github',
+          repoFullName,
+          prNumber: 35,
+        },
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platformIntegrationId: firstIntegrationId,
+          repoFullName,
+          prNumber: 35,
+          prUrl: `https://github.com/${repoFullName}/pull/35`,
+          prTitle: 'ledger transaction no admit',
+          prAuthor: 'octocat',
+          baseRef: 'main',
+          headRef: 'feature/ledger-transaction-no-admit',
+          headSha: 'ledger-transaction-no-admit-head-sha',
+          platform: 'github',
+          triggerSource: 'webhook',
+        }
+      )
+    );
+    expect(result.created).toBe(true);
+    createdReviewIds.push(result.reviewId);
+
+    const ledgerRows = await db
+      .select({ id: operation_ledgers.id })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${result.reviewId}`));
+
+    expect(ledgerRows).toHaveLength(0);
   });
 });
 
@@ -1171,6 +1285,44 @@ describe('cancelSupersededReviewsForPR', () => {
       .where(eq(cloud_agent_code_reviews.id, otherRepoId))
       .limit(1);
     expect(otherRepoRow?.status).toBe('pending');
+  });
+
+  it('settles the admitted ledger row for superseded reviews', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platformIntegrationId: githubIntegrationId,
+      repoFullName: repo,
+      prNumber: 46,
+      prUrl: `https://github.com/${repo}/pull/46`,
+      prTitle: 'ledger superseded settle',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/ledger-superseded-settle',
+      headSha: 'sha-ledger-superseded-settle',
+      platform: 'github',
+      triggerSource: 'webhook',
+    });
+    createdReviewIds.push(reviewId);
+
+    const cancelled = await cancelSupersededReviewsForPR(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'github',
+        repoFullName: repo,
+        prNumber: 46,
+        platformIntegrationId: githubIntegrationId,
+      },
+      'sha-ledger-superseded-settle-new'
+    );
+
+    expect(cancelled.map(row => row.id)).toEqual([reviewId]);
+    expect(cancelled[0]?.triggerSource).toBe('webhook');
+
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('superseded');
   });
 });
 
@@ -1817,5 +1969,113 @@ describe('resetCodeReviewForRetry', () => {
       where: eq(cloud_agent_code_reviews.id, reviewId),
     });
     expect(stored?.status).toBe('pending');
+  });
+});
+
+describe('listCodeReviews narrows the list DTO', () => {
+  let testUser: User;
+  let integrationId: string;
+  const createdReviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `narrow-list-${Date.now()}`,
+        platform_account_id: 'narrow-list',
+        platform_account_login: 'narrow-list',
+        repository_access: 'all',
+        integration_status: 'active',
+      })
+      .returning({ id: platform_integrations.id });
+    if (!integration) {
+      throw new Error('Expected narrow-list integration');
+    }
+    integrationId = integration.id;
+  });
+
+  afterAll(async () => {
+    for (const id of createdReviewIds) {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
+    }
+    await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createReviewWithHeavyFields() {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platformIntegrationId: integrationId,
+      repoFullName: `${REPO}-narrow-list`,
+      prNumber: 61,
+      prUrl: `https://github.com/${REPO}-narrow-list/pull/61`,
+      prTitle: 'narrow list DTO',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/narrow-list',
+      headSha: 'narrow-list-head-sha',
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        council_result: {
+          decision: 'pass',
+          aggregationStrategy: 'unanimous',
+          specialists: [],
+        } as CodeReviewCouncilResult,
+        manual_config: {
+          outputMode: 'kilo',
+          instructions: null,
+          agentConfig: { model_slug: 'test-model' },
+        } as ManualCodeReviewConfig,
+        previous_summary_body: 'previous summary body',
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    return reviewId;
+  }
+
+  it('omits council_result, manual_config, and previous_summary_body from list rows', async () => {
+    const reviewId = await createReviewWithHeavyFields();
+
+    const rows = await listCodeReviews({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      limit: 50,
+      offset: 0,
+    });
+
+    const row = rows.find(r => r.id === reviewId);
+    expect(row).toBeDefined();
+    if (!row) {
+      throw new Error('Expected narrow-list row');
+    }
+    expect(row).not.toHaveProperty('council_result');
+    expect(row).not.toHaveProperty('manual_config');
+    expect(row).not.toHaveProperty('previous_summary_body');
+
+    const {
+      council_result: _councilResult,
+      manual_config: _manualConfig,
+      previous_summary_body: _previousSummaryBody,
+      ...listColumns
+    } = getTableColumns(cloud_agent_code_reviews);
+    expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());
+  });
+
+  it('keeps council_result available to the detail getter', async () => {
+    const reviewId = await createReviewWithHeavyFields();
+
+    const councilResult = await getCodeReviewCouncilResult(reviewId);
+
+    expect(councilResult).toEqual({
+      decision: 'pass',
+      aggregationStrategy: 'unanimous',
+      specialists: [],
+    });
   });
 });

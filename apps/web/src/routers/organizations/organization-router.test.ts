@@ -1,6 +1,11 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { credit_transactions, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  credit_transactions,
+  organization_invitations,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
@@ -352,6 +357,179 @@ describe('organizations trpc router', () => {
           expect(member).toHaveProperty('currentDailyUsageUsd');
         }
       });
+    });
+  });
+
+  describe('withMembers role-gated DTO', () => {
+    it('returns the narrow member shape for members and the full shape for owners', async () => {
+      const owner = await insertTestUser({
+        google_user_email: `dto-owner-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'DTO Owner',
+        is_admin: false,
+      });
+      const member = await insertTestUser({
+        google_user_email: `dto-member-${crypto.randomUUID()}@example.com`,
+        google_user_name: 'DTO Member',
+        is_admin: false,
+      });
+      const org = await createOrganization('DTO Org', owner.id);
+      await addUserToOrganization(org.id, member.id, 'member');
+      await db
+        .update(organizations)
+        .set({ stripe_customer_id: 'cus_dto_org' })
+        .where(eq(organizations.id, org.id));
+
+      const invitedEmail = `dto-invite-${crypto.randomUUID()}@example.com`;
+      await db.insert(organization_invitations).values({
+        organization_id: org.id,
+        email: invitedEmail,
+        role: 'member',
+        invited_by: owner.id,
+        token: 'dto-invite-token',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      try {
+        const memberCaller = await createCallerForUser(member.id);
+        const memberResult = await memberCaller.organizations.withMembers({
+          organizationId: org.id,
+        });
+
+        expect(Object.keys(memberResult).sort()).toEqual(
+          [
+            'id',
+            'name',
+            'created_at',
+            'updated_at',
+            'microdollars_used',
+            'microdollars_balance',
+            'total_microdollars_acquired',
+            'next_credit_expiration_at',
+            'auto_top_up_enabled',
+            'settings',
+            'seat_count',
+            'require_seats',
+            'created_by_kilo_user_id',
+            'deleted_at',
+            'sso_domain',
+            'parent_organization_id',
+            'plan',
+            'free_trial_end_at',
+            'company_domain',
+            'callerRole',
+            'members',
+            'childOrganizations',
+            'effectiveSsoPolicy',
+          ].sort()
+        );
+        expect(memberResult).not.toHaveProperty('stripe_customer_id');
+
+        const memberActive = memberResult.members.find(
+          m => m.status === 'active' && m.id === member.id
+        );
+        expect(Object.keys(memberActive!).sort()).toEqual(
+          [
+            'id',
+            'name',
+            'email',
+            'role',
+            'status',
+            'inviteDate',
+            'dailyUsageLimitUsd',
+            'childOrganizationMemberships',
+          ].sort()
+        );
+
+        const memberInvited = memberResult.members.find(m => m.status === 'invited');
+        expect(Object.keys(memberInvited!).sort()).toEqual(
+          [
+            'email',
+            'role',
+            'status',
+            'inviteDate',
+            'inviteId',
+            'emailStatus',
+            'dailyUsageLimitUsd',
+          ].sort()
+        );
+        expect(memberInvited).not.toHaveProperty('inviteToken');
+        expect(memberInvited).not.toHaveProperty('inviteUrl');
+        expect(memberInvited).not.toHaveProperty('currentDailyUsageUsd');
+
+        const ownerCaller = await createCallerForUser(owner.id);
+        const ownerResult = await ownerCaller.organizations.withMembers({
+          organizationId: org.id,
+        });
+
+        expect(Object.keys(ownerResult).sort()).toEqual(
+          [
+            'id',
+            'name',
+            'created_at',
+            'updated_at',
+            'microdollars_used',
+            'microdollars_balance',
+            'total_microdollars_acquired',
+            'next_credit_expiration_at',
+            'stripe_customer_id',
+            'auto_top_up_enabled',
+            'settings',
+            'seat_count',
+            'require_seats',
+            'created_by_kilo_user_id',
+            'deleted_at',
+            'sso_domain',
+            'parent_organization_id',
+            'plan',
+            'free_trial_end_at',
+            'company_domain',
+            'callerRole',
+            'members',
+            'childOrganizations',
+            'effectiveSsoPolicy',
+          ].sort()
+        );
+        expect(ownerResult).toHaveProperty('stripe_customer_id', 'cus_dto_org');
+
+        const ownerActive = ownerResult.members.find(
+          m => m.status === 'active' && m.id === member.id
+        );
+        expect(Object.keys(ownerActive!).sort()).toEqual(
+          [
+            'id',
+            'name',
+            'email',
+            'role',
+            'status',
+            'inviteDate',
+            'dailyUsageLimitUsd',
+            'currentDailyUsageUsd',
+            'childOrganizationMemberships',
+          ].sort()
+        );
+
+        const ownerInvited = ownerResult.members.find(m => m.status === 'invited');
+        expect(Object.keys(ownerInvited!).sort()).toEqual(
+          [
+            'email',
+            'role',
+            'status',
+            'inviteDate',
+            'inviteToken',
+            'inviteId',
+            'inviteUrl',
+            'emailStatus',
+            'dailyUsageLimitUsd',
+            'currentDailyUsageUsd',
+          ].sort()
+        );
+        expect(ownerInvited).toHaveProperty('inviteToken', 'dto-invite-token');
+      } finally {
+        await db
+          .delete(organization_invitations)
+          .where(eq(organization_invitations.organization_id, org.id));
+        await db.delete(organizations).where(eq(organizations.id, org.id));
+      }
     });
   });
 

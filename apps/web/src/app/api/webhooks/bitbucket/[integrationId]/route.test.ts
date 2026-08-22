@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 const mockFetchBitbucketPullRequest = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
+const mockSettleOperation = jest.fn();
+const mockGetBitbucketCodeReviewerReadiness = jest.fn();
 const mockBitbucketSigningKeys = JSON.stringify({
   active: Buffer.alloc(32, 31).toString('base64'),
   previous: Buffer.alloc(32, 47).toString('base64'),
@@ -35,12 +37,26 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   },
 }));
 
+jest.mock('@kilocode/db/operation-ledger', () => {
+  const actual = jest.requireActual('@kilocode/db/operation-ledger');
+  return {
+    ...actual,
+    settleOperation: (...args: unknown[]) => mockSettleOperation(...args),
+  };
+});
+
+jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache', () => ({
+  getBitbucketCodeReviewerReadiness: (...args: unknown[]) =>
+    mockGetBitbucketCodeReviewerReadiness(...args),
+}));
+
 import { createHmac, randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import {
   agent_configs,
   cloud_agent_code_reviews,
   kilocode_users,
+  operation_ledgers,
   organization_memberships,
   organizations,
   platform_integrations,
@@ -49,7 +65,7 @@ import {
   type PlatformIntegration,
   type User,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import {
@@ -62,6 +78,7 @@ import {
   deriveBitbucketWebhookSecret,
   parseBitbucketWebhookSigningKeyring,
 } from '@/lib/integrations/platforms/bitbucket/webhook-signing';
+import { triggerManualBitbucketCodeReview } from '@/lib/integrations/platforms/bitbucket/manual-code-review-trigger';
 import { POST } from './route';
 
 const WORKSPACE_UUID = '11111111-1111-4111-8111-111111111111';
@@ -274,6 +291,30 @@ async function organizationWebhookEvents() {
     .where(eq(webhook_events.owned_by_organization_id, organization.id));
 }
 
+function readinessFor(integration: PlatformIntegration) {
+  return {
+    connected: true,
+    ready: true,
+    integrationId: integration.id,
+    workspace: { uuid: WORKSPACE_UUID, slug: 'acme', displayName: 'Acme Workspace' },
+    missingRequiredScopes: [],
+    repositoryCache: {
+      status: 'available' as const,
+      repositories: [
+        {
+          id: REPOSITORY_UUID,
+          workspaceUuid: WORKSPACE_UUID,
+          name: 'widgets',
+          fullName: REPOSITORY_FULL_NAME,
+          private: true,
+          defaultBranch: 'main',
+        },
+      ],
+      syncedAt: '2026-06-24T08:00:00.000Z',
+    },
+  };
+}
+
 describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
   beforeAll(async () => {
     ownerUser = await insertTestUser();
@@ -291,6 +332,10 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const actualOperationLedger = jest.requireActual('@kilocode/db/operation-ledger') as {
+      settleOperation: (...args: unknown[]) => Promise<unknown>;
+    };
+    mockSettleOperation.mockImplementation(actualOperationLedger.settleOperation);
     mockFetchBitbucketPullRequest.mockResolvedValue(providerPullRequest());
     mockTryDispatchPendingReviews.mockResolvedValue({
       dispatched: 1,
@@ -301,6 +346,18 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
   });
 
   afterEach(async () => {
+    const reviewIds = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+    if (reviewIds.length > 0) {
+      await db.delete(operation_ledgers).where(
+        inArray(
+          operation_ledgers.operation_key,
+          reviewIds.map(review => `review:${review.id}`)
+        )
+      );
+    }
     await db
       .delete(webhook_events)
       .where(eq(webhook_events.owned_by_organization_id, organization.id));
@@ -645,5 +702,120 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
     expect((await organizationWebhookEvents())[0]?.processed).toBe(true);
     expect(mockCancelReview).toHaveBeenCalledWith(reviewId, expect.any(String), undefined);
     expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('admits the code_review ledger row after the review transaction commits', async () => {
+    const integration = await insertIntegrationAndConfig();
+
+    const response = await callWebhook(integration, webhookRequest(integration));
+
+    expect(response.status).toBe(202);
+    const reviews = await organizationReviews();
+    expect(reviews).toHaveLength(1);
+    const reviewId = reviews[0].id;
+
+    const [ledgerRow] = await db
+      .select({
+        domain: operation_ledgers.domain,
+        operationKey: operation_ledgers.operation_key,
+        intent: operation_ledgers.intent,
+      })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+
+    expect(ledgerRow).toEqual({
+      domain: 'code_review',
+      operationKey: `review:${reviewId}`,
+      intent: 'webhook',
+    });
+  });
+
+  it('settles the admitted ledger row as superseded after a superseding webhook cancels active work', async () => {
+    const integration = await insertIntegrationAndConfig();
+    const reviewId = await createExistingReview(integration, DEFAULT_HEAD_SHA, 'queued');
+    mockFetchBitbucketPullRequest.mockResolvedValueOnce(
+      providerPullRequest({ state: 'MERGED', draft: false })
+    );
+
+    const response = await callWebhook(
+      integration,
+      webhookRequest(integration, { eventKey: 'pullrequest:fulfilled' })
+    );
+
+    expect(response.status).toBe(200);
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('superseded');
+  });
+
+  it('still succeeds when the superseded ledger settle fails', async () => {
+    const integration = await insertIntegrationAndConfig();
+    const reviewId = await createExistingReview(integration, DEFAULT_HEAD_SHA, 'queued');
+    mockFetchBitbucketPullRequest.mockResolvedValueOnce(
+      providerPullRequest({ state: 'MERGED', draft: false })
+    );
+    mockSettleOperation.mockRejectedValueOnce(new Error('ledger unavailable'));
+
+    const response = await callWebhook(
+      integration,
+      webhookRequest(integration, { eventKey: 'pullrequest:fulfilled' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+    expect((await organizationReviews())[0]).toEqual(
+      expect.objectContaining({ id: reviewId, status: 'cancelled', terminal_reason: 'superseded' })
+    );
+  });
+
+  it('settles the admitted ledger row as superseded after a superseding manual trigger', async () => {
+    const integration = await insertIntegrationAndConfig();
+    const reviewId = await createExistingReview(integration, DEFAULT_HEAD_SHA, 'queued');
+    mockGetBitbucketCodeReviewerReadiness.mockResolvedValue(readinessFor(integration));
+    mockFetchBitbucketPullRequest.mockResolvedValueOnce(
+      providerPullRequest({ headSha: 'b'.repeat(40) })
+    );
+
+    const result = await triggerManualBitbucketCodeReview({
+      organizationId: organization.id,
+      pullRequestUrl: `https://bitbucket.org/${REPOSITORY_FULL_NAME}/pull-requests/${PULL_REQUEST_ID}`,
+    });
+
+    expect(result.status).toBe('queued');
+    const [cancelledReview] = await db
+      .select({ status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(cancelledReview?.status).toBe('cancelled');
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow?.status).toBe('superseded');
+  });
+
+  it('still starts the review when the superseded ledger settle fails for a manual trigger', async () => {
+    const integration = await insertIntegrationAndConfig();
+    const reviewId = await createExistingReview(integration, DEFAULT_HEAD_SHA, 'queued');
+    mockGetBitbucketCodeReviewerReadiness.mockResolvedValue(readinessFor(integration));
+    mockFetchBitbucketPullRequest.mockResolvedValueOnce(
+      providerPullRequest({ headSha: 'b'.repeat(40) })
+    );
+    mockSettleOperation.mockRejectedValueOnce(new Error('ledger unavailable'));
+
+    const result = await triggerManualBitbucketCodeReview({
+      organizationId: organization.id,
+      pullRequestUrl: `https://bitbucket.org/${REPOSITORY_FULL_NAME}/pull-requests/${PULL_REQUEST_ID}`,
+    });
+
+    expect(result.status).toBe('queued');
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+    const [cancelledReview] = await db
+      .select({ status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(cancelledReview?.status).toBe('cancelled');
   });
 });

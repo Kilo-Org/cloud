@@ -33,6 +33,7 @@ vi.mock('drizzle-orm', async importOriginal => {
 
 vi.mock('./dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
+  CLONE_ITEM_TYPES: ['session', 'message', 'part', 'session_diff'],
 }));
 
 vi.mock('./dos/SessionAccessCacheDO', () => ({
@@ -61,7 +62,9 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, or } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
+import { notifyUserSessionEvent } from './session-events';
 import { canCreateCliSessionForUser } from './services/user-session-admission';
 
 const sdkSessionInfoFixture = {
@@ -145,8 +148,9 @@ function makeRootWriteDb(params: {
     limit: vi.fn(() => select),
     for: vi.fn(async () => (params.existing ? [params.existing] : [])),
   };
+  const updateSet = vi.fn((_values: unknown) => update);
   const update = {
-    set: vi.fn(() => update),
+    set: updateSet,
     where: vi.fn(() => update),
     returning: vi.fn(async () => (params.existing ? [params.existing] : [])),
   };
@@ -158,6 +162,7 @@ function makeRootWriteDb(params: {
   return {
     db: { transaction: vi.fn(async callback => callback(tx)) },
     values,
+    updateSet,
   };
 }
 
@@ -224,6 +229,1150 @@ describe('createSessionForCloudAgent', () => {
       'User session creation is not allowed'
     );
     expect(fake.values).not.toHaveBeenCalled();
+  });
+
+  it('refuses to change the payer organization of an existing root', async () => {
+    const fake = makeRootWriteDb({
+      existing: {
+        session_id: params.sessionId,
+        kilo_user_id: params.kiloUserId,
+        cloud_agent_session_id: params.cloudAgentSessionId,
+        cloud_agent_session_scope_id: params.cloudAgentSessionId,
+        organization_id: null,
+        parent_session_id: null,
+      },
+    });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).rejects.toThrow(
+      'Cloud Agent root session identity conflict'
+    );
+  });
+
+  it('refuses to remove the payer organization of an existing root', async () => {
+    const fake = makeRootWriteDb({
+      existing: {
+        session_id: params.sessionId,
+        kilo_user_id: params.kiloUserId,
+        cloud_agent_session_id: params.cloudAgentSessionId,
+        cloud_agent_session_scope_id: params.cloudAgentSessionId,
+        organization_id: params.organizationId,
+        parent_session_id: null,
+      },
+    });
+    const rpc = makeRpc(fake.db as never);
+    const { organizationId: _organizationId, ...personalParams } = params;
+
+    await expect(rpc.createSessionForCloudAgent(personalParams)).rejects.toThrow(
+      'Cloud Agent root session identity conflict'
+    );
+  });
+
+  it('accepts an idempotent retry with the same payer organization', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    expect(fake.values).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an idempotent retry for a personal root', async () => {
+    const { organizationId: _organizationId, ...personalParams } = params;
+    const existing = {
+      session_id: personalParams.sessionId,
+      kilo_user_id: personalParams.kiloUserId,
+      cloud_agent_session_id: personalParams.cloudAgentSessionId,
+      cloud_agent_session_scope_id: personalParams.cloudAgentSessionId,
+      organization_id: null,
+      parent_session_id: null,
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(personalParams)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: personalParams.sessionId, copiedItemCount: 0 },
+    });
+    expect(fake.values).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists a normalized git_url on first insert', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' });
+
+    expect(fake.values).toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: 'https://github.com/acme/repo' })
+    );
+  });
+
+  it('accepts an identical repository retry without rewriting git_url', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' })
+    ).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    expect(fake.values).toHaveBeenCalledTimes(1);
+    const setArg = fake.updateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).not.toHaveProperty('git_url');
+  });
+
+  it('leaves an existing repository unchanged when old workers omit gitUrl', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    expect(fake.values).toHaveBeenCalledTimes(1);
+    const setArg = fake.updateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).not.toHaveProperty('git_url');
+  });
+
+  it('heals a null repository URL to the input URL and invalidates the access cache', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const cacheRemove = vi.fn(async () => undefined);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ remove: cacheRemove } as never);
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' });
+
+    expect(fake.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: 'https://github.com/acme/repo' })
+    );
+    expect(cacheRemove).toHaveBeenCalledWith(params.sessionId);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      params.kiloUserId,
+      expect.objectContaining({ type: 'session.updated' }),
+      expect.anything()
+    );
+  });
+
+  it('rejects a conflicting repository URL', async () => {
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      git_url: 'https://github.com/acme/repo',
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/other/repo' })
+    ).rejects.toThrow('Cloud Agent root session identity conflict');
+  });
+});
+
+describe('createSessionForCloudAgent clone path', () => {
+  const sourceSessionId = 'ses_12345678901234567890123456';
+  const destinationSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+  const kiloUserId = 'usr_test';
+  const organizationId = '11111111-1111-4111-8111-111111111111';
+
+  type CloneItem = {
+    itemId: string;
+    itemType: string;
+    itemData: string;
+    itemDataR2Key: string | null;
+    ingestedAt: number | null;
+  };
+
+  const sourceSessionItem = (): CloneItem => ({
+    itemId: 'session',
+    itemType: 'session',
+    itemData: JSON.stringify({
+      id: sourceSessionId,
+      slug: 'quiet-forest',
+      projectID: 'project-cloud-agent',
+      directory: '/workspace/cloud-agent',
+      title: 'SDK attach session',
+      agent: 'build',
+      model: { id: 'anthropic/claude-sonnet-4', providerID: 'openrouter' },
+      version: '7.2.52',
+      time: { created: 1761000000000, updated: 1761000001000 },
+    }),
+    itemDataR2Key: null,
+    ingestedAt: 1,
+  });
+
+  const sourceMessageItem = (): CloneItem => ({
+    itemId: 'message/msg_user_01',
+    itemType: 'message',
+    itemData: JSON.stringify({
+      id: 'msg_user_01',
+      sessionID: sourceSessionId,
+      role: 'user',
+      time: { created: 1761000000100 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+    }),
+    itemDataR2Key: null,
+    ingestedAt: 2,
+  });
+
+  const sourcePartItem = (): CloneItem => ({
+    itemId: 'msg_user_01/prt_user_01',
+    itemType: 'part',
+    itemData: JSON.stringify({
+      id: 'prt_user_01',
+      sessionID: sourceSessionId,
+      messageID: 'msg_user_01',
+      type: 'text',
+      text: 'Attach to this persisted turn',
+    }),
+    itemDataR2Key: null,
+    ingestedAt: 3,
+  });
+
+  function makePagedSourceStub(items: CloneItem[], pageSize: number) {
+    const exportCloneBatch = vi.fn(
+      async (cursor: { ingestedAt: number | null; id: number } | null, limit: number) => {
+        const startIndex = cursor === null ? 0 : cursor.id;
+        const page = items.slice(startIndex, startIndex + Math.min(limit, pageSize));
+        const lastIndex = startIndex + page.length;
+        const done = lastIndex >= items.length;
+        const nextCursor = done
+          ? null
+          : { ingestedAt: items[lastIndex - 1]?.ingestedAt ?? null, id: lastIndex };
+        return { rows: page, nextCursor, done, digest: 'page-digest' };
+      }
+    );
+    return { exportCloneBatch };
+  }
+
+  function makeDestinationStub() {
+    const state = {
+      kind: 'empty' as 'empty' | 'in_progress' | 'complete',
+      sourceSessionId: null as string | null,
+      destinationSessionId: null as string | null,
+      nextCursor: null as { ingestedAt: number | null; id: number } | null,
+      rollingDigest: '',
+      copiedItemCount: 0,
+      stagedRows: [] as CloneItem[],
+    };
+
+    const inspectCloneStage = vi.fn(() => {
+      if (state.kind === 'empty') return { status: 'empty' };
+      const sameIdentity =
+        state.sourceSessionId === sourceSessionId &&
+        state.destinationSessionId === destinationSessionId;
+      if (!sameIdentity) {
+        return {
+          status: 'mismatch',
+          storedSourceSessionId: state.sourceSessionId,
+          storedDestinationSessionId: state.destinationSessionId,
+          storedStage: state.kind === 'complete' ? 'complete' : 'in_progress',
+        };
+      }
+      if (state.kind === 'complete') {
+        return {
+          status: 'complete',
+          sourceSessionId: state.sourceSessionId,
+          destinationSessionId: state.destinationSessionId,
+        };
+      }
+      return {
+        status: 'in_progress',
+        sourceSessionId: state.sourceSessionId,
+        destinationSessionId: state.destinationSessionId,
+        nextCursor: state.nextCursor,
+        rollingDigest: state.rollingDigest,
+        copiedItemCount: state.copiedItemCount,
+      };
+    });
+
+    const stageCloneBatch = vi.fn(
+      (params: {
+        sourceSessionId: string;
+        destinationSessionId: string;
+        rows: CloneItem[];
+        nextCursor: { ingestedAt: number | null; id: number } | null;
+        rollingDigest: string;
+        copiedItemCount: number;
+      }) => {
+        if (state.kind === 'complete') {
+          if (
+            state.sourceSessionId === params.sourceSessionId &&
+            state.destinationSessionId === params.destinationSessionId
+          ) {
+            return {
+              status: 'complete',
+              sourceSessionId: params.sourceSessionId,
+              destinationSessionId: params.destinationSessionId,
+            };
+          }
+          return {
+            status: 'mismatch',
+            storedSourceSessionId: state.sourceSessionId,
+            storedDestinationSessionId: state.destinationSessionId,
+          };
+        }
+        if (
+          state.kind === 'in_progress' &&
+          (state.sourceSessionId !== params.sourceSessionId ||
+            state.destinationSessionId !== params.destinationSessionId)
+        ) {
+          return {
+            status: 'mismatch',
+            storedSourceSessionId: state.sourceSessionId,
+            storedDestinationSessionId: state.destinationSessionId,
+          };
+        }
+        state.kind = 'in_progress';
+        state.sourceSessionId = params.sourceSessionId;
+        state.destinationSessionId = params.destinationSessionId;
+        state.nextCursor = params.nextCursor;
+        state.rollingDigest = params.rollingDigest;
+        state.copiedItemCount = params.copiedItemCount;
+        for (const row of params.rows) state.stagedRows.push(row);
+        return {
+          status: 'staged',
+          sourceSessionId: params.sourceSessionId,
+          destinationSessionId: params.destinationSessionId,
+          nextCursor: params.nextCursor,
+          rollingDigest: params.rollingDigest,
+          copiedItemCount: params.copiedItemCount,
+        };
+      }
+    );
+
+    const finalizeCloneStage = vi.fn(
+      (params: {
+        sourceSessionId: string;
+        destinationSessionId: string;
+        finalDigest: string;
+        finalItemCount: number;
+      }) => {
+        if (state.kind === 'empty') return { status: 'empty' };
+        if (
+          state.sourceSessionId !== params.sourceSessionId ||
+          state.destinationSessionId !== params.destinationSessionId
+        ) {
+          return {
+            status: 'mismatch',
+            storedSourceSessionId: state.sourceSessionId,
+            storedDestinationSessionId: state.destinationSessionId,
+          };
+        }
+        if (state.kind === 'complete') {
+          return {
+            status: 'complete',
+            sourceSessionId: params.sourceSessionId,
+            destinationSessionId: params.destinationSessionId,
+          };
+        }
+        if (
+          state.rollingDigest !== params.finalDigest ||
+          state.copiedItemCount !== params.finalItemCount
+        ) {
+          return {
+            status: 'digest_mismatch',
+            expectedDigest: params.finalDigest,
+            actualDigest: state.rollingDigest,
+            expectedItemCount: params.finalItemCount,
+            actualItemCount: state.copiedItemCount,
+          };
+        }
+        state.kind = 'complete';
+        return {
+          status: 'complete',
+          sourceSessionId: params.sourceSessionId,
+          destinationSessionId: params.destinationSessionId,
+        };
+      }
+    );
+
+    const resetCloneStage = vi.fn(async () => {
+      state.kind = 'empty';
+      state.sourceSessionId = null;
+      state.destinationSessionId = null;
+      state.nextCursor = null;
+      state.rollingDigest = '';
+      state.copiedItemCount = 0;
+      state.stagedRows = [];
+    });
+
+    return {
+      stub: { inspectCloneStage, stageCloneBatch, finalizeCloneStage, resetCloneStage },
+      state,
+    };
+  }
+
+  function makeCloneDb(options: {
+    sourceRows: Array<{ sessionId: string; organizationId: string | null }>;
+    destinationRows?: Array<Record<string, unknown>>;
+    created?: Record<string, unknown>;
+    existing?: Record<string, unknown>;
+    insertError?: Error;
+  }) {
+    // `leftJoin` distinguishes the source ownership lookup from the destination
+    // pre-check read: only the source lookup joins organization_memberships.
+    // `from` resets the flag so each query chain starts clean.
+    let leftJoined = false;
+    const selectResult = vi.fn(async () =>
+      leftJoined ? options.sourceRows : (options.destinationRows ?? [])
+    );
+    const select = {
+      from: vi.fn(() => {
+        leftJoined = false;
+        return select;
+      }),
+      leftJoin: vi.fn(() => {
+        leftJoined = true;
+        return select;
+      }),
+      where: vi.fn(() => select),
+      orderBy: vi.fn(() => select),
+      limit: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+    };
+    const values = vi.fn(() => insert);
+    const insert = {
+      values,
+      onConflictDoNothing: vi.fn(() => insert),
+      returning: vi.fn(async () => {
+        if (options.insertError) throw options.insertError;
+        return options.created ? [options.created] : [];
+      }),
+    };
+    const txSelect = {
+      from: vi.fn(() => txSelect),
+      where: vi.fn(() => txSelect),
+      limit: vi.fn(() => txSelect),
+      for: vi.fn(async () => (options.existing ? [options.existing] : [])),
+    };
+    const update = {
+      set: vi.fn(() => update),
+      where: vi.fn(() => update),
+      returning: vi.fn(async () => (options.existing ? [options.existing] : [])),
+    };
+    const tx = {
+      insert: vi.fn(() => insert),
+      select: vi.fn(() => txSelect),
+      update: vi.fn(() => update),
+    };
+    const db = {
+      select: vi.fn(() => select),
+      transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(tx)),
+    };
+    return { db, values, selectResult };
+  }
+
+  function makeCloneRpc(options: {
+    db: ReturnType<typeof makeCloneDb>['db'];
+    sourceStub: { exportCloneBatch: ReturnType<typeof vi.fn> };
+    destStub: ReturnType<typeof makeDestinationStub>['stub'];
+    r2: {
+      get: ReturnType<typeof vi.fn>;
+      put: ReturnType<typeof vi.fn>;
+      delete?: ReturnType<typeof vi.fn>;
+    };
+  }) {
+    vi.mocked(getWorkerDb).mockReturnValue(options.db as never);
+    vi.mocked(getSessionIngestDO).mockImplementation(
+      (_env, { sessionId }) =>
+        (sessionId === sourceSessionId ? options.sourceStub : options.destStub) as never
+    );
+    const ctx = {
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+    } as unknown as ConstructorParameters<typeof SessionIngestRPC>[0];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: options.r2,
+    } as unknown as ConstructorParameters<typeof SessionIngestRPC>[1];
+    return new SessionIngestRPC(ctx, env);
+  }
+
+  const cloneParams = (overrides: Record<string, unknown> = {}) => ({
+    sessionId: destinationSessionId,
+    kiloUserId,
+    cloudAgentSessionId: 'cloud-agent-session-clone',
+    organizationId,
+    createdOnPlatform: 'cloud-agent',
+    cloneFromKiloSessionId: sourceSessionId,
+    ...overrides,
+  });
+
+  const createdRow = {
+    session_id: destinationSessionId,
+    kilo_user_id: kiloUserId,
+    cloud_agent_session_id: 'cloud-agent-session-clone',
+    cloud_agent_session_scope_id: 'cloud-agent-session-clone',
+    organization_id: organizationId,
+    parent_session_id: null,
+    updated_at: '2026-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(canCreateCliSessionForUser).mockReset().mockResolvedValue(true);
+  });
+
+  it('clones inline session, message, and part rows, rewrites sessionID, and returns ready', async () => {
+    const sourceItems = [sourceSessionItem(), sourceMessageItem(), sourcePartItem()];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 3 },
+    });
+
+    const stagedSession = dest.state.stagedRows.find(row => row.itemId === 'session');
+    expect(stagedSession).toBeDefined();
+    expect(JSON.parse(stagedSession!.itemData)).toMatchObject({
+      id: destinationSessionId,
+      slug: 'quiet-forest',
+      directory: '',
+    });
+    expect(JSON.parse(stagedSession!.itemData)).not.toHaveProperty('path');
+    expect(JSON.parse(stagedSession!.itemData)).not.toHaveProperty('parentID');
+
+    const stagedMessage = dest.state.stagedRows.find(row => row.itemId === 'message/msg_user_01');
+    expect(JSON.parse(stagedMessage!.itemData)).toMatchObject({
+      id: 'msg_user_01',
+      sessionID: destinationSessionId,
+    });
+
+    const stagedPart = dest.state.stagedRows.find(row => row.itemId === 'msg_user_01/prt_user_01');
+    expect(JSON.parse(stagedPart!.itemData)).toMatchObject({
+      id: 'prt_user_01',
+      messageID: 'msg_user_01',
+      sessionID: destinationSessionId,
+    });
+  });
+
+  it('copies an R2-backed message body to a deterministic destination key', async () => {
+    const r2MessageBody = JSON.stringify({
+      id: 'msg_r2_01',
+      sessionID: sourceSessionId,
+      role: 'user',
+      time: { created: 1761000000200 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+    });
+    const sourceItems = [
+      sourceSessionItem(),
+      {
+        itemId: 'message/msg_r2_01',
+        itemType: 'message',
+        itemData: '{}',
+        itemDataR2Key: 'items/blob-msg',
+        ingestedAt: 2,
+      },
+    ];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const put = vi.fn(async () => {});
+    const r2 = {
+      get: vi.fn(async (key: string) =>
+        key === 'items/blob-msg' ? { text: async () => r2MessageBody } : null
+      ),
+      put,
+    };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 2 },
+    });
+
+    const destinationKey = `clone/${destinationSessionId}/message/msg_r2_01`;
+    expect(put).toHaveBeenCalledWith(
+      destinationKey,
+      expect.stringContaining(`"sessionID":"${destinationSessionId}"`)
+    );
+    const stagedMessage = dest.state.stagedRows.find(row => row.itemId === 'message/msg_r2_01');
+    expect(stagedMessage).toMatchObject({ itemData: '{}', itemDataR2Key: destinationKey });
+  });
+
+  it('rejects with source_access_denied and leaves no row when the source is not owned', async () => {
+    const sourceStub = makePagedSourceStub([], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({ sourceRows: [] });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'source_access_denied',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects with organization_mismatch when source and destination organizations differ', async () => {
+    const sourceStub = makePagedSourceStub([], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId: 'other-org' }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'organization_mismatch',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects with malformed_source_data and resets the destination stage', async () => {
+    const sourceItems = [
+      sourceSessionItem(),
+      {
+        itemId: 'message/msg_bad_01',
+        itemType: 'message',
+        itemData: 'not-json',
+        itemDataR2Key: null,
+        ingestedAt: 2,
+      },
+    ];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'malformed_source_data',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+  });
+
+  it('rejects with missing_source_body and resets the destination stage', async () => {
+    const sourceItems = [
+      sourceSessionItem(),
+      {
+        itemId: 'message/msg_r2_missing',
+        itemType: 'message',
+        itemData: '{}',
+        itemDataR2Key: 'items/missing-blob',
+        ingestedAt: 2,
+      },
+    ];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'missing_source_body',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+  });
+
+  it('rejects with source_digest_changed when the source changes before finalization', async () => {
+    let exportCalls = 0;
+    const sourceStub = makePagedSourceStub([], 100);
+    sourceStub.exportCloneBatch.mockImplementation(
+      async (cursor: { ingestedAt: number | null; id: number } | null, limit: number) => {
+        exportCalls += 1;
+        const items =
+          exportCalls === 1 ? [sourceSessionItem(), sourceMessageItem()] : [sourceSessionItem()];
+        const startIndex = cursor === null ? 0 : cursor.id;
+        const page = items.slice(startIndex, startIndex + limit);
+        const lastIndex = startIndex + page.length;
+        const done = lastIndex >= items.length;
+        const nextCursor = done
+          ? null
+          : { ingestedAt: items[lastIndex - 1]?.ingestedAt ?? null, id: lastIndex };
+        return { rows: page, nextCursor, done, digest: 'page-digest' };
+      }
+    );
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'source_digest_changed',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+  });
+
+  it('synthesizes a minimal destination session for an empty source and returns ready', async () => {
+    const sourceStub = makePagedSourceStub([], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams({ title: 'Cloned' }))).resolves.toEqual(
+      {
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 0 },
+      }
+    );
+
+    const stagedSession = dest.state.stagedRows.find(row => row.itemId === 'session');
+    expect(stagedSession).toBeDefined();
+    expect(JSON.parse(stagedSession!.itemData)).toMatchObject({
+      id: destinationSessionId,
+      projectID: 'cloud-agent',
+      title: 'Cloned',
+      directory: '',
+    });
+  });
+
+  it('returns in_progress when the request budget is exhausted and resumes on a same-key retry', async () => {
+    const items = Array.from({ length: 20 }, (_, index) => ({
+      itemId: `message/msg_${String(index).padStart(2, '0')}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id: `msg_${String(index).padStart(2, '0')}`,
+        sessionID: sourceSessionId,
+        role: 'user',
+        time: { created: index },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      itemDataR2Key: null,
+      ingestedAt: index,
+    }));
+    const sourceStub = makePagedSourceStub(items, 1);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    expect(dest.state.kind).toBe('in_progress');
+    expect(dest.state.copiedItemCount).toBe(16);
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 20 },
+    });
+    expect(dest.state.kind).toBe('complete');
+  });
+
+  it('rejects a destination identity conflict and leaves the claimed session untouched', async () => {
+    const sourceStub = makePagedSourceStub([], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      destinationRows: [
+        {
+          session_id: destinationSessionId,
+          kilo_user_id: kiloUserId,
+          cloud_agent_session_id: 'some-other-agent',
+          cloud_agent_session_scope_id: 'some-other-agent',
+          organization_id: organizationId,
+          parent_session_id: null,
+        },
+      ],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'destination_conflict',
+    });
+    // The claimed session's DO, R2, and row are never touched.
+    expect(dest.stub.inspectCloneStage).not.toHaveBeenCalled();
+    expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
+    expect(r2.put).not.toHaveBeenCalled();
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it('resets the destination stage and rethrows when the insert fails without committing', async () => {
+    const sourceStub = makePagedSourceStub([sourceSessionItem()], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      insertError: new Error('postgres unavailable'),
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).rejects.toThrow(
+      'postgres unavailable'
+    );
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+  });
+
+  it('does not copy excluded item types', async () => {
+    const sourceItems = [
+      sourceSessionItem(),
+      {
+        itemId: 'kilo_meta/1',
+        itemType: 'kilo_meta',
+        itemData: JSON.stringify({ platform: 'cli' }),
+        itemDataR2Key: null,
+        ingestedAt: 2,
+      },
+      sourceMessageItem(),
+    ];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 2 },
+    });
+    expect(dest.state.stagedRows.map(row => row.itemType)).toEqual(['session', 'message']);
+  });
+
+  it('rejects a resumed clone whose source digest changed since the prior request', async () => {
+    const sourceStub = makePagedSourceStub([sourceSessionItem(), sourceMessageItem()], 100);
+    const dest = makeDestinationStub();
+    dest.state.kind = 'in_progress';
+    dest.state.sourceSessionId = sourceSessionId;
+    dest.state.destinationSessionId = destinationSessionId;
+    dest.state.nextCursor = null;
+    dest.state.rollingDigest = 'stale-digest';
+    dest.state.copiedItemCount = 2;
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'source_digest_changed',
+    });
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+  });
+
+  it('rejects a complete destination that belongs to another source without resetting it', async () => {
+    const sourceStub = makePagedSourceStub([sourceSessionItem()], 100);
+    const dest = makeDestinationStub();
+    dest.state.kind = 'complete';
+    dest.state.sourceSessionId = 'ses_other_000000000000000000000';
+    dest.state.destinationSessionId = destinationSessionId;
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'destination_conflict',
+    });
+    expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+    expect(r2.put).not.toHaveBeenCalled();
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it('deletes destination R2 bodies written before a rejection', async () => {
+    const r2MessageBody = JSON.stringify({
+      id: 'msg_r2_01',
+      sessionID: sourceSessionId,
+      role: 'user',
+      time: { created: 1761000000200 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+    });
+    const sourceItems = [
+      sourceSessionItem(),
+      {
+        itemId: 'message/msg_r2_01',
+        itemType: 'message',
+        itemData: '{}',
+        itemDataR2Key: 'items/blob-msg',
+        ingestedAt: 2,
+      },
+      {
+        itemId: 'message/msg_bad_01',
+        itemType: 'message',
+        itemData: 'not-json',
+        itemDataR2Key: null,
+        ingestedAt: 3,
+      },
+    ];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const put = vi.fn(async () => {});
+    const deleteFn = vi.fn(async () => {});
+    const r2 = {
+      get: vi.fn(async (key: string) =>
+        key === 'items/blob-msg' ? { text: async () => r2MessageBody } : null
+      ),
+      put,
+      delete: deleteFn,
+    };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'malformed_source_data',
+    });
+    expect(deleteFn).toHaveBeenCalledWith([`clone/${destinationSessionId}/message/msg_r2_01`]);
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it('writes no destination R2 body for a byte-budget overflow row before an in_progress return', async () => {
+    const hugeMessageBody = JSON.stringify({
+      id: 'msg_huge',
+      sessionID: sourceSessionId,
+      role: 'user',
+      time: { created: 1761000000200 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      text: 'x'.repeat(5 * 1024 * 1024),
+    });
+    const smallMessage = (index: number): CloneItem => ({
+      itemId: `message/msg_${String(index).padStart(2, '0')}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id: `msg_${String(index).padStart(2, '0')}`,
+        sessionID: sourceSessionId,
+        role: 'user',
+        time: { created: index },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      itemDataR2Key: null,
+      ingestedAt: index,
+    });
+    const sourceItems = [
+      sourceSessionItem(),
+      ...Array.from({ length: 30 }, (_, index) => smallMessage(index + 1)),
+      {
+        itemId: 'message/msg_huge',
+        itemType: 'message',
+        itemData: '{}',
+        itemDataR2Key: 'items/huge-blob',
+        ingestedAt: 32,
+      },
+    ];
+    const sourceStub = makePagedSourceStub(sourceItems, 2);
+    const dest = makeDestinationStub();
+    const put = vi.fn(async () => {});
+    const r2 = {
+      get: vi.fn(async (key: string) =>
+        key === 'items/huge-blob' ? { text: async () => hugeMessageBody } : null
+      ),
+      put,
+    };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    expect(dest.state.kind).toBe('in_progress');
+    expect(dest.state.copiedItemCount).toBe(31);
+    expect(put).not.toHaveBeenCalledWith(
+      `clone/${destinationSessionId}/message/msg_huge`,
+      expect.anything()
+    );
+
+    // A later reject resets the stage and must leave no orphaned body behind.
+    dest.state.rollingDigest = 'stale-digest';
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'source_digest_changed',
+    });
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalledWith(
+      `clone/${destinationSessionId}/message/msg_huge`,
+      expect.anything()
+    );
+  });
+});
+
+describe('deleteSessionForCloudAgent clone rollback', () => {
+  const sourceSessionId = 'ses_12345678901234567890123456';
+  const destinationSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+  const kiloUserId = 'usr_test';
+
+  function makeDeleteDb(row?: Record<string, unknown>) {
+    const deleteFn = vi.fn(() => ({ where: vi.fn(async () => {}) }));
+    const selectResult = vi.fn(async () => (row ? [row] : []));
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+    };
+    const db = {
+      select: vi.fn(() => select),
+      delete: deleteFn,
+    };
+    return { db, selectResult, deleteFn };
+  }
+
+  function makeDeleteRpc(options: {
+    db: ReturnType<typeof makeDeleteDb>['db'];
+    destStub: {
+      inspectCloneStage: ReturnType<typeof vi.fn>;
+      resetCloneStage: ReturnType<typeof vi.fn>;
+    };
+  }) {
+    vi.mocked(getWorkerDb).mockReturnValue(options.db as never);
+    vi.mocked(getSessionIngestDO).mockReturnValue(options.destStub as never);
+    const ctx = {
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+    } as unknown as ConstructorParameters<typeof SessionIngestRPC>[0];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+    } as unknown as ConstructorParameters<typeof SessionIngestRPC>[1];
+    return new SessionIngestRPC(ctx, env);
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('deletes the row and resets the clone stage only when the clone matches the source', async () => {
+    const inspectCloneStage = vi.fn(() => ({
+      status: 'complete',
+      sourceSessionId,
+      destinationSessionId,
+    }));
+    const resetCloneStage = vi.fn(async () => {});
+    const { db, deleteFn } = makeDeleteDb({
+      session_id: destinationSessionId,
+      kilo_user_id: kiloUserId,
+    });
+    const rpc = makeDeleteRpc({ db, destStub: { inspectCloneStage, resetCloneStage } });
+
+    await rpc.deleteSessionForCloudAgent({
+      sessionId: destinationSessionId,
+      kiloUserId,
+      cloneSourceSessionId: sourceSessionId,
+    });
+
+    expect(inspectCloneStage).toHaveBeenCalledWith({
+      sourceSessionId,
+      destinationSessionId,
+    });
+    expect(resetCloneStage).toHaveBeenCalled();
+    expect(deleteFn).toHaveBeenCalled();
+  });
+
+  it('never clears a destination clone that belongs to another source', async () => {
+    const inspectCloneStage = vi.fn(() => ({
+      status: 'mismatch',
+      storedSourceSessionId: 'ses_other_000000000000000000000',
+      storedDestinationSessionId: destinationSessionId,
+    }));
+    const resetCloneStage = vi.fn(async () => {});
+    const { db, deleteFn } = makeDeleteDb({
+      session_id: destinationSessionId,
+      kilo_user_id: kiloUserId,
+    });
+    const rpc = makeDeleteRpc({ db, destStub: { inspectCloneStage, resetCloneStage } });
+
+    await rpc.deleteSessionForCloudAgent({
+      sessionId: destinationSessionId,
+      kiloUserId,
+      cloneSourceSessionId: sourceSessionId,
+    });
+
+    expect(resetCloneStage).not.toHaveBeenCalled();
+    expect(deleteFn).not.toHaveBeenCalled();
   });
 });
 

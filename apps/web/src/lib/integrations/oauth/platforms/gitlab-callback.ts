@@ -19,8 +19,13 @@ import {
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
-import { appendIntegrationOAuthRedirectQuery } from '@/lib/integrations/oauth/common';
+import {
+  appendIntegrationOAuthRedirectQuery,
+  organizationAccessDenialErrorCode,
+} from '@/lib/integrations/oauth/common';
 import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 function buildGitLabRedirectPath(
   state: Pick<VerifiedGitLabOAuthState, 'owner' | 'returnTo'> | null | undefined,
@@ -99,7 +104,14 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
 
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      // Replacing an existing org GitLab integration is a billing-scoped action;
+      // a first-time connect keeps member-level access.
+      const existingIntegration = await getIntegrationForOrganization(owner.id, PLATFORM.GITLAB);
+      await ensureOrganizationAccess(
+        { user },
+        owner.id,
+        existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
+      );
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
@@ -189,17 +201,20 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
 
-    captureException(error, {
-      tags: {
-        endpoint: 'gitlab/callback',
-        source: 'gitlab_oauth',
-      },
-      extra: gitLabOAuthSentryContext(searchParams),
-    });
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: 'gitlab/callback',
+          source: 'gitlab_oauth',
+        },
+        extra: gitLabOAuthSentryContext(searchParams),
+      });
+    }
 
     const redirectPath = buildGitLabRedirectPath(
       verifyGitLabOAuthState(state),
-      'error=connection_failed'
+      denialCode ? `error=${denialCode}` : 'error=connection_failed'
     );
     return NextResponse.redirect(new URL(redirectPath, APP_URL));
   }

@@ -8,11 +8,12 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { hasOrganizationEverPaid } from '@/lib/creditTransactions';
 import type { User, Organization } from '@kilocode/db/schema';
 
 let ownerUser: User;
+let memberUser: User;
 let parentOrg: Organization;
 let childA: Organization;
 let childB: Organization;
@@ -60,10 +61,18 @@ describe('organization funds router', () => {
       is_admin: false,
     });
 
+    memberUser = await insertTestUser({
+      google_user_email: 'funds-member@example.com',
+      google_user_name: 'Funds Member',
+      is_admin: false,
+    });
+
     parentOrg = await createOrganization('Funds Parent Org', ownerUser.id);
     childA = await createOrganization('Funds Child A', ownerUser.id);
     childB = await createOrganization('Funds Child B', ownerUser.id);
     unrelatedOrg = await createOrganization('Funds Unrelated Org', ownerUser.id);
+
+    await addUserToOrganization(parentOrg.id, memberUser.id, 'member');
 
     await setChildOf(childA.id, parentOrg.id);
     await setChildOf(childB.id, parentOrg.id);
@@ -295,6 +304,23 @@ describe('organization funds router', () => {
 
       expect(balanceOf(await getOrg(parentOrg.id))).toBe(5_000_000);
       expect(balanceOf(await getOrg(childA.id))).toBe(0);
+    });
+  });
+
+  describe('role matrix', () => {
+    it('rejects member for every funds procedure', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.funds.childBalances({ organizationId: parentOrg.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      await expect(
+        caller.organizations.funds.distribute({
+          organizationId: parentOrg.id,
+          allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 1_000_000 }],
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
   });
 });

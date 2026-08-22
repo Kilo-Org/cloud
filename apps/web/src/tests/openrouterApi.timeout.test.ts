@@ -70,6 +70,25 @@ describe('upstreamRequest timeout', () => {
     }
   );
 
+  it('uses x-api-key instead of authorization when configured by the provider', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+    global.fetch = mockFetch;
+
+    const result = await upstreamRequest({
+      chatApi: 'chat_completions',
+      search: '',
+      method: 'POST',
+      body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+      extraHeaders: {},
+      provider: { ...OPENROUTER, apiKey: 'custom-key', apiKeyHeader: 'x-api-key' },
+    });
+
+    expect(result.type).toBe('success');
+    const headers = mockFetch.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get('x-api-key')).toBe('custom-key');
+    expect(headers.has('authorization')).toBe(false);
+  });
+
   it('reports a client disconnect instead of an upstream disconnect when the caller aborts', async () => {
     const controller = new AbortController();
     controller.abort();

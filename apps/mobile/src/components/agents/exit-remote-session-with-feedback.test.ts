@@ -18,7 +18,9 @@ function createHarness() {
   const onAccepted = vi.fn(() => {
     order.push('accepted');
   });
-  const router = { replace: vi.fn(() => order.push('replace')) };
+  const router = {
+    dismissTo: vi.fn(() => order.push('dismissTo')),
+  };
   const lock = createLock();
   return { order, onAccepted, router, lock };
 }
@@ -28,7 +30,7 @@ describe('exitRemoteSessionWithFeedback — happy path', () => {
     vi.clearAllMocks();
   });
 
-  it('shows "Session exited", calls onAccepted, and replaces with the sessions route', async () => {
+  it('shows "Session exited", calls onAccepted, and navigates to the sessions route', async () => {
     const { order, onAccepted, router, lock } = createHarness();
     const exit = vi.fn(async () => {
       order.push('exit');
@@ -41,9 +43,9 @@ describe('exitRemoteSessionWithFeedback — happy path', () => {
     expect(toast.success).toHaveBeenCalledWith('Session exited');
     expect(toast.error).not.toHaveBeenCalled();
     expect(onAccepted).toHaveBeenCalledTimes(1);
-    expect(router.replace).toHaveBeenCalledTimes(1);
-    expect(router.replace).toHaveBeenCalledWith(SESSIONS_ROUTE);
-    expect(order).toEqual(['exit', 'accepted', 'replace']);
+    expect(router.dismissTo).toHaveBeenCalledTimes(1);
+    expect(router.dismissTo).toHaveBeenCalledWith(SESSIONS_ROUTE);
+    expect(order).toEqual(['exit', 'accepted', 'dismissTo']);
     expect(lock.current).toBe(false);
   });
 });
@@ -71,7 +73,7 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
     });
     expect(toast.success).not.toHaveBeenCalled();
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
     expect(lock.current).toBe(false);
   });
 
@@ -97,7 +99,7 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
     });
     expect(lock.current).toBe(false);
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it('does not start a second exit mutation while a retry is pending', async () => {
@@ -137,7 +139,7 @@ describe('exitRemoteSessionWithFeedback — retryable error', () => {
     expect(lock.current).toBe(true);
     expect(exit).toHaveBeenCalledTimes(2);
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
 
     exitPromiseRef.resolve?.();
     await vi.waitFor(() => {
@@ -197,7 +199,7 @@ describe('exitRemoteSessionWithFeedback — non-retryable error', () => {
     expect(options?.action).toBeUndefined();
     expect(toast.success).not.toHaveBeenCalled();
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
     expect(lock.current).toBe(false);
   });
 });

@@ -72,7 +72,7 @@ describe('INVITE_SUCCESS_MESSAGE', () => {
 describe('invitedMemberActionOptions', () => {
   it('offers a Resend invite option for a failed invite', () => {
     expect(canResendInvite('failed')).toBe(true);
-    expect(invitedMemberActionOptions('failed')).toEqual([
+    expect(invitedMemberActionOptions('failed', true)).toEqual([
       'Share invite link',
       'Resend invite',
       'Revoke invitation',
@@ -83,12 +83,21 @@ describe('invitedMemberActionOptions', () => {
   it('omits the Resend invite option for non-failed statuses', () => {
     for (const status of ['pending', 'sending', 'delivered', null] as const) {
       expect(canResendInvite(status)).toBe(false);
-      expect(invitedMemberActionOptions(status)).toEqual([
+      expect(invitedMemberActionOptions(status, true)).toEqual([
         'Share invite link',
         'Revoke invitation',
         'Cancel',
       ]);
     }
+  });
+
+  it('omits the Share invite link option when the caller has no invite URL', () => {
+    expect(invitedMemberActionOptions('failed', false)).toEqual([
+      'Resend invite',
+      'Revoke invitation',
+      'Cancel',
+    ]);
+    expect(invitedMemberActionOptions('delivered', false)).toEqual(['Revoke invitation', 'Cancel']);
   });
 });
 

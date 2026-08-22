@@ -32,7 +32,9 @@ async function runWriteAfter(
   try {
     await write();
   } catch (error: unknown) {
-    Sentry.captureException(error);
+    Sentry.captureException(error, {
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'write_pending_external_auth' },
+    });
   }
 }
 

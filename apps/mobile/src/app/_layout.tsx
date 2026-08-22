@@ -35,6 +35,7 @@ import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
+import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -86,6 +87,7 @@ import {
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { applySentryContext, setSentryContext } from '@/lib/sentry-context';
 import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
@@ -103,7 +105,8 @@ installE2EWebSocketLatency();
 // MASKED session replay and error screenshots (DEC-02 amendment, owner
 // decision 2026-08-17); the replay integration is only registered once
 // optional consent is accepted, so no replay code runs before the
-// decision. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// decision. The Sentry context module reapplies identity and global tags after
+// every init, and auth sign-out clears its canonical identity state.
 // `enableTombstone` is Android 12+ only; NDK stays on for older devices.
 // `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
 // hangs are not reported twice. Native init in the Expo plugin captures
@@ -148,6 +151,7 @@ function initSentry(optionalConsented: boolean) {
 
     spotlight: __DEV__,
   });
+  applySentryContext();
 }
 
 initSentry(false);
@@ -176,7 +180,7 @@ preloadThemePreference();
 preloadStartupFonts();
 
 function RootLayoutNav() {
-  const { token, isLoading: authLoading, signOut } = useAuth();
+  const { token, isLoading: authLoading, isSigningOut, signOut } = useAuth();
   const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
@@ -208,9 +212,39 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (fontsError) {
-      Sentry.captureException(fontsError);
+      Sentry.captureException(fontsError, {
+        tags: { 'error.subsystem': 'startup', 'error.operation': 'load_fonts' },
+      });
     }
   }, [fontsError]);
+
+  useEffect(() => {
+    let authState: 'error' | 'loading' | 'signed_in' | 'signed_out' = 'signed_out';
+    if (isSigningOut) {
+      authState = 'signed_out';
+    } else if (authLoading || userIdLoading) {
+      authState = 'loading';
+    } else if (userIdError) {
+      authState = 'error';
+    } else if (token && userId) {
+      authState = 'signed_in';
+    }
+    setSentryContext({
+      userId: authState === 'signed_in' ? (userId ?? null) : null,
+      authState,
+      telemetryMode: consentChecked && !needsConsent && optionalConsent ? 'optional' : 'mandatory',
+    });
+  }, [
+    authLoading,
+    consentChecked,
+    isSigningOut,
+    needsConsent,
+    optionalConsent,
+    token,
+    userId,
+    userIdError,
+    userIdLoading,
+  ]);
 
   // Cold-start read-cache restore: best effort, never blocks startup. Starts
   // before the auth gate resolves so allowlisted queries can hydrate under
@@ -317,7 +351,9 @@ function RootLayoutNav() {
       }
 
       if (result.status === 'error') {
-        Sentry.captureException(result.error);
+        Sentry.captureException(result.error, {
+          tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
+        });
         setNeedsConsent(false);
         setOptionalConsentState(false);
         setConsentChecked(false);
@@ -379,7 +415,13 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (shareIntentError) {
-      Sentry.captureException(new Error(shareIntentError));
+      Sentry.captureException(new Error('Share intent provider error'), {
+        tags: {
+          'error.subsystem': 'share-intent',
+          'error.operation': 'read_native_payload',
+        },
+        fingerprint: ['share-intent-provider-error'],
+      });
       toast.error("Couldn't read the shared content");
       resetShareIntentRef.current();
     }
@@ -417,7 +459,9 @@ function RootLayoutNav() {
         if (cancelled) {
           return;
         }
-        Sentry.captureException(error);
+        Sentry.captureException(error, {
+          tags: { 'error.subsystem': 'share-intent', 'error.operation': 'normalize_payload' },
+        });
         toast.error("Couldn't read the shared content");
         resetShareIntentRef.current();
       }
@@ -431,68 +475,83 @@ function RootLayoutNav() {
   }, [hasShareIntent, shareIntent]);
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
+    const decision = resolveBootstrapDecision({
+      isLoading,
+      updateRequired,
+      inForceUpdate,
+      inAuthGroup,
+      hasToken: token != null,
+      userIdLoading,
+      userIdError,
+      consentCheckError: consentCheckError != null,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+    });
 
-    if (updateRequired) {
-      if (!inForceUpdate) {
+    // Replaces the old inline if-chain (resolveBootstrapTag in
+    // src/lib/bootstrap-decision.ts). Remove this switch when the decision
+    // module owns all bootstrap routing.
+    switch (decision.tag) {
+      case 'wait-loading':
+      case 'wait-user-consent': {
+        return;
+      }
+      case 'redirect-force-update': {
         router.replace('/force-update');
-      } else {
+        return;
+      }
+      case 'settle-force-update': {
         markStartupComplete('force-update');
         setStartupFinished(true);
+        return;
       }
-      return;
-    }
-
-    if (inForceUpdate) {
-      router.replace('/(app)');
-      return;
-    }
-
-    if (!token) {
-      if (inAuthGroup) {
+      case 'exit-force-update': {
+        router.replace('/(app)');
+        return;
+      }
+      case 'settle-login': {
         markStartupComplete('login');
         setStartupFinished(true);
-      } else {
-        router.replace('/(auth)/login');
+        return;
       }
-    } else {
-      if (userIdError) {
+      case 'redirect-login': {
+        router.replace('/(auth)/login');
+        return;
+      }
+      case 'settle-user-error': {
         markStartupComplete('user-error');
         setStartupFinished(true);
         return;
       }
-
-      if (consentCheckError) {
+      case 'settle-consent-error': {
         markStartupComplete('consent-error');
         setStartupFinished(true);
         return;
       }
-
-      if (userIdLoading || !consentChecked) {
+      case 'settle-consent': {
+        markStartupComplete('consent');
+        setStartupFinished(true);
         return;
       }
-
-      if (needsConsent) {
-        if (onConsentRoute) {
-          markStartupComplete('consent');
-          setStartupFinished(true);
-        } else {
-          router.replace('/(app)/consent' as Href);
-        }
+      case 'redirect-consent': {
+        router.replace('/(app)/consent' as Href);
         return;
       }
-
-      if ((onConsentRoute && !onConsentReviewRoute) || inAuthGroup) {
+      case 'redirect-app': {
         router.replace('/(app)');
         return;
       }
-
-      markStartupComplete('app');
-      setStartupFinished(true);
-      // Deep-link navigation is owned by the pendingDeepLink effect below.
-      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
+      case 'settle-app': {
+        markStartupComplete('app');
+        setStartupFinished(true);
+        // Deep-link navigation is owned by the pendingDeepLink effect below.
+        // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
+        break;
+      }
+      default:
+      // Unreachable: BootstrapDecisionTag is a closed union.
     }
   }, [
     token,
@@ -573,30 +632,25 @@ function RootLayoutNav() {
     });
   }, [startupFinished, token, consentChecked, needsConsent, optionalConsent, postHogReady]);
 
-  const needsForceUpdate = updateRequired && !inForceUpdate;
-  const showingForceUpdate = updateRequired && inForceUpdate;
-  const needsAuth = !token && !inAuthGroup;
-  const needsAppRedirect = token != null && inAuthGroup;
-  const hasUserBootstrapError = token != null && userIdError;
-  const hasConsentBootstrapError = token != null && consentCheckError !== null;
-  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
-  const consentLoading =
-    token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
-  const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
-
-  const needsRedirect =
-    !isLoading &&
-    (needsForceUpdate ||
-      (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
-
   // Always keep Slot mounted so Expo Router's navigation tree stays
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const hidden =
-    !hasUserBootstrapError &&
-    !hasConsentBootstrapError &&
-    (isLoading || needsRedirect || consentLoading);
+  const { hasUserBootstrapError, hasConsentBootstrapError, hasBootstrapError, hidden } =
+    resolveBootstrapDecision({
+      isLoading,
+      updateRequired,
+      inForceUpdate,
+      inAuthGroup,
+      hasToken: token != null,
+      userIdLoading,
+      userIdError,
+      consentCheckError: consentCheckError != null,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+    });
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,

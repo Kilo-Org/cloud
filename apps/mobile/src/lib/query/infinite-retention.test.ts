@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -110,5 +110,40 @@ describe('reconcileFirstPage', () => {
     // eslint-disable-next-line typescript-eslint/no-confusing-void-expression -- asserting the void return proves the call needs no await.
     const returned = reconcileFirstPage(queryClient, ['trpc', 'cliSessionsV2', 'list']);
     expect(returned).toBeUndefined();
+  });
+
+  it('empties pages and flips fetchStatus to fetching in the same flush on an observed idle query', () => {
+    const queryClient = new QueryClient();
+    const prefix = ['trpc', 'cliSessionsV2', 'list'];
+    const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
+    queryClient.setQueryData(fullKey, {
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      // eslint-disable-next-line require-await -- the recipe pins an async queryFn for the flush contract; the body needs no await.
+      queryFn: async () => page([{ id: 'a', title: 'a' }]),
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+      staleTime: Infinity,
+      retry: false,
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+
+    // The observer must be settled before the blank, or the fetchStatus flip
+    // below would be vacuous.
+    expect(observer.getCurrentResult().data).toBeDefined();
+    expect(observer.getCurrentResult().fetchStatus).toBe('idle');
+
+    reconcileFirstPage(queryClient, prefix);
+
+    const data = queryClient.getQueryData(fullKey) as { pages: Page[] };
+    expect(data.pages).toEqual([]);
+    expect(queryClient.getQueryState(fullKey)?.fetchStatus).toBe('fetching');
+
+    unsubscribe();
   });
 });

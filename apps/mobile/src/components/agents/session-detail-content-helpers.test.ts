@@ -64,7 +64,7 @@ describe('runConnectRepository', () => {
     expect(openGitHubIntegration).toHaveBeenCalledTimes(1);
     expect(clearGuidance).toHaveBeenCalledTimes(1);
     expect(openGitHubIntegration.mock.invocationCallOrder[0]).toBeLessThan(
-      clearGuidance.mock.invocationCallOrder[0] as number
+      clearGuidance.mock.invocationCallOrder[0] ?? 0
     );
   });
 });

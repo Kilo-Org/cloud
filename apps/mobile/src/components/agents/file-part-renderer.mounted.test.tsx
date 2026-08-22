@@ -1084,6 +1084,16 @@ describe('FilePartRenderer preview sheet surface', () => {
     // usable = 800 - 24 - 34 = 742; half = 371.
     expect(surface[0]?.props.style).toEqual({ height: 371 });
 
+    // The insets.bottom spacer clears the Android navigation bar.
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.style as { height?: number } | undefined)?.height === 34 &&
+        node.props.className === 'bg-background'
+    );
+    expect(spacers).toHaveLength(1);
+
     await unmount(renderer);
   });
 

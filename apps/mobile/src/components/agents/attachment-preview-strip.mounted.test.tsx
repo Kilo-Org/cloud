@@ -626,6 +626,17 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 
+  it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const previewScrollView = nodesByType(renderer.root, 'ScrollView').find(
+      node => node.props.contentContainerClassName === 'px-6 pb-6 pt-2'
+    );
+    expect(previewScrollView?.props.className).toBe('flex-1');
+
+    renderer.unmount();
+  });
+
   it('renders a transparent Modal with a blocking scrim and half-height surface on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 800 });

@@ -402,7 +402,9 @@ function FilePreviewModal({ mode, url, part, onRetry, onClose }: Readonly<FilePr
   return (
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader title={part.filename ?? 'File'} onDone={onClose} doneLabel="Done" />
-      <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
+      <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+        {renderBody()}
+      </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>
   );

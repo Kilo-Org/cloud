@@ -174,6 +174,18 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('sizes the details ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await mountSheet(storedMessage(userInfo(), [textPart('hello world')]));
+
+    const scrollViews = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
+    );
+    expect(scrollViews).toHaveLength(1);
+    expect(scrollViews[0]?.props.className).toBe('flex-1');
+
+    await unmount(renderer);
+  });
+
   it('swaps the details Modal content to the select view when Select text is pressed', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 

@@ -1062,6 +1062,16 @@ describe('FilePartRenderer preview sheet surface', () => {
     await unmount(renderer);
   });
 
+  it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const scrollViews = findByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(scrollViews[0]?.props.className).toBe('flex-1');
+
+    await unmount(renderer);
+  });
+
   it('renders a transparent Modal with a blocking scrim and half-height surface on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 800 });

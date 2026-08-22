@@ -122,7 +122,7 @@ export function MessageDetailsSheet({
           <SheetHeader title="Message details" onDone={onClose} doneLabel="Done" />
 
           {content ? (
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+            <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
               {content.copyableText ? (
                 <View className="mb-6 gap-2">
                   <Pressable

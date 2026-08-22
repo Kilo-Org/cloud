@@ -315,6 +315,9 @@ describe('PartDetailSheet mounted', () => {
     expect(radioSelected(renderer.root, 'Scroll')).toBe(false);
     // Only the sheet's own vertical ScrollView: the block wraps without a scroller.
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(1);
+    // The sheet ScrollView fills the fixed-height Android surface so long
+    // content scrolls inside it instead of clipping.
+    expect(propOf(sheetScrollView(renderer.root), 'className')).toBe('flex-1');
 
     await unmount(renderer);
   });

@@ -111,6 +111,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
 
       <ScrollView
         ref={autoFollow.scrollRef}
+        className="flex-1"
         contentContainerClassName="gap-2 px-4 pb-6 pt-3"
         onScroll={autoFollow.handleScroll}
         onScrollBeginDrag={autoFollow.handleScrollBeginDrag}

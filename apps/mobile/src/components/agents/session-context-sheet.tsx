@@ -95,7 +95,7 @@ export function SessionContextSheet({
       {/* Rows below are exposed individually to screen readers; collapsing
           them behind a single ScrollView accessibilityLabel would shadow the
           natural read order. */}
-      <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+      <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
         <View className="items-center gap-3 pt-2">
           <ContextUsageRing
             size={SHEET_RING_SIZE}

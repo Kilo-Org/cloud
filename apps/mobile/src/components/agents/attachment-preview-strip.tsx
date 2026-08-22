@@ -299,7 +299,7 @@ function AttachmentChip({
             }}
             doneLabel="Done"
           />
-          <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+          <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
             {renderPreviewBody(textPreview)}
           </ScrollView>
           <View style={{ height: insets.bottom }} className="bg-background" />

@@ -6,10 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export function useFormSheetDetents() {
   const { height } = useWindowDimensions();
   const { top } = useSafeAreaInsets();
-  let androidTopInset = 0;
-  if (Platform.OS === 'android') {
-    androidTopInset = top > 0 ? top : (StatusBar.currentHeight ?? 0);
-  }
+  const androidTopInset = top > 0 ? top : (StatusBar.currentHeight ?? 0);
   const androidFullSheetDetent =
     height > 0 ? Math.max(0.5, (height - androidTopInset) / height) : 1;
   const fullSheetDetent = Platform.OS === 'android' ? androidFullSheetDetent : 1;

@@ -83,6 +83,7 @@ import {
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
+import { ChildSessionDismissLayer } from '@/components/agents/child-session-dismiss-layer';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import {
   type ChildSessionSheetMountState,
@@ -1185,6 +1186,8 @@ export function SessionDetailContent({
             modelOptions={modelOptions}
           />
         ) : null}
+
+        <ChildSessionDismissLayer state={childSessionSheet} />
 
         {rename.isTitleInteractive && rename.isModalOpen ? (
           <RenameModal

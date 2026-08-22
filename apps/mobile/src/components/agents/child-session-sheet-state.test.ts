@@ -7,6 +7,7 @@ import {
   getChildSessionSheetState,
   openChildSessionSheet,
   releaseChildSessionSheet,
+  shouldShowChildSessionDismissLayer,
 } from './child-session-sheet-state';
 
 const emptyMount: ChildSessionSheetMountState = { sheet: null, visible: false };
@@ -147,5 +148,40 @@ describe('releaseChildSessionSheet', () => {
     const closed = closeChildSessionSheet(openChildSessionSheet(emptyMount, childA));
     const reopened = openChildSessionSheet(closed, childB);
     expect(releaseChildSessionSheet(reopened)).toBe(reopened);
+  });
+});
+
+describe('shouldShowChildSessionDismissLayer', () => {
+  it('shows the dismiss layer on Android while a closed sheet is still held', () => {
+    const closed = closeChildSessionSheet(openChildSessionSheet(emptyMount, childA));
+    expect(shouldShowChildSessionDismissLayer(closed, 'android')).toBe(true);
+  });
+
+  it('hides the dismiss layer on Android while the sheet is visible', () => {
+    const open = openChildSessionSheet(emptyMount, childA);
+    expect(shouldShowChildSessionDismissLayer(open, 'android')).toBe(false);
+  });
+
+  it('hides the dismiss layer on Android after the delayed release', () => {
+    const closed = closeChildSessionSheet(openChildSessionSheet(emptyMount, childA));
+    const released = releaseChildSessionSheet(closed);
+    expect(shouldShowChildSessionDismissLayer(released, 'android')).toBe(false);
+  });
+
+  it('hides the dismiss layer on Android when a reopen lands before release', () => {
+    const closed = closeChildSessionSheet(openChildSessionSheet(emptyMount, childA));
+    const reopened = openChildSessionSheet(closed, childB);
+    expect(shouldShowChildSessionDismissLayer(reopened, 'android')).toBe(false);
+  });
+
+  it('never shows the dismiss layer on iOS — dismissal stays native', () => {
+    const open = openChildSessionSheet(emptyMount, childA);
+    const closed = closeChildSessionSheet(open);
+    expect(shouldShowChildSessionDismissLayer(open, 'ios')).toBe(false);
+    expect(shouldShowChildSessionDismissLayer(closed, 'ios')).toBe(false);
+  });
+
+  it('never shows the dismiss layer when no sheet is held', () => {
+    expect(shouldShowChildSessionDismissLayer(emptyMount, 'android')).toBe(false);
   });
 });

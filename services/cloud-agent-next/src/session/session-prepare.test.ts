@@ -2121,6 +2121,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
     expect(doStub.registerSession).toHaveBeenCalledTimes(1);
@@ -2181,6 +2182,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
     expect(doStub.registerSession).toHaveBeenCalledTimes(1);
@@ -2312,6 +2314,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
     expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {

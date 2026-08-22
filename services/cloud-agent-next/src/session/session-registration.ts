@@ -1437,6 +1437,7 @@ async function resumeCloneCreate(
   const sessionService = new SessionService();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
   const defaultTitle = `New session - ${new Date().toISOString()}`;
+  const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
 
   let ingestResult: Awaited<ReturnType<SessionService['createCliSessionViaSessionIngest']>>;
   try {
@@ -1448,6 +1449,7 @@ async function resumeCloneCreate(
       input.options?.kilocodeOrganizationId,
       createdOnPlatform,
       defaultTitle,
+      canonicalRepositoryUrl,
       cloneFromKiloSessionId
     );
   } catch (error) {

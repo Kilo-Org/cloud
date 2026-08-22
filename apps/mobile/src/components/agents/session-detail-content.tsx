@@ -299,7 +299,11 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
-  const { continueSession, isContinuing } = useContinueSession({
+  const {
+    continueSession,
+    isContinuing,
+    guidance: continueGuidance,
+  } = useContinueSession({
     sessionId,
     organizationId,
     models: modelOptions,
@@ -827,6 +831,10 @@ export function SessionDetailContent({
     router.replace('/(app)/(tabs)/(2_agents)' as Href);
   }, [router]);
 
+  const handleConnectRepository = useCallback(() => {
+    router.push('/(app)/agent-chat/repo-picker' as Href);
+  }, [router]);
+
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
@@ -1271,15 +1279,50 @@ export function SessionDetailContent({
             <Text className="text-center text-sm text-muted-foreground">
               This is a read-only session
             </Text>
-            <Button
-              variant="outline"
-              size="sm"
-              accessibilityLabel="Continue in a new session"
-              disabled={isContinuing}
-              onPress={handleContinueInNewSession}
-            >
-              <Text>Continue in a new session</Text>
-            </Button>
+            {continueGuidance?.kind === 'terminal' ? (
+              <>
+                <Text className="text-center text-sm text-muted-foreground">
+                  {continueGuidance.message}
+                </Text>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  accessibilityLabel={
+                    continueGuidance.action === 'connect-repository'
+                      ? 'Connect repository'
+                      : 'Back to sessions'
+                  }
+                  onPress={
+                    continueGuidance.action === 'connect-repository'
+                      ? handleConnectRepository
+                      : handleBackToSessions
+                  }
+                >
+                  <Text>
+                    {continueGuidance.action === 'connect-repository'
+                      ? 'Connect repository'
+                      : 'Back to sessions'}
+                  </Text>
+                </Button>
+              </>
+            ) : (
+              <>
+                {continueGuidance?.kind === 'retry' ? (
+                  <Text className="text-center text-sm text-muted-foreground">
+                    {continueGuidance.message}
+                  </Text>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  accessibilityLabel="Cloning session"
+                  loading={isContinuing}
+                  onPress={handleContinueInNewSession}
+                >
+                  <Text>Cloning session</Text>
+                </Button>
+              </>
+            )}
           </View>
         ) : null}
 

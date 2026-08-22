@@ -33,15 +33,18 @@ const hapticsMock = vi.hoisted(() => ({
 // Destination list handed back by the mocked resolver; each test sets the
 // single cloud destination the continue flow should execute against.
 const destinationsRef = vi.hoisted(() => ({ value: [] as unknown[] }));
+// Injected backoff sleep; tests assert the exact delay sequence.
+const sleepMock = vi.hoisted(() =>
+  vi.fn(async (_ms: number) => {
+    void _ms;
+  })
+);
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ fetchQuery: queryClientFetchQuery }),
-}));
-vi.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
-  generateMessageId: () => 'msg-1',
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: async (): Promise<void> => {
@@ -137,8 +140,6 @@ import { useContinueSession } from './use-continue-session';
 
 const SESSION_ID = 'ses_12345678901234567890123456' as KiloSessionId;
 const OTHER_SESSION_ID = 'ses_abcdefghijklmnopqrstuvwxyz' as KiloSessionId;
-const FIXED_PROMPT =
-  'Continue from the cloned session context. Confirm that the context is ready, then wait for the next instruction.';
 
 function creationInProgressError(): Error {
   return Object.assign(new Error('creation_in_progress'), { data: { code: 'CONFLICT' } });
@@ -158,15 +159,24 @@ type HookDispatcher = {
   useCallback: <T>(callback: T, _deps?: unknown) => T;
   useRef: <T>(initial: T) => { current: T };
   useState: <T>(initialValue: T) => [T, (value: T | ((previous: T) => T)) => void];
+  useEffect: (_effect: () => void, _deps?: unknown) => void;
 };
 
 type ContinueSessionResult = ReturnType<typeof useContinueSession>;
 
-function runContinueSession(args: {
+type ContinueSessionArgs = {
   sessionId?: KiloSessionId;
   organizationId?: string;
   models?: SessionModelOption[];
-}): ContinueSessionResult {
+  sleep?: (ms: number) => Promise<void>;
+};
+
+type ContinueSessionMount = {
+  result: ContinueSessionResult;
+  rerender: (args?: ContinueSessionArgs) => ContinueSessionResult;
+};
+
+function mountContinueSession(args: ContinueSessionArgs): ContinueSessionMount {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
   const refs: { current: unknown }[] = [];
@@ -202,23 +212,37 @@ function runContinueSession(args: {
       };
       return [hookState[stateIndex] as typeof initialValue, setState];
     },
+    useEffect: () => {
+      hookIndex += 1;
+    },
   };
 
-  const previousDispatcher =
-    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
-  reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
-    return useContinueSession({
-      sessionId: args.sessionId ?? SESSION_ID,
-      organizationId: args.organizationId,
-      models: args.models ?? [],
-      modelsLoading: false,
-    });
-  } finally {
-    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
-      previousDispatcher;
-  }
+  const render = (renderArgs: ContinueSessionArgs): ContinueSessionResult => {
+    hookIndex = 0;
+    refIndex = 0;
+    const previousDispatcher =
+      reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
+    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
+    try {
+      // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
+      return useContinueSession({
+        sessionId: renderArgs.sessionId ?? SESSION_ID,
+        organizationId: renderArgs.organizationId,
+        models: renderArgs.models ?? [],
+        modelsLoading: false,
+        sleep: renderArgs.sleep ?? sleepMock,
+      });
+    } finally {
+      reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
+        previousDispatcher;
+    }
+  };
+
+  const result = render(args);
+  return {
+    result,
+    rerender: (nextArgs = args) => render(nextArgs),
+  };
 }
 
 const CLOUD_DESTINATION = {
@@ -250,6 +274,7 @@ describe('useContinueSession cloud clone wiring', () => {
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
     destinationsRef.value = [CLOUD_DESTINATION];
+    sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();
     outboxMock.writeSafeRetry.mockResolvedValue(undefined);
@@ -260,32 +285,32 @@ describe('useContinueSession cloud clone wiring', () => {
     mockRepositories();
   });
 
-  it('forwards the clone source id and the fixed prompt into prepareSession', async () => {
+  it('forwards the clone-only input into prepareSession', async () => {
     prepareSessionMutate.mockResolvedValueOnce({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
-    const hook = runContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
+    const mount = mountContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
-    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
       cloneFromKiloSessionId: SESSION_ID,
-      prompt: FIXED_PROMPT,
-      initialMessageId: 'msg-1',
-      githubRepo: 'owner/repo',
-      autoCommit: false,
       autoInitiate: true,
       operationKey: expect.any(String),
+      githubRepo: 'owner/repo',
     });
+    expect(input.prompt).toBeUndefined();
+    expect(input.initialMessageId).toBeUndefined();
   });
 
   it('never drains history and never queries instances: only the repository list is fetched', async () => {
     prepareSessionMutate.mockResolvedValueOnce({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     const queryKeys = queryClientFetchQuery.mock.calls.map(
       call => (call[0] as { queryKey?: string[] }).queryKey
@@ -298,38 +323,48 @@ describe('useContinueSession cloud clone wiring', () => {
     prepareSessionMutate.mockResolvedValueOnce({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     expect(putSharePayloadMock).not.toHaveBeenCalled();
   });
 
-  it('keeps the same cloud operationKey across retryable creation_in_progress failures', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
-    const hook = runContinueSession({ organizationId: 'org-1' });
+  it('retries up to six attempts reusing the same operationKey with the exact delays', async () => {
+    prepareSessionMutate.mockRejectedValue(creationInProgressError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
+    expect(prepareSessionMutate).toHaveBeenCalledTimes(6);
     const keys = usedCloudKeys();
+    expect(keys).toHaveLength(6);
+    expect(new Set(keys).size).toBe(1);
     expect(keys[0]).toBeDefined();
-    expect(keys[1]).toBe(keys[0]);
+    expect(sleepMock.mock.calls.map(call => call[0])).toEqual([500, 1000, 2000, 4000, 5000]);
   });
 
-  it('rotates the cloud operationKey after a successful prepare', async () => {
+  it('reuses the same operationKey across user retries after a retryable failure', async () => {
+    prepareSessionMutate.mockRejectedValue(creationInProgressError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
+
+    const keys = usedCloudKeys();
+    expect(keys).toHaveLength(12);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it('rotates the operationKey after a successful prepare', async () => {
     prepareSessionMutate
       .mockRejectedValueOnce(creationInProgressError())
       .mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' })
-      .mockRejectedValueOnce(creationInProgressError());
-    const hook = runContinueSession({ organizationId: 'org-1' });
+      .mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
-    await hook.continueSession(FIELDS);
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     const keys = usedCloudKeys();
     // The successful retry rides the same key as the retryable attempt.
@@ -338,14 +373,14 @@ describe('useContinueSession cloud clone wiring', () => {
     expect(keys[2]).not.toBe(keys[0]);
   });
 
-  it('rotates the cloud operationKey after a typed non-retryable rejection', async () => {
+  it('rotates the operationKey after a terminal rejection', async () => {
     prepareSessionMutate
       .mockRejectedValueOnce(badRequestError())
-      .mockRejectedValueOnce(creationInProgressError());
-    const hook = runContinueSession({ organizationId: 'org-1' });
+      .mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     const keys = usedCloudKeys();
     expect(keys[0]).toBeDefined();
@@ -359,11 +394,11 @@ describe('useContinueSession cloud clone wiring', () => {
     prepareSessionMutate.mockResolvedValueOnce({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
-    const hookA = runContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
-    const hookB = runContinueSession({ sessionId: OTHER_SESSION_ID, organizationId: 'org-1' });
+    const mountA = mountContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
+    const mountB = mountContinueSession({ sessionId: OTHER_SESSION_ID, organizationId: 'org-1' });
 
-    await hookA.continueSession(FIELDS);
-    await hookB.continueSession(FIELDS);
+    await mountA.result.continueSession(FIELDS);
+    await mountB.result.continueSession(FIELDS);
 
     const fingerprints = outboxMock.writeSafeRetry.mock.calls.map(
       call => (call[0] as { fingerprint?: string }).fingerprint
@@ -373,14 +408,13 @@ describe('useContinueSession cloud clone wiring', () => {
     expect(fingerprints[0]).not.toBe(fingerprints[1]);
   });
 
-  it('reuses the same fingerprint across retries of the same source', async () => {
+  it('reuses the same fingerprint across internal retries of the same source', async () => {
     prepareSessionMutate
       .mockRejectedValueOnce(creationInProgressError())
       .mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
-    const hook = runContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
+    const mount = mountContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     const fingerprints = outboxMock.writeSafeRetry.mock.calls.map(
       call => (call[0] as { fingerprint?: string }).fingerprint
@@ -389,15 +423,98 @@ describe('useContinueSession cloud clone wiring', () => {
     expect(fingerprints[0]).toBe(fingerprints[1]);
   });
 
-  it('shows a terminal toast and does not navigate when no destination resolves', async () => {
+  it('surfaces connect-repository guidance and does not navigate when no cloud destination resolves', async () => {
     destinationsRef.value = [];
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
-    expect(toastError).toHaveBeenCalledWith('Full continuation is unavailable for this session.');
+    expect(mount.rerender().guidance).toEqual({
+      kind: 'terminal',
+      action: 'connect-repository',
+      message: expect.any(String),
+    });
     expect(routerPush).not.toHaveBeenCalled();
     expect(prepareSessionMutate).not.toHaveBeenCalled();
+  });
+});
+
+describe('useContinueSession loading and guidance states', () => {
+  beforeEach(() => {
+    prepareSessionMutate.mockReset();
+    routerPush.mockClear();
+    queryClientFetchQuery.mockReset();
+    toastError.mockClear();
+    invalidateAgentSessionQueriesMock.mockReset();
+    hapticsMock.calls = 0;
+    hapticsMock.rejectWith = undefined;
+    destinationsRef.value = [CLOUD_DESTINATION];
+    sleepMock.mockClear();
+    outboxMock.getStoredOperationKey.mockReturnValue(null);
+    outboxMock.writeSafeRetry.mockReset();
+    outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+    outboxMock.remove.mockReset();
+    outboxMock.remove.mockResolvedValue(undefined);
+    outboxMock.whenLoaded.mockReset();
+    outboxMock.whenLoaded.mockResolvedValue(true);
+    mockRepositories();
+  });
+
+  it('sets isContinuing during the attempt and clears it after', async () => {
+    prepareSessionMutate.mockResolvedValueOnce({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    const promise = mount.result.continueSession(FIELDS);
+    // isContinuing is set synchronously before the first await.
+    expect(mount.rerender().isContinuing).toBe(true);
+
+    await promise;
+    expect(mount.rerender().isContinuing).toBe(false);
+  });
+
+  it('re-enables Continue after the sixth retryable failure', async () => {
+    prepareSessionMutate.mockRejectedValue(creationInProgressError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    const after = mount.rerender();
+    expect(after.isContinuing).toBe(false);
+    expect(after.guidance).toEqual({ kind: 'retry', message: expect.any(String) });
+  });
+
+  it('surfaces persistent terminal guidance with the back-to-sessions action', async () => {
+    prepareSessionMutate.mockRejectedValue(badRequestError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    const after = mount.rerender();
+    expect(after.isContinuing).toBe(false);
+    expect(after.guidance).toEqual({
+      kind: 'terminal',
+      action: 'back-to-sessions',
+      message: expect.any(String),
+    });
+    expect(prepareSessionMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('never falls back to a partial clone: every attempt carries the clone source and no navigation happens', async () => {
+    prepareSessionMutate.mockRejectedValue(creationInProgressError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    expect(routerPush).not.toHaveBeenCalled();
+    const inputs = prepareSessionMutate.mock.calls.map(call => call[0] as Record<string, unknown>);
+    expect(inputs).toHaveLength(6);
+    for (const input of inputs) {
+      expect(input.cloneFromKiloSessionId).toBe(SESSION_ID);
+      expect(input.prompt).toBeUndefined();
+      expect(input.initialMessageId).toBeUndefined();
+    }
   });
 });
 
@@ -411,6 +528,7 @@ describe('useContinueSession post-success failure containment', () => {
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
     destinationsRef.value = [CLOUD_DESTINATION];
+    sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();
     outboxMock.writeSafeRetry.mockResolvedValue(undefined);
@@ -426,9 +544,9 @@ describe('useContinueSession post-success failure containment', () => {
       kiloSessionId: 'ses_12345678901234567890123456',
     });
     invalidateAgentSessionQueriesMock.mockRejectedValueOnce(new Error('cache invalidation failed'));
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     // The cloud prepare succeeded; the cache failure must not block
     // navigation and must not surface as a create failure.
@@ -448,8 +566,8 @@ describe('useContinueSession post-success failure containment', () => {
     process.on('unhandledRejection', onUnhandledRejection);
 
     try {
-      const hook = runContinueSession({ organizationId: 'org-1' });
-      await hook.continueSession(FIELDS);
+      const mount = mountContinueSession({ organizationId: 'org-1' });
+      await mount.result.continueSession(FIELDS);
       // Give the runtime a turn to flag an unhandled rejection if the hook
       // ever leaks the haptics promise's rejection.
       await new Promise(resolve => {
@@ -478,6 +596,7 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
     destinationsRef.value = [CLOUD_DESTINATION];
+    sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();
     outboxMock.writeSafeRetry.mockResolvedValue(undefined);
@@ -490,9 +609,9 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
 
   it('writes a safe-retry row before mutate and removes it on success', async () => {
     prepareSessionMutate.mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     expect(outboxMock.writeSafeRetry).toHaveBeenCalledTimes(1);
     expect(outboxMock.writeSafeRetry).toHaveBeenCalledWith(
@@ -511,9 +630,9 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
   it('reuses a stored operationKey instead of minting a new UUID', async () => {
     outboxMock.getStoredOperationKey.mockReturnValue('stored-op-key');
     prepareSessionMutate.mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
       operationKey: 'stored-op-key',
@@ -532,9 +651,9 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
       return 'stored-op-key';
     });
     prepareSessionMutate.mockResolvedValueOnce({ kiloSessionId: 'ses_12345678901234567890123456' });
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     expect(order).toEqual(['whenLoaded', 'getStoredOperationKey']);
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
@@ -542,20 +661,20 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
     });
   });
 
-  it('keeps the row on a retryable failure so a relaunch reuses the key', async () => {
-    prepareSessionMutate.mockRejectedValueOnce(creationInProgressError());
-    const hook = runContinueSession({ organizationId: 'org-1' });
+  it('keeps the row on retryable failures so a relaunch reuses the key', async () => {
+    prepareSessionMutate.mockRejectedValue(creationInProgressError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     expect(outboxMock.remove).not.toHaveBeenCalled();
   });
 
   it('removes the row on a terminal failure', async () => {
-    prepareSessionMutate.mockRejectedValueOnce(badRequestError());
-    const hook = runContinueSession({ organizationId: 'org-1' });
+    prepareSessionMutate.mockRejectedValue(badRequestError());
+    const mount = mountContinueSession({ organizationId: 'org-1' });
 
-    await hook.continueSession(FIELDS);
+    await mount.result.continueSession(FIELDS);
 
     expect(outboxMock.remove).toHaveBeenCalledTimes(1);
   });

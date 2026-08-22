@@ -5,7 +5,6 @@
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
 
@@ -17,11 +16,6 @@ import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { trpcClient, useTRPC } from '@/lib/trpc';
-
-// The full clone carries no transcript seed; the continuation turn is a fixed
-// confirmation that the cloned context is ready and waits for the next prompt.
-const CONTINUE_CLONE_PROMPT =
-  'Continue from the cloned session context. Confirm that the context is ready, then wait for the next instruction.';
 
 export function useContinueCloudCreate(
   organizationId: string | undefined
@@ -71,16 +65,15 @@ export function useContinueCloudCreate(
       }
       const operationKey =
         getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
-      const initialMessageId = generateMessageId();
+      // The clone-only prepare schema forbids `prompt` and `initialMessageId`;
+      // the clone carries no synthetic turn.
       const baseInput = {
-        prompt: CONTINUE_CLONE_PROMPT,
-        initialMessageId,
         mode: normalizeAgentMode(mode),
         model: dest.model,
         variant: dest.variant || undefined,
         githubRepo: dest.repo,
         autoCommit: false,
-        autoInitiate: true,
+        autoInitiate: true as const,
         operationKey,
         cloneFromKiloSessionId: sessionId,
       };

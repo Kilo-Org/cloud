@@ -5,6 +5,9 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ShareRemoteFileError } from '@/lib/share-remote-file';
+
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FilePartRenderer } from './file-part-renderer';
 import {
   __resetFilePartCacheForTests,
@@ -102,9 +105,13 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
+  Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: vi.fn(),
 }));
 vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', File: 'File' }));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
@@ -211,6 +218,12 @@ function pressableByLabel(
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel === label
   );
+}
+
+function accessibleStatusNodes(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.type === AccessibleStatus);
 }
 
 function texts(root: TestRenderer.ReactTestInstance): string[] {
@@ -543,6 +556,42 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
+  it('shares the source file from the header Share on an empty markdown preview', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    expect(texts(root)).toContain('This file is empty.');
+
+    const headers = findByType(root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(headers[0]?.props.onShare).toBeTypeOf('function');
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-readme.md',
+      { mimeType: 'text/markdown' }
+    );
+
+    await unmount(renderer);
+  });
+
   it('shows an error and retry when the text fails to load', async () => {
     expoFileSystemMock.fileText.mockRejectedValue(new Error('boom'));
     cacheFilePart('part-1', {
@@ -613,6 +662,333 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     expect(toastMock.error).toHaveBeenCalledWith('File sharing is not available on this device.');
+
+    await unmount(renderer);
+  });
+
+  it('passes a share action to the image viewer and shares an http(s) URL via shareRemoteFile', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    expect(viewers).toHaveLength(1);
+    expect(viewers[0]?.props.onShare).toBeTypeOf('function');
+    expect(viewers[0]?.props.sharing).toBe(false);
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith({
+      url: 'https://x/a.png',
+      cacheDirectoryName: 'session-file-parts',
+      cacheKey: 'part-1',
+      filename: 'shot.png',
+    });
+
+    await unmount(renderer);
+  });
+
+  it('shares a captured data: image through the viewer via shareLocalFile', async () => {
+    cacheFilePart('part-1', {
+      url: 'data:image/png;base64,QUJD',
+      mime: 'image/png',
+      filename: 'shot.png',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-shot.png',
+      { mimeType: 'image/png' }
+    );
+
+    await unmount(renderer);
+  });
+
+  it('shares a captured data: markdown through the preview sheet via shareLocalFile', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    const headers = findByType(root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(headers[0]?.props.onShare).toBeTypeOf('function');
+
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-1-readme.md',
+      { mimeType: 'text/markdown' }
+    );
+
+    await unmount(renderer);
+  });
+
+  it('shares an http(s) markdown through the preview sheet via shareRemoteFile', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'https://x/readme.md',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledTimes(1);
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith({
+      url: 'https://x/readme.md',
+      cacheDirectoryName: 'session-file-parts',
+      cacheKey: 'part-1',
+      filename: 'readme.md',
+    });
+
+    await unmount(renderer);
+  });
+
+  it('renders share failures inline in the image viewer instead of toasting', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    const updated = findByType(root, 'ImageViewerModal');
+    expect(updated[0]?.props.shareError).not.toBeNull();
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('toasts a share failure that lands after the viewer closed', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    const shareHolder: { reject?: (error: Error) => void } = {};
+    shareRemoteFileMock.shareRemoteFile.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        shareHolder.reject = reject;
+      })
+    );
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+
+    // Close the viewer while the share is in flight.
+    const openViewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(openViewers).props.onClose as () => void)();
+    });
+
+    await act(async () => {
+      shareHolder.reject?.(new Error('boom'));
+      await Promise.resolve();
+    });
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Share failed');
+
+    await unmount(renderer);
+  });
+
+  it('renders share failures inline in the Markdown preview instead of toasting', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('Share failed');
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    const statuses = accessibleStatusNodes(root);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('Share failed');
+    expect(statuses[0]?.props.className).toBe('px-6 pt-2 text-sm');
+    const statusText = findByType(first(statuses), 'Text');
+    expect(statusText[0]?.props.className).toContain('text-destructive');
+
+    await unmount(renderer);
+  });
+
+  it('renders the share error outside the scroll view, directly under the header', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('Share failed');
+    const scrollViews = findByType(root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(texts(first(scrollViews))).not.toContain('Share failed');
+
+    await unmount(renderer);
+  });
+
+  it('renders the retryable share error inline in the image viewer', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open shot.png full screen')));
+
+    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(
+      new ShareRemoteFileError('download-failed')
+    );
+
+    const viewers = findByType(root, 'ImageViewerModal');
+    await act(async () => {
+      await Promise.resolve();
+      (first(viewers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    const updated = findByType(root, 'ImageViewerModal');
+    expect(updated[0]?.props.shareError).toBe('Failed to share file. Please try again.');
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('renders the non-retryable share error inline in the Markdown preview', async () => {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Preview readme.md')));
+    await flushAsync();
+
+    shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
+    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce('sharing-unavailable');
+
+    const headers = findByType(root, 'SheetHeader');
+    await act(async () => {
+      await Promise.resolve();
+      (first(headers).props.onShare as () => void)();
+    });
+    await flushAsync();
+
+    expect(texts(root)).toContain('File sharing is not available on this device.');
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    const statuses = accessibleStatusNodes(root);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('File sharing is not available on this device.');
 
     await unmount(renderer);
   });

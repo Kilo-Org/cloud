@@ -2,12 +2,13 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -106,32 +107,69 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   const [imageFailed, setImageFailed] = useState(false);
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  const viewerVisibleRef = useRef(viewerVisible);
+  const previewRef = useRef(preview);
+
+  useEffect(() => {
+    viewerVisibleRef.current = viewerVisible;
+  }, [viewerVisible]);
+
+  useEffect(() => {
+    previewRef.current = preview;
+  }, [preview]);
 
   async function handleShare() {
     if (!url) {
       return;
     }
     setSharing(true);
+    setShareError(null);
     try {
       await shareFilePart(url, part);
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
+      let message = 'Share failed';
       if (reason === 'sharing-unavailable') {
-        toast.error('File sharing is not available on this device.');
+        message = 'File sharing is not available on this device.';
       } else if (error instanceof ShareRemoteFileError) {
-        toast.error('Failed to share file. Please try again.');
+        message = 'Failed to share file. Please try again.';
+      }
+      if (viewerVisibleRef.current || previewRef.current) {
+        setShareError(message);
       } else {
-        toast.error('Share failed');
+        toast.error(message);
       }
     } finally {
       setSharing(false);
     }
   }
 
+  function openViewer() {
+    setShareError(null);
+    setViewerVisible(true);
+  }
+
+  function closeViewer() {
+    setShareError(null);
+    setViewerVisible(false);
+  }
+
+  function openPreview(mode: PreviewMode) {
+    setShareError(null);
+    setPreview(mode);
+  }
+
+  function closePreview() {
+    setShareError(null);
+    setPreview(null);
+  }
+
   function handleChipTap() {
     if (url) {
       if (kind === 'markdown') {
-        setPreview('markdown');
+        openPreview('markdown');
         return;
       }
       showActionSheetWithOptions(
@@ -144,7 +182,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             return;
           }
           if (index === 0) {
-            setPreview('text');
+            openPreview('text');
           } else if (index === 1) {
             void handleShare();
           }
@@ -156,7 +194,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       // A markdown chip tapped while the presign is in flight opens the
       // modal as soon as the URL lands; the modal render is gated on `url`.
       if (kind === 'markdown') {
-        setPreview('markdown');
+        openPreview('markdown');
       }
       return;
     }
@@ -173,7 +211,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   useEffect(() => {
     if (preview !== null && resolved.status === 'error') {
       toast.error('Could not load this file. Try again.');
-      setPreview(null);
+      closePreview();
     }
   }, [preview, resolved.status]);
 
@@ -206,9 +244,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return (
         <>
           <Pressable
-            onPress={() => {
-              setViewerVisible(true);
-            }}
+            onPress={openViewer}
             className="my-1 overflow-hidden rounded-lg active:opacity-80"
             accessibilityRole="button"
             accessibilityLabel={getFilePartAccessibilityLabel('image', part.filename)}
@@ -233,9 +269,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
               visible={viewerVisible}
               uri={url}
               filename={part.filename ?? 'File'}
-              onClose={() => {
-                setViewerVisible(false);
+              onShare={() => {
+                void handleShare();
               }}
+              sharing={sharing}
+              shareError={shareError}
+              onClose={closeViewer}
             />
           )}
         </>
@@ -307,9 +346,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
                 }
               : undefined
           }
-          onClose={() => {
-            setPreview(null);
+          onShare={() => {
+            void handleShare();
           }}
+          sharing={sharing}
+          shareError={shareError}
+          onClose={closePreview}
         />
       ) : null}
     </>
@@ -322,9 +364,21 @@ type FilePreviewModalProps = {
   part: FilePart;
   onRetry?: () => Promise<boolean>;
   onClose: () => void;
+  onShare?: () => void;
+  sharing?: boolean;
+  shareError?: string | null;
 };
 
-function FilePreviewModal({ mode, url, part, onRetry, onClose }: Readonly<FilePreviewModalProps>) {
+function FilePreviewModal({
+  mode,
+  url,
+  part,
+  onRetry,
+  onClose,
+  onShare,
+  sharing = false,
+  shareError = null,
+}: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
@@ -399,7 +453,14 @@ function FilePreviewModal({ mode, url, part, onRetry, onClose }: Readonly<FilePr
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View className="flex-1 bg-background">
-        <SheetHeader title={part.filename ?? 'File'} onDone={onClose} doneLabel="Done" />
+        <SheetHeader
+          title={part.filename ?? 'File'}
+          onDone={onClose}
+          doneLabel="Done"
+          onShare={onShare}
+          sharing={sharing}
+        />
+        <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
         <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
       </View>
     </Modal>

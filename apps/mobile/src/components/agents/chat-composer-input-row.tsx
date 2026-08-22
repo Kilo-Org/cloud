@@ -23,6 +23,7 @@ type ChatComposerInputRowProps = {
   attachmentsEnabled: boolean;
   canSend: boolean;
   disabled: boolean;
+  hasSendableContent: boolean;
   inputAccessibilityDisabled: boolean;
   inputEditable: boolean;
   inputRef: RefObject<TextInput | null>;
@@ -58,6 +59,7 @@ export function ChatComposerInputRow({
   attachmentsEnabled,
   canSend,
   disabled,
+  hasSendableContent,
   inputAccessibilityDisabled,
   inputEditable,
   inputRef,
@@ -144,7 +146,7 @@ export function ChatComposerInputRow({
         </View>
       ) : null}
 
-      {isStreaming && !canSend && !isSending ? (
+      {isStreaming && !hasSendableContent && !isSending ? (
         <Pressable
           onPress={onStop}
           disabled={disabled}

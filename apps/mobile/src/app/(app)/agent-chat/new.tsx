@@ -415,6 +415,7 @@ function NewSessionScreenBody() {
     ? remoteSpawn.isSpawningRemote ||
       isSubmitting ||
       attachments.hasFailedAttachments ||
+      attachments.isUploading ||
       modelView.isSelectionUnavailable ||
       instanceCatalog.isLoading
     : resolveNewSessionStartDisabled({

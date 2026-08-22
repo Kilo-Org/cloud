@@ -11,7 +11,15 @@ import {
 } from './constants';
 import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
 
-const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>(['png', 'jpg', 'jpeg', 'webp', 'gif']);
+const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>([
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'gif',
+  'heic',
+  'heif',
+]);
 
 /**
  * Normalize a candidate's filename extension.

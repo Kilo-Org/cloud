@@ -343,7 +343,8 @@ describe('createSessionWithLedger admission ladder', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
-      'https://github.com/acme/widgets'
+      'https://github.com/acme/widgets',
+      undefined
     );
   });
 
@@ -366,7 +367,8 @@ describe('createSessionWithLedger admission ladder', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
-      'https://gitlab.com/acme/widgets'
+      'https://gitlab.com/acme/widgets',
+      undefined
     );
   });
 
@@ -394,7 +396,8 @@ describe('createSessionWithLedger admission ladder', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
-      'https://bitbucket.org/acme/widgets'
+      'https://bitbucket.org/acme/widgets',
+      undefined
     );
   });
 
@@ -1858,6 +1861,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
@@ -1969,6 +1973,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       undefined
     );
     expect(deleteCliSessionMock).toHaveBeenCalledWith(
@@ -2226,6 +2231,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
@@ -2318,6 +2324,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       undefined,
       'cloud-agent',
       expect.any(String),
+      'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);

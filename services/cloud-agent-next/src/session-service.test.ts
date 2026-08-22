@@ -3521,6 +3521,7 @@ describe('SessionService session-ingest compatibility', () => {
       undefined,
       'cloud-agent',
       undefined,
+      undefined,
       'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
     );
 
@@ -3533,6 +3534,7 @@ describe('SessionService session-ingest compatibility', () => {
       organizationId: undefined,
       createdOnPlatform: 'cloud-agent',
       title: undefined,
+      gitUrl: undefined,
       cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
   });

@@ -975,7 +975,7 @@ async function registerAllocatedSession(
     throw error;
   }
 
-  if (!registerResult.success) {
+  if (!registerResult.success && registerResult.error !== 'Session already registered') {
     const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1000,6 +1000,10 @@ async function registerAllocatedSession(
     });
   }
 
+  // `Session already registered` means the registration already committed on a
+  // prior attempt whose response was lost. The DO method is not idempotent, so
+  // the retry returns this rejection; treat it as idempotent success instead of
+  // rolling back a live clone, tombstoning its IDs, or settling the row failed.
   logger.info('Session registered for lazy preparation');
   const result = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
@@ -1654,6 +1658,26 @@ async function reconcileLedgerCreate(
   }
 
   // (d) Metadata present → completion requires the recorded initialMessageId.
+  // A clone-only create never records one: with the ownership row and DO
+  // metadata both present the create fully succeeded, so settle it completed
+  // directly instead of conflicting with `creation_in_progress` forever.
+  if (input.initialTurn === undefined) {
+    const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
+    await settleTerminalOutcome(db, {
+      rowId: row.id,
+      status: 'completed',
+      outcomeCode: 'ok',
+      canonicalResult: ids,
+      outboxEvent: sessionCreateSettledOutboxEvent({
+        distinctId,
+        outcome: 'completed',
+        admission: 'takeover',
+        startedAt: options.startedAt,
+        inOrganization: input.options?.kilocodeOrganizationId != null,
+      }),
+    });
+    return { ...ids, replayed: true };
+  }
   return confirm();
 }
 

@@ -2013,6 +2013,51 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
+  it('treats a clone-only "Session already registered" DO result as idempotent success', async () => {
+    // A lost first-attempt response makes the retry hit the non-idempotent DO
+    // method, which returns this rejection when metadata already exists. The
+    // caller must settle success without rolling back the live clone or
+    // tombstoning its IDs.
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    const doStub = makeDoStub({
+      registerSession: vi.fn().mockResolvedValue({
+        success: false,
+        error: 'Session already registered',
+      }),
+    });
+    const ctx = makeContext(doStub);
+
+    const result = await runCreate(ctx, cloneRequest());
+
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalledWith(
+      expect.any(Object),
+      ROW_ID,
+      expect.objectContaining({ [SESSION_CREATE_TOMBSTONED_IDS_KEY]: expect.anything() })
+    );
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+  });
+
   it('records sandbox allocation fields in ledger progress before the ingest call', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
@@ -2137,6 +2182,51 @@ describe('createSessionWithLedger clone reconciliation', () => {
         },
       })
     );
+    expect(result).toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+  });
+
+  it('settles a clone-only create completed when ownership and metadata are both present', async () => {
+    // A fully-succeeded clone-only create records no initialMessageId, so the
+    // initial-turn confirmation would conflict forever. Ownership row present +
+    // DO metadata present must settle `completed` with the takeover outbox
+    // event instead of `creation_in_progress`.
+    const request = cloneRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow(),
+    });
+    // First query: ownership present. Second: distinct-id email.
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    const result = await runCreate(ctx, request);
+
+    expect(doStub.getMetadata).toHaveBeenCalledTimes(1);
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      })
+    );
+    expect(settleOptions(0)?.outboxEvent).toMatchObject({
+      properties: { outcome: 'completed', admission: 'takeover', in_organization: false },
+    });
     expect(result).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,

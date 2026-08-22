@@ -64,17 +64,3 @@ export function releaseChildSessionSheet(
   }
   return { sheet: null, visible: false };
 }
-
-/**
- * The subagent sheet keeps a `bg-background` layer mounted on Android while
- * the identity is still held and `visible` is false, so the native slide-out
- * dismissal never reveals the session content behind the transparent Modal as
- * a white frame. iOS keeps its native pageSheet dismissal and never renders
- * this layer; the other five sheets do not use this state.
- */
-export function shouldShowChildSessionDismissLayer(
-  state: ChildSessionSheetMountState,
-  platform: string
-): boolean {
-  return platform !== 'ios' && state.sheet !== null && !state.visible;
-}

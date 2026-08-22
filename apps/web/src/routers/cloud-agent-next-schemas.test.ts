@@ -175,39 +175,92 @@ describe('cloudAgentGetAttachmentDownloadUrlSchema', () => {
   });
 });
 
-describe('basePrepareSessionNextSchema cloneFromKiloSessionId', () => {
-  const validInput = {
+describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
+  const OPERATION_KEY = '12345678-1234-4234-9234-123456789abc';
+  const cloneOnlyInput = {
     githubRepo: 'acme/repo',
-    prompt: 'Continue the clone',
+    cloneFromKiloSessionId: KILO_SESSION_ID,
+    autoInitiate: true,
+    operationKey: OPERATION_KEY,
     mode: 'code',
     model: 'kilo/test-model',
   };
 
-  it('accepts an optional cloneFromKiloSessionId', () => {
-    const result = basePrepareSessionNextSchema.safeParse({
-      ...validInput,
-      cloneFromKiloSessionId: KILO_SESSION_ID,
-    });
+  it('accepts a clone-only input with no prompt', () => {
+    const result = basePrepareSessionNextSchema.safeParse(cloneOnlyInput);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.cloneFromKiloSessionId).toBe(KILO_SESSION_ID);
+      expect(result.data.prompt).toBeUndefined();
     }
+  });
+
+  it('rejects a clone-only input that also carries a prompt', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, prompt: 'Continue the clone' })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects a clone-only input that also carries initialMessageId', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        ...cloneOnlyInput,
+        initialMessageId: 'msg_12345678901212345678901234',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone-only input that also carries initialPayload', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        ...cloneOnlyInput,
+        initialPayload: { type: 'prompt', prompt: 'hi', mode: 'code', model: 'gpt-4' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone-only input missing operationKey', () => {
+    const { operationKey: _omitted, ...withoutOperationKey } = cloneOnlyInput;
+    expect(basePrepareSessionNextSchema.safeParse(withoutOperationKey).success).toBe(false);
+  });
+
+  it('rejects a clone-only input with autoInitiate false', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, autoInitiate: false }).success
+    ).toBe(false);
   });
 
   it('rejects a malformed cloneFromKiloSessionId', () => {
     expect(
       basePrepareSessionNextSchema.safeParse({
-        ...validInput,
+        ...cloneOnlyInput,
         cloneFromKiloSessionId: 'agent_invalid',
       }).success
     ).toBe(false);
   });
 
-  it('still accepts an input without cloneFromKiloSessionId', () => {
-    const result = basePrepareSessionNextSchema.safeParse(validInput);
+  it('accepts a non-clone input with required prompt and no cloneFromKiloSessionId', () => {
+    const result = basePrepareSessionNextSchema.safeParse({
+      githubRepo: 'acme/repo',
+      prompt: 'Continue the clone',
+      mode: 'code',
+      model: 'kilo/test-model',
+    });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.cloneFromKiloSessionId).toBeUndefined();
     }
+  });
+
+  it('accepts a non-clone input with an explicit undefined cloneFromKiloSessionId', () => {
+    const result = basePrepareSessionNextSchema.safeParse({
+      githubRepo: 'acme/repo',
+      prompt: 'Continue the clone',
+      mode: 'code',
+      model: 'kilo/test-model',
+      cloneFromKiloSessionId: undefined,
+    });
+    expect(result.success).toBe(true);
   });
 });

@@ -332,71 +332,94 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
   sendMessageNextPayloadSchema.options[1],
 ]);
 
+/**
+ * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
+ * the non-clone variant keeps the required `prompt` and the current optional
+ * initial fields, while the clone-only variant requires the source session,
+ * `autoInitiate: true`, and a stable `operationKey`, and forbids any synthetic
+ * initial turn fields.
+ */
+const PrepareSessionSharedFields = {
+  // Repository source (mutually exclusive - must provide exactly one)
+  githubRepo: z
+    .string()
+    .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid repository format')
+    .optional(),
+  gitlabProject: z
+    .string()
+    .regex(
+      /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/,
+      'Invalid project path format. Expected: group/project or group/subgroup/project'
+    )
+    .optional()
+    .describe('GitLab project path (e.g., group/project or group/subgroup/project)'),
+  bitbucketRepo: z
+    .object({
+      fullName: z
+        .string()
+        .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid Bitbucket repository'),
+      workspaceUuid: z.uuid(),
+      repositoryUuid: z.uuid(),
+    })
+    .strict()
+    .optional(),
+
+  // Execution params (required)
+  mode: preparedSessionModeSchema,
+  model: z.string().min(1),
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
+
+  /**
+   * Optional environment profile id. When omitted, the effective default
+   * profile (personal default wins over org default) is used.
+   */
+  profileId: z.uuid().optional(),
+
+  // Optional configuration
+  envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
+  setupCommands: z.array(z.string().max(500)).max(20).optional(),
+  mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
+  runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
+  runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
+  upstreamBranch: z.string().optional(),
+  autoCommit: z.boolean().optional(),
+  attachments: cloudAgentAttachmentsSchema.optional(),
+  images: cloudAgentImagesSchema,
+  devcontainer: z.boolean().optional(),
+};
+
+const PrepareSessionNonCloneVariant = z.object({
+  prompt: z.string().min(1).max(100_000),
+  initialMessageId: messageIdNextSchema.optional(),
+  initialPayload: sendMessageNextPayloadSchema.optional(),
+  autoInitiate: z.boolean().optional(),
+  /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
+  operationKey: z.string().uuid().optional(),
+  /**
+   * Optional source Kilo session to clone into this Cloud Agent session.
+   * Old callers omit the field and create an empty destination session.
+   */
+  cloneFromKiloSessionId: z.undefined().optional(),
+  ...PrepareSessionSharedFields,
+});
+
+const PrepareSessionCloneVariant = z.object({
+  prompt: z.undefined().optional(),
+  initialMessageId: z.undefined().optional(),
+  initialPayload: z.undefined().optional(),
+  cloneFromKiloSessionId: z.string().startsWith('ses_').length(30),
+  autoInitiate: z.literal(true),
+  operationKey: z.string().uuid(),
+  ...PrepareSessionSharedFields,
+});
+
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
-  .object({
-    // Repository source (mutually exclusive - must provide exactly one)
-    githubRepo: z
-      .string()
-      .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid repository format')
-      .optional(),
-    gitlabProject: z
-      .string()
-      .regex(
-        /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/,
-        'Invalid project path format. Expected: group/project or group/subgroup/project'
-      )
-      .optional()
-      .describe('GitLab project path (e.g., group/project or group/subgroup/project)'),
-    bitbucketRepo: z
-      .object({
-        fullName: z
-          .string()
-          .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid Bitbucket repository'),
-        workspaceUuid: z.uuid(),
-        repositoryUuid: z.uuid(),
-      })
-      .strict()
-      .optional(),
-
-    // Execution params (required)
-    prompt: z.string().min(1).max(100_000),
-    mode: preparedSessionModeSchema,
-    model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
-
-    /**
-     * Optional environment profile id. When omitted, the effective default
-     * profile (personal default wins over org default) is used.
-     */
-    profileId: z.uuid().optional(),
-
-    // Optional configuration
-    envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
-    setupCommands: z.array(z.string().max(500)).max(20).optional(),
-    mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
-    runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
-    runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
-    upstreamBranch: z.string().optional(),
-    autoCommit: z.boolean().optional(),
-    autoInitiate: z.boolean().optional(),
-    initialMessageId: messageIdNextSchema.optional(),
-    initialPayload: sendMessageNextPayloadSchema.optional(),
-    attachments: cloudAgentAttachmentsSchema.optional(),
-    images: cloudAgentImagesSchema,
-    devcontainer: z.boolean().optional(),
-    /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
-    operationKey: z.string().uuid().optional(),
-    /**
-     * Optional source Kilo session to clone into this Cloud Agent session.
-     * Old callers omit the field and create an empty destination session.
-     */
-    cloneFromKiloSessionId: z.string().startsWith('ses_').length(30).optional(),
-  })
+  .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
   .refine(
     data =>
       [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(

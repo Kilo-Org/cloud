@@ -2,10 +2,12 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import { createCallerFactory } from '@/lib/trpc/init';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type * as ZodModule from 'zod';
+import type { z } from 'zod';
 import type { User } from '@kilocode/db/schema';
 import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import { TRPCError } from '@trpc/server';
+import type { basePrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -193,22 +195,9 @@ jest.mock('@/routers/organizations/utils', () => {
 });
 
 let createCaller: (ctx: { user: User }) => {
-  prepareSession: (input: {
-    organizationId: string;
-    prompt: string;
-    mode: string;
-    model: string;
-    githubRepo?: string;
-    bitbucketRepo?: {
-      fullName: string;
-      workspaceUuid: string;
-      repositoryUuid: string;
-    };
-    autoInitiate: boolean;
-    devcontainer: boolean;
-    images?: { path: string; files: string[] };
-    cloneFromKiloSessionId?: string;
-  }) => Promise<{
+  prepareSession: (
+    input: z.infer<typeof basePrepareSessionNextSchema> & { organizationId: string }
+  ) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
@@ -897,13 +886,13 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
 
     await caller.prepareSession({
       organizationId: ORGANIZATION_ID,
-      prompt: 'Continue the clone',
+      cloneFromKiloSessionId,
+      autoInitiate: true,
+      operationKey: '12345678-1234-4234-9234-123456789abc',
       mode: 'code',
       model: 'kilo/test-model',
       githubRepo: 'acme/repo',
-      autoInitiate: true,
       devcontainer: false,
-      cloneFromKiloSessionId,
     });
 
     expect(mockPrepareSession).toHaveBeenCalledWith(

@@ -1,6 +1,8 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import type { z } from 'zod';
+import type { personalPrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -156,21 +158,7 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
-  prepareSession: (input: {
-    prompt: string;
-    mode: string;
-    model: string;
-    githubRepo?: string;
-    bitbucketRepo?: {
-      fullName: string;
-      workspaceUuid: string;
-      repositoryUuid: string;
-    };
-    autoInitiate: boolean;
-    devcontainer: boolean;
-    images?: { path: string; files: string[] };
-    cloneFromKiloSessionId?: string;
-  }) => Promise<{
+  prepareSession: (input: z.infer<typeof personalPrepareSessionNextSchema>) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
@@ -717,13 +705,13 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     const cloneFromKiloSessionId = 'ses_12345678901234567890123456';
 
     await caller.prepareSession({
-      prompt: 'Continue the clone',
+      cloneFromKiloSessionId,
+      autoInitiate: true,
+      operationKey: '12345678-1234-4234-9234-123456789abc',
       mode: 'code',
       model: 'kilo/test-model',
       githubRepo: 'acme/repo',
-      autoInitiate: true,
       devcontainer: false,
-      cloneFromKiloSessionId,
     });
 
     expect(mockPrepareSession).toHaveBeenCalledWith(

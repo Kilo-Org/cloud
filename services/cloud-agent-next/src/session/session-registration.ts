@@ -581,7 +581,7 @@ async function allocateNewSession(
         await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
         await ledger.onFailure('ownership_row', 'session_clone_failed');
       }
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_clone_failed' });
+      throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
     }
     if (ingestResult.status === 'in_progress') {
       if (ledger) {
@@ -1467,13 +1467,32 @@ async function resumeCloneCreate(
   }
 
   if (ingestResult === undefined) {
+    // Old worker with no clone acknowledgement: the clone outcome is unknown.
+    // Delete the empty destination row best-effort so a same-key retry does
+    // not treat it as a finished clone with zero copied items.
+    try {
+      await sessionService.deleteCliSessionViaSessionIngest(
+        ids.kiloSessionId,
+        ctx.userId,
+        ctx.env,
+        {
+          onlyIfEmpty: true,
+        }
+      );
+    } catch (deleteError) {
+      logger
+        .withFields({
+          error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+        })
+        .error('Failed to remove empty destination row after missing clone acknowledgement');
+    }
     await hooks.onTransportFailure();
     throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'session_clone_unavailable' });
   }
   if (ingestResult.status === 'rejected') {
     await recordCloneTombstone(hooks, ids);
     await hooks.onFailure('ownership_row', 'session_clone_failed');
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_clone_failed' });
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
   }
   if (ingestResult.status === 'in_progress') {
     await hooks.onTransportFailure();

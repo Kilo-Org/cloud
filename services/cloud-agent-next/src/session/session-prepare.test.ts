@@ -1885,7 +1885,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     await expect(runCreate(ctx, cloneRequest())).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'session_clone_failed',
+      message: 'source_access_denied',
     });
 
     expect(settleOperationMock).toHaveBeenCalledWith(
@@ -2201,6 +2201,32 @@ describe('createSessionWithLedger clone reconciliation', () => {
     });
   });
 
+  it('surfaces SERVICE_UNAVAILABLE session_clone_unavailable when the resume ingest sends no acknowledgement', async () => {
+    const request = cloneRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow(),
+    });
+    createCliSessionMock.mockResolvedValue(undefined);
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_clone_unavailable',
+    });
+
+    expect(deleteCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      { onlyIfEmpty: true }
+    );
+    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
+
   it('tombstones a rejected clone so the next same-key retry allocates fresh IDs', async () => {
     const request = cloneRequest();
     const doStub = makeDoStub();
@@ -2221,7 +2247,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
 
     await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'session_clone_failed',
+      message: 'source_access_denied',
     });
 
     expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
@@ -2303,7 +2329,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
 
     await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'session_clone_failed',
+      message: 'source_access_denied',
     });
 
     expect(createCliSessionMock).toHaveBeenCalledWith(

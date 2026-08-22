@@ -1,8 +1,10 @@
-export type SecurityCommandType =
-  | 'sync'
-  | 'dismiss_finding'
-  | 'start_analysis'
-  | 'apply_auto_remediation';
+export const SECURITY_COMMAND_TYPES = [
+  'sync',
+  'dismiss_finding',
+  'start_analysis',
+  'apply_auto_remediation',
+] as const;
+export type SecurityCommandType = (typeof SECURITY_COMMAND_TYPES)[number];
 
 // Web's full invalidation-scope superset (from
 // apps/web/src/components/security-agent/security-agent-command-invalidation.ts:6).

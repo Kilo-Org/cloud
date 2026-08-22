@@ -90,11 +90,8 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
   };
 });
 
-// useSsoRecovery reports the organization id to Sentry; stub the SDK so the
-// hook can be mounted without a native runtime.
-vi.mock('@sentry/react-native', () => ({
-  addBreadcrumb: vi.fn(),
-}));
+const sentryMock = vi.hoisted(() => ({ addBreadcrumb: vi.fn() }));
+vi.mock('@sentry/react-native', () => sentryMock);
 
 // postAuth is the single fetch boundary for native auth; stub it so the SSO
 // recovery path can be driven without a network.
@@ -379,6 +376,7 @@ describe('useNativeAuth SSO recovery', () => {
       email: 'user@example.com',
       ssoOrganizationId: 'org_1',
     });
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
 
     // A new attempt clears the recovery state before posting.
     mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });

@@ -126,7 +126,9 @@ export function GroupDetailsPanel({
 
   const group = entry.mode === 'edit' ? groupQuery.data?.group : undefined;
   const members =
-    organizationQuery.data?.members.filter(member => member.status === 'active') ?? [];
+    organizationQuery.data?.members.flatMap(member =>
+      member.status === 'active' ? [member] : []
+    ) ?? [];
   const visibleMembers = members.filter(member =>
     `${member.name} ${member.email}`.toLowerCase().includes(memberSearch.toLowerCase())
   );

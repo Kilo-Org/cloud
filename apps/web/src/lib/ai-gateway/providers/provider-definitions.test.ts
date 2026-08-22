@@ -6,7 +6,10 @@ import {
   tryGetProviderById,
 } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
+import {
+  ReasoningDetailsTransform,
+  type TransformRequestContext,
+} from '@/lib/ai-gateway/providers/types';
 
 describe('LongCat provider', () => {
   test('targets the LongCat chat completions endpoint', () => {
@@ -14,6 +17,7 @@ describe('LongCat provider', () => {
       'https://api.longcat.ai/openai/v1/chat/completions'
     );
     expect(LONGCAT.supportedChatApis).toEqual(['chat_completions']);
+    expect(LONGCAT.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
   });
 
   test.each([

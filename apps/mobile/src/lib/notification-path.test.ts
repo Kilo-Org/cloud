@@ -83,6 +83,41 @@ describe('notificationPathForData', () => {
       })
     ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-2?via=push');
   });
+
+  it('routes every security_lifecycle event value to the finding detail path', () => {
+    const events = [
+      'analysis_completed',
+      'analysis_failed',
+      'remediation_queued',
+      'remediation_pr_opened',
+      'remediation_failed',
+      'remediation_blocked',
+      'remediation_no_changes_needed',
+      'remediation_cancelled',
+    ] as const;
+
+    for (const event of events) {
+      expect(
+        notificationPathForData({
+          type: 'security_lifecycle',
+          event,
+          findingId: 'finding-3',
+          scope: 'personal',
+        })
+      ).toBe('/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-3?via=push');
+    }
+  });
+
+  it('routes security_lifecycle notifications for an organization scope', () => {
+    expect(
+      notificationPathForData({
+        type: 'security_lifecycle',
+        event: 'remediation_pr_opened',
+        findingId: 'finding-4',
+        scope: 'org-xyz',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-4?via=push');
+  });
 });
 
 describe('pushDataSchema', () => {
@@ -193,6 +228,17 @@ describe('pushDataSchema', () => {
       pushDataSchema.safeParse({
         type: 'cloud_agent_session',
         cliSessionId: '',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a security_lifecycle payload with an unknown event value', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'security_lifecycle',
+        event: 'sla_warning',
+        findingId: 'finding-1',
+        scope: 'org-xyz',
       }).success
     ).toBe(false);
   });

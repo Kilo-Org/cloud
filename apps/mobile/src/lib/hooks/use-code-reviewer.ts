@@ -13,7 +13,7 @@ import { pick } from '@/lib/utils';
 
 export { PERSONAL_SCOPE };
 
-function isPersonal(scope: string) {
+export function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
 }
 
@@ -27,8 +27,22 @@ function isPersonal(scope: string) {
 // construction). This narrows a ReviewerPlatform down to what the personal
 // procedures accept, without an `as` cast — the 'bitbucket' branch is dead
 // whenever scope is actually personal.
-function toPersonalPlatform(platform: ReviewerPlatform): 'github' | 'gitlab' {
+export function toPersonalPlatform(platform: ReviewerPlatform): 'github' | 'gitlab' {
   return platform === 'bitbucket' ? 'github' : platform;
+}
+
+/**
+ * Narrows a mixed `number | string` id array down to numeric ids. The
+ * personal schema only accepts numeric repository IDs (bitbucket, the only
+ * string-ID platform, is org-only), so the personal PATCH path must drop
+ * string ids before sending. Shared by the full-array save and the delta
+ * save so the two copies of this contract rule cannot drift.
+ */
+export function toNumericRepositoryIds(ids: (number | string)[]): number[] {
+  return ids.filter(
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing a number id from a string id in a mixed primitive union has no non-typeof narrowing
+    (id): id is number => typeof id === 'number'
+  );
 }
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -119,7 +133,7 @@ export function useReviewConfig(
   return (isPersonal(scope) ? personal : org) as UseQueryResult<ReviewConfigData>;
 }
 
-function useReviewConfigQueryKey(scope: string, platform: ReviewerPlatform) {
+export function useReviewConfigQueryKey(scope: string, platform: ReviewerPlatform) {
   const trpc = useTRPC();
   return isPersonal(scope)
     ? trpc.personalReviewAgent.getReviewConfig.queryKey({ platform: toPersonalPlatform(platform) })
@@ -182,7 +196,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
   });
 }
 
-function gitLabWebhookWarningQueryKey(scope: string, platform: ReviewerPlatform) {
+export function gitLabWebhookWarningQueryKey(scope: string, platform: ReviewerPlatform) {
   return ['codeReviewerGitLabWebhookWarning', scope, platform] as const;
 }
 
@@ -251,10 +265,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         // still be a real edit and could clobber stored values.
         const narrowedSelectedRepositoryIds =
           rawSelectedRepositoryIds !== undefined
-            ? rawSelectedRepositoryIds.filter(
-                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- distinguishing a number id from a string id in a mixed primitive union has no non-typeof narrowing
-                (id): id is number => typeof id === 'number'
-              )
+            ? toNumericRepositoryIds(rawSelectedRepositoryIds)
             : undefined;
         const narrowedRepositoryModelOverrides =
           rawRepositoryModelOverrides !== undefined
@@ -374,5 +385,33 @@ export function useConnectBitbucket(scope: string) {
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+}
+
+// Review memory only exists for GitHub, so the owner input pins the platform
+// and only varies the scope segment (personal vs. an organization id).
+function reviewMemoryOwnerInput(scope: string) {
+  return isPersonal(scope)
+    ? { platform: 'github' as const }
+    : { organizationId: scope, platform: 'github' as const };
+}
+
+export function useSetReviewMemoryEnabled(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+
+  return useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (enabled: boolean) =>
+      trpcClient.reviewMemory.setEnabled.mutate({ ...ownerInput, enabled }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+      });
+    },
+    onError: error => {
+      announcingToast.error(error.message);
+    },
   });
 }

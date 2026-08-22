@@ -194,7 +194,12 @@ describe('useTrackingPermissionPrompt', () => {
       await Promise.resolve();
     });
 
-    expect(captureException).toHaveBeenCalledWith(requestError);
+    expect(captureException).toHaveBeenCalledWith(requestError, {
+      tags: {
+        'error.subsystem': 'tracking_permission',
+        'error.operation': 'request_permission',
+      },
+    });
     renderer.unmount();
   });
 
@@ -210,7 +215,9 @@ describe('useTrackingPermissionPrompt', () => {
 
     expect(getTrackingPermissionsAsync).toHaveBeenCalledOnce();
     expect(alertMock).not.toHaveBeenCalled();
-    expect(captureException).toHaveBeenCalledWith(checkError);
+    expect(captureException).toHaveBeenCalledWith(checkError, {
+      tags: { 'error.subsystem': 'tracking_permission', 'error.operation': 'get_permission' },
+    });
     renderer.unmount();
   });
 

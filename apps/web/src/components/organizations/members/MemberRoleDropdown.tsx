@@ -10,7 +10,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
 import { useUpdateMemberRole } from '@/app/api/organizations/hooks';
-import type { OrganizationRole, OrganizationMember } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationRole,
+  OrganizationMemberResponse,
+} from '@/lib/organizations/organization-types';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,
@@ -58,7 +61,7 @@ const getAvailableRoles = (
 
 type MemberRoleDropdownProps = {
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
   showAsReadOnly?: boolean;
 };
 

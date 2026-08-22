@@ -135,6 +135,29 @@ describe('Organizations', () => {
 
       expect(result).toEqual([]);
     });
+
+    test('returns exactly the documented UserOrganizationWithSeats key set with no extra org fields', async () => {
+      const user = await insertTestUser();
+      await createOrganization('Key Set Org', user.id);
+
+      const result = await getUserOrganizationsWithSeats(user.id);
+
+      expect(result).toHaveLength(1);
+      expect(Object.keys(result[0]).sort()).toEqual(
+        [
+          'balance',
+          'created_at',
+          'memberCount',
+          'organizationId',
+          'organizationName',
+          'plan',
+          'requireSeats',
+          'role',
+          'seatCount',
+        ].sort()
+      );
+      expect(Object.keys(result[0].seatCount).sort()).toEqual(['total', 'used'].sort());
+    });
   });
 
   describe('getProfileOrganizations', () => {

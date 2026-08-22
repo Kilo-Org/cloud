@@ -145,7 +145,13 @@ describe('ensureAndroidNotificationChannels', () => {
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
     expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(3);
-    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'create_android_channel',
+        'notification.channel': 'agent',
+      },
+    });
   });
 });
 

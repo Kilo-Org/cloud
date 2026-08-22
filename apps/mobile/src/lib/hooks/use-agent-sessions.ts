@@ -20,6 +20,10 @@ import {
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
 import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
+import {
+  resolveStoredSessionsHold,
+  type StoredSessionsHold,
+} from '@/lib/agent-session-render-hold';
 import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
 import {
   type AgentSessionSortBy,
@@ -250,6 +254,27 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // using the shared collection helper.
   const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
 
+  // Render hold: `reconcileFirstPage` (departure effect below, mutation
+  // settle via `invalidateAgentSessionQueries`) empties the cached pages
+  // before refetching page one. Keep rendering the last non-empty rows for
+  // the same query key until the refetch delivers, so the SectionList never
+  // unmounts and scroll survives. A key change (filter/sort) or a settled
+  // empty result releases the hold.
+  const storedQueryKeyJson = JSON.stringify(
+    trpc.cliSessionsV2.list.infiniteQueryKey(buildAgentSessionListInput(options ?? {}))
+  );
+  const storedHoldRef = useRef<StoredSessionsHold<StoredSession> | null>(null);
+  const resolvedStored = resolveStoredSessionsHold({
+    current: storedSessions,
+    isFetching: stored.isFetching,
+    queryKeyJson: storedQueryKeyJson,
+    previousHold: storedHoldRef.current,
+  });
+  useEffect(() => {
+    storedHoldRef.current = resolvedStored.hold;
+  }, [resolvedStored.hold]);
+  const renderedStoredSessions = resolvedStored.sessions;
+
   // The server already filters by context; this covers the window where a WS
   // heartbeat has introduced a row the client has not enriched yet (see
   // `filterActiveSessionsByOrganization`).
@@ -279,8 +304,8 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   );
 
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(storedSessions, sortBy),
-    [storedSessions, sortBy]
+    () => groupAgentSessionsByDate(renderedStoredSessions, sortBy),
+    [renderedStoredSessions, sortBy]
   );
 
   // Departure-triggered stored reset. Only the active poll has a refetch
@@ -294,7 +319,8 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   //
   // The guard is strictly "id present before, absent now": the empty→populated
   // transition (first poll) is ignored, and the initial mount with a non-empty
-  // set is ignored (no "before" to compare against).
+  // set is ignored (no "before" to compare against). The render hold above
+  // keeps the last rows visible while this reset refetches page one.
   const previousActiveIdsRef = useRef<Set<string> | null>(null);
   useEffect(() => {
     const previous = previousActiveIdsRef.current;
@@ -317,7 +343,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   }, [activeSessionIds, queryClient, trpc]);
 
   return {
-    storedSessions,
+    storedSessions: renderedStoredSessions,
     activeSessions,
     activeSessionIds,
     activeExclusionIds,

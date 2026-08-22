@@ -156,18 +156,15 @@ function fullKey(userId: string, entityKey: string): string {
   return `${draftScope(userId)}\u0000${entityKey}`;
 }
 
-const DRAFT_READ_DISCARDED = 'draft read discarded';
-const DRAFT_WRITE_FAILED = 'draft write failed';
-
-function reportDraftFailure(report: {
-  message: string;
-  reason: string;
-  userId: string;
-  entityKey: string;
-}): void {
-  Sentry.captureException(new Error(report.message), {
+function reportDraftFailure(
+  error: unknown,
+  operation: 'read' | 'write' | 'clear',
+  fingerprint?: string
+): void {
+  Sentry.captureException(error, {
     level: 'warning',
-    extra: { scope: draftScope(report.userId), entityKey: report.entityKey, reason: report.reason },
+    tags: { 'error.subsystem': 'drafts', 'error.operation': operation },
+    ...(fingerprint ? { fingerprint: [fingerprint] } : {}),
   });
 }
 
@@ -193,32 +190,25 @@ export async function loadDraft<T>(
       return null;
     }
     if (utf8ByteLength(raw) > DRAFT_MAX_BYTES) {
-      reportDraftFailure({
-        message: 'stored draft exceeds the 64 KB cap',
-        reason: DRAFT_READ_DISCARDED,
-        userId,
-        entityKey,
-      });
+      reportDraftFailure(
+        new Error('stored draft exceeds the 64 KB cap'),
+        'read',
+        'draft-read-size-limit'
+      );
       return null;
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isValid(parsed)) {
-      reportDraftFailure({
-        message: 'stored draft does not match its expected shape',
-        reason: DRAFT_READ_DISCARDED,
-        userId,
-        entityKey,
-      });
+      reportDraftFailure(
+        new Error('stored draft does not match its expected shape'),
+        'read',
+        'draft-read-shape-mismatch'
+      );
       return null;
     }
     return parsed;
   } catch (error) {
-    reportDraftFailure({
-      message: error instanceof Error ? error.message : 'stored draft is not valid JSON',
-      reason: DRAFT_READ_DISCARDED,
-      userId,
-      entityKey,
-    });
+    reportDraftFailure(error, 'read');
     return null;
   }
 }
@@ -252,12 +242,7 @@ async function writeDraftSafely(payload: DraftWritePayload): Promise<void> {
   try {
     await writeDraft(payload);
   } catch (error) {
-    reportDraftFailure({
-      message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
-      reason: DRAFT_WRITE_FAILED,
-      userId: payload.userId,
-      entityKey: payload.entityKey,
-    });
+    reportDraftFailure(error, 'write');
   }
 }
 
@@ -293,12 +278,11 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
     // or symbol; reject those before the byte-cap check, which needs a string.
     const serialized = JSON.stringify(value) as string | undefined;
     if (serialized === undefined) {
-      reportDraftFailure({
-        message: 'draft value cannot be serialized to JSON',
-        reason: DRAFT_WRITE_FAILED,
-        userId,
-        entityKey,
-      });
+      reportDraftFailure(
+        new Error('draft value cannot be serialized to JSON'),
+        'write',
+        'draft-write-unsupported-value'
+      );
       return;
     }
     if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
@@ -318,12 +302,7 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
   } catch (error) {
     // Serialization and byte sizing run before any timer exists; contain
     // every failure here so saveDraft never throws synchronously.
-    reportDraftFailure({
-      message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
-      reason: DRAFT_WRITE_FAILED,
-      userId,
-      entityKey,
-    });
+    reportDraftFailure(error, 'write');
   }
 }
 
@@ -372,12 +351,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<boo
     });
     return true;
   } catch (error) {
-    reportDraftFailure({
-      message: error instanceof Error ? error.message : DRAFT_WRITE_FAILED,
-      reason: DRAFT_WRITE_FAILED,
-      userId,
-      entityKey,
-    });
+    reportDraftFailure(error, 'clear');
     return false;
   }
 }

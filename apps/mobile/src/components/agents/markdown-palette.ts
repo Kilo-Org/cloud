@@ -105,7 +105,9 @@ export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
       paddingLeft: 12,
       marginVertical: 4,
     },
-    list: { marginVertical: 2 },
+    // react-native-marked maps `list` onto each item's marker box, not a list
+    // container. A top margin misaligns the marker; keep this bottom-only.
+    list: { marginBottom: 4 },
     li: { color: textColor, fontSize: 16, lineHeight: 24 },
     hr: {
       borderBottomWidth: 1,

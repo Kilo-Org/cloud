@@ -13,8 +13,12 @@ import type { SecurityFindingNotificationKind } from '@kilocode/db/schema-types'
 import { db } from '@/lib/drizzle';
 import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail, type TemplateName } from '@/lib/email';
-import { dispatchSecurityFindingPush } from '@/lib/notifications-worker-client';
+import {
+  dispatchSecurityFindingPush,
+  dispatchSecurityLifecyclePush,
+} from '@/lib/notifications-worker-client';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
+import { securityLifecycleEventSchema } from '@kilocode/notifications';
 import {
   SecurityNotificationPolicySchema,
   getEligibleSlaNotificationKind,
@@ -23,11 +27,27 @@ import {
 
 const SECRET_COMPARE_HMAC_KEY = Buffer.from('security-agent-notification-secret-compare');
 
-const BodySchema = z
+// The sweep posts the strict `{ notificationId }` shape with no discriminator,
+// so a discriminated union on `kind` would break it. A plain union keeps the
+// old shape parsing while adding the lifecycle shape.
+const NotificationBodySchema = z
   .object({
     notificationId: z.string().uuid(),
   })
   .strict();
+
+const SecurityLifecycleBodySchema = z
+  .object({
+    event: securityLifecycleEventSchema,
+    findingId: z.string().uuid(),
+    scope: z.string().min(1),
+    remediationId: z.string().uuid().optional(),
+    prUrl: z.string().url().optional(),
+    recipientUserIds: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
+const BodySchema = z.union([NotificationBodySchema, SecurityLifecycleBodySchema]);
 
 const notificationKindToTemplate = {
   new_finding: 'securityFindingNew',
@@ -184,6 +204,30 @@ export async function POST(req: NextRequest) {
   const parsedBody = BodySchema.safeParse(rawBody);
   if (!parsedBody.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+
+  // Lifecycle events have no persisted `security_finding_notifications` row,
+  // so they bypass the notification-row lookup and the email template pipeline
+  // entirely and dispatch push only.
+  if (!('notificationId' in parsedBody.data)) {
+    const body = parsedBody.data;
+    // Push must not extend route latency: the security-auto-analysis producer
+    // aborts at 10s and would drop the push if the route held the response.
+    after(async () => {
+      try {
+        await dispatchSecurityLifecyclePush({
+          event: body.event,
+          findingId: body.findingId,
+          scope: body.scope,
+          remediationId: body.remediationId,
+          prUrl: body.prUrl,
+          recipientUserIds: body.recipientUserIds,
+        });
+      } catch {
+        // Push is best-effort: the lifecycle persist already committed.
+      }
+    });
+    return NextResponse.json({ outcome: 'sent' }, { status: 200 });
   }
 
   const [row] = await db

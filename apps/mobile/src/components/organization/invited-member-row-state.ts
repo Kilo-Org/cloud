@@ -49,11 +49,17 @@ export function canResendInvite(emailStatus: InvitedOrgMember['emailStatus']): b
 
 /**
  * Action-sheet options for an invited member row, in display order. The
- * `Resend invite` option appears only for a failed invite.
+ * `Resend invite` option appears only for a failed invite. The `Share invite
+ * link` option appears only when the caller has the invite URL: a member
+ * caller's `withMembers` response omits `inviteUrl`, so the row must not offer
+ * a share action it cannot perform.
  */
-export function invitedMemberActionOptions(emailStatus: InvitedOrgMember['emailStatus']): string[] {
+export function invitedMemberActionOptions(
+  emailStatus: InvitedOrgMember['emailStatus'],
+  hasInviteUrl: boolean
+): string[] {
   return [
-    'Share invite link',
+    ...(hasInviteUrl ? ['Share invite link'] : []),
     ...(canResendInvite(emailStatus) ? ['Resend invite'] : []),
     'Revoke invitation',
     'Cancel',

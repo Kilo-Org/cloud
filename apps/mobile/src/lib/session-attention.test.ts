@@ -1,19 +1,63 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- cohesive suite for the ack state machine, durable persistence, expiry, and hydration contracts */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The session-attention module lazy-loads the native encrypted-kv chain; the
+// fake below is an in-memory Map-backed KV so persistence tests run in node.
+const kvStore = new Map<string, string>();
+
+const kvMock = vi.hoisted(() => ({
+  getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
+}));
+
+vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
+
+/* eslint-disable import/first */
+import { SESSION_ATTENTION_KEY } from '@/lib/storage-keys';
 import {
+  __flushSessionAttentionWritesForTests,
+  __hydrateSessionAttentionForTests,
+  __peekSessionAttentionEntryForTests,
   __peekSessionAttentionForTests,
   __resetSessionAttentionForTests,
   ackSessionAttention,
   getRevisionSnapshot,
   isAttentionAcked,
   reconcileSessionAttention,
+  SESSION_ATTENTION_EXPIRY_MS,
   sessionNeedsInput,
   shouldShowNeedsInput,
   subscribe,
 } from './session-attention';
+/* eslint-enable import/first */
+
+// Matches the module's internal item key for the single entries blob.
+const ATTENTION_ENTRY_KEY = 'entries';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function storageKey(scope: string, k: string): string {
+  return `${scope}\u0000${k}`;
+}
+
+function seedAttentionKv(entries: unknown[]): void {
+  kvStore.set(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY), JSON.stringify(entries));
+}
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  kvStore.clear();
   __resetSessionAttentionForTests();
+  kvMock.getItem.mockImplementation(async (scope, k) => kvStore.get(storageKey(scope, k)) ?? null);
+  kvMock.setItem.mockImplementation(async (scope, k, v) => {
+    kvStore.set(storageKey(scope, k), v);
+  });
+});
+
+afterEach(async () => {
+  await __flushSessionAttentionWritesForTests();
+  vi.useRealTimers();
 });
 
 describe('sessionNeedsInput', () => {
@@ -196,7 +240,7 @@ describe('ack store state machine', () => {
     unsubscribe();
   });
 
-  it('reconcile with attention status and a resolved entry is a no-op (does not bump revision)', () => {
+  it('reconcile with attention status and a resolved entry is a no-op for the same raise', () => {
     ackSessionAttention('s1');
     reconcileSessionAttention('s1', 'question', 'R1');
     // now entry.raiseId === 'R1'
@@ -209,15 +253,281 @@ describe('ack store state machine', () => {
     reconcileSessionAttention('s1', 'question', 'R1');
     expect(getRevisionSnapshot()).toBe(before);
     expect(listener).not.toHaveBeenCalled();
-
-    // different raiseId → resolved entry blocks absorb, no change
-    reconcileSessionAttention('s1', 'question', 'R2');
-    expect(getRevisionSnapshot()).toBe(before);
-    expect(listener).not.toHaveBeenCalled();
     expect(isAttentionAcked('s1', 'R1')).toBe(true);
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
 
     unsubscribe();
+  });
+});
+
+describe('entry shape and re-raise', () => {
+  it('resolves a pending entry with the observed raise and ack metadata', () => {
+    ackSessionAttention('s1');
+    reconcileSessionAttention('s1', 'question', 'R1');
+    const entry = __peekSessionAttentionEntryForTests('s1');
+    expect(entry).toMatchObject({ raiseId: 'R1', status: 'question' });
+    expect(entry?.ackedAt).toBeTypeOf('number');
+    expect(entry?.expiresAt).toBe((entry?.ackedAt ?? 0) + SESSION_ATTENTION_EXPIRY_MS);
+  });
+
+  it('replaces the raise and clears the ack on a same-session re-raise', () => {
+    ackSessionAttention('s1');
+    reconcileSessionAttention('s1', 'question', 'R1');
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+
+    // a new status_updated_at is a new raise: the badge returns
+    reconcileSessionAttention('s1', 'question', 'R2');
+    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(__peekSessionAttentionEntryForTests('s1')).toEqual({
+      raiseId: 'R2',
+      status: 'question',
+      ackedAt: null,
+      expiresAt: null,
+    });
+  });
+
+  it('acking a re-raised entry re-pends it and hides the new raise', () => {
+    ackSessionAttention('s1');
+    reconcileSessionAttention('s1', 'question', 'R1');
+    // re-raise
+    reconcileSessionAttention('s1', 'question', 'R2');
+    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+
+    // user answers the new raise
+    ackSessionAttention('s1');
+    expect(isAttentionAcked('s1', 'R2')).toBe(true);
+    expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: null });
+  });
+});
+
+describe('durable persistence', () => {
+  it('round-trips acks across a simulated restart', async () => {
+    ackSessionAttention('s1');
+    reconcileSessionAttention('s1', 'question', 'R1');
+    await __flushSessionAttentionWritesForTests();
+
+    // Simulated restart: clear the in-memory store, then re-hydrate from KV.
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(__peekSessionAttentionEntryForTests('s1')).toEqual({
+      raiseId: 'R1',
+      status: 'question',
+      ackedAt: expect.any(Number),
+      expiresAt: expect.any(Number),
+    });
+  });
+
+  it('restores a pending ack as pending across a restart', async () => {
+    ackSessionAttention('s1');
+    await __flushSessionAttentionWritesForTests();
+
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+
+    // A pending ack hides any raise after restart.
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', 'R2')).toBe(true);
+  });
+
+  it('persists a deleted entry as gone across a restart', async () => {
+    ackSessionAttention('s1');
+    reconcileSessionAttention('s1', 'question', 'R1');
+    // delete
+    reconcileSessionAttention('s1', 'busy', null);
+    await __flushSessionAttentionWritesForTests();
+
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+
+    expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
+  });
+
+  it('persists a write during the hydration window without erasing the hydrated entry', async () => {
+    const now = Date.now();
+    const persisted = JSON.stringify([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+
+    // Hold the KV read open so the write can land mid-hydration.
+    const readGate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(readGate.promise);
+
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+
+    // A write for a different session lands while hydration is still reading.
+    ackSessionAttention('s2');
+
+    // Release the stale persisted read.
+    readGate.resolve(persisted);
+    await hydration;
+    await __flushSessionAttentionWritesForTests();
+
+    // The persisted blob holds both the hydrated entry and the fresh entry.
+    const stored = JSON.parse(
+      kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY)) ?? '[]'
+    ) as { sessionId: string }[];
+    expect(stored.map(entry => entry.sessionId).toSorted()).toEqual(['s1', 's2']);
+  });
+
+  it('keeps in-memory behavior when a KV write fails and retries on the next bump', async () => {
+    kvMock.setItem.mockRejectedValueOnce(new Error('disk full'));
+    ackSessionAttention('s1');
+    // In-memory store is authoritative: the badge hides immediately.
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    await __flushSessionAttentionWritesForTests();
+    expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: null });
+
+    // The next bump retries the write.
+    reconcileSessionAttention('s1', 'question', 'R1');
+    await __flushSessionAttentionWritesForTests();
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+    expect(kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY))).toBeDefined();
+  });
+
+  it('starts empty when hydration fails, and the in-memory store still works', async () => {
+    seedAttentionKv([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: Date.now(),
+        expiresAt: Date.now() + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+    kvMock.getItem.mockRejectedValueOnce(new Error('corrupt'));
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+
+    expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
+
+    ackSessionAttention('s1');
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+  });
+});
+
+describe('expiry', () => {
+  it('drops expired entries at hydration', async () => {
+    const now = Date.now();
+    seedAttentionKv([
+      {
+        sessionId: 'expired',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now - 8 * DAY_MS,
+        expiresAt: now - DAY_MS,
+      },
+      {
+        sessionId: 'fresh',
+        raiseId: 'R2',
+        status: 'permission',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+
+    expect(__peekSessionAttentionForTests('expired')).toBeUndefined();
+    expect(__peekSessionAttentionForTests('fresh')).toEqual({ raiseId: 'R2' });
+  });
+
+  it('drops expired entries on reconcile', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      ackSessionAttention('s1');
+      reconcileSessionAttention('s1', 'question', 'R1');
+      expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'R1' });
+
+      // 9 days later the ack has expired.
+      vi.setSystemTime(new Date('2026-01-10T00:00:00Z'));
+      reconcileSessionAttention('s1', 'question', 'R1');
+      expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('hydration gating', () => {
+  it('renders badges from server status until hydration completes', async () => {
+    const now = Date.now();
+    seedAttentionKv([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+
+    // Hydration is in flight: the store is still empty, so the badge derives
+    // from server status (no stale ack suppression).
+    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'question',
+        raiseId: 'R1',
+        isAcked: isAttentionAcked('s1', 'R1'),
+      })
+    ).toBe(true);
+
+    await hydration;
+
+    // After hydration the restored ack suppresses its raise.
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(
+      shouldShowNeedsInput({
+        status: 'question',
+        raiseId: 'R1',
+        isAcked: isAttentionAcked('s1', 'R1'),
+      })
+    ).toBe(false);
+  });
+
+  it('does not revert a fresh ack committed during the hydration window', async () => {
+    const now = Date.now();
+    const persisted = JSON.stringify([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+
+    // Hold the KV read open so the ack can land mid-hydration.
+    const readGate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(readGate.promise);
+
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+
+    // The fresh ack lands while hydration is still reading.
+    ackSessionAttention('s1');
+    expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: null });
+
+    // Release the stale persisted read.
+    readGate.resolve(persisted);
+    await hydration;
+
+    // The fresh ack survives: still pending, not the persisted resolved entry.
+    expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: null });
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
   });
 });
 
@@ -272,7 +582,7 @@ describe('revision snapshot and listener notification', () => {
     unsubscribe();
   });
 
-  it('bumps revision on mutating reconciles (resolve, delete) and stays stable on no-ops', () => {
+  it('bumps revision on mutating reconciles and stays stable on no-ops', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribe(listener);
 
@@ -293,19 +603,22 @@ describe('revision snapshot and listener notification', () => {
 
     const afterMutations = getRevisionSnapshot();
 
-    // no-op reconciles: no entry → no change; resolved entry → no change
+    // no-op reconciles: no entry → no change; resolved entry + same raise → no change
     reconcileSessionAttention('s2', 'busy', null);
     reconcileSessionAttention('s1', 'question', 'R1');
-    reconcileSessionAttention('s1', 'question', 'R2');
-    reconcileSessionAttention('s1', 'question', null);
 
     expect(getRevisionSnapshot()).toBe(afterMutations);
     expect(listener).toHaveBeenCalledTimes(mutations);
 
-    // delete → mutation
-    reconcileSessionAttention('s1', 'busy', null);
+    // re-raise → mutation
+    reconcileSessionAttention('s1', 'question', 'R2');
     expect(getRevisionSnapshot()).toBe(afterMutations + 1);
     expect(listener).toHaveBeenCalledTimes(mutations + 1);
+
+    // delete → mutation
+    reconcileSessionAttention('s1', 'busy', null);
+    expect(getRevisionSnapshot()).toBe(afterMutations + 2);
+    expect(listener).toHaveBeenCalledTimes(mutations + 2);
 
     unsubscribe();
   });

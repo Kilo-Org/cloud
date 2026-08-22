@@ -179,6 +179,7 @@ export function ReviewDetailScreen({
         {/* Gate: check-run presence, review status, and threshold when set. */}
         <GateSection
           checkRunId={review.check_run_id}
+          checkRunRedacted={review.rawIdsRedacted}
           statusLabel={meta.label}
           gateThreshold={gateThreshold}
         />

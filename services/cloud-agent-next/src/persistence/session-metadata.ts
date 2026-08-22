@@ -1,10 +1,11 @@
 import * as z from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import type { AgentSandboxProvider, SandboxId } from '../types.js';
+import { type AgentSandboxProvider, type SandboxId } from '../types.js';
 import {
   AttachmentsSchema,
   branchNameSchema,
@@ -277,12 +278,19 @@ const MetadataLifecycleSchema = z
   })
   .strip();
 
+const MetadataCloneSchema = z
+  .object({
+    cloneFromKiloSessionId: kiloSessionIdSchema,
+  })
+  .strip();
+
 export const CurrentSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
     identity: MetadataIdentitySchema,
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
+    clone: MetadataCloneSchema.optional(),
     initialMessage: CurrentMetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),

@@ -12,6 +12,24 @@ const onMutationError = (error: { message: string }) => {
   announcingToast.error(error.message || 'Something went wrong');
 };
 
+// Distributive helpers: `OrgWithMembers` is a union of the admin and member
+// variants, so a plain `{ ...old, members: ... }` spread loses the variant
+// correlation. These preserve it by mapping over `T['members']` for the
+// concrete `T`.
+function mapMembers<T extends OrgWithMembers>(
+  old: T,
+  fn: (member: T['members'][number]) => T['members'][number]
+): T {
+  return { ...old, members: old.members.map(fn) };
+}
+
+function filterMembers<T extends OrgWithMembers>(
+  old: T,
+  fn: (member: T['members'][number]) => boolean
+): T {
+  return { ...old, members: old.members.filter(fn) };
+}
+
 type UseOrganizationMutationsOptions = {
   /**
    * member-limit-sheet renders `updateMember` errors inline (Pattern P2) and
@@ -137,9 +155,8 @@ export function useOrganizationMutations(
         dailyUsageLimitUsd?: number | null;
       }) => trpcClient.organizations.members.update.mutate({ organizationId, ...input }),
       ...optimistic<{ memberId: string; role?: OrgRole; dailyUsageLimitUsd?: number | null }>(
-        (old, input) => ({
-          ...old,
-          members: old.members.map(member =>
+        (old, input) =>
+          mapMembers(old, member =>
             member.status === 'active' && member.id === input.memberId
               ? {
                   ...member,
@@ -150,7 +167,6 @@ export function useOrganizationMutations(
                 }
               : member
           ),
-        }),
         { silent: silenceUpdateMemberToast }
       ),
     }),
@@ -159,24 +175,21 @@ export function useOrganizationMutations(
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { memberId: string }) =>
         trpcClient.organizations.members.remove.mutate({ organizationId, ...input }),
-      ...optimistic<{ memberId: string }>((old, input) => ({
-        ...old,
-        members: old.members.filter(
-          member => !(member.status === 'active' && member.id === input.memberId)
-        ),
-      })),
+      ...optimistic<{ memberId: string }>((old, input) =>
+        filterMembers(old, member => !(member.status === 'active' && member.id === input.memberId))
+      ),
     }),
 
     deleteInvite: useMutation({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { inviteId: string }) =>
         trpcClient.organizations.members.deleteInvite.mutate({ organizationId, ...input }),
-      ...optimistic<{ inviteId: string }>((old, input) => ({
-        ...old,
-        members: old.members.filter(
+      ...optimistic<{ inviteId: string }>((old, input) =>
+        filterMembers(
+          old,
           member => !(member.status === 'invited' && member.inviteId === input.inviteId)
-        ),
-      })),
+        )
+      ),
     }),
 
     // No onMutationError toast here: low-balance-alert-sheet (the only

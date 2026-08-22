@@ -180,18 +180,46 @@ export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
 
 export const PublicOrganizationMembersSchema = z.array(PublicOrganizationMemberSchema);
 
+export const ChildOrganizationSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export const ChildOrganizationMembershipSchema = ChildOrganizationSummarySchema.extend({
+  role: OrganizationRoleSchema,
+});
+
+// Member-visible variants returned by `organizations.withMembers` for `member`
+// callers. The member response omits the Stripe customer id, the invite
+// secret, and per-member daily usage, so the type reflects the stripped shape
+// instead of casting back to the admin superset.
+export const MemberOrganizationSchema = OrganizationSchema.omit({
+  stripe_customer_id: true,
+});
+
+export const MemberInvitedOrganizationMemberSchema = InvitedOrganizationMemberSchema.omit({
+  inviteToken: true,
+  inviteUrl: true,
+  currentDailyUsageUsd: true,
+});
+
+export const MemberActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
+  currentDailyUsageUsd: true,
+}).extend({
+  childOrganizationMemberships: z.array(ChildOrganizationMembershipSchema).optional(),
+});
+
+export const MemberOrganizationMemberSchema = z.discriminatedUnion('status', [
+  MemberActiveOrganizationMemberSchema,
+  MemberInvitedOrganizationMemberSchema,
+]);
+
 export const OrganizationWithMembersSchema = OrganizationSchema.extend({
   members: z.array(OrganizationMemberSchema),
 });
 
-export type ChildOrganizationSummary = {
-  id: string;
-  name: string;
-};
-
-export type ChildOrganizationMembership = ChildOrganizationSummary & {
-  role: OrganizationRole;
-};
+export type ChildOrganizationSummary = z.infer<typeof ChildOrganizationSummarySchema>;
+export type ChildOrganizationMembership = z.infer<typeof ChildOrganizationMembershipSchema>;
 
 export type OrganizationSsoPolicyView = {
   required: boolean;
@@ -201,11 +229,27 @@ export type OrganizationSsoPolicyView = {
 };
 
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
-  callerRole: OrganizationRole;
+  callerRole: Exclude<OrganizationRole, 'member'>;
   members: OrganizationMember[];
   childOrganizations: ChildOrganizationSummary[];
   effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
+
+export type MemberOrganizationMember = z.infer<typeof MemberOrganizationMemberSchema>;
+
+export type MemberOrganizationWithMembers = z.infer<typeof MemberOrganizationSchema> & {
+  callerRole: 'member';
+  members: MemberOrganizationMember[];
+  childOrganizations: ChildOrganizationSummary[];
+  effectiveSsoPolicy: OrganizationSsoPolicyView;
+};
+
+export type OrganizationWithMembersResponse =
+  | OrganizationWithMembers
+  | MemberOrganizationWithMembers;
+
+/** A member row from `withMembers`, in either the admin or member variant. */
+export type OrganizationMemberResponse = OrganizationMember | MemberOrganizationMember;
 
 export type AcceptInviteResult = Result<
   {

@@ -276,6 +276,8 @@ export function GitLabIntegrationDetails({
         missing_code: 'Authorization code missing from GitLab',
         connection_failed: 'Failed to connect to GitLab',
         oauth_init_failed: 'Failed to initiate GitLab OAuth',
+        permission_required: 'You need a billing role to replace this GitLab integration',
+        organization_access_required: 'You do not have access to this organization',
       };
       toast.error(errorMessages[error] || `Connection failed: ${error}`);
     }

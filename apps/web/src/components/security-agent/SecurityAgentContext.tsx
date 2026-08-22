@@ -12,7 +12,10 @@ import {
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
-import { getSecurityCommandFailureMessage } from '@kilocode/app-shared/security-agent';
+import {
+  getSecurityCommandFailureMessage,
+  type SecurityCommandType,
+} from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
@@ -65,6 +68,7 @@ type SecurityAgentContextValue = {
         autoRemediationEnabled: boolean;
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
+        autoRemediationRequireApproval: boolean;
         autoRemediationEnabledAt: string | null;
         remediationModelSlug?: string;
         slaNotificationsEnabled: boolean;
@@ -118,6 +122,7 @@ type SecurityAgentContextValue = {
       autoRemediationEnabled: boolean;
       autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoRemediationIncludeExisting: boolean;
+      autoRemediationRequireApproval: boolean;
       remediationModelSlug: string;
       slaNotificationsEnabled: boolean;
       slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
@@ -203,7 +208,7 @@ const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositori
 
 export type SecurityAgentCommand = {
   id: string;
-  commandType: 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
+  commandType: SecurityCommandType;
   findingId: string | null;
   status: 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
   resultCode: string | null;
@@ -1188,6 +1193,7 @@ function useSecurityAgentProviderValue(
         autoRemediationEnabled: boolean;
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
+        autoRemediationRequireApproval: boolean;
         remediationModelSlug: string;
         slaNotificationsEnabled: boolean;
         slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
@@ -1225,6 +1231,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: config.autoRemediationEnabled,
             autoRemediationMinSeverity: config.autoRemediationMinSeverity,
             autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            autoRemediationRequireApproval: config.autoRemediationRequireApproval,
             slaNotificationsEnabled: config.slaNotificationsEnabled,
             slaNotificationMinSeverity: config.slaNotificationMinSeverity,
             slaNotificationWarningDays: config.slaNotificationWarningDays,
@@ -1254,6 +1261,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: config.autoRemediationEnabled,
             autoRemediationMinSeverity: config.autoRemediationMinSeverity,
             autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            autoRemediationRequireApproval: config.autoRemediationRequireApproval,
             slaNotificationsEnabled: config.slaNotificationsEnabled,
             slaNotificationMinSeverity: config.slaNotificationMinSeverity,
             slaNotificationWarningDays: config.slaNotificationWarningDays,
@@ -1421,6 +1429,7 @@ function useSecurityAgentProviderValue(
             autoRemediationEnabled: configData.autoRemediationEnabled ?? false,
             autoRemediationMinSeverity: configData.autoRemediationMinSeverity ?? 'high',
             autoRemediationIncludeExisting: configData.autoRemediationIncludeExisting ?? false,
+            autoRemediationRequireApproval: configData.autoRemediationRequireApproval ?? true,
             autoRemediationEnabledAt: configData.autoRemediationEnabledAt ?? null,
             remediationModelSlug,
           }

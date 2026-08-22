@@ -4,6 +4,7 @@ import {
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   mergeTrackedCommandIds,
+  SECURITY_COMMAND_TYPES,
   type SecurityCommand,
 } from './commands';
 
@@ -36,6 +37,12 @@ describe('security agent command helpers', () => {
       'autoDismissEligible',
       'permissionStatus',
     ]);
+  });
+
+  it('maps every command type to a non-empty invalidation scope list', () => {
+    for (const commandType of SECURITY_COMMAND_TYPES) {
+      expect(getSecurityCommandInvalidationScopes(commandType).length).toBeGreaterThan(0);
+    }
   });
 
   it('deduplicates recovered and locally tracked command ids', () => {

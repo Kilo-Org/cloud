@@ -4,10 +4,14 @@ import { captureException } from '@sentry/nextjs';
 import type {
   InternalDispatchLowBalanceRequest,
   InternalDispatchSecurityFindingRequest,
+  InternalDispatchSecurityLifecycleRequest,
 } from '@kilocode/notifications';
 import { INTERNAL_API_SECRET, NOTIFICATIONS_WORKER_URL } from '@/lib/config.server';
 
-type DispatchBody = InternalDispatchLowBalanceRequest | InternalDispatchSecurityFindingRequest;
+type DispatchBody =
+  | InternalDispatchLowBalanceRequest
+  | InternalDispatchSecurityFindingRequest
+  | InternalDispatchSecurityLifecycleRequest;
 
 /**
  * Best-effort POST to the notifications worker internal dispatch endpoint.
@@ -69,4 +73,10 @@ export async function dispatchSecurityFindingPush(
   input: Omit<InternalDispatchSecurityFindingRequest, 'kind'>
 ): Promise<void> {
   await dispatchInternal({ kind: 'security_finding', ...input });
+}
+
+export async function dispatchSecurityLifecyclePush(
+  input: Omit<InternalDispatchSecurityLifecycleRequest, 'kind'>
+): Promise<void> {
+  await dispatchInternal({ kind: 'security_lifecycle', ...input });
 }

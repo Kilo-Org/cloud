@@ -10,7 +10,7 @@ import {
   useAdminToggleCodeIndexing,
   useUpdateSuppressTrialMessaging,
 } from '@/app/api/organizations/hooks';
-import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
+import type { OrganizationWithMembersResponse } from '@/lib/organizations/organization-types';
 import { normalizeCompanyDomain, isValidDomain } from '@/lib/organizations/company-domain';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
@@ -69,7 +69,7 @@ function useCanManagePaymentInfo() {
 }
 
 type InnerProps = {
-  info: OrganizationWithMembers;
+  info: OrganizationWithMembersResponse;
   className?: string;
   showAdminControls: boolean;
 };
@@ -156,10 +156,12 @@ function Inner(props: InnerProps) {
     updated_at,
     total_microdollars_acquired,
     microdollars_used,
-    stripe_customer_id,
     deleted_at,
     auto_top_up_enabled,
   } = info;
+  // The member variant omits the Stripe customer id, so read it only on the
+  // admin-and-above variant. The field is rendered only in the admin dashboard.
+  const stripe_customer_id = info.callerRole === 'member' ? null : info.stripe_customer_id;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);

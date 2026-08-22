@@ -1,6 +1,8 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import type { z } from 'zod';
+import type { personalPrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -95,8 +97,19 @@ const mockFetchGitLabRepositoriesForUser = jest.fn<
     repositories: unknown[];
     integrationInstalled: boolean;
     syncedAt: null;
+    instanceUrl?: string;
   }>
 >();
+const mockOrderRepositoriesByUsage =
+  jest.fn<
+    <T extends { fullName: string }>(params: {
+      userId: string;
+      organizationId: string | null;
+      platform: 'github' | 'gitlab' | 'bitbucket';
+      repositories: T[];
+      gitlabInstanceUrl?: string;
+    }) => Promise<T[]>
+  >();
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -130,6 +143,10 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForUser: jest.fn(),
 }));
 
+jest.mock('@/lib/cloud-agent/order-repositories', () => ({
+  orderRepositoriesByUsage: mockOrderRepositoriesByUsage,
+}));
+
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
@@ -141,20 +158,7 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
-  prepareSession: (input: {
-    prompt: string;
-    mode: string;
-    model: string;
-    githubRepo?: string;
-    bitbucketRepo?: {
-      fullName: string;
-      workspaceUuid: string;
-      repositoryUuid: string;
-    };
-    autoInitiate: boolean;
-    devcontainer: boolean;
-    images?: { path: string; files: string[] };
-  }) => Promise<{
+  prepareSession: (input: z.infer<typeof personalPrepareSessionNextSchema>) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
@@ -412,6 +416,7 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
 describe('cloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) => repositories);
   });
 
   it.each([
@@ -433,11 +438,11 @@ describe('cloudAgentNextRouter helper procedures', () => {
   });
 
   it.each([
-    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForUser],
-    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForUser],
+    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForUser, 'github'],
+    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForUser, 'gitlab'],
   ] as const)(
     'lists %s repositories without creating a runtime client',
-    async (_, method, fetchRepositories) => {
+    async (_, method, fetchRepositories, platform) => {
       const repositories = {
         repositories: [],
         integrationInstalled: true,
@@ -448,9 +453,61 @@ describe('cloudAgentNextRouter helper procedures', () => {
 
       await expect(caller[method]({ forceRefresh: true })).resolves.toEqual(repositories);
       expect(fetchRepositories).toHaveBeenCalledWith('user-repositories', true);
+      expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({
+        userId: 'user-repositories',
+        organizationId: null,
+        platform,
+        repositories: [],
+      });
       expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
     }
   );
+
+  it('passes the GitLab instance URL to repository ranking', async () => {
+    const repositories = [{ id: 1, name: 'repo', fullName: 'acme/repo', private: false }];
+    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+      instanceUrl: 'https://gitlab.example.com',
+    });
+    const caller = createCaller({ user: { id: 'user-repositories', is_admin: false } as User });
+
+    await caller.listGitLabRepositories({ forceRefresh: false });
+
+    expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({
+      userId: 'user-repositories',
+      organizationId: null,
+      platform: 'gitlab',
+      repositories,
+      gitlabInstanceUrl: 'https://gitlab.example.com',
+    });
+  });
+
+  it('does not expose the GitLab instance URL in the output shape', async () => {
+    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
+      repositories: [],
+      integrationInstalled: true,
+      syncedAt: null,
+      instanceUrl: 'https://gitlab.example.com',
+    });
+    const caller = createCaller({ user: { id: 'user-repositories', is_admin: false } as User });
+
+    const result = await caller.listGitLabRepositories({ forceRefresh: false });
+
+    expect(result).toEqual({ repositories: [], integrationInstalled: true, syncedAt: null });
+    expect(result).not.toHaveProperty('instanceUrl');
+  });
+
+  it('propagates provider fetch errors without swallowing them', async () => {
+    mockFetchGitHubRepositoriesForUser.mockRejectedValueOnce(new Error('provider down'));
+    const caller = createCaller({ user: { id: 'user-repositories', is_admin: false } as User });
+
+    await expect(caller.listGitHubRepositories({ forceRefresh: false })).rejects.toThrow(
+      'provider down'
+    );
+    expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
 });
 
 describe('cloudAgentNextRouter.prepareSession', () => {
@@ -639,5 +696,26 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       isFree: false,
       hasUserByokAvailable: false,
     });
+  });
+
+  it('forwards cloneFromKiloSessionId to the Worker', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1', is_admin: false } as User,
+    });
+    const cloneFromKiloSessionId = 'ses_12345678901234567890123456';
+
+    await caller.prepareSession({
+      cloneFromKiloSessionId,
+      autoInitiate: true,
+      operationKey: '12345678-1234-4234-9234-123456789abc',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      devcontainer: false,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloneFromKiloSessionId })
+    );
   });
 });

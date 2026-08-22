@@ -31,6 +31,7 @@ import { openKiloGlobalFeed } from './global-feed.js';
 import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
 import { startToolCgroup } from './tool-cgroup.js';
+import { abortKiloSessionForShutdown } from './shutdown.js';
 import {
   kiloServerBootstrapError,
   kiloServerStartupError,
@@ -54,8 +55,8 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Grace period before force exit during shutdown (20 seconds) */
-const SHUTDOWN_TIMEOUT_MS = 20_000;
+/** Grace period before force exit during shutdown (110 seconds) */
+const SHUTDOWN_TIMEOUT_MS = 110_000;
 
 /** Timeout for createKilo() server startup */
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
@@ -940,6 +941,8 @@ async function main() {
   async function handleShutdown(signal: string): Promise<void> {
     if (isShuttingDown) return;
     isShuttingDown = true;
+    const activeKiloSessionId = state.currentSession?.kiloSessionId;
+    lifecycleManager?.setAborted();
 
     logToFile(`shutdown signal: ${signal}`);
     console.error(`Received ${signal}, shutting down...`);
@@ -960,6 +963,7 @@ async function main() {
       },
       timestamp: new Date().toISOString(),
     });
+    await abortKiloSessionForShutdown({ activeKiloSessionId, kiloClient });
 
     workspaceBootstrapController.abort();
     const workspaceBootstraps = [...activeWorkspaceBootstraps];
@@ -973,7 +977,8 @@ async function main() {
       logToFile('shutdown startup cleanup finished');
     }
 
-    // Stop lifecycle timers
+    await lifecycleManager?.drainAndClose();
+    // Stop lifecycle timers after finalization has flushed.
     lifecycleManager?.stop();
     globalFeedManager.close();
     toolCgroup?.stop();
@@ -984,12 +989,6 @@ async function main() {
       const uploadTimeout = new Promise<void>(resolve => setTimeout(resolve, 5_000));
       await Promise.race([uploader.uploadNow().catch(() => {}), uploadTimeout]);
       uploader.stop();
-    }
-
-    // Abort kilo session if running
-    const session = state.currentSession;
-    if (session && kiloClient) {
-      kiloClient.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
     }
 
     // Close connections

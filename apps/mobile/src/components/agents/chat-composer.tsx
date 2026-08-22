@@ -515,6 +515,7 @@ export function ChatComposer({
     hasText,
     isFocused,
     isSending,
+    isUploading: upload.isUploading,
     voiceInputActive: voiceInput.isActive,
   });
 
@@ -976,6 +977,7 @@ export function ChatComposer({
             attachmentsEnabled={attachmentsEnabled}
             canSend={control.canSend}
             disabled={disabled}
+            hasSendableContent={control.hasSendableContent}
             inputAccessibilityDisabled={control.inputAccessibilityDisabled}
             inputEditable={control.inputEditable}
             inputRef={inputRef}

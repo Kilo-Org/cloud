@@ -18,6 +18,7 @@ const variants = [
   { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' },
   { type: 'low_balance', organizationId: 'org1' },
   { type: 'security_finding', findingId: 'f1', scope: 'org' },
+  { type: 'security_lifecycle', event: 'analysis_completed', findingId: 'f1', scope: 'org' },
 ] as const;
 
 describe('androidChannelIdForPushData', () => {
@@ -42,6 +43,7 @@ describe('androidChannelIdForPushData', () => {
       'scheduled-action': 'kiloclaw',
       low_balance: 'balance',
       security_finding: 'security',
+      security_lifecycle: 'security',
     };
 
     for (const variant of variants) {
@@ -76,5 +78,20 @@ describe('genericPushContentForPushData', () => {
       expect(title.length).toBeGreaterThan(0);
       expect(body.length).toBeGreaterThan(0);
     }
+  });
+
+  it('returns the security lifecycle copy for the security_lifecycle variant', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'security_lifecycle',
+      event: 'remediation_failed',
+      findingId: 'f1',
+      scope: 'org',
+      remediationId: 'r1',
+      prUrl: 'https://github.com/org/repo/pull/1',
+    });
+    expect(genericPushContentForPushData(parsed)).toEqual({
+      title: 'Kilo',
+      body: 'A security finding needs attention',
+    });
   });
 });

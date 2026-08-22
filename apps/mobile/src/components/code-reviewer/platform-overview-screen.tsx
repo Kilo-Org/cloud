@@ -159,6 +159,14 @@ export function PlatformOverviewScreen({
               },
             });
           },
+          onOpenReviewMemory:
+            platform === 'github'
+              ? () => {
+                  router.push(
+                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/review-memory` as Href
+                  );
+                }
+              : undefined,
         });
 
   const actionRequiredCopy =

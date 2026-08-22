@@ -95,6 +95,7 @@ describe('applyReasoningDetailsTransform', () => {
       apiUrl: 'https://example.com/v1',
       apiUrlOverrides: {},
       apiKey: 'test-key',
+      apiKeyHeader: null,
       supportedChatApis: ['chat_completions'],
       responseTransforms,
       async transformRequest() {},

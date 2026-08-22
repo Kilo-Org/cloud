@@ -15,7 +15,10 @@ import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js'
 import { fetchLatestAssistantText as fetchSessionAssistantText } from './session-result.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import { trackSecurityAnalysisCompleted } from './posthog.js';
-import { maybeAdmitAutoRemediationForCompletedAnalysis } from './remediation.js';
+import {
+  maybeAdmitAutoRemediationForCompletedAnalysis,
+  dispatchSecurityLifecycleEventForFinding,
+} from './remediation.js';
 import type {
   AutoAnalysisFailureCode,
   SecurityFindingAnalysis,
@@ -297,20 +300,42 @@ export async function finalizeCompletedAnalysisCallback(params: {
   });
   if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
   if (lifecycleTransition.status === 'stale-attempt') return { status: 'stale-attempt' };
-  await params.maybeAutoDismissAnalysis?.({
-    findingId: params.findingId,
-    analysis: completedAnalysis,
-    finding,
+
+  // The terminal persist already committed, so the post-commit follow-ups are
+  // best-effort. A throw here must not fail the callback (a retry would hit the
+  // already-terminal guard and never re-run them) and must not skip the
+  // lifecycle push the FromEnv wrapper emits after this returns.
+  async function runBestEffortFollowUp(label: string, fn: () => Promise<void>): Promise<void> {
+    try {
+      await fn();
+    } catch (error) {
+      console.error(`Security analysis callback ${label} follow-up failed`, {
+        findingId: params.findingId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  await runBestEffortFollowUp('auto-dismiss', async () => {
+    await params.maybeAutoDismissAnalysis?.({
+      findingId: params.findingId,
+      analysis: completedAnalysis,
+      finding,
+    });
   });
-  await params.maybeAutoRemediateAnalysis?.({
-    findingId: params.findingId,
-    analysis: completedAnalysis,
-    finding,
+  await runBestEffortFollowUp('auto-remediate', async () => {
+    await params.maybeAutoRemediateAnalysis?.({
+      findingId: params.findingId,
+      analysis: completedAnalysis,
+      finding,
+    });
   });
-  await params.trackCompletedAnalysis?.({
-    findingId: params.findingId,
-    analysis: completedAnalysis,
-    finding,
+  await runBestEffortFollowUp('track-completed', async () => {
+    await params.trackCompletedAnalysis?.({
+      findingId: params.findingId,
+      analysis: completedAnalysis,
+      finding,
+    });
   });
   return { status: 'completed-finalized' };
 }
@@ -400,12 +425,21 @@ export async function finalizeFailedAnalysisCallbackFromEnv(params: {
   payload: SecurityAnalysisCallbackPayload;
 }): Promise<{ status: 'missing' | CallbackDisposition | 'failed-finalized' }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
-  return finalizeFailedAnalysisCallback({
+  const result = await finalizeFailedAnalysisCallback({
     db,
     findingId: params.findingId,
     attemptToken: params.attemptToken,
     payload: params.payload,
   });
+  if (result.status === 'failed-finalized') {
+    await dispatchSecurityLifecycleEventForFinding({
+      env: params.env,
+      db,
+      findingId: params.findingId,
+      event: 'analysis_failed',
+    });
+  }
+  return result;
 }
 
 export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
@@ -417,7 +451,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
   status: 'missing' | CallbackDisposition | 'completed-finalized' | 'result-missing';
 }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
-  return finalizeCompletedAnalysisCallback({
+  const result = await finalizeCompletedAnalysisCallback({
     db,
     findingId: params.findingId,
     attemptToken: params.attemptToken,
@@ -482,6 +516,24 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       });
     },
   });
+  if (result.status === 'completed-finalized') {
+    await dispatchSecurityLifecycleEventForFinding({
+      env: params.env,
+      db,
+      findingId: params.findingId,
+      event: 'analysis_completed',
+    });
+  } else if (result.status === 'result-missing') {
+    // The lifecycle transition wrote a failed audit event for the missing
+    // result text, so the push mirrors that terminal outcome.
+    await dispatchSecurityLifecycleEventForFinding({
+      env: params.env,
+      db,
+      findingId: params.findingId,
+      event: 'analysis_failed',
+    });
+  }
+  return result;
 }
 
 export async function finalizeAnalysisCallbackFromEnv(params: {

@@ -1,4 +1,5 @@
 import {
+  Brain,
   FileSliders,
   FolderGit2,
   Gauge,
@@ -18,6 +19,8 @@ type OverviewRow = {
   title: string;
   subtitle: string;
   onPress?: () => void;
+  // A row members may open read-only even when they cannot edit config.
+  readOnlyAccessible?: boolean;
 };
 
 /**
@@ -31,12 +34,14 @@ export function buildOverviewRows({
   models,
   modelsLoading,
   onOpenModelPicker,
+  onOpenReviewMemory,
 }: {
   data: ReviewConfigData;
   capabilities: (typeof PLATFORM_CAPABILITIES)[keyof typeof PLATFORM_CAPABILITIES];
   models: ModelOption[];
   modelsLoading: boolean;
   onOpenModelPicker: () => void;
+  onOpenReviewMemory?: () => void;
 }): OverviewRow[] {
   return [
     {
@@ -90,18 +95,35 @@ export function buildOverviewRows({
           ? 'All repositories'
           : `${data.selectedRepositoryIds.length} selected`,
     },
+    // Review memory is GitHub-only and only offered when the caller wires the
+    // navigation callback (the overview screen pushes the scope-level route,
+    // not a per-platform settings field). Members may open it read-only: the
+    // server allows member reads and the screen ships a member off-state.
+    ...(onOpenReviewMemory
+      ? [
+          {
+            field: 'review-memory',
+            icon: Brain,
+            title: 'Review memory',
+            subtitle: 'Proposed REVIEW.md guidance',
+            onPress: onOpenReviewMemory,
+            readOnlyAccessible: true,
+          },
+        ]
+      : []),
   ];
 }
 
-/** Shared onPress resolution for an overview row: no-op when read-only, the
- * row's own handler (e.g. the model picker) when it has one, otherwise a
- * push to its settings field. */
+/** Shared onPress resolution for an overview row: no-op when read-only unless
+ * the row is marked read-only-accessible, the row's own handler (e.g. the
+ * model picker or review memory) when it has one, otherwise a push to its
+ * settings field. */
 export function resolveRowOnPress(
   row: OverviewRow,
   canEdit: boolean,
   pushField: (field: string) => void
 ): (() => void) | undefined {
-  if (!canEdit) {
+  if (!canEdit && !row.readOnlyAccessible) {
     return undefined;
   }
   if ('onPress' in row) {

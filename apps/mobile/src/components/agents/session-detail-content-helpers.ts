@@ -38,6 +38,18 @@ export async function retryMessageAndClear(
 }
 
 /**
+ * Runs the Connect repository action: opens the GitHub integration setup and
+ * clears the terminal guidance so Continue becomes available again.
+ */
+export function runConnectRepository(
+  openGitHubIntegration: () => void,
+  clearGuidance: () => void
+): void {
+  openGitHubIntegration();
+  clearGuidance();
+}
+
+/**
  * Resolves the retry prompt for a failed row. A user delivery failure re-sends
  * the row's own first human-authored text part; an assistant failure re-sends
  * the newest preceding user row's. Returns null when there is no human text

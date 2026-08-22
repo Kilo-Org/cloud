@@ -135,7 +135,13 @@ describe('IdentityStep GPS error reporting', () => {
     await vi.waitFor(() => {
       expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     });
-    expect(vi.mocked(Sentry.captureException).mock.calls[0]?.[0]).toBe(validateError);
+    expect(Sentry.captureException).toHaveBeenCalledWith(validateError, {
+      tags: {
+        'error.subsystem': 'kiloclaw-onboarding',
+        'error.operation': 'validate-gps-location',
+      },
+      extra: { coordinatePrecision: 2 },
+    });
   });
 
   it.each(['timeout', 'Location request failed due to unsatisfied device settings'])(

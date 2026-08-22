@@ -28,6 +28,7 @@ const hoistedKeys = vi.hoisted(() => ({
 }));
 
 const trackCommandMock = vi.hoisted(() => vi.fn());
+const invalidateQueriesMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.fn();
 
 vi.mock('expo-crypto', () => ({
@@ -115,7 +116,7 @@ vi.mock('@tanstack/react-query', () => ({
     return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false, error: null };
   },
   useQueryClient: () => ({
-    invalidateQueries: vi.fn(),
+    invalidateQueries: invalidateQueriesMock,
     setQueryData: vi.fn(),
     getQueryData: vi.fn(),
     cancelQueries: vi.fn(),
@@ -257,6 +258,8 @@ describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
     lastCapturedOptions = null;
     personalStartAnalysisMutateMock.mockReset();
     orgStartAnalysisMutateMock.mockReset();
+    trackCommandMock.mockClear();
+    invalidateQueriesMock.mockClear();
   });
 
   it('always sends forceSandbox: true on a personal analysis start', async () => {
@@ -283,6 +286,17 @@ describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
       retrySandboxOnly: true,
       forceSandbox: true,
     });
+  });
+
+  it('onSuccess with no commandId skips command tracking but still invalidates queries', () => {
+    useStartSecurityAnalysis('personal');
+
+    // The invalidation calls run synchronously while the Promise.all array is
+    // built, so no await is needed to observe them.
+    lastCapturedOptions?.onSuccess?.({ commandId: undefined }, { findingId: FINDING_ID });
+
+    expect(trackCommandMock).not.toHaveBeenCalled();
+    expect(invalidateQueriesMock).toHaveBeenCalled();
   });
 });
 

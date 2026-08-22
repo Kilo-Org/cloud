@@ -39,7 +39,7 @@ import {
   rewriteGlobalEventDirectory,
   UserKiloFacade,
 } from './user-kilo-facade';
-import type { LiveWrapperTarget, SessionKiloFacadeDecision } from './session-proxy';
+import type { LiveWrapperResolution, SessionKiloFacadeDecision } from './session-proxy';
 
 const kiloSessionId = 'ses_12345678901234567890123456';
 type ContainerFetch = (request: Request, port: number) => Promise<Response>;
@@ -364,10 +364,16 @@ function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
   ];
 }
 
-function liveWrapperTarget(containerFetch: ContainerFetch): LiveWrapperTarget {
+function liveWrapperTarget(containerFetch: ContainerFetch): LiveWrapperResolution {
   return {
-    port: 5123,
-    sandbox: { containerFetch } as unknown as LiveWrapperTarget['sandbox'],
+    kind: 'available',
+    target: {
+      port: 5123,
+      sandbox: { containerFetch } as unknown as Extract<
+        LiveWrapperResolution,
+        { kind: 'available' }
+      >['target']['sandbox'],
+    },
   };
 }
 
@@ -728,7 +734,11 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: 'agent_cold',
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
+        resolveLiveWrapper: vi.fn(
+          async (): Promise<LiveWrapperResolution> => ({
+            kind: 'unavailable',
+          })
+        ),
       },
     });
 
@@ -738,6 +748,45 @@ describe('handleKiloFacadeRequest', () => {
       kiloUserId: 'usr_1',
       kiloSessionId,
     });
+  });
+
+  it('returns a billing rejection instead of reading a persisted detail snapshot', async () => {
+    const env = envStub();
+    const getCloudAgentRootSessionSnapshot = vi.mocked(
+      env.SESSION_INGEST.getCloudAgentRootSessionSnapshot
+    );
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_billing_blocked',
+        })),
+        resolveLiveWrapper: vi.fn(
+          async (): Promise<LiveWrapperResolution> => ({
+            kind: 'billing-rejected',
+            admission: {
+              success: false,
+              code: 'insufficient_credits',
+              message: 'internal admission detail',
+              remainingMicrodollars: 1,
+              minimumRequiredMicrodollars: 5,
+            },
+          })
+        ),
+      },
+    });
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({
+      error: 'KILO_BILLING_PAYMENT_REQUIRED',
+      message: 'Container billing requires additional credits',
+      remainingMicrodollars: 1,
+      minimumRequiredMicrodollars: 5,
+    });
+    expect(getCloudAgentRootSessionSnapshot).not.toHaveBeenCalled();
   });
 
   it('falls back to the persisted detail snapshot when the wrapper has no private Kilo runtime', async () => {

@@ -67,6 +67,7 @@ export const SaveSecurityConfigInputSchema = z.object({
   autoRemediationEnabled: z.boolean().optional(),
   autoRemediationMinSeverity: AutoRemediationMinSeveritySchema.optional(),
   autoRemediationIncludeExisting: z.boolean().optional(),
+  autoRemediationRequireApproval: z.boolean().optional(),
   remediationModelSlug: z.string().optional(),
   slaNotificationsEnabled: z.boolean().optional(),
   slaNotificationMinSeverity: NotificationMinSeveritySchema.optional(),
@@ -207,6 +208,10 @@ export const GetCommandStatusInputSchema = z.object({
   commandId: z.string().uuid(),
 });
 
+export const GetCommandStatusesInputSchema = z.object({
+  commandIds: z.array(z.string().uuid()).min(1).max(100),
+});
+
 export const DeleteFindingsByRepoInputSchema = z.object({
   repoFullName: z.string().min(1),
 });
@@ -237,5 +242,6 @@ export type RetryRemediationInput = z.infer<typeof RetryRemediationInputSchema>;
 export type CancelRemediationInput = z.infer<typeof CancelRemediationInputSchema>;
 export type GetAnalysisInput = z.infer<typeof GetAnalysisInputSchema>;
 export type GetCommandStatusInput = z.infer<typeof GetCommandStatusInputSchema>;
+export type GetCommandStatusesInput = z.infer<typeof GetCommandStatusesInputSchema>;
 export type DeleteFindingsByRepoInput = z.infer<typeof DeleteFindingsByRepoInputSchema>;
 export type GetDashboardStatsInput = z.infer<typeof GetDashboardStatsInputSchema>;

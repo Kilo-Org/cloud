@@ -176,4 +176,26 @@ describe('ContainerUsageClient', () => {
     });
     expect(recordStart).toHaveBeenCalledOnce();
   });
+
+  it('preserves insufficient-credit balance details without retrying', async () => {
+    const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
+      success: false,
+      error: {
+        code: 'insufficient_credits',
+        message: 'Insufficient credits',
+        remainingMicrodollars: 5_000_000,
+        minimumRequiredMicrodollars: 10_000_000,
+      },
+    });
+    const client = new ContainerUsageClient(binding({ recordStart }), {
+      service: 'cloud-agent-next',
+    });
+
+    await expect(client.recordStart({ ...context, startEpochMs: 123 })).rejects.toMatchObject({
+      code: 'insufficient_credits',
+      remainingMicrodollars: 5_000_000,
+      minimumRequiredMicrodollars: 10_000_000,
+    });
+    expect(recordStart).toHaveBeenCalledOnce();
+  });
 });

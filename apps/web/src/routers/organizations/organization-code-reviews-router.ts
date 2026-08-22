@@ -173,6 +173,13 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
+  // Compatibility: selectedRepositoryIds full-array input kept for web save and mobile clients before delta support; remove when web and all shipped mobile clients send deltas.
+  selectedRepositoryDelta: z
+    .object({
+      add: z.array(z.union([z.number(), z.string()])).max(500),
+      remove: z.array(z.union([z.number(), z.string()])).max(500),
+    })
+    .optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
   repositoryModelOverrides: z
     .array(RepositoryModelOverrideInputSchema)
@@ -183,8 +190,8 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   council: CodeReviewCouncilConfigSchema.nullable().optional(),
   councilEnabledRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
-  // GitLab-specific: only consulted when `selectedRepositoryIds` is also
-  // present in the patch.
+  // GitLab-specific: only consulted when `selectedRepositoryIds` or
+  // `selectedRepositoryDelta` is also present in the patch.
   autoConfigureWebhooks: z.boolean().optional(),
 });
 
@@ -811,16 +818,14 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    *   - GitLab forces `repository_selection_mode = 'selected'`
    *   - Bitbucket forces 'selected' + `gate_threshold = 'off'` +
    *     `disable_review_md = true` + `manually_added_repositories = []`
-   * The PATCH intentionally does NOT re-validate Bitbucket selections
-   * against the workspace cache (that's a save-level concern handled by
-   * the full save) and does NOT ensure the Bitbucket workspace webhook
-   * (also save-level). Callers that change `selectedRepositoryIds` for
-   * Bitbucket via PATCH are expected to have already saved a valid
-   * configuration.
+   * The PATCH re-validates Bitbucket selections against the workspace
+   * repository cache whenever the patch carries `selectedRepositoryIds` or
+   * `selectedRepositoryDelta`, mirroring the full save. It does NOT ensure
+   * the Bitbucket workspace webhook (that stays save-level).
    *
-   * GitLab webhook sync runs ONLY when `selectedRepositoryIds` is present
-   * in the patch, so an unrelated edit (e.g. `focusAreas` only) never
-   * touches integration metadata.
+   * GitLab webhook sync runs ONLY when `selectedRepositoryIds` or
+   * `selectedRepositoryDelta` is present in the patch, so an unrelated edit
+   * (e.g. `focusAreas` only) never touches integration metadata.
    *
    * The council entitlement gate (`isCouncilActive + isCouncilEntitledForOrganization`)
    * fires ONLY when the patch actually carries a `council` key. An omitted
@@ -839,6 +844,16 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         const isBitbucket = platform === PLATFORM.BITBUCKET;
         const isGitLab = platform === PLATFORM.GITLAB;
 
+        if (
+          input.selectedRepositoryIds !== undefined &&
+          input.selectedRepositoryDelta !== undefined
+        ) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Send either selectedRepositoryIds or selectedRepositoryDelta, not both.',
+          });
+        }
+
         const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
         if (!previousConfig) {
           throw new TRPCError({
@@ -851,6 +866,18 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
             | Array<number | string>
             | undefined) || [];
+
+        // Delta repository selection: `selectedRepositoryDelta` computes
+        // next = (stored ∪ add) \ remove, with remove winning on overlap.
+        // The full-array `selectedRepositoryIds` input is kept for
+        // compatibility and flows through the merge helper unchanged.
+        let selectedRepositoryIdsFromDelta: Array<number | string> | undefined;
+        if (input.selectedRepositoryDelta !== undefined) {
+          const remove = new Set(input.selectedRepositoryDelta.remove);
+          selectedRepositoryIdsFromDelta = [
+            ...new Set([...previousRepoIds, ...input.selectedRepositoryDelta.add]),
+          ].filter(repositoryId => !remove.has(repositoryId));
+        }
 
         const prevCfg = previousConfig.config as CodeReviewAgentConfig;
         const stored: CodeReviewStoredConfig = {
@@ -885,9 +912,21 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
         // Field-merge: every key absent from `input` is preserved from
         // `stored`. `null` is an explicit "clear" (e.g. `council: null`).
-        const { organizationId: _orgId, platform: _platform, ...rest } = input;
+        // `selectedRepositoryDelta` is stripped — the patch helper only
+        // accepts known config keys; the delta is applied separately above.
+        const {
+          organizationId: _orgId,
+          platform: _platform,
+          selectedRepositoryDelta: _delta,
+          ...rest
+        } = input;
         const patch: CodeReviewFieldMergePatch = rest;
         const merged = applyCodeReviewConfigPatch(stored, patch);
+
+        // Effective selected repository ids: a delta input computes the next
+        // array above; a full-array input flows through the merge helper.
+        const effectiveSelectedRepositoryIds: Array<number | string> =
+          selectedRepositoryIdsFromDelta ?? merged.selectedRepositoryIds ?? [];
 
         // Council entitlement gate: ONLY when the patch actually carries a
         // `council` key. An omitted council must not re-trigger the gate —
@@ -957,6 +996,25 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinking_effort: override.thinkingEffort ?? null,
           }));
 
+        // Bitbucket selections must be re-validated against the workspace
+        // repository cache before persisting, exactly like the full save. A
+        // delta (or full-array) input that would leave an invalid selection —
+        // unknown UUIDs, an empty result after removal, duplicates, or an
+        // unavailable cache — is rejected here rather than persisted.
+        if (
+          isBitbucket &&
+          (input.selectedRepositoryIds !== undefined || input.selectedRepositoryDelta !== undefined)
+        ) {
+          const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
+          requireBitbucketRepositorySelection(
+            {
+              repositorySelectionMode,
+              selectedRepositoryIds: effectiveSelectedRepositoryIds,
+            },
+            readiness
+          );
+        }
+
         await upsertAgentConfig({
           organizationId: input.organizationId,
           agentType: 'code_review',
@@ -969,7 +1027,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinking_effort: merged.thinkingEffort ?? null,
             gate_threshold: gateThreshold,
             repository_selection_mode: repositorySelectionMode,
-            selected_repository_ids: (merged.selectedRepositoryIds ?? []) as Array<number | string>,
+            selected_repository_ids: effectiveSelectedRepositoryIds as Array<number | string>,
             manually_added_repositories: manuallyAddedRepositories,
             repository_model_overrides: repositoryModelOverrides,
             council,
@@ -989,14 +1047,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         });
 
         // GitLab webhook sync runs ONLY when the patch actually carries
-        // `selectedRepositoryIds`. A patch that doesn't touch selection
-        // (e.g. mobile updating `focusAreas`) must not mutate integration
-        // metadata. Auto-configure is honored when present, defaulting to
-        // true to match the full-save default.
+        // `selectedRepositoryIds` or `selectedRepositoryDelta`. A patch that
+        // doesn't touch selection (e.g. mobile updating `focusAreas`) must
+        // not mutate integration metadata. Auto-configure is honored when
+        // present, defaulting to true to match the full-save default.
         let webhookSyncResult = null;
         if (
           isGitLab &&
-          input.selectedRepositoryIds !== undefined &&
+          (input.selectedRepositoryIds !== undefined ||
+            input.selectedRepositoryDelta !== undefined) &&
           (input.autoConfigureWebhooks ?? true) &&
           repositorySelectionMode === 'selected'
         ) {
@@ -1019,7 +1078,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   organizationId: input.organizationId,
                 });
 
-                const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
+                const selectedRepositoryIds = effectiveSelectedRepositoryIds.filter(
                   (repositoryId): repositoryId is number => typeof repositoryId === 'number'
                 );
                 const previousSelectedRepositoryIds = previousRepoIds.filter(

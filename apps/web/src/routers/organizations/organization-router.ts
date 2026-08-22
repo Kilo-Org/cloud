@@ -9,7 +9,10 @@ import { timedUsageQuery } from '@/lib/usage-query';
 import { successResult } from '@/lib/maybe-result';
 import { captureMessage } from '@sentry/nextjs';
 import type {
+  MemberOrganizationWithMembers,
+  OrganizationSsoPolicyView,
   OrganizationWithMembers,
+  OrganizationWithMembersResponse,
   UserOrganizationWithInheritedChildren,
 } from '@/lib/organizations/organization-types';
 import {
@@ -312,7 +315,7 @@ export const organizationsRouter = createTRPCRouter({
 
   withMembers: baseProcedure
     .input(OrganizationIdInputSchema)
-    .query<OrganizationWithMembers>(async opts => {
+    .query<OrganizationWithMembersResponse>(async opts => {
       const organizationId = opts.input.organizationId;
       const callerRole = await ensureOrganizationAccess(opts.ctx, organizationId);
 
@@ -402,26 +405,66 @@ export const organizationsRouter = createTRPCRouter({
         };
       });
 
+      // Role-gated DTO: ordinary members must not receive the Stripe customer
+      // id or the invitation secret. Admin-and-above keep the full shape.
+      //
+      // Stripped for member:
+      // - organization.stripe_customer_id (payment identifier; rendered only in
+      //   the admin dashboard, OrganizationInfoCard.tsx).
+      // - invited member inviteToken/inviteUrl (the accept-invite secret).
+      // - member currentDailyUsageUsd (no member-role consumer).
+      //
+      // Compatibility: inviteId, dailyUsageLimitUsd, emailStatus, and
+      // childOrganizationMemberships are kept for member-facing consumers
+      // (OrganizationMembersCard, mobile members screen); remove when those
+      // consumers migrate to organizations.members.listPublic.
+      const effectiveSsoPolicy: OrganizationSsoPolicyView =
+        ssoPolicy.status === 'required'
+          ? {
+              required: true,
+              source: ssoPolicy.source,
+              domain: ssoPolicy.domain,
+              configurationError: false,
+            }
+          : {
+              required: false,
+              source: null,
+              domain: null,
+              configurationError: ssoPolicy.status === 'misconfigured',
+            };
+
+      if (callerRole === 'member') {
+        const { stripe_customer_id: _stripeCustomerId, ...memberOrganization } = organization;
+        const memberPayload = membersWithChildOrganizations.map(member => {
+          if (member.status === 'active') {
+            const { currentDailyUsageUsd: _currentDailyUsageUsd, ...activeMember } = member;
+            return activeMember;
+          }
+          const {
+            inviteToken: _inviteToken,
+            inviteUrl: _inviteUrl,
+            currentDailyUsageUsd: _currentDailyUsageUsd,
+            ...invitedMember
+          } = member;
+          return invitedMember;
+        });
+
+        return {
+          ...memberOrganization,
+          callerRole,
+          members: memberPayload,
+          childOrganizations,
+          effectiveSsoPolicy,
+        } satisfies MemberOrganizationWithMembers;
+      }
+
       return {
         ...organization,
         callerRole,
         members: membersWithChildOrganizations,
         childOrganizations,
-        effectiveSsoPolicy:
-          ssoPolicy.status === 'required'
-            ? {
-                required: true,
-                source: ssoPolicy.source,
-                domain: ssoPolicy.domain,
-                configurationError: false,
-              }
-            : {
-                required: false,
-                source: null,
-                domain: null,
-                configurationError: ssoPolicy.status === 'misconfigured',
-              },
-      };
+        effectiveSsoPolicy,
+      } satisfies OrganizationWithMembers;
     }),
 
   createChild: organizationAdminMutationProcedure

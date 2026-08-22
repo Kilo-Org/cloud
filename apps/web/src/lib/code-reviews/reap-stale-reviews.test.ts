@@ -12,6 +12,9 @@ const mockSetCommitStatus = jest.fn() as jest.MockedFunction<(...args: any[]) =>
 const mockResolveGitLabAccessToken = jest.fn() as jest.MockedFunction<
   (...args: any[]) => Promise<string>
 >;
+const mockSettleCodeReviewLedgerRowOn = jest.fn() as jest.MockedFunction<
+  (...args: any[]) => Promise<void>
+>;
 
 // The real SQL (selection predicate, optimistic lock, attempt terminalization)
 // is exercised against the database in reap-stale-reviews.integration.test.ts;
@@ -75,6 +78,10 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 jest.mock('@/lib/code-reviews/platform/gitlab-access', () => ({
   resolveGitLabAccessToken: (...args: unknown[]) => mockResolveGitLabAccessToken(...args),
   getGitLabInstanceUrl: () => 'https://gitlab.com',
+}));
+
+jest.mock('@/lib/code-reviews/code-review-ledger', () => ({
+  settleCodeReviewLedgerRowOn: (...args: unknown[]) => mockSettleCodeReviewLedgerRowOn(...args),
 }));
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -160,6 +167,7 @@ beforeEach(() => {
   mockUpdateCheckRun.mockResolvedValue(undefined);
   mockSetCommitStatus.mockResolvedValue(undefined);
   mockResolveGitLabAccessToken.mockResolvedValue('gl-token');
+  mockSettleCodeReviewLedgerRowOn.mockResolvedValue(undefined);
 });
 
 describe('reapStaleCodeReviews', () => {
@@ -234,6 +242,33 @@ describe('reapStaleCodeReviews', () => {
 
     expect(mockUpdateCheckRun).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ selected: 1, terminalized: 0 });
+  });
+
+  // The ledger settle runs inside the terminalize transaction, so the event is
+  // emitted atomically with the terminal claim.
+  it('settles the ledger row inside the terminalize transaction', async () => {
+    mockSelectStale.mockResolvedValue([makeReview()]);
+
+    await reapStaleCodeReviews();
+
+    expect(mockSettleCodeReviewLedgerRowOn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        reviewId: '00000000-0000-0000-0000-0000000000aa',
+        status: 'failed',
+        terminalReason: 'abandoned',
+        triggerSource: 'webhook',
+      })
+    );
+  });
+
+  // A transient settle failure must propagate so the terminalize rolls back and
+  // the review stays non-terminal for a later run, instead of losing the event.
+  it('propagates a settle failure so the terminalize rolls back', async () => {
+    mockSelectStale.mockResolvedValue([makeReview()]);
+    mockSettleCodeReviewLedgerRowOn.mockRejectedValue(new Error('settle failed'));
+
+    await expect(reapStaleCodeReviews()).rejects.toThrow('settle failed');
   });
 
   // A dashboard-only manual review never published anything to the pull

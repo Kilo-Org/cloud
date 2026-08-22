@@ -108,6 +108,19 @@ vi.mock('@/lib/utils', () => ({ cn: (...args: unknown[]) => args.filter(Boolean)
 type R = ReactTestRenderer;
 type I = ReactTestInstance;
 
+function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    chatMessages: { available: true, unavailableReason: null },
+    agentAttention: { available: true, unavailableReason: null },
+    agentUpdates: { available: true, unavailableReason: null },
+    sessionStatus: { available: true, unavailableReason: null },
+    kiloclawActivity: { available: true, unavailableReason: null },
+    balanceAlerts: { available: true, unavailableReason: null },
+    securityFindings: { available: true, unavailableReason: null },
+    ...overrides,
+  };
+}
+
 function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     chatMessages: true,
@@ -119,6 +132,7 @@ function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unkn
     securityFindings: true,
     agentPushEnabled: true,
     notificationPreviews: 'generic',
+    capabilities: fullCapabilities(),
     ...overrides,
   };
 }
@@ -159,6 +173,12 @@ function skeletonCount(root: I): number {
 function switchOnValueChange(root: I, label: string): ((value: boolean) => void) | undefined {
   const sw = switchesByLabel(root, label)[0];
   return sw ? (sw.props as { onValueChange?: (value: boolean) => void }).onValueChange : undefined;
+}
+
+function textWithChildren(root: I, content: string): I[] {
+  return root.findAll(
+    n => typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === content
+  );
 }
 
 // The switch renders as soon as the preference query resolves, but it stays
@@ -317,5 +337,123 @@ describe('NotificationsScreen KiloClaw activity row', () => {
 
     expect(switchesByLabel(renderer.root, 'KiloClaw activity').length).toBe(0);
     expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
+  });
+});
+
+describe('NotificationsScreen category availability', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useKiloClawTabVisible.mockReturnValue(true);
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('happy: an available category toggle flips and persists', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.value).toBe(true);
+
+    prefsQueryFn.mockResolvedValue(fullPrefs({ chatMessages: false }));
+    act(() => {
+      switchOnValueChange(renderer.root, 'Chat messages')?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ chatMessages: false });
+    await waitFor(() => switchesByLabel(renderer.root, 'Chat messages')[0]?.props.value === false);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable unhappy: an unavailable category disables the switch and shows the server reason', async () => {
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          balanceAlerts: {
+            available: false,
+            unavailableReason: 'Join an organization to get balance alerts.',
+          },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+
+    // Wait for an available sibling row to be enabled first: the master gate
+    // disables every row until the permission/device-token/push-token queries
+    // settle, so the unavailable row is disabled from the first render. Waiting
+    // on the sibling proves the gate settled and capabilities loaded, so the
+    // Balance alerts `disabled` below is the unavailable state, not the gate.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
+    expect(
+      textWithChildren(renderer.root, 'Join an organization to get balance alerts.').length
+    ).toBe(1);
+  });
+
+  it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    setPreferenceMutationFn.mockRejectedValue({
+      data: { code: 'INTERNAL_SERVER_ERROR' },
+      message: 'boom',
+    });
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    act(() => {
+      switchOnValueChange(renderer.root, 'Chat messages')?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    await waitFor(() => activityIndicators(renderer.root).length === 0);
+
+    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.value).toBe(true);
+    expect(toastError).toHaveBeenCalledWith('boom');
+  });
+
+  it('happy: a preferences response without capabilities renders every row as available', async () => {
+    prefsQueryFn.mockResolvedValue({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
+      agentPushEnabled: true,
+      notificationPreviews: 'generic',
+    });
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'KiloClaw activity')[0]?.props.disabled).toBe(false);
+  });
+
+  it('retryable unhappy: a capabilities query failure keeps last good availability and shows retry', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer, queryClient } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    prefsQueryFn.mockRejectedValue(new Error('prefs boom'));
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: ['getNotificationPreferences'] });
+    });
+
+    await waitFor(
+      () =>
+        renderer.root.findAll(
+          n =>
+            typeof n.type === 'string' &&
+            (n.type as string) === 'Pressable' &&
+            n.props.accessibilityLabel === 'Retry loading notification categories'
+        ).length === 1
+    );
+    // Last good availability is preserved: rows stay rendered and enabled.
+    expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
   });
 });

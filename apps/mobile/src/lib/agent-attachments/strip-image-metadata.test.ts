@@ -26,6 +26,11 @@ describe('strippedExtension', () => {
     expect(strippedExtension('jpg')).toBe('jpg');
     expect(strippedExtension('gif')).toBe('jpg');
   });
+
+  it('re-encodes heic and heif to jpg', () => {
+    expect(strippedExtension('heic')).toBe('jpg');
+    expect(strippedExtension('heif')).toBe('jpg');
+  });
 });
 
 describe('stripImageMetadata', () => {
@@ -46,12 +51,35 @@ describe('stripImageMetadata', () => {
     expect(result).toBe('file:///cache/stripped.png');
   });
 
+  it('re-encodes heic and heif with the JPEG save format', async () => {
+    mocks.manipulateAsync.mockResolvedValue({ uri: 'file:///cache/stripped.jpg' });
+
+    await stripImageMetadata('file:///cache/original.heic', 'heic');
+    expect(mocks.manipulateAsync).toHaveBeenCalledWith('file:///cache/original.heic', [], {
+      compress: 1,
+      format: 'jpeg',
+    });
+
+    await stripImageMetadata('file:///cache/original.heif', 'heif');
+    expect(mocks.manipulateAsync).toHaveBeenCalledWith('file:///cache/original.heif', [], {
+      compress: 1,
+      format: 'jpeg',
+    });
+  });
+
   it('falls back to the original URI on failure and reports to Sentry', async () => {
     mocks.manipulateAsync.mockRejectedValue(new Error('re-encode failed'));
 
     const result = await stripImageMetadata('file:///cache/original.png', 'png');
 
     expect(result).toBe('file:///cache/original.png');
-    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'strip-image-metadata',
+      },
+      extra: { outputExtension: 'png' },
+      fingerprint: ['agent-attachments-strip-image-metadata'],
+    });
   });
 });

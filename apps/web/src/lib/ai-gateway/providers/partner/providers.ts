@@ -10,6 +10,7 @@ export const FRIENDLI_GLM_PROVIDER = {
   apiUrl: 'https://api.friendli.ai/serverless/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('FRIENDLI_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: [
     'chat_completions',
     // 'messages', // supported, not tested
@@ -43,6 +44,7 @@ export const PERPLEXITY_KIMI_PROVIDER = {
   apiUrl: 'https://api.perplexity.ai/router/v1',
   apiUrlOverrides: {},
   apiKey: getEnvVariable('PERPLEXITY_API_KEY'),
+  apiKeyHeader: null,
   supportedChatApis: [
     'chat_completions',
     // 'messages', // supported, not tested

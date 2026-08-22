@@ -1,18 +1,25 @@
 import { Pressable, View } from 'react-native';
 
+import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function SheetHeader({
   title,
   onDone,
   onCancel,
   doneLabel = 'Done',
+  onShare,
+  sharing = false,
 }: {
   title: string;
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
+  onShare?: () => void;
+  sharing?: boolean;
 }) {
+  const colors = useThemeColors();
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a
@@ -28,6 +35,19 @@ export function SheetHeader({
             {title}
           </Text>
         </View>
+        {onShare !== undefined ? (
+          <Pressable
+            onPress={onShare}
+            disabled={sharing}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Share ${title}`}
+            accessibilityState={{ disabled: false, busy: sharing }}
+            className="absolute left-0 px-2 py-2 active:opacity-70 disabled:opacity-50"
+          >
+            <Share size={20} color={colors.foreground} />
+          </Pressable>
+        ) : null}
         {onCancel ? (
           <Pressable
             onPress={onCancel}

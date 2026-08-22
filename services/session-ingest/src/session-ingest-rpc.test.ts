@@ -343,7 +343,10 @@ describe('createSessionForCloudAgent', () => {
 
     await expect(
       rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/acme/repo.git' })
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
     expect(fake.values).toHaveBeenCalledTimes(1);
     const setArg = fake.updateSet.mock.calls[0][0] as Record<string, unknown>;
     expect(setArg).not.toHaveProperty('git_url');
@@ -362,7 +365,10 @@ describe('createSessionForCloudAgent', () => {
     const fake = makeRootWriteDb({ existing });
     const rpc = makeRpc(fake.db as never);
 
-    await expect(rpc.createSessionForCloudAgent(params)).resolves.toBeUndefined();
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
     expect(fake.values).toHaveBeenCalledTimes(1);
     const setArg = fake.updateSet.mock.calls[0][0] as Record<string, unknown>;
     expect(setArg).not.toHaveProperty('git_url');

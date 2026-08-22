@@ -9,12 +9,16 @@ import {
 
 import {
   buildChildIngestItems,
+  buildEmptyIngestItems,
   buildRootIngestItems,
+  buildUnsupportedIngestItems,
   CHILD_ASSISTANT_MESSAGE_ID,
   CHILD_BASH_PART_ID,
   CHILD_SESSION_ID,
   CHILD_SESSION_TITLE,
   CHILD_USER_MESSAGE_ID,
+  EMPTY_SESSION_ID,
+  EMPTY_SESSION_TITLE,
   expectedPartIdsFor,
   fixtureSessionIds,
   parseSessionIngestServiceStatus,
@@ -25,6 +29,9 @@ import {
   ROOT_SESSION_TITLE,
   ROOT_TASK_PART_ID,
   ROOT_USER_MESSAGE_ID,
+  UNSUPPORTED_SESSION_ID,
+  UNSUPPORTED_SESSION_TITLE,
+  UNSUPPORTED_USER_MESSAGE_ID,
   type SessionIngestItem,
 } from './mobile-sheet-fixtures';
 
@@ -62,8 +69,13 @@ function parsePartData(data: SessionIngestItem['data']) {
   return parsed.data;
 }
 
-void test('cleanup scope is exactly the two fixture session IDs', () => {
-  assert.deepEqual(fixtureSessionIds(), [ROOT_SESSION_ID, CHILD_SESSION_ID]);
+void test('cleanup scope is exactly the four fixture session IDs', () => {
+  assert.deepEqual(fixtureSessionIds(), [
+    ROOT_SESSION_ID,
+    CHILD_SESSION_ID,
+    UNSUPPORTED_SESSION_ID,
+    EMPTY_SESSION_ID,
+  ]);
   for (const id of fixtureSessionIds()) {
     assert.match(id, /^ses_/);
     assert.equal(id.length, 30);
@@ -219,6 +231,52 @@ void test('child fixture items match the session-ingest schemas', () => {
   ]);
   assert.deepEqual(expectedPartIdsFor(CHILD_SESSION_ID), [CHILD_BASH_PART_ID]);
   assert.throws(() => expectedPartIdsFor('ses_unknown'), /Unknown fixture session id/);
+});
+
+void test('unsupported fixture items match the session-ingest schemas', () => {
+  const items = buildUnsupportedIngestItems();
+  assert.equal(items.length, 2);
+
+  const session = parseSessionData(singleItemOfType(items, 'session').data);
+  assert.equal(session.id, UNSUPPORTED_SESSION_ID);
+  assert.equal(session.slug, 'unsupported-repository-fixture');
+  assert.equal(session.projectID, 'fixture');
+  assert.equal(session.directory, '/workspace');
+  assert.equal(session.title, UNSUPPORTED_SESSION_TITLE);
+  assert.equal(session.version, '1');
+  assert.equal(session.parentID, undefined);
+
+  const messages = itemsOfType(items, 'message').map(item => parseMessageData(item.data));
+  assert.equal(messages.length, 1);
+  const userMessage = messages[0];
+  assert.equal(userMessage.role, 'user');
+  assert.equal(userMessage.id, UNSUPPORTED_USER_MESSAGE_ID);
+  assert.equal(userMessage.sessionID, UNSUPPORTED_SESSION_ID);
+  assert.equal(userMessage.agent, 'build');
+  assert.deepEqual(userMessage.model, {
+    providerID: 'kilo',
+    modelID: 'anthropic/claude-sonnet-4',
+  });
+
+  assert.deepEqual(expectedPartIdsFor(UNSUPPORTED_SESSION_ID), []);
+});
+
+void test('empty fixture items match the session-ingest schemas', () => {
+  const items = buildEmptyIngestItems();
+  assert.equal(items.length, 1);
+
+  const session = parseSessionData(singleItemOfType(items, 'session').data);
+  assert.equal(session.id, EMPTY_SESSION_ID);
+  assert.equal(session.slug, 'empty-session-fixture');
+  assert.equal(session.projectID, 'fixture');
+  assert.equal(session.directory, '/workspace');
+  assert.equal(session.title, EMPTY_SESSION_TITLE);
+  assert.equal(session.version, '1');
+  assert.equal(session.parentID, undefined);
+
+  assert.equal(itemsOfType(items, 'message').length, 0);
+
+  assert.deepEqual(expectedPartIdsFor(EMPTY_SESSION_ID), []);
 });
 
 void test('status JSON parsing extracts the session-ingest service', () => {

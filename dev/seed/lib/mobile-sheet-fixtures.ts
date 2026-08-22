@@ -4,11 +4,17 @@
 
 export const ROOT_SESSION_ID = 'ses_000000000001RootFixture001';
 export const CHILD_SESSION_ID = 'ses_000000000002ChildFixture01';
+export const UNSUPPORTED_SESSION_ID = 'ses_000000000003Unsupported001';
+export const EMPTY_SESSION_ID = 'ses_000000000004EmptyFixture01';
 
 export const ROOT_SESSION_TITLE = 'Mobile sheet fixtures';
 export const CHILD_SESSION_TITLE = 'Inspect child fixture';
+export const UNSUPPORTED_SESSION_TITLE = 'Unsupported repository fixture';
+export const EMPTY_SESSION_TITLE = 'Empty session fixture';
 export const ROOT_SESSION_SLUG = 'mobile-sheet-fixtures';
 export const CHILD_SESSION_SLUG = 'inspect-child-fixture';
+export const UNSUPPORTED_SESSION_SLUG = 'unsupported-repository-fixture';
+export const EMPTY_SESSION_SLUG = 'empty-session-fixture';
 
 export const FIXTURE_PROJECT_ID = 'fixture';
 export const FIXTURE_DIRECTORY = '/workspace';
@@ -29,6 +35,8 @@ export const CHILD_USER_MESSAGE_ID = 'msgChildUser0000001';
 export const CHILD_ASSISTANT_MESSAGE_ID = 'msgChildAssistant01';
 export const CHILD_BASH_PART_ID = 'prtChildBash0000001';
 
+export const UNSUPPORTED_USER_MESSAGE_ID = 'msgUnsupported00001';
+
 export const FIXTURE_TIME_CREATED = 1_700_000_000_000;
 export const FIXTURE_TIME_UPDATED = 1_700_000_300_000;
 
@@ -45,6 +53,8 @@ const CHILD_ASSISTANT_CREATED = 1_700_000_050_000;
 const CHILD_ASSISTANT_COMPLETED = 1_700_000_055_000;
 const CHILD_BASH_START = 1_700_000_051_000;
 const CHILD_BASH_END = 1_700_000_054_000;
+
+const UNSUPPORTED_USER_CREATED = 1_700_000_060_000;
 
 const ROOT_FILE_MIME = 'text/plain';
 const ROOT_FILE_NAME = 'fixture-notes.txt';
@@ -90,7 +100,7 @@ const CHILD_ASSISTANT_TOKENS: FixtureTokens = {
 
 /** The exact session IDs this seed resets. Nothing else is touched. */
 export function fixtureSessionIds(): string[] {
-  return [ROOT_SESSION_ID, CHILD_SESSION_ID];
+  return [ROOT_SESSION_ID, CHILD_SESSION_ID, UNSUPPORTED_SESSION_ID, EMPTY_SESSION_ID];
 }
 
 /** Part IDs that must appear in the materialized history for a fixture session. */
@@ -100,6 +110,9 @@ export function expectedPartIdsFor(sessionId: string): string[] {
   }
   if (sessionId === CHILD_SESSION_ID) {
     return [CHILD_BASH_PART_ID];
+  }
+  if (sessionId === UNSUPPORTED_SESSION_ID || sessionId === EMPTY_SESSION_ID) {
+    return [];
   }
   throw new Error(`Unknown fixture session id: ${sessionId}`);
 }
@@ -323,6 +336,31 @@ export function buildChildIngestItems(): SessionIngestItem[] {
       metadata: {},
       start: CHILD_BASH_START,
       end: CHILD_BASH_END,
+    }),
+  ];
+}
+
+export function buildUnsupportedIngestItems(): SessionIngestItem[] {
+  return [
+    buildSessionItem({
+      sessionId: UNSUPPORTED_SESSION_ID,
+      slug: UNSUPPORTED_SESSION_SLUG,
+      title: UNSUPPORTED_SESSION_TITLE,
+    }),
+    buildUserMessageItem({
+      messageId: UNSUPPORTED_USER_MESSAGE_ID,
+      sessionId: UNSUPPORTED_SESSION_ID,
+      createdAt: UNSUPPORTED_USER_CREATED,
+    }),
+  ];
+}
+
+export function buildEmptyIngestItems(): SessionIngestItem[] {
+  return [
+    buildSessionItem({
+      sessionId: EMPTY_SESSION_ID,
+      slug: EMPTY_SESSION_SLUG,
+      title: EMPTY_SESSION_TITLE,
     }),
   ];
 }

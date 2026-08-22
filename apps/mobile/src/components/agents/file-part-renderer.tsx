@@ -4,6 +4,7 @@ import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
@@ -327,6 +328,7 @@ type FilePreviewModalProps = {
 
 function FilePreviewModal({ mode, url, part, onRetry, onClose }: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -401,6 +403,7 @@ function FilePreviewModal({ mode, url, part, onRetry, onClose }: Readonly<FilePr
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader title={part.filename ?? 'File'} onDone={onClose} doneLabel="Done" />
       <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
+      <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>
   );
 }

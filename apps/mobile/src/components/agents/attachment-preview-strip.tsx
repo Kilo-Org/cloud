@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File } from 'expo-file-system';
 import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -58,6 +59,7 @@ function AttachmentChip({
   onRetry: () => void;
 }) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [textPreview, setTextPreview] = useState<{
@@ -300,6 +302,7 @@ function AttachmentChip({
           <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
             {renderPreviewBody(textPreview)}
           </ScrollView>
+          <View style={{ height: insets.bottom }} className="bg-background" />
         </SessionPageSheet>
       ) : null}
     </>

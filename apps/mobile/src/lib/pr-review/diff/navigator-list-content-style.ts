@@ -5,8 +5,8 @@
 import { Platform, type ViewStyle } from 'react-native';
 
 /** Matches the previous ScrollView `contentContainerClassName="pb-8 pt-2"`. */
-export const NAVIGATOR_LIST_CONTENT_BASE_PADDING_BOTTOM = 32;
-export const NAVIGATOR_LIST_CONTENT_BASE_PADDING_TOP = 8;
+const NAVIGATOR_LIST_CONTENT_BASE_PADDING_BOTTOM = 32;
+const NAVIGATOR_LIST_CONTENT_BASE_PADDING_TOP = 8;
 
 /**
  * Returns the navigator list content style. The navigator is a formSheet whose

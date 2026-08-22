@@ -15,9 +15,6 @@ type ContinuePickerBridge = {
  */
 let bridge: ContinuePickerBridge | null = null;
 
-export function setContinuePickerBridge(next: ContinuePickerBridge) {
-  bridge = next;
-}
 export function getContinuePickerBridge() {
   return bridge;
 }

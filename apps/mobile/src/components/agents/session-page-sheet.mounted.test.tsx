@@ -6,10 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionPageSheet } from './session-page-sheet';
 
 // Mutated between tests so one suite can prove both platform branches and the
-// half-height geometry.
+// Android top-inset padding.
 const reactNativeMock = vi.hoisted(() => ({
   Platform: { OS: 'ios' as string },
-  useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
 }));
 const safeAreaMock = vi.hoisted(() => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
@@ -17,10 +16,8 @@ const safeAreaMock = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
-  Pressable: 'Pressable',
   View: 'View',
   Platform: reactNativeMock.Platform,
-  useWindowDimensions: reactNativeMock.useWindowDimensions,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
@@ -88,7 +85,6 @@ function press(instance: TestRenderer.ReactTestInstance, key: string): void {
 
 beforeEach(() => {
   reactNativeMock.Platform.OS = 'ios';
-  reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
   safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0 });
 });
 
@@ -105,8 +101,7 @@ describe('SessionPageSheet mounted', () => {
     expect(modalNode.props.onRequestClose).toBe(onClose);
     expect(modalNode.props.onDismiss).toBe(onDismiss);
 
-    // No Android scrim or surface on iOS.
-    expect(findByTestID(renderer.root, 'session-page-sheet-scrim')).toHaveLength(0);
+    // No Android surface on iOS.
     expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
 
     renderer.unmount();
@@ -122,55 +117,32 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
-  it('renders a transparent Modal with a blocking scrim and bottom surface on Android', async () => {
+  it('renders an opaque full-window Modal on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose });
 
     const modalNode = modal(renderer.root);
-    expect(modalNode.props.transparent).toBe(true);
+    expect(modalNode.props.transparent).toBeUndefined();
     expect(modalNode.props.animationType).toBe('slide');
     expect(modalNode.props.onRequestClose).toBe(onClose);
 
-    const scrim = findByTestID(renderer.root, 'session-page-sheet-scrim');
-    expect(scrim).toHaveLength(1);
-    // The scrim is a Pressable that consumes touches, so the session behind
-    // cannot receive them.
-    expect(scrim[0]?.type).toBe('Pressable');
-    expect(scrim[0]?.props.onPress).toBe(onClose);
-
-    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(1);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 keeps the surface at the full window height.
+    expect(surface[0]?.props.className).toContain('flex-1');
 
     renderer.unmount();
   });
 
-  it('sizes the Android surface to half the usable height', async () => {
+  it('pads the Android surface by the top inset', async () => {
     reactNativeMock.Platform.OS = 'android';
-    reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 800 });
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await mountSheet();
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
-    // usable = 800 - 24 - 34 = 742; half = 371.
-    expect(surface?.props.style).toEqual({ height: 371 });
-
-    renderer.unmount();
-  });
-
-  it('closes when the scrim is pressed', async () => {
-    reactNativeMock.Platform.OS = 'android';
-    const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet({ onClose });
-
-    const scrim = findByTestID(renderer.root, 'session-page-sheet-scrim')[0];
-    if (!scrim) {
-      throw new Error('scrim not found');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      press(scrim, 'onPress');
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // The padding keeps the content below the system status bar.
+    expect(surface?.props.style).toEqual({ paddingTop: 24 });
 
     renderer.unmount();
   });

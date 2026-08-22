@@ -1431,7 +1431,6 @@ describe('FilePartRenderer preview sheet surface', () => {
     expect(modals[0]?.props.animationType).toBe('slide');
     expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
     expect(modals[0]?.props.transparent).toBeUndefined();
-    expect(findByTestID(renderer.root, 'session-page-sheet-scrim')).toHaveLength(0);
     expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
 
     await unmount(renderer);
@@ -1447,27 +1446,21 @@ describe('FilePartRenderer preview sheet surface', () => {
     await unmount(renderer);
   });
 
-  it('renders a transparent Modal with a blocking scrim and half-height surface on Android', async () => {
+  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
-    reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 800 });
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await openMarkdownPreview();
 
     const modals = findByType(renderer.root, 'Modal');
     expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.transparent).toBe(true);
-
-    const scrim = findByTestID(renderer.root, 'session-page-sheet-scrim');
-    expect(scrim).toHaveLength(1);
-    // The scrim is a Pressable that consumes touches, so the session behind
-    // cannot receive them.
-    expect(scrim[0]?.type).toBe('Pressable');
+    expect(modals[0]?.props.transparent).toBeUndefined();
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    // usable = 800 - 24 - 34 = 742; half = 371.
-    expect(surface[0]?.props.style).toEqual({ height: 371 });
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
 
     // The insets.bottom spacer clears the Android navigation bar.
     const spacers = renderer.root.findAll(
@@ -1478,21 +1471,6 @@ describe('FilePartRenderer preview sheet surface', () => {
         node.props.className === 'bg-background'
     );
     expect(spacers).toHaveLength(1);
-
-    await unmount(renderer);
-  });
-
-  it('closes the preview when the Android scrim is pressed', async () => {
-    reactNativeMock.Platform.OS = 'android';
-    const renderer = await openMarkdownPreview();
-
-    const scrim = findByTestID(renderer.root, 'session-page-sheet-scrim')[0];
-    if (!scrim) {
-      throw new Error('scrim not found');
-    }
-    await press(scrim);
-
-    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
 
     await unmount(renderer);
   });

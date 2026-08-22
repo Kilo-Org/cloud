@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Modal, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Modal, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SessionPageSheetProps = {
@@ -14,9 +14,9 @@ type SessionPageSheetProps = {
  * Shared sheet surface for the session page. On iOS it renders the native
  * pageSheet Modal and keeps the current safe-area behavior; callers render
  * their own SheetHeader, scroll content, and safe bottom spacer inside it.
- * On Android it renders a transparent full-window Modal with a dimmed blocking
- * scrim and a bottom-aligned half-height surface, so the session stays visible
- * behind it. Scrim press, Android Back, and Done all route through `onClose`.
+ * On Android the Modal fills the window, so the surface pads the top inset to
+ * keep the content out of the system status bar. Android Back and Done both
+ * route through `onClose`.
  */
 export function SessionPageSheet({
   visible,
@@ -24,7 +24,6 @@ export function SessionPageSheet({
   onDismiss,
   children,
 }: Readonly<SessionPageSheetProps>) {
-  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   if (Platform.OS === 'ios') {
@@ -41,25 +40,14 @@ export function SessionPageSheet({
     );
   }
 
-  const usableHeight = windowHeight - insets.top - insets.bottom;
-  const surfaceHeight = Math.floor(usableHeight * 0.5);
-
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end">
-        <Pressable
-          className="absolute inset-0 bg-black/50"
-          onPress={onClose}
-          accessibilityLabel="Close sheet"
-          testID="session-page-sheet-scrim"
-        />
-        <View
-          style={{ height: surfaceHeight }}
-          className="overflow-hidden rounded-t-3xl bg-background"
-          testID="session-page-sheet-surface"
-        >
-          {children}
-        </View>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View
+        style={{ paddingTop: insets.top }}
+        className="flex-1 bg-background"
+        testID="session-page-sheet-surface"
+      >
+        {children}
       </View>
     </Modal>
   );

@@ -95,17 +95,6 @@ function readSessionIngestStatusJson(): string {
   }
 }
 
-async function deleteSession(baseUrl: string, sessionId: string, token: string): Promise<void> {
-  const response = await fetch(`${baseUrl}/api/session/${sessionId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (response.status !== 200 && response.status !== 404) {
-    const body = await response.text();
-    throw new Error(`Delete of ${sessionId} failed (${response.status}): ${body}`);
-  }
-}
-
 async function ingestSession(
   baseUrl: string,
   sessionId: string,
@@ -243,10 +232,38 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // Reset only the four fixture sessions (child first, then root, then the
   // parentless unsupported and empty sessions) so reruns are idempotent and
   // the parent FK is never violated.
-  await deleteSession(sessionIngestUrl, CHILD_SESSION_ID, token);
-  await deleteSession(sessionIngestUrl, ROOT_SESSION_ID, token);
-  await deleteSession(sessionIngestUrl, UNSUPPORTED_SESSION_ID, token);
-  await deleteSession(sessionIngestUrl, EMPTY_SESSION_ID, token);
+  await db
+    .delete(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, user.userId),
+        eq(cli_sessions_v2.session_id, CHILD_SESSION_ID)
+      )
+    );
+  await db
+    .delete(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, user.userId),
+        eq(cli_sessions_v2.session_id, ROOT_SESSION_ID)
+      )
+    );
+  await db
+    .delete(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, user.userId),
+        eq(cli_sessions_v2.session_id, UNSUPPORTED_SESSION_ID)
+      )
+    );
+  await db
+    .delete(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, user.userId),
+        eq(cli_sessions_v2.session_id, EMPTY_SESSION_ID)
+      )
+    );
 
   const remaining = await db
     .select({ sessionId: cli_sessions_v2.session_id })

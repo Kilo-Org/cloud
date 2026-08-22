@@ -13,7 +13,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 // clone source id, so a different source never reuses the stored key.
 //
 // Destination resolution is deliberately mocked: this suite tests KEY
-// WIRING, not `resolveContinuationDestinations` (which has its own module).
+// WIRING, not `resolveContinuationResolution` (which has its own module).
 
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
@@ -30,9 +30,10 @@ const hapticsMock = vi.hoisted(() => ({
   calls: 0,
   rejectWith: undefined as Error | undefined,
 }));
-// Destination list handed back by the mocked resolver; each test sets the
-// single cloud destination the continue flow should execute against.
-const destinationsRef = vi.hoisted(() => ({ value: [] as unknown[] }));
+// Resolution handed back by the mocked resolver; each test sets the
+// single cloud resolution the continue flow should execute against, or a
+// failure kind that maps to terminal guidance.
+const resolutionRef = vi.hoisted(() => ({ value: null as unknown }));
 // Injected backoff sleep; tests assert the exact delay sequence.
 const sleepMock = vi.hoisted(() =>
   vi.fn(async (_ms: number) => {
@@ -110,7 +111,7 @@ vi.mock('@/components/agents/mode-normalize', () => ({
 // The real continuation-seed module pulls in mode-options -> lucide-react-native
 // (RN tree); this suite pins key wiring, so the resolver is a test hook.
 vi.mock('@/components/agents/continuation-seed', () => ({
-  resolveContinuationDestinations: () => destinationsRef.value,
+  resolveContinuationResolution: () => resolutionRef.value,
 }));
 vi.mock('expo-crypto', () => {
   let n = 0;
@@ -245,7 +246,7 @@ function mountContinueSession(args: ContinueSessionArgs): ContinueSessionMount {
   };
 }
 
-const CLOUD_DESTINATION = {
+const CLOUD_RESOLUTION = {
   kind: 'cloud-agent',
   repo: 'owner/repo',
   model: 'model-1',
@@ -273,7 +274,7 @@ describe('useContinueSession cloud clone wiring', () => {
     invalidateAgentSessionQueriesMock.mockReset();
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
-    destinationsRef.value = [CLOUD_DESTINATION];
+    resolutionRef.value = CLOUD_RESOLUTION;
     sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();
@@ -423,8 +424,8 @@ describe('useContinueSession cloud clone wiring', () => {
     expect(fingerprints[0]).toBe(fingerprints[1]);
   });
 
-  it('surfaces connect-repository guidance and does not navigate when no cloud destination resolves', async () => {
-    destinationsRef.value = [];
+  it('surfaces connect-repository guidance and does not navigate when the repository is unmatched', async () => {
+    resolutionRef.value = { kind: 'unmatched-repository' };
     const mount = mountContinueSession({ organizationId: 'org-1' });
 
     await mount.result.continueSession(FIELDS);
@@ -437,6 +438,42 @@ describe('useContinueSession cloud clone wiring', () => {
     expect(routerPush).not.toHaveBeenCalled();
     expect(prepareSessionMutate).not.toHaveBeenCalled();
   });
+
+  it('surfaces back-to-sessions guidance when the repository matches but the model is unresolved', async () => {
+    resolutionRef.value = { kind: 'unresolved-model' };
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    expect(mount.rerender().guidance).toEqual({
+      kind: 'terminal',
+      action: 'back-to-sessions',
+      message: expect.any(String),
+    });
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+  });
+
+  it('surfaces persistent retry guidance when the repository fetch fails', async () => {
+    queryClientFetchQuery.mockRejectedValue(new Error('network'));
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    expect(mount.rerender().guidance).toEqual({ kind: 'retry', message: expect.any(String) });
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+  });
+
+  it('clears guidance when clearGuidance is called', async () => {
+    resolutionRef.value = { kind: 'unmatched-repository' };
+    const mount = mountContinueSession({ organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+    expect(mount.rerender().guidance).not.toBeNull();
+
+    mount.result.clearGuidance();
+    expect(mount.rerender().guidance).toBeNull();
+  });
 });
 
 describe('useContinueSession loading and guidance states', () => {
@@ -448,7 +485,7 @@ describe('useContinueSession loading and guidance states', () => {
     invalidateAgentSessionQueriesMock.mockReset();
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
-    destinationsRef.value = [CLOUD_DESTINATION];
+    resolutionRef.value = CLOUD_RESOLUTION;
     sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();
@@ -527,7 +564,7 @@ describe('useContinueSession post-success failure containment', () => {
     invalidateAgentSessionQueriesMock.mockReset();
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
-    destinationsRef.value = [CLOUD_DESTINATION];
+    resolutionRef.value = CLOUD_RESOLUTION;
     sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();
@@ -595,7 +632,7 @@ describe('useContinueSession cloud mutation outbox (P1-E-40c)', () => {
     invalidateAgentSessionQueriesMock.mockReset();
     hapticsMock.calls = 0;
     hapticsMock.rejectWith = undefined;
-    destinationsRef.value = [CLOUD_DESTINATION];
+    resolutionRef.value = CLOUD_RESOLUTION;
     sleepMock.mockClear();
     outboxMock.getStoredOperationKey.mockReturnValue(null);
     outboxMock.writeSafeRetry.mockReset();

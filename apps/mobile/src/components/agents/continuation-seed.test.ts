@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveContinuationDestinations } from './continuation-seed';
+import { resolveContinuationResolution } from './continuation-seed';
 
 vi.mock('@/components/ui/icons', () => ({
   Bug: 'Bug',
@@ -11,16 +11,16 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// resolveContinuationDestinations
+// resolveContinuationResolution
 // ---------------------------------------------------------------------------
 
-describe('resolveContinuationDestinations', () => {
+describe('resolveContinuationResolution', () => {
   const GIT_URL = 'https://github.com/owner/repo.git';
   const REPOS = [{ fullName: 'owner/repo' }];
   const MODELS = [{ id: 'test-model', variants: ['default'] }];
 
-  it('returns the cloud destination when repo and model resolve', () => {
-    const result = resolveContinuationDestinations({
+  it('returns the cloud-agent resolution when repo and model resolve', () => {
+    const result = resolveContinuationResolution({
       gitUrl: GIT_URL,
       mode: 'code',
       model: 'test-model',
@@ -29,8 +29,7 @@ describe('resolveContinuationDestinations', () => {
       models: MODELS,
     });
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({
+    expect(result).toEqual({
       kind: 'cloud-agent',
       repo: 'owner/repo',
       model: 'test-model',
@@ -38,22 +37,8 @@ describe('resolveContinuationDestinations', () => {
     });
   });
 
-  it('omits the cloud destination when repo is absent from repositories', () => {
-    const result = resolveContinuationDestinations({
-      gitUrl: GIT_URL,
-      mode: 'code',
-      model: 'test-model',
-      variant: 'default',
-      // repo "owner/repo" is not listed.
-      repositories: [],
-      models: MODELS,
-    });
-
-    expect(result).toEqual([]);
-  });
-
-  it('omits the cloud destination when gitUrl is null', () => {
-    const result = resolveContinuationDestinations({
+  it('returns unmatched-repository when gitUrl is null', () => {
+    const result = resolveContinuationResolution({
       gitUrl: null,
       mode: 'code',
       model: 'test-model',
@@ -62,33 +47,45 @@ describe('resolveContinuationDestinations', () => {
       models: MODELS,
     });
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ kind: 'unmatched-repository' });
   });
 
-  it('omits the cloud destination when model is absent from models', () => {
-    const result = resolveContinuationDestinations({
+  it('returns unmatched-repository when gitUrl is not a GitHub URL', () => {
+    const result = resolveContinuationResolution({
+      gitUrl: 'https://gitlab.com/owner/repo.git',
+      mode: 'code',
+      model: 'test-model',
+      variant: 'default',
+      repositories: REPOS,
+      models: MODELS,
+    });
+
+    expect(result).toEqual({ kind: 'unmatched-repository' });
+  });
+
+  it('returns unmatched-repository when the repo is absent from repositories', () => {
+    const result = resolveContinuationResolution({
+      gitUrl: GIT_URL,
+      mode: 'code',
+      model: 'test-model',
+      variant: 'default',
+      repositories: [],
+      models: MODELS,
+    });
+
+    expect(result).toEqual({ kind: 'unmatched-repository' });
+  });
+
+  it('returns unresolved-model when the repo matches but the model is missing', () => {
+    const result = resolveContinuationResolution({
       gitUrl: GIT_URL,
       mode: 'code',
       model: 'test-model',
       variant: 'default',
       repositories: REPOS,
-      // model not found.
       models: [],
     });
 
-    expect(result).toEqual([]);
-  });
-
-  it('returns an empty array when everything is empty', () => {
-    const result = resolveContinuationDestinations({
-      gitUrl: null,
-      mode: 'code',
-      model: '',
-      variant: '',
-      repositories: [],
-      models: [],
-    });
-
-    expect(result).toEqual([]);
+    expect(result).toEqual({ kind: 'unresolved-model' });
   });
 });

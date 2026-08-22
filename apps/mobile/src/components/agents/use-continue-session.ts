@@ -2,12 +2,8 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
-import {
-  type ContinuationDestination,
-  resolveContinuationDestinations,
-} from '@/components/agents/continuation-seed';
+import { resolveContinuationResolution } from '@/components/agents/continuation-seed';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -17,8 +13,6 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type RepositoriesResult =
   | RouterOutputs['organizations']['cloudAgentNext']['listGitHubRepositories']
   | RouterOutputs['cloudAgentNext']['listGitHubRepositories'];
-
-const FULL_CONTINUATION_UNAVAILABLE_TOAST = 'Full continuation is unavailable for this session.';
 
 // Six clone attempts with the five gaps between them. The sixth retryable
 // failure ends the intent with persistent retry guidance.
@@ -91,11 +85,11 @@ export function useContinueSession(args: {
             staleTime: 0,
           });
         } catch {
-          toast.error(FULL_CONTINUATION_UNAVAILABLE_TOAST);
+          setGuidance({ kind: 'retry', message: CONTINUE_RETRY_MESSAGE });
           return;
         }
 
-        const destinations = resolveContinuationDestinations({
+        const resolution = resolveContinuationResolution({
           gitUrl: fields.gitUrl,
           mode: fields.mode,
           model: fields.model,
@@ -104,8 +98,7 @@ export function useContinueSession(args: {
           models: args.modelsLoading ? [] : args.models,
         });
 
-        const dest: ContinuationDestination | undefined = destinations[0];
-        if (dest?.kind !== 'cloud-agent') {
+        if (resolution.kind === 'unmatched-repository') {
           setGuidance({
             kind: 'terminal',
             action: 'connect-repository',
@@ -113,6 +106,17 @@ export function useContinueSession(args: {
           });
           return;
         }
+
+        if (resolution.kind === 'unresolved-model') {
+          setGuidance({
+            kind: 'terminal',
+            action: 'back-to-sessions',
+            message: CONTINUE_TERMINAL_MESSAGE,
+          });
+          return;
+        }
+
+        const dest = resolution;
 
         for (let attempt = 0; ; attempt += 1) {
           try {
@@ -156,5 +160,9 @@ export function useContinueSession(args: {
     ]
   );
 
-  return { continueSession, isContinuing, guidance };
+  const clearGuidance = useCallback(() => {
+    setGuidance(null);
+  }, []);
+
+  return { continueSession, isContinuing, guidance, clearGuidance };
 }

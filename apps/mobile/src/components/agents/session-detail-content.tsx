@@ -62,6 +62,7 @@ import {
   countInFlightMessages,
   resolveRetryPrompt,
   retryMessageAndClear,
+  runConnectRepository,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -127,6 +128,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { useContinueSession } from '@/components/agents/use-continue-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -303,11 +305,16 @@ export function SessionDetailContent({
     continueSession,
     isContinuing,
     guidance: continueGuidance,
+    clearGuidance,
   } = useContinueSession({
     sessionId,
     organizationId,
     models: modelOptions,
     modelsLoading: gatewayModelsLoading,
+  });
+  const { openGitHubIntegration } = useGitHubReposRefresh({
+    organizationId,
+    integrationInstalled: undefined,
   });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
@@ -832,8 +839,8 @@ export function SessionDetailContent({
   }, [router]);
 
   const handleConnectRepository = useCallback(() => {
-    router.push('/(app)/agent-chat/repo-picker' as Href);
-  }, [router]);
+    runConnectRepository(openGitHubIntegration, clearGuidance);
+  }, [openGitHubIntegration, clearGuidance]);
 
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {

@@ -113,7 +113,6 @@ const safeAreaMock = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
-  Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',

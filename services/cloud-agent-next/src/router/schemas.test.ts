@@ -319,27 +319,48 @@ describe('legacy live attachment input compatibility', () => {
   });
 });
 
-describe('prepareSession clone source forwarding', () => {
-  const basePrepareInput = {
-    prompt: 'Continue from the cloned session context.',
+describe('prepareSession clone-only variant', () => {
+  const baseCloneInput = {
     mode: 'code',
     model: 'claude-sonnet-4-5-20250929',
     githubRepo: 'acme/repo',
+    autoInitiate: true,
+    operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
   };
 
-  it('accepts an optional cloneFromKiloSessionId', () => {
+  it('accepts a clone-only prepare without a prompt', () => {
     expect(
       PrepareSessionInput.safeParse({
-        ...basePrepareInput,
+        ...baseCloneInput,
         cloneFromKiloSessionId: validKiloSessionId,
       }).success
     ).toBe(true);
   });
 
+  it('rejects a clone-only prepare with a prompt', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        prompt: 'Continue from the cloned session context.',
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone-only prepare with an initialMessageId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        initialMessageId: validMessageId,
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects a malformed cloneFromKiloSessionId', () => {
     expect(
       PrepareSessionInput.safeParse({
-        ...basePrepareInput,
+        ...baseCloneInput,
         cloneFromKiloSessionId: 'agent_invalid',
       }).success
     ).toBe(false);
@@ -348,14 +369,28 @@ describe('prepareSession clone source forwarding', () => {
   it('rejects an agent_ UUID cloneFromKiloSessionId', () => {
     expect(
       PrepareSessionInput.safeParse({
-        ...basePrepareInput,
+        ...baseCloneInput,
         cloneFromKiloSessionId: validSessionId,
       }).success
     ).toBe(false);
   });
 
-  it('keeps old inputs without the field unchanged', () => {
-    expect(PrepareSessionInput.safeParse(basePrepareInput).success).toBe(true);
+  it('still requires a prompt for a non-clone prepare', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Continue from the cloned session context.',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(true);
   });
 });
 

@@ -76,8 +76,9 @@ export type SessionRegistrationResult = {
   sandboxProvider: SandboxSelection['provider'];
   /**
    * Canonical initial turn reserved for a later legacy initiation request.
+   * Omitted for a clone-only create, which has no synthetic initial turn.
    */
-  initialTurn: AcceptedExecutionTurn;
+  initialTurn?: AcceptedExecutionTurn;
 };
 
 export type StartedSessionResult = Omit<SessionRegistrationResult, 'initialTurn'> & {
@@ -162,8 +163,8 @@ type SessionCreationLedgerHooks = {
   onFailure: (stage: SessionLedgerFailureStage, outcomeCode: string) => Promise<void>;
   /** The DO RPC threw; the commit outcome is unknown. */
   onTransportFailure: () => Promise<void>;
-  /** The DO confirmed registration and initial message admission. */
-  onSuccess: (result: StartedSessionResult) => Promise<void>;
+  /** The DO confirmed registration (and initial admission when one exists). */
+  onSuccess: (result: { cloudAgentSessionId: string; kiloSessionId: string }) => Promise<void>;
 };
 
 /** Result returned to the prepare handler for ledger-guarded creates. */
@@ -407,7 +408,7 @@ async function allocateNewSession(
   ledger?: SessionCreationLedgerHooks
 ): Promise<NewSessionAllocation> {
   const sessionService = new SessionService();
-  const initialTurn = acceptInitialTurn(input.initialTurn);
+  const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const cloudAgentSessionId = generateSessionId();
   const kiloSessionId = generateKiloSessionId();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
@@ -420,18 +421,22 @@ async function allocateNewSession(
       // the admitted row so the client gets a terminal result. The immutable
       // create-intent fingerprint is recorded with the same write so a same-key
       // retry can reject a changed intent before any replay or reconciliation.
+      // A clone-only create has no initial turn, so no initialMessageId is
+      // recorded.
       await recordOperationProgress(ledger.db, ledger.rowId, {
         cloudAgentSessionId,
         kiloSessionId,
-        initialMessageId: initialTurn.messageId,
+        ...(initialTurn ? { initialMessageId: initialTurn.messageId } : {}),
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       });
     }
 
-    await createCloudAgentSessionReport(
-      { cloudAgentSessionId, kiloSessionId, initialMessageId: initialTurn.messageId },
-      ctx.env
-    );
+    if (initialTurn) {
+      await createCloudAgentSessionReport(
+        { cloudAgentSessionId, kiloSessionId, initialMessageId: initialTurn.messageId },
+        ctx.env
+      );
+    }
   } catch (error) {
     rethrowAllocationFailure(ledger, 'report', error);
   }
@@ -620,10 +625,11 @@ async function allocateNewSession(
 /**
  * Rebuilds a clone allocation from the ledger progress recorded by the
  * original create, so a same-key retry can resume the stored destination IDs
- * instead of allocating fresh ones. The initial turn keeps the stored
- * `initialMessageId` (the retry's own message id is never used) with the turn
- * content from `input.initialTurn`, which the intent fingerprint already
- * proved unchanged.
+ * instead of allocating fresh ones. When the create carried an initial turn it
+ * keeps the stored `initialMessageId` (the retry's own message id is never
+ * used) with the turn content from `input.initialTurn`, which the intent
+ * fingerprint already proved unchanged. A clone-only create recorded no
+ * `initialMessageId` and rebuilds no initial turn.
  */
 function rebuildCloneAllocation(
   input: SessionRegistrationInput,
@@ -643,8 +649,6 @@ function rebuildCloneAllocation(
     cloudAgentSessionId.length === 0 ||
     typeof kiloSessionId !== 'string' ||
     kiloSessionId.length === 0 ||
-    typeof initialMessageId !== 'string' ||
-    initialMessageId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
     typeof sandboxProvider !== 'string' ||
@@ -666,8 +670,15 @@ function rebuildCloneAllocation(
     route = sandboxRoute as SharedSandboxRouteMetadata;
   }
 
-  const accepted = acceptInitialTurn(input.initialTurn);
-  const initialTurn: AcceptedExecutionTurn = { ...accepted, messageId: initialMessageId };
+  let initialTurn: AcceptedExecutionTurn | undefined;
+  if (input.initialTurn !== undefined) {
+    if (typeof initialMessageId !== 'string' || initialMessageId.length === 0) {
+      throw creationInProgressError();
+    }
+    const accepted = acceptInitialTurn(input.initialTurn);
+    initialTurn = { ...accepted, messageId: initialMessageId };
+  }
+
   const sessionService = new SessionService();
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
@@ -721,10 +732,14 @@ function buildSessionRegistrationCommand(
       kilocodeToken: ctx.authToken,
     },
     clone: input.clone,
-    message: {
-      initialMessageId: allocation.initialTurn.messageId,
-      turn: executionTurnSubmissionFromAcceptedTurn(allocation.initialTurn),
-    },
+    ...(allocation.initialTurn
+      ? {
+          message: {
+            initialMessageId: allocation.initialTurn.messageId,
+            turn: executionTurnSubmissionFromAcceptedTurn(allocation.initialTurn),
+          },
+        }
+      : {}),
     agent: {
       ...input.agent,
       appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt,
@@ -815,6 +830,12 @@ async function registerAndAdmitInitialTurn(
   allocation: NewSessionAllocation,
   ledger: SessionCreationLedgerHooks | undefined
 ): Promise<StartedSessionResult> {
+  const initialTurn = allocation.initialTurn;
+  if (initialTurn === undefined) {
+    // The admission path is only reachable for creates that carry an initial
+    // turn; clone-only creates register through `registerAllocatedSession`.
+    throw new Error('registerAndAdmitInitialTurn requires an initial turn');
+  }
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
     `${ctx.userId}:${allocation.cloudAgentSessionId}`
   );
@@ -828,7 +849,7 @@ async function registerAndAdmitInitialTurn(
       stub =>
         stub.createSessionWithInitialAdmission({
           ...buildSessionRegistrationCommand(input, ctx, allocation, options),
-          message: { initialTurn: allocation.initialTurn },
+          message: { initialTurn },
         }),
       'createSessionWithInitialAdmission'
     );
@@ -890,6 +911,107 @@ async function registerAndAdmitInitialTurn(
 }
 
 /**
+ * Allocates canonical IDs and external ownership for a create, translating a
+ * ledger allocation failure into the settled stage error. Shared by the
+ * admission path and the clone-only registration path.
+ */
+async function allocateSessionForCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options: { billingOrigin?: string } | undefined,
+  ledger: SessionCreationLedgerHooks | undefined
+): Promise<NewSessionAllocation> {
+  try {
+    return await allocateNewSession(input, ctx, options, ledger);
+  } catch (error) {
+    if (ledger && error instanceof SessionAllocationStageError) {
+      await ledger.onFailure(error.stage, error.stage);
+      throw error.cause;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Registers an already allocated session in its Durable Object without
+ * admitting an initial turn. Used by the clone-only create, which has no
+ * synthetic initial turn. Mirrors `registerNewSession` but threads the ledger
+ * hooks so the create effect settles exactly once.
+ */
+async function registerAllocatedSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options: { billingOrigin?: string } | undefined,
+  allocation: NewSessionAllocation,
+  ledger: SessionCreationLedgerHooks | undefined
+): Promise<{ cloudAgentSessionId: string; kiloSessionId: string }> {
+  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
+    `${ctx.userId}:${allocation.cloudAgentSessionId}`
+  );
+  let registerResult: Awaited<ReturnType<CloudAgentSession['registerSession']>>;
+  try {
+    registerResult = await withDORetry<
+      DurableObjectStub<CloudAgentSession>,
+      Awaited<ReturnType<CloudAgentSession['registerSession']>>
+    >(
+      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      stub =>
+        stub.registerSession(buildSessionRegistrationCommand(input, ctx, allocation, options)),
+      'registerSession'
+    );
+  } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
+    if (ledger) {
+      await ledger.onTransportFailure();
+    }
+    throw error;
+  }
+
+  if (!registerResult.success) {
+    const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        { cloudAgentSessionId: allocation.cloudAgentSessionId, failure },
+        ctx.env
+      )
+    );
+    await allocation.rollbackCliSession();
+    logger.withFields({ error: registerResult.error }).error('Failed to register session in DO');
+    if (ledger) {
+      if (input.clone?.cloneFromKiloSessionId) {
+        await recordCloneTombstone(ledger, {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          kiloSessionId: allocation.kiloSessionId,
+        });
+      }
+      await ledger.onFailure(failure.stage, failure.code);
+    }
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: registerResult.error ?? 'Failed to register session',
+    });
+  }
+
+  logger.info('Session registered for lazy preparation');
+  const result = {
+    cloudAgentSessionId: allocation.cloudAgentSessionId,
+    kiloSessionId: allocation.kiloSessionId,
+  };
+  if (ledger) {
+    await ledger.onSuccess(result);
+  }
+  return result;
+}
+
+/**
  * Create a new session and ask its Durable Object to register metadata and
  * durably admit the canonical initial turn.
  */
@@ -899,16 +1021,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  let allocation: NewSessionAllocation;
-  try {
-    allocation = await allocateNewSession(input, ctx, options, ledger);
-  } catch (error) {
-    if (ledger && error instanceof SessionAllocationStageError) {
-      await ledger.onFailure(error.stage, error.stage);
-      throw error.cause;
-    }
-    throw error;
-  }
+  const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
 
@@ -1031,18 +1144,20 @@ export async function sessionCreateIntentFingerprint(
   input: SessionRegistrationInput
 ): Promise<string> {
   const initialTurn =
-    input.initialTurn.type === 'prompt'
-      ? {
-          type: 'prompt' as const,
-          prompt: input.initialTurn.prompt,
-          attachments: input.initialTurn.attachments,
-        }
-      : {
-          type: 'command' as const,
-          command: input.initialTurn.command,
-          arguments: input.initialTurn.arguments,
-          attachments: input.initialTurn.attachments,
-        };
+    input.initialTurn === undefined
+      ? { type: 'none' as const }
+      : input.initialTurn.type === 'prompt'
+        ? {
+            type: 'prompt' as const,
+            prompt: input.initialTurn.prompt,
+            attachments: input.initialTurn.attachments,
+          }
+        : {
+            type: 'command' as const,
+            command: input.initialTurn.command,
+            arguments: input.initialTurn.arguments,
+            attachments: input.initialTurn.attachments,
+          };
   return sha256Hex(
     canonicalJson({
       initialTurn,
@@ -1240,7 +1355,16 @@ async function executeLedgerCreate(
   admissionKind: 'new' | 'takeover'
 ): Promise<LedgerSessionCreateResult> {
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, admissionKind);
-  const result = await startNewSession(input, ctx, { billingOrigin: options.billingOrigin }, hooks);
+  const billingOrigin = { billingOrigin: options.billingOrigin };
+  let result: { cloudAgentSessionId: string; kiloSessionId: string };
+  if (input.initialTurn === undefined) {
+    // Clone-only create: register the copied transcript without admitting a
+    // synthetic initial turn.
+    const allocation = await allocateSessionForCreate(input, ctx, billingOrigin, hooks);
+    result = await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks);
+  } else {
+    result = await startNewSession(input, ctx, billingOrigin, hooks);
+  }
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
@@ -1356,13 +1480,11 @@ async function resumeCloneCreate(
   // `ready` continues.
 
   const allocation = rebuildCloneAllocation(input, ctx, row);
-  const result = await registerAndAdmitInitialTurn(
-    input,
-    ctx,
-    { billingOrigin: options.billingOrigin },
-    allocation,
-    hooks
-  );
+  const billingOrigin = { billingOrigin: options.billingOrigin };
+  const result =
+    input.initialTurn === undefined
+      ? await registerAllocatedSession(input, ctx, billingOrigin, allocation, hooks)
+      : await registerAndAdmitInitialTurn(input, ctx, billingOrigin, allocation, hooks);
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,

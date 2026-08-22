@@ -163,6 +163,7 @@ function makeDb(limitResults: unknown[][]): WorkerDb {
 }
 
 type DoStubOverrides = {
+  registerSession?: ReturnType<typeof vi.fn>;
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getMessageResult?: ReturnType<typeof vi.fn>;
@@ -170,6 +171,7 @@ type DoStubOverrides = {
 
 function makeDoStub(overrides: DoStubOverrides = {}) {
   return {
+    registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission:
       overrides.createSessionWithInitialAdmission ??
       vi.fn().mockResolvedValue({
@@ -1838,6 +1840,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
   function cloneRequest(): SessionCreateRequest {
     return makeRequest({
+      initialTurn: undefined,
       clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
       options: { operationKey: OPERATION_KEY },
     });
@@ -1864,7 +1867,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ rowId: ROW_ID, status: 'completed', outcomeCode: 'ok' })
@@ -1894,7 +1897,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       })
     );
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
   });
 
@@ -1910,7 +1913,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(deleteCliSessionMock).toHaveBeenCalledWith(
       KILO_SESSION_ID,
       USER_ID,
@@ -1931,7 +1934,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('routes a thrown clone ingest outcome through reconcile-pending and rethrows the raw error', async () => {
@@ -1949,7 +1952,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       }),
       expect.any(Object)
     );
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('keeps onlyIfEmpty rollback and no clone forwarding for a non-clone create', async () => {
@@ -1990,17 +1993,15 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
     });
     const doStub = makeDoStub({
-      createSessionWithInitialAdmission: vi.fn().mockResolvedValue({
+      registerSession: vi.fn().mockResolvedValue({
         success: false,
-        code: 'BAD_REQUEST',
         error: 'registration rejected',
-        failureBoundary: 'registration',
-      } satisfies SessionMessageAdmissionResult),
+      }),
     });
     const ctx = makeContext(doStub);
 
     await expect(runCreate(ctx, cloneRequest())).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
+      code: 'INTERNAL_SERVER_ERROR',
       message: 'registration rejected',
     });
 
@@ -2024,6 +2025,31 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       sandboxProvider: 'cloudflare',
     });
   });
+
+  it('records a none initial-turn fingerprint and no initialMessageId for a clone-only create', async () => {
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await runCreate(ctx, cloneRequest());
+
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(1, expect.any(Object), ROW_ID, {
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      createIntentFingerprint: await sessionCreateIntentFingerprint(cloneRequest()),
+    });
+    // A clone-only create has no synthetic initial turn, so no initialMessageId
+    // is recorded and the fingerprint differs from a prompt create.
+    expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty('initialMessageId');
+    expect(await sessionCreateIntentFingerprint(cloneRequest())).not.toBe(
+      await sessionCreateIntentFingerprint(
+        makeRequest({ options: { operationKey: OPERATION_KEY } })
+      )
+    );
+  });
 });
 
 describe('createSessionWithLedger clone reconciliation', () => {
@@ -2046,6 +2072,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
 
   function cloneRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
     return makeRequest({
+      initialTurn: undefined,
       clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
       options: { operationKey: OPERATION_KEY },
       ...overrides,
@@ -2053,16 +2080,17 @@ describe('createSessionWithLedger clone reconciliation', () => {
   }
 
   /** Reconcile-pending clone row whose progress holds the stored destination IDs. */
-  async function cloneRow(overrides: Record<string, unknown> = {}): Promise<OperationLedgerRow> {
+  async function cloneRow(
+    overrides: Record<string, unknown> = {},
+    request: SessionCreateRequest = cloneRequest()
+  ): Promise<OperationLedgerRow> {
     return makeLedgerRow({
       canonical_result: {
         cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
-        initialMessageId: INITIAL_MESSAGE_ID,
         sandboxId: 'sb-test-123',
         sandboxProvider: 'cloudflare',
-        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
-          await sessionCreateIntentFingerprint(cloneRequest()),
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
         ...overrides,
       },
     });
@@ -2095,7 +2123,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       expect.any(String),
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -2155,7 +2183,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       expect.any(String),
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -2234,7 +2262,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -2292,7 +2320,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         kiloSessionId: KILO_SESSION_ID,
       },
     });
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
 
     // Attempt 2: same-key retry sees the tombstone and allocates fresh IDs.
     const FRESH_CLOUD_ID = 'agent_fresh_11111111-1111-1111-1111-111111111111';
@@ -2327,7 +2355,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       cloudAgentSessionId: FRESH_CLOUD_ID,
       kiloSessionId: FRESH_KILO_ID,
@@ -2340,7 +2368,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
     });
     admitOperationMock.mockResolvedValueOnce({
       admission: 'takeover',
-      row: await cloneRow({ initialMessageId: STORED_MESSAGE_ID }),
+      row: await cloneRow({ initialMessageId: STORED_MESSAGE_ID }, request),
     });
     createCliSessionMock.mockResolvedValue({
       status: 'ready',
@@ -2373,18 +2401,20 @@ describe('createSessionWithLedger clone reconciliation', () => {
 describe('prepareInputToSessionCreateRequest clone mapping', () => {
   const SOURCE_SESSION_ID = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-  it('maps cloneFromKiloSessionId into the grouped clone object', () => {
+  it('maps cloneFromKiloSessionId into the grouped clone object and omits the initial turn', () => {
     const request = prepareInputToSessionCreateRequest({
-      prompt: 'Continue from the cloned session context.',
       mode: 'code',
       model: 'claude-3',
       githubRepo: 'acme/repo',
       shallow: false,
       devcontainer: false,
+      autoInitiate: true,
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       cloneFromKiloSessionId: SOURCE_SESSION_ID,
     });
 
     expect(request.clone).toEqual({ cloneFromKiloSessionId: SOURCE_SESSION_ID });
+    expect(request.initialTurn).toBeUndefined();
   });
 
   it('omits clone when cloneFromKiloSessionId is absent', () => {

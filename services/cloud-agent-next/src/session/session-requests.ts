@@ -47,7 +47,8 @@ export type SessionRuntimeIntent = {
 };
 
 export type SessionCreateRequest = {
-  initialTurn: ExecutionTurnSubmission;
+  /** Omitted for a clone-only create: the copied transcript is the session state. */
+  initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;
   repository: SessionRepositoryRequest;
   runtime?: SessionRuntimeIntent;

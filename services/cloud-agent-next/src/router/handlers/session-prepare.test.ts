@@ -340,7 +340,6 @@ describe('prepareSession operation-ledger admission gate', () => {
     const sourceKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 
     await caller.prepareSession({
-      prompt: 'Continue from the cloned session',
       mode: 'code',
       model: 'claude-3',
       githubRepo: 'acme/repo',
@@ -352,6 +351,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(1);
     expect(createSessionWithLedgerMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        initialTurn: undefined,
         clone: { cloneFromKiloSessionId: sourceKiloSessionId },
       }),
       expect.objectContaining({ userId: 'test-user-123' }),
@@ -367,7 +367,6 @@ describe('prepareSession operation-ledger admission gate', () => {
       replayed: true,
     });
     const retry = await caller.prepareSession({
-      prompt: 'Continue from the cloned session',
       mode: 'code',
       model: 'claude-3',
       githubRepo: 'acme/repo',

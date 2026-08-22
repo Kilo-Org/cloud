@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive chip: thumbnail, status overlays, retry/remove controls, viewer, and text preview share one strip component */
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +63,7 @@ function AttachmentChip({
   const insets = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const [textPreview, setTextPreview] = useState<{
     mode: 'markdown' | 'text';
     text: string;
@@ -134,6 +136,25 @@ function AttachmentChip({
   const accessibilityState =
     isUploading && attachment.progress === null ? { busy: true } : undefined;
 
+  const imageThumbnail = imageFailed ? (
+    <View className="h-full w-full items-center justify-center">
+      <AlertCircle size={20} color={colors.mutedForeground} />
+    </View>
+  ) : (
+    <Image
+      source={{ uri: attachment.localUri }}
+      className="h-full w-full"
+      contentFit="cover"
+      transition={0}
+      allowDownscaling
+      recyclingKey={attachment.id}
+      cachePolicy="memory"
+      onError={() => {
+        setImageFailed(true);
+      }}
+    />
+  );
+
   const bodyContent = (
     // Visual descendants are excluded from the accessibility tree so
     // the body stays the single announced element: the nested Texts,
@@ -145,15 +166,7 @@ function AttachmentChip({
       importantForAccessibility="no-hide-descendants"
     >
       {isImage ? (
-        <Image
-          source={{ uri: attachment.localUri }}
-          className="h-full w-full"
-          contentFit="cover"
-          transition={0}
-          allowDownscaling
-          recyclingKey={attachment.id}
-          cachePolicy="memory"
-        />
+        imageThumbnail
       ) : (
         <View
           className={cn(

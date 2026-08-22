@@ -27,7 +27,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 type RenderProps = {
+  canSend?: boolean;
+  hasSendableContent?: boolean;
   inputEditable: boolean;
+  isStreaming?: boolean;
 };
 
 function makeProps(overrides: Partial<RenderProps> = {}) {
@@ -35,6 +38,7 @@ function makeProps(overrides: Partial<RenderProps> = {}) {
     attachmentsEnabled: false,
     canSend: false,
     disabled: false,
+    hasSendableContent: false,
     inputAccessibilityDisabled: false,
     inputEditable: false,
     inputRef: { current: null },
@@ -63,6 +67,16 @@ function makeProps(overrides: Partial<RenderProps> = {}) {
 
 function findTextInput(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   return root.find(node => typeof node.type === 'string' && (node.type as string) === 'TextInput');
+}
+
+function findByAccessibilityLabel(
+  root: TestRenderer.ReactTestInstance,
+  label: string
+): TestRenderer.ReactTestInstance | null {
+  const matches = root.findAll(
+    node => typeof node.type === 'string' && node.props.accessibilityLabel === label
+  );
+  return matches[0] ?? null;
 }
 
 async function renderRow(props: RenderProps): Promise<TestRenderer.ReactTestRenderer> {
@@ -99,6 +113,34 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
       input.props.contextMenuHidden === undefined || input.props.contextMenuHidden === false
     ).toBe(true);
     expect(input.props.pointerEvents).not.toBe('none');
+
+    renderer.unmount();
+  });
+
+  it('shows the Send pressable (not Stop) while streaming with content and an in-flight upload', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      isStreaming: true,
+      canSend: false,
+      hasSendableContent: true,
+    });
+
+    expect(findByAccessibilityLabel(renderer.root, 'Send message')).not.toBeNull();
+    expect(findByAccessibilityLabel(renderer.root, 'Stop generating')).toBeNull();
+
+    renderer.unmount();
+  });
+
+  it('shows the Stop pressable while streaming with no content', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      isStreaming: true,
+      canSend: false,
+      hasSendableContent: false,
+    });
+
+    expect(findByAccessibilityLabel(renderer.root, 'Stop generating')).not.toBeNull();
+    expect(findByAccessibilityLabel(renderer.root, 'Send message')).toBeNull();
 
     renderer.unmount();
   });

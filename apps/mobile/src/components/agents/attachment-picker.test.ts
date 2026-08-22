@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
-import { pickAgentAttachments } from './attachment-picker';
+import { normalizeImageAsset, pickAgentAttachments } from './attachment-picker';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -69,6 +69,54 @@ async function pickWithSheetSelection(
   await Promise.resolve(registered?.(buttonIndex));
   return resultPromise;
 }
+
+describe('normalizeImageAsset', () => {
+  it('keeps the picker fileName when present', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        fileName: 'IMG_0001.HEIC',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('IMG_0001.HEIC');
+  });
+
+  it('treats a whitespace-only fileName as missing and synthesizes from the URI', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        fileName: '   ',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('image.heic');
+  });
+
+  it('synthesizes image.heic from the URI extension when fileName is missing', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('image.heic');
+  });
+
+  it('synthesizes image.jpeg from the MIME subtype for an extension-less URI', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/Camera/uuid',
+        mimeType: 'image/jpeg',
+      }).name
+    ).toBe('image.jpeg');
+  });
+
+  it('falls back to image.png when no signal carries the extension', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/Camera/uuid',
+      }).name
+    ).toBe('image.png');
+  });
+});
 
 describe('agent attachment picker', () => {
   it('opens a native action sheet that keeps all sources and the cancel action', () => {

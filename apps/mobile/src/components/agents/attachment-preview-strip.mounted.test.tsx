@@ -725,3 +725,66 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 });
+
+describe('AttachmentPreviewStrip — thumbnail decode fallback', () => {
+  it('shows the AlertCircle fallback while the upload spinner still renders', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        kind: 'image',
+        filename: 'photo.png',
+        status: 'uploading',
+        progress: null,
+      }),
+    ]);
+
+    const images = nodesByType(renderer.root, 'Image');
+    expect(images).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    const image = images[0];
+    if (!image) {
+      throw new Error('thumbnail Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    // The upload overlay is driven by status alone and stays unchanged.
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('shows the AlertCircle fallback with no spinner for an uploaded image', async () => {
+    const renderer = await mount([
+      makeAttachment({
+        kind: 'image',
+        filename: 'photo.png',
+        status: 'uploaded',
+        progress: 1,
+      }),
+    ]);
+
+    const images = nodesByType(renderer.root, 'Image');
+    expect(images).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+
+    const image = images[0];
+    if (!image) {
+      throw new Error('thumbnail Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});

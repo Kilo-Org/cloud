@@ -5,6 +5,7 @@ import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 
+import { AGENT_ATTACHMENT_EXTENSION_REGEX } from '@/lib/agent-attachments/constants';
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 import { writePickerLaunchContext } from '@/lib/agent-attachments/picker-launch-context';
@@ -23,14 +24,30 @@ export function normalizeImageAsset(asset: {
   mimeType?: string | null;
   fileSize?: number | null;
 }): AgentAttachmentCandidate {
-  // Image picker cannot return a filename with an arbitrary extension;
-  // synthesize one from the picker's MIME so `normalizeAttachmentExtension`
-  // can resolve a known key. The actual byte size is re-measured by the
-  // upload hook via `getInfoAsync`; `size` here is informational.
-  const fallbackName = `image.${(asset.mimeType ?? 'image/png').split('/')[1] ?? 'png'}`;
-  const name = asset.fileName ?? fallbackName;
+  // Keep the picker's filename when it is non-empty after trimming.
+  const fileName = asset.fileName?.trim();
+  if (fileName) {
+    return {
+      name: fileName,
+      uri: asset.uri,
+      mimeType: asset.mimeType ?? undefined,
+      size: asset.fileSize ?? undefined,
+    };
+  }
+
+  // The image picker can omit the filename — camera HEIC assets report
+  // `application/octet-stream` with no name. Synthesize `image.<ext>` from
+  // the URI extension, then the MIME subtype, then fall back to `image.png`.
+  // The upload hook re-measures size via `getInfoAsync`; `size` here is
+  // informational.
+  const uriExtension = asset.uri.split('.').pop()?.toLowerCase();
+  const mimeSubtype = asset.mimeType?.split('/')[1]?.toLowerCase();
+  const extension =
+    (uriExtension && AGENT_ATTACHMENT_EXTENSION_REGEX.test(uriExtension) ? uriExtension : null) ??
+    (mimeSubtype && AGENT_ATTACHMENT_EXTENSION_REGEX.test(mimeSubtype) ? mimeSubtype : null) ??
+    'png';
   return {
-    name,
+    name: `image.${extension}`,
     uri: asset.uri,
     mimeType: asset.mimeType ?? undefined,
     size: asset.fileSize ?? undefined,

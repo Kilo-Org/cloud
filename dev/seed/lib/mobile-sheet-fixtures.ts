@@ -60,10 +60,9 @@ export type FixtureTokens = {
   cache: { read: number; write: number };
 };
 
-export type SessionIngestItem = {
-  type: 'session' | 'message' | 'part';
-  data: Record<string, unknown>;
-};
+export type SessionIngestItem =
+  | { type: 'session' | 'message' | 'part'; data: Record<string, unknown> }
+  | { type: 'session_diff'; data: Array<Record<string, unknown>> };
 
 export type SessionIngestServiceStatus = {
   name: string;
@@ -283,6 +282,10 @@ export function buildRootIngestItems(): SessionIngestItem[] {
       filename: ROOT_FILE_NAME,
       url: ROOT_FILE_URL,
     }),
+    {
+      type: 'session_diff',
+      data: [{ file: 'direct-fixture.txt', additions: 1, deletions: 0 }],
+    },
   ];
 }
 

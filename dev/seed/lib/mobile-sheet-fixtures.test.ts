@@ -38,7 +38,7 @@ function singleItemOfType(items: SessionIngestItem[], type: string): SessionInge
   return found[0];
 }
 
-function parseSessionData(data: Record<string, unknown>) {
+function parseSessionData(data: SessionIngestItem['data']) {
   const parsed = kiloSdkSessionInfoSchema.safeParse(data);
   if (!parsed.success) {
     assert.fail(`session item failed schema validation: ${JSON.stringify(parsed.error.issues)}`);
@@ -46,7 +46,7 @@ function parseSessionData(data: Record<string, unknown>) {
   return parsed.data;
 }
 
-function parseMessageData(data: Record<string, unknown>) {
+function parseMessageData(data: SessionIngestItem['data']) {
   const parsed = kiloSdkMessageSchema.safeParse(data);
   if (!parsed.success) {
     assert.fail(`message item failed schema validation: ${JSON.stringify(parsed.error.issues)}`);
@@ -54,7 +54,7 @@ function parseMessageData(data: Record<string, unknown>) {
   return parsed.data;
 }
 
-function parsePartData(data: Record<string, unknown>) {
+function parsePartData(data: SessionIngestItem['data']) {
   const parsed = kiloSdkPartSchema.safeParse(data);
   if (!parsed.success) {
     assert.fail(`part item failed schema validation: ${JSON.stringify(parsed.error.issues)}`);
@@ -72,7 +72,7 @@ void test('cleanup scope is exactly the two fixture session IDs', () => {
 
 void test('root fixture items match the session-ingest schemas', () => {
   const items = buildRootIngestItems();
-  assert.equal(items.length, 6);
+  assert.equal(items.length, 7);
 
   const session = parseSessionData(singleItemOfType(items, 'session').data);
   assert.equal(session.id, ROOT_SESSION_ID);
@@ -151,6 +151,11 @@ void test('root fixture items match the session-ingest schemas', () => {
     assert.equal(filePart.filename, 'fixture-notes.txt');
     assert.equal(filePart.url, 'data:text/plain;base64,Zml4dHVyZSBub3RlcyBjb250ZW50');
   }
+
+  const sessionDiff = singleItemOfType(items, 'session_diff');
+  assert.equal(sessionDiff.type, 'session_diff');
+  assert.ok(Array.isArray(sessionDiff.data));
+  assert.deepEqual(sessionDiff.data, [{ file: 'direct-fixture.txt', additions: 1, deletions: 0 }]);
 });
 
 void test('child fixture items match the session-ingest schemas', () => {

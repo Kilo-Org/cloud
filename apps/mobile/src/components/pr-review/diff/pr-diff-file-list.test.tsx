@@ -130,7 +130,7 @@ function bottomPaddedViews(
   return renderer.root.findAll(
     node =>
       typeof node.type === 'string' &&
-      node.type === 'View' &&
+      (node.type as string) === 'View' &&
       node.props.style != null &&
       typeof node.props.style === 'object' &&
       'paddingBottom' in (node.props.style as Record<string, unknown>)

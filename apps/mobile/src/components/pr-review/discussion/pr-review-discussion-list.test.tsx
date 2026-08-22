@@ -69,7 +69,7 @@ function mountList(overrides: Partial<typeof BASE_PROPS> = {}): TestRenderer.Rea
 
 function footerView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const views = renderer.root.findAll(
-    node => typeof node.type === 'string' && node.type === 'View'
+    node => typeof node.type === 'string' && (node.type as string) === 'View'
   );
   const footer = views[0];
   if (!footer) {

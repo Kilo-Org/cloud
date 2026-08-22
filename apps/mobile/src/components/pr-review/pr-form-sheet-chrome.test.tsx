@@ -34,7 +34,7 @@ function mountFooter(): TestRenderer.ReactTestRenderer {
 
 function footerPaddingBottom(renderer: TestRenderer.ReactTestRenderer): number | undefined {
   const views = renderer.root.findAll(
-    node => typeof node.type === 'string' && node.type === 'View'
+    node => typeof node.type === 'string' && (node.type as string) === 'View'
   );
   const footer = views[0];
   if (!footer) {

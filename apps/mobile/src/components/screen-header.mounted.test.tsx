@@ -37,7 +37,7 @@ type TestInstance = TestRenderer.ReactTestInstance;
 function isBackPressable(node: TestInstance): boolean {
   return (
     typeof node.type === 'string' &&
-    node.type === 'Pressable' &&
+    (node.type as string) === 'Pressable' &&
     (node.props.accessibilityLabel === 'Go back' || node.props.accessibilityLabel === 'Close')
   );
 }
@@ -59,7 +59,7 @@ function findTitlePressable(root: TestInstance): TestInstance {
   const nodes = root.findAll(
     node =>
       typeof node.type === 'string' &&
-      node.type === 'Pressable' &&
+      (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
   );
@@ -143,7 +143,9 @@ describe('ScreenHeader mounted', () => {
       expect(hitSlop.top).toBeGreaterThanOrEqual(13);
       expect(hitSlop.bottom).toBeGreaterThanOrEqual(13);
 
-      const texts = title.findAll(node => typeof node.type === 'string' && node.type === 'Text');
+      const texts = title.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Text'
+      );
       const text = texts[0];
       if (!text) {
         throw new Error('title text not found');
@@ -213,7 +215,7 @@ describe('ScreenHeader mounted', () => {
     const closeIcon = findIcon(back, 'ChevronDown');
     expect(closeIcon.props.size).toBe(24);
     expect(
-      back.findAll(node => typeof node.type === 'string' && node.type === 'ChevronLeft')
+      back.findAll(node => typeof node.type === 'string' && (node.type as string) === 'ChevronLeft')
     ).toHaveLength(0);
   });
 

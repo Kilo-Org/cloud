@@ -40,7 +40,7 @@ function mountNode(node: React.ReactElement): TestRenderer.ReactTestRenderer {
 
 function rootView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const views = renderer.root.findAll(
-    node => typeof node.type === 'string' && node.type === 'View'
+    node => typeof node.type === 'string' && (node.type as string) === 'View'
   );
   const root = views[0];
   if (!root) {

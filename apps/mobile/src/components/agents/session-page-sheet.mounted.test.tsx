@@ -32,15 +32,13 @@ vi.mock('@/components/sheet-header', () => ({
 function sheetElement(
   props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
 ): ReactElement {
-  return createElement(
-    SessionPageSheet,
-    {
-      visible: true,
-      onClose: props.onClose ?? vi.fn<() => void>(),
-      onDismiss: props.onDismiss,
-    },
-    props.children ?? null
-  );
+  return createElement(SessionPageSheet, {
+    visible: true,
+    onClose: props.onClose ?? vi.fn<() => void>(),
+    onDismiss: props.onDismiss,
+    // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
+    children: props.children ?? null,
+  });
 }
 
 async function mountSheet(
@@ -165,6 +163,9 @@ describe('SessionPageSheet mounted', () => {
     const renderer = await mountSheet({ onClose });
 
     const scrim = findByTestID(renderer.root, 'session-page-sheet-scrim')[0];
+    if (!scrim) {
+      throw new Error('scrim not found');
+    }
     await act(async () => {
       await Promise.resolve();
       press(scrim, 'onPress');
@@ -201,9 +202,13 @@ describe('SessionPageSheet mounted', () => {
     });
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
-    expect(surface?.children[0]?.type).toBe('SheetHeader');
+    const firstChild = surface?.children[0];
+    expect(typeof firstChild === 'object' ? firstChild.type : undefined).toBe('SheetHeader');
 
     const header = findByType(renderer.root, 'SheetHeader')[0];
+    if (!header) {
+      throw new Error('header not found');
+    }
     await act(async () => {
       await Promise.resolve();
       press(header, 'onDone');

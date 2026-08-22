@@ -32,6 +32,12 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: useQueryMock,
 }));
 
+// This suite covers route-param parsing only; the foreground refresh hook
+// needs a real QueryClient, which the react-query mock above does not provide.
+vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
+  useRouteForegroundRefresh: vi.fn(),
+}));
+
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     cliSessionsV2: {

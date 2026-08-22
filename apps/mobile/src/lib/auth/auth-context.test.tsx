@@ -53,6 +53,7 @@ const hoisted = vi.hoisted(() => {
     setUser: vi.fn().mockImplementation(() => {
       callOrder.push('Sentry.setUser');
     }),
+    setTag: vi.fn(),
   };
 
   // Hoisted so the foreground tests can capture AppState listeners from the
@@ -105,6 +106,7 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@sentry/react-native', () => ({
   setUser: hoisted.sentry.setUser,
+  setTag: hoisted.sentry.setTag,
 }));
 
 vi.mock('@/lib/analytics/posthog', () => ({

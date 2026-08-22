@@ -40,7 +40,9 @@ export function createSecureStorePreference<T>(options: {
       // Keep the default on read failure — this runs on mount, before the
       // user has done anything, so there's nothing actionable to tell them.
       // Just log so we can see failure rates.
-      Sentry.captureException(error);
+      Sentry.captureException(error, {
+        tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
+      });
     } finally {
       hasLoaded = true;
       emit();

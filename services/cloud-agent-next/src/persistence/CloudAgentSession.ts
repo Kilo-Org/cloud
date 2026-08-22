@@ -232,7 +232,9 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
 type GroupedRegisterSessionInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
-  message: {
+  clone?: SessionMetadata['clone'];
+  /** Omitted for a clone-only create: no synthetic initial turn is registered. */
+  message?: {
     initialMessageId?: string;
     turn: ExecutionTurnSubmission;
   };
@@ -2191,34 +2193,41 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       };
     }
 
+    const initialMessage: SessionMetadata['initialMessage'] = input.message
+      ? {
+          id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,
+          prompt:
+            input.message.turn.type === 'prompt'
+              ? input.message.turn.prompt
+              : input.message.turn.arguments.length > 0
+                ? `/${input.message.turn.command} ${input.message.turn.arguments}`
+                : `/${input.message.turn.command}`,
+          attachments:
+            input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
+          turn:
+            input.message.turn.type === 'prompt'
+              ? {
+                  type: 'prompt',
+                  prompt: input.message.turn.prompt,
+                  attachments: input.message.turn.attachments,
+                }
+              : {
+                  type: 'command',
+                  command: input.message.turn.command,
+                  arguments: input.message.turn.arguments,
+                },
+        }
+      : undefined;
+
     const metadata: SessionMetadata = {
       metadataSchemaVersion: 2,
       identity: input.identity,
       auth: input.auth,
+      // Metadata without clone remains an empty-session bootstrap; remove
+      // this fallback only after old prepared sessions age out.
+      clone: input.clone,
       repository,
-      initialMessage: {
-        id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,
-        prompt:
-          input.message.turn.type === 'prompt'
-            ? input.message.turn.prompt
-            : input.message.turn.arguments.length > 0
-              ? `/${input.message.turn.command} ${input.message.turn.arguments}`
-              : `/${input.message.turn.command}`,
-        attachments:
-          input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
-        turn:
-          input.message.turn.type === 'prompt'
-            ? {
-                type: 'prompt',
-                prompt: input.message.turn.prompt,
-                attachments: input.message.turn.attachments,
-              }
-            : {
-                type: 'command',
-                command: input.message.turn.command,
-                arguments: input.message.turn.arguments,
-              },
-      },
+      ...(initialMessage ? { initialMessage } : {}),
       agent: {
         mode: input.agent.mode,
         model: input.agent.model,

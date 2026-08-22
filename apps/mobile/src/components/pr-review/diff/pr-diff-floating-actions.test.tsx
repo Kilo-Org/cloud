@@ -12,13 +12,14 @@
 // make the "0 pending" case below FAIL.
 
 import * as React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrDiffFloatingActions } from './pr-diff-floating-actions';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 import { type SelectionState } from '@/lib/pr-review/diff-selection';
 
 const routerPush = vi.fn();
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -27,6 +28,10 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insets,
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -220,5 +225,63 @@ describe('PrDiffFloatingActions submit reachability (P1-F-46b)', () => {
       pathname: '/(app)/pr-review/[owner]/[repo]/[number]/review-submit',
       params: { owner: 'octocat', repo: 'hello', number: 7 },
     });
+  });
+});
+
+describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
+  beforeEach(() => {
+    insets.bottom = 0;
+  });
+
+  function findRootBar(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrDiffFloatingActions(baseProps);
+    return findElement({
+      node: element,
+      type: 'View',
+      prop: 'pointerEvents',
+      value: 'box-none',
+    });
+  }
+
+  function rootPaddingBottom(): number | undefined {
+    const root = findRootBar();
+    if (!root) {
+      throw new Error('floating action bar root not found');
+    }
+    return (root.props as { style?: { paddingBottom?: number } }).style?.paddingBottom;
+  }
+
+  it('pads the bar by 24 points at a zero inset', () => {
+    expect(rootPaddingBottom()).toBe(24);
+  });
+
+  it('adds the system inset to the 24-point base padding', () => {
+    insets.bottom = 34;
+    expect(rootPaddingBottom()).toBe(58);
+  });
+
+  it('reports the measured layout height through onHeightChange', () => {
+    const onHeightChange = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap
+    const element = PrDiffFloatingActions({ ...baseProps, onHeightChange });
+    const root = findElement({
+      node: element,
+      type: 'View',
+      prop: 'pointerEvents',
+      value: 'box-none',
+    });
+    if (!root) {
+      throw new Error('floating action bar root not found');
+    }
+    const onLayout = (
+      root.props as {
+        onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
+      }
+    ).onLayout;
+    onLayout?.({ nativeEvent: { layout: { height: 150 } } });
+
+    expect(onHeightChange).toHaveBeenCalledTimes(1);
+    expect(onHeightChange).toHaveBeenCalledWith(150);
   });
 });

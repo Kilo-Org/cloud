@@ -1456,6 +1456,115 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     );
   });
 
+  it('throws when a required snapshot restore returns 404', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.workspace.requireSnapshot = true;
+    request.materialized.setupCommands = [];
+
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return { stdout: '', stderr: '', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: false,
+          error: 'snapshot not found (404)',
+          code: 404,
+          step: 'download',
+        }),
+      })
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'kilo_import_failed',
+      retryable: true,
+      message: 'Session snapshot required but not found',
+    });
+  });
+
+  it('returns the restore telemetry when a required snapshot restore succeeds', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.workspace.requireSnapshot = true;
+    request.materialized.setupCommands = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+            recursive: true,
+          });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      }),
+    });
+
+    expect(result.restore).toEqual({
+      path: 'cold',
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+  });
+
+  it('falls back to an empty import when a non-required snapshot restore returns 404', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    request.materialized.setupCommands = [];
+    const restoreCalls: Array<{ filePath?: string }> = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+            recursive: true,
+          });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async (_kiloSessionId, _workspacePath, filePath) => {
+        restoreCalls.push({ filePath });
+        if (filePath === undefined) {
+          return {
+            ok: false,
+            error: 'snapshot not found (404)',
+            code: 404,
+            step: 'download',
+          };
+        }
+        return {
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        };
+      },
+    });
+
+    expect(restoreCalls).toHaveLength(2);
+    expect(restoreCalls[0].filePath).toBeUndefined();
+    expect(restoreCalls[1].filePath).toContain('/tmp/kilo-empty-session-kilo_sess_1.json');
+    expect(result.restore).toEqual({ path: 'cold' });
+  });
+
   it('reclones unfinished workspaces that have no bootstrap marker', async () => {
     const request = makeRequest(tmpDir);
     await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });

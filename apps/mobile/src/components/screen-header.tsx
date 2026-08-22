@@ -75,7 +75,7 @@ export function ScreenHeader({
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
-        hitSlop={13}
+        hitSlop={{ top: 13, right: 13, bottom: 13, left: 0 }}
         accessibilityRole="button"
         accessibilityLabel={
           onTitlePressAccessibilityLabel ?? (title ? `Open menu for ${title}` : 'Open menu')
@@ -102,10 +102,9 @@ export function ScreenHeader({
                   router.back();
                 }
               }}
-              hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
-              className="-ml-1 mr-1 shrink-0 active:opacity-70"
+              className="-ml-4 h-11 w-11 shrink-0 items-center justify-center active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />

@@ -122,6 +122,8 @@ type ApplyMetadataDbOptions = {
   scopeRootMissing?: boolean;
   /** Title stored on the row before applyMetadataChanges runs. Defaults to the creation placeholder (NULL). */
   initialTitle?: string | null;
+  /** git_url stored on the row before applyMetadataChanges runs. Defaults to NULL. */
+  initialGitUrl?: string | null;
 };
 
 /**
@@ -156,6 +158,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       parentSessionId: options.parentSessionId ?? null,
       cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
+      gitUrl: options.initialGitUrl ?? null,
     };
   }
 
@@ -167,7 +170,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       title: 'T',
       created_on_platform: 'cli',
       organization_id: null,
-      git_url: null,
+      git_url: options.initialGitUrl ?? null,
       git_branch: null,
       parent_session_id: null,
       status: options.initialStatus ?? 'idle',
@@ -829,6 +832,105 @@ describe('applyMetadataChanges', () => {
       expect.objectContaining({ type: 'session.updated' }),
       undefined
     );
+  });
+
+  describe('Cloud Agent git_url immutability', () => {
+    it('heals a null Cloud Agent git_url to the normalized input', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: null,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/acme/repo.git']])
+      );
+
+      expect(db.updateSets).toEqual([
+        expect.objectContaining({ git_url: 'https://github.com/acme/repo' }),
+      ]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
+
+    it('ignores an identical Cloud Agent git_url rewrite', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: 'https://github.com/acme/repo',
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/acme/repo.git']])
+      );
+
+      expect(db.updateSets).toEqual([]);
+      expect(db.applyUpdate).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('rejects a clear of an existing Cloud Agent git_url', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: 'https://github.com/acme/repo',
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitUrl', null]]));
+
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('rejects a different Cloud Agent git_url', async () => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        initialGitUrl: 'https://github.com/acme/repo',
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/other/repo']])
+      );
+
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('keeps non-Cloud-Agent git_url writes unchanged', async () => {
+      const db = createApplyMetadataDb();
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['gitUrl', 'https://github.com/acme/repo.git']])
+      );
+
+      expect(db.updateSets).toEqual([
+        expect.objectContaining({ git_url: 'https://github.com/acme/repo' }),
+      ]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    });
   });
 });
 

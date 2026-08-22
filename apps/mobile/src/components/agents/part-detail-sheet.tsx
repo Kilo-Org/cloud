@@ -1,6 +1,6 @@
 import { type Part } from '@kilocode/cloud-agent-sdk';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetHeader } from '@/components/sheet-header';
@@ -10,6 +10,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollSheetProvider } from './mono-scroll-block';
+import { SessionPageSheet } from './session-page-sheet';
 import { getPartDetailTitle, shouldAutoFollowPartDetail } from './part-detail-model';
 import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
 import { ToolPartDetailBody } from './tool-part-detail-body';
@@ -90,49 +91,43 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   });
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={part ? getPartDetailTitle(part) : 'Details'}
-          onDone={onClose}
-          doneLabel="Done"
-        />
+    <SessionPageSheet visible={visible} onClose={onClose}>
+      <SheetHeader
+        title={part ? getPartDetailTitle(part) : 'Details'}
+        onDone={onClose}
+        doneLabel="Done"
+      />
 
-        {monoCount > 0 ? (
-          <View className="px-4 pb-2 pt-3">
-            <SegmentedControl<MonoScrollTextMode>
-              accessibilityLabel="Text display"
-              options={MONO_SCROLL_TEXT_MODE_OPTIONS}
-              value={textMode}
-              onChange={setTextMode}
-            />
-          </View>
-        ) : null}
+      {monoCount > 0 ? (
+        <View className="px-4 pb-2 pt-3">
+          <SegmentedControl<MonoScrollTextMode>
+            accessibilityLabel="Text display"
+            options={MONO_SCROLL_TEXT_MODE_OPTIONS}
+            value={textMode}
+            onChange={setTextMode}
+          />
+        </View>
+      ) : null}
 
-        <ScrollView
-          ref={autoFollow.scrollRef}
-          contentContainerClassName="gap-2 px-4 pb-6 pt-3"
-          onScroll={autoFollow.handleScroll}
-          onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
-          onScrollEndDrag={autoFollow.handleScrollEndDrag}
-          onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
-          onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
-          onContentSizeChange={autoFollow.handleContentSizeChange}
-          onLayout={autoFollow.handleLayout}
-          scrollEventThrottle={16}
-        >
-          <MonoScrollSheetProvider value={sheetContext}>
-            {renderPartContent(part)}
-          </MonoScrollSheetProvider>
-        </ScrollView>
+      <ScrollView
+        ref={autoFollow.scrollRef}
+        className="flex-1"
+        contentContainerClassName="gap-2 px-4 pb-6 pt-3"
+        onScroll={autoFollow.handleScroll}
+        onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
+        onScrollEndDrag={autoFollow.handleScrollEndDrag}
+        onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
+        onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
+        onContentSizeChange={autoFollow.handleContentSizeChange}
+        onLayout={autoFollow.handleLayout}
+        scrollEventThrottle={16}
+      >
+        <MonoScrollSheetProvider value={sheetContext}>
+          {renderPartContent(part)}
+        </MonoScrollSheetProvider>
+      </ScrollView>
 
-        <View style={{ height: insets.bottom }} className="bg-background" />
-      </View>
-    </Modal>
+      <View style={{ height: insets.bottom }} className="bg-background" />
+    </SessionPageSheet>
   );
 }

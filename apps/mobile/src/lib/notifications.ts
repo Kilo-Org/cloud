@@ -125,7 +125,13 @@ async function createAndroidNotificationChannels(): Promise<void> {
             : Notifications.AndroidImportance.DEFAULT,
       });
     } catch (error) {
-      Sentry.captureException(error);
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'create_android_channel',
+          'notification.channel': channel.id,
+        },
+      });
     }
   }
 }

@@ -17,6 +17,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate: vi.fn() }),
@@ -32,7 +34,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
@@ -168,6 +170,18 @@ describe('MessageDetailsSheet mounted', () => {
 
     expect(findByTestID(renderer.root, 'message-details-copy')).toHaveLength(1);
     expect(findByTestID(renderer.root, 'message-details-select-text')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('sizes the details ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await mountSheet(storedMessage(userInfo(), [textPart('hello world')]));
+
+    const scrollViews = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
+    );
+    expect(scrollViews).toHaveLength(1);
+    expect(scrollViews[0]?.props.className).toBe('flex-1');
 
     await unmount(renderer);
   });

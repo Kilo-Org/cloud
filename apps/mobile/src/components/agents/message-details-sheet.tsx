@@ -1,7 +1,7 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -14,6 +14,7 @@ import { formatExactTokens } from './context-usage-display';
 import { handleMessageDetailsCopy } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
+import { SessionPageSheet } from './session-page-sheet';
 import {
   buildReportAiResponseErrorToast,
   buildReportAiResponseInput,
@@ -99,11 +100,9 @@ export function MessageDetailsSheet({
   };
 
   return (
-    <Modal
+    <SessionPageSheet
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={
+      onClose={
         selectVisible
           ? () => {
               setSelectVisible(false);
@@ -119,11 +118,11 @@ export function MessageDetailsSheet({
           }}
         />
       ) : (
-        <View className="flex-1 bg-background">
+        <>
           <SheetHeader title="Message details" onDone={onClose} doneLabel="Done" />
 
           {content ? (
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+            <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
               {content.copyableText ? (
                 <View className="mb-6 gap-2">
                   <Pressable
@@ -211,9 +210,9 @@ export function MessageDetailsSheet({
           ) : null}
 
           <View style={{ height: insets.bottom }} className="bg-background" />
-        </View>
+        </>
       )}
-    </Modal>
+    </SessionPageSheet>
   );
 }
 

@@ -193,7 +193,7 @@ describe('effective organization model access', () => {
     ).toBe(false);
   });
 
-  it('lets all dominate selected and none within the organization ceiling', async () => {
+  it('lets group all grant the complete organization baseline', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({ groupPolicies: [[{ type: 'model_access', data: { mode: 'all' } }]] })
     );
@@ -224,14 +224,15 @@ describe('effective organization model access', () => {
     expect(decision).toMatchObject({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it('intersects provider-derived grants with the organization ceiling', async () => {
+  it('allows provider grants beyond the organization baseline', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
         groupPolicies: [
           [
             {
               type: 'model_access',
-              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['anthropic'] },
+              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['google'] },
             },
           ],
         ],
@@ -240,22 +241,103 @@ describe('effective organization model access', () => {
     const decision = await getEffectiveModelDecision(
       policy,
       'shared/model',
-      async () => new Set(['anthropic', 'openai'])
+      async () => new Set(['google', 'openai'])
     );
     expect(decision.allowed).toBe(true);
-    expect([...decision.eligibleProviderRoutes!]).toEqual(['anthropic']);
+    expect([...decision.eligibleProviderRoutes!]).toEqual(['google', 'openai']);
   });
 
-  it('denies models with no route inside the organization provider ceiling', async () => {
+  it('allows selected model grants beyond the organization baseline', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
-      context({ groupPolicies: [[{ type: 'model_access', data: { mode: 'all' } }]] })
+      context({
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['google/gemini'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
     );
     const decision = await getEffectiveModelDecision(
       policy,
       'google/gemini',
       async () => new Set(['google'])
     );
-    expect(decision).toEqual({ allowed: false, denialSource: 'organization_provider' });
+    expect(decision).toEqual({ allowed: true });
+  });
+
+  it('allows selected group models denied by the organization baseline', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+        groupPolicies: [
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['openai/o3'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/o3', currentSnapshotLookup)
+    ).resolves.toEqual({ allowed: true });
+    await expect(
+      getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)
+    ).resolves.toMatchObject({ allowed: true });
+  });
+
+  it('keeps organization restrictions as the baseline without an additive grant', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({ defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }] })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'google/gemini', async () => new Set(['google']))
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    await expect(
+      getEffectiveModelDecision(policy, 'openai/o3', currentSnapshotLookup)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+  });
+
+  it('combines group all baseline access with selected grants from another group', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
+        groupPolicies: [
+          [{ type: 'model_access', data: { mode: 'all' } }],
+          [
+            {
+              type: 'model_access',
+              data: {
+                mode: 'selected',
+                model_allow_list: ['google/gemini'],
+                provider_allow_list: [],
+              },
+            },
+          ],
+        ],
+      })
+    );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)
+    ).resolves.toMatchObject({ allowed: true });
+    await expect(
+      getEffectiveModelDecision(policy, 'google/gemini', async () => new Set(['google']))
+    ).resolves.toEqual({ allowed: true });
   });
 
   it('hides restricted exclusive models when every restricted provider is disabled', async () => {

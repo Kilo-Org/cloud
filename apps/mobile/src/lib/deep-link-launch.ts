@@ -94,7 +94,9 @@ function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
       await previous;
       await write();
     } catch (error) {
-      Sentry.captureException(error);
+      Sentry.captureException(error, {
+        tags: { 'error.subsystem': 'deep_link', 'error.operation': 'write_pending_link' },
+      });
     }
   })();
 }
@@ -235,7 +237,9 @@ async function readPersistedPendingDeepLink(): Promise<string | null> {
   try {
     return await getSecureStore().getItemAsync(PENDING_DEEP_LINK_KEY);
   } catch (error) {
-    Sentry.captureException(error);
+    Sentry.captureException(error, {
+      tags: { 'error.subsystem': 'deep_link', 'error.operation': 'read_pending_link' },
+    });
     return null;
   }
 }

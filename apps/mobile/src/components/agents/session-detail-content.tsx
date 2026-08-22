@@ -62,6 +62,7 @@ import {
   countInFlightMessages,
   resolveRetryPrompt,
   retryMessageAndClear,
+  runConnectRepository,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -126,6 +127,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { useContinueSession } from '@/components/agents/use-continue-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -201,6 +203,7 @@ export function SessionDetailContent({
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
+  const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
@@ -297,11 +300,20 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
-  const { continueSession, isContinuing } = useContinueSession({
+  const {
+    continueSession,
+    isContinuing,
+    guidance: continueGuidance,
+    clearGuidance,
+  } = useContinueSession({
+    sessionId,
     organizationId,
-    manager,
     models: modelOptions,
     modelsLoading: gatewayModelsLoading,
+  });
+  const { openGitHubIntegration } = useGitHubReposRefresh({
+    organizationId,
+    integrationInstalled: undefined,
   });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
@@ -825,6 +837,10 @@ export function SessionDetailContent({
     router.replace('/(app)/(tabs)/(2_agents)' as Href);
   }, [router]);
 
+  const handleConnectRepository = useCallback(() => {
+    runConnectRepository(openGitHubIntegration, clearGuidance);
+  }, [openGitHubIntegration, clearGuidance]);
+
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
@@ -1159,6 +1175,7 @@ export function SessionDetailContent({
             title={childSessionSheet.sheet.title}
             getChildMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+            sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
             hasOlderMessages={childHasOlderMessages}
             isLoadingOlderMessages={childIsLoadingOlderMessages}
@@ -1266,15 +1283,50 @@ export function SessionDetailContent({
             <Text className="text-center text-sm text-muted-foreground">
               This is a read-only session
             </Text>
-            <Button
-              variant="outline"
-              size="sm"
-              accessibilityLabel="Continue in a new session"
-              disabled={isContinuing}
-              onPress={handleContinueInNewSession}
-            >
-              <Text>Continue in a new session</Text>
-            </Button>
+            {continueGuidance?.kind === 'terminal' ? (
+              <>
+                <Text className="text-center text-sm text-muted-foreground">
+                  {continueGuidance.message}
+                </Text>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  accessibilityLabel={
+                    continueGuidance.action === 'connect-repository'
+                      ? 'Connect repository'
+                      : 'Back to sessions'
+                  }
+                  onPress={
+                    continueGuidance.action === 'connect-repository'
+                      ? handleConnectRepository
+                      : handleBackToSessions
+                  }
+                >
+                  <Text>
+                    {continueGuidance.action === 'connect-repository'
+                      ? 'Connect repository'
+                      : 'Back to sessions'}
+                  </Text>
+                </Button>
+              </>
+            ) : (
+              <>
+                {continueGuidance?.kind === 'retry' ? (
+                  <Text className="text-center text-sm text-muted-foreground">
+                    {continueGuidance.message}
+                  </Text>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  accessibilityLabel={isContinuing ? 'Cloning session' : 'Continue'}
+                  loading={isContinuing}
+                  onPress={handleContinueInNewSession}
+                >
+                  <Text>{isContinuing ? 'Cloning session' : 'Continue'}</Text>
+                </Button>
+              </>
+            )}
           </View>
         ) : null}
 

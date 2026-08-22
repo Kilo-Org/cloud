@@ -130,6 +130,30 @@ function writeIngestMetaNumber(
     .run();
 }
 
+type CloneMetaKey =
+  | 'cloneSourceSessionId'
+  | 'cloneDestinationSessionId'
+  | 'cloneNextCursor'
+  | 'cloneRollingDigest'
+  | 'cloneCopiedItemCount'
+  | 'cloneCompleteSourceId';
+
+function readCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey): string | null {
+  const row = db
+    .select({ value: ingestMeta.value })
+    .from(ingestMeta)
+    .where(eq(ingestMeta.key, key))
+    .get();
+  return row?.value ?? null;
+}
+
+function writeCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey, value: string): void {
+  db.insert(ingestMeta)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+    .run();
+}
+
 /**
  * Monotonic live-column write for cost and/or last_activity_at.
  * Per-column CASE guards so concurrent waitUntil tasks commute.
@@ -225,6 +249,122 @@ export function ingestOrderCursor(row: {
   id: number;
 }): IngestOrderCursor {
   return { ingestedAt: row.ingested_at, id: row.id };
+}
+
+export type CloneItemType = 'session' | 'message' | 'part' | 'session_diff';
+
+export const CLONE_ITEM_TYPES: CloneItemType[] = ['session', 'message', 'part', 'session_diff'];
+
+export type CloneBatchRow = {
+  itemId: string;
+  itemType: CloneItemType;
+  itemData: string;
+  itemDataR2Key: string | null;
+  ingestedAt: number | null;
+};
+
+export type ExportCloneBatchResult = {
+  rows: CloneBatchRow[];
+  nextCursor: IngestOrderCursor | null;
+  done: boolean;
+  digest: string;
+};
+
+export type StageCloneBatchParams = {
+  sourceSessionId: string;
+  destinationSessionId: string;
+  rows: CloneBatchRow[];
+  nextCursor: IngestOrderCursor | null;
+  rollingDigest: string;
+  copiedItemCount: number;
+};
+
+export type StageCloneBatchResult =
+  | {
+      status: 'staged';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      nextCursor: IngestOrderCursor | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    }
+  | { status: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+    };
+
+export type InspectCloneStageParams = {
+  sourceSessionId: string;
+  destinationSessionId: string;
+};
+
+export type InspectCloneStageResult =
+  | { status: 'empty' }
+  | { status: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      status: 'in_progress';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      nextCursor: IngestOrderCursor | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+      storedStage: 'complete' | 'in_progress';
+    };
+
+export type FinalizeCloneStageParams = {
+  sourceSessionId: string;
+  destinationSessionId: string;
+  finalDigest: string;
+  finalItemCount: number;
+};
+
+export type FinalizeCloneStageResult =
+  | { status: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
+    }
+  | {
+      status: 'digest_mismatch';
+      expectedDigest: string;
+      actualDigest: string;
+      expectedItemCount: number;
+      actualItemCount: number;
+    }
+  | { status: 'empty' };
+
+type CloneStageState =
+  | { kind: 'empty' }
+  | { kind: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      kind: 'in_progress';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      nextCursor: IngestOrderCursor | null;
+      rollingDigest: string;
+      copiedItemCount: number;
+    };
+
+async function sha256Hex(input: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  );
+  return Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
+  const joined = rows
+    .map(row => `${row.itemId}:${row.itemType}:${row.itemDataR2Key ?? row.itemData}`)
+    .join('\n');
+  return sha256Hex(joined);
 }
 
 export class SessionIngestDO extends DurableObject<Env> {
@@ -1019,25 +1159,287 @@ export class SessionIngestDO extends DurableObject<Env> {
   }
 
   async clear(): Promise<void> {
-    // Delete any R2-backed item blobs before wiping SQLite
+    await this.wipeStorage();
+    this.db
+      .insert(ingestMeta)
+      .values({ key: 'deleted', value: 'true' })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
+      .run();
+  }
+
+  /**
+   * Cancel the alarm, wipe SQLite, then delete the captured R2-backed item blobs.
+   * Shared by `clear()` and `resetCloneStage()`; `clear()` additionally marks the
+   * DO deleted.
+   */
+  private async wipeStorage(): Promise<void> {
+    // Capture the R2 keys first (synchronous SQLite). The SQLite wipe below must
+    // never be separated from this key read by an R2 await: an R2 await opens the
+    // Durable Object input gate, so a same-destination stageCloneBatch could commit
+    // rows and clone meta, then the reset would delete that commit.
     const r2Rows = this.db
       .select({ item_data_r2_key: ingestItems.item_data_r2_key })
       .from(ingestItems)
       .where(isNotNull(ingestItems.item_data_r2_key))
       .all();
     const r2Keys = r2Rows.map(r => r.item_data_r2_key).filter((k): k is string => k !== null);
-    if (r2Keys.length > 0) {
-      await this.env.SESSION_INGEST_R2.delete(r2Keys);
-    }
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     await migrate(this.db, migrations);
-    this.db
-      .insert(ingestMeta)
-      .values({ key: 'deleted', value: 'true' })
-      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
-      .run();
+
+    // Delete the captured R2 objects last, after the SQLite wipe is complete.
+    if (r2Keys.length > 0) {
+      await this.env.SESSION_INGEST_R2.delete(r2Keys);
+    }
+  }
+
+  /**
+   * Read the next bounded batch of clone-eligible ingest rows in (ingested_at, id)
+   * order after `cursor`. Returns the rows, the next cursor (null when done), a
+   * `done` flag, and a stable SHA-256 digest over the returned rows. R2 bodies are
+   * not read here; the digest covers the stored reference (item_data or r2 key).
+   */
+  async exportCloneBatch(
+    cursor: IngestOrderCursor | null,
+    limit: number
+  ): Promise<ExportCloneBatchResult> {
+    const rows = this.db
+      .select({
+        id: ingestItems.id,
+        item_id: ingestItems.item_id,
+        item_type: ingestItems.item_type,
+        item_data: ingestItems.item_data,
+        item_data_r2_key: ingestItems.item_data_r2_key,
+        ingested_at: ingestItems.ingested_at,
+      })
+      .from(ingestItems)
+      .where(
+        and(
+          inArray(ingestItems.item_type, CLONE_ITEM_TYPES),
+          cursor ? afterIngestOrderCursor(cursor) : undefined
+        )
+      )
+      .orderBy(ingestItems.ingested_at, ingestItems.id)
+      .limit(limit)
+      .all();
+
+    const batchRows: CloneBatchRow[] = rows.map(row => ({
+      itemId: row.item_id,
+      itemType: row.item_type as CloneItemType,
+      itemData: row.item_data,
+      itemDataR2Key: row.item_data_r2_key,
+      ingestedAt: row.ingested_at,
+    }));
+
+    const digest = await computeCloneBatchDigest(batchRows);
+    const done = rows.length < limit;
+    const nextCursor = done ? null : ingestOrderCursor(rows[rows.length - 1]);
+
+    return { rows: batchRows, nextCursor, done, digest };
+  }
+
+  private readCloneStage(): CloneStageState {
+    const completeSource = readCloneMeta(this.db, 'cloneCompleteSourceId');
+    if (completeSource !== null) {
+      return {
+        kind: 'complete',
+        sourceSessionId: completeSource,
+        destinationSessionId: readCloneMeta(this.db, 'cloneDestinationSessionId') ?? '',
+      };
+    }
+
+    const source = readCloneMeta(this.db, 'cloneSourceSessionId');
+    const destination = readCloneMeta(this.db, 'cloneDestinationSessionId');
+    if (source !== null && destination !== null) {
+      const nextCursorRaw = readCloneMeta(this.db, 'cloneNextCursor');
+      let nextCursor: IngestOrderCursor | null = null;
+      if (nextCursorRaw !== null) {
+        try {
+          nextCursor = JSON.parse(nextCursorRaw) as IngestOrderCursor;
+        } catch {
+          nextCursor = null;
+        }
+      }
+      return {
+        kind: 'in_progress',
+        sourceSessionId: source,
+        destinationSessionId: destination,
+        nextCursor,
+        rollingDigest: readCloneMeta(this.db, 'cloneRollingDigest') ?? '',
+        copiedItemCount: Number(readCloneMeta(this.db, 'cloneCopiedItemCount') ?? '0') || 0,
+      };
+    }
+
+    return { kind: 'empty' };
+  }
+
+  /**
+   * Persist one batch of already-rewritten clone rows and advance the clone stage
+   * state. Idempotent for the same source: re-staging the same batch upserts the
+   * same rows and rewrites the same meta. A different stored source or destination
+   * is rejected without mutation.
+   */
+  stageCloneBatch(params: StageCloneBatchParams): StageCloneBatchResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind === 'complete') {
+      if (
+        stage.sourceSessionId === params.sourceSessionId &&
+        stage.destinationSessionId === params.destinationSessionId
+      ) {
+        return {
+          status: 'complete',
+          sourceSessionId: stage.sourceSessionId,
+          destinationSessionId: stage.destinationSessionId,
+        };
+      }
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    if (stage.kind === 'in_progress') {
+      if (
+        stage.sourceSessionId !== params.sourceSessionId ||
+        stage.destinationSessionId !== params.destinationSessionId
+      ) {
+        return {
+          status: 'mismatch',
+          storedSourceSessionId: stage.sourceSessionId,
+          storedDestinationSessionId: stage.destinationSessionId,
+        };
+      }
+    }
+
+    for (const row of params.rows) {
+      this.db
+        .insert(ingestItems)
+        .values({
+          item_id: row.itemId,
+          item_type: row.itemType,
+          item_data: row.itemData,
+          item_data_r2_key: row.itemDataR2Key,
+          ingested_at: row.ingestedAt,
+        })
+        .onConflictDoUpdate({
+          target: ingestItems.item_id,
+          set: {
+            item_type: row.itemType,
+            item_data: row.itemData,
+            item_data_r2_key: row.itemDataR2Key,
+            ingested_at: row.ingestedAt,
+          },
+        })
+        .run();
+    }
+
+    writeCloneMeta(this.db, 'cloneSourceSessionId', params.sourceSessionId);
+    writeCloneMeta(this.db, 'cloneDestinationSessionId', params.destinationSessionId);
+    writeCloneMeta(this.db, 'cloneNextCursor', JSON.stringify(params.nextCursor));
+    writeCloneMeta(this.db, 'cloneRollingDigest', params.rollingDigest);
+    writeCloneMeta(this.db, 'cloneCopiedItemCount', String(params.copiedItemCount));
+
+    return {
+      status: 'staged',
+      sourceSessionId: params.sourceSessionId,
+      destinationSessionId: params.destinationSessionId,
+      nextCursor: params.nextCursor,
+      rollingDigest: params.rollingDigest,
+      copiedItemCount: params.copiedItemCount,
+    };
+  }
+
+  inspectCloneStage(params: InspectCloneStageParams): InspectCloneStageResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind === 'empty') {
+      return { status: 'empty' };
+    }
+
+    const sameIdentity =
+      stage.sourceSessionId === params.sourceSessionId &&
+      stage.destinationSessionId === params.destinationSessionId;
+
+    if (!sameIdentity) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+        storedStage: stage.kind === 'complete' ? 'complete' : 'in_progress',
+      };
+    }
+
+    if (stage.kind === 'complete') {
+      return {
+        status: 'complete',
+        sourceSessionId: stage.sourceSessionId,
+        destinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    return {
+      status: 'in_progress',
+      sourceSessionId: stage.sourceSessionId,
+      destinationSessionId: stage.destinationSessionId,
+      nextCursor: stage.nextCursor,
+      rollingDigest: stage.rollingDigest,
+      copiedItemCount: stage.copiedItemCount,
+    };
+  }
+
+  finalizeCloneStage(params: FinalizeCloneStageParams): FinalizeCloneStageResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind === 'empty') {
+      return { status: 'empty' };
+    }
+
+    if (
+      stage.sourceSessionId !== params.sourceSessionId ||
+      stage.destinationSessionId !== params.destinationSessionId
+    ) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    if (stage.kind === 'complete') {
+      return {
+        status: 'complete',
+        sourceSessionId: stage.sourceSessionId,
+        destinationSessionId: stage.destinationSessionId,
+      };
+    }
+
+    if (
+      stage.rollingDigest !== params.finalDigest ||
+      stage.copiedItemCount !== params.finalItemCount
+    ) {
+      return {
+        status: 'digest_mismatch',
+        expectedDigest: params.finalDigest,
+        actualDigest: stage.rollingDigest,
+        expectedItemCount: params.finalItemCount,
+        actualItemCount: stage.copiedItemCount,
+      };
+    }
+
+    writeCloneMeta(this.db, 'cloneCompleteSourceId', params.sourceSessionId);
+    return {
+      status: 'complete',
+      sourceSessionId: params.sourceSessionId,
+      destinationSessionId: params.destinationSessionId,
+    };
+  }
+
+  /** Delete every staged row, any R2 objects the stage wrote, and the clone state markers. */
+  async resetCloneStage(): Promise<void> {
+    await this.wipeStorage();
   }
 }
 

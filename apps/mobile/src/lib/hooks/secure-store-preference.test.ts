@@ -48,7 +48,9 @@ describe('createSecureStorePreference', () => {
 
     expect(store.get()).toBe(false);
     expect(store.getHasLoaded()).toBe(true);
-    expect(captureException).toHaveBeenCalledWith(expect.any(Error));
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
+    });
     expect(toastError).not.toHaveBeenCalled();
     unsubscribe();
   });

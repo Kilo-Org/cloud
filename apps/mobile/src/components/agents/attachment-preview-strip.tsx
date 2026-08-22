@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { File } from 'expo-file-system';
 import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -22,6 +22,7 @@ import {
 } from '@/lib/share-remote-file';
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -283,27 +284,23 @@ function AttachmentChip({
       ) : null}
 
       {textPreview !== null ? (
-        <Modal
+        <SessionPageSheet
           visible
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => {
+          onClose={() => {
             setTextPreview(null);
           }}
         >
-          <View className="flex-1 bg-background">
-            <SheetHeader
-              title={attachment.filename}
-              onDone={() => {
-                setTextPreview(null);
-              }}
-              doneLabel="Done"
-            />
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-              {renderPreviewBody(textPreview)}
-            </ScrollView>
-          </View>
-        </Modal>
+          <SheetHeader
+            title={attachment.filename}
+            onDone={() => {
+              setTextPreview(null);
+            }}
+            doneLabel="Done"
+          />
+          <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+            {renderPreviewBody(textPreview)}
+          </ScrollView>
+        </SessionPageSheet>
       ) : null}
     </>
   );

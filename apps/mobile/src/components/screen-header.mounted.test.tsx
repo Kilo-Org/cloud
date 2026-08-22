@@ -79,6 +79,17 @@ function findIcon(back: TestInstance, type: string): TestInstance {
   return icon;
 }
 
+function deriveTitleFontSize(className: string): number {
+  const arbitrary = /text-\[(\d+)px\]/.exec(className);
+  if (arbitrary) {
+    return Number(arbitrary[1]);
+  }
+  if (className.includes('text-lg')) {
+    return 18;
+  }
+  throw new Error(`no known title font size in class: ${className}`);
+}
+
 function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -102,7 +113,7 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({ title: 'Sessions' });
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-13 w-13');
+    expect(back.props.className).toContain('h-11 w-11');
     expect(back.props.className).toContain('items-center');
     expect(back.props.className).toContain('justify-center');
     expect(back.props.className).toContain('-ml-4');
@@ -117,6 +128,30 @@ describe('ScreenHeader mounted', () => {
 
     const title = findTitlePressable(renderer.root);
     expect(title.props.hitSlop).toEqual({ top: 13, right: 13, bottom: 13, left: 0 });
+  });
+
+  it('gives the interactive title at least a 44-point reachable target', () => {
+    const cases: ScreenHeaderProps[] = [
+      { title: 'Sessions', onTitlePress: () => undefined },
+      { title: 'Sessions', size: 'large', onTitlePress: () => undefined },
+    ];
+
+    for (const props of cases) {
+      const renderer = renderHeader(props);
+      const title = findTitlePressable(renderer.root);
+      const hitSlop = title.props.hitSlop as { top: number; bottom: number };
+      expect(hitSlop.top).toBeGreaterThanOrEqual(13);
+      expect(hitSlop.bottom).toBeGreaterThanOrEqual(13);
+
+      const texts = title.findAll(node => typeof node.type === 'string' && node.type === 'Text');
+      const text = texts[0];
+      if (!text) {
+        throw new Error('title text not found');
+      }
+      const fontSize = deriveTitleFontSize(text.props.className as string);
+      // The rendered font size plus the 13pt top/bottom slop must clear 44pt.
+      expect(fontSize + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    }
   });
 
   it('calls router.back() by default and onBack when provided', () => {
@@ -208,7 +243,7 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({});
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-13 w-13');
+    expect(back.props.className).toContain('h-11 w-11');
     expect(back.props.className).toContain('items-center justify-center');
     expect(back.props.hitSlop).toBeUndefined();
   });
@@ -225,7 +260,7 @@ describe('ScreenHeader mounted', () => {
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
-      expect(back.props.className).toContain('h-13 w-13');
+      expect(back.props.className).toContain('h-11 w-11');
       expect(back.props.className).toContain('items-center');
       expect(back.props.className).toContain('justify-center');
     }

@@ -104,7 +104,7 @@ export function ScreenHeader({
               }}
               accessibilityRole="button"
               accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
-              className="-ml-4 h-13 w-13 shrink-0 items-center justify-center active:opacity-70"
+              className="-ml-4 h-11 w-11 shrink-0 items-center justify-center active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />

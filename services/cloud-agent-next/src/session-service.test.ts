@@ -523,7 +523,7 @@ function createCloneMetadata(): CloudAgentSessionState {
       platform: 'gitlab',
     },
     clone: {
-      cloneFromKiloSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     },
     agent: { mode: 'code', model: 'kilo/test-model' },
     lifecycle: { version: 1, timestamp: 1 },

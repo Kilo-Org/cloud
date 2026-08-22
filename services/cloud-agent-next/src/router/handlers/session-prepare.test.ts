@@ -337,7 +337,7 @@ describe('prepareSession operation-ledger admission gate', () => {
 
   it('propagates the clone source through createSessionWithLedger and replays on a same-key retry', async () => {
     const caller = router.createCaller(createContext());
-    const sourceKiloSessionId = 'agent_aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const sourceKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 
     await caller.prepareSession({
       prompt: 'Continue from the cloned session',

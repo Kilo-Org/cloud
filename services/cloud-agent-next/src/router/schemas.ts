@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   sessionIdSchema,
   githubRepoSchema,
@@ -572,7 +573,7 @@ export const PrepareSessionInput = z
      * Old clients omit this field and keep the empty-session bootstrap; remove
      * the fallback only after old prepared sessions age out.
      */
-    cloneFromKiloSessionId: sessionIdSchema
+    cloneFromKiloSessionId: kiloSessionIdSchema
       .optional()
       .describe('Source Kilo session ID to clone into this Cloud Agent session'),
     /**

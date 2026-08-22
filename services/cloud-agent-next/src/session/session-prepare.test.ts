@@ -1907,6 +1907,12 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(deleteCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      { onlyIfEmpty: true }
+    );
   });
 
   it('surfaces CONFLICT creation_in_progress when the clone is in progress', async () => {
@@ -2358,7 +2364,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
 });
 
 describe('prepareInputToSessionCreateRequest clone mapping', () => {
-  const SOURCE_SESSION_ID = 'agent_12345678-1234-1234-1234-123456789abc';
+  const SOURCE_SESSION_ID = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 
   it('maps cloneFromKiloSessionId into the grouped clone object', () => {
     const request = prepareInputToSessionCreateRequest({

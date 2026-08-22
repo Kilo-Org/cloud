@@ -553,6 +553,19 @@ async function allocateNewSession(
   if (cloneFromKiloSessionId) {
     if (ingestResult === undefined) {
       // Old worker with no clone acknowledgement: the clone outcome is unknown.
+      // Delete the empty destination row best-effort so a same-key retry does
+      // not treat it as a finished clone with zero copied items.
+      try {
+        await sessionService.deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
+          onlyIfEmpty: true,
+        });
+      } catch (deleteError) {
+        logger
+          .withFields({
+            error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+          })
+          .error('Failed to remove empty destination row after missing clone acknowledgement');
+      }
       if (ledger) {
         await ledger.onTransportFailure();
       }

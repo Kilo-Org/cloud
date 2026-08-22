@@ -17,6 +17,7 @@ import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
+const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 const validImages = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.png'],
@@ -330,7 +331,7 @@ describe('prepareSession clone source forwarding', () => {
     expect(
       PrepareSessionInput.safeParse({
         ...basePrepareInput,
-        cloneFromKiloSessionId: validSessionId,
+        cloneFromKiloSessionId: validKiloSessionId,
       }).success
     ).toBe(true);
   });
@@ -340,6 +341,15 @@ describe('prepareSession clone source forwarding', () => {
       PrepareSessionInput.safeParse({
         ...basePrepareInput,
         cloneFromKiloSessionId: 'agent_invalid',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects an agent_ UUID cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePrepareInput,
+        cloneFromKiloSessionId: validSessionId,
       }).success
     ).toBe(false);
   });

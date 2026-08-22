@@ -156,7 +156,7 @@ describe('session metadata boundary', () => {
       identity: { sessionId: 'agent_clone', userId: 'user_clone' },
       auth: {},
       clone: {
-        cloneFromKiloSessionId: 'agent_12345678-1234-1234-1234-123456789012',
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
       },
       lifecycle: { version: 1, timestamp: 1 },
     };

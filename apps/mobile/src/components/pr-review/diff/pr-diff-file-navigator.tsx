@@ -17,11 +17,20 @@
 //   - render the four states: loading, retryable (fetch-to-completion
 //     error), empty (0 listed files), happy
 
+/* eslint-disable max-lines -- cohesive navigator component: the four states plus the search and pagination rules */
+
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  TextInput,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -36,7 +45,6 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
-import { navigatorListContentStyle } from '@/lib/pr-review/diff/navigator-list-content-style';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
@@ -82,7 +90,10 @@ export function PrDiffFileNavigator({
   // The navigator is a formSheet whose bottom edge sits on the Android system
   // bar, so the list's bottom content padding carries the system inset.
   const { bottom } = useSafeAreaInsets();
-  const listContentStyle = useMemo(() => navigatorListContentStyle(bottom), [bottom]);
+  const listContentStyle = useMemo<ViewStyle>(
+    () => ({ paddingBottom: 32 + (Platform.OS === 'android' ? bottom : 0), paddingTop: 8 }),
+    [bottom]
+  );
   // Re-render trigger when the uncontrolled search field changes — refs
   // alone don't cause re-renders, but we don't want to re-mount the
   // TextInput on every keystroke (per iOS rule), so the value lives in

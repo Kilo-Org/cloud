@@ -5,11 +5,6 @@ import {
   resolvePrefillModel,
   resolvePrefillRepo,
 } from '@/components/agents/new-session-prefill';
-import { type InstancePickerInstance } from '@/lib/picker-bridge';
-
-export type ContinuationDestination =
-  | { kind: 'cloud-agent'; repo: string; model: string; variant: string }
-  | { kind: 'remote'; instance: InstancePickerInstance };
 
 export type ContinuationResolution =
   | { kind: 'cloud-agent'; repo: string; model: string; variant: string }

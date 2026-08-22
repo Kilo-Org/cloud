@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useAndroidSheetTopInset, useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetDetents } from '@/lib/form-sheet';
 
 const mocks = vi.hoisted(() => {
   const platform = { OS: 'android' as string };
@@ -26,44 +26,6 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: mocks.useSafeAreaInsets,
 }));
-
-describe('useAndroidSheetTopInset', () => {
-  beforeEach(() => {
-    mocks.platform.OS = 'android';
-    mocks.insets.top = 0;
-    mocks.statusBar.currentHeight = null;
-    vi.clearAllMocks();
-  });
-
-  it('prefers a positive Android safe-area top over StatusBar.currentHeight', () => {
-    mocks.insets.top = 47;
-    mocks.statusBar.currentHeight = 24;
-
-    expect(useAndroidSheetTopInset()).toBe(47);
-  });
-
-  it('falls back to StatusBar.currentHeight when the Android safe-area top is zero', () => {
-    mocks.insets.top = 0;
-    mocks.statusBar.currentHeight = 24;
-
-    expect(useAndroidSheetTopInset()).toBe(24);
-  });
-
-  it('returns 0 when the Android safe-area top is zero and StatusBar.currentHeight is null', () => {
-    mocks.insets.top = 0;
-    mocks.statusBar.currentHeight = null;
-
-    expect(useAndroidSheetTopInset()).toBe(0);
-  });
-
-  it('returns 0 on iOS regardless of insets', () => {
-    mocks.platform.OS = 'ios';
-    mocks.insets.top = 47;
-    mocks.statusBar.currentHeight = 24;
-
-    expect(useAndroidSheetTopInset()).toBe(0);
-  });
-});
 
 describe('useFormSheetDetents', () => {
   beforeEach(() => {

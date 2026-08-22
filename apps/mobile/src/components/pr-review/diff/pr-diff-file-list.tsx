@@ -54,6 +54,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 type PrReviewFileListProps = {
@@ -98,6 +99,9 @@ export function PrReviewFileList({
   });
   const { viewMode, setViewMode } = useDiffViewMode();
   const isTablet = useIsTablet();
+  // Bottom clearance for the reconnect and retryable first-page chrome, which
+  // render without the floating bar (so no list reserve applies).
+  const bottomPadding = useDetailScreenBottomPadding();
   const { selection, selectionView, handleLineTap, clearSelection } = useDiffSelection({
     owner,
     repo,
@@ -270,14 +274,17 @@ export function PrReviewFileList({
     }
     if (firstPageErrorState?.kind === 'reconnect') {
       return (
-        <View className="flex-1 items-center justify-center px-6 py-12">
+        <View
+          className="flex-1 items-center justify-center px-6 py-12"
+          style={{ paddingBottom: bottomPadding }}
+        >
           <PrReviewReconnectNotice />
         </View>
       );
     }
     if (firstPageErrorState?.kind === 'retryable') {
       return (
-        <View className="flex-1">
+        <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
           <QueryError
             variant="server"
             onRetry={() => {

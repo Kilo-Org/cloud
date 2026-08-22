@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 
 const DEFAULT_EXPAND_WINDOW = 20;
@@ -206,8 +207,12 @@ export function PaginationRow({
 }
 
 export function TabStateMessage({ title, message }: { title: string; message: string }) {
+  const bottomPadding = useDetailScreenBottomPadding();
   return (
-    <View className="flex-1 items-center justify-center gap-2 px-6 py-12">
+    <View
+      className="flex-1 items-center justify-center gap-2 px-6 py-12"
+      style={{ paddingBottom: bottomPadding }}
+    >
       <Text className="text-lg font-semibold text-foreground">{title}</Text>
       <Text variant="muted" className="text-center">
         {message}
@@ -224,8 +229,12 @@ export function EmptyFilesView({
   onRequestOverview?: () => void;
 }) {
   const colors = useThemeColors();
+  const bottomPadding = useDetailScreenBottomPadding();
   return (
-    <View className="flex-1 items-center justify-center gap-3 px-6 py-16">
+    <View
+      className="flex-1 items-center justify-center gap-3 px-6 py-16"
+      style={{ paddingBottom: bottomPadding }}
+    >
       <File size={28} color={colors.mutedForeground} />
       <Text className="text-lg font-semibold text-foreground">No files changed</Text>
       <Text variant="muted" className="text-center">

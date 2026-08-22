@@ -13,6 +13,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { MessageCirclePlus } from '@/components/ui/icons';
 import { type LayoutChangeEvent, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -52,6 +53,10 @@ export function PrDiffFloatingActions({
   const router = useRouter();
   const colors = useThemeColors();
   const pending = usePendingReview();
+  // The bar sits on the bottom edge, so its bottom padding must include the
+  // Android system inset. The measured height (onLayout) therefore already
+  // includes the inset, which `prDiffListBottomPadding` reserves for the list.
+  const insets = useSafeAreaInsets();
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
   // P1-F-46b: the submit affordance must always be reachable from the
@@ -92,7 +97,8 @@ export function PrDiffFloatingActions({
         onHeightChange?.(event.nativeEvent.layout.height);
       }}
       pointerEvents="box-none"
-      className="absolute inset-x-0 bottom-0 items-center gap-2 px-4 pb-6 pt-3"
+      className="absolute inset-x-0 bottom-0 items-center gap-2 px-4 pt-3"
+      style={{ paddingBottom: 24 + insets.bottom }}
     >
       <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-black/10">
         {showSelectionAction ? (

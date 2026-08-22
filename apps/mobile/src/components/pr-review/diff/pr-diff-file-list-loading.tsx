@@ -5,15 +5,18 @@
 import { View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
 export function PrDiffFileListLoading() {
+  const bottomPadding = useDetailScreenBottomPadding();
   return (
     <View
       className="flex-1 gap-0 px-0 pt-1"
       accessibilityLabel="Loading files"
       accessibilityRole="progressbar"
+      style={{ paddingBottom: bottomPadding }}
     >
       {SKELETON_ROWS.map(index => (
         <View

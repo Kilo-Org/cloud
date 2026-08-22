@@ -69,6 +69,7 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -103,6 +104,9 @@ export function PrReviewDiscussionTab({
   const settleGenerationRef = useRef(0);
   const settleThreadIdRef = useRef<string | null>(null);
   const { scrollAnimated } = useMotionPolicy();
+  // Bottom clearance for the non-list chrome (loading, empty, and every
+  // first-page error state) so the last control clears the system bar.
+  const bottomPadding = useDetailScreenBottomPadding();
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -209,47 +213,60 @@ export function PrReviewDiscussionTab({
 
   if (view.kind === 'permission') {
     return (
-      <QueryError
-        variant="permission"
-        title="Access denied"
-        message="You don't have permission to view this PR's discussion."
-      />
+      <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
+        <QueryError
+          variant="permission"
+          title="Access denied"
+          message="You don't have permission to view this PR's discussion."
+        />
+      </View>
     );
   }
   if (view.kind === 'not-found') {
     return (
-      <QueryError
-        variant="not-found"
-        title="Discussion unavailable"
-        message="This pull request may have been removed."
-      />
+      <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
+        <QueryError
+          variant="not-found"
+          title="Discussion unavailable"
+          message="This pull request may have been removed."
+        />
+      </View>
     );
   }
   if (view.kind === 'reconnect') {
     return (
-      <View className="flex-1 items-center justify-center px-6 py-12">
+      <View
+        className="flex-1 items-center justify-center px-6 py-12"
+        style={{ paddingBottom: bottomPadding }}
+      >
         <PrReviewReconnectNotice />
       </View>
     );
   }
   if (view.kind === 'retryable') {
     return (
-      <QueryError
-        variant="server"
-        title="Could not load discussion"
-        message="Something went wrong on our end. Please try again."
-        onRetry={() => {
-          void query.refetch();
-        }}
-        isRetrying={query.isFetching}
-      />
+      <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
+        <QueryError
+          variant="server"
+          title="Could not load discussion"
+          message="Something went wrong on our end. Please try again."
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+      </View>
     );
   }
 
   // ── Loading (first page in flight) ─────────────────────────────────
   if (view.kind === 'loading') {
     return (
-      <View accessibilityLabel="Loading discussion" className="flex-1 gap-3 px-4 pb-6 pt-3">
+      <View
+        accessibilityLabel="Loading discussion"
+        className="flex-1 gap-3 px-4 pt-3"
+        style={{ paddingBottom: bottomPadding }}
+      >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
           <View key={index} className="gap-2 rounded-xl border border-border bg-card p-3.5">
@@ -266,7 +283,7 @@ export function PrReviewDiscussionTab({
   // ── Empty (neither threads nor conversation comments) ──────────────
   if (view.kind === 'empty') {
     return (
-      <View className="flex-1 px-4 pb-6">
+      <View className="flex-1 px-4" style={{ paddingBottom: bottomPadding }}>
         <EmptyState
           icon={MessageSquarePlus}
           title="No discussion yet"

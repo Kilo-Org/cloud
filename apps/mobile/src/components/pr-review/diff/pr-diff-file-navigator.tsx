@@ -21,7 +21,8 @@ import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
@@ -35,15 +36,13 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
+import { navigatorListContentStyle } from '@/lib/pr-review/diff/navigator-list-content-style';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
 // are `useCallback`-stable.
 const MemoNavigatorFileRow = memo(NavigatorFileRow);
-
-// Matches the previous ScrollView `contentContainerClassName="pb-8 pt-2"`.
-const LIST_CONTENT_STYLE: ViewStyle = { paddingBottom: 32, paddingTop: 8 };
 
 // Identity-stable per-path row callbacks (the row's `onSelect`/`onToggleViewed`
 // take no args, so the path is bound once and cached in a ref map).
@@ -80,6 +79,10 @@ export function PrDiffFileNavigator({
   const router = useRouter();
   const colors = useThemeColors();
   const searchRef = useRef<string>('');
+  // The navigator is a formSheet whose bottom edge sits on the Android system
+  // bar, so the list's bottom content padding carries the system inset.
+  const { bottom } = useSafeAreaInsets();
+  const listContentStyle = useMemo(() => navigatorListContentStyle(bottom), [bottom]);
   // Re-render trigger when the uncontrolled search field changes — refs
   // alone don't cause re-renders, but we don't want to re-mount the
   // TextInput on every keystroke (per iOS rule), so the value lives in
@@ -352,7 +355,7 @@ export function PrDiffFileNavigator({
         keyExtractor={file => file.path}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={LIST_CONTENT_STYLE}
+        contentContainerStyle={listContentStyle}
         onEndReached={() => {
           // During a search, fetch-to-completion loads pages; a scroll fetch would race it.
           if (!hasActiveSearch && query.hasNextPage && !query.isFetchingNextPage) {

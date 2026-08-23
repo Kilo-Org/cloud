@@ -1,11 +1,13 @@
 /* eslint-disable max-lines -- cohesive unit-test suite for session-list-helpers pure functions */
 import { describe, expect, it } from 'vitest';
 
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
   activeSessionMetaTimestamp,
+  canExitSessionFromList,
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
   excludeActiveFromGroups,
@@ -331,6 +333,18 @@ describe('selectPinnedActiveSessions', () => {
       searchQuery: '',
     });
     expect(result.map(s => s.id)).toEqual(['pass']);
+  });
+});
+
+describe('canExitSessionFromList', () => {
+  it('returns true for a real CLI connection id', () => {
+    expect(canExitSessionFromList(makeActive({ connectionId: 'c1' }))).toBe(true);
+  });
+
+  it('returns false for the cloud-agent sentinel connection id', () => {
+    expect(canExitSessionFromList(makeActive({ connectionId: CLOUD_AGENT_CONNECTION_ID }))).toBe(
+      false
+    );
   });
 });
 

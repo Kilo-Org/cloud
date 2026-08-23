@@ -22,6 +22,7 @@ import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
 import {
   activeSessionMetaTimestamp,
+  canExitSessionFromList,
   composeActiveSessionVisibleMeta,
   formatSessionTotalCost,
   remoteMeta,
@@ -68,6 +69,7 @@ export function RemoteSessionRow({
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status;
+  const canExit = canExitSessionFromList(session);
   const needsInput = shouldShowNeedsInput({
     status: session.status,
     raiseId,
@@ -150,7 +152,7 @@ export function RemoteSessionRow({
           setRenameVisible(true);
         }
       },
-      onExit: handleExit,
+      onExit: canExit ? handleExit : undefined,
     });
   };
 

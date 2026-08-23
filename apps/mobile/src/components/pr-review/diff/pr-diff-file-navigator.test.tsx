@@ -21,6 +21,8 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const fetchNextPageMock = vi.hoisted(() => vi.fn());
 const fetchAllRunMock = vi.hoisted(() => vi.fn());
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
+const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 // Records every `NavigatorFileRow` render. Because the navigator wraps the row
 // in `memo`, a memo hit (stable callbacks) does NOT push a new entry.
@@ -67,6 +69,11 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
+  Platform: platformState,
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insetsState,
 }));
 
 vi.mock('@/components/pr-review/diff/pr-diff-navigator-file-row', () => ({
@@ -451,5 +458,67 @@ describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {
 
     expect(toggleB).toHaveBeenCalledTimes(1);
     expect(toggleA).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrDiffFileNavigator list bottom inset (plan §6)', () => {
+  beforeEach(() => {
+    fetchNextPageMock.mockReset();
+    fetchAllRunMock.mockReset();
+    rowRenders.length = 0;
+    flashListProps.current = null;
+    platformState.OS = 'ios';
+    insetsState.bottom = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      isRunning: false,
+      loadedFiles: 0,
+      totalFiles: null,
+      error: null,
+    };
+  });
+
+  function listContentStyle(): Record<string, unknown> | null {
+    return (
+      (flashListProps.current?.contentContainerStyle as Record<string, unknown> | null) ?? null
+    );
+  }
+
+  it('keeps the 32-point base padding on iOS regardless of the inset', async () => {
+    platformState.OS = 'ios';
+    insetsState.bottom = 34;
+    await mountNavigator();
+
+    expect(listContentStyle()).toEqual({ paddingBottom: 32, paddingTop: 8 });
+  });
+
+  it('keeps the 32-point base padding on Android at a zero inset', async () => {
+    platformState.OS = 'android';
+    insetsState.bottom = 0;
+    await mountNavigator();
+
+    expect(listContentStyle()).toEqual({ paddingBottom: 32, paddingTop: 8 });
+  });
+
+  it('adds the Android system inset to the list bottom padding', async () => {
+    platformState.OS = 'android';
+    insetsState.bottom = 34;
+    await mountNavigator();
+
+    expect(listContentStyle()).toEqual({ paddingBottom: 66, paddingTop: 8 });
   });
 });

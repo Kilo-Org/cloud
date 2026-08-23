@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- cohesive chip: thumbnail, status overlays, retry/remove controls, viewer, and text preview share one strip component */
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File } from 'expo-file-system';
 import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -23,6 +24,7 @@ import {
 } from '@/lib/share-remote-file';
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -58,6 +60,7 @@ function AttachmentChip({
   onRetry: () => void;
 }) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
@@ -296,27 +299,24 @@ function AttachmentChip({
       ) : null}
 
       {textPreview !== null ? (
-        <Modal
+        <SessionPageSheet
           visible
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => {
+          onClose={() => {
             setTextPreview(null);
           }}
         >
-          <View className="flex-1 bg-background">
-            <SheetHeader
-              title={attachment.filename}
-              onDone={() => {
-                setTextPreview(null);
-              }}
-              doneLabel="Done"
-            />
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-              {renderPreviewBody(textPreview)}
-            </ScrollView>
-          </View>
-        </Modal>
+          <SheetHeader
+            title={attachment.filename}
+            onDone={() => {
+              setTextPreview(null);
+            }}
+            doneLabel="Done"
+          />
+          <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+            {renderPreviewBody(textPreview)}
+          </ScrollView>
+          <View style={{ height: insets.bottom }} className="bg-background" />
+        </SessionPageSheet>
       ) : null}
     </>
   );

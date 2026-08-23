@@ -102,13 +102,25 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
+const reactNativeMock = vi.hoisted(() => ({
+  Platform: { OS: 'ios' as string },
+  useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
+}));
+const safeAreaMock = vi.hoisted(() => ({
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
+}));
+
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
-  Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  Platform: reactNativeMock.Platform,
+  useWindowDimensions: reactNativeMock.useWindowDimensions,
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
@@ -145,6 +157,9 @@ beforeEach(() => {
   fileInstances.length = 0;
   __resetFilePartCacheForTests();
   __resetFilePartUrlResolverForTests();
+  reactNativeMock.Platform.OS = 'ios';
+  reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
+  safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0 });
   getAttachmentDownloadUrlMutate.mockReset();
   getAttachmentDownloadUrlMutate.mockResolvedValue({
     signedUrl: 'https://r2.example/signed',
@@ -206,6 +221,13 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+function findByTestID(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.props.testID === testID);
 }
 
 function pressableByLabel(
@@ -1380,6 +1402,110 @@ describe('FilePartRenderer mounted', () => {
 
     expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
     expect(findByType(root, 'Modal')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+});
+
+describe('FilePartRenderer preview sheet surface', () => {
+  async function openMarkdownPreview(): Promise<TestRenderer.ReactTestRenderer> {
+    expoFileSystemMock.fileText.mockResolvedValue('# Hello');
+    cacheFilePart('part-1', {
+      url: 'data:text/markdown;base64,QUJD',
+      mime: 'text/markdown',
+      filename: 'readme.md',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
+    );
+    await press(first(pressableByLabel(renderer.root, 'Preview readme.md')));
+    await flushAsync();
+    return renderer;
+  }
+
+  it('renders the native pageSheet Modal on iOS', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const modals = findByType(renderer.root, 'Modal');
+    expect(modals).toHaveLength(1);
+    expect(modals[0]?.props.animationType).toBe('slide');
+    expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
+    expect(modals[0]?.props.transparent).toBeUndefined();
+    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const scrollViews = findByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    expect(scrollViews[0]?.props.className).toBe('flex-1');
+
+    await unmount(renderer);
+  });
+
+  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
+
+    const renderer = await openMarkdownPreview();
+
+    const modals = findByType(renderer.root, 'Modal');
+    expect(modals).toHaveLength(1);
+    expect(modals[0]?.props.transparent).toBeUndefined();
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+
+    // The insets.bottom spacer clears the Android navigation bar.
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.style as { height?: number } | undefined)?.height === 34 &&
+        node.props.className === 'bg-background'
+    );
+    expect(spacers).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('closes the preview when Android Back fires onRequestClose', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await openMarkdownPreview();
+
+    const modal = findByType(renderer.root, 'Modal')[0];
+    if (!modal) {
+      throw new Error('Modal not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (modal.props.onRequestClose as () => void)();
+    });
+
+    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('closes the preview when Done is pressed', async () => {
+    const renderer = await openMarkdownPreview();
+
+    const header = findByType(renderer.root, 'SheetHeader')[0];
+    if (!header) {
+      throw new Error('SheetHeader not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (header.props.onDone as () => void)();
+    });
+
+    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
 
     await unmount(renderer);
   });

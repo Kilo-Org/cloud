@@ -3,7 +3,8 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
@@ -24,6 +25,7 @@ import {
 
 import { ChatMarkdownText } from './chat-markdown-text';
 import { getFilePartAccessibilityLabel, getFilePartKind } from './file-part-preview';
+import { SessionPageSheet } from './session-page-sheet';
 import { refreshFilePartUrl, useResolvedFilePartUrl } from './file-part-url-resolver';
 import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
@@ -380,6 +382,7 @@ function FilePreviewModal({
   shareError = null,
 }: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -451,18 +454,19 @@ function FilePreviewModal({
   }
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={part.filename ?? 'File'}
-          onDone={onClose}
-          doneLabel="Done"
-          onShare={onShare}
-          sharing={sharing}
-        />
-        <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
-        <ScrollView contentContainerClassName="px-6 pb-6 pt-2">{renderBody()}</ScrollView>
-      </View>
-    </Modal>
+    <SessionPageSheet visible onClose={onClose}>
+      <SheetHeader
+        title={part.filename ?? 'File'}
+        onDone={onClose}
+        doneLabel="Done"
+        onShare={onShare}
+        sharing={sharing}
+      />
+      <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
+      <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+        {renderBody()}
+      </ScrollView>
+      <View style={{ height: insets.bottom }} className="bg-background" />
+    </SessionPageSheet>
   );
 }

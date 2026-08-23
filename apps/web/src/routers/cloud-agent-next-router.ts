@@ -15,6 +15,7 @@ import {
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
@@ -477,7 +478,12 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const result = await fetchGitHubRepositoriesForUser(ctx.user.id, input.forceRefresh);
       return {
-        repositories: result.repositories,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: null,
+          platform: 'github',
+          repositories: result.repositories,
+        }),
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
@@ -511,7 +517,13 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const result = await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh);
       return {
-        repositories: result.repositories,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: null,
+          platform: 'gitlab',
+          repositories: result.repositories,
+          gitlabInstanceUrl: result.instanceUrl,
+        }),
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,

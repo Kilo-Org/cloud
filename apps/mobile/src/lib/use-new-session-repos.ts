@@ -60,7 +60,7 @@ export function useNewSessionRepos({
     if (!repoData?.repositories) {
       return [];
     }
-    return (repoData.repositories as { fullName: string; private: boolean }[]).map(r => ({
+    return repoData.repositories.map(r => ({
       fullName: r.fullName,
       isPrivate: r.private,
     }));

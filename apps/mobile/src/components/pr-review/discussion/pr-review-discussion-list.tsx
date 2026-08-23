@@ -16,6 +16,7 @@ import {
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
 const DISCUSSION_LIST_CONTENT_STYLE = { paddingTop: 12 };
@@ -177,9 +178,13 @@ function ListFooter({
   onLoadMore,
   onRetryLoadMore,
 }: Readonly<ListFooterProps>) {
+  // The footer is the last list content, so it owns the bottom clearance
+  // that keeps the final row and every next action above the system bar.
+  const paddingBottom = useDetailScreenBottomPadding();
+
   if (laterPageError) {
     return (
-      <View className="items-center gap-2 px-4 pb-8 pt-2">
+      <View className="items-center gap-2 px-4 pt-2" style={{ paddingBottom }}>
         <Text variant="muted" className="text-center text-xs">
           Could not load more comments.
         </Text>
@@ -195,10 +200,10 @@ function ListFooter({
     );
   }
   if (!hasNextPage) {
-    return <View className="h-6" />;
+    return <View style={{ height: paddingBottom }} />;
   }
   return (
-    <View className="items-center px-4 pb-8 pt-2">
+    <View className="items-center px-4 pt-2" style={{ paddingBottom }}>
       <Button
         size="sm"
         variant="outline"

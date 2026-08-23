@@ -90,10 +90,8 @@ export type CallbackTarget = {
  */
 export type AgentMode = string;
 
-/** Input for prepareSession procedure */
-export type PrepareSessionInput = {
-  prompt: string;
-  initialPayload?: SendMessagePayload;
+/** Shared fields for prepareSession, present on both the non-clone and clone variants. */
+type PrepareSessionSharedFields = {
   mode: AgentMode;
   model: string;
   variant?: string;
@@ -139,14 +137,31 @@ export type PrepareSessionInput = {
   createdOnPlatform?: string;
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-  /** When true, return immediately and run preparation asynchronously */
-  autoInitiate?: boolean;
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
   devcontainer?: boolean;
+};
+
+/** Non-clone prepare input: required `prompt` and the current optional initial fields. */
+export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
+  prompt: string;
+  initialPayload?: SendMessagePayload;
   initialMessageId?: string | null;
+  /** When true, return immediately and run preparation asynchronously */
+  autoInitiate?: boolean;
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
+  cloneFromKiloSessionId?: undefined;
 };
+
+/** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
+export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
+  cloneFromKiloSessionId: string;
+  autoInitiate: true;
+  operationKey: string;
+};
+
+/** Input for prepareSession procedure */
+export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCloneInput;
 
 /** Output from prepareSession procedure */
 export type PrepareSessionOutput = {

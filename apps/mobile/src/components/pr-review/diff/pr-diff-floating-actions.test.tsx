@@ -14,7 +14,20 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { PrDiffFloatingActions } from './pr-diff-floating-actions';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 import { type SelectionState } from '@/lib/pr-review/diff-selection';
 

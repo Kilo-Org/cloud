@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from '@/components/ui/icons';
 
+import { i18n } from '@/i18n';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { capitalize } from '@/lib/utils';
@@ -47,15 +48,17 @@ export function buildOverviewRows({
     {
       field: 'style',
       icon: MessageSquareText,
-      title: 'Review Style',
+      title: i18n.t('codeReviewer.overview.reviewStyle'),
       subtitle: capitalize(data.reviewStyle),
     },
     {
       field: 'focus-areas',
       icon: ShieldCheck,
-      title: 'Focus Areas',
+      title: i18n.t('codeReviewer.overview.focusAreas'),
       subtitle:
-        data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
+        data.focusAreas.length > 0
+          ? data.focusAreas.map(capitalize).join(', ')
+          : i18n.t('codeReviewer.overview.allAreas'),
     },
     // Custom Instructions is deprecated in favour of REVIEW.md, so the row is
     // only offered to configs that already have something stored in it.
@@ -64,15 +67,15 @@ export function buildOverviewRows({
           {
             field: 'instructions',
             icon: ScrollText,
-            title: 'Custom Instructions',
-            subtitle: 'Set',
+            title: i18n.t('codeReviewer.overview.customInstructions'),
+            subtitle: i18n.t('codeReviewer.overview.set'),
           },
         ]
       : []),
     {
       field: 'model',
       icon: FileSliders,
-      title: 'Model',
+      title: i18n.t('codeReviewer.overview.model'),
       subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
@@ -81,7 +84,7 @@ export function buildOverviewRows({
           {
             field: 'gate',
             icon: Gauge,
-            title: 'Merge gate',
+            title: i18n.t('codeReviewer.overview.mergeGate'),
             subtitle: capitalize(data.gateThreshold),
           },
         ]
@@ -89,11 +92,13 @@ export function buildOverviewRows({
     {
       field: 'repos',
       icon: FolderGit2,
-      title: 'Repositories',
+      title: i18n.t('codeReviewer.overview.repositories'),
       subtitle:
         capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
-          ? 'All repositories'
-          : `${data.selectedRepositoryIds.length} selected`,
+          ? i18n.t('codeReviewer.overview.allRepositories')
+          : i18n.t('codeReviewer.overview.nSelected', {
+              count: data.selectedRepositoryIds.length,
+            }),
     },
     // Review memory is GitHub-only and only offered when the caller wires the
     // navigation callback (the overview screen pushes the scope-level route,
@@ -104,8 +109,8 @@ export function buildOverviewRows({
           {
             field: 'review-memory',
             icon: Brain,
-            title: 'Review memory',
-            subtitle: 'Proposed REVIEW.md guidance',
+            title: i18n.t('codeReviewer.overview.reviewMemory'),
+            subtitle: i18n.t('codeReviewer.overview.proposedReviewMdGuidance'),
             onPress: onOpenReviewMemory,
             readOnlyAccessible: true,
           },

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the review-memory screen state contract */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Review-memory screen state contract: loading skeleton, retryable summary and
@@ -10,6 +11,7 @@ import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectAccessibilityLabels, collectText } from './review-memory-screen.test-helpers';
 

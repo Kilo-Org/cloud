@@ -49,7 +49,6 @@ vi.mock('@kilocode/app-shared/code-review', () => ({
   isRetriggerableReviewStatus: () => false,
 }));
 vi.mock('@kilocode/app-shared/utils', () => ({
-  formatDollars: String,
   fromMicrodollars: (value: unknown) => value,
 }));
 vi.mock('@/components/code-reviewer/review-list-screen', () => ({
@@ -170,6 +169,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     detail.data = {
       success: true,
       review: makeReview({
+        total_cost_musd: 123,
         council_result: {
           decision: 'block',
           aggregationStrategy: 'unanimous',
@@ -194,6 +194,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(idx('Council')).toBeGreaterThan(idx('Findings'));
     expect(idx('Gate')).toBeGreaterThan(idx('Council'));
     expect(idx('Details')).toBeGreaterThan(idx('Gate'));
+    expect(texts).toContain('$123.00');
   });
 
   it('shows the error message inside the conclusion', () => {

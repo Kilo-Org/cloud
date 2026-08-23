@@ -14,6 +14,7 @@
 import * as Haptics from 'expo-haptics';
 import { SmilePlus } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
@@ -59,6 +60,7 @@ export function ReactionsRow({
   readOnly,
 }: Readonly<ReactionsRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
   const addReactionRef = useRef<View>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -108,7 +110,7 @@ export function ReactionsRow({
         <Pressable
           ref={addReactionRef}
           accessibilityRole="button"
-          accessibilityLabel="Add reaction"
+          accessibilityLabel={t('prReview.discussion.addReaction')}
           accessibilityState={{ disabled: isDisabled }}
           disabled={isDisabled}
           onPress={() => {
@@ -153,6 +155,7 @@ function ReactionPill({
   disabled,
   onPress,
 }: Readonly<ReactionPillProps>) {
+  const { t } = useTranslation();
   // Reacted pills get the accent-soft fill (same as the rest of the
   // product's "active toggle" surface) so they read as selected in
   // both light and dark themes. Unreacted pills use a flat border
@@ -168,7 +171,12 @@ function ReactionPill({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${emoji} reaction, ${count} ${count === 1 ? 'reaction' : 'reactions'}`}
+      accessibilityLabel={t('prReview.discussion.reactionPill', {
+        emoji,
+        count,
+        countLabel:
+          count === 1 ? t('prReview.discussion.reactionSingular') : t('prReview.discussion.reactionPlural'),
+      })}
       accessibilityState={{ selected: viewerHasReacted, disabled }}
       onPress={onPress}
       disabled={disabled}

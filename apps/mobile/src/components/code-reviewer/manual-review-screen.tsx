@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Check, GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
@@ -57,6 +58,7 @@ function isValidManualReviewUrl(platform: ManualReviewPlatform, url: string): bo
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -85,7 +87,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const onSubmit = () => {
     const url = urlRef.current.trim();
     if (!isValidManualReviewUrl(platform, url)) {
-      setUrlError('Enter a valid pull request URL');
+      setUrlError(t('codeReviewer.manualReview.invalidUrl'));
       return;
     }
     setUrlError(null);
@@ -120,13 +122,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
+        <ScreenHeader
+          title={t('codeReviewer.manualReview.title')}
+          eyebrow={t('codeReviewer.title')}
+        />
         <QueryError
           variant={variant}
-          title={permanent ? undefined : "Couldn't check provider status"}
-          message={
-            permanent ? undefined : "We couldn't load your connected providers. Please try again."
-          }
+          title={permanent ? undefined : t('codeReviewer.manualReview.couldNotCheckProviderStatus')}
+          message={permanent ? undefined : t('codeReviewer.manualReview.couldNotLoadProviders')}
           onRetry={
             permanent
               ? undefined
@@ -144,18 +147,21 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   if (!statusesLoading && !statusesError && !isConnected('github') && !isConnected('gitlab')) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
+        <ScreenHeader
+          title={t('codeReviewer.manualReview.title')}
+          eyebrow={t('codeReviewer.title')}
+        />
         <EmptyState
           icon={GitPullRequest}
-          title="Connect a provider"
-          description="Connect GitHub to start a manual review of a pull request."
+          title={t('codeReviewer.manualReview.connectProvider')}
+          description={t('codeReviewer.manualReview.connectProviderDescription')}
           action={
             <Button
               onPress={() => {
                 router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
               }}
             >
-              <Text>Connect GitHub</Text>
+              <Text>{t('codeReviewer.manualReview.connectGitHub')}</Text>
             </Button>
           }
         />
@@ -165,7 +171,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
+      <ScreenHeader
+        title={t('codeReviewer.manualReview.title')}
+        eyebrow={t('codeReviewer.title')}
+      />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pt-4"
@@ -175,7 +184,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       >
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Platform
+            {t('codeReviewer.manualReview.platform')}
           </Text>
           {statusesLoading ? (
             <View className="gap-2">
@@ -183,7 +192,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               <Skeleton className="h-14 w-full rounded-lg" />
             </View>
           ) : (
-            <RadioGroup label="Platform" className="overflow-hidden rounded-lg bg-secondary">
+            <RadioGroup
+              label={t('codeReviewer.manualReview.platform')}
+              className="overflow-hidden rounded-lg bg-secondary"
+            >
               {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
                 const connected = isConnected(option);
                 return (
@@ -214,7 +226,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                       </Text>
                       {!connected && (
                         <Text variant="muted" className="text-xs">
-                          Not connected
+                          {t('codeReviewer.manualReview.notConnected')}
                         </Text>
                       )}
                     </View>
@@ -231,7 +243,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Pull request URL
+            {t('codeReviewer.manualReview.pullRequestUrl')}
           </Text>
           <TextInput
             key={platform}
@@ -241,7 +253,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            accessibilityLabel={formFieldA11y({ label: 'Pull request URL', error: urlError })}
+            accessibilityLabel={formFieldA11y({
+              label: t('codeReviewer.manualReview.pullRequestUrl'),
+              error: urlError,
+            })}
             onChangeText={value => {
               urlRef.current = value;
               if (urlError) {
@@ -254,13 +269,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Instructions (optional)
+            {t('codeReviewer.manualReview.instructions')}
           </Text>
           <TextInput
             className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
             multiline
             textAlignVertical="top"
-            placeholder="Anything specific the reviewer should focus on…"
+            placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             onChangeText={value => {
               instructionsRef.current = value;
@@ -270,7 +285,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Model
+            {t('codeReviewer.manualReview.model')}
           </Text>
           {/* flex-row so the pill hugs its content instead of stretching to column width */}
           <View className="flex-row">
@@ -290,7 +305,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           disabled={!config.data || !isConnected(platform)}
           onPress={onSubmit}
         >
-          <Text>{createReview.isPending ? 'Starting review…' : 'Start review'}</Text>
+          <Text>
+            {createReview.isPending
+              ? t('codeReviewer.manualReview.starting')
+              : t('codeReviewer.manualReview.start')}
+          </Text>
         </Button>
       </TabScreenScrollView>
     </View>

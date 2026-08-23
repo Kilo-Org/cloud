@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Plus,
 } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Image } from '@/components/ui/image';
@@ -15,8 +16,17 @@ import { cn } from '@/lib/utils';
 
 type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 
+type PrStateChipLabelKey =
+  | 'prReview.overview.stateMerged'
+  | 'prReview.overview.stateClosed'
+  | 'prReview.overview.stateDraft'
+  | 'prReview.overview.stateOpenApproved'
+  | 'prReview.overview.stateOpenChangesRequested'
+  | 'prReview.overview.stateOpenReviewRequired'
+  | 'prReview.overview.stateOpen';
+
 type PrStateChipDescriptor = {
-  label: string;
+  labelKey: PrStateChipLabelKey;
   tone: PrStateChipTone;
   icon: LucideIcon;
 };
@@ -27,25 +37,33 @@ export function describePrState(args: {
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 }): PrStateChipDescriptor {
   if (args.state === 'merged') {
-    return { label: 'Merged', tone: 'muted', icon: GitMerge };
+    return { labelKey: 'prReview.overview.stateMerged', tone: 'muted', icon: GitMerge };
   }
   if (args.state === 'closed') {
-    return { label: 'Closed', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'prReview.overview.stateClosed', tone: 'muted', icon: GitPullRequest };
   }
   if (args.draft) {
-    return { label: 'Draft', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'prReview.overview.stateDraft', tone: 'muted', icon: GitPullRequest };
   }
   // state === 'open'
   if (args.reviewDecision === 'APPROVED') {
-    return { label: 'Open · Approved', tone: 'good', icon: GitPullRequest };
+    return { labelKey: 'prReview.overview.stateOpenApproved', tone: 'good', icon: GitPullRequest };
   }
   if (args.reviewDecision === 'CHANGES_REQUESTED') {
-    return { label: 'Open · Changes requested', tone: 'destructive', icon: GitPullRequest };
+    return {
+      labelKey: 'prReview.overview.stateOpenChangesRequested',
+      tone: 'destructive',
+      icon: GitPullRequest,
+    };
   }
   if (args.reviewDecision === 'REVIEW_REQUIRED') {
-    return { label: 'Open · Review required', tone: 'warn', icon: GitPullRequest };
+    return {
+      labelKey: 'prReview.overview.stateOpenReviewRequired',
+      tone: 'warn',
+      icon: GitPullRequest,
+    };
   }
-  return { label: 'Open', tone: 'muted', icon: GitPullRequest };
+  return { labelKey: 'prReview.overview.stateOpen', tone: 'muted', icon: GitPullRequest };
 }
 
 // Theme colors are CSS variables — Tailwind opacity modifiers like
@@ -60,12 +78,13 @@ const TONE_FG_CLASS = {
 } satisfies Record<PrStateChipTone, string>;
 
 export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDescriptor }>) {
+  const { t } = useTranslation();
   const Icon = descriptor.icon;
   return (
     <View className="flex-row items-center gap-1.5 self-start rounded-full bg-secondary px-2.5 py-1">
       <Icon size={12} className={TONE_FG_CLASS[descriptor.tone]} />
       <Text className={cn('text-xs font-medium', TONE_FG_CLASS[descriptor.tone])}>
-        {descriptor.label}
+        {t(descriptor.labelKey)}
       </Text>
     </View>
   );
@@ -74,12 +93,13 @@ export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDe
 export function PrAuthorRow({
   author,
 }: Readonly<{ author: { login: string; avatarUrl: string | null } | null }>) {
+  const { t } = useTranslation();
   if (!author) {
     return (
       <View className="flex-row items-center gap-2">
         <View className="size-6 rounded-full bg-muted" />
         <Text variant="muted" className="text-sm">
-          Unknown author
+          {t('prReview.overview.unknownAuthor')}
         </Text>
       </View>
     );
@@ -144,18 +164,25 @@ export function PrCountsLine({
   deletions: number;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
       <View className="flex-row items-center gap-1.5">
         <GitCommit size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="text-sm">
-          {commits.toLocaleString()} {commits === 1 ? 'commit' : 'commits'}
+          {commits.toLocaleString()}{' '}
+          {commits === 1
+            ? t('prReview.overview.commitSingular')
+            : t('prReview.overview.commitPlural')}
         </Text>
       </View>
       <View className="flex-row items-center gap-1.5">
         <GitPullRequest size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="text-sm">
-          {changedFiles.toLocaleString()} {changedFiles === 1 ? 'file' : 'files'}
+          {changedFiles.toLocaleString()}{' '}
+          {changedFiles === 1
+            ? t('prReview.overview.fileSingular')
+            : t('prReview.overview.filePlural')}
         </Text>
       </View>
       <View className="flex-row items-center gap-1.5">

@@ -3,6 +3,7 @@
 // under the line cap.
 
 import { type ReactNode, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 
 import {
@@ -14,8 +15,6 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { cn } from '@/lib/utils';
-
-const BODY_PLACEHOLDER = 'Leave a comment';
 
 export function CommentBodyField({
   inputRef,
@@ -30,14 +29,15 @@ export function CommentBodyField({
 }) {
   const colors = useThemeColors();
   const keyboardVisible = useFormSheetKeyboardVisible();
+  const { t } = useTranslation();
   return (
     <TextInput
       ref={inputRef}
       defaultValue={defaultValue}
       editable={!isDisabled}
-      placeholder={BODY_PLACEHOLDER}
+      placeholder={t('prReview.composer.commentBodyPlaceholder')}
       placeholderTextColor={colors.mutedForeground}
-      accessibilityLabel="Comment body"
+      accessibilityLabel={t('prReview.composer.commentBody')}
       onChangeText={onChangeText}
       multiline
       textAlignVertical="top"
@@ -70,14 +70,15 @@ export function ComposerFooter({
   onAddToReview: () => void;
   onCancel: () => void;
 }): ReactNode {
+  const { t } = useTranslation();
   return (
     // Lives inside the formSheet ScrollView (not a sticky sibling).
     // Half detent stays a drag-down; keep Cancel above the closed-sheet
     // limit (~874) without scrolling.
     <PrFormSheetFooter>
       {isEdit ? (
-        <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel="Save">
-          <Text>Save</Text>
+        <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel={t('common.save')}>
+          <Text>{t('common.save')}</Text>
         </Button>
       ) : (
         <>
@@ -85,18 +86,18 @@ export function ComposerFooter({
             onPress={onCommentNow}
             loading={isSubmitting}
             disabled={primaryDisabled}
-            accessibilityLabel="Comment now"
+            accessibilityLabel={t('prReview.composer.commentNow')}
           >
-            <Text>Comment now</Text>
+            <Text>{t('prReview.composer.commentNow')}</Text>
           </Button>
           <Button
             variant="secondary"
             onPress={onAddToReview}
             disabled={isSubmitting}
             className="mt-2"
-            accessibilityLabel="Add to review"
+            accessibilityLabel={t('prReview.composer.addToReview')}
           >
-            <Text>Add to review</Text>
+            <Text>{t('prReview.composer.addToReview')}</Text>
           </Button>
         </>
       )}
@@ -105,9 +106,9 @@ export function ComposerFooter({
         onPress={onCancel}
         disabled={isSubmitting}
         className="mt-2"
-        accessibilityLabel="Cancel"
+        accessibilityLabel={t('common.cancel')}
       >
-        <Text>Cancel</Text>
+        <Text>{t('common.cancel')}</Text>
       </Button>
     </PrFormSheetFooter>
   );

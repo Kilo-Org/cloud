@@ -7,19 +7,23 @@
 // Styling mirrors `AutoMergeEnabledBanner` so the two read as
 // siblings; tone is "soft" / accent, not destructive.
 
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 
 export function PrMergePartialSuccessBanner({ reason }: Readonly<{ reason: string }>) {
+  const { t } = useTranslation();
   return (
     <View
       className="gap-1 rounded-lg bg-accent-soft p-4"
-      accessibilityLabel={`Merged. Couldn't delete the branch: ${reason}`}
+      accessibilityLabel={t('prReview.merge.partialSuccessBanner.accessibility', { reason })}
     >
-      <Text className="text-sm font-medium text-accent-soft-foreground">Merged</Text>
+      <Text className="text-sm font-medium text-accent-soft-foreground">
+        {t('prReview.merge.partialSuccessBanner.title')}
+      </Text>
       <Text className="text-xs text-accent-soft-foreground">
-        {`Couldn't delete the branch: ${reason}`}
+        {t('prReview.merge.partialSuccessBanner.body', { reason })}
       </Text>
     </View>
   );

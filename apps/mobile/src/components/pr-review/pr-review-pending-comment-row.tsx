@@ -3,12 +3,14 @@
 // pressable body that opens the comment composer in edit mode.
 
 import { type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 import { cn } from '@/lib/utils';
@@ -30,6 +32,7 @@ export function PrReviewPendingCommentRow({
   stale = false,
 }: PrReviewPendingCommentRowProps) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const location = pendingCommentLocationLabel(item);
 
   return (
@@ -40,8 +43,8 @@ export function PrReviewPendingCommentRow({
         accessibilityRole="button"
         accessibilityLabel={
           stale
-            ? `Edit outdated pending comment on ${location}`
-            : `Edit pending comment on ${location}`
+            ? t('prReview.pendingComment.editOutdatedA11y', { location })
+            : t('prReview.pendingComment.editA11y', { location })
         }
         className="min-h-9 flex-1 gap-0.5 active:opacity-70"
       >
@@ -49,17 +52,17 @@ export function PrReviewPendingCommentRow({
           {location}
         </Text>
         <Text className="text-xs leading-4 text-foreground" numberOfLines={1}>
-          {item.body.trim().length > 0 ? item.body : '(empty)'}
+          {item.body.trim().length > 0 ? item.body : t('prReview.pendingComment.emptyBody')}
         </Text>
         {stale ? (
           <View className="flex-row items-center gap-1.5">
             <View className="rounded-full border border-warn-tile-border bg-warn-tile-bg px-2 py-0.5">
               <Text className="text-[10px] font-medium uppercase tracking-wide text-warn">
-                Outdated
+                {t('prReview.pendingComment.outdated')}
               </Text>
             </View>
             <Text className="flex-1 text-[10px] text-muted-foreground">
-              the PR moved since you wrote this.
+              {t('prReview.pendingComment.staleHint')}
             </Text>
           </View>
         ) : null}
@@ -69,7 +72,7 @@ export function PrReviewPendingCommentRow({
         disabled={disabled}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel={`Delete pending comment on ${location}`}
+        accessibilityLabel={t('prReview.pendingComment.deleteA11y', { location })}
         className="h-8 w-8 items-center justify-center rounded-md active:opacity-60"
       >
         <Trash2 size={14} color={colors.mutedForeground} />
@@ -91,7 +94,7 @@ export function focusAfterPendingCommentRemoval(
   if (!removed) {
     return;
   }
-  announceForA11y('Pending comment deleted');
+  announceForA11y(i18n.t('prReview.pendingComment.deletedAnnouncement'));
   moveA11yFocus(inputRef);
 }
 
@@ -114,14 +117,14 @@ export function PendingQueueHint({
   queuedCount: number;
   staleCount: number;
 }) {
+  const { t } = useTranslation();
   let message = '';
   if (queuedCount === 0) {
-    message = 'No comments queued. The review will be submitted with just the event above.';
+    message = t('prReview.pendingComment.noCommentsQueued');
   } else if (staleCount > 0) {
-    message =
-      'Comments written against an older commit are not sent. They stay in your queue so you can edit or delete them.';
+    message = t('prReview.pendingComment.staleQueueHint');
   } else {
-    message = 'All comments will be sent in a single batched request.';
+    message = t('prReview.pendingComment.allQueuedHint');
   }
   return (
     <Text variant="muted" className="text-xs">
@@ -142,15 +145,16 @@ export function ReviewSummaryField({
   onChange: () => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const keyboardVisible = useFormSheetKeyboardVisible();
   return (
     <TextInput
       ref={inputRef}
       defaultValue=""
       editable={!isDisabled}
-      placeholder="Optional summary for the review"
+      placeholder={t('prReview.pendingComment.summaryPlaceholder')}
       placeholderTextColor={colors.mutedForeground}
-      accessibilityLabel="Review summary"
+      accessibilityLabel={t('prReview.pendingComment.summaryA11y')}
       onChangeText={value => {
         bodyRef.current = value;
         onChange();

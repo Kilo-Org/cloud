@@ -24,8 +24,6 @@ vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
 
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: vi.fn(async () => ({ kind: 'accepted' as const })),
-  TERMS_CHECK_RETRY_COPY: 'terms-check-retry',
-  TERMS_OUTDATED_COPY: 'terms-outdated',
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
@@ -121,6 +119,8 @@ function Consumer() {
   return null;
 }
 
+const SUBMIT_TITLE = 'Submit review';
+
 function mount(): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
@@ -132,7 +132,7 @@ function mount(): TestRenderer.ReactTestRenderer {
           repo="kilo"
           number={42}
           headSha="head-1"
-          title="Submit review"
+          title={SUBMIT_TITLE}
           eyebrow="acme/kilo#42"
           onDismiss={vi.fn(() => undefined)}
         />

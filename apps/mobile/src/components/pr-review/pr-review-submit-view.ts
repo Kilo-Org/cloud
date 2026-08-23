@@ -4,11 +4,16 @@
  * message are unit-testable without mounting the sheet.
  */
 
+import { i18n } from '@/i18n';
+
 export function selectSubmitCtaLabel(args: { freshCount: number; totalCount: number }): string {
   if (args.totalCount > args.freshCount) {
-    return `Submit ${args.freshCount} of ${args.totalCount} comments`;
+    return i18n.t('prReview.submit.submitCountOfTotal', {
+      freshCount: args.freshCount,
+      totalCount: args.totalCount,
+    });
   }
-  return 'Submit review';
+  return i18n.t('prReview.submit.submitReview');
 }
 
 export function selectPartialSubmitMessage(args: {
@@ -18,5 +23,8 @@ export function selectPartialSubmitMessage(args: {
   if (args.staleCount === 0) {
     return null;
   }
-  return `Posted ${args.freshCount} comment(s). ${args.staleCount} comment(s) point at an older commit and stayed in your queue.`;
+  return i18n.t('prReview.submit.partialPostedMessage', {
+    freshCount: args.freshCount,
+    staleCount: args.staleCount,
+  });
 }

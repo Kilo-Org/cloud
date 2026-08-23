@@ -10,7 +10,20 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 import { clearDraft } from '@/lib/persist/drafts';
 
 type AlertButton = { text?: string; style?: string; onPress?: () => void };
@@ -99,7 +112,6 @@ vi.mock('@/components/pr-review/pr-review-comment-composer-parts', () => ({
 
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: vi.fn().mockResolvedValue({ kind: 'accepted' as const }),
-  TERMS_OUTDATED_COPY: 'outdated',
 }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({

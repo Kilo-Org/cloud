@@ -12,6 +12,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { GitMerge } from '@/components/ui/icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -91,6 +92,7 @@ export function PrMergeSection({
 }: PrMergeSectionProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const status = getMergeabilityStatus(overview);
   const reasons = useMemo(
     () =>
@@ -210,11 +212,11 @@ export function PrMergeSection({
                 })
               );
             }}
-            accessibilityLabel="Merge now"
+            accessibilityLabel={t('prReview.merge.mergeNow')}
           >
             <View className="flex-row items-center gap-2">
               <GitMerge size={14} color={colors.primaryForeground} />
-              <Text>Merge now</Text>
+              <Text>{t('prReview.merge.mergeNow')}</Text>
             </View>
           </Button>
         ) : null}
@@ -257,9 +259,9 @@ export function PrMergeSection({
                 })
               );
             }}
-            accessibilityLabel="Enable auto-merge"
+            accessibilityLabel={t('prReview.merge.enableAutoMerge')}
           >
-            <Text>Enable auto-merge</Text>
+            <Text>{t('prReview.merge.enableAutoMerge')}</Text>
           </Button>
         ) : null}
       </View>
@@ -270,7 +272,7 @@ export function PrMergeSection({
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Merge
+        {t('prReview.merge.merge')}
       </Text>
       <Button
         onPress={() => {
@@ -279,11 +281,11 @@ export function PrMergeSection({
             mergeSheetHref({ owner, repo, number: overview.number, mode: 'merge', method: m })
           );
         }}
-        accessibilityLabel="Merge pull request"
+        accessibilityLabel={t('prReview.merge.mergePullRequest')}
       >
         <View className="flex-row items-center gap-2">
           <GitMerge size={14} color={colors.primaryForeground} />
-          <Text>Merge</Text>
+          <Text>{t('prReview.merge.merge')}</Text>
         </View>
       </Button>
     </View>

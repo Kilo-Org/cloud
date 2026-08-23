@@ -18,8 +18,6 @@ const { ensureTermsAcceptedOutcomeMock, TERMS_CHECK_RETRY, TERMS_OUTDATED } = vi
 
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: () => ensureTermsAcceptedOutcomeMock(),
-  TERMS_CHECK_RETRY_COPY: TERMS_CHECK_RETRY,
-  TERMS_OUTDATED_COPY: TERMS_OUTDATED,
 }));
 
 vi.mock('react-native', () => ({

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -45,6 +46,7 @@ export function BitbucketOverview({
   permissionLoading: boolean;
 }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
@@ -61,7 +63,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
         <View className="flex-1" style={{ paddingBottom }}>
           <QueryError
             onRetry={() => {
@@ -84,7 +86,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && config.isError && config.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
         <View className="flex-1" style={{ paddingBottom }}>
           <QueryError
             onRetry={() => {
@@ -132,7 +134,7 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+      <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="pt-4"
@@ -156,8 +158,7 @@ export function BitbucketOverview({
                 <BitbucketConnectForm scope={scope} />
               ) : (
                 <Text className="text-center text-xs text-muted-foreground">
-                  Bitbucket isn't connected. Only organization owners and billing managers can
-                  connect it.
+                  {t('codeReviewer.bitbucket.notConnectedReadOnly')}
                 </Text>
               )}
             </Animated.View>
@@ -168,18 +169,18 @@ export function BitbucketOverview({
               {readiness.data?.ready === false && (
                 <View className="items-center gap-2 rounded-lg bg-secondary p-4">
                   <Text className="text-center text-xs text-muted-foreground">
-                    Setup incomplete — finish configuration on kilo.ai
+                    {t('codeReviewer.bitbucket.setupIncomplete')}
                   </Text>
                   <Button
                     variant="outline"
                     size="sm"
                     onPress={() => {
                       void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                        label: 'Bitbucket setup',
+                        label: t('codeReviewer.bitbucket.setup'),
                       });
                     }}
                   >
-                    <Text>Finish setup</Text>
+                    <Text>{t('codeReviewer.repos.finishSetup')}</Text>
                   </Button>
                 </View>
               )}
@@ -187,13 +188,13 @@ export function BitbucketOverview({
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Automatic reviews</Text>
+                    <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
                     <Text variant="muted" className="text-xs">
                       {readiness.data?.workspace?.slug ?? ''}
                     </Text>
                   </View>
                   <Switch
-                    accessibilityLabel="Automatic reviews"
+                    accessibilityLabel={t('codeReviewer.autoReviews')}
                     value={config.data.isEnabled}
                     disabled={
                       !canEdit ||
@@ -209,7 +210,7 @@ export function BitbucketOverview({
                 {isReady && !hasRepoSelection && (
                   <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
-                      Select at least one repository to enable automatic reviews.
+                      {t('codeReviewer.selectRepository')}
                     </Text>
                     <Button
                       variant="outline"
@@ -219,7 +220,7 @@ export function BitbucketOverview({
                         pushField('repos');
                       }}
                     >
-                      <Text>Select repositories</Text>
+                      <Text>{t('codeReviewer.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}
@@ -240,7 +241,7 @@ export function BitbucketOverview({
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  Only organization owners and billing managers can change these settings.
+                  {t('codeReviewer.readOnlyDescription')}
                 </Text>
               )}
             </Animated.View>

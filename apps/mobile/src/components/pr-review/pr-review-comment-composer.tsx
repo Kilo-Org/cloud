@@ -8,6 +8,7 @@
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
 
 import {
@@ -26,10 +27,7 @@ import {
 } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import {
-  ensureTermsAcceptedOutcome,
-  TERMS_OUTDATED_COPY,
-} from '@/components/pr-review/discussion/reply-input';
+import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { clearDraft, prCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
@@ -75,6 +73,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     onDismiss,
   } = props;
   const pending = usePendingReview();
+  const { t } = useTranslation();
   const createComment = useCreateReviewCommentMutation({ owner, repo, number });
   const isEdit = mode.kind === 'edit';
 
@@ -152,7 +151,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     }
     const body = bodyRef.current;
     if (body.trim().length === 0) {
-      setInlineError('Comment body cannot be empty.');
+      setInlineError(t('prReview.composer.bodyEmpty'));
       setInlineErrorIsLocal(true);
       return;
     }
@@ -181,7 +180,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     }
     const body = bodyRef.current;
     if (body.trim().length === 0) {
-      setInlineError('Comment body cannot be empty.');
+      setInlineError(t('prReview.composer.bodyEmpty'));
       setInlineErrorKind('bad-request');
       setInlineErrorIsLocal(true);
       return;
@@ -191,7 +190,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setInlineErrorIsLocal(false);
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
-      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineError(t('prReview.discussion.termsOutdatedCopy'));
       setInlineErrorKind('bad-request');
       setInlineErrorIsLocal(false);
       return;
@@ -242,10 +241,10 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       ? bodyRef.current !== bodyBaselineRef.current
       : bodyRef.current.trim().length > 0;
     if (dirty) {
-      Alert.alert('Discard comment?', 'Your draft will be lost.', [
-        { text: 'Keep editing', style: 'cancel' },
+      Alert.alert(t('prReview.composer.discardTitle'), t('prReview.composer.discardMessage'), [
+        { text: t('prReview.composer.keepEditing'), style: 'cancel' },
         {
-          text: 'Discard',
+          text: t('prReview.composer.discard'),
           style: 'destructive',
           onPress: () => {
             if (draftUserId) {
@@ -288,9 +287,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   let suggestionDisabledReason: string | null = null;
   if (!isEdit) {
     if (side === 'LEFT') {
-      suggestionDisabledReason = 'Suggestions only apply to added lines.';
+      suggestionDisabledReason = t('prReview.composer.suggestionsOnlyAddedLines');
     } else if (!selection?.selectedText) {
-      suggestionDisabledReason = 'Tap a diff line to enable suggestions.';
+      suggestionDisabledReason = t('prReview.composer.tapDiffLineToSuggest');
     }
   }
   // Half-detent needs every row for footer CTAs; surface Insert only once the
@@ -328,7 +327,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             preferFallback={isEdit}
           />
           <View className="gap-1">
-            <Text className="text-sm font-medium text-foreground">Comment</Text>
+            <Text className="text-sm font-medium text-foreground">
+              {t('prReview.composer.comment')}
+            </Text>
             {isEdit || draft.settled ? (
               <CommentBodyField
                 inputRef={bodyInputRef}
@@ -342,11 +343,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
                 variant="ghost"
                 size="sm"
                 onPress={handleInsertSuggestion}
-                accessibilityLabel="Insert a code suggestion"
+                accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
                 accessibilityHint={suggestionDisabledReason ?? undefined}
                 className="self-start"
               >
-                <Text>Insert suggestion</Text>
+                <Text>{t('prReview.composer.insertSuggestion')}</Text>
               </Button>
             ) : null}
           </View>

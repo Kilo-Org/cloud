@@ -4,6 +4,7 @@ import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -99,6 +100,7 @@ type PreviewMode = 'markdown' | 'text';
 
 export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const resolved = useResolvedFilePartUrl(part);
@@ -132,11 +134,11 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       await shareFilePart(url, part);
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
-      let message = 'Share failed';
+      let message = t('agentChat.filePart.shareFailed');
       if (reason === 'sharing-unavailable') {
-        message = 'File sharing is not available on this device.';
+        message = t('agentChat.filePart.sharingUnavailable');
       } else if (error instanceof ShareRemoteFileError) {
-        message = 'Failed to share file. Please try again.';
+        message = t('agentChat.filePart.shareFailedRetry');
       }
       if (viewerVisibleRef.current || previewRef.current) {
         setShareError(message);
@@ -176,7 +178,11 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       }
       showActionSheetWithOptions(
         {
-          options: ['Open as text', 'Open in external app', 'Cancel'],
+          options: [
+            t('agentChat.filePart.openAsText'),
+            t('agentChat.filePart.openInExternalApp'),
+            t('common.cancel'),
+          ],
           cancelButtonIndex: 2,
         },
         index => {
@@ -202,20 +208,20 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
     }
     if (resolved.status === 'error') {
       resolved.retry?.();
-      toast.error('Could not load this file. Try again.');
+      toast.error(t('agentChat.filePart.couldNotLoadFileRetry'));
       return;
     }
-    toast.error('Preview unavailable');
+    toast.error(t('agentChat.filePart.previewUnavailable'));
   }
 
   // A markdown tap during the presign sets `preview` before the URL lands.
   // If the presign then fails, surface the failure instead of a silent no-op.
   useEffect(() => {
     if (preview !== null && resolved.status === 'error') {
-      toast.error('Could not load this file. Try again.');
+      toast.error(t('agentChat.filePart.couldNotLoadFileRetry'));
       closePreview();
     }
-  }, [preview, resolved.status]);
+  }, [preview, resolved.status, t]);
 
   if (kind === 'image') {
     if (url) {
@@ -236,10 +242,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             }}
             className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
             accessibilityRole="button"
-            accessibilityLabel="Image unavailable, retry loading"
+            accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
           >
             <AlertCircle size={14} color={colors.mutedForeground} />
-            <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+            <Text className="text-xs text-muted-foreground">
+              {t('imageViewer.imageUnavailable')}
+            </Text>
           </Pressable>
         );
       }
@@ -257,7 +265,11 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
               contentFit="contain"
               accessible
               accessibilityRole="image"
-              accessibilityLabel={part.filename ? `Image output, ${part.filename}` : 'Image output'}
+              accessibilityLabel={
+                part.filename
+                  ? t('agentChat.filePart.imageOutputWithFilename', { filename: part.filename })
+                  : t('agentChat.filePart.imageOutput')
+              }
               onError={() => {
                 setImageFailed(true);
               }}
@@ -270,7 +282,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             <ImageViewerModal
               visible={viewerVisible}
               uri={url}
-              filename={part.filename ?? 'File'}
+              filename={part.filename ?? t('agentChat.filePart.defaultName')}
               onShare={() => {
                 void handleShare();
               }}
@@ -286,10 +298,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return (
         <View
           className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
-          accessibilityLabel="Loading image"
+          accessibilityLabel={t('agentChat.filePart.loadingImage')}
         >
           <ActivityIndicator size="small" />
-          <Text className="text-xs text-muted-foreground">Loading image</Text>
+          <Text className="text-xs text-muted-foreground">
+            {t('agentChat.filePart.loadingImage')}
+          </Text>
         </View>
       );
     }
@@ -301,17 +315,17 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           }}
           className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
           accessibilityRole="button"
-          accessibilityLabel="Image unavailable, retry loading"
+          accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
         >
           <AlertCircle size={14} color={colors.mutedForeground} />
-          <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+          <Text className="text-xs text-muted-foreground">{t('imageViewer.imageUnavailable')}</Text>
         </Pressable>
       );
     }
     return (
       <View className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
         <AlertCircle size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+        <Text className="text-xs text-muted-foreground">{t('imageViewer.imageUnavailable')}</Text>
       </View>
     );
   }
@@ -332,7 +346,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           <FileIcon size={14} color={colors.mutedForeground} />
         )}
         <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-          {part.filename ?? 'File'}
+          {part.filename ?? t('agentChat.filePart.defaultName')}
         </Text>
       </Pressable>
       {preview && url ? (
@@ -383,6 +397,7 @@ function FilePreviewModal({
 }: Readonly<FilePreviewModalProps>) {
   const { id, mime, filename } = part;
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [text, setText] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -418,7 +433,9 @@ function FilePreviewModal({
     if (status === 'error') {
       return (
         <View className="gap-3">
-          <Text className="text-sm text-muted-foreground">Could not load this file.</Text>
+          <Text className="text-sm text-muted-foreground">
+            {t('agentChat.filePart.couldNotLoadFile')}
+          </Text>
           <Pressable
             onPress={() => {
               if (!onRetry) {
@@ -436,16 +453,20 @@ function FilePreviewModal({
               })();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Retry loading file"
+            accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
             className="rounded-md border border-border px-4 py-2 active:opacity-70"
           >
-            <Text className="text-center text-sm font-medium text-foreground">Retry</Text>
+            <Text className="text-center text-sm font-medium text-foreground">
+              {t('common.retry')}
+            </Text>
           </Pressable>
         </View>
       );
     }
     if (text === '') {
-      return <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+      return (
+        <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>
+      );
     }
     if (mode === 'markdown') {
       return <ChatMarkdownText value={text} />;
@@ -456,9 +477,9 @@ function FilePreviewModal({
   return (
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader
-        title={part.filename ?? 'File'}
+        title={part.filename ?? t('agentChat.filePart.defaultName')}
         onDone={onClose}
-        doneLabel="Done"
+        doneLabel={t('common.done')}
         onShare={onShare}
         sharing={sharing}
       />

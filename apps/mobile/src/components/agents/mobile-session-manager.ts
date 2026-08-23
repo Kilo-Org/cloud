@@ -27,6 +27,7 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { i18n } from '@/i18n';
 
 type SessionWithRuntimeState =
   inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
@@ -366,7 +367,7 @@ export function createMobileAgentSessionManager({
       toast.error(
         formatSafeCloudAgentFailureDiagnostic('send', error, organizationId) ??
           displayMessage ??
-          'Failed to send message. Please try again.'
+          i18n.t('agentChat.messageFailure.sendFailed')
       );
     },
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {

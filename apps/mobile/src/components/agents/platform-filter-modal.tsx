@@ -1,7 +1,9 @@
 import { Check, X } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
@@ -20,11 +22,6 @@ const PLATFORM_FILTERS = [
   'other',
 ] as const;
 const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
-
-const SORT_OPTIONS: readonly { value: AgentSessionSortBy; label: string }[] = [
-  { value: 'updated_at', label: 'Last updated' },
-  { value: 'created_at', label: 'Created' },
-];
 
 export type ProjectFilterOption = {
   gitUrl: string;
@@ -61,25 +58,25 @@ type FilterCheckboxRowProps = {
 function platformFilterLabel(p: string): string {
   switch (p) {
     case 'cloud-agent': {
-      return 'Cloud';
+      return i18n.t('agentChat.sessionFilter.platformCloud');
     }
     case 'extension': {
-      return 'Extension';
+      return i18n.t('agentChat.sessionFilter.platformExtension');
     }
     case 'cli': {
-      return 'CLI';
+      return i18n.t('agentChat.sessionFilter.platformCli');
     }
     case 'slack': {
-      return 'Slack';
+      return i18n.t('agentChat.sessionFilter.platformSlack');
     }
     case 'github': {
-      return 'GitHub';
+      return i18n.t('agentChat.sessionFilter.platformGithub');
     }
     case 'linear': {
-      return 'Linear';
+      return i18n.t('agentChat.sessionFilter.platformLinear');
     }
     case 'other': {
-      return 'Other';
+      return i18n.t('agentChat.sessionFilter.platformOther');
     }
     default: {
       return p;
@@ -124,6 +121,7 @@ export function SessionFilterChips({
   onRemoveProject,
 }: Readonly<SessionFilterChipsProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   if (platformFilter.length === 0 && projectFilter.length === 0) {
     return null;
@@ -145,7 +143,7 @@ export function SessionFilterChips({
               onRemoveProject(gitUrl);
             }}
             accessibilityRole="button"
-            accessibilityLabel={`Remove ${label} project filter`}
+            accessibilityLabel={t('agentChat.sessionFilter.removeProjectFilter', { label })}
           >
             <Text
               className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
@@ -165,7 +163,9 @@ export function SessionFilterChips({
             onRemovePlatform(platform);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${platformFilterLabel(platform)} platform filter`}
+          accessibilityLabel={t('agentChat.sessionFilter.removePlatformFilter', {
+            label: platformFilterLabel(platform),
+          })}
         >
           <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
             {platformFilterLabel(platform)}
@@ -185,9 +185,14 @@ export function SessionFilterModal({
   onClose,
   onApply,
 }: Readonly<SessionFilterModalProps>) {
+  const { t } = useTranslation();
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
   const [draftSortBy, setDraftSortBy] = useState<AgentSessionSortBy>(selectedSortBy);
+  const sortOptions: readonly { value: AgentSessionSortBy; label: string }[] = [
+    { value: 'updated_at', label: t('agentChat.sessionFilter.sortLastUpdated') },
+    { value: 'created_at', label: t('agentChat.sessionFilter.sortCreated') },
+  ];
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -222,15 +227,15 @@ export function SessionFilterModal({
             e.stopPropagation();
           }}
         >
-          <Text className="text-base font-semibold">Filter sessions</Text>
+          <Text className="text-base font-semibold">{t('agentChat.sessionFilter.title')}</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
-                  Sort by
+                  {t('agentChat.sessionFilter.sortBy')}
                 </Text>
-                <RadioGroup label="Sort by">
-                  {SORT_OPTIONS.map(option => (
+                <RadioGroup label={t('agentChat.sessionFilter.sortBy')}>
+                  {sortOptions.map(option => (
                     <ChoiceRow
                       key={option.value}
                       label={option.label}
@@ -245,7 +250,7 @@ export function SessionFilterModal({
               </View>
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
-                  Platform
+                  {t('agentChat.sessionFilter.platform')}
                 </Text>
                 {PLATFORM_FILTERS.map(platform => (
                   <FilterCheckboxRow
@@ -261,7 +266,7 @@ export function SessionFilterModal({
               {projectOptions.length > 0 && (
                 <View className="gap-1">
                   <Text variant="eyebrow" className="px-3">
-                    Project
+                    {t('agentChat.sessionFilter.project')}
                   </Text>
                   {projectOptions.map(project => (
                     <FilterCheckboxRow
@@ -279,7 +284,7 @@ export function SessionFilterModal({
           </ScrollView>
           <View className="flex-row justify-end gap-3">
             <Button variant="outline" onPress={onClose}>
-              <Text>Cancel</Text>
+              <Text>{t('common.cancel')}</Text>
             </Button>
             <Button
               onPress={() => {
@@ -291,7 +296,7 @@ export function SessionFilterModal({
                 onClose();
               }}
             >
-              <Text className="text-primary-foreground">Apply</Text>
+              <Text className="text-primary-foreground">{t('common.apply')}</Text>
             </Button>
           </View>
         </Pressable>

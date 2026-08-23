@@ -16,6 +16,7 @@
     "refresh": "Обновить",
     "couldNotRefresh": "Не удалось обновить. Потяните вниз, чтобы повторить.",
     "openInBrowser": "Открыть в браузере",
+    "openSettings": "Открыть настройки",
     "copiedToClipboard": "Скопировано в буфер обмена",
     "required": "обязательно",
     "error": "ошибка: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Фильтровать находки"
     }
   },
+  "agents": {
+    "activeNow": "Активен сейчас"
+  },
   "agentChat": {
     "session": {
       "title": "Сеанс",
@@ -411,14 +415,64 @@
       "notFound": "Не найдено",
       "notFoundDescription": "Возможно, этот элемент был удален или больше недоступен."
     },
+    "remoteSession": {
+      "failedToCreate": "Не удалось создать удаленный сеанс",
+      "exited": "Сеанс завершен",
+      "failedToExit": "Не удалось выйти из сеанса"
+    },
     "newSession": {
-      "title": "Новый сеанс"
+      "title": "Новый сеанс",
+      "repository": "Репозиторий",
+      "couldNotLoadRepositories": "Не удалось загрузить репозитории",
+      "connectGithub": "Подключить GitHub",
+      "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
+      "openGithub": "Открыть GitHub",
+      "refreshRepositories": "Обновить репозитории",
+      "githubConnectionNotVisible": "Мы пока не видим ваше подключение GitHub",
+      "githubConnectionNotVisibleDescription": "Если вы установили или настроили приложение Kilo GitHub, проверьте снова — или убедитесь, что оно установлено для этого аккаунта или организации.",
+      "checkAgain": "Проверить снова",
+      "githubConnected": "GitHub подключен",
+      "noRepositoriesVisible": "Репозитории не видны. Проверьте доступ к репозиториям для приложения Kilo GitHub, затем обновите.",
+      "runOnWithTarget": "Запустить на: {{target}}",
+      "environment": "Окружение",
+      "couldNotLoadEnvironment": "Не удалось загрузить ваше окружение",
+      "retryLoadingEnvironment": "Повторить загрузку окружения",
+      "defaultEnvironment": "Окружение по умолчанию",
+      "environmentSummary": "{{commands}} команд · {{mcp}} MCP · {{skills}} навыков · {{agents}} агентов",
+      "changes": "Изменения",
+      "leaveChanges": "Оставить изменения",
+      "commitAndPush": "Закоммитить и отправить",
+      "startSession": "Начать сеанс",
+      "promptPlaceholder": "Над чем хотите поработать?",
+      "addAttachment": "Добавить вложение",
+      "couldNotLoadModels": "Не удалось загрузить модели",
+      "prefillRepoAndModelUnavailable": "Репозиторий и модель исходного сеанса больше недоступны. Выберите их ниже.",
+      "prefillRepoUnavailable": "{{repo}} больше недоступен. Выберите репозиторий ниже.",
+      "prefillModelUnavailable": "{{model}} больше недоступна. Используется ваша модель по умолчанию."
+    },
+    "partRenderer": {
+      "updatedFile": "Обновлен {{count}} файл",
+      "updatedFiles": "Обновлено {{count}} файлов"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "строки {{start}}–{{end}} (обрезано)",
+      "linesOf": "строки {{start}}–{{end}} из {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Облачный агент {{action}} не удался ({{status}})",
+      "failed": "Облачный агент {{action}} не удался"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[несериализуемый ввод]",
+      "errorPrefix": "Ошибка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Запустить на",
+      "runOnAccessibility": "Запустить на: {{label}}",
       "couldNotLoad": "Не удалось загрузить экземпляры",
       "couldNotLoadDescription": "Проверьте подключение и попробуйте снова.",
       "cloudAgent": "Облачный агент",
+      "loading": "Загрузка…",
       "cloudAgentDescription": "Запуск в облачной песочнице Kilo",
       "noCliInstances": "Нет подключенных экземпляров CLI",
       "noCliInstancesDescription": "Выполните `kilo remote` в проекте на своем компьютере или обновите Kilo CLI, если она уже запущена.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Пользовательские режимы"
     },
+    "modeSelector": {
+      "accessibility": "Режим: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Код",
+      "plan": "План",
+      "debug": "Отладка",
+      "orchestrator": "Оркестратор",
+      "ask": "Спросить",
+      "codeDescription": "Писать и изменять код",
+      "planDescription": "Планировать и проектировать решения",
+      "debugDescription": "Находить и исправлять проблемы",
+      "orchestratorDescription": "Координировать сложные задачи",
+      "askDescription": "Получать ответы и объяснения"
+    },
     "repoPicker": {
       "title": "Выбрать репозиторий",
       "searchLabel": "Поиск репозиториев",
@@ -439,6 +508,279 @@
       "noRepositories": "Нет доступных репозиториев",
       "noRepositoriesDescription": "К вашей учетной записи не подключены репозитории.",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос."
+    },
+    "messageDetails": {
+      "title": "Сведения о сообщении",
+      "copyMessage": "Копировать сообщение",
+      "selectText": "Выделить текст",
+      "reportAiResponse": "Пожаловаться на ответ ИИ",
+      "reportAiResponseConfirm": "Отправить этот ответ на проверку?",
+      "report": "Пожаловаться",
+      "role": "Роль",
+      "roleUser": "Пользователь",
+      "roleAssistant": "Ассистент",
+      "sent": "Отправлено",
+      "model": "Модель",
+      "costAndTokens": "Стоимость и токены",
+      "cost": "Стоимость",
+      "input": "Ввод",
+      "output": "Вывод",
+      "reasoning": "Рассуждение",
+      "cacheRead": "Чтение кэша",
+      "cacheWrite": "Запись кэша",
+      "total": "Итого"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Сведения недоступны",
+      "textDisplay": "Отображение текста",
+      "thinking": "Мышление",
+      "thought": "Мысль",
+      "title": "Сведения",
+      "showDetails": "Показать сведения"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Не удалось отобразить содержимое"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Не удалось доставить",
+      "deliveryInterrupted": "Вы остановили это сообщение.",
+      "deliveryExhausted": "Мы не смогли доставить это сообщение после нескольких попыток.",
+      "deliveryExecution": "Агент не смог выполнить это сообщение.",
+      "assistantTitle": "Ответ не удался",
+      "assistantProviderRejected": "Провайдер отклонил запрос.",
+      "assistantStopped": "Ответ был остановлен.",
+      "assistantContextOverflow": "Разговор слишком длинный для модели.",
+      "assistantFailed": "Ответ не удался.",
+      "sendFailed": "Не удалось отправить сообщение. Попробуйте снова."
+    },
+    "filePart": {
+      "loadingImage": "Загрузка изображения",
+      "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
+      "imageUnavailable": "Изображение недоступно",
+      "imageUnavailableWithAlt": "Изображение недоступно {{alt}}",
+      "viewImage": "Просмотреть изображение",
+      "viewImageWithAlt": "Просмотреть изображение {{alt}}",
+      "imageOutput": "Вывод изображения",
+      "imageOutputWithFilename": "Вывод изображения, {{filename}}",
+      "defaultName": "Файл",
+      "openFullScreen": "Открыть {{name}} на весь экран",
+      "preview": "Предпросмотр {{name}}",
+      "openFile": "Открыть {{name}}",
+      "couldNotLoadFile": "Не удалось загрузить этот файл.",
+      "couldNotLoadFileRetry": "Не удалось загрузить этот файл. Попробуйте снова.",
+      "retryLoadingFile": "Повторить загрузку файла",
+      "fileEmpty": "Этот файл пуст.",
+      "previewUnavailable": "Предпросмотр недоступен",
+      "shareFailed": "Не удалось поделиться",
+      "sharingUnavailable": "Обмен файлами недоступен на этом устройстве.",
+      "shareFailedRetry": "Не удалось поделиться файлом. Попробуйте снова.",
+      "openAsText": "Открыть как текст",
+      "openInExternalApp": "Открыть во внешнем приложении"
+    },
+    "preparation": {
+      "exitCode": "Код выхода: {{code}}",
+      "earlierOutputOmitted": "Более ранний вывод опущен",
+      "preparingEnvironment": "Подготовка окружения",
+      "preparationComplete": "Подготовка завершена",
+      "preparationFailed": "Подготовка не удалась",
+      "setupCommand": "Команда настройки {{index}}",
+      "setupCommandOf": "Команда настройки {{index}} из {{count}}"
+    },
+    "permissionCard": {
+      "title": "Требуется разрешение",
+      "allowQuestion": "Разрешить {{permission}}?",
+      "appliesTo": "Применяется к:",
+      "denyPermission": "Запретить разрешение",
+      "deny": "Запретить",
+      "allowOnce": "Разрешить один раз",
+      "allowOnceAccessibility": "Разрешить один раз",
+      "alwaysAllow": "Всегда разрешать",
+      "alwaysAllowAccessibility": "Всегда разрешать",
+      "retrying": "Повторная попытка…"
+    },
+    "questionCard": {
+      "title": "Агенту нужен ввод",
+      "skipQuestionsTitle": "Пропустить вопросы?",
+      "skipQuestionsMessage": "Агент пропустит этот шаг.",
+      "selectAllThatApply": "Выберите все подходящие",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, выбрано",
+      "typeYourOwnAnswer": "Введите свой ответ",
+      "typeYourOwnAnswerPlaceholder": "Введите свой ответ…",
+      "skip": "Пропустить",
+      "retrySkip": "Повторить пропуск",
+      "submitting": "Отправка…",
+      "sendAnswers": "Отправить ответы"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Этот вопрос больше недоступен.",
+      "permissionUnavailable": "Этот запрос на разрешение больше недоступен.",
+      "failedToSkipQuestion": "Не удалось пропустить вопрос. Попробуйте снова.",
+      "failedToSubmitAnswer": "Не удалось отправить ответ. Попробуйте снова.",
+      "failedToRespondToPermission": "Не удалось ответить на запрос разрешения. Попробуйте снова.",
+      "submissionFailed": "Отправка не удалась. Попробуйте снова.",
+      "questionAnnouncement": "Агенту нужен ваш ввод. Редактор приостановлен, пока вы отвечаете.",
+      "permissionAnnouncement": "Агенту нужно разрешение для продолжения. Редактор приостановлен, пока вы решаете.",
+      "positionHint": "(1 из {{count}})",
+      "movedPastPrompt": "Агент прошел дальше этого запроса. Эта карточка закроется, когда сеанс продолжится.",
+      "waitingForAnswer": "Агент ждет вашего ответа. Пока этот вопрос открыт, ваше сообщение агенту приостановлено.",
+      "waitingForPermission": "Агент ждет разрешения. Пока этот запрос открыт, ваше сообщение агенту приостановлено."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Достигнута максимальная глубина вложенности.",
+      "modelAccessibility": "Модель: {{modelLabel}}",
+      "openHint": "Открыть сеанс субагента",
+      "subagent": "Субагент",
+      "task": "Задача",
+      "waitingForActivity": "Ожидание активности"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Не удалось загрузить сеанс субагента",
+      "failed": "Сеанс субагента завершился ошибкой",
+      "noMessages": "Нет сообщений субагента",
+      "noMessagesDescription": "Этот сеанс субагента завершился без создания протокола.",
+      "loading": "Загрузка сеанса субагента",
+      "loadingDescription": "Ожидание сообщений субагента…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Доступен повтор.",
+      "copyToComposer": "Копировать в редактор",
+      "queued": "В очереди",
+      "queuedAccessibility": "Сообщение в очереди",
+      "userMessage": "Сообщение пользователя",
+      "assistantMessage": "Сообщение ассистента",
+      "longPressHint": "Долгое нажатие для сведений о сообщении"
+    },
+    "olderMessages": {
+      "arrived": "Более ранние сообщения загружены"
+    },
+    "markdownTable": {
+      "viewTable": "Просмотреть таблицу",
+      "title": "Таблица",
+      "close": "Закрыть таблицу",
+      "column": "столбец",
+      "columns": "столбцы",
+      "row": "строка",
+      "rows": "строки",
+      "opensFullScreen": "открывается на весь экран"
+    },
+    "sessionFilter": {
+      "title": "Фильтровать сеансы",
+      "sortBy": "Сортировать по",
+      "sortLastUpdated": "Последнее обновление",
+      "sortCreated": "Создано",
+      "platform": "Платформа",
+      "platformCloud": "Облако",
+      "platformExtension": "Расширение",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Другое",
+      "project": "Проект",
+      "removeProjectFilter": "Убрать фильтр проекта {{label}}",
+      "removePlatformFilter": "Убрать фильтр платформы {{label}}"
+    },
+    "modelPicker": {
+      "title": "Выбрать модель",
+      "searchPlaceholder": "Поиск моделей...",
+      "noModels": "Нет доступных моделей",
+      "noModelsDescription": "Нет моделей, доступных для выбора."
+    },
+    "modelSelector": {
+      "model": "Модель",
+      "provider": "Провайдер {{id}}",
+      "modelId": "Модель {{id}}",
+      "unavailable": "Недоступно",
+      "unavailableState": "недоступно",
+      "selectedState": "выбрано",
+      "thinkingEffort": "Уровень мышления",
+      "thinkingEffortAccessibility": "{{label}} уровень мышления",
+      "thinkingEffortSelected": "{{label}} уровень мышления, выбрано",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} уровень мышления",
+      "lockedByAgent": ", Заблокировано агентом \"{{agent}}\"",
+      "addToFavorites": "Добавить {{name}} в избранное",
+      "removeFromFavorites": "Убрать {{name}} из избранного",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Не удалось открыть файл. Попробуйте снова.",
+      "retryUploading": "Повторить загрузку {{filename}}",
+      "removeAttachment": "Убрать вложение {{filename}}",
+      "uploading": "Загрузка…",
+      "uploaded": "Загружено",
+      "uploadFailedRetry": "Загрузка не удалась. Нажмите, чтобы повторить.",
+      "uploadFailedTerminal": "Этот файл нельзя загрузить."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Вставить изображение из буфера обмена",
+      "label": "Обнаружено изображение, нажмите, чтобы вставить"
+    },
+    "attachmentPicker": {
+      "camera": "Камера",
+      "photoLibrary": "Библиотека фото",
+      "files": "Файлы",
+      "cameraAccessDisabled": "Доступ к камере отключен",
+      "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото."
+    },
+    "composer": {
+      "addAttachment": "Добавить вложение",
+      "removeOrRetryFailed": "Сначала удалите или повторите неудачные вложения.",
+      "attachmentsWithSlashCommands": "Вложения нельзя отправлять с командами со слешем.",
+      "photoMetadataNotRemoved": "Не удалось удалить метаданные фотографии из вложения.",
+      "waitForUploads": "Дождитесь завершения загрузки вложений.",
+      "pasteFromClipboard": "Вставить из буфера обмена",
+      "stopGenerating": "Остановить генерацию",
+      "sendMessage": "Отправить сообщение"
+    },
+    "chatLink": {
+      "linkCopied": "Ссылка скопирована",
+      "reviewPr": "Проверить PR",
+      "openLink": "Открыть ссылку",
+      "copyLink": "Копировать ссылку",
+      "shareLink": "Поделиться ссылкой",
+      "share": "Поделиться",
+      "prLinkActions": "Действия со ссылкой на PR",
+      "linkActions": "Действия со ссылкой",
+      "couldNotCopyLink": "Не удалось скопировать ссылку",
+      "couldNotShareLink": "Не удалось поделиться ссылкой",
+      "opensInBrowser": "Открывается в браузере",
+      "showLinkActions": "Показать действия со ссылкой"
+    },
+    "compaction": {
+      "contextCompacted": "Контекст сжат"
+    },
+    "computeStatus": {
+      "exploring": "Изучение",
+      "searchingCodebase": "Поиск по кодовой базе",
+      "makingEdits": "Внесение правок",
+      "runningCommands": "Выполнение команд",
+      "searchingWeb": "Поиск в интернете",
+      "planningNextSteps": "Планирование следующих шагов",
+      "delegatingWork": "Делегирование работы",
+      "askingQuestion": "Задает вопрос",
+      "consideringNextSteps": "Обдумывание следующих шагов",
+      "writingResponse": "Написание ответа"
+    },
+    "slashCommands": {
+      "startNewSession": "Начать новый сеанс",
+      "exitSession": "Выйти из сеанса",
+      "clearSession": "Завершить этот сеанс и начать новый",
+      "upgradeRequiredFallback": "Обновите ваш CLI, чтобы использовать эту команду.",
+      "exitCapabilityUnavailable": "Обновите ваш CLI, чтобы выйти из сеанса.",
+      "clearCapabilityUnavailable": "Обновите ваш CLI, чтобы перезапустить сеанс.",
+      "argumentError": "{{command}} не принимает аргументы."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Размер окна контекста недоступен",
+      "tapToViewDetails": "Нажмите, чтобы просмотреть сведения о контексте.",
+      "costPrefix": "стоимость {{cost}}",
+      "costSuffix": ", стоимость {{cost}}",
+      "tokensWindowUnavailable": "Контекст {{used}} токенов, окно недоступно",
+      "tokensUsage": "Контекст {{used}} из {{window}} токенов, использовано {{percentage}}%"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Эта ссылка больше не действительна.",
     "goBack": "Назад",
     "title": "Страница не найдена"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Содержимое обрезано",
+    "truncated": "Обрезано",
+    "wrap": "Перенос",
+    "scroll": "Прокрутка"
   },
   "offline": {
     "noInternet": "Нет подключения к интернету",

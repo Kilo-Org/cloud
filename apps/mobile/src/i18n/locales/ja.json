@@ -16,6 +16,7 @@
     "refresh": "更新",
     "couldNotRefresh": "更新できませんでした。下に引いて再試行してください。",
     "openInBrowser": "ブラウザーで開く",
+    "openSettings": "設定を開く",
     "copiedToClipboard": "クリップボードにコピーしました",
     "required": "必須",
     "error": "エラー: {{error}}"
@@ -399,6 +400,9 @@
       "title": "検出結果をフィルター"
     }
   },
+  "agents": {
+    "activeNow": "現在アクティブ"
+  },
   "agentChat": {
     "session": {
       "title": "セッション",
@@ -411,14 +415,64 @@
       "notFound": "見つかりません",
       "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。"
     },
+    "remoteSession": {
+      "failedToCreate": "リモートセッションを作成できませんでした",
+      "exited": "セッションが終了しました",
+      "failedToExit": "セッションを終了できませんでした"
+    },
     "newSession": {
-      "title": "新しいセッション"
+      "title": "新しいセッション",
+      "repository": "リポジトリ",
+      "couldNotLoadRepositories": "リポジトリを読み込めませんでした",
+      "connectGithub": "GitHubを接続",
+      "connectGithubDescription": "ブラウザーでGitHubを接続し、ここに戻ってリポジトリを選択してください。",
+      "openGithub": "GitHubを開く",
+      "refreshRepositories": "リポジトリを更新",
+      "githubConnectionNotVisible": "GitHub接続がまだ確認できません",
+      "githubConnectionNotVisibleDescription": "Kilo GitHub Appをインストールまたは設定した場合は、もう一度確認してください。または、このアカウント/組織に対してインストールされていることを確認してください。",
+      "checkAgain": "もう一度確認",
+      "githubConnected": "GitHub接続済み",
+      "noRepositoriesVisible": "リポジトリが表示されません。Kilo GitHub Appのリポジトリアクセスを確認してから更新してください。",
+      "runOnWithTarget": "実行先: {{target}}",
+      "environment": "環境",
+      "couldNotLoadEnvironment": "環境を読み込めませんでした",
+      "retryLoadingEnvironment": "環境の読み込みを再試行",
+      "defaultEnvironment": "デフォルト環境",
+      "environmentSummary": "{{commands}}コマンド · {{mcp}} MCP · {{skills}}スキル · {{agents}}エージェント",
+      "changes": "変更",
+      "leaveChanges": "変更を残す",
+      "commitAndPush": "コミットしてプッシュ",
+      "startSession": "セッションを開始",
+      "promptPlaceholder": "何に取り組みますか？",
+      "addAttachment": "添付ファイルを追加",
+      "couldNotLoadModels": "モデルを読み込めませんでした",
+      "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
+      "prefillRepoUnavailable": "{{repo}}は利用できなくなりました。以下でリポジトリを選択してください。",
+      "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。"
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}}件のファイルを更新しました",
+      "updatedFiles": "{{count}}件のファイルを更新しました"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "{{start}}–{{end}}行目（切り詰め）",
+      "linesOf": "{{total}}行中{{start}}–{{end}}行目"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "クラウドエージェントの{{action}}に失敗しました ({{status}})",
+      "failed": "クラウドエージェントの{{action}}に失敗しました"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[シリアル化できない入力]",
+      "errorPrefix": "エラー: {{error}}"
     },
     "instancePicker": {
       "runOn": "実行先",
+      "runOnAccessibility": "実行先: {{label}}",
       "couldNotLoad": "インスタンスを読み込めませんでした",
       "couldNotLoadDescription": "接続を確認して、もう一度お試しください。",
       "cloudAgent": "クラウドエージェント",
+      "loading": "読み込み中…",
       "cloudAgentDescription": "Kiloのクラウドサンドボックスで実行",
       "noCliInstances": "接続されたCLIインスタンスがありません",
       "noCliInstancesDescription": "コンピューター上のプロジェクトで`kilo remote`を実行するか、すでに実行中の場合はKilo CLIを更新してください。",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "カスタムモード"
     },
+    "modeSelector": {
+      "accessibility": "モード: {{label}}"
+    },
+    "modeOptions": {
+      "code": "コード",
+      "plan": "プラン",
+      "debug": "デバッグ",
+      "orchestrator": "オーケストレーター",
+      "ask": "質問",
+      "codeDescription": "コードを作成・変更",
+      "planDescription": "ソリューションを計画・設計",
+      "debugDescription": "問題を検出して修正",
+      "orchestratorDescription": "複雑なタスクを調整",
+      "askDescription": "回答と説明を得る"
+    },
     "repoPicker": {
       "title": "リポジトリを選択",
       "searchLabel": "リポジトリを検索",
@@ -439,6 +508,279 @@
       "noRepositories": "利用可能なリポジトリはありません",
       "noRepositoriesDescription": "アカウントに接続されたリポジトリはありません。",
       "tryDifferentSearch": "別の検索語をお試しください。"
+    },
+    "messageDetails": {
+      "title": "メッセージの詳細",
+      "copyMessage": "メッセージをコピー",
+      "selectText": "テキストを選択",
+      "reportAiResponse": "AI応答を報告",
+      "reportAiResponseConfirm": "この応答をレビュー対象として報告しますか？",
+      "report": "報告",
+      "role": "役割",
+      "roleUser": "ユーザー",
+      "roleAssistant": "アシスタント",
+      "sent": "送信日時",
+      "model": "モデル",
+      "costAndTokens": "コストとトークン",
+      "cost": "コスト",
+      "input": "入力",
+      "output": "出力",
+      "reasoning": "推論",
+      "cacheRead": "キャッシュ読み取り",
+      "cacheWrite": "キャッシュ書き込み",
+      "total": "合計"
+    },
+    "partDetail": {
+      "detailsUnavailable": "詳細を利用できません",
+      "textDisplay": "テキスト表示",
+      "thinking": "思考",
+      "thought": "思考",
+      "title": "詳細",
+      "showDetails": "詳細を表示"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "コンテンツを描画できませんでした"
+    },
+    "messageFailure": {
+      "deliveryTitle": "配信に失敗しました",
+      "deliveryInterrupted": "このメッセージを停止しました。",
+      "deliveryExhausted": "数回試行しましたが、このメッセージを配信できませんでした。",
+      "deliveryExecution": "エージェントはこのメッセージを実行できませんでした。",
+      "assistantTitle": "応答に失敗しました",
+      "assistantProviderRejected": "プロバイダーがリクエストを拒否しました。",
+      "assistantStopped": "応答が停止されました。",
+      "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
+      "assistantFailed": "応答に失敗しました。",
+      "sendFailed": "メッセージを送信できませんでした。もう一度お試しください。"
+    },
+    "filePart": {
+      "loadingImage": "画像を読み込み中",
+      "imageUnavailableRetry": "画像を利用できません。読み込みを再試行してください",
+      "imageUnavailable": "画像を利用できません",
+      "imageUnavailableWithAlt": "画像を利用できません {{alt}}",
+      "viewImage": "画像を表示",
+      "viewImageWithAlt": "画像を表示 {{alt}}",
+      "imageOutput": "画像出力",
+      "imageOutputWithFilename": "画像出力、{{filename}}",
+      "defaultName": "ファイル",
+      "openFullScreen": "{{name}}を全画面で開く",
+      "preview": "{{name}}をプレビュー",
+      "openFile": "{{name}}を開く",
+      "couldNotLoadFile": "このファイルを読み込めませんでした。",
+      "couldNotLoadFileRetry": "このファイルを読み込めませんでした。もう一度お試しください。",
+      "retryLoadingFile": "ファイルの読み込みを再試行",
+      "fileEmpty": "このファイルは空です。",
+      "previewUnavailable": "プレビューを利用できません",
+      "shareFailed": "共有に失敗しました",
+      "sharingUnavailable": "このデバイスではファイル共有を利用できません。",
+      "shareFailedRetry": "ファイルを共有できませんでした。もう一度お試しください。",
+      "openAsText": "テキストとして開く",
+      "openInExternalApp": "外部アプリで開く"
+    },
+    "preparation": {
+      "exitCode": "終了コード: {{code}}",
+      "earlierOutputOmitted": "以前の出力は省略されました",
+      "preparingEnvironment": "環境を準備中",
+      "preparationComplete": "準備が完了しました",
+      "preparationFailed": "準備に失敗しました",
+      "setupCommand": "セットアップコマンド {{index}}",
+      "setupCommandOf": "セットアップコマンド {{index}} / {{count}}"
+    },
+    "permissionCard": {
+      "title": "権限が必要です",
+      "allowQuestion": "{{permission}}を許可しますか？",
+      "appliesTo": "適用対象:",
+      "denyPermission": "権限を拒否",
+      "deny": "拒否",
+      "allowOnce": "1回だけ許可",
+      "allowOnceAccessibility": "1回だけ許可",
+      "alwaysAllow": "常に許可",
+      "alwaysAllowAccessibility": "常に許可",
+      "retrying": "再試行中…"
+    },
+    "questionCard": {
+      "title": "エージェントが入力を求めています",
+      "skipQuestionsTitle": "質問をスキップしますか？",
+      "skipQuestionsMessage": "エージェントはこのステップをスキップします。",
+      "selectAllThatApply": "該当するものをすべて選択",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}、選択済み",
+      "typeYourOwnAnswer": "自分の回答を入力",
+      "typeYourOwnAnswerPlaceholder": "自分の回答を入力…",
+      "skip": "スキップ",
+      "retrySkip": "スキップを再試行",
+      "submitting": "送信中…",
+      "sendAnswers": "回答を送信"
+    },
+    "blockingCard": {
+      "questionUnavailable": "この質問は利用できなくなりました。",
+      "permissionUnavailable": "この権限リクエストは利用できなくなりました。",
+      "failedToSkipQuestion": "質問をスキップできませんでした。もう一度お試しください。",
+      "failedToSubmitAnswer": "回答を送信できませんでした。もう一度お試しください。",
+      "failedToRespondToPermission": "権限に応答できませんでした。もう一度お試しください。",
+      "submissionFailed": "送信に失敗しました。もう一度お試しください。",
+      "questionAnnouncement": "エージェントが入力を必要としています。回答中はコンポーザーが一時停止しています。",
+      "permissionAnnouncement": "続行するにはエージェントの権限が必要です。判断中はコンポーザーが一時停止しています。",
+      "positionHint": "({{count}}件中1件目)",
+      "movedPastPrompt": "エージェントはこのプロンプトを通過しました。セッションが続行するとこのカードは閉じます。",
+      "waitingForAnswer": "エージェントが回答を待っています。この質問が開いている間、エージェントへのメッセージは一時停止されます。",
+      "waitingForPermission": "エージェントが権限を待っています。このリクエストが開いている間、エージェントへのメッセージは一時停止されます。"
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}、{{taskName}}{{modelLabel}}、{{latestActivityLabel}}、{{status}}",
+      "maxNestingDepth": "最大ネスト深度に達しました。",
+      "modelAccessibility": "モデル: {{modelLabel}}",
+      "openHint": "サブエージェントセッションを開く",
+      "subagent": "サブエージェント",
+      "task": "タスク",
+      "waitingForActivity": "アクティビティを待機中"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "サブエージェントセッションを読み込めませんでした",
+      "failed": "サブエージェントセッションが失敗しました",
+      "noMessages": "サブエージェントのメッセージがありません",
+      "noMessagesDescription": "このサブエージェントセッションはトランスクリプトを生成せずに完了しました。",
+      "loading": "サブエージェントセッションを読み込み中",
+      "loadingDescription": "サブエージェントのメッセージを待機中…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}。",
+      "failureRetryAvailable": "{{title}}。再試行できます。",
+      "copyToComposer": "コンポーザーにコピー",
+      "queued": "キューに追加済み",
+      "queuedAccessibility": "メッセージがキューに追加されました",
+      "userMessage": "ユーザーメッセージ",
+      "assistantMessage": "アシスタントメッセージ",
+      "longPressHint": "メッセージの詳細は長押し"
+    },
+    "olderMessages": {
+      "arrived": "以前のメッセージを読み込みました"
+    },
+    "markdownTable": {
+      "viewTable": "テーブルを表示",
+      "title": "テーブル",
+      "close": "テーブルを閉じる",
+      "column": "列",
+      "columns": "列",
+      "row": "行",
+      "rows": "行",
+      "opensFullScreen": "全画面で開きます"
+    },
+    "sessionFilter": {
+      "title": "セッションをフィルター",
+      "sortBy": "並べ替え",
+      "sortLastUpdated": "最終更新",
+      "sortCreated": "作成日時",
+      "platform": "プラットフォーム",
+      "platformCloud": "クラウド",
+      "platformExtension": "拡張機能",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "その他",
+      "project": "プロジェクト",
+      "removeProjectFilter": "{{label}}プロジェクトフィルターを削除",
+      "removePlatformFilter": "{{label}}プラットフォームフィルターを削除"
+    },
+    "modelPicker": {
+      "title": "モデルを選択",
+      "searchPlaceholder": "モデルを検索...",
+      "noModels": "利用可能なモデルはありません",
+      "noModelsDescription": "選択できるモデルはありません。"
+    },
+    "modelSelector": {
+      "model": "モデル",
+      "provider": "プロバイダー {{id}}",
+      "modelId": "モデル {{id}}",
+      "unavailable": "利用不可",
+      "unavailableState": "利用不可",
+      "selectedState": "選択済み",
+      "thinkingEffort": "思考量",
+      "thinkingEffortAccessibility": "{{label}}の思考量",
+      "thinkingEffortSelected": "{{label}}の思考量、選択済み",
+      "thinkingEffortWithModel": "{{model}}、{{variant}}の思考量",
+      "lockedByAgent": "、エージェント「{{agent}}」によってロックされています",
+      "addToFavorites": "{{name}}をお気に入りに追加",
+      "removeFromFavorites": "{{name}}をお気に入りから削除",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "ファイルを開けませんでした。もう一度お試しください。",
+      "retryUploading": "{{filename}}のアップロードを再試行",
+      "removeAttachment": "添付ファイル{{filename}}を削除",
+      "uploading": "アップロード中…",
+      "uploaded": "アップロード済み",
+      "uploadFailedRetry": "アップロードに失敗しました。タップして再試行してください。",
+      "uploadFailedTerminal": "このファイルはアップロードできません。"
+    },
+    "attachmentPasteHint": {
+      "accessibility": "クリップボードから画像を貼り付け",
+      "label": "画像を検出しました。タップして貼り付け"
+    },
+    "attachmentPicker": {
+      "camera": "カメラ",
+      "photoLibrary": "フォトライブラリ",
+      "files": "ファイル",
+      "cameraAccessDisabled": "カメラアクセスが無効です",
+      "cameraAccessMessage": "写真を撮るには設定でカメラアクセスを許可してください。"
+    },
+    "composer": {
+      "addAttachment": "添付ファイルを追加",
+      "removeOrRetryFailed": "まず失敗した添付ファイルを削除するか再試行してください。",
+      "attachmentsWithSlashCommands": "添付ファイルはスラッシュコマンドと一緒に送信できません。",
+      "photoMetadataNotRemoved": "添付ファイルから写真のメタデータを削除できませんでした。",
+      "waitForUploads": "添付ファイルのアップロードが完了するまでお待ちください。",
+      "pasteFromClipboard": "クリップボードから貼り付け",
+      "stopGenerating": "生成を停止",
+      "sendMessage": "メッセージを送信"
+    },
+    "chatLink": {
+      "linkCopied": "リンクをコピーしました",
+      "reviewPr": "PRをレビュー",
+      "openLink": "リンクを開く",
+      "copyLink": "リンクをコピー",
+      "shareLink": "リンクを共有",
+      "share": "共有",
+      "prLinkActions": "PRリンクの操作",
+      "linkActions": "リンクの操作",
+      "couldNotCopyLink": "リンクをコピーできませんでした",
+      "couldNotShareLink": "リンクを共有できませんでした",
+      "opensInBrowser": "ブラウザーで開きます",
+      "showLinkActions": "リンクの操作を表示"
+    },
+    "compaction": {
+      "contextCompacted": "コンテキストを圧縮しました"
+    },
+    "computeStatus": {
+      "exploring": "調査中",
+      "searchingCodebase": "コードベースを検索中",
+      "makingEdits": "編集を実行中",
+      "runningCommands": "コマンドを実行中",
+      "searchingWeb": "Webを検索中",
+      "planningNextSteps": "次のステップを計画中",
+      "delegatingWork": "作業を委任中",
+      "askingQuestion": "質問中",
+      "consideringNextSteps": "次のステップを検討中",
+      "writingResponse": "応答を作成中"
+    },
+    "slashCommands": {
+      "startNewSession": "新しいセッションを開始",
+      "exitSession": "セッションを終了",
+      "clearSession": "このセッションを終了して新しいセッションを開始",
+      "upgradeRequiredFallback": "このコマンドを使用するにはCLIをアップグレードしてください。",
+      "exitCapabilityUnavailable": "セッションを終了するにはCLIを更新してください。",
+      "clearCapabilityUnavailable": "セッションを再開するにはCLIを更新してください。",
+      "argumentError": "{{command}}は引数を取りません。"
+    },
+    "contextUsage": {
+      "windowUnavailable": "コンテキストウィンドウのサイズを利用できません",
+      "tapToViewDetails": "タップしてコンテキストの詳細を表示。",
+      "costPrefix": "コスト {{cost}}",
+      "costSuffix": "、コスト {{cost}}",
+      "tokensWindowUnavailable": "コンテキスト {{used}}トークン、ウィンドウを利用できません",
+      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}%使用"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "このリンクは無効になりました。",
     "goBack": "戻る",
     "title": "ページが見つかりません"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "コンテンツが切り詰められました",
+    "truncated": "切り詰め",
+    "wrap": "折り返し",
+    "scroll": "スクロール"
   },
   "offline": {
     "noInternet": "インターネット接続がありません",

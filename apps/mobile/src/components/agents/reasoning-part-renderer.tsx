@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
@@ -22,12 +23,15 @@ export function ReasoningPartRenderer({
 }: Readonly<ReasoningPartRendererProps>) {
   const openPartDetail = useOpenPartDetail();
   const textSelectable = useTranscriptTextSelectable();
+  const { t } = useTranslation();
 
   if (text.trim() === '') {
     return null;
   }
 
-  const label = isStreaming ? 'Thinking' : 'Thought';
+  const label = isStreaming
+    ? t('agentChat.partDetail.thinking')
+    : t('agentChat.partDetail.thought');
 
   if (defaultExpanded) {
     // Static, not collapsible: dashed container, Eyebrow label, full text.

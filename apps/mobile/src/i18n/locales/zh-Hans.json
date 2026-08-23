@@ -16,6 +16,7 @@
     "refresh": "刷新",
     "couldNotRefresh": "无法刷新。下拉重试。",
     "openInBrowser": "在浏览器中打开",
+    "openSettings": "打开设置",
     "copiedToClipboard": "已复制到剪贴板",
     "required": "必填",
     "error": "错误：{{error}}"
@@ -399,6 +400,9 @@
       "title": "筛选发现"
     }
   },
+  "agents": {
+    "activeNow": "当前活跃"
+  },
   "agentChat": {
     "session": {
       "title": "会话",
@@ -411,14 +415,64 @@
       "notFound": "未找到",
       "notFoundDescription": "此项目可能已被删除或不再可用。"
     },
+    "remoteSession": {
+      "failedToCreate": "创建远程会话失败",
+      "exited": "会话已退出",
+      "failedToExit": "退出会话失败"
+    },
     "newSession": {
-      "title": "新会话"
+      "title": "新会话",
+      "repository": "仓库",
+      "couldNotLoadRepositories": "无法加载仓库",
+      "connectGithub": "连接 GitHub",
+      "connectGithubDescription": "在浏览器中连接 GitHub，然后返回此处选择仓库。",
+      "openGithub": "打开 GitHub",
+      "refreshRepositories": "刷新仓库",
+      "githubConnectionNotVisible": "我们暂时看不到您的 GitHub 连接",
+      "githubConnectionNotVisibleDescription": "如果您已安装或配置 Kilo GitHub App，请再检查一次 — 或确认它是为此账户/组织安装的。",
+      "checkAgain": "再检查一次",
+      "githubConnected": "GitHub 已连接",
+      "noRepositoriesVisible": "看不到任何仓库。请检查 Kilo GitHub App 的仓库访问权限，然后刷新。",
+      "runOnWithTarget": "运行于：{{target}}",
+      "environment": "环境",
+      "couldNotLoadEnvironment": "无法加载您的环境",
+      "retryLoadingEnvironment": "重试加载环境",
+      "defaultEnvironment": "默认环境",
+      "environmentSummary": "{{commands}} 条命令 · {{mcp}} 个 MCP · {{skills}} 项技能 · {{agents}} 个代理",
+      "changes": "更改",
+      "leaveChanges": "保留更改",
+      "commitAndPush": "提交并推送",
+      "startSession": "开始会话",
+      "promptPlaceholder": "您想处理什么？",
+      "addAttachment": "添加附件",
+      "couldNotLoadModels": "无法加载模型",
+      "prefillRepoAndModelUnavailable": "原始会话的仓库和模型已不再可用。请在下方选择。",
+      "prefillRepoUnavailable": "{{repo}} 已不再可用。请在下方选择一个仓库。",
+      "prefillModelUnavailable": "{{model}} 已不再可用。正在使用您的默认模型。"
+    },
+    "partRenderer": {
+      "updatedFile": "已更新 {{count}} 个文件",
+      "updatedFiles": "已更新 {{count}} 个文件"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
+      "linesOf": "第 {{start}}–{{end}} 行，共 {{total}} 行"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "云端代理 {{action}} 失败（{{status}}）",
+      "failed": "云端代理 {{action}} 失败"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[无法序列化的输入]",
+      "errorPrefix": "错误：{{error}}"
     },
     "instancePicker": {
       "runOn": "运行于",
+      "runOnAccessibility": "运行于：{{label}}",
       "couldNotLoad": "无法加载实例",
       "couldNotLoadDescription": "请检查连接后重试。",
       "cloudAgent": "云端代理",
+      "loading": "加载中…",
       "cloudAgentDescription": "在 Kilo 的云端沙盒中运行",
       "noCliInstances": "未连接 CLI 实例",
       "noCliInstancesDescription": "在您电脑上的项目中运行 `kilo remote`，或如果已有 Kilo CLI 在运行，请更新它。",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "自定义模式"
     },
+    "modeSelector": {
+      "accessibility": "模式：{{label}}"
+    },
+    "modeOptions": {
+      "code": "代码",
+      "plan": "规划",
+      "debug": "调试",
+      "orchestrator": "编排器",
+      "ask": "提问",
+      "codeDescription": "编写和修改代码",
+      "planDescription": "规划和设计解决方案",
+      "debugDescription": "查找并修复问题",
+      "orchestratorDescription": "协调复杂任务",
+      "askDescription": "获取答案和解释"
+    },
     "repoPicker": {
       "title": "选择仓库",
       "searchLabel": "搜索仓库",
@@ -439,6 +508,279 @@
       "noRepositories": "没有可用的仓库",
       "noRepositoriesDescription": "您的账户没有连接任何仓库。",
       "tryDifferentSearch": "请尝试其他搜索词。"
+    },
+    "messageDetails": {
+      "title": "消息详情",
+      "copyMessage": "复制消息",
+      "selectText": "选择文本",
+      "reportAiResponse": "举报 AI 回复",
+      "reportAiResponseConfirm": "举报此回复以供审查？",
+      "report": "举报",
+      "role": "角色",
+      "roleUser": "用户",
+      "roleAssistant": "助手",
+      "sent": "已发送",
+      "model": "模型",
+      "costAndTokens": "费用与令牌",
+      "cost": "费用",
+      "input": "输入",
+      "output": "输出",
+      "reasoning": "推理",
+      "cacheRead": "缓存读取",
+      "cacheWrite": "缓存写入",
+      "total": "总计"
+    },
+    "partDetail": {
+      "detailsUnavailable": "详情不可用",
+      "textDisplay": "文本显示",
+      "thinking": "思考",
+      "thought": "想法",
+      "title": "详情",
+      "showDetails": "显示详情"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "内容渲染失败"
+    },
+    "messageFailure": {
+      "deliveryTitle": "发送失败",
+      "deliveryInterrupted": "您停止了此消息。",
+      "deliveryExhausted": "多次尝试后，我们仍无法送达此消息。",
+      "deliveryExecution": "代理无法运行此消息。",
+      "assistantTitle": "回复失败",
+      "assistantProviderRejected": "提供商拒绝了该请求。",
+      "assistantStopped": "回复已停止。",
+      "assistantContextOverflow": "对话对模型而言过长。",
+      "assistantFailed": "回复失败。",
+      "sendFailed": "发送消息失败。请重试。"
+    },
+    "filePart": {
+      "loadingImage": "正在加载图片",
+      "imageUnavailableRetry": "图片不可用，重试加载",
+      "imageUnavailable": "图片不可用",
+      "imageUnavailableWithAlt": "图片不可用 {{alt}}",
+      "viewImage": "查看图片",
+      "viewImageWithAlt": "查看图片 {{alt}}",
+      "imageOutput": "图片输出",
+      "imageOutputWithFilename": "图片输出，{{filename}}",
+      "defaultName": "文件",
+      "openFullScreen": "全屏打开 {{name}}",
+      "preview": "预览 {{name}}",
+      "openFile": "打开 {{name}}",
+      "couldNotLoadFile": "无法加载此文件。",
+      "couldNotLoadFileRetry": "无法加载此文件。请重试。",
+      "retryLoadingFile": "重试加载文件",
+      "fileEmpty": "此文件为空。",
+      "previewUnavailable": "预览不可用",
+      "shareFailed": "分享失败",
+      "sharingUnavailable": "此设备不支持文件分享。",
+      "shareFailedRetry": "分享文件失败。请重试。",
+      "openAsText": "以文本打开",
+      "openInExternalApp": "在外部应用中打开"
+    },
+    "preparation": {
+      "exitCode": "退出代码：{{code}}",
+      "earlierOutputOmitted": "较早的输出已省略",
+      "preparingEnvironment": "正在准备环境",
+      "preparationComplete": "准备完成",
+      "preparationFailed": "准备失败",
+      "setupCommand": "设置命令 {{index}}",
+      "setupCommandOf": "设置命令 {{index}}/{{count}}"
+    },
+    "permissionCard": {
+      "title": "需要权限",
+      "allowQuestion": "允许 {{permission}}？",
+      "appliesTo": "适用于：",
+      "denyPermission": "拒绝权限",
+      "deny": "拒绝",
+      "allowOnce": "允许一次",
+      "allowOnceAccessibility": "允许一次",
+      "alwaysAllow": "始终允许",
+      "alwaysAllowAccessibility": "始终允许",
+      "retrying": "正在重试…"
+    },
+    "questionCard": {
+      "title": "代理需要输入",
+      "skipQuestionsTitle": "跳过问题？",
+      "skipQuestionsMessage": "代理将跳过此步骤。",
+      "selectAllThatApply": "选择所有适用的选项",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}，已选择",
+      "typeYourOwnAnswer": "输入您自己的答案",
+      "typeYourOwnAnswerPlaceholder": "输入您自己的答案…",
+      "skip": "跳过",
+      "retrySkip": "重试跳过",
+      "submitting": "正在提交…",
+      "sendAnswers": "发送答案"
+    },
+    "blockingCard": {
+      "questionUnavailable": "此问题已不再可用。",
+      "permissionUnavailable": "此权限请求已不再可用。",
+      "failedToSkipQuestion": "跳过问题失败。请重试。",
+      "failedToSubmitAnswer": "提交答案失败。请重试。",
+      "failedToRespondToPermission": "响应权限失败。请重试。",
+      "submissionFailed": "提交失败。请重试。",
+      "questionAnnouncement": "代理需要您的输入。在您回答期间，编辑器已暂停。",
+      "permissionAnnouncement": "代理需要权限才能继续。在您决定期间，编辑器已暂停。",
+      "positionHint": "（{{count}} 之 1）",
+      "movedPastPrompt": "代理已越过此提示。会话继续时此卡片将关闭。",
+      "waitingForAnswer": "代理正在等待您的回答。此问题打开期间，您发给代理的消息已暂停。",
+      "waitingForPermission": "代理正在等待权限。此请求打开期间，您发给代理的消息已暂停。"
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}，{{taskName}}{{modelLabel}}，{{latestActivityLabel}}，{{status}}",
+      "maxNestingDepth": "已达到最大嵌套深度。",
+      "modelAccessibility": "模型：{{modelLabel}}",
+      "openHint": "打开子代理会话",
+      "subagent": "子代理",
+      "task": "任务",
+      "waitingForActivity": "等待活动"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "无法加载子代理会话",
+      "failed": "子代理会话失败",
+      "noMessages": "没有子代理消息",
+      "noMessagesDescription": "此子代理会话已完成，但未生成记录。",
+      "loading": "正在加载子代理会话",
+      "loadingDescription": "正在等待子代理消息…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}。",
+      "failureRetryAvailable": "{{title}}。可重试。",
+      "copyToComposer": "复制到编辑器",
+      "queued": "已排队",
+      "queuedAccessibility": "消息已排队",
+      "userMessage": "用户消息",
+      "assistantMessage": "助手消息",
+      "longPressHint": "长按查看消息详情"
+    },
+    "olderMessages": {
+      "arrived": "已加载较早的消息"
+    },
+    "markdownTable": {
+      "viewTable": "查看表格",
+      "title": "表格",
+      "close": "关闭表格",
+      "column": "列",
+      "columns": "列",
+      "row": "行",
+      "rows": "行",
+      "opensFullScreen": "打开全屏"
+    },
+    "sessionFilter": {
+      "title": "筛选会话",
+      "sortBy": "排序方式",
+      "sortLastUpdated": "最近更新",
+      "sortCreated": "创建时间",
+      "platform": "平台",
+      "platformCloud": "云端",
+      "platformExtension": "扩展",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "其他",
+      "project": "项目",
+      "removeProjectFilter": "移除 {{label}} 项目筛选",
+      "removePlatformFilter": "移除 {{label}} 平台筛选"
+    },
+    "modelPicker": {
+      "title": "选择模型",
+      "searchPlaceholder": "搜索模型...",
+      "noModels": "没有可用的模型",
+      "noModelsDescription": "没有可选择的模型。"
+    },
+    "modelSelector": {
+      "model": "模型",
+      "provider": "提供商 {{id}}",
+      "modelId": "模型 {{id}}",
+      "unavailable": "不可用",
+      "unavailableState": "不可用",
+      "selectedState": "已选择",
+      "thinkingEffort": "思考强度",
+      "thinkingEffortAccessibility": "{{label}} 思考强度",
+      "thinkingEffortSelected": "{{label}} 思考强度，已选择",
+      "thinkingEffortWithModel": "{{model}}，{{variant}} 思考强度",
+      "lockedByAgent": "，已被代理“{{agent}}”锁定",
+      "addToFavorites": "将 {{name}} 添加到收藏",
+      "removeFromFavorites": "从收藏中移除 {{name}}",
+      "thinkingEffortXhigh": "超高",
+      "thinkingEffortMedium": "中"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "打开文件失败。请重试。",
+      "retryUploading": "重试上传 {{filename}}",
+      "removeAttachment": "移除附件 {{filename}}",
+      "uploading": "正在上传…",
+      "uploaded": "已上传",
+      "uploadFailedRetry": "上传失败。点击重试。",
+      "uploadFailedTerminal": "无法上传此文件。"
+    },
+    "attachmentPasteHint": {
+      "accessibility": "从剪贴板粘贴图片",
+      "label": "检测到图片，点击粘贴"
+    },
+    "attachmentPicker": {
+      "camera": "相机",
+      "photoLibrary": "照片图库",
+      "files": "文件",
+      "cameraAccessDisabled": "相机访问已禁用",
+      "cameraAccessMessage": "在设置中允许相机访问以拍照。"
+    },
+    "composer": {
+      "addAttachment": "添加附件",
+      "removeOrRetryFailed": "请先移除或重试失败的附件。",
+      "attachmentsWithSlashCommands": "附件无法与斜杠命令一起发送。",
+      "photoMetadataNotRemoved": "无法移除附件中的照片元数据。",
+      "waitForUploads": "请等待附件上传完成。",
+      "pasteFromClipboard": "从剪贴板粘贴",
+      "stopGenerating": "停止生成",
+      "sendMessage": "发送消息"
+    },
+    "chatLink": {
+      "linkCopied": "链接已复制",
+      "reviewPr": "审查 PR",
+      "openLink": "打开链接",
+      "copyLink": "复制链接",
+      "shareLink": "分享链接",
+      "share": "分享",
+      "prLinkActions": "PR 链接操作",
+      "linkActions": "链接操作",
+      "couldNotCopyLink": "无法复制链接",
+      "couldNotShareLink": "无法分享链接",
+      "opensInBrowser": "在浏览器中打开",
+      "showLinkActions": "显示链接操作"
+    },
+    "compaction": {
+      "contextCompacted": "上下文已压缩"
+    },
+    "computeStatus": {
+      "exploring": "正在探索",
+      "searchingCodebase": "正在搜索代码库",
+      "makingEdits": "正在编辑",
+      "runningCommands": "正在运行命令",
+      "searchingWeb": "正在搜索网络",
+      "planningNextSteps": "正在规划下一步",
+      "delegatingWork": "正在委派工作",
+      "askingQuestion": "正在提问",
+      "consideringNextSteps": "正在考虑下一步",
+      "writingResponse": "正在撰写回复"
+    },
+    "slashCommands": {
+      "startNewSession": "开始一个新会话",
+      "exitSession": "退出会话",
+      "clearSession": "结束此会话并开始一个新会话",
+      "upgradeRequiredFallback": "请升级您的 CLI 以使用此命令。",
+      "exitCapabilityUnavailable": "更新您的 CLI 以退出会话。",
+      "clearCapabilityUnavailable": "更新您的 CLI 以重新启动会话。",
+      "argumentError": "{{command}} 不接受参数。"
+    },
+    "contextUsage": {
+      "windowUnavailable": "上下文窗口大小不可用",
+      "tapToViewDetails": "点击查看上下文详情。",
+      "costPrefix": "费用 {{cost}}",
+      "costSuffix": "，费用 {{cost}}",
+      "tokensWindowUnavailable": "上下文 {{used}} 个令牌，窗口不可用",
+      "tokensUsage": "上下文 {{used}}/{{window}} 个令牌，已使用 {{percentage}}%"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "此链接已失效。",
     "goBack": "返回",
     "title": "页面未找到"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "内容已截断",
+    "truncated": "已截断",
+    "wrap": "换行",
+    "scroll": "滚动"
   },
   "offline": {
     "noInternet": "无网络连接",

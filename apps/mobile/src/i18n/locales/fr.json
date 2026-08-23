@@ -16,6 +16,7 @@
     "couldNotRefresh": "Actualisation impossible. Tirez vers le bas pour réessayer.",
     "tryAgain": "Réessayer",
     "openInBrowser": "Ouvrir dans le navigateur",
+    "openSettings": "Ouvrir les Réglages",
     "copiedToClipboard": "Copié dans le presse-papiers",
     "required": "obligatoire",
     "error": "erreur : {{error}}"
@@ -398,20 +399,70 @@
       "notFound": "Introuvable",
       "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible."
     },
+    "remoteSession": {
+      "failedToCreate": "Échec de la création de la session distante",
+      "exited": "Session terminée",
+      "failedToExit": "Échec de la sortie de la session"
+    },
     "newSession": {
-      "title": "Nouvelle session"
+      "title": "Nouvelle session",
+      "repository": "Dépôt",
+      "couldNotLoadRepositories": "Impossible de charger les dépôts",
+      "connectGithub": "Connecter GitHub",
+      "connectGithubDescription": "Connectez GitHub dans votre navigateur, puis revenez ici pour choisir un dépôt.",
+      "openGithub": "Ouvrir GitHub",
+      "refreshRepositories": "Actualiser les dépôts",
+      "githubConnectionNotVisible": "Nous ne voyons pas encore votre connexion GitHub",
+      "githubConnectionNotVisibleDescription": "Si vous avez installé ou configuré la Kilo GitHub App, vérifiez à nouveau — ou assurez-vous qu'elle a été installée pour ce compte/cette organisation.",
+      "checkAgain": "Vérifier à nouveau",
+      "githubConnected": "GitHub connecté",
+      "noRepositoriesVisible": "Aucun dépôt visible. Vérifiez l'accès au dépôt de la Kilo GitHub App, puis actualisez.",
+      "runOnWithTarget": "Exécuter sur : {{target}}",
+      "environment": "Environnement",
+      "couldNotLoadEnvironment": "Impossible de charger votre environnement",
+      "retryLoadingEnvironment": "Réessayer le chargement de l'environnement",
+      "defaultEnvironment": "Environnement par défaut",
+      "environmentSummary": "{{commands}} commandes · {{mcp}} MCP · {{skills}} compétences · {{agents}} agents",
+      "changes": "Modifications",
+      "leaveChanges": "Laisser les modifications",
+      "commitAndPush": "Commit et push",
+      "startSession": "Démarrer la session",
+      "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
+      "addAttachment": "Ajouter une pièce jointe",
+      "couldNotLoadModels": "Impossible de charger les modèles",
+      "prefillRepoAndModelUnavailable": "Le dépôt et le modèle de la session d'origine ne sont plus disponibles. Choisissez-les ci-dessous.",
+      "prefillRepoUnavailable": "{{repo}} n'est plus disponible. Choisissez un dépôt ci-dessous.",
+      "prefillModelUnavailable": "{{model}} n'est plus disponible. Utilisation de votre modèle par défaut."
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}} fichier mis à jour",
+      "updatedFiles": "{{count}} fichiers mis à jour"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",
+      "linesOf": "lignes {{start}}–{{end}} sur {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Échec de l'agent cloud {{action}} ({{status}})",
+      "failed": "Échec de l'agent cloud {{action}}"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[entrée non sérialisable]",
+      "errorPrefix": "Erreur : {{error}}"
     },
     "instancePicker": {
       "runOn": "Exécuter sur",
       "couldNotLoad": "Impossible de charger les instances",
       "couldNotLoadDescription": "Vérifiez votre connexion et réessayez.",
       "cloudAgent": "Agent cloud",
+      "loading": "Chargement…",
       "cloudAgentDescription": "Exécuter sur le bac à sable cloud de Kilo",
       "noCliInstances": "Aucune instance CLI connectée",
       "noCliInstancesDescription": "Exécutez `kilo remote` dans un projet sur votre ordinateur, ou mettez à jour la CLI Kilo si elle est déjà en cours d'exécution.",
       "instanceOnProject": "{{name}} sur {{project}}",
       "instanceOnProjectSuffix": "{{name}} sur {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Exécuter sur Agent cloud"
+      "runOnCloudAgent": "Exécuter sur Agent cloud",
+      "runOnAccessibility": "Exécuter sur : {{label}}"
     },
     "modePicker": {
       "title": "Sélectionner le mode",
@@ -426,6 +477,294 @@
       "noRepositories": "Aucun dépôt disponible",
       "noRepositoriesDescription": "Aucun dépôt n'est connecté à votre compte.",
       "tryDifferentSearch": "Essayez un autre terme de recherche."
+    },
+    "modeSelector": {
+      "accessibility": "Mode : {{label}}"
+    },
+    "modeOptions": {
+      "code": "Code",
+      "plan": "Planifier",
+      "debug": "Déboguer",
+      "orchestrator": "Orchestrateur",
+      "ask": "Demander",
+      "codeDescription": "Écrire et modifier du code",
+      "planDescription": "Planifier et concevoir des solutions",
+      "debugDescription": "Trouver et corriger les problèmes",
+      "orchestratorDescription": "Coordonner des tâches complexes",
+      "askDescription": "Obtenir des réponses et des explications"
+    },
+    "messageDetails": {
+      "title": "Détails du message",
+      "copyMessage": "Copier le message",
+      "selectText": "Sélectionner le texte",
+      "reportAiResponse": "Signaler la réponse de l'IA",
+      "reportAiResponseConfirm": "Signaler cette réponse pour examen ?",
+      "report": "Signaler",
+      "role": "Rôle",
+      "roleUser": "Utilisateur",
+      "roleAssistant": "Assistant",
+      "sent": "Envoyé",
+      "model": "Modèle",
+      "costAndTokens": "Coût et jetons",
+      "cost": "Coût",
+      "input": "Entrée",
+      "output": "Sortie",
+      "reasoning": "Raisonnement",
+      "cacheRead": "Lecture du cache",
+      "cacheWrite": "Écriture du cache",
+      "total": "Total"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Détails indisponibles",
+      "textDisplay": "Affichage du texte",
+      "thinking": "Réflexion",
+      "thought": "Pensée",
+      "title": "Détails",
+      "showDetails": "Afficher les détails"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Échec du rendu du contenu"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Échec de la délivrance",
+      "deliveryInterrupted": "Vous avez arrêté ce message.",
+      "deliveryExhausted": "Nous n'avons pas pu délivrer ce message après plusieurs tentatives.",
+      "deliveryExecution": "L'agent n'a pas pu exécuter ce message.",
+      "assistantTitle": "Échec de la réponse",
+      "assistantProviderRejected": "Le fournisseur a rejeté la requête.",
+      "assistantStopped": "La réponse a été arrêtée.",
+      "assistantContextOverflow": "La conversation est trop longue pour le modèle.",
+      "assistantFailed": "La réponse a échoué.",
+      "sendFailed": "Échec de l'envoi du message. Veuillez réessayer."
+    },
+    "filePart": {
+      "loadingImage": "Chargement de l'image",
+      "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
+      "imageUnavailable": "Image indisponible",
+      "imageUnavailableWithAlt": "Image indisponible {{alt}}",
+      "viewImage": "Voir l'image",
+      "viewImageWithAlt": "Voir l'image {{alt}}",
+      "imageOutput": "Sortie image",
+      "imageOutputWithFilename": "Sortie image, {{filename}}",
+      "defaultName": "Fichier",
+      "openFullScreen": "Ouvrir {{name}} en plein écran",
+      "preview": "Aperçu de {{name}}",
+      "openFile": "Ouvrir {{name}}",
+      "couldNotLoadFile": "Impossible de charger ce fichier.",
+      "couldNotLoadFileRetry": "Impossible de charger ce fichier. Réessayez.",
+      "retryLoadingFile": "Réessayer le chargement du fichier",
+      "fileEmpty": "Ce fichier est vide.",
+      "previewUnavailable": "Aperçu indisponible",
+      "shareFailed": "Échec du partage",
+      "sharingUnavailable": "Le partage de fichiers n'est pas disponible sur cet appareil.",
+      "shareFailedRetry": "Échec du partage du fichier. Veuillez réessayer.",
+      "openAsText": "Ouvrir comme texte",
+      "openInExternalApp": "Ouvrir dans une app externe"
+    },
+    "preparation": {
+      "exitCode": "Code de sortie : {{code}}",
+      "earlierOutputOmitted": "Sortie précédente omise",
+      "preparingEnvironment": "Préparation de l'environnement",
+      "preparationComplete": "Préparation terminée",
+      "preparationFailed": "Échec de la préparation",
+      "setupCommand": "Commande de configuration {{index}}",
+      "setupCommandOf": "Commande de configuration {{index}} sur {{count}}"
+    },
+    "permissionCard": {
+      "title": "Autorisation requise",
+      "allowQuestion": "Autoriser {{permission}} ?",
+      "appliesTo": "S'applique à :",
+      "denyPermission": "Refuser l'autorisation",
+      "deny": "Refuser",
+      "allowOnce": "Autoriser une fois",
+      "allowOnceAccessibility": "Autoriser une fois",
+      "alwaysAllow": "Toujours autoriser",
+      "alwaysAllowAccessibility": "Toujours autoriser",
+      "retrying": "Nouvel essai…"
+    },
+    "questionCard": {
+      "title": "L'agent a besoin d'une saisie",
+      "skipQuestionsTitle": "Passer les questions ?",
+      "skipQuestionsMessage": "L'agent passera cette étape.",
+      "selectAllThatApply": "Sélectionnez tout ce qui s'applique",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, sélectionné",
+      "typeYourOwnAnswer": "Saisir votre propre réponse",
+      "typeYourOwnAnswerPlaceholder": "Saisir votre propre réponse…",
+      "skip": "Passer",
+      "retrySkip": "Réessayer de passer",
+      "submitting": "Envoi…",
+      "sendAnswers": "Envoyer les réponses"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Cette question n'est plus disponible.",
+      "permissionUnavailable": "Cette demande d'autorisation n'est plus disponible.",
+      "failedToSkipQuestion": "Échec du passage de la question. Veuillez réessayer.",
+      "failedToSubmitAnswer": "Échec de l'envoi de la réponse. Veuillez réessayer.",
+      "failedToRespondToPermission": "Échec de la réponse à l'autorisation. Veuillez réessayer.",
+      "submissionFailed": "Échec de l'envoi. Veuillez réessayer.",
+      "questionAnnouncement": "L'agent a besoin de votre saisie. L'éditeur est en pause pendant que vous répondez.",
+      "permissionAnnouncement": "L'agent a besoin d'une autorisation pour continuer. L'éditeur est en pause pendant que vous décidez.",
+      "positionHint": "(1 sur {{count}})",
+      "movedPastPrompt": "L'agent a dépassé cette invite. Cette carte se fermera lorsque la session continuera.",
+      "waitingForAnswer": "L'agent attend votre réponse. Tant que cette question est ouverte, votre message à l'agent est en pause.",
+      "waitingForPermission": "L'agent attend une autorisation. Tant que cette demande est ouverte, votre message à l'agent est en pause."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Profondeur d'imbrication maximale atteinte.",
+      "modelAccessibility": "Modèle : {{modelLabel}}",
+      "openHint": "Ouvrir la session du sous-agent",
+      "subagent": "Sous-agent",
+      "task": "Tâche",
+      "waitingForActivity": "En attente d'activité"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Impossible de charger la session du sous-agent",
+      "failed": "Échec de la session du sous-agent",
+      "noMessages": "Aucun message du sous-agent",
+      "noMessagesDescription": "Cette session de sous-agent s'est terminée sans produire de transcription.",
+      "loading": "Chargement de la session du sous-agent",
+      "loadingDescription": "En attente des messages du sous-agent…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Nouvel essai disponible.",
+      "copyToComposer": "Copier dans l'éditeur",
+      "queued": "En file d'attente",
+      "queuedAccessibility": "Message en file d'attente",
+      "userMessage": "Message de l'utilisateur",
+      "assistantMessage": "Message de l'assistant",
+      "longPressHint": "Appui long pour les détails du message"
+    },
+    "olderMessages": {
+      "arrived": "Messages précédents chargés"
+    },
+    "markdownTable": {
+      "viewTable": "Voir le tableau",
+      "title": "Tableau",
+      "close": "Fermer le tableau",
+      "column": "colonne",
+      "columns": "colonnes",
+      "row": "ligne",
+      "rows": "lignes",
+      "opensFullScreen": "ouvre en plein écran"
+    },
+    "sessionFilter": {
+      "title": "Filtrer les sessions",
+      "sortBy": "Trier par",
+      "sortLastUpdated": "Dernière mise à jour",
+      "sortCreated": "Créé",
+      "platform": "Plateforme",
+      "platformCloud": "Cloud",
+      "platformExtension": "Extension",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Autre",
+      "project": "Projet",
+      "removeProjectFilter": "Supprimer le filtre de projet {{label}}",
+      "removePlatformFilter": "Supprimer le filtre de plateforme {{label}}"
+    },
+    "modelPicker": {
+      "title": "Sélectionner le modèle",
+      "searchPlaceholder": "Rechercher des modèles...",
+      "noModels": "Aucun modèle disponible",
+      "noModelsDescription": "Aucun modèle n'est disponible à la sélection."
+    },
+    "modelSelector": {
+      "model": "Modèle",
+      "provider": "Fournisseur {{id}}",
+      "modelId": "Modèle {{id}}",
+      "unavailable": "Indisponible",
+      "unavailableState": "indisponible",
+      "selectedState": "sélectionné",
+      "thinkingEffort": "Niveau de réflexion",
+      "thinkingEffortAccessibility": "{{label}} niveau de réflexion",
+      "thinkingEffortSelected": "{{label}} niveau de réflexion, sélectionné",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} niveau de réflexion",
+      "lockedByAgent": ", Verrouillé par l'agent « {{agent}} »",
+      "addToFavorites": "Ajouter {{name}} aux favoris",
+      "removeFromFavorites": "Retirer {{name}} des favoris",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Moyen"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Échec de l'ouverture du fichier. Veuillez réessayer.",
+      "retryUploading": "Réessayer l'envoi de {{filename}}",
+      "removeAttachment": "Supprimer la pièce jointe {{filename}}",
+      "uploading": "Envoi…",
+      "uploaded": "Envoyé",
+      "uploadFailedRetry": "Échec de l'envoi. Touchez pour réessayer.",
+      "uploadFailedTerminal": "Ce fichier ne peut pas être envoyé."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Coller l'image depuis le presse-papiers",
+      "label": "Image détectée, touchez pour coller"
+    },
+    "attachmentPicker": {
+      "camera": "Appareil photo",
+      "photoLibrary": "Photothèque",
+      "files": "Fichiers",
+      "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
+      "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans les Réglages pour prendre une photo."
+    },
+    "composer": {
+      "addAttachment": "Ajouter une pièce jointe",
+      "removeOrRetryFailed": "Supprimez ou réessayez d'abord les pièces jointes en échec.",
+      "attachmentsWithSlashCommands": "Les pièces jointes ne peuvent pas être envoyées avec des commandes slash.",
+      "photoMetadataNotRemoved": "Les métadonnées de la photo n'ont pas pu être supprimées d'une pièce jointe.",
+      "waitForUploads": "Attendez la fin de l'envoi des pièces jointes.",
+      "pasteFromClipboard": "Coller depuis le presse-papiers",
+      "stopGenerating": "Arrêter la génération",
+      "sendMessage": "Envoyer le message"
+    },
+    "chatLink": {
+      "linkCopied": "Lien copié",
+      "reviewPr": "Examiner la PR",
+      "openLink": "Ouvrir le lien",
+      "copyLink": "Copier le lien",
+      "shareLink": "Partager le lien",
+      "share": "Partager",
+      "prLinkActions": "Actions du lien de PR",
+      "linkActions": "Actions du lien",
+      "couldNotCopyLink": "Impossible de copier le lien",
+      "couldNotShareLink": "Impossible de partager le lien",
+      "opensInBrowser": "S'ouvre dans le navigateur",
+      "showLinkActions": "Afficher les actions du lien"
+    },
+    "compaction": {
+      "contextCompacted": "Contexte compacté"
+    },
+    "computeStatus": {
+      "exploring": "Explore",
+      "searchingCodebase": "Recherche dans le code",
+      "makingEdits": "Effectue des modifications",
+      "runningCommands": "Exécute des commandes",
+      "searchingWeb": "Recherche sur le web",
+      "planningNextSteps": "Planifie les prochaines étapes",
+      "delegatingWork": "Délègue le travail",
+      "askingQuestion": "Pose une question",
+      "consideringNextSteps": "Étudie les prochaines étapes",
+      "writingResponse": "Rédige la réponse"
+    },
+    "slashCommands": {
+      "startNewSession": "Démarrer une nouvelle session",
+      "exitSession": "Quitter la session",
+      "clearSession": "Terminer cette session et en démarrer une nouvelle",
+      "upgradeRequiredFallback": "Veuillez mettre à jour votre CLI pour utiliser cette commande.",
+      "exitCapabilityUnavailable": "Mettez à jour votre CLI pour quitter la session.",
+      "clearCapabilityUnavailable": "Mettez à jour votre CLI pour redémarrer la session.",
+      "argumentError": "{{command}} n'accepte pas d'arguments."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Taille de la fenêtre de contexte indisponible",
+      "tapToViewDetails": "Touchez pour voir les détails du contexte.",
+      "costPrefix": "coût {{cost}}",
+      "costSuffix": ", coût {{cost}}",
+      "tokensWindowUnavailable": "Contexte {{used}} jetons, fenêtre indisponible",
+      "tokensUsage": "Contexte {{used}} sur {{window}} jetons, {{percentage}} % utilisés"
     }
   },
   "bootstrap": {
@@ -667,5 +1006,14 @@
     "back": "Retour",
     "revokeConsent": "Révoquer le consentement",
     "revokeConsentTitle": "Révoquer le consentement de partage de données ?"
+  },
+  "agents": {
+    "activeNow": "Actif maintenant"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Contenu tronqué",
+    "truncated": "Tronqué",
+    "wrap": "Retour à la ligne",
+    "scroll": "Défilement"
   }
 }

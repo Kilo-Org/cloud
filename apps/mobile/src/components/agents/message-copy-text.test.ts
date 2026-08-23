@@ -7,6 +7,8 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { collectCopyableText } from './collect-copyable-text';
 
 function makeTextPart(overrides: Partial<TextPart> = {}): TextPart {
@@ -132,7 +134,7 @@ describe('collectCopyableText', () => {
       time: { start: 0, end: 1 },
     });
     expect(collectCopyableText(message([part]))).toBe(
-      'read\n{\n  "filePath": "/missing.txt"\n}\nError: No such file or directory'
+      `read\n{\n  "filePath": "/missing.txt"\n}\n${i18n.t('agentChat.collectCopyableText.errorPrefix', { error: 'No such file or directory' })}`
     );
   });
 

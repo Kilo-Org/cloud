@@ -1,23 +1,29 @@
 import { type ActiveSessionType, type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
+import { i18n } from '@/i18n';
+
 /**
  * Local reserved /new command — surfaced only for remote sessions, never
  * pushed to the CLI. Remote CLIs have no /new (they create sessions through a
  * dedicated control message), so a slash-style "new" must live in the mobile
  * client.
  */
-export const LOCAL_NEW_SLASH_COMMAND: SlashCommandInfo = {
-  name: 'new',
-  description: 'Start a new session',
-  hints: [],
-};
+export function getLocalNewSlashCommand(): SlashCommandInfo {
+  return {
+    name: 'new',
+    description: i18n.t('agentChat.slashCommands.startNewSession'),
+    hints: [],
+  };
+}
 
-export const LOCAL_EXIT_SLASH_COMMAND: SlashCommandInfo = {
-  name: 'exit',
-  description: 'Exit the session',
-  hints: [],
-};
+export function getLocalExitSlashCommand(): SlashCommandInfo {
+  return {
+    name: 'exit',
+    description: i18n.t('agentChat.slashCommands.exitSession'),
+    hints: [],
+  };
+}
 
 /**
  * Local reserved /clear command — closes the current remote session and
@@ -25,11 +31,13 @@ export const LOCAL_EXIT_SLASH_COMMAND: SlashCommandInfo = {
  * `canExitSession === true` because /clear needs both create_session and
  * exit_cli.
  */
-export const LOCAL_CLEAR_SLASH_COMMAND: SlashCommandInfo = {
-  name: 'clear',
-  description: 'End this session and start a new one',
-  hints: [],
-};
+export function getLocalClearSlashCommand(): SlashCommandInfo {
+  return {
+    name: 'clear',
+    description: i18n.t('agentChat.slashCommands.clearSession'),
+    hints: [],
+  };
+}
 
 const NEW_COMMAND_NAME = 'new';
 const EXIT_COMMAND_NAME = 'exit';
@@ -79,15 +87,6 @@ export type ChatComposerParseResult =
   | { type: 'argument-error'; message: string }
   | { type: 'upgrade-required'; message: string };
 
-const UPGRADE_REQUIRED_FALLBACK_MESSAGE = 'Please upgrade your CLI to use this command.';
-/**
- * Fallback copy when the catalog omits `canExitSession` and the CLI has not
- * surfaced an explicit upgrade message. The product promise is fail-closed
- * with no CTA: the user must upgrade the CLI before `/exit` is safe to send.
- */
-const EXIT_CAPABILITY_UNAVAILABLE_MESSAGE = 'Update your CLI to exit the session.';
-const CLEAR_CAPABILITY_UNAVAILABLE_MESSAGE = 'Update your CLI to restart the session.';
-
 /**
  * Select the slash command catalog the mobile composer should surface.
  *
@@ -121,8 +120,8 @@ export function createMobileSlashCommandList(
   );
   return [
     ...remoteCommands,
-    LOCAL_NEW_SLASH_COMMAND,
-    ...(supportsExit ? [LOCAL_EXIT_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND] : []),
+    getLocalNewSlashCommand(),
+    ...(supportsExit ? [getLocalExitSlashCommand(), getLocalClearSlashCommand()] : []),
   ];
 }
 
@@ -191,7 +190,9 @@ export function parseChatComposerSubmission(
     if (commandName && RESERVED_UPGRADE_REQUIRED_COMMANDS.has(commandName)) {
       return {
         type: 'upgrade-required',
-        message: context.remoteCommandState.message ?? UPGRADE_REQUIRED_FALLBACK_MESSAGE,
+        message:
+          context.remoteCommandState.message ??
+          i18n.t('agentChat.slashCommands.upgradeRequiredFallback'),
       };
     }
     return { type: 'prompt', prompt: trimmed };
@@ -203,7 +204,12 @@ export function parseChatComposerSubmission(
       return { type: 'attachment-error' };
     }
     if (argumentsText.length > 0) {
-      return { type: 'argument-error', message: '/new does not take arguments.' };
+      return {
+        type: 'argument-error',
+        message: i18n.t('agentChat.slashCommands.argumentError', {
+          command: `/${NEW_COMMAND_NAME}`,
+        }),
+      };
     }
     return { type: 'create-session' };
   }
@@ -218,14 +224,21 @@ export function parseChatComposerSubmission(
       // shows; fall back to a copy that names the capability gap.
       return {
         type: 'upgrade-required',
-        message: context.remoteCommandState?.message ?? EXIT_CAPABILITY_UNAVAILABLE_MESSAGE,
+        message:
+          context.remoteCommandState?.message ??
+          i18n.t('agentChat.slashCommands.exitCapabilityUnavailable'),
       };
     }
     if (context.hasAttachments) {
       return { type: 'attachment-error' };
     }
     if (argumentsText.length > 0) {
-      return { type: 'argument-error', message: '/exit does not take arguments.' };
+      return {
+        type: 'argument-error',
+        message: i18n.t('agentChat.slashCommands.argumentError', {
+          command: `/${EXIT_COMMAND_NAME}`,
+        }),
+      };
     }
     return { type: 'exit-session' };
   }
@@ -237,14 +250,21 @@ export function parseChatComposerSubmission(
     if (context.remoteCommandState?.canExitSession !== true) {
       return {
         type: 'upgrade-required',
-        message: context.remoteCommandState?.message ?? CLEAR_CAPABILITY_UNAVAILABLE_MESSAGE,
+        message:
+          context.remoteCommandState?.message ??
+          i18n.t('agentChat.slashCommands.clearCapabilityUnavailable'),
       };
     }
     if (context.hasAttachments) {
       return { type: 'attachment-error' };
     }
     if (argumentsText.length > 0) {
-      return { type: 'argument-error', message: '/clear does not take arguments.' };
+      return {
+        type: 'argument-error',
+        message: i18n.t('agentChat.slashCommands.argumentError', {
+          command: `/${CLEAR_COMMAND_NAME}`,
+        }),
+      };
     }
     return { type: 'restart-session' };
   }

@@ -16,6 +16,7 @@
     "couldNotRefresh": "Vernieuwen mislukt. Trek omlaag om opnieuw te proberen.",
     "tryAgain": "Probeer opnieuw",
     "openInBrowser": "Openen in browser",
+    "openSettings": "Instellingen openen",
     "copiedToClipboard": "Gekopieerd naar klembord",
     "required": "verplicht",
     "error": "fout: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Bevindingen filteren"
     }
   },
+  "agents": {
+    "activeNow": "Nu actief"
+  },
   "agentChat": {
     "session": {
       "title": "Sessie",
@@ -411,14 +415,64 @@
       "notFound": "Niet gevonden",
       "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar."
     },
+    "remoteSession": {
+      "failedToCreate": "Externe sessie maken mislukt",
+      "exited": "Sessie beëindigd",
+      "failedToExit": "Sessie afsluiten mislukt"
+    },
     "newSession": {
-      "title": "Nieuwe sessie"
+      "title": "Nieuwe sessie",
+      "repository": "Repository",
+      "couldNotLoadRepositories": "Kon repositories niet laden",
+      "connectGithub": "GitHub verbinden",
+      "connectGithubDescription": "Verbind GitHub in je browser en kom dan hier terug om een repository te kiezen.",
+      "openGithub": "GitHub openen",
+      "refreshRepositories": "Repositories vernieuwen",
+      "githubConnectionNotVisible": "We zien je GitHub-verbinding nog niet",
+      "githubConnectionNotVisibleDescription": "Als je de Kilo GitHub-app hebt geïnstalleerd of geconfigureerd, controleer dan opnieuw — of zorg dat deze voor dit account/deze organisatie is geïnstalleerd.",
+      "checkAgain": "Opnieuw controleren",
+      "githubConnected": "GitHub verbonden",
+      "noRepositoriesVisible": "Geen repositories zichtbaar. Controleer de repositorytoegang voor de Kilo GitHub-app en vernieuw daarna.",
+      "runOnWithTarget": "Uitvoeren op: {{target}}",
+      "environment": "Omgeving",
+      "couldNotLoadEnvironment": "Kon je omgeving niet laden",
+      "retryLoadingEnvironment": "Opnieuw omgeving laden",
+      "defaultEnvironment": "Standaardomgeving",
+      "environmentSummary": "{{commands}} opdrachten · {{mcp}} MCP · {{skills}} skills · {{agents}} agents",
+      "changes": "Wijzigingen",
+      "leaveChanges": "Wijzigingen achterlaten",
+      "commitAndPush": "Committen en pushen",
+      "startSession": "Sessie starten",
+      "promptPlaceholder": "Waar wil je aan werken?",
+      "addAttachment": "Bijlage toevoegen",
+      "couldNotLoadModels": "Kon modellen niet laden",
+      "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies ze hieronder.",
+      "prefillRepoUnavailable": "{{repo}} is niet meer beschikbaar. Kies hieronder een repository.",
+      "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt."
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}} bestand bijgewerkt",
+      "updatedFiles": "{{count}} bestanden bijgewerkt"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
+      "linesOf": "regels {{start}}–{{end}} van {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Cloud Agent {{action}} mislukt ({{status}})",
+      "failed": "Cloud Agent {{action}} mislukt"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[niet-serialiseerbare invoer]",
+      "errorPrefix": "Fout: {{error}}"
     },
     "instancePicker": {
       "runOn": "Uitvoeren op",
+      "runOnAccessibility": "Uitvoeren op: {{label}}",
       "couldNotLoad": "Kon instanties niet laden",
       "couldNotLoadDescription": "Controleer je verbinding en probeer het opnieuw.",
       "cloudAgent": "Cloudagent",
+      "loading": "Laden…",
       "cloudAgentDescription": "Uitvoeren in Kilo's cloudsandbox",
       "noCliInstances": "Geen CLI-instanties verbonden",
       "noCliInstancesDescription": "Voer `kilo remote` uit in een project op je computer, of werk Kilo CLI bij als er al een draait.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Aangepaste modi"
     },
+    "modeSelector": {
+      "accessibility": "Modus: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Code",
+      "plan": "Plan",
+      "debug": "Debug",
+      "orchestrator": "Orchestrator",
+      "ask": "Vragen",
+      "codeDescription": "Code schrijven en wijzigen",
+      "planDescription": "Oplossingen plannen en ontwerpen",
+      "debugDescription": "Problemen vinden en oplossen",
+      "orchestratorDescription": "Complexe taken coördineren",
+      "askDescription": "Antwoorden en uitleg krijgen"
+    },
     "repoPicker": {
       "title": "Selecteer repository",
       "searchLabel": "Repositories zoeken",
@@ -439,6 +508,279 @@
       "noRepositories": "Geen repositories beschikbaar",
       "noRepositoriesDescription": "Er zijn geen repositories verbonden met je account.",
       "tryDifferentSearch": "Probeer een andere zoekterm."
+    },
+    "messageDetails": {
+      "title": "Berichtdetails",
+      "copyMessage": "Bericht kopiëren",
+      "selectText": "Tekst selecteren",
+      "reportAiResponse": "AI-antwoord rapporteren",
+      "reportAiResponseConfirm": "Dit antwoord rapporteren voor beoordeling?",
+      "report": "Rapporteren",
+      "role": "Rol",
+      "roleUser": "Gebruiker",
+      "roleAssistant": "Assistent",
+      "sent": "Verzonden",
+      "model": "Model",
+      "costAndTokens": "Kosten en tokens",
+      "cost": "Kosten",
+      "input": "Invoer",
+      "output": "Uitvoer",
+      "reasoning": "Redeneren",
+      "cacheRead": "Cache gelezen",
+      "cacheWrite": "Cache geschreven",
+      "total": "Totaal"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Details niet beschikbaar",
+      "textDisplay": "Tekstweergave",
+      "thinking": "Denken",
+      "thought": "Gedachte",
+      "title": "Details",
+      "showDetails": "Details tonen"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Inhoud kon niet worden weergegeven"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Bezorging mislukt",
+      "deliveryInterrupted": "Je hebt dit bericht gestopt.",
+      "deliveryExhausted": "We konden dit bericht na meerdere pogingen niet bezorgen.",
+      "deliveryExecution": "De agent kon dit bericht niet uitvoeren.",
+      "assistantTitle": "Antwoord mislukt",
+      "assistantProviderRejected": "De provider heeft het verzoek afgewezen.",
+      "assistantStopped": "Het antwoord is gestopt.",
+      "assistantContextOverflow": "Het gesprek is te lang voor het model.",
+      "assistantFailed": "Het antwoord is mislukt.",
+      "sendFailed": "Bericht verzenden mislukt. Probeer het opnieuw."
+    },
+    "filePart": {
+      "loadingImage": "Afbeelding laden",
+      "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
+      "imageUnavailable": "Afbeelding niet beschikbaar",
+      "imageUnavailableWithAlt": "Afbeelding niet beschikbaar {{alt}}",
+      "viewImage": "Afbeelding bekijken",
+      "viewImageWithAlt": "Afbeelding bekijken {{alt}}",
+      "imageOutput": "Afbeeldingsuitvoer",
+      "imageOutputWithFilename": "Afbeeldingsuitvoer, {{filename}}",
+      "defaultName": "Bestand",
+      "openFullScreen": "{{name}} op volledig scherm openen",
+      "preview": "Voorbeeld {{name}}",
+      "openFile": "{{name}} openen",
+      "couldNotLoadFile": "Kon dit bestand niet laden.",
+      "couldNotLoadFileRetry": "Kon dit bestand niet laden. Probeer opnieuw.",
+      "retryLoadingFile": "Bestand opnieuw laden",
+      "fileEmpty": "Dit bestand is leeg.",
+      "previewUnavailable": "Voorbeeld niet beschikbaar",
+      "shareFailed": "Delen mislukt",
+      "sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
+      "shareFailedRetry": "Bestand delen mislukt. Probeer het opnieuw.",
+      "openAsText": "Als tekst openen",
+      "openInExternalApp": "In externe app openen"
+    },
+    "preparation": {
+      "exitCode": "Afsluitcode: {{code}}",
+      "earlierOutputOmitted": "Eerdere uitvoer weggelaten",
+      "preparingEnvironment": "Omgeving voorbereiden",
+      "preparationComplete": "Voorbereiding voltooid",
+      "preparationFailed": "Voorbereiding mislukt",
+      "setupCommand": "Installatieopdracht {{index}}",
+      "setupCommandOf": "Installatieopdracht {{index}} van {{count}}"
+    },
+    "permissionCard": {
+      "title": "Toestemming vereist",
+      "allowQuestion": "{{permission}} toestaan?",
+      "appliesTo": "Van toepassing op:",
+      "denyPermission": "Toestemming weigeren",
+      "deny": "Weigeren",
+      "allowOnce": "Eenmalig toestaan",
+      "allowOnceAccessibility": "Eenmalig toestaan",
+      "alwaysAllow": "Altijd toestaan",
+      "alwaysAllowAccessibility": "Altijd toestaan",
+      "retrying": "Opnieuw proberen…"
+    },
+    "questionCard": {
+      "title": "Agent heeft invoer nodig",
+      "skipQuestionsTitle": "Vragen overslaan?",
+      "skipQuestionsMessage": "De agent slaat deze stap over.",
+      "selectAllThatApply": "Selecteer alles wat van toepassing is",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, geselecteerd",
+      "typeYourOwnAnswer": "Typ je eigen antwoord",
+      "typeYourOwnAnswerPlaceholder": "Typ je eigen antwoord…",
+      "skip": "Overslaan",
+      "retrySkip": "Opnieuw overslaan",
+      "submitting": "Verzenden…",
+      "sendAnswers": "Antwoorden verzenden"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Deze vraag is niet meer beschikbaar.",
+      "permissionUnavailable": "Dit toestemmingsverzoek is niet meer beschikbaar.",
+      "failedToSkipQuestion": "Vraag overslaan mislukt. Probeer het opnieuw.",
+      "failedToSubmitAnswer": "Antwoord verzenden mislukt. Probeer het opnieuw.",
+      "failedToRespondToPermission": "Reageren op toestemming mislukt. Probeer het opnieuw.",
+      "submissionFailed": "Verzenden mislukt. Probeer het opnieuw.",
+      "questionAnnouncement": "De agent heeft je invoer nodig. De composer is gepauzeerd terwijl je antwoordt.",
+      "permissionAnnouncement": "De agent heeft toestemming nodig om door te gaan. De composer is gepauzeerd terwijl je beslist.",
+      "positionHint": "(1 van {{count}})",
+      "movedPastPrompt": "De agent is verder gegaan dan deze prompt. Deze kaart sluit wanneer de sessie doorgaat.",
+      "waitingForAnswer": "De agent wacht op je antwoord. Zolang deze vraag open is, is je bericht aan de agent gepauzeerd.",
+      "waitingForPermission": "De agent wacht op toestemming. Zolang dit verzoek open is, is je bericht aan de agent gepauzeerd."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Maximale nestdiepte bereikt.",
+      "modelAccessibility": "Model: {{modelLabel}}",
+      "openHint": "Subagentsessie openen",
+      "subagent": "Subagent",
+      "task": "Taak",
+      "waitingForActivity": "Wachten op activiteit"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Kon subagentsessie niet laden",
+      "failed": "Subagentsessie mislukt",
+      "noMessages": "Geen subagentberichten",
+      "noMessagesDescription": "Deze subagentsessie is voltooid zonder transcript.",
+      "loading": "Subagentsessie laden",
+      "loadingDescription": "Wachten op subagentberichten…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Opnieuw proberen beschikbaar.",
+      "copyToComposer": "Naar composer kopiëren",
+      "queued": "In wachtrij",
+      "queuedAccessibility": "Bericht in wachtrij",
+      "userMessage": "Gebruikersbericht",
+      "assistantMessage": "Assistentbericht",
+      "longPressHint": "Lang indrukken voor berichtdetails"
+    },
+    "olderMessages": {
+      "arrived": "Eerdere berichten geladen"
+    },
+    "markdownTable": {
+      "viewTable": "Tabel bekijken",
+      "title": "Tabel",
+      "close": "Tabel sluiten",
+      "column": "kolom",
+      "columns": "kolommen",
+      "row": "rij",
+      "rows": "rijen",
+      "opensFullScreen": "opent op volledig scherm"
+    },
+    "sessionFilter": {
+      "title": "Sessies filteren",
+      "sortBy": "Sorteren op",
+      "sortLastUpdated": "Laatst bijgewerkt",
+      "sortCreated": "Aangemaakt",
+      "platform": "Platform",
+      "platformCloud": "Cloud",
+      "platformExtension": "Extensie",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Overig",
+      "project": "Project",
+      "removeProjectFilter": "Projectfilter {{label}} verwijderen",
+      "removePlatformFilter": "Platformfilter {{label}} verwijderen"
+    },
+    "modelPicker": {
+      "title": "Model selecteren",
+      "searchPlaceholder": "Modellen zoeken...",
+      "noModels": "Geen modellen beschikbaar",
+      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren."
+    },
+    "modelSelector": {
+      "model": "Model",
+      "provider": "Provider {{id}}",
+      "modelId": "Model {{id}}",
+      "unavailable": "Niet beschikbaar",
+      "unavailableState": "niet beschikbaar",
+      "selectedState": "geselecteerd",
+      "thinkingEffort": "Denkinspanning",
+      "thinkingEffortAccessibility": "{{label}} denkinspanning",
+      "thinkingEffortSelected": "{{label}} denkinspanning, geselecteerd",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} denkinspanning",
+      "lockedByAgent": ", Vergrendeld door agent \"{{agent}}\"",
+      "addToFavorites": "{{name}} aan favorieten toevoegen",
+      "removeFromFavorites": "{{name}} uit favorieten verwijderen",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Gem"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Bestand openen mislukt. Probeer het opnieuw.",
+      "retryUploading": "{{filename}} opnieuw uploaden",
+      "removeAttachment": "Bijlage {{filename}} verwijderen",
+      "uploading": "Uploaden…",
+      "uploaded": "Geüpload",
+      "uploadFailedRetry": "Uploaden mislukt. Tik om opnieuw te proberen.",
+      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Afbeelding plakken vanaf klembord",
+      "label": "Afbeelding gedetecteerd, tik om te plakken"
+    },
+    "attachmentPicker": {
+      "camera": "Camera",
+      "photoLibrary": "Fotobibliotheek",
+      "files": "Bestanden",
+      "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
+      "cameraAccessMessage": "Sta cameratoegang toe in Instellingen om een foto te maken."
+    },
+    "composer": {
+      "addAttachment": "Bijlage toevoegen",
+      "removeOrRetryFailed": "Verwijder of probeer mislukte bijlagen eerst opnieuw.",
+      "attachmentsWithSlashCommands": "Bijlagen kunnen niet met slash-opdrachten worden verzonden.",
+      "photoMetadataNotRemoved": "Fotometadata kon niet uit een bijlage worden verwijderd.",
+      "waitForUploads": "Wacht tot bijlagen klaar zijn met uploaden.",
+      "pasteFromClipboard": "Plakken vanaf klembord",
+      "stopGenerating": "Stoppen met genereren",
+      "sendMessage": "Bericht verzenden"
+    },
+    "chatLink": {
+      "linkCopied": "Link gekopieerd",
+      "reviewPr": "PR beoordelen",
+      "openLink": "Link openen",
+      "copyLink": "Link kopiëren",
+      "shareLink": "Link delen",
+      "share": "Delen",
+      "prLinkActions": "PR-linkacties",
+      "linkActions": "Linkacties",
+      "couldNotCopyLink": "Link kon niet worden gekopieerd",
+      "couldNotShareLink": "Link kon niet worden gedeeld",
+      "opensInBrowser": "Opent in browser",
+      "showLinkActions": "Linkacties tonen"
+    },
+    "compaction": {
+      "contextCompacted": "Context gecomprimeerd"
+    },
+    "computeStatus": {
+      "exploring": "Verkennen",
+      "searchingCodebase": "Codebase doorzoeken",
+      "makingEdits": "Wijzigingen maken",
+      "runningCommands": "Opdrachten uitvoeren",
+      "searchingWeb": "Web doorzoeken",
+      "planningNextSteps": "Volgende stappen plannen",
+      "delegatingWork": "Werk delegeren",
+      "askingQuestion": "Een vraag stellen",
+      "consideringNextSteps": "Volgende stappen overwegen",
+      "writingResponse": "Antwoord schrijven"
+    },
+    "slashCommands": {
+      "startNewSession": "Een nieuwe sessie starten",
+      "exitSession": "De sessie afsluiten",
+      "clearSession": "Deze sessie beëindigen en een nieuwe starten",
+      "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
+      "exitCapabilityUnavailable": "Werk je CLI bij om de sessie af te sluiten.",
+      "clearCapabilityUnavailable": "Werk je CLI bij om de sessie opnieuw te starten.",
+      "argumentError": "{{command}} accepteert geen argumenten."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Contextvenstergrootte niet beschikbaar",
+      "tapToViewDetails": "Tik om contextdetails te bekijken.",
+      "costPrefix": "kosten {{cost}}",
+      "costSuffix": ", kosten {{cost}}",
+      "tokensWindowUnavailable": "Context {{used}} tokens, venster niet beschikbaar",
+      "tokensUsage": "Context {{used}} van {{window}} tokens, {{percentage}}% gebruikt"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Deze link is niet meer geldig.",
     "goBack": "Terug",
     "title": "Pagina niet gevonden"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Inhoud afgekapt",
+    "truncated": "Afgekapt",
+    "wrap": "Terugloop",
+    "scroll": "Scrollen"
   },
   "offline": {
     "noInternet": "Geen internetverbinding",

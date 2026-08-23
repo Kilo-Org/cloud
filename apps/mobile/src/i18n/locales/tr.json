@@ -16,6 +16,7 @@
     "refresh": "Yenile",
     "couldNotRefresh": "Yenilenemedi. Tekrar denemek için aşağı çekin.",
     "openInBrowser": "Tarayıcıda aç",
+    "openSettings": "Ayarları Aç",
     "copiedToClipboard": "Panoya kopyalandı",
     "required": "zorunlu",
     "error": "hata: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Bulguları filtrele"
     }
   },
+  "agents": {
+    "activeNow": "Şu anda etkin"
+  },
   "agentChat": {
     "session": {
       "title": "Oturum",
@@ -411,14 +415,64 @@
       "notFound": "Bulunamadı",
       "notFoundDescription": "Bu öğe kaldırılmış olabilir veya artık kullanılamıyor olabilir."
     },
+    "remoteSession": {
+      "failedToCreate": "Uzak oturum oluşturulamadı",
+      "exited": "Oturum sona erdi",
+      "failedToExit": "Oturumdan çıkılamadı"
+    },
     "newSession": {
-      "title": "Yeni oturum"
+      "title": "Yeni oturum",
+      "repository": "Depo",
+      "couldNotLoadRepositories": "Depolar yüklenemedi",
+      "connectGithub": "GitHub'ı bağla",
+      "connectGithubDescription": "Tarayıcınızda GitHub'ı bağlayın, ardından bir depo seçmek için buraya dönün.",
+      "openGithub": "GitHub'ı aç",
+      "refreshRepositories": "Depoları yenile",
+      "githubConnectionNotVisible": "GitHub bağlantınızı henüz göremiyoruz",
+      "githubConnectionNotVisibleDescription": "Kilo GitHub Uygulamasını kurduysanız veya yapılandırdıysanız tekrar kontrol edin — veya bu hesap/kuruluş için kurulduğundan emin olun.",
+      "checkAgain": "Tekrar kontrol et",
+      "githubConnected": "GitHub bağlandı",
+      "noRepositoriesVisible": "Görünür depo yok. Kilo GitHub Uygulaması için depo erişimini kontrol edin, ardından yenileyin.",
+      "runOnWithTarget": "Çalıştırma yeri: {{target}}",
+      "environment": "Ortam",
+      "couldNotLoadEnvironment": "Ortamınız yüklenemedi",
+      "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
+      "defaultEnvironment": "Varsayılan ortam",
+      "environmentSummary": "{{commands}} komut · {{mcp}} MCP · {{skills}} beceri · {{agents}} ajan",
+      "changes": "Değişiklikler",
+      "leaveChanges": "Değişiklikleri bırak",
+      "commitAndPush": "Commit et ve gönder",
+      "startSession": "Oturumu başlat",
+      "promptPlaceholder": "Ne üzerinde çalışmak istersiniz?",
+      "addAttachment": "Ek ekle",
+      "couldNotLoadModels": "Modeller yüklenemedi",
+      "prefillRepoAndModelUnavailable": "Orijinal oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan seçin.",
+      "prefillRepoUnavailable": "{{repo}} artık kullanılamıyor. Aşağıdan bir depo seçin.",
+      "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modeliniz kullanılıyor."
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}} dosya güncellendi",
+      "updatedFiles": "{{count}} dosya güncellendi"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "satırlar {{start}}–{{end}} (kısaltıldı)",
+      "linesOf": "satırlar {{start}}–{{end}} / {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Cloud Agent {{action}} başarısız oldu ({{status}})",
+      "failed": "Cloud Agent {{action}} başarısız oldu"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[serileştirilemeyen girdi]",
+      "errorPrefix": "Hata: {{error}}"
     },
     "instancePicker": {
       "runOn": "Çalıştırma yeri",
+      "runOnAccessibility": "Çalıştırma yeri: {{label}}",
       "couldNotLoad": "Örnekler yüklenemedi",
       "couldNotLoadDescription": "Bağlantınızı kontrol edip tekrar deneyin.",
       "cloudAgent": "Bulut Ajanı",
+      "loading": "Yükleniyor…",
       "cloudAgentDescription": "Kilo'nun bulut korumalı alanında çalıştır",
       "noCliInstances": "Bağlı CLI örneği yok",
       "noCliInstancesDescription": "Bilgisayarınızdaki bir projede `kilo remote` çalıştırın veya zaten çalışıyorsa Kilo CLI'yi güncelleyin.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Özel modlar"
     },
+    "modeSelector": {
+      "accessibility": "Mod: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Kod",
+      "plan": "Plan",
+      "debug": "Hata Ayıklama",
+      "orchestrator": "Orkestratör",
+      "ask": "Sor",
+      "codeDescription": "Kod yazın ve değiştirin",
+      "planDescription": "Çözümleri planlayın ve tasarlayın",
+      "debugDescription": "Sorunları bulun ve düzeltin",
+      "orchestratorDescription": "Karmaşık görevleri koordine edin",
+      "askDescription": "Yanıtlar ve açıklamalar alın"
+    },
     "repoPicker": {
       "title": "Depo seç",
       "searchLabel": "Depo ara",
@@ -439,6 +508,279 @@
       "noRepositories": "Kullanılabilir depo yok",
       "noRepositoriesDescription": "Hesabınıza bağlı depo yok.",
       "tryDifferentSearch": "Farklı bir arama terimi deneyin."
+    },
+    "messageDetails": {
+      "title": "Mesaj ayrıntıları",
+      "copyMessage": "Mesajı kopyala",
+      "selectText": "Metni seç",
+      "reportAiResponse": "Yapay zeka yanıtını bildir",
+      "reportAiResponseConfirm": "Bu yanıt inceleme için bildirilsin mi?",
+      "report": "Bildir",
+      "role": "Rol",
+      "roleUser": "Kullanıcı",
+      "roleAssistant": "Asistan",
+      "sent": "Gönderildi",
+      "model": "Model",
+      "costAndTokens": "Maliyet ve jetonlar",
+      "cost": "Maliyet",
+      "input": "Girdi",
+      "output": "Çıktı",
+      "reasoning": "Akıl yürütme",
+      "cacheRead": "Önbellek okuma",
+      "cacheWrite": "Önbellek yazma",
+      "total": "Toplam"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Ayrıntılar kullanılamıyor",
+      "textDisplay": "Metin görüntüsü",
+      "thinking": "Düşünme",
+      "thought": "Düşünce",
+      "title": "Ayrıntılar",
+      "showDetails": "Ayrıntıları göster"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "İçerik oluşturulamadı"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Teslim edilemedi",
+      "deliveryInterrupted": "Bu mesajı siz durdurdunuz.",
+      "deliveryExhausted": "Bu mesajı birkaç denemeden sonra teslim edemedik.",
+      "deliveryExecution": "Ajan bu mesajı çalıştıramadı.",
+      "assistantTitle": "Yanıt başarısız oldu",
+      "assistantProviderRejected": "Sağlayıcı isteği reddetti.",
+      "assistantStopped": "Yanıt durduruldu.",
+      "assistantContextOverflow": "Konuşma model için çok uzun.",
+      "assistantFailed": "Yanıt başarısız oldu.",
+      "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
+    },
+    "filePart": {
+      "loadingImage": "Görüntü yükleniyor",
+      "imageUnavailableRetry": "Görüntü kullanılamıyor, yüklemeyi tekrar dene",
+      "imageUnavailable": "Görüntü kullanılamıyor",
+      "imageUnavailableWithAlt": "Görüntü kullanılamıyor {{alt}}",
+      "viewImage": "Görüntüyü görüntüle",
+      "viewImageWithAlt": "Görüntüyü görüntüle {{alt}}",
+      "imageOutput": "Görüntü çıktısı",
+      "imageOutputWithFilename": "Görüntü çıktısı, {{filename}}",
+      "defaultName": "Dosya",
+      "openFullScreen": "{{name}} tam ekran aç",
+      "preview": "{{name}} önizle",
+      "openFile": "{{name}} aç",
+      "couldNotLoadFile": "Bu dosya yüklenemedi.",
+      "couldNotLoadFileRetry": "Bu dosya yüklenemedi. Tekrar deneyin.",
+      "retryLoadingFile": "Dosyayı yüklemeyi tekrar dene",
+      "fileEmpty": "Bu dosya boş.",
+      "previewUnavailable": "Önizleme kullanılamıyor",
+      "shareFailed": "Paylaşım başarısız oldu",
+      "sharingUnavailable": "Dosya paylaşımı bu cihazda kullanılamıyor.",
+      "shareFailedRetry": "Dosya paylaşılamadı. Lütfen tekrar deneyin.",
+      "openAsText": "Metin olarak aç",
+      "openInExternalApp": "Harici uygulamada aç"
+    },
+    "preparation": {
+      "exitCode": "Çıkış kodu: {{code}}",
+      "earlierOutputOmitted": "Önceki çıktı atlandı",
+      "preparingEnvironment": "Ortam hazırlanıyor",
+      "preparationComplete": "Hazırlık tamamlandı",
+      "preparationFailed": "Hazırlık başarısız oldu",
+      "setupCommand": "Kurulum komutu {{index}}",
+      "setupCommandOf": "Kurulum komutu {{index}} / {{count}}"
+    },
+    "permissionCard": {
+      "title": "İzin gerekli",
+      "allowQuestion": "{{permission}} izni verilsin mi?",
+      "appliesTo": "Şunlar için geçerli:",
+      "denyPermission": "İzni reddet",
+      "deny": "Reddet",
+      "allowOnce": "Bir Kez İzin Ver",
+      "allowOnceAccessibility": "Bir kez izin ver",
+      "alwaysAllow": "Her Zaman İzin Ver",
+      "alwaysAllowAccessibility": "Her zaman izin ver",
+      "retrying": "Tekrar deneniyor…"
+    },
+    "questionCard": {
+      "title": "Ajanın girdiye ihtiyacı var",
+      "skipQuestionsTitle": "Sorular atlansın mı?",
+      "skipQuestionsMessage": "Ajan bu adımı atlayacak.",
+      "selectAllThatApply": "Geçerli olanların tümünü seçin",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, seçildi",
+      "typeYourOwnAnswer": "Kendi yanıtınızı yazın",
+      "typeYourOwnAnswerPlaceholder": "Kendi yanıtınızı yazın…",
+      "skip": "Atla",
+      "retrySkip": "Atlamayı tekrar dene",
+      "submitting": "Gönderiliyor…",
+      "sendAnswers": "Yanıtları gönder"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Bu soru artık kullanılamıyor.",
+      "permissionUnavailable": "Bu izin isteği artık kullanılamıyor.",
+      "failedToSkipQuestion": "Soru atlanamadı. Lütfen tekrar deneyin.",
+      "failedToSubmitAnswer": "Yanıt gönderilemedi. Lütfen tekrar deneyin.",
+      "failedToRespondToPermission": "İzne yanıt verilemedi. Lütfen tekrar deneyin.",
+      "submissionFailed": "Gönderim başarısız oldu. Lütfen tekrar deneyin.",
+      "questionAnnouncement": "Ajanın girdinize ihtiyacı var. Siz yanıtlarken yazma alanı duraklatıldı.",
+      "permissionAnnouncement": "Ajanın devam etmek için izne ihtiyacı var. Siz karar verirken yazma alanı duraklatıldı.",
+      "positionHint": "(1 / {{count}})",
+      "movedPastPrompt": "Ajan bu istemi geçti. Oturum devam ettiğinde bu kart kapanacak.",
+      "waitingForAnswer": "Ajan yanıtınızı bekliyor. Bu soru açıkken ajana gönderdiğiniz mesaj duraklatılır.",
+      "waitingForPermission": "Ajan izin bekliyor. Bu istek açıkken ajana gönderdiğiniz mesaj duraklatılır."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Maksimum yuvalama derinliğine ulaşıldı.",
+      "modelAccessibility": "Model: {{modelLabel}}",
+      "openHint": "Alt ajan oturumunu aç",
+      "subagent": "Alt ajan",
+      "task": "Görev",
+      "waitingForActivity": "Etkinlik bekleniyor"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Alt ajan oturumu yüklenemedi",
+      "failed": "Alt ajan oturumu başarısız oldu",
+      "noMessages": "Alt ajan mesajı yok",
+      "noMessagesDescription": "Bu alt ajan oturumu bir döküm üretmeden tamamlandı.",
+      "loading": "Alt ajan oturumu yükleniyor",
+      "loadingDescription": "Alt ajan mesajları bekleniyor…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Tekrar deneme mevcut.",
+      "copyToComposer": "Mesaj yazma alanına kopyala",
+      "queued": "Kuyruğa alındı",
+      "queuedAccessibility": "Mesaj kuyruğa alındı",
+      "userMessage": "Kullanıcı mesajı",
+      "assistantMessage": "Asistan mesajı",
+      "longPressHint": "Mesaj ayrıntıları için uzun basın"
+    },
+    "olderMessages": {
+      "arrived": "Önceki mesajlar yüklendi"
+    },
+    "markdownTable": {
+      "viewTable": "Tabloyu görüntüle",
+      "title": "Tablo",
+      "close": "Tabloyu kapat",
+      "column": "sütun",
+      "columns": "sütunlar",
+      "row": "satır",
+      "rows": "satırlar",
+      "opensFullScreen": "tam ekran açar"
+    },
+    "sessionFilter": {
+      "title": "Oturumları filtrele",
+      "sortBy": "Sıralama ölçütü",
+      "sortLastUpdated": "Son güncellenen",
+      "sortCreated": "Oluşturulma",
+      "platform": "Platform",
+      "platformCloud": "Bulut",
+      "platformExtension": "Eklenti",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Diğer",
+      "project": "Proje",
+      "removeProjectFilter": "{{label}} proje filtresini kaldır",
+      "removePlatformFilter": "{{label}} platform filtresini kaldır"
+    },
+    "modelPicker": {
+      "title": "Model seç",
+      "searchPlaceholder": "Model ara...",
+      "noModels": "Kullanılabilir model yok",
+      "noModelsDescription": "Seçilebilecek model yok."
+    },
+    "modelSelector": {
+      "model": "Model",
+      "provider": "Sağlayıcı {{id}}",
+      "modelId": "Model {{id}}",
+      "unavailable": "Kullanılamıyor",
+      "unavailableState": "kullanılamıyor",
+      "selectedState": "seçildi",
+      "thinkingEffort": "Düşünme çabası",
+      "thinkingEffortAccessibility": "{{label}} düşünme çabası",
+      "thinkingEffortSelected": "{{label}} düşünme çabası, seçildi",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} düşünme çabası",
+      "lockedByAgent": ", \"{{agent}}\" ajanı tarafından kilitlendi",
+      "addToFavorites": "{{name}} favorilere ekle",
+      "removeFromFavorites": "{{name}} favorilerden kaldır",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Orta"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Dosya açılamadı. Lütfen tekrar deneyin.",
+      "retryUploading": "{{filename}} yüklemeyi tekrar dene",
+      "removeAttachment": "{{filename}} ekini kaldır",
+      "uploading": "Yükleniyor…",
+      "uploaded": "Yüklendi",
+      "uploadFailedRetry": "Yükleme başarısız oldu. Tekrar denemek için dokunun.",
+      "uploadFailedTerminal": "Bu dosya yüklenemiyor."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Panodan görüntü yapıştır",
+      "label": "Görüntü algılandı, yapıştırmak için dokunun"
+    },
+    "attachmentPicker": {
+      "camera": "Kamera",
+      "photoLibrary": "Fotoğraf Arşivi",
+      "files": "Dosyalar",
+      "cameraAccessDisabled": "Kamera Erişimi Devre Dışı",
+      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin."
+    },
+    "composer": {
+      "addAttachment": "Ek ekle",
+      "removeOrRetryFailed": "Önce başarısız ekleri kaldırın veya tekrar deneyin.",
+      "attachmentsWithSlashCommands": "Ekler eğik çizgi komutlarıyla gönderilemez.",
+      "photoMetadataNotRemoved": "Fotoğraf meta verileri bir ekten kaldırılamadı.",
+      "waitForUploads": "Eklerin yüklenmesinin bitmesini bekleyin.",
+      "pasteFromClipboard": "Panodan yapıştır",
+      "stopGenerating": "Oluşturmayı durdur",
+      "sendMessage": "Mesaj gönder"
+    },
+    "chatLink": {
+      "linkCopied": "Bağlantı kopyalandı",
+      "reviewPr": "PR'yi İncele",
+      "openLink": "Bağlantıyı aç",
+      "copyLink": "Bağlantıyı kopyala",
+      "shareLink": "Bağlantıyı paylaş",
+      "share": "Paylaş",
+      "prLinkActions": "PR bağlantı eylemleri",
+      "linkActions": "Bağlantı eylemleri",
+      "couldNotCopyLink": "Bağlantı kopyalanamadı",
+      "couldNotShareLink": "Bağlantı paylaşılamadı",
+      "opensInBrowser": "Tarayıcıda açılır",
+      "showLinkActions": "Bağlantı eylemlerini göster"
+    },
+    "compaction": {
+      "contextCompacted": "Bağlam sıkıştırıldı"
+    },
+    "computeStatus": {
+      "exploring": "Keşfediyor",
+      "searchingCodebase": "Kod tabanında arama yapıyor",
+      "makingEdits": "Düzenlemeler yapıyor",
+      "runningCommands": "Komutlar çalıştırıyor",
+      "searchingWeb": "Web'de arama yapıyor",
+      "planningNextSteps": "Sonraki adımları planlıyor",
+      "delegatingWork": "İş dağıtıyor",
+      "askingQuestion": "Soru soruyor",
+      "consideringNextSteps": "Sonraki adımları değerlendiriyor",
+      "writingResponse": "Yanıt yazıyor"
+    },
+    "slashCommands": {
+      "startNewSession": "Yeni bir oturum başlat",
+      "exitSession": "Oturumdan çık",
+      "clearSession": "Bu oturumu sonlandır ve yeni bir tane başlat",
+      "upgradeRequiredFallback": "Bu komutu kullanmak için lütfen CLI'nizi yükseltin.",
+      "exitCapabilityUnavailable": "Oturumdan çıkmak için CLI'nizi güncelleyin.",
+      "clearCapabilityUnavailable": "Oturumu yeniden başlatmak için CLI'nizi güncelleyin.",
+      "argumentError": "{{command}} bağımsız değişken almaz."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Bağlam penceresi boyutu kullanılamıyor",
+      "tapToViewDetails": "Bağlam ayrıntılarını görüntülemek için dokunun.",
+      "costPrefix": "maliyet {{cost}}",
+      "costSuffix": ", maliyet {{cost}}",
+      "tokensWindowUnavailable": "Bağlam {{used}} jeton, pencere kullanılamıyor",
+      "tokensUsage": "Bağlam {{window}} jetonun {{used}} kadarı, %{{percentage}} kullanıldı"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Bu bağlantı artık geçerli değil.",
     "goBack": "Geri dön",
     "title": "Sayfa bulunamadı"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "İçerik kısaltıldı",
+    "truncated": "Kısaltıldı",
+    "wrap": "Sarmala",
+    "scroll": "Kaydır"
   },
   "offline": {
     "noInternet": "İnternet bağlantısı yok",

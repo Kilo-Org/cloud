@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Paperclip } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
+import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
@@ -92,6 +93,7 @@ export function NewSessionPrompt({
   initialPrompt,
 }: Readonly<NewSessionPromptProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const promptRef = useRef(initialPrompt ?? '');
   const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
@@ -216,7 +218,7 @@ export function NewSessionPrompt({
         {promptMeasure.measureElement}
         <RNTextInput
           ref={promptInputRef}
-          placeholder="What would you like to work on?"
+          placeholder={t('agentChat.newSession.promptPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           multiline
           defaultValue={initialPrompt}
@@ -253,7 +255,7 @@ export function NewSessionPrompt({
                 paperclipDisabled && 'opacity-50'
               )}
               accessibilityRole="button"
-              accessibilityLabel="Add attachment"
+              accessibilityLabel={t('agentChat.newSession.addAttachment')}
               accessibilityState={{ disabled: paperclipDisabled }}
             >
               <Paperclip size={18} color={colors.mutedForeground} />
@@ -281,8 +283,8 @@ export function NewSessionPrompt({
         <QueryError
           placement="top"
           variant="server"
-          title="Couldn't load models"
-          message="Check your connection and try again."
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('agentChat.instancePicker.couldNotLoadDescription')}
           onRetry={() => {
             onRefetchModels();
           }}

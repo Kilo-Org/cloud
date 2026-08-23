@@ -16,6 +16,7 @@
     "refresh": "Làm mới",
     "couldNotRefresh": "Không thể làm mới. Kéo xuống để thử lại.",
     "openInBrowser": "Mở trong trình duyệt",
+    "openSettings": "Mở Cài đặt",
     "copiedToClipboard": "Đã sao chép vào bảng nhớ tạm",
     "required": "bắt buộc",
     "error": "lỗi: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Lọc phát hiện"
     }
   },
+  "agents": {
+    "activeNow": "Đang hoạt động"
+  },
   "agentChat": {
     "session": {
       "title": "Phiên",
@@ -411,14 +415,64 @@
       "notFound": "Không tìm thấy",
       "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn khả dụng."
     },
+    "remoteSession": {
+      "failedToCreate": "Không thể tạo phiên từ xa",
+      "exited": "Phiên đã thoát",
+      "failedToExit": "Không thể thoát phiên"
+    },
     "newSession": {
-      "title": "Phiên mới"
+      "title": "Phiên mới",
+      "repository": "Kho lưu trữ",
+      "couldNotLoadRepositories": "Không thể tải các kho lưu trữ",
+      "connectGithub": "Kết nối GitHub",
+      "connectGithubDescription": "Kết nối GitHub trong trình duyệt của bạn, sau đó quay lại đây để chọn kho lưu trữ.",
+      "openGithub": "Mở GitHub",
+      "refreshRepositories": "Làm mới kho lưu trữ",
+      "githubConnectionNotVisible": "Chúng tôi chưa thấy kết nối GitHub của bạn",
+      "githubConnectionNotVisibleDescription": "Nếu bạn đã cài đặt hoặc cấu hình ứng dụng Kilo GitHub, hãy kiểm tra lại — hoặc đảm bảo nó đã được cài đặt cho tài khoản/tổ chức này.",
+      "checkAgain": "Kiểm tra lại",
+      "githubConnected": "Đã kết nối GitHub",
+      "noRepositoriesVisible": "Không thấy kho lưu trữ nào. Kiểm tra quyền truy cập kho lưu trữ cho ứng dụng Kilo GitHub, sau đó làm mới.",
+      "runOnWithTarget": "Chạy trên: {{target}}",
+      "environment": "Môi trường",
+      "couldNotLoadEnvironment": "Không thể tải môi trường của bạn",
+      "retryLoadingEnvironment": "Thử tải lại môi trường",
+      "defaultEnvironment": "Môi trường mặc định",
+      "environmentSummary": "{{commands}} lệnh · {{mcp}} MCP · {{skills}} kỹ năng · {{agents}} tác nhân",
+      "changes": "Thay đổi",
+      "leaveChanges": "Giữ nguyên thay đổi",
+      "commitAndPush": "Commit và đẩy",
+      "startSession": "Bắt đầu phiên",
+      "promptPlaceholder": "Bạn muốn làm việc trên gì?",
+      "addAttachment": "Thêm tệp đính kèm",
+      "couldNotLoadModels": "Không thể tải các mô hình",
+      "prefillRepoAndModelUnavailable": "Kho lưu trữ và mô hình của phiên gốc không còn khả dụng. Hãy chọn chúng bên dưới.",
+      "prefillRepoUnavailable": "{{repo}} không còn khả dụng. Hãy chọn một kho lưu trữ bên dưới.",
+      "prefillModelUnavailable": "{{model}} không còn khả dụng. Đang sử dụng mô hình mặc định của bạn."
+    },
+    "partRenderer": {
+      "updatedFile": "Đã cập nhật {{count}} tệp",
+      "updatedFiles": "Đã cập nhật {{count}} tệp"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "các dòng {{start}}–{{end}} (đã cắt bớt)",
+      "linesOf": "các dòng {{start}}–{{end}} trên {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Tác nhân đám mây {{action}} thất bại ({{status}})",
+      "failed": "Tác nhân đám mây {{action}} thất bại"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[đầu vào không thể tuần tự hóa]",
+      "errorPrefix": "Lỗi: {{error}}"
     },
     "instancePicker": {
       "runOn": "Chạy trên",
+      "runOnAccessibility": "Chạy trên: {{label}}",
       "couldNotLoad": "Không thể tải các phiên bản",
       "couldNotLoadDescription": "Kiểm tra kết nối của bạn và thử lại.",
       "cloudAgent": "Tác nhân đám mây",
+      "loading": "Đang tải…",
       "cloudAgentDescription": "Chạy trên hộp cát đám mây của Kilo",
       "noCliInstances": "Không có phiên bản CLI nào được kết nối",
       "noCliInstancesDescription": "Chạy `kilo remote` trong một dự án trên máy tính của bạn, hoặc cập nhật Kilo CLI nếu một phiên bản đang chạy.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Chế độ tùy chỉnh"
     },
+    "modeSelector": {
+      "accessibility": "Chế độ: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Mã",
+      "plan": "Lập kế hoạch",
+      "debug": "Gỡ lỗi",
+      "orchestrator": "Điều phối",
+      "ask": "Hỏi",
+      "codeDescription": "Viết và sửa mã",
+      "planDescription": "Lập kế hoạch và thiết kế giải pháp",
+      "debugDescription": "Tìm và sửa lỗi",
+      "orchestratorDescription": "Điều phối các tác vụ phức tạp",
+      "askDescription": "Nhận câu trả lời và giải thích"
+    },
     "repoPicker": {
       "title": "Chọn kho lưu trữ",
       "searchLabel": "Tìm kiếm kho lưu trữ",
@@ -439,6 +508,279 @@
       "noRepositories": "Không có kho lưu trữ khả dụng",
       "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác."
+    },
+    "messageDetails": {
+      "title": "Chi tiết tin nhắn",
+      "copyMessage": "Sao chép tin nhắn",
+      "selectText": "Chọn văn bản",
+      "reportAiResponse": "Báo cáo phản hồi AI",
+      "reportAiResponseConfirm": "Báo cáo phản hồi này để xem xét?",
+      "report": "Báo cáo",
+      "role": "Vai trò",
+      "roleUser": "Người dùng",
+      "roleAssistant": "Trợ lý",
+      "sent": "Đã gửi",
+      "model": "Mô hình",
+      "costAndTokens": "Chi phí & token",
+      "cost": "Chi phí",
+      "input": "Đầu vào",
+      "output": "Đầu ra",
+      "reasoning": "Suy luận",
+      "cacheRead": "Đọc bộ nhớ đệm",
+      "cacheWrite": "Ghi bộ nhớ đệm",
+      "total": "Tổng"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Chi tiết không khả dụng",
+      "textDisplay": "Hiển thị văn bản",
+      "thinking": "Suy nghĩ",
+      "thought": "Ý nghĩ",
+      "title": "Chi tiết",
+      "showDetails": "Hiển thị chi tiết"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Không thể hiển thị nội dung"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Không thể gửi",
+      "deliveryInterrupted": "Bạn đã dừng tin nhắn này.",
+      "deliveryExhausted": "Chúng tôi không thể gửi tin nhắn này sau nhiều lần thử.",
+      "deliveryExecution": "Tác nhân không thể chạy tin nhắn này.",
+      "assistantTitle": "Phản hồi thất bại",
+      "assistantProviderRejected": "Nhà cung cấp đã từ chối yêu cầu.",
+      "assistantStopped": "Phản hồi đã bị dừng.",
+      "assistantContextOverflow": "Cuộc trò chuyện quá dài đối với mô hình.",
+      "assistantFailed": "Phản hồi thất bại.",
+      "sendFailed": "Không thể gửi tin nhắn. Vui lòng thử lại."
+    },
+    "filePart": {
+      "loadingImage": "Đang tải hình ảnh",
+      "imageUnavailableRetry": "Hình ảnh không khả dụng, thử tải lại",
+      "imageUnavailable": "Hình ảnh không khả dụng",
+      "imageUnavailableWithAlt": "Hình ảnh không khả dụng {{alt}}",
+      "viewImage": "Xem hình ảnh",
+      "viewImageWithAlt": "Xem hình ảnh {{alt}}",
+      "imageOutput": "Đầu ra hình ảnh",
+      "imageOutputWithFilename": "Đầu ra hình ảnh, {{filename}}",
+      "defaultName": "Tệp",
+      "openFullScreen": "Mở {{name}} toàn màn hình",
+      "preview": "Xem trước {{name}}",
+      "openFile": "Mở {{name}}",
+      "couldNotLoadFile": "Không thể tải tệp này.",
+      "couldNotLoadFileRetry": "Không thể tải tệp này. Thử lại.",
+      "retryLoadingFile": "Thử tải lại tệp",
+      "fileEmpty": "Tệp này trống.",
+      "previewUnavailable": "Xem trước không khả dụng",
+      "shareFailed": "Chia sẻ thất bại",
+      "sharingUnavailable": "Chia sẻ tệp không khả dụng trên thiết bị này.",
+      "shareFailedRetry": "Không thể chia sẻ tệp. Vui lòng thử lại.",
+      "openAsText": "Mở dưới dạng văn bản",
+      "openInExternalApp": "Mở trong ứng dụng ngoài"
+    },
+    "preparation": {
+      "exitCode": "Mã thoát: {{code}}",
+      "earlierOutputOmitted": "Đã bỏ qua đầu ra trước đó",
+      "preparingEnvironment": "Đang chuẩn bị môi trường",
+      "preparationComplete": "Chuẩn bị hoàn tất",
+      "preparationFailed": "Chuẩn bị thất bại",
+      "setupCommand": "Lệnh thiết lập {{index}}",
+      "setupCommandOf": "Lệnh thiết lập {{index}} trên {{count}}"
+    },
+    "permissionCard": {
+      "title": "Cần quyền",
+      "allowQuestion": "Cho phép {{permission}}?",
+      "appliesTo": "Áp dụng cho:",
+      "denyPermission": "Từ chối quyền",
+      "deny": "Từ chối",
+      "allowOnce": "Cho phép một lần",
+      "allowOnceAccessibility": "Cho phép một lần",
+      "alwaysAllow": "Luôn cho phép",
+      "alwaysAllowAccessibility": "Luôn cho phép",
+      "retrying": "Đang thử lại…"
+    },
+    "questionCard": {
+      "title": "Tác nhân cần nhập liệu",
+      "skipQuestionsTitle": "Bỏ qua các câu hỏi?",
+      "skipQuestionsMessage": "Tác nhân sẽ bỏ qua bước này.",
+      "selectAllThatApply": "Chọn tất cả các mục phù hợp",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, đã chọn",
+      "typeYourOwnAnswer": "Nhập câu trả lời của riêng bạn",
+      "typeYourOwnAnswerPlaceholder": "Nhập câu trả lời của riêng bạn…",
+      "skip": "Bỏ qua",
+      "retrySkip": "Thử bỏ qua lại",
+      "submitting": "Đang gửi…",
+      "sendAnswers": "Gửi câu trả lời"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Câu hỏi này không còn khả dụng.",
+      "permissionUnavailable": "Yêu cầu quyền này không còn khả dụng.",
+      "failedToSkipQuestion": "Không thể bỏ qua câu hỏi. Vui lòng thử lại.",
+      "failedToSubmitAnswer": "Không thể gửi câu trả lời. Vui lòng thử lại.",
+      "failedToRespondToPermission": "Không thể phản hồi yêu cầu quyền. Vui lòng thử lại.",
+      "submissionFailed": "Gửi thất bại. Vui lòng thử lại.",
+      "questionAnnouncement": "Tác nhân cần nhập liệu của bạn. Trình soạn đang tạm dừng trong khi bạn trả lời.",
+      "permissionAnnouncement": "Tác nhân cần quyền để tiếp tục. Trình soạn đang tạm dừng trong khi bạn quyết định.",
+      "positionHint": "(1 trên {{count}})",
+      "movedPastPrompt": "Tác nhân đã vượt qua lời nhắc này. Thẻ này sẽ đóng khi phiên tiếp tục.",
+      "waitingForAnswer": "Tác nhân đang chờ câu trả lời của bạn. Trong khi câu hỏi này đang mở, tin nhắn của bạn đến tác nhân bị tạm dừng.",
+      "waitingForPermission": "Tác nhân đang chờ quyền. Trong khi yêu cầu này đang mở, tin nhắn của bạn đến tác nhân bị tạm dừng."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Đã đạt độ sâu lồng tối đa.",
+      "modelAccessibility": "Mô hình: {{modelLabel}}",
+      "openHint": "Mở phiên tác nhân phụ",
+      "subagent": "Tác nhân phụ",
+      "task": "Tác vụ",
+      "waitingForActivity": "Đang chờ hoạt động"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Không thể tải phiên tác nhân phụ",
+      "failed": "Phiên tác nhân phụ thất bại",
+      "noMessages": "Không có tin nhắn tác nhân phụ",
+      "noMessagesDescription": "Phiên tác nhân phụ này đã hoàn tất mà không tạo ra bản ghi.",
+      "loading": "Đang tải phiên tác nhân phụ",
+      "loadingDescription": "Đang chờ tin nhắn tác nhân phụ…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Có thể thử lại.",
+      "copyToComposer": "Sao chép vào trình soạn",
+      "queued": "Đã xếp hàng đợi",
+      "queuedAccessibility": "Tin nhắn đã xếp hàng đợi",
+      "userMessage": "Tin nhắn người dùng",
+      "assistantMessage": "Tin nhắn trợ lý",
+      "longPressHint": "Nhấn giữ để xem chi tiết tin nhắn"
+    },
+    "olderMessages": {
+      "arrived": "Đã tải các tin nhắn trước đó"
+    },
+    "markdownTable": {
+      "viewTable": "Xem bảng",
+      "title": "Bảng",
+      "close": "Đóng bảng",
+      "column": "cột",
+      "columns": "các cột",
+      "row": "hàng",
+      "rows": "các hàng",
+      "opensFullScreen": "mở toàn màn hình"
+    },
+    "sessionFilter": {
+      "title": "Lọc phiên",
+      "sortBy": "Sắp xếp theo",
+      "sortLastUpdated": "Cập nhật gần nhất",
+      "sortCreated": "Đã tạo",
+      "platform": "Nền tảng",
+      "platformCloud": "Đám mây",
+      "platformExtension": "Tiện ích mở rộng",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Khác",
+      "project": "Dự án",
+      "removeProjectFilter": "Xóa bộ lọc dự án {{label}}",
+      "removePlatformFilter": "Xóa bộ lọc nền tảng {{label}}"
+    },
+    "modelPicker": {
+      "title": "Chọn mô hình",
+      "searchPlaceholder": "Tìm kiếm mô hình...",
+      "noModels": "Không có mô hình khả dụng",
+      "noModelsDescription": "Không có mô hình nào để chọn."
+    },
+    "modelSelector": {
+      "model": "Mô hình",
+      "provider": "Nhà cung cấp {{id}}",
+      "modelId": "Mô hình {{id}}",
+      "unavailable": "Không khả dụng",
+      "unavailableState": "không khả dụng",
+      "selectedState": "đã chọn",
+      "thinkingEffort": "Mức độ suy nghĩ",
+      "thinkingEffortAccessibility": "{{label}} mức độ suy nghĩ",
+      "thinkingEffortSelected": "{{label}} mức độ suy nghĩ, đã chọn",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} mức độ suy nghĩ",
+      "lockedByAgent": ", Bị khóa bởi tác nhân \"{{agent}}\"",
+      "addToFavorites": "Thêm {{name}} vào mục yêu thích",
+      "removeFromFavorites": "Xóa {{name}} khỏi mục yêu thích",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Không thể mở tệp. Vui lòng thử lại.",
+      "retryUploading": "Thử tải lên lại {{filename}}",
+      "removeAttachment": "Xóa tệp đính kèm {{filename}}",
+      "uploading": "Đang tải lên…",
+      "uploaded": "Đã tải lên",
+      "uploadFailedRetry": "Tải lên thất bại. Chạm để thử lại.",
+      "uploadFailedTerminal": "Không thể tải lên tệp này."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Dán hình ảnh từ bảng nhớ tạm",
+      "label": "Đã phát hiện hình ảnh, chạm để dán"
+    },
+    "attachmentPicker": {
+      "camera": "Máy ảnh",
+      "photoLibrary": "Thư viện ảnh",
+      "files": "Tệp",
+      "cameraAccessDisabled": "Quyền truy cập máy ảnh bị tắt",
+      "cameraAccessMessage": "Cho phép quyền truy cập máy ảnh trong Cài đặt để chụp ảnh."
+    },
+    "composer": {
+      "addAttachment": "Thêm tệp đính kèm",
+      "removeOrRetryFailed": "Trước tiên hãy xóa hoặc thử lại các tệp đính kèm thất bại.",
+      "attachmentsWithSlashCommands": "Không thể gửi tệp đính kèm cùng với lệnh gạch chéo.",
+      "photoMetadataNotRemoved": "Không thể xóa siêu dữ liệu ảnh khỏi tệp đính kèm.",
+      "waitForUploads": "Chờ các tệp đính kèm tải lên xong.",
+      "pasteFromClipboard": "Dán từ bảng nhớ tạm",
+      "stopGenerating": "Dừng tạo",
+      "sendMessage": "Gửi tin nhắn"
+    },
+    "chatLink": {
+      "linkCopied": "Đã sao chép liên kết",
+      "reviewPr": "Đánh giá PR",
+      "openLink": "Mở liên kết",
+      "copyLink": "Sao chép liên kết",
+      "shareLink": "Chia sẻ liên kết",
+      "share": "Chia sẻ",
+      "prLinkActions": "Hành động liên kết PR",
+      "linkActions": "Hành động liên kết",
+      "couldNotCopyLink": "Không thể sao chép liên kết",
+      "couldNotShareLink": "Không thể chia sẻ liên kết",
+      "opensInBrowser": "Mở trong trình duyệt",
+      "showLinkActions": "Hiển thị hành động liên kết"
+    },
+    "compaction": {
+      "contextCompacted": "Đã nén ngữ cảnh"
+    },
+    "computeStatus": {
+      "exploring": "Đang khám phá",
+      "searchingCodebase": "Đang tìm kiếm mã nguồn",
+      "makingEdits": "Đang chỉnh sửa",
+      "runningCommands": "Đang chạy lệnh",
+      "searchingWeb": "Đang tìm kiếm trên web",
+      "planningNextSteps": "Đang lập kế hoạch các bước tiếp theo",
+      "delegatingWork": "Đang phân công công việc",
+      "askingQuestion": "Đang đặt câu hỏi",
+      "consideringNextSteps": "Đang cân nhắc các bước tiếp theo",
+      "writingResponse": "Đang viết phản hồi"
+    },
+    "slashCommands": {
+      "startNewSession": "Bắt đầu phiên mới",
+      "exitSession": "Thoát phiên",
+      "clearSession": "Kết thúc phiên này và bắt đầu phiên mới",
+      "upgradeRequiredFallback": "Vui lòng nâng cấp CLI của bạn để sử dụng lệnh này.",
+      "exitCapabilityUnavailable": "Cập nhật CLI của bạn để thoát phiên.",
+      "clearCapabilityUnavailable": "Cập nhật CLI của bạn để khởi động lại phiên.",
+      "argumentError": "{{command}} không nhận đối số."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Kích thước cửa sổ ngữ cảnh không khả dụng",
+      "tapToViewDetails": "Chạm để xem chi tiết ngữ cảnh.",
+      "costPrefix": "chi phí {{cost}}",
+      "costSuffix": ", chi phí {{cost}}",
+      "tokensWindowUnavailable": "Ngữ cảnh {{used}} token, cửa sổ không khả dụng",
+      "tokensUsage": "Ngữ cảnh {{used}} trên {{window}} token, đã dùng {{percentage}}%"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Liên kết này không còn hợp lệ.",
     "goBack": "Quay lại",
     "title": "Không tìm thấy trang"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Nội dung bị cắt bớt",
+    "truncated": "Đã cắt bớt",
+    "wrap": "Xuống dòng",
+    "scroll": "Cuộn"
   },
   "offline": {
     "noInternet": "Không có kết nối internet",

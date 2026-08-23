@@ -10,7 +10,7 @@ import { SessionPaginationHeader } from '@/components/agents/session-pagination-
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
 
@@ -160,7 +160,7 @@ export function SessionMessageList<T>({
         nextNewestKey,
       })
     ) {
-      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+      AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;

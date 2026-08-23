@@ -13,7 +13,7 @@ import {
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import {
-  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
 import {
@@ -188,7 +188,7 @@ export function MessageList({
         nextNewestKey,
       })
     ) {
-      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+      AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;

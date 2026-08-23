@@ -1,5 +1,6 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { collectCopyableText } from './collect-copyable-text';
@@ -37,7 +38,10 @@ export function getMessageDetailsContent(
   message: StoredMessage,
   modelOptions: SessionModelOption[]
 ): MessageDetailsContent {
-  const roleLabel = message.info.role === 'user' ? 'User' : 'Assistant';
+  const roleLabel =
+    message.info.role === 'user'
+      ? i18n.t('agentChat.messageDetails.roleUser')
+      : i18n.t('agentChat.messageDetails.roleAssistant');
   const sentTimeLabel = formatMessageSentTime(message.info.time.created);
   const copyable = collectCopyableText(message);
   const copyableText = copyable.length > 0 ? copyable : null;
@@ -72,12 +76,12 @@ export function getMessageDetailsContent(
     costLabel: showUsage ? formatCost(usage.cost) : null,
     tokenRows: showUsage
       ? [
-          { label: 'Input', value: usage.input },
-          { label: 'Output', value: usage.output },
-          { label: 'Reasoning', value: usage.reasoning },
-          { label: 'Cache read', value: usage.cacheRead },
-          { label: 'Cache write', value: usage.cacheWrite },
-          { label: 'Total', value: usage.total },
+          { label: i18n.t('agentChat.messageDetails.input'), value: usage.input },
+          { label: i18n.t('agentChat.messageDetails.output'), value: usage.output },
+          { label: i18n.t('agentChat.messageDetails.reasoning'), value: usage.reasoning },
+          { label: i18n.t('agentChat.messageDetails.cacheRead'), value: usage.cacheRead },
+          { label: i18n.t('agentChat.messageDetails.cacheWrite'), value: usage.cacheWrite },
+          { label: i18n.t('agentChat.messageDetails.total'), value: usage.total },
         ]
       : null,
     copyableText,

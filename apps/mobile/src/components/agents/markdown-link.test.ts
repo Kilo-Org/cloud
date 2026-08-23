@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getLinkAccessibilityActions,
+  getLinkAccessibilityHint,
   getLinkLongPressHandler,
-  LINK_ACCESSIBILITY_HINT,
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
 
@@ -35,7 +35,7 @@ describe('resolveLinkAccessibilityLabel', () => {
 
 describe('link action accessibility', () => {
   it('describes the existing in-app browser behavior', () => {
-    expect(LINK_ACCESSIBILITY_HINT).toBe('Opens in browser');
+    expect(getLinkAccessibilityHint()).toBe('Opens in browser');
   });
 
   it('exposes link actions only when the chat callback is enabled', () => {

@@ -88,8 +88,8 @@ vi.mock('./markdown-image', () => ({
 }));
 vi.mock('./markdown-link', () => ({
   getLinkAccessibilityActions: () => [],
+  getLinkAccessibilityHint: () => 'hint',
   getLinkLongPressHandler: () => undefined,
-  LINK_ACCESSIBILITY_HINT: 'hint',
   resolveLinkAccessibilityLabel: () => 'label',
 }));
 vi.mock('@/lib/external-link', () => ({

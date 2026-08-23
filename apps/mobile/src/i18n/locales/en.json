@@ -16,6 +16,7 @@
     "refresh": "Refresh",
     "couldNotRefresh": "Couldn't refresh. Pull down to try again.",
     "openInBrowser": "Open in browser",
+    "openSettings": "Open Settings",
     "copiedToClipboard": "Copied to clipboard",
     "required": "required",
     "error": "error: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Filter findings"
     }
   },
+  "agents": {
+    "activeNow": "Active now"
+  },
   "agentChat": {
     "session": {
       "title": "Session",
@@ -411,14 +415,64 @@
       "notFound": "Not found",
       "notFoundDescription": "This item may have been removed or is no longer available."
     },
+    "remoteSession": {
+      "failedToCreate": "Failed to create remote session",
+      "exited": "Session exited",
+      "failedToExit": "Failed to exit session"
+    },
     "newSession": {
-      "title": "New session"
+      "title": "New session",
+      "repository": "Repository",
+      "couldNotLoadRepositories": "Couldn't load repositories",
+      "connectGithub": "Connect GitHub",
+      "connectGithubDescription": "Connect GitHub in your browser, then return here to pick a repository.",
+      "openGithub": "Open GitHub",
+      "refreshRepositories": "Refresh repositories",
+      "githubConnectionNotVisible": "We can't see your GitHub connection yet",
+      "githubConnectionNotVisibleDescription": "If you installed or configured the Kilo GitHub App, check again — or make sure it was installed for this account/organization.",
+      "checkAgain": "Check again",
+      "githubConnected": "GitHub connected",
+      "noRepositoriesVisible": "No repositories visible. Check repository access for the Kilo GitHub App, then refresh.",
+      "runOnWithTarget": "Run on: {{target}}",
+      "environment": "Environment",
+      "couldNotLoadEnvironment": "Couldn't load your environment",
+      "retryLoadingEnvironment": "Retry loading environment",
+      "defaultEnvironment": "Default environment",
+      "environmentSummary": "{{commands}} commands · {{mcp}} MCP · {{skills}} skills · {{agents}} agents",
+      "changes": "Changes",
+      "leaveChanges": "Leave changes",
+      "commitAndPush": "Commit and push",
+      "startSession": "Start session",
+      "promptPlaceholder": "What would you like to work on?",
+      "addAttachment": "Add attachment",
+      "couldNotLoadModels": "Couldn't load models",
+      "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",
+      "prefillRepoUnavailable": "{{repo}} is no longer available. Pick a repository below.",
+      "prefillModelUnavailable": "{{model}} is no longer available. Using your default model."
+    },
+    "partRenderer": {
+      "updatedFile": "Updated {{count}} file",
+      "updatedFiles": "Updated {{count}} files"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "lines {{start}}–{{end}} (truncated)",
+      "linesOf": "lines {{start}}–{{end}} of {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Cloud Agent {{action}} failed ({{status}})",
+      "failed": "Cloud Agent {{action}} failed"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[unserializable input]",
+      "errorPrefix": "Error: {{error}}"
     },
     "instancePicker": {
       "runOn": "Run on",
+      "runOnAccessibility": "Run on: {{label}}",
       "couldNotLoad": "Couldn't load instances",
       "couldNotLoadDescription": "Check your connection and try again.",
       "cloudAgent": "Cloud Agent",
+      "loading": "Loading…",
       "cloudAgentDescription": "Run on Kilo's cloud sandbox",
       "noCliInstances": "No CLI instances connected",
       "noCliInstancesDescription": "Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Custom modes"
     },
+    "modeSelector": {
+      "accessibility": "Mode: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Code",
+      "plan": "Plan",
+      "debug": "Debug",
+      "orchestrator": "Orchestrator",
+      "ask": "Ask",
+      "codeDescription": "Write and modify code",
+      "planDescription": "Plan and design solutions",
+      "debugDescription": "Find and fix issues",
+      "orchestratorDescription": "Coordinate complex tasks",
+      "askDescription": "Get answers and explanations"
+    },
     "repoPicker": {
       "title": "Select repository",
       "searchLabel": "Search repositories",
@@ -439,6 +508,279 @@
       "noRepositories": "No repositories available",
       "noRepositoriesDescription": "No repositories are connected to your account.",
       "tryDifferentSearch": "Try a different search term."
+    },
+    "messageDetails": {
+      "title": "Message details",
+      "copyMessage": "Copy message",
+      "selectText": "Select text",
+      "reportAiResponse": "Report AI response",
+      "reportAiResponseConfirm": "Report this response for review?",
+      "report": "Report",
+      "role": "Role",
+      "roleUser": "User",
+      "roleAssistant": "Assistant",
+      "sent": "Sent",
+      "model": "Model",
+      "costAndTokens": "Cost & tokens",
+      "cost": "Cost",
+      "input": "Input",
+      "output": "Output",
+      "reasoning": "Reasoning",
+      "cacheRead": "Cache read",
+      "cacheWrite": "Cache write",
+      "total": "Total"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Details unavailable",
+      "textDisplay": "Text display",
+      "thinking": "Thinking",
+      "thought": "Thought",
+      "title": "Details",
+      "showDetails": "Show details"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Failed to render content"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Failed to deliver",
+      "deliveryInterrupted": "You stopped this message.",
+      "deliveryExhausted": "We could not deliver this message after several attempts.",
+      "deliveryExecution": "The agent could not run this message.",
+      "assistantTitle": "Response failed",
+      "assistantProviderRejected": "The provider rejected the request.",
+      "assistantStopped": "The response was stopped.",
+      "assistantContextOverflow": "The conversation is too long for the model.",
+      "assistantFailed": "The response failed.",
+      "sendFailed": "Failed to send message. Please try again."
+    },
+    "filePart": {
+      "loadingImage": "Loading image",
+      "imageUnavailableRetry": "Image unavailable, retry loading",
+      "imageUnavailable": "Image unavailable",
+      "imageUnavailableWithAlt": "Image unavailable {{alt}}",
+      "viewImage": "View image",
+      "viewImageWithAlt": "View image {{alt}}",
+      "imageOutput": "Image output",
+      "imageOutputWithFilename": "Image output, {{filename}}",
+      "defaultName": "File",
+      "openFullScreen": "Open {{name}} full screen",
+      "preview": "Preview {{name}}",
+      "openFile": "Open {{name}}",
+      "couldNotLoadFile": "Could not load this file.",
+      "couldNotLoadFileRetry": "Could not load this file. Try again.",
+      "retryLoadingFile": "Retry loading file",
+      "fileEmpty": "This file is empty.",
+      "previewUnavailable": "Preview unavailable",
+      "shareFailed": "Share failed",
+      "sharingUnavailable": "File sharing is not available on this device.",
+      "shareFailedRetry": "Failed to share file. Please try again.",
+      "openAsText": "Open as text",
+      "openInExternalApp": "Open in external app"
+    },
+    "preparation": {
+      "exitCode": "Exit code: {{code}}",
+      "earlierOutputOmitted": "Earlier output omitted",
+      "preparingEnvironment": "Preparing environment",
+      "preparationComplete": "Preparation complete",
+      "preparationFailed": "Preparation failed",
+      "setupCommand": "Setup command {{index}}",
+      "setupCommandOf": "Setup command {{index}} of {{count}}"
+    },
+    "permissionCard": {
+      "title": "Permission required",
+      "allowQuestion": "Allow {{permission}}?",
+      "appliesTo": "Applies to:",
+      "denyPermission": "Deny permission",
+      "deny": "Deny",
+      "allowOnce": "Allow Once",
+      "allowOnceAccessibility": "Allow once",
+      "alwaysAllow": "Always Allow",
+      "alwaysAllowAccessibility": "Always allow",
+      "retrying": "Retrying…"
+    },
+    "questionCard": {
+      "title": "Agent needs input",
+      "skipQuestionsTitle": "Skip questions?",
+      "skipQuestionsMessage": "The agent will skip this step.",
+      "selectAllThatApply": "Select all that apply",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, selected",
+      "typeYourOwnAnswer": "Type your own answer",
+      "typeYourOwnAnswerPlaceholder": "Type your own answer…",
+      "skip": "Skip",
+      "retrySkip": "Retry skip",
+      "submitting": "Submitting…",
+      "sendAnswers": "Send answers"
+    },
+    "blockingCard": {
+      "questionUnavailable": "This question is no longer available.",
+      "permissionUnavailable": "This permission request is no longer available.",
+      "failedToSkipQuestion": "Failed to skip question. Please try again.",
+      "failedToSubmitAnswer": "Failed to submit answer. Please try again.",
+      "failedToRespondToPermission": "Failed to respond to permission. Please try again.",
+      "submissionFailed": "Submission failed. Please try again.",
+      "questionAnnouncement": "Agent needs your input. The composer is paused while you answer.",
+      "permissionAnnouncement": "Agent needs permission to continue. The composer is paused while you decide.",
+      "positionHint": "(1 of {{count}})",
+      "movedPastPrompt": "The agent has moved past this prompt. This card will close when the session continues.",
+      "waitingForAnswer": "The agent is waiting for your answer. While this question is open, your message to the agent is paused.",
+      "waitingForPermission": "The agent is waiting for permission. While this request is open, your message to the agent is paused."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Maximum nesting depth reached.",
+      "modelAccessibility": "Model: {{modelLabel}}",
+      "openHint": "Open subagent session",
+      "subagent": "Subagent",
+      "task": "Task",
+      "waitingForActivity": "Waiting for activity"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Could not load subagent session",
+      "failed": "Subagent session failed",
+      "noMessages": "No subagent messages",
+      "noMessagesDescription": "This subagent session completed without producing a transcript.",
+      "loading": "Loading subagent session",
+      "loadingDescription": "Waiting for subagent messages…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Retry available.",
+      "copyToComposer": "Copy to composer",
+      "queued": "Queued",
+      "queuedAccessibility": "Message queued",
+      "userMessage": "User message",
+      "assistantMessage": "Assistant message",
+      "longPressHint": "Long press for message details"
+    },
+    "olderMessages": {
+      "arrived": "Earlier messages loaded"
+    },
+    "markdownTable": {
+      "viewTable": "View table",
+      "title": "Table",
+      "close": "Close table",
+      "column": "column",
+      "columns": "columns",
+      "row": "row",
+      "rows": "rows",
+      "opensFullScreen": "opens full screen"
+    },
+    "sessionFilter": {
+      "title": "Filter sessions",
+      "sortBy": "Sort by",
+      "sortLastUpdated": "Last updated",
+      "sortCreated": "Created",
+      "platform": "Platform",
+      "platformCloud": "Cloud",
+      "platformExtension": "Extension",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Other",
+      "project": "Project",
+      "removeProjectFilter": "Remove {{label}} project filter",
+      "removePlatformFilter": "Remove {{label}} platform filter"
+    },
+    "modelPicker": {
+      "title": "Select model",
+      "searchPlaceholder": "Search models...",
+      "noModels": "No models available",
+      "noModelsDescription": "No models are available to select."
+    },
+    "modelSelector": {
+      "model": "Model",
+      "provider": "Provider {{id}}",
+      "modelId": "Model {{id}}",
+      "unavailable": "Unavailable",
+      "unavailableState": "unavailable",
+      "selectedState": "selected",
+      "thinkingEffort": "Thinking effort",
+      "thinkingEffortAccessibility": "{{label}} thinking effort",
+      "thinkingEffortSelected": "{{label}} thinking effort, selected",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} thinking effort",
+      "lockedByAgent": ", Locked by agent \"{{agent}}\"",
+      "addToFavorites": "Add {{name}} to favorites",
+      "removeFromFavorites": "Remove {{name}} from favorites",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Failed to open file. Please try again.",
+      "retryUploading": "Retry uploading {{filename}}",
+      "removeAttachment": "Remove attachment {{filename}}",
+      "uploading": "Uploading…",
+      "uploaded": "Uploaded",
+      "uploadFailedRetry": "Upload failed. Tap to retry.",
+      "uploadFailedTerminal": "This file can't be uploaded."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Paste image from clipboard",
+      "label": "Image detected, tap to paste"
+    },
+    "attachmentPicker": {
+      "camera": "Camera",
+      "photoLibrary": "Photo Library",
+      "files": "Files",
+      "cameraAccessDisabled": "Camera Access Disabled",
+      "cameraAccessMessage": "Allow camera access in Settings to take a photo."
+    },
+    "composer": {
+      "addAttachment": "Add attachment",
+      "removeOrRetryFailed": "Remove or retry failed attachments first.",
+      "attachmentsWithSlashCommands": "Attachments cannot be sent with slash commands.",
+      "photoMetadataNotRemoved": "Photo metadata could not be removed from an attachment.",
+      "waitForUploads": "Wait for attachments to finish uploading.",
+      "pasteFromClipboard": "Paste from clipboard",
+      "stopGenerating": "Stop generating",
+      "sendMessage": "Send message"
+    },
+    "chatLink": {
+      "linkCopied": "Link copied",
+      "reviewPr": "Review PR",
+      "openLink": "Open link",
+      "copyLink": "Copy link",
+      "shareLink": "Share link",
+      "share": "Share",
+      "prLinkActions": "PR link actions",
+      "linkActions": "Link actions",
+      "couldNotCopyLink": "Could not copy link",
+      "couldNotShareLink": "Could not share link",
+      "opensInBrowser": "Opens in browser",
+      "showLinkActions": "Show link actions"
+    },
+    "compaction": {
+      "contextCompacted": "Context compacted"
+    },
+    "computeStatus": {
+      "exploring": "Exploring",
+      "searchingCodebase": "Searching the codebase",
+      "makingEdits": "Making edits",
+      "runningCommands": "Running commands",
+      "searchingWeb": "Searching the web",
+      "planningNextSteps": "Planning next steps",
+      "delegatingWork": "Delegating work",
+      "askingQuestion": "Asking a question",
+      "consideringNextSteps": "Considering next steps",
+      "writingResponse": "Writing response"
+    },
+    "slashCommands": {
+      "startNewSession": "Start a new session",
+      "exitSession": "Exit the session",
+      "clearSession": "End this session and start a new one",
+      "upgradeRequiredFallback": "Please upgrade your CLI to use this command.",
+      "exitCapabilityUnavailable": "Update your CLI to exit the session.",
+      "clearCapabilityUnavailable": "Update your CLI to restart the session.",
+      "argumentError": "{{command}} does not take arguments."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Context-window size unavailable",
+      "tapToViewDetails": "Tap to view context details.",
+      "costPrefix": "cost {{cost}}",
+      "costSuffix": ", cost {{cost}}",
+      "tokensWindowUnavailable": "Context {{used}} tokens, window unavailable",
+      "tokensUsage": "Context {{used}} of {{window}} tokens, {{percentage}}% used"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "This link is no longer valid.",
     "goBack": "Go back",
     "title": "Page not found"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Content truncated",
+    "truncated": "Truncated",
+    "wrap": "Wrap",
+    "scroll": "Scroll"
   },
   "offline": {
     "noInternet": "No internet connection",

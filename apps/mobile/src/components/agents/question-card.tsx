@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Check } from '@/components/ui/icons';
@@ -72,6 +73,7 @@ export function QuestionCard({
   pendingCount = 1,
 }: Readonly<QuestionCardProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
   const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
   const customInputs = useRef<Record<number, string>>({});
@@ -175,10 +177,14 @@ export function QuestionCard({
   }
 
   function handleReject() {
-    Alert.alert('Skip questions?', 'The agent will skip this step.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Skip', style: 'destructive', onPress: onReject },
-    ]);
+    Alert.alert(
+      t('agentChat.questionCard.skipQuestionsTitle'),
+      t('agentChat.questionCard.skipQuestionsMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('agentChat.questionCard.skip'), style: 'destructive', onPress: onReject },
+      ]
+    );
   }
 
   function handleRetrySkip() {
@@ -187,7 +193,7 @@ export function QuestionCard({
   }
 
   const allQuestionsAnswered = buildAnswers().every(answer => answer.length > 0);
-  const title = formatBlockingCardTitle('Agent needs input', pendingCount);
+  const title = formatBlockingCardTitle(t('agentChat.questionCard.title'), pendingCount);
   const isInert = presentation.state === 'non-retryable';
   const interactionDisabled = isSubmitting || isInert;
   const submitDisabled = !allQuestionsAnswered || interactionDisabled;
@@ -220,7 +226,9 @@ export function QuestionCard({
               <View key={qIndex} className="gap-2">
                 <Text className="text-sm font-medium text-foreground">{question.question}</Text>
                 {question.multiple && (
-                  <Text className="text-xs text-muted-foreground">Select all that apply</Text>
+                  <Text className="text-xs text-muted-foreground">
+                    {t('agentChat.questionCard.selectAllThatApply')}
+                  </Text>
                 )}
                 <View className="gap-1">
                   {question.options.map((option, oIndex) => {
@@ -235,7 +243,11 @@ export function QuestionCard({
                         }}
                         disabled={interactionDisabled}
                         accessibilityRole="button"
-                        accessibilityLabel={`${option.label}${isSelected ? ', selected' : ''}`}
+                        accessibilityLabel={
+                          isSelected
+                            ? t('agentChat.questionCard.optionSelected', { label: option.label })
+                            : t('agentChat.questionCard.option', { label: option.label })
+                        }
                         className={cn(
                           'h-auto justify-start py-2.5',
                           isSelected ? 'bg-primary' : 'bg-background'
@@ -264,7 +276,7 @@ export function QuestionCard({
                     <View className="gap-1">
                       <Pressable
                         accessibilityRole={question.multiple ? 'checkbox' : 'radio'}
-                        accessibilityLabel="Type your own answer"
+                        accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
                         accessibilityState={{
                           checked: isCustomActive,
                           disabled: interactionDisabled,
@@ -288,7 +300,7 @@ export function QuestionCard({
                             isCustomActive ? 'text-primary-foreground' : 'text-foreground'
                           )}
                         >
-                          Type your own answer
+                          {t('agentChat.questionCard.typeYourOwnAnswer')}
                         </Text>
                         {isCustomActive ? (
                           <Check size={16} color={colors.primaryForeground} />
@@ -302,10 +314,10 @@ export function QuestionCard({
                         onChangeText={text => {
                           handleCustomTextChange(qIndex, text);
                         }}
-                        placeholder="Type your own answer…"
+                        placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
                         placeholderTextColor={colors.mutedForeground}
                         editable={!interactionDisabled}
-                        accessibilityLabel="Type your own answer"
+                        accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
                         accessibilityState={{ disabled: interactionDisabled }}
                         className={cn(
                           'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-black/5',
@@ -333,26 +345,30 @@ export function QuestionCard({
               onPress={handleReject}
               disabled={interactionDisabled}
             >
-              <Text className="text-sm">Skip</Text>
+              <Text className="text-sm">{t('agentChat.questionCard.skip')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'answer' ? (
             <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>Retry</Text>
+              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>{t('common.retry')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'reject' ? (
             <Button className="flex-1" onPress={handleRetrySkip} disabled={interactionDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>Retry skip</Text>
+              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+                {t('agentChat.questionCard.retrySkip')}
+              </Text>
             </Button>
           ) : null}
           {presentation.hasPrimaryCta ? (
             <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
               <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
-                {isSubmitting ? 'Submitting…' : 'Send answers'}
+                {isSubmitting
+                  ? t('agentChat.questionCard.submitting')
+                  : t('agentChat.questionCard.sendAnswers')}
               </Text>
             </Button>
           ) : null}

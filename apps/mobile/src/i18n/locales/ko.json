@@ -16,6 +16,7 @@
     "refresh": "새로고침",
     "couldNotRefresh": "새로 고침할 수 없습니다. 아래로 당겨 다시 시도하세요.",
     "openInBrowser": "브라우저에서 열기",
+    "openSettings": "설정 열기",
     "copiedToClipboard": "클립보드에 복사됨",
     "required": "필수",
     "error": "오류: {{error}}"
@@ -399,6 +400,9 @@
       "title": "검색 결과 필터링"
     }
   },
+  "agents": {
+    "activeNow": "지금 활성 중"
+  },
   "agentChat": {
     "session": {
       "title": "세션",
@@ -411,14 +415,64 @@
       "notFound": "찾을 수 없음",
       "notFoundDescription": "이 항목은 삭제되었거나 더 이상 사용할 수 없습니다."
     },
+    "remoteSession": {
+      "failedToCreate": "원격 세션을 만들지 못했습니다",
+      "exited": "세션 종료됨",
+      "failedToExit": "세션을 종료하지 못했습니다"
+    },
     "newSession": {
-      "title": "새 세션"
+      "title": "새 세션",
+      "repository": "리포지토리",
+      "couldNotLoadRepositories": "리포지토리를 불러올 수 없습니다",
+      "connectGithub": "GitHub 연결",
+      "connectGithubDescription": "브라우저에서 GitHub를 연결한 다음 여기로 돌아와 리포지토리를 선택하세요.",
+      "openGithub": "GitHub 열기",
+      "refreshRepositories": "리포지토리 새로고침",
+      "githubConnectionNotVisible": "아직 GitHub 연결을 확인할 수 없습니다",
+      "githubConnectionNotVisibleDescription": "Kilo GitHub 앱을 설치하거나 구성했다면 다시 확인하세요. 또는 이 계정/조직에 설치되었는지 확인하세요.",
+      "checkAgain": "다시 확인",
+      "githubConnected": "GitHub 연결됨",
+      "noRepositoriesVisible": "표시되는 리포지토리가 없습니다. Kilo GitHub 앱의 리포지토리 액세스를 확인한 다음 새로고침하세요.",
+      "runOnWithTarget": "실행 위치: {{target}}",
+      "environment": "환경",
+      "couldNotLoadEnvironment": "환경을 불러올 수 없습니다",
+      "retryLoadingEnvironment": "환경 로드 다시 시도",
+      "defaultEnvironment": "기본 환경",
+      "environmentSummary": "명령 {{commands}}개 · MCP {{mcp}}개 · 스킬 {{skills}}개 · 에이전트 {{agents}}개",
+      "changes": "변경 사항",
+      "leaveChanges": "변경 사항 남기기",
+      "commitAndPush": "커밋 및 푸시",
+      "startSession": "세션 시작",
+      "promptPlaceholder": "무엇을 작업하고 싶으신가요?",
+      "addAttachment": "첨부 파일 추가",
+      "couldNotLoadModels": "모델을 불러올 수 없습니다",
+      "prefillRepoAndModelUnavailable": "원래 세션의 리포지토리와 모델을 더 이상 사용할 수 없습니다. 아래에서 선택하세요.",
+      "prefillRepoUnavailable": "{{repo}}은(는) 더 이상 사용할 수 없습니다. 아래에서 리포지토리를 선택하세요.",
+      "prefillModelUnavailable": "{{model}}은(는) 더 이상 사용할 수 없습니다. 기본 모델을 사용합니다."
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}}개 파일 업데이트됨",
+      "updatedFiles": "{{count}}개 파일 업데이트됨"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "{{start}}–{{end}}행 (잘림)",
+      "linesOf": "전체 {{total}}행 중 {{start}}–{{end}}행"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Cloud Agent {{action}} 실패 ({{status}})",
+      "failed": "Cloud Agent {{action}} 실패"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[직렬화할 수 없는 입력]",
+      "errorPrefix": "오류: {{error}}"
     },
     "instancePicker": {
       "runOn": "실행 위치",
+      "runOnAccessibility": "실행 위치: {{label}}",
       "couldNotLoad": "인스턴스를 불러올 수 없습니다",
       "couldNotLoadDescription": "연결을 확인하고 다시 시도하세요.",
       "cloudAgent": "클라우드 에이전트",
+      "loading": "로드 중…",
       "cloudAgentDescription": "Kilo의 클라우드 샌드박스에서 실행",
       "noCliInstances": "연결된 CLI 인스턴스 없음",
       "noCliInstancesDescription": "컴퓨터의 프로젝트에서 `kilo remote`를 실행하거나, 이미 실행 중이라면 Kilo CLI를 업데이트하세요.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "사용자 지정 모드"
     },
+    "modeSelector": {
+      "accessibility": "모드: {{label}}"
+    },
+    "modeOptions": {
+      "code": "코드",
+      "plan": "계획",
+      "debug": "디버그",
+      "orchestrator": "오케스트레이터",
+      "ask": "질문",
+      "codeDescription": "코드 작성 및 수정",
+      "planDescription": "솔루션 계획 및 설계",
+      "debugDescription": "문제 찾기 및 수정",
+      "orchestratorDescription": "복잡한 작업 조정",
+      "askDescription": "답변과 설명 얻기"
+    },
     "repoPicker": {
       "title": "리포지토리 선택",
       "searchLabel": "리포지토리 검색",
@@ -439,6 +508,279 @@
       "noRepositories": "사용 가능한 저장소가 없습니다",
       "noRepositoriesDescription": "계정에 연결된 저장소가 없습니다.",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요."
+    },
+    "messageDetails": {
+      "title": "메시지 세부 정보",
+      "copyMessage": "메시지 복사",
+      "selectText": "텍스트 선택",
+      "reportAiResponse": "AI 응답 신고",
+      "reportAiResponseConfirm": "검토를 위해 이 응답을 신고하시겠습니까?",
+      "report": "신고",
+      "role": "역할",
+      "roleUser": "사용자",
+      "roleAssistant": "어시스턴트",
+      "sent": "보냄",
+      "model": "모델",
+      "costAndTokens": "비용 및 토큰",
+      "cost": "비용",
+      "input": "입력",
+      "output": "출력",
+      "reasoning": "추론",
+      "cacheRead": "캐시 읽기",
+      "cacheWrite": "캐시 쓰기",
+      "total": "합계"
+    },
+    "partDetail": {
+      "detailsUnavailable": "세부 정보를 사용할 수 없습니다",
+      "textDisplay": "텍스트 표시",
+      "thinking": "사고",
+      "thought": "생각",
+      "title": "세부 정보",
+      "showDetails": "세부 정보 표시"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "콘텐츠를 렌더링하지 못했습니다"
+    },
+    "messageFailure": {
+      "deliveryTitle": "전달 실패",
+      "deliveryInterrupted": "이 메시지를 중지했습니다.",
+      "deliveryExhausted": "여러 번 시도했지만 이 메시지를 전달할 수 없었습니다.",
+      "deliveryExecution": "에이전트가 이 메시지를 실행할 수 없었습니다.",
+      "assistantTitle": "응답 실패",
+      "assistantProviderRejected": "제공업체가 요청을 거부했습니다.",
+      "assistantStopped": "응답이 중지되었습니다.",
+      "assistantContextOverflow": "대화가 모델에 비해 너무 깁니다.",
+      "assistantFailed": "응답에 실패했습니다.",
+      "sendFailed": "메시지를 보내지 못했습니다. 다시 시도하세요."
+    },
+    "filePart": {
+      "loadingImage": "이미지 로드 중",
+      "imageUnavailableRetry": "이미지를 사용할 수 없습니다. 다시 로드하세요",
+      "imageUnavailable": "이미지를 사용할 수 없습니다",
+      "imageUnavailableWithAlt": "이미지를 사용할 수 없습니다 {{alt}}",
+      "viewImage": "이미지 보기",
+      "viewImageWithAlt": "이미지 보기 {{alt}}",
+      "imageOutput": "이미지 출력",
+      "imageOutputWithFilename": "이미지 출력, {{filename}}",
+      "defaultName": "파일",
+      "openFullScreen": "{{name}} 전체 화면으로 열기",
+      "preview": "{{name}} 미리보기",
+      "openFile": "{{name}} 열기",
+      "couldNotLoadFile": "이 파일을 불러올 수 없습니다.",
+      "couldNotLoadFileRetry": "이 파일을 불러올 수 없습니다. 다시 시도하세요.",
+      "retryLoadingFile": "파일 로드 다시 시도",
+      "fileEmpty": "이 파일은 비어 있습니다.",
+      "previewUnavailable": "미리보기를 사용할 수 없습니다",
+      "shareFailed": "공유 실패",
+      "sharingUnavailable": "이 기기에서는 파일 공유를 사용할 수 없습니다.",
+      "shareFailedRetry": "파일을 공유하지 못했습니다. 다시 시도하세요.",
+      "openAsText": "텍스트로 열기",
+      "openInExternalApp": "외부 앱에서 열기"
+    },
+    "preparation": {
+      "exitCode": "종료 코드: {{code}}",
+      "earlierOutputOmitted": "이전 출력 생략됨",
+      "preparingEnvironment": "환경 준비 중",
+      "preparationComplete": "준비 완료",
+      "preparationFailed": "준비 실패",
+      "setupCommand": "설정 명령 {{index}}",
+      "setupCommandOf": "설정 명령 {{index}} / {{count}}"
+    },
+    "permissionCard": {
+      "title": "권한 필요",
+      "allowQuestion": "{{permission}}을(를) 허용하시겠습니까?",
+      "appliesTo": "적용 대상:",
+      "denyPermission": "권한 거부",
+      "deny": "거부",
+      "allowOnce": "한 번 허용",
+      "allowOnceAccessibility": "한 번 허용",
+      "alwaysAllow": "항상 허용",
+      "alwaysAllowAccessibility": "항상 허용",
+      "retrying": "다시 시도 중…"
+    },
+    "questionCard": {
+      "title": "에이전트 입력 필요",
+      "skipQuestionsTitle": "질문을 건너뛰시겠습니까?",
+      "skipQuestionsMessage": "에이전트가 이 단계를 건너뜁니다.",
+      "selectAllThatApply": "해당하는 항목 모두 선택",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, 선택됨",
+      "typeYourOwnAnswer": "직접 답변 입력",
+      "typeYourOwnAnswerPlaceholder": "직접 답변 입력…",
+      "skip": "건너뛰기",
+      "retrySkip": "건너뛰기 다시 시도",
+      "submitting": "제출 중…",
+      "sendAnswers": "답변 보내기"
+    },
+    "blockingCard": {
+      "questionUnavailable": "이 질문은 더 이상 사용할 수 없습니다.",
+      "permissionUnavailable": "이 권한 요청은 더 이상 사용할 수 없습니다.",
+      "failedToSkipQuestion": "질문을 건너뛰지 못했습니다. 다시 시도하세요.",
+      "failedToSubmitAnswer": "답변을 제출하지 못했습니다. 다시 시도하세요.",
+      "failedToRespondToPermission": "권한에 응답하지 못했습니다. 다시 시도하세요.",
+      "submissionFailed": "제출에 실패했습니다. 다시 시도하세요.",
+      "questionAnnouncement": "에이전트가 입력을 필요로 합니다. 답변하는 동안 작성기가 일시 중지됩니다.",
+      "permissionAnnouncement": "에이전트가 계속하려면 권한이 필요합니다. 결정하는 동안 작성기가 일시 중지됩니다.",
+      "positionHint": "({{count}}개 중 1개)",
+      "movedPastPrompt": "에이전트가 이 프롬프트를 지나갔습니다. 세션이 계속되면 이 카드가 닫힙니다.",
+      "waitingForAnswer": "에이전트가 답변을 기다리고 있습니다. 이 질문이 열려 있는 동안 에이전트에게 보내는 메시지가 일시 중지됩니다.",
+      "waitingForPermission": "에이전트가 권한을 기다리고 있습니다. 이 요청이 열려 있는 동안 에이전트에게 보내는 메시지가 일시 중지됩니다."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "최대 중첩 깊이에 도달했습니다.",
+      "modelAccessibility": "모델: {{modelLabel}}",
+      "openHint": "하위 에이전트 세션 열기",
+      "subagent": "하위 에이전트",
+      "task": "작업",
+      "waitingForActivity": "활동 대기 중"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "하위 에이전트 세션을 불러올 수 없습니다",
+      "failed": "하위 에이전트 세션 실패",
+      "noMessages": "하위 에이전트 메시지 없음",
+      "noMessagesDescription": "이 하위 에이전트 세션은 기록을 생성하지 않고 완료되었습니다.",
+      "loading": "하위 에이전트 세션 로드 중",
+      "loadingDescription": "하위 에이전트 메시지 대기 중…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. 다시 시도할 수 있습니다.",
+      "copyToComposer": "작성기에 복사",
+      "queued": "대기 중",
+      "queuedAccessibility": "메시지 대기 중",
+      "userMessage": "사용자 메시지",
+      "assistantMessage": "어시스턴트 메시지",
+      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요"
+    },
+    "olderMessages": {
+      "arrived": "이전 메시지 로드됨"
+    },
+    "markdownTable": {
+      "viewTable": "표 보기",
+      "title": "표",
+      "close": "표 닫기",
+      "column": "열",
+      "columns": "열",
+      "row": "행",
+      "rows": "행",
+      "opensFullScreen": "전체 화면으로 열림"
+    },
+    "sessionFilter": {
+      "title": "세션 필터링",
+      "sortBy": "정렬 기준",
+      "sortLastUpdated": "마지막 업데이트",
+      "sortCreated": "생성됨",
+      "platform": "플랫폼",
+      "platformCloud": "클라우드",
+      "platformExtension": "확장 프로그램",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "기타",
+      "project": "프로젝트",
+      "removeProjectFilter": "{{label}} 프로젝트 필터 제거",
+      "removePlatformFilter": "{{label}} 플랫폼 필터 제거"
+    },
+    "modelPicker": {
+      "title": "모델 선택",
+      "searchPlaceholder": "모델 검색...",
+      "noModels": "사용 가능한 모델이 없습니다",
+      "noModelsDescription": "선택할 수 있는 모델이 없습니다."
+    },
+    "modelSelector": {
+      "model": "모델",
+      "provider": "제공업체 {{id}}",
+      "modelId": "모델 {{id}}",
+      "unavailable": "사용할 수 없음",
+      "unavailableState": "사용할 수 없음",
+      "selectedState": "선택됨",
+      "thinkingEffort": "사고 강도",
+      "thinkingEffortAccessibility": "{{label}} 사고 강도",
+      "thinkingEffortSelected": "{{label}} 사고 강도, 선택됨",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} 사고 강도",
+      "lockedByAgent": ", 에이전트 \"{{agent}}\"에 의해 잠김",
+      "addToFavorites": "{{name}}을(를) 즐겨찾기에 추가",
+      "removeFromFavorites": "{{name}}을(를) 즐겨찾기에서 제거",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "파일을 열지 못했습니다. 다시 시도하세요.",
+      "retryUploading": "{{filename}} 업로드 다시 시도",
+      "removeAttachment": "첨부 파일 {{filename}} 제거",
+      "uploading": "업로드 중…",
+      "uploaded": "업로드됨",
+      "uploadFailedRetry": "업로드에 실패했습니다. 탭하여 다시 시도하세요.",
+      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "클립보드에서 이미지 붙여넣기",
+      "label": "이미지 감지됨, 탭하여 붙여넣기"
+    },
+    "attachmentPicker": {
+      "camera": "카메라",
+      "photoLibrary": "사진 보관함",
+      "files": "파일",
+      "cameraAccessDisabled": "카메라 액세스 비활성화됨",
+      "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 액세스를 허용하세요."
+    },
+    "composer": {
+      "addAttachment": "첨부 파일 추가",
+      "removeOrRetryFailed": "먼저 실패한 첨부 파일을 제거하거나 다시 시도하세요.",
+      "attachmentsWithSlashCommands": "첨부 파일은 슬래시 명령과 함께 보낼 수 없습니다.",
+      "photoMetadataNotRemoved": "첨부 파일에서 사진 메타데이터를 제거할 수 없습니다.",
+      "waitForUploads": "첨부 파일 업로드가 끝날 때까지 기다리세요.",
+      "pasteFromClipboard": "클립보드에서 붙여넣기",
+      "stopGenerating": "생성 중지",
+      "sendMessage": "메시지 보내기"
+    },
+    "chatLink": {
+      "linkCopied": "링크 복사됨",
+      "reviewPr": "PR 리뷰",
+      "openLink": "링크 열기",
+      "copyLink": "링크 복사",
+      "shareLink": "링크 공유",
+      "share": "공유",
+      "prLinkActions": "PR 링크 작업",
+      "linkActions": "링크 작업",
+      "couldNotCopyLink": "링크를 복사할 수 없습니다",
+      "couldNotShareLink": "링크를 공유할 수 없습니다",
+      "opensInBrowser": "브라우저에서 열림",
+      "showLinkActions": "링크 작업 표시"
+    },
+    "compaction": {
+      "contextCompacted": "컨텍스트 압축됨"
+    },
+    "computeStatus": {
+      "exploring": "탐색 중",
+      "searchingCodebase": "코드베이스 검색 중",
+      "makingEdits": "편집 중",
+      "runningCommands": "명령 실행 중",
+      "searchingWeb": "웹 검색 중",
+      "planningNextSteps": "다음 단계 계획 중",
+      "delegatingWork": "작업 위임 중",
+      "askingQuestion": "질문하는 중",
+      "consideringNextSteps": "다음 단계 검토 중",
+      "writingResponse": "응답 작성 중"
+    },
+    "slashCommands": {
+      "startNewSession": "새 세션 시작",
+      "exitSession": "세션 종료",
+      "clearSession": "이 세션을 끝내고 새 세션 시작",
+      "upgradeRequiredFallback": "이 명령을 사용하려면 CLI를 업그레이드하세요.",
+      "exitCapabilityUnavailable": "세션을 종료하려면 CLI를 업데이트하세요.",
+      "clearCapabilityUnavailable": "세션을 다시 시작하려면 CLI를 업데이트하세요.",
+      "argumentError": "{{command}}은(는) 인수를 받지 않습니다."
+    },
+    "contextUsage": {
+      "windowUnavailable": "컨텍스트 창 크기를 사용할 수 없습니다",
+      "tapToViewDetails": "컨텍스트 세부 정보를 보려면 탭하세요.",
+      "costPrefix": "비용 {{cost}}",
+      "costSuffix": ", 비용 {{cost}}",
+      "tokensWindowUnavailable": "컨텍스트 {{used}} 토큰, 창 사용 불가",
+      "tokensUsage": "컨텍스트 {{window}} 중 {{used}} 토큰, {{percentage}}% 사용됨"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "이 링크는 더 이상 유효하지 않습니다.",
     "goBack": "뒤로 가기",
     "title": "페이지를 찾을 수 없습니다"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "콘텐츠 잘림",
+    "truncated": "잘림",
+    "wrap": "줄 바꿈",
+    "scroll": "스크롤"
   },
   "offline": {
     "noInternet": "인터넷 연결 없음",

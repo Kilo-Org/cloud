@@ -2,6 +2,8 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   balanceCodeFences,
   isMarkdownPath,
@@ -312,7 +314,9 @@ describe('resolveMarkdownBody', () => {
         },
       },
     });
-    expect(resolveMarkdownBody(part)?.footer).toBe('lines 201–400 of 1,450');
+    expect(resolveMarkdownBody(part)?.footer).toBe(
+      i18n.t('agentChat.readToolMarkdown.linesOf', { start: '201', end: '400', total: '1,450' })
+    );
   });
 
   it('formats a byte-capped footer ending with (truncated)', () => {
@@ -321,8 +325,9 @@ describe('resolveMarkdownBody', () => {
       metadata: {},
     });
     const footer = resolveMarkdownBody(part)?.footer;
-    expect(footer).toBeDefined();
-    expect(footer?.endsWith('(truncated)')).toBe(true);
+    expect(footer).toBe(
+      i18n.t('agentChat.readToolMarkdown.linesTruncated', { start: '1', end: '2' })
+    );
   });
 
   it('keeps the full markdown over 2000 chars without truncation', () => {
@@ -417,7 +422,9 @@ describe('resolveReadCodeBody', () => {
         },
       },
     });
-    expect(resolveReadCodeBody(part)?.footer).toBe('lines 201–400 of 1,450');
+    expect(resolveReadCodeBody(part)?.footer).toBe(
+      i18n.t('agentChat.readToolMarkdown.linesOf', { start: '201', end: '400', total: '1,450' })
+    );
   });
 
   it('falls back to the output envelope when the display is absent', () => {

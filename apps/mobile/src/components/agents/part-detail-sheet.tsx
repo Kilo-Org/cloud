@@ -2,7 +2,9 @@ import { type Part } from '@kilocode/cloud-agent-sdk';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -24,7 +26,11 @@ type PartDetailSheetProps = {
 
 function renderPartContent(part: Part | null): ReactNode {
   if (part === null) {
-    return <Text className="text-sm text-muted-foreground">Details unavailable</Text>;
+    return (
+      <Text className="text-sm text-muted-foreground">
+        {i18n.t('agentChat.partDetail.detailsUnavailable')}
+      </Text>
+    );
   }
   if (isToolPart(part)) {
     return <ToolPartDetailBody part={part} />;
@@ -68,6 +74,7 @@ function renderPartContent(part: Part | null): ReactNode {
  */
 export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
   const trackMonoBlock = useCallback(() => {
@@ -93,16 +100,19 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
       <SheetHeader
-        title={part ? getPartDetailTitle(part) : 'Details'}
+        title={part ? getPartDetailTitle(part) : t('agentChat.partDetail.title')}
         onDone={onClose}
-        doneLabel="Done"
+        doneLabel={t('common.done')}
       />
 
       {monoCount > 0 ? (
         <View className="px-4 pb-2 pt-3">
           <SegmentedControl<MonoScrollTextMode>
-            accessibilityLabel="Text display"
-            options={MONO_SCROLL_TEXT_MODE_OPTIONS}
+            accessibilityLabel={t('agentChat.partDetail.textDisplay')}
+            options={MONO_SCROLL_TEXT_MODE_OPTIONS.map(o => ({
+              value: o.value,
+              label: t(o.labelKey),
+            }))}
             value={textMode}
             onChange={setTextMode}
           />

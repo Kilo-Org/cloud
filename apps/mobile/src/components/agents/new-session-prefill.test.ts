@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   appendNewSessionPrefill,
   buildContinuePrefillParams,
@@ -274,14 +276,16 @@ describe('describePrefillFallback', () => {
       prefill: { mode: 'code', repo: 'owner/repo' } satisfies NewSessionPrefill,
       repos: settled,
       models: unsettled,
-      expected: 'owner/repo is no longer available. Pick a repository below.',
+      expected: i18n.t('agentChat.newSession.prefillRepoUnavailable', { repo: 'owner/repo' }),
     },
     {
       desc: 'model unmatched, repo not requested',
       prefill: { mode: 'code', model: 'anthropic/claude-sonnet-4' } satisfies NewSessionPrefill,
       repos: unsettled,
       models: settled,
-      expected: 'anthropic/claude-sonnet-4 is no longer available. Using your default model.',
+      expected: i18n.t('agentChat.newSession.prefillModelUnavailable', {
+        model: 'anthropic/claude-sonnet-4',
+      }),
     },
   ])('returns per-field message when $desc', ({ prefill, repos, models, expected }) => {
     expect(describePrefillFallback({ prefill, repos, models })).toBe(expected);
@@ -340,8 +344,6 @@ describe('describePrefillFallback', () => {
       repos: settled,
       models: settled,
     });
-    expect(note).toBe(
-      "The original session's repository and model are no longer available. Pick them below."
-    );
+    expect(note).toBe(i18n.t('agentChat.newSession.prefillRepoAndModelUnavailable'));
   });
 });

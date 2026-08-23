@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionTotalCost } from './session-list-helpers';
@@ -11,7 +12,6 @@ const WARNING_TONE_THRESHOLD = 75;
 const DESTRUCTIVE_TONE_THRESHOLD = 90;
 
 const INDETERMINATE_ARC_FRACTION = 0.25;
-const WINDOW_UNAVAILABLE_LABEL = 'Context-window size unavailable';
 
 export function formatCompactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
@@ -161,7 +161,7 @@ export function getContextSheetContent(
       usedTokens,
       windowTokens: null,
       windowUnavailable: true,
-      windowUnavailableLabel: WINDOW_UNAVAILABLE_LABEL,
+      windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),
       capacityKnown: false,
       percentage: null,
       remainingTokens: null,
@@ -180,7 +180,7 @@ export function getContextSheetContent(
     usedTokens,
     windowTokens: formatExactTokens(info.contextWindow),
     windowUnavailable: false,
-    windowUnavailableLabel: WINDOW_UNAVAILABLE_LABEL,
+    windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),
     capacityKnown: true,
     percentage: `${realPercentage}%`,
     remainingTokens: formatExactTokens(remaining),
@@ -200,17 +200,23 @@ export function getMetricsAccessibilityLabel({
   interactive: boolean;
 }): string {
   const spoken = formatSpokenCost(totalCostMicrodollars);
-  const tapPart = interactive ? ' Tap to view context details.' : '';
+  const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
 
   if (!info) {
-    return spoken ? `cost ${spoken}` : '';
+    return spoken ? i18n.t('agentChat.contextUsage.costPrefix', { cost: spoken }) : '';
   }
 
-  const costPart = spoken ? `, cost ${spoken}` : '';
+  const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
   const body =
     info.contextWindow === undefined
-      ? `Context ${formatExactTokens(info.contextTokens)} tokens, window unavailable${costPart}.`
-      : `Context ${formatExactTokens(info.contextTokens)} of ${formatExactTokens(info.contextWindow)} tokens, ${info.percentage ?? 0}% used${costPart}.`;
+      ? `${i18n.t('agentChat.contextUsage.tokensWindowUnavailable', {
+          used: formatExactTokens(info.contextTokens),
+        })}${costPart}.`
+      : `${i18n.t('agentChat.contextUsage.tokensUsage', {
+          used: formatExactTokens(info.contextTokens),
+          window: formatExactTokens(info.contextWindow),
+          percentage: info.percentage ?? 0,
+        })}${costPart}.`;
   return `${body}${tapPart}`;
 }
 

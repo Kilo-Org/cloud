@@ -1,5 +1,7 @@
 import { formatFileSize } from '@kilocode/kilo-chat';
 
+import { i18n } from '@/i18n';
+
 export type ChipStateInput = {
   filename: string;
   size: number;
@@ -44,10 +46,10 @@ type ChipDescription = {
  */
 export function progressLabel(progress: number | null): string {
   if (progress === null) {
-    return 'Uploading…';
+    return i18n.t('agentChat.attachmentPreview.uploading');
   }
   if (progress >= 1) {
-    return 'Uploaded';
+    return i18n.t('agentChat.attachmentPreview.uploaded');
   }
   return `${Math.round(progress * 100)}%`;
 }
@@ -71,7 +73,9 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
 
   let message: string | null = null;
   if (isErrored) {
-    message = isRetryable ? 'Upload failed. Tap to retry.' : "This file can't be uploaded.";
+    message = isRetryable
+      ? i18n.t('agentChat.attachmentPreview.uploadFailedRetry')
+      : i18n.t('agentChat.attachmentPreview.uploadFailedTerminal');
   }
 
   let progressText = '';

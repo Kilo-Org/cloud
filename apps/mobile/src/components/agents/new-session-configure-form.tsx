@@ -1,5 +1,6 @@
 import { type ReactNode, type RefObject } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
@@ -20,11 +21,6 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
-
-const COMMIT_CHOICE_OPTIONS = [
-  { value: 'leave', label: 'Leave changes' },
-  { value: 'commit', label: 'Commit and push' },
-] as const;
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -137,6 +133,7 @@ export function NewSessionConfigureForm({
   onStartSession,
 }: Readonly<NewSessionConfigureFormProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
@@ -144,7 +141,9 @@ export function NewSessionConfigureForm({
   if (showRunOnSelector) {
     runTargetBlock = (
       <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
+        <Text className="mb-2 text-sm font-medium text-muted-foreground">
+          {t('agentChat.instancePicker.runOn')}
+        </Text>
         <InstanceSelector
           value={runOnInstance}
           instances={instanceList}
@@ -157,7 +156,9 @@ export function NewSessionConfigureForm({
   } else if (targetLabel) {
     runTargetBlock = (
       <View className="mt-2">
-        <Text className="text-sm text-muted-foreground">Run on: {targetLabel}</Text>
+        <Text className="text-sm text-muted-foreground">
+          {t('agentChat.newSession.runOnWithTarget', { target: targetLabel })}
+        </Text>
       </View>
     );
   }
@@ -171,16 +172,20 @@ export function NewSessionConfigureForm({
     if (isProfileError) {
       return (
         <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">Environment</Text>
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">
+            {t('agentChat.newSession.environment')}
+          </Text>
           <View className="flex-row items-center gap-2">
-            <Text className="text-sm text-destructive">Couldn't load your environment</Text>
+            <Text className="text-sm text-destructive">
+              {t('agentChat.newSession.couldNotLoadEnvironment')}
+            </Text>
             <Button
               variant="link"
               size="sm"
               onPress={onRetryProfile}
-              accessibilityLabel="Retry loading environment"
+              accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
             >
-              <Text>Retry</Text>
+              <Text>{t('common.retry')}</Text>
             </Button>
           </View>
         </View>
@@ -188,16 +193,25 @@ export function NewSessionConfigureForm({
     }
     return (
       <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">Environment</Text>
+        <Text className="mb-2 text-sm font-medium text-muted-foreground">
+          {t('agentChat.newSession.environment')}
+        </Text>
         {profile ? (
           <View className="gap-1">
             <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
             <Text className="text-sm text-muted-foreground">
-              {`${profile.commandCount} commands · ${profile.mcpServerCount} MCP · ${profile.skillCount} skills · ${profile.agentCount} agents`}
+              {t('agentChat.newSession.environmentSummary', {
+                commands: profile.commandCount,
+                mcp: profile.mcpServerCount,
+                skills: profile.skillCount,
+                agents: profile.agentCount,
+              })}
             </Text>
           </View>
         ) : (
-          <Text className="text-sm text-foreground">Default environment</Text>
+          <Text className="text-sm text-foreground">
+            {t('agentChat.newSession.defaultEnvironment')}
+          </Text>
         )}
       </View>
     );
@@ -259,10 +273,15 @@ export function NewSessionConfigureForm({
 
       {!isRemote ? (
         <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">Changes</Text>
+          <Text className="mb-2 text-sm font-medium text-muted-foreground">
+            {t('agentChat.newSession.changes')}
+          </Text>
           <SegmentedControl
-            accessibilityLabel="Changes"
-            options={COMMIT_CHOICE_OPTIONS}
+            accessibilityLabel={t('agentChat.newSession.changes')}
+            options={[
+              { value: 'leave', label: t('agentChat.newSession.leaveChanges') },
+              { value: 'commit', label: t('agentChat.newSession.commitAndPush') },
+            ]}
             value={autoCommit ? 'commit' : 'leave'}
             onChange={next => {
               onAutoCommitChange(next === 'commit');
@@ -277,7 +296,7 @@ export function NewSessionConfigureForm({
         {isStarting ? (
           <ActivityIndicator size="small" color={colors.primaryForeground} />
         ) : (
-          <Text>Start session</Text>
+          <Text>{t('agentChat.newSession.startSession')}</Text>
         )}
       </Button>
     </ScrollView>

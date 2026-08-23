@@ -19,10 +19,10 @@ export type MonoScrollTextMode = 'wrap' | 'scroll';
 /** Segmented-control options; 'wrap' first because the sheet defaults to it. */
 export const MONO_SCROLL_TEXT_MODE_OPTIONS: readonly {
   value: MonoScrollTextMode;
-  label: string;
+  labelKey: string;
 }[] = [
-  { value: 'wrap', label: 'Wrap' },
-  { value: 'scroll', label: 'Scroll' },
+  { value: 'wrap', labelKey: 'monoScrollBlock.wrap' },
+  { value: 'scroll', labelKey: 'monoScrollBlock.scroll' },
 ];
 
 /** Measured ScrollView height keyed to the text it was measured for. */

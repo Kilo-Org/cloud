@@ -16,6 +16,7 @@
     "refresh": "रीफ़्रेश करें",
     "couldNotRefresh": "रीफ़्रेश नहीं हो सका. फिर से कोशिश करने के लिए नीचे खींचें.",
     "openInBrowser": "ब्राउज़र में खोलें",
+    "openSettings": "सेटिंग खोलें",
     "copiedToClipboard": "क्लिपबोर्ड पर कॉपी किया गया",
     "required": "आवश्यक",
     "error": "त्रुटि: {{error}}"
@@ -399,6 +400,9 @@
       "title": "निष्कर्ष फ़िल्टर करें"
     }
   },
+  "agents": {
+    "activeNow": "अभी सक्रिय"
+  },
   "agentChat": {
     "session": {
       "title": "सत्र",
@@ -411,14 +415,64 @@
       "notFound": "नहीं मिला",
       "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो."
     },
+    "remoteSession": {
+      "failedToCreate": "रिमोट सत्र बनाने में विफल",
+      "exited": "सत्र समाप्त हो गया",
+      "failedToExit": "सत्र से बाहर निकलने में विफल"
+    },
     "newSession": {
-      "title": "नया सत्र"
+      "title": "नया सत्र",
+      "repository": "रिपॉज़िटरी",
+      "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं",
+      "connectGithub": "GitHub कनेक्ट करें",
+      "connectGithubDescription": "अपने ब्राउज़र में GitHub कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
+      "openGithub": "GitHub खोलें",
+      "refreshRepositories": "रिपॉज़िटरी रीफ़्रेश करें",
+      "githubConnectionNotVisible": "हमें अभी आपका GitHub कनेक्शन नहीं दिख रहा",
+      "githubConnectionNotVisibleDescription": "यदि आपने Kilo GitHub ऐप इंस्टॉल या कॉन्फ़िगर किया है, तो फिर से जाँचें — या सुनिश्चित करें कि यह इस खाते/संगठन के लिए इंस्टॉल किया गया था।",
+      "checkAgain": "फिर से जाँचें",
+      "githubConnected": "GitHub कनेक्ट हो गया",
+      "noRepositoriesVisible": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। Kilo GitHub ऐप के लिए रिपॉज़िटरी पहुँच जाँचें, फिर रीफ़्रेश करें।",
+      "runOnWithTarget": "इस पर चलाएँ: {{target}}",
+      "environment": "एनवायरनमेंट",
+      "couldNotLoadEnvironment": "आपका एनवायरनमेंट लोड नहीं हो सका",
+      "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",
+      "defaultEnvironment": "डिफ़ॉल्ट एनवायरनमेंट",
+      "environmentSummary": "{{commands}} कमांड · {{mcp}} MCP · {{skills}} कौशल · {{agents}} एजेंट",
+      "changes": "बदलाव",
+      "leaveChanges": "बदलाव छोड़ दें",
+      "commitAndPush": "Commit करें और push करें",
+      "startSession": "सत्र शुरू करें",
+      "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
+      "addAttachment": "संलग्नक जोड़ें",
+      "couldNotLoadModels": "मॉडल लोड नहीं हो सके",
+      "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे उन्हें चुनें।",
+      "prefillRepoUnavailable": "{{repo}} अब उपलब्ध नहीं है। नीचे एक रिपॉज़िटरी चुनें।",
+      "prefillModelUnavailable": "{{model}} अब उपलब्ध नहीं है। आपका डिफ़ॉल्ट मॉडल उपयोग हो रहा है।"
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}} फ़ाइल अपडेट की गई",
+      "updatedFiles": "{{count}} फ़ाइलें अपडेट की गईं"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "पंक्तियाँ {{start}}–{{end}} (छोटा किया गया)",
+      "linesOf": "{{total}} में से पंक्तियाँ {{start}}–{{end}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "क्लाउड एजेंट {{action}} विफल रहा ({{status}})",
+      "failed": "क्लाउड एजेंट {{action}} विफल रहा"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[सीरियलाइज़ न होने योग्य इनपुट]",
+      "errorPrefix": "त्रुटि: {{error}}"
     },
     "instancePicker": {
       "runOn": "इस पर चलाएँ",
+      "runOnAccessibility": "इस पर चलाएँ: {{label}}",
       "couldNotLoad": "इंस्टेंस लोड नहीं हो सके",
       "couldNotLoadDescription": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
       "cloudAgent": "क्लाउड एजेंट",
+      "loading": "लोड हो रहा है…",
       "cloudAgentDescription": "Kilo के क्लाउड सैंडबॉक्स पर चलाएँ",
       "noCliInstances": "कोई CLI इंस्टेंस कनेक्ट नहीं",
       "noCliInstancesDescription": "अपने कंप्यूटर पर किसी प्रोजेक्ट में `kilo remote` चलाएँ, या अगर पहले से चल रहा है तो Kilo CLI अपडेट करें।",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "कस्टम मोड"
     },
+    "modeSelector": {
+      "accessibility": "मोड: {{label}}"
+    },
+    "modeOptions": {
+      "code": "कोड",
+      "plan": "प्लान",
+      "debug": "डीबग",
+      "orchestrator": "ऑर्केस्ट्रेटर",
+      "ask": "पूछें",
+      "codeDescription": "कोड लिखें और बदलें",
+      "planDescription": "समाधान की योजना बनाएँ और डिज़ाइन करें",
+      "debugDescription": "समस्याएँ खोजें और ठीक करें",
+      "orchestratorDescription": "जटिल कार्यों का समन्वय करें",
+      "askDescription": "उत्तर और स्पष्टीकरण पाएँ"
+    },
     "repoPicker": {
       "title": "रिपॉज़िटरी चुनें",
       "searchLabel": "रिपॉज़िटरी खोजें",
@@ -439,6 +508,279 @@
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है.",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ."
+    },
+    "messageDetails": {
+      "title": "संदेश विवरण",
+      "copyMessage": "संदेश कॉपी करें",
+      "selectText": "टेक्स्ट चुनें",
+      "reportAiResponse": "AI प्रतिक्रिया की रिपोर्ट करें",
+      "reportAiResponseConfirm": "समीक्षा के लिए यह प्रतिक्रिया रिपोर्ट करें?",
+      "report": "रिपोर्ट करें",
+      "role": "भूमिका",
+      "roleUser": "उपयोगकर्ता",
+      "roleAssistant": "सहायक",
+      "sent": "भेजा गया",
+      "model": "मॉडल",
+      "costAndTokens": "लागत और टोकन",
+      "cost": "लागत",
+      "input": "इनपुट",
+      "output": "आउटपुट",
+      "reasoning": "रीज़निंग",
+      "cacheRead": "कैश रीड",
+      "cacheWrite": "कैश राइट",
+      "total": "कुल"
+    },
+    "partDetail": {
+      "detailsUnavailable": "विवरण उपलब्ध नहीं",
+      "textDisplay": "टेक्स्ट प्रदर्शन",
+      "thinking": "सोच",
+      "thought": "विचार",
+      "title": "विवरण",
+      "showDetails": "विवरण दिखाएँ"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "सामग्री रेंडर नहीं हो सकी"
+    },
+    "messageFailure": {
+      "deliveryTitle": "वितरित करने में विफल",
+      "deliveryInterrupted": "आपने यह संदेश रोक दिया।",
+      "deliveryExhausted": "कई प्रयासों के बाद भी हम यह संदेश वितरित नहीं कर सके।",
+      "deliveryExecution": "एजेंट यह संदेश नहीं चला सका।",
+      "assistantTitle": "प्रतिक्रिया विफल रही",
+      "assistantProviderRejected": "प्रदाता ने अनुरोध अस्वीकार कर दिया।",
+      "assistantStopped": "प्रतिक्रिया रोक दी गई।",
+      "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
+      "assistantFailed": "प्रतिक्रिया विफल रही।",
+      "sendFailed": "संदेश भेजने में विफल। कृपया फिर से कोशिश करें।"
+    },
+    "filePart": {
+      "loadingImage": "छवि लोड हो रही है",
+      "imageUnavailableRetry": "छवि उपलब्ध नहीं, फिर से लोड करें",
+      "imageUnavailable": "छवि उपलब्ध नहीं",
+      "imageUnavailableWithAlt": "छवि उपलब्ध नहीं {{alt}}",
+      "viewImage": "छवि देखें",
+      "viewImageWithAlt": "छवि देखें {{alt}}",
+      "imageOutput": "छवि आउटपुट",
+      "imageOutputWithFilename": "छवि आउटपुट, {{filename}}",
+      "defaultName": "फ़ाइल",
+      "openFullScreen": "{{name}} पूर्ण स्क्रीन में खोलें",
+      "preview": "{{name}} का पूर्वावलोकन करें",
+      "openFile": "{{name}} खोलें",
+      "couldNotLoadFile": "यह फ़ाइल लोड नहीं हो सकी।",
+      "couldNotLoadFileRetry": "यह फ़ाइल लोड नहीं हो सकी। फिर से कोशिश करें।",
+      "retryLoadingFile": "फ़ाइल फिर से लोड करें",
+      "fileEmpty": "यह फ़ाइल खाली है।",
+      "previewUnavailable": "पूर्वावलोकन उपलब्ध नहीं",
+      "shareFailed": "साझा करना विफल रहा",
+      "sharingUnavailable": "इस डिवाइस पर फ़ाइल साझाकरण उपलब्ध नहीं है।",
+      "shareFailedRetry": "फ़ाइल साझा नहीं हो सकी। कृपया फिर से कोशिश करें।",
+      "openAsText": "टेक्स्ट के रूप में खोलें",
+      "openInExternalApp": "बाहरी ऐप में खोलें"
+    },
+    "preparation": {
+      "exitCode": "एग्ज़िट कोड: {{code}}",
+      "earlierOutputOmitted": "पहले का आउटपुट छोड़ दिया गया",
+      "preparingEnvironment": "एनवायरनमेंट तैयार हो रहा है",
+      "preparationComplete": "तैयारी पूरी हुई",
+      "preparationFailed": "तैयारी विफल रही",
+      "setupCommand": "सेटअप कमांड {{index}}",
+      "setupCommandOf": "{{count}} में से सेटअप कमांड {{index}}"
+    },
+    "permissionCard": {
+      "title": "अनुमति आवश्यक",
+      "allowQuestion": "{{permission}} की अनुमति दें?",
+      "appliesTo": "इस पर लागू होता है:",
+      "denyPermission": "अनुमति अस्वीकार करें",
+      "deny": "अस्वीकार करें",
+      "allowOnce": "एक बार अनुमति दें",
+      "allowOnceAccessibility": "एक बार अनुमति दें",
+      "alwaysAllow": "हमेशा अनुमति दें",
+      "alwaysAllowAccessibility": "हमेशा अनुमति दें",
+      "retrying": "फिर से कोशिश हो रही है…"
+    },
+    "questionCard": {
+      "title": "एजेंट को इनपुट चाहिए",
+      "skipQuestionsTitle": "प्रश्न छोड़ें?",
+      "skipQuestionsMessage": "एजेंट यह चरण छोड़ देगा।",
+      "selectAllThatApply": "जो लागू हों उन्हें चुनें",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, चयनित",
+      "typeYourOwnAnswer": "अपना उत्तर टाइप करें",
+      "typeYourOwnAnswerPlaceholder": "अपना उत्तर टाइप करें…",
+      "skip": "छोड़ें",
+      "retrySkip": "छोड़ना फिर से करें",
+      "submitting": "सबमिट हो रहा है…",
+      "sendAnswers": "उत्तर भेजें"
+    },
+    "blockingCard": {
+      "questionUnavailable": "यह प्रश्न अब उपलब्ध नहीं है।",
+      "permissionUnavailable": "यह अनुमति अनुरोध अब उपलब्ध नहीं है।",
+      "failedToSkipQuestion": "प्रश्न छोड़ने में विफल। कृपया फिर से कोशिश करें।",
+      "failedToSubmitAnswer": "उत्तर सबमिट करने में विफल। कृपया फिर से कोशिश करें।",
+      "failedToRespondToPermission": "अनुमति का जवाब देने में विफल। कृपया फिर से कोशिश करें।",
+      "submissionFailed": "सबमिशन विफल रहा। कृपया फिर से कोशिश करें।",
+      "questionAnnouncement": "एजेंट को आपके इनपुट की ज़रूरत है। जब तक आप उत्तर देते हैं, कंपोज़र रुका हुआ है।",
+      "permissionAnnouncement": "एजेंट को जारी रखने के लिए अनुमति चाहिए। जब तक आप निर्णय लेते हैं, कंपोज़र रुका हुआ है।",
+      "positionHint": "({{count}} में से 1)",
+      "movedPastPrompt": "एजेंट इस प्रॉम्प्ट से आगे बढ़ चुका है। सत्र जारी रहने पर यह कार्ड बंद हो जाएगा।",
+      "waitingForAnswer": "एजेंट आपके उत्तर की प्रतीक्षा कर रहा है। जब तक यह प्रश्न खुला है, एजेंट को आपका संदेश रुका हुआ है।",
+      "waitingForPermission": "एजेंट अनुमति की प्रतीक्षा कर रहा है। जब तक यह अनुरोध खुला है, एजेंट को आपका संदेश रुका हुआ है।"
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "अधिकतम नेस्टिंग गहराई तक पहुँच गए।",
+      "modelAccessibility": "मॉडल: {{modelLabel}}",
+      "openHint": "सबएजेंट सत्र खोलें",
+      "subagent": "सबएजेंट",
+      "task": "कार्य",
+      "waitingForActivity": "गतिविधि की प्रतीक्षा"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "सबएजेंट सत्र लोड नहीं हो सका",
+      "failed": "सबएजेंट सत्र विफल रहा",
+      "noMessages": "कोई सबएजेंट संदेश नहीं",
+      "noMessagesDescription": "यह सबएजेंट सत्र बिना ट्रांसक्रिप्ट बनाए पूरा हो गया।",
+      "loading": "सबएजेंट सत्र लोड हो रहा है",
+      "loadingDescription": "सबएजेंट संदेशों की प्रतीक्षा हो रही है…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}।",
+      "failureRetryAvailable": "{{title}}। फिर से कोशिश उपलब्ध है।",
+      "copyToComposer": "कंपोज़र पर कॉपी करें",
+      "queued": "कतार में",
+      "queuedAccessibility": "संदेश कतार में",
+      "userMessage": "उपयोगकर्ता संदेश",
+      "assistantMessage": "सहायक संदेश",
+      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ"
+    },
+    "olderMessages": {
+      "arrived": "पहले के संदेश लोड हो गए"
+    },
+    "markdownTable": {
+      "viewTable": "तालिका देखें",
+      "title": "तालिका",
+      "close": "तालिका बंद करें",
+      "column": "कॉलम",
+      "columns": "कॉलम",
+      "row": "पंक्ति",
+      "rows": "पंक्तियाँ",
+      "opensFullScreen": "पूर्ण स्क्रीन खोलता है"
+    },
+    "sessionFilter": {
+      "title": "सत्र फ़िल्टर करें",
+      "sortBy": "इसके अनुसार क्रमबद्ध करें",
+      "sortLastUpdated": "अंतिम बार अपडेट",
+      "sortCreated": "बनाया गया",
+      "platform": "प्लेटफ़ॉर्म",
+      "platformCloud": "क्लाउड",
+      "platformExtension": "एक्सटेंशन",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "अन्य",
+      "project": "प्रोजेक्ट",
+      "removeProjectFilter": "{{label}} प्रोजेक्ट फ़िल्टर हटाएँ",
+      "removePlatformFilter": "{{label}} प्लेटफ़ॉर्म फ़िल्टर हटाएँ"
+    },
+    "modelPicker": {
+      "title": "मॉडल चुनें",
+      "searchPlaceholder": "मॉडल खोजें...",
+      "noModels": "कोई मॉडल उपलब्ध नहीं",
+      "noModelsDescription": "चुनने के लिए कोई मॉडल उपलब्ध नहीं है।"
+    },
+    "modelSelector": {
+      "model": "मॉडल",
+      "provider": "प्रदाता {{id}}",
+      "modelId": "मॉडल {{id}}",
+      "unavailable": "अनुपलब्ध",
+      "unavailableState": "अनुपलब्ध",
+      "selectedState": "चयनित",
+      "thinkingEffort": "सोच प्रयास",
+      "thinkingEffortAccessibility": "{{label}} सोच प्रयास",
+      "thinkingEffortSelected": "{{label}} सोच प्रयास, चयनित",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} सोच प्रयास",
+      "lockedByAgent": ", एजेंट \"{{agent}}\" द्वारा लॉक",
+      "addToFavorites": "{{name}} को पसंदीदा में जोड़ें",
+      "removeFromFavorites": "{{name}} को पसंदीदा से हटाएँ",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "फ़ाइल खोलने में विफल। कृपया फिर से कोशिश करें।",
+      "retryUploading": "{{filename}} अपलोड करना फिर से करें",
+      "removeAttachment": "संलग्नक {{filename}} हटाएँ",
+      "uploading": "अपलोड हो रहा है…",
+      "uploaded": "अपलोड हो गया",
+      "uploadFailedRetry": "अपलोड विफल रहा। फिर से कोशिश करने के लिए टैप करें।",
+      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।"
+    },
+    "attachmentPasteHint": {
+      "accessibility": "क्लिपबोर्ड से छवि पेस्ट करें",
+      "label": "छवि पहचानी गई, पेस्ट करने के लिए टैप करें"
+    },
+    "attachmentPicker": {
+      "camera": "कैमरा",
+      "photoLibrary": "फ़ोटो लाइब्रेरी",
+      "files": "फ़ाइलें",
+      "cameraAccessDisabled": "कैमरा पहुँच अक्षम",
+      "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा पहुँच की अनुमति दें।"
+    },
+    "composer": {
+      "addAttachment": "संलग्नक जोड़ें",
+      "removeOrRetryFailed": "पहले विफल संलग्नक हटाएँ या फिर से कोशिश करें।",
+      "attachmentsWithSlashCommands": "स्लैश कमांड के साथ संलग्नक नहीं भेजे जा सकते।",
+      "photoMetadataNotRemoved": "किसी संलग्नक से फ़ोटो मेटाडेटा नहीं हटाया जा सका।",
+      "waitForUploads": "संलग्नकों के अपलोड पूरे होने की प्रतीक्षा करें।",
+      "pasteFromClipboard": "क्लिपबोर्ड से पेस्ट करें",
+      "stopGenerating": "जनरेट करना रोकें",
+      "sendMessage": "संदेश भेजें"
+    },
+    "chatLink": {
+      "linkCopied": "लिंक कॉपी किया गया",
+      "reviewPr": "PR की समीक्षा करें",
+      "openLink": "लिंक खोलें",
+      "copyLink": "लिंक कॉपी करें",
+      "shareLink": "लिंक साझा करें",
+      "share": "साझा करें",
+      "prLinkActions": "PR लिंक क्रियाएँ",
+      "linkActions": "लिंक क्रियाएँ",
+      "couldNotCopyLink": "लिंक कॉपी नहीं हो सका",
+      "couldNotShareLink": "लिंक साझा नहीं हो सका",
+      "opensInBrowser": "ब्राउज़र में खुलता है",
+      "showLinkActions": "लिंक क्रियाएँ दिखाएँ"
+    },
+    "compaction": {
+      "contextCompacted": "संदर्भ संकुचित किया गया"
+    },
+    "computeStatus": {
+      "exploring": "एक्सप्लोर कर रहा है",
+      "searchingCodebase": "कोडबेस खोज रहा है",
+      "makingEdits": "संपादन कर रहा है",
+      "runningCommands": "कमांड चला रहा है",
+      "searchingWeb": "वेब खोज रहा है",
+      "planningNextSteps": "अगले चरणों की योजना बना रहा है",
+      "delegatingWork": "काम सौंप रहा है",
+      "askingQuestion": "प्रश्न पूछ रहा है",
+      "consideringNextSteps": "अगले चरणों पर विचार कर रहा है",
+      "writingResponse": "प्रतिक्रिया लिख रहा है"
+    },
+    "slashCommands": {
+      "startNewSession": "नया सत्र शुरू करें",
+      "exitSession": "सत्र से बाहर निकलें",
+      "clearSession": "यह सत्र समाप्त करें और नया शुरू करें",
+      "upgradeRequiredFallback": "इस कमांड का उपयोग करने के लिए कृपया अपना CLI अपग्रेड करें।",
+      "exitCapabilityUnavailable": "सत्र से बाहर निकलने के लिए अपना CLI अपडेट करें।",
+      "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
+      "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।"
+    },
+    "contextUsage": {
+      "windowUnavailable": "संदर्भ-विंडो आकार उपलब्ध नहीं",
+      "tapToViewDetails": "संदर्भ विवरण देखने के लिए टैप करें।",
+      "costPrefix": "लागत {{cost}}",
+      "costSuffix": ", लागत {{cost}}",
+      "tokensWindowUnavailable": "संदर्भ {{used}} टोकन, विंडो उपलब्ध नहीं",
+      "tokensUsage": "संदर्भ {{window}} में से {{used}} टोकन, {{percentage}}% उपयोग हुआ"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "यह लिंक अब मान्य नहीं है।",
     "goBack": "वापस जाएँ",
     "title": "पेज नहीं मिला"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "सामग्री छोटी की गई",
+    "truncated": "छोटा किया गया",
+    "wrap": "रैप",
+    "scroll": "स्क्रॉल"
   },
   "offline": {
     "noInternet": "कोई इंटरनेट कनेक्शन नहीं",

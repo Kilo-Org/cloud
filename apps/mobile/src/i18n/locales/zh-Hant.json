@@ -16,6 +16,7 @@
     "refresh": "重新整理",
     "couldNotRefresh": "無法重新整理。下拉重試。",
     "openInBrowser": "在瀏覽器中開啟",
+    "openSettings": "開啟設定",
     "copiedToClipboard": "已複製到剪貼簿",
     "required": "必填",
     "error": "錯誤：{{error}}"
@@ -399,6 +400,9 @@
       "title": "篩選發現"
     }
   },
+  "agents": {
+    "activeNow": "目前使用中"
+  },
   "agentChat": {
     "session": {
       "title": "工作階段",
@@ -411,14 +415,64 @@
       "notFound": "找不到",
       "notFoundDescription": "此項目可能已遭移除或不再可用。"
     },
+    "remoteSession": {
+      "failedToCreate": "無法建立遠端工作階段",
+      "exited": "工作階段已結束",
+      "failedToExit": "無法結束工作階段"
+    },
     "newSession": {
-      "title": "新工作階段"
+      "title": "新工作階段",
+      "repository": "存放庫",
+      "couldNotLoadRepositories": "無法載入存放庫",
+      "connectGithub": "連接 GitHub",
+      "connectGithubDescription": "在瀏覽器中連接 GitHub，然後返回此處選取存放庫。",
+      "openGithub": "開啟 GitHub",
+      "refreshRepositories": "重新整理存放庫",
+      "githubConnectionNotVisible": "我們還看不到您的 GitHub 連線",
+      "githubConnectionNotVisibleDescription": "如果您已安裝或設定 Kilo GitHub App，請再次檢查 — 或確認它已為此帳戶/組織安裝。",
+      "checkAgain": "再次檢查",
+      "githubConnected": "GitHub 已連接",
+      "noRepositoriesVisible": "看不到任何存放庫。請檢查 Kilo GitHub App 的存放庫存取權限，然後重新整理。",
+      "runOnWithTarget": "執行於：{{target}}",
+      "environment": "環境",
+      "couldNotLoadEnvironment": "無法載入您的環境",
+      "retryLoadingEnvironment": "重試載入環境",
+      "defaultEnvironment": "預設環境",
+      "environmentSummary": "{{commands}} 個指令 · {{mcp}} 個 MCP · {{skills}} 個技能 · {{agents}} 個代理",
+      "changes": "變更",
+      "leaveChanges": "保留變更",
+      "commitAndPush": "提交並推送",
+      "startSession": "開始工作階段",
+      "promptPlaceholder": "您想處理什麼？",
+      "addAttachment": "新增附件",
+      "couldNotLoadModels": "無法載入模型",
+      "prefillRepoAndModelUnavailable": "原始工作階段的存放庫與模型已不再可用。請在下方選取。",
+      "prefillRepoUnavailable": "{{repo}} 已不再可用。請在下方選取存放庫。",
+      "prefillModelUnavailable": "{{model}} 已不再可用。將使用您的預設模型。"
+    },
+    "partRenderer": {
+      "updatedFile": "已更新 {{count}} 個檔案",
+      "updatedFiles": "已更新 {{count}} 個檔案"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
+      "linesOf": "第 {{start}}–{{end}} 行，共 {{total}} 行"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "雲端代理 {{action}} 失敗（{{status}}）",
+      "failed": "雲端代理 {{action}} 失敗"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[無法序列化的輸入]",
+      "errorPrefix": "錯誤：{{error}}"
     },
     "instancePicker": {
       "runOn": "執行於",
+      "runOnAccessibility": "執行於：{{label}}",
       "couldNotLoad": "無法載入執行個體",
       "couldNotLoadDescription": "請檢查連線後重試。",
       "cloudAgent": "雲端代理",
+      "loading": "載入中…",
       "cloudAgentDescription": "在 Kilo 的雲端沙箱中執行",
       "noCliInstances": "未連接 CLI 執行個體",
       "noCliInstancesDescription": "在您電腦上的專案中執行 `kilo remote`，或如果已有 Kilo CLI 在執行，請更新它。",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "自訂模式"
     },
+    "modeSelector": {
+      "accessibility": "模式：{{label}}"
+    },
+    "modeOptions": {
+      "code": "程式碼",
+      "plan": "規劃",
+      "debug": "偵錯",
+      "orchestrator": "協調者",
+      "ask": "提問",
+      "codeDescription": "撰寫與修改程式碼",
+      "planDescription": "規劃與設計解決方案",
+      "debugDescription": "找出並修正問題",
+      "orchestratorDescription": "協調複雜任務",
+      "askDescription": "取得答案與說明"
+    },
     "repoPicker": {
       "title": "選取存放庫",
       "searchLabel": "搜尋存放庫",
@@ -439,6 +508,279 @@
       "noRepositories": "沒有可用的存放庫",
       "noRepositoriesDescription": "您的帳戶沒有連接任何存放庫。",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。"
+    },
+    "messageDetails": {
+      "title": "訊息詳細資料",
+      "copyMessage": "複製訊息",
+      "selectText": "選取文字",
+      "reportAiResponse": "檢舉 AI 回覆",
+      "reportAiResponseConfirm": "要檢舉此回覆以供審查嗎？",
+      "report": "檢舉",
+      "role": "角色",
+      "roleUser": "使用者",
+      "roleAssistant": "助理",
+      "sent": "已傳送",
+      "model": "模型",
+      "costAndTokens": "成本與 Token",
+      "cost": "成本",
+      "input": "輸入",
+      "output": "輸出",
+      "reasoning": "推理",
+      "cacheRead": "快取讀取",
+      "cacheWrite": "快取寫入",
+      "total": "總計"
+    },
+    "partDetail": {
+      "detailsUnavailable": "詳細資料無法使用",
+      "textDisplay": "文字顯示",
+      "thinking": "思考",
+      "thought": "想法",
+      "title": "詳細資料",
+      "showDetails": "顯示詳細資料"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "無法轉譯內容"
+    },
+    "messageFailure": {
+      "deliveryTitle": "傳送失敗",
+      "deliveryInterrupted": "您停止了此訊息。",
+      "deliveryExhausted": "多次嘗試後仍無法傳送此訊息。",
+      "deliveryExecution": "代理無法執行此訊息。",
+      "assistantTitle": "回覆失敗",
+      "assistantProviderRejected": "供應商拒絕了此要求。",
+      "assistantStopped": "回覆已停止。",
+      "assistantContextOverflow": "對話對模型而言過長。",
+      "assistantFailed": "回覆失敗。",
+      "sendFailed": "無法傳送訊息。請再試一次。"
+    },
+    "filePart": {
+      "loadingImage": "正在載入圖片",
+      "imageUnavailableRetry": "圖片無法使用，重試載入",
+      "imageUnavailable": "圖片無法使用",
+      "imageUnavailableWithAlt": "圖片無法使用 {{alt}}",
+      "viewImage": "檢視圖片",
+      "viewImageWithAlt": "檢視圖片 {{alt}}",
+      "imageOutput": "圖片輸出",
+      "imageOutputWithFilename": "圖片輸出，{{filename}}",
+      "defaultName": "檔案",
+      "openFullScreen": "全螢幕開啟 {{name}}",
+      "preview": "預覽 {{name}}",
+      "openFile": "開啟 {{name}}",
+      "couldNotLoadFile": "無法載入此檔案。",
+      "couldNotLoadFileRetry": "無法載入此檔案。請再試一次。",
+      "retryLoadingFile": "重試載入檔案",
+      "fileEmpty": "此檔案為空。",
+      "previewUnavailable": "無法預覽",
+      "shareFailed": "分享失敗",
+      "sharingUnavailable": "此裝置無法分享檔案。",
+      "shareFailedRetry": "無法分享檔案。請再試一次。",
+      "openAsText": "以文字開啟",
+      "openInExternalApp": "在外部應用程式中開啟"
+    },
+    "preparation": {
+      "exitCode": "結束代碼：{{code}}",
+      "earlierOutputOmitted": "已省略先前的輸出",
+      "preparingEnvironment": "正在準備環境",
+      "preparationComplete": "準備完成",
+      "preparationFailed": "準備失敗",
+      "setupCommand": "設定命令 {{index}}",
+      "setupCommandOf": "設定命令 {{index}} / {{count}}"
+    },
+    "permissionCard": {
+      "title": "需要權限",
+      "allowQuestion": "允許 {{permission}}？",
+      "appliesTo": "適用於：",
+      "denyPermission": "拒絕權限",
+      "deny": "拒絕",
+      "allowOnce": "允許一次",
+      "allowOnceAccessibility": "允許一次",
+      "alwaysAllow": "一律允許",
+      "alwaysAllowAccessibility": "一律允許",
+      "retrying": "正在重試…"
+    },
+    "questionCard": {
+      "title": "代理需要輸入",
+      "skipQuestionsTitle": "略過問題？",
+      "skipQuestionsMessage": "代理將略過此步驟。",
+      "selectAllThatApply": "選取所有適用項目",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}，已選取",
+      "typeYourOwnAnswer": "輸入您自己的答案",
+      "typeYourOwnAnswerPlaceholder": "輸入您自己的答案…",
+      "skip": "略過",
+      "retrySkip": "重試略過",
+      "submitting": "正在提交…",
+      "sendAnswers": "傳送答案"
+    },
+    "blockingCard": {
+      "questionUnavailable": "此問題已不再可用。",
+      "permissionUnavailable": "此權限要求已不再可用。",
+      "failedToSkipQuestion": "無法略過問題。請再試一次。",
+      "failedToSubmitAnswer": "無法提交答案。請再試一次。",
+      "failedToRespondToPermission": "無法回應權限要求。請再試一次。",
+      "submissionFailed": "提交失敗。請再試一次。",
+      "questionAnnouncement": "代理需要您的輸入。回答期間撰寫器已暫停。",
+      "permissionAnnouncement": "代理需要權限才能繼續。決定期間撰寫器已暫停。",
+      "positionHint": "（第 1 個，共 {{count}} 個）",
+      "movedPastPrompt": "代理已越過此提示。工作階段繼續時，此卡片將關閉。",
+      "waitingForAnswer": "代理正在等待您的答案。此問題開啟期間，您傳給代理的訊息已暫停。",
+      "waitingForPermission": "代理正在等待權限。此要求開啟期間，您傳給代理的訊息已暫停。"
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "已達最大巢狀深度。",
+      "modelAccessibility": "模型：{{modelLabel}}",
+      "openHint": "開啟子代理工作階段",
+      "subagent": "子代理",
+      "task": "任務",
+      "waitingForActivity": "等待活動"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "無法載入子代理工作階段",
+      "failed": "子代理工作階段失敗",
+      "noMessages": "沒有子代理訊息",
+      "noMessagesDescription": "此子代理工作階段已完成，但未產生逐字稿。",
+      "loading": "正在載入子代理工作階段",
+      "loadingDescription": "正在等待子代理訊息…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}。",
+      "failureRetryAvailable": "{{title}}。可重試。",
+      "copyToComposer": "複製到撰寫器",
+      "queued": "已排入佇列",
+      "queuedAccessibility": "訊息已排入佇列",
+      "userMessage": "使用者訊息",
+      "assistantMessage": "助理訊息",
+      "longPressHint": "長按以檢視訊息詳細資料"
+    },
+    "olderMessages": {
+      "arrived": "已載入較早的訊息"
+    },
+    "markdownTable": {
+      "viewTable": "檢視表格",
+      "title": "表格",
+      "close": "關閉表格",
+      "column": "欄",
+      "columns": "欄",
+      "row": "列",
+      "rows": "列",
+      "opensFullScreen": "開啟全螢幕"
+    },
+    "sessionFilter": {
+      "title": "篩選工作階段",
+      "sortBy": "排序方式",
+      "sortLastUpdated": "最後更新",
+      "sortCreated": "建立時間",
+      "platform": "平台",
+      "platformCloud": "雲端",
+      "platformExtension": "擴充功能",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "其他",
+      "project": "專案",
+      "removeProjectFilter": "移除 {{label}} 專案篩選條件",
+      "removePlatformFilter": "移除 {{label}} 平台篩選條件"
+    },
+    "modelPicker": {
+      "title": "選取模型",
+      "searchPlaceholder": "搜尋模型...",
+      "noModels": "沒有可用的模型",
+      "noModelsDescription": "沒有可選取的模型。"
+    },
+    "modelSelector": {
+      "model": "模型",
+      "provider": "供應商 {{id}}",
+      "modelId": "模型 {{id}}",
+      "unavailable": "無法使用",
+      "unavailableState": "無法使用",
+      "selectedState": "已選取",
+      "thinkingEffort": "思考程度",
+      "thinkingEffortAccessibility": "{{label}} 思考程度",
+      "thinkingEffortSelected": "{{label}} 思考程度，已選取",
+      "thinkingEffortWithModel": "{{model}}，{{variant}} 思考程度",
+      "lockedByAgent": "，已由代理「{{agent}}」鎖定",
+      "addToFavorites": "將 {{name}} 加入最愛",
+      "removeFromFavorites": "將 {{name}} 從最愛移除",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "中"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "無法開啟檔案。請再試一次。",
+      "retryUploading": "重試上傳 {{filename}}",
+      "removeAttachment": "移除附件 {{filename}}",
+      "uploading": "正在上傳…",
+      "uploaded": "已上傳",
+      "uploadFailedRetry": "上傳失敗。點按重試。",
+      "uploadFailedTerminal": "無法上傳此檔案。"
+    },
+    "attachmentPasteHint": {
+      "accessibility": "從剪貼簿貼上圖片",
+      "label": "偵測到圖片，點按以貼上"
+    },
+    "attachmentPicker": {
+      "camera": "相機",
+      "photoLibrary": "照片圖庫",
+      "files": "檔案",
+      "cameraAccessDisabled": "相機存取已停用",
+      "cameraAccessMessage": "請在「設定」中允許相機存取以拍攝照片。"
+    },
+    "composer": {
+      "addAttachment": "新增附件",
+      "removeOrRetryFailed": "請先移除或重試失敗的附件。",
+      "attachmentsWithSlashCommands": "附件無法與斜線指令一起傳送。",
+      "photoMetadataNotRemoved": "無法移除附件中的相片中繼資料。",
+      "waitForUploads": "請等待附件上傳完成。",
+      "pasteFromClipboard": "從剪貼簿貼上",
+      "stopGenerating": "停止產生",
+      "sendMessage": "傳送訊息"
+    },
+    "chatLink": {
+      "linkCopied": "連結已複製",
+      "reviewPr": "審查 PR",
+      "openLink": "開啟連結",
+      "copyLink": "複製連結",
+      "shareLink": "分享連結",
+      "share": "分享",
+      "prLinkActions": "PR 連結動作",
+      "linkActions": "連結動作",
+      "couldNotCopyLink": "無法複製連結",
+      "couldNotShareLink": "無法分享連結",
+      "opensInBrowser": "在瀏覽器中開啟",
+      "showLinkActions": "顯示連結動作"
+    },
+    "compaction": {
+      "contextCompacted": "內容已壓縮"
+    },
+    "computeStatus": {
+      "exploring": "探索中",
+      "searchingCodebase": "正在搜尋程式碼庫",
+      "makingEdits": "正在進行編輯",
+      "runningCommands": "正在執行指令",
+      "searchingWeb": "正在搜尋網路",
+      "planningNextSteps": "正在規劃後續步驟",
+      "delegatingWork": "正在分派工作",
+      "askingQuestion": "正在提問",
+      "consideringNextSteps": "正在考慮後續步驟",
+      "writingResponse": "正在撰寫回覆"
+    },
+    "slashCommands": {
+      "startNewSession": "開始新工作階段",
+      "exitSession": "結束工作階段",
+      "clearSession": "結束此工作階段並開始新的",
+      "upgradeRequiredFallback": "請升級您的 CLI 以使用此指令。",
+      "exitCapabilityUnavailable": "請更新您的 CLI 以結束工作階段。",
+      "clearCapabilityUnavailable": "請更新您的 CLI 以重新啟動工作階段。",
+      "argumentError": "{{command}} 不接受引數。"
+    },
+    "contextUsage": {
+      "windowUnavailable": "內容視窗大小無法使用",
+      "tapToViewDetails": "點按以檢視內容詳細資料。",
+      "costPrefix": "成本 {{cost}}",
+      "costSuffix": "，成本 {{cost}}",
+      "tokensWindowUnavailable": "內容 {{used}} 個 token，視窗無法使用",
+      "tokensUsage": "內容 {{used}} / {{window}} 個 token，已使用 {{percentage}}%"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "此連結已失效。",
     "goBack": "返回",
     "title": "找不到頁面"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "內容已截斷",
+    "truncated": "已截斷",
+    "wrap": "換行",
+    "scroll": "捲動"
   },
   "offline": {
     "noInternet": "沒有網際網路連線",

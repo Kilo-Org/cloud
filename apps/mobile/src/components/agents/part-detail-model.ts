@@ -1,5 +1,7 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
 import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
 import { getToolDisplay } from './tool-card-display';
 
@@ -25,13 +27,15 @@ export function findPartById(messages: readonly StoredMessage[], partId: string)
  */
 export function getPartDetailTitle(part: Part): string {
   if (isReasoningPart(part)) {
-    return isPartStreaming(part) ? 'Thinking' : 'Thought';
+    return isPartStreaming(part)
+      ? i18n.t('agentChat.partDetail.thinking')
+      : i18n.t('agentChat.partDetail.thought');
   }
   if (isToolPart(part)) {
     const display = getToolDisplay(part);
     return display.subtitle ? `${display.title}: ${display.subtitle}` : display.title;
   }
-  return 'Details';
+  return i18n.t('agentChat.partDetail.title');
 }
 
 /**

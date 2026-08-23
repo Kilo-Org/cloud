@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, type Text as RNText, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -50,6 +51,7 @@ export function PermissionCard({
   pendingCount = 1,
 }: Readonly<PermissionCardProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [activeResponse, setActiveResponse] = useState<'once' | 'always' | 'reject' | null>(null);
 
   // Accessibility presentation is derived from the shared FSM so the
@@ -88,7 +90,7 @@ export function PermissionCard({
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
-  const title = formatBlockingCardTitle('Permission required', pendingCount);
+  const title = formatBlockingCardTitle(t('agentChat.permissionCard.title'), pendingCount);
   const isInert = presentation.state === 'non-retryable';
 
   // Skill-shell batches accept only once/reject (CLI/TUI show no persist option);
@@ -115,12 +117,14 @@ export function PermissionCard({
       <ScrollView className="max-h-96 shrink">
         <View className="gap-3 p-4">
           <Text className="text-sm text-foreground">
-            Allow <Text className="font-medium">{permissionDisplay}</Text>?
+            {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
           {patterns.length > 0 ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
-              <Text className="text-xs font-medium text-muted-foreground">Applies to:</Text>
+              <Text className="text-xs font-medium text-muted-foreground">
+                {t('agentChat.permissionCard.appliesTo')}
+              </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
                   • {pattern}
@@ -154,13 +158,13 @@ export function PermissionCard({
                 }}
                 disabled={isSubmitting || isInert}
                 accessibilityRole="button"
-                accessibilityLabel="Deny permission"
+                accessibilityLabel={t('agentChat.permissionCard.denyPermission')}
               >
                 {activeResponse === 'reject' && isSubmitting ? (
                   <ActivityIndicator size="small" color={colors.foreground} />
                 ) : (
                   <Text className={cn('text-xs', activeResponse === 'reject' && 'font-medium')}>
-                    Deny
+                    {t('agentChat.permissionCard.deny')}
                   </Text>
                 )}
               </Button>
@@ -173,13 +177,13 @@ export function PermissionCard({
                 }}
                 disabled={isSubmitting || isInert}
                 accessibilityRole="button"
-                accessibilityLabel="Allow once"
+                accessibilityLabel={t('agentChat.permissionCard.allowOnceAccessibility')}
               >
                 {activeResponse === 'once' && isSubmitting ? (
                   <ActivityIndicator size="small" color={colors.secondaryForeground} />
                 ) : (
                   <Text className={cn('text-xs', activeResponse === 'once' && 'font-medium')}>
-                    Allow Once
+                    {t('agentChat.permissionCard.allowOnce')}
                   </Text>
                 )}
               </Button>
@@ -192,7 +196,7 @@ export function PermissionCard({
                   }}
                   disabled={isSubmitting || isInert}
                   accessibilityRole="button"
-                  accessibilityLabel="Always allow"
+                  accessibilityLabel={t('agentChat.permissionCard.alwaysAllowAccessibility')}
                 >
                   {activeResponse === 'always' && isSubmitting ? (
                     <ActivityIndicator size="small" color={colors.primaryForeground} />
@@ -203,7 +207,7 @@ export function PermissionCard({
                         activeResponse === 'always' && 'font-medium'
                       )}
                     >
-                      Always Allow
+                      {t('agentChat.permissionCard.alwaysAllow')}
                     </Text>
                   )}
                 </Button>
@@ -219,13 +223,13 @@ export function PermissionCard({
               }}
               disabled={isSubmitting || isInert}
               accessibilityRole="button"
-              accessibilityLabel="Retry"
+              accessibilityLabel={t('common.retry')}
             >
               {isSubmitting ? (
                 <ActivityIndicator size="small" color={colors.primaryForeground} />
               ) : null}
               <Text className={cn('text-xs text-primary-foreground', isSubmitting && 'ml-2')}>
-                {isSubmitting ? 'Retrying…' : 'Retry'}
+                {isSubmitting ? t('agentChat.permissionCard.retrying') : t('common.retry')}
               </Text>
             </Button>
           ) : null}

@@ -16,6 +16,7 @@
     "refresh": "تحديث",
     "couldNotRefresh": "تعذّر التحديث. اسحب للأسفل للمحاولة مرة أخرى.",
     "openInBrowser": "افتح في المتصفح",
+    "openSettings": "فتح الإعدادات",
     "copiedToClipboard": "تم النسخ إلى الحافظة",
     "required": "مطلوب",
     "error": "خطأ: {{error}}"
@@ -399,6 +400,9 @@
       "title": "تصفية النتائج"
     }
   },
+  "agents": {
+    "activeNow": "نشط الآن"
+  },
   "agentChat": {
     "session": {
       "title": "الجلسة",
@@ -411,14 +415,64 @@
       "notFound": "غير موجود",
       "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا."
     },
+    "remoteSession": {
+      "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",
+      "exited": "انتهت الجلسة",
+      "failedToExit": "تعذّر الخروج من الجلسة"
+    },
     "newSession": {
-      "title": "جلسة جديدة"
+      "title": "جلسة جديدة",
+      "repository": "المستودع",
+      "couldNotLoadRepositories": "تعذّر تحميل المستودعات",
+      "connectGithub": "ربط GitHub",
+      "connectGithubDescription": "اربط GitHub في متصفحك، ثم عد إلى هنا لاختيار مستودع.",
+      "openGithub": "فتح GitHub",
+      "refreshRepositories": "تحديث المستودعات",
+      "githubConnectionNotVisible": "لا يمكننا رؤية اتصال GitHub الخاص بك بعد",
+      "githubConnectionNotVisibleDescription": "إذا ثبّت تطبيق Kilo GitHub أو ضبطته، فتحقق مرة أخرى — أو تأكد من تثبيته لهذا الحساب/المؤسسة.",
+      "checkAgain": "تحقق مرة أخرى",
+      "githubConnected": "تم ربط GitHub",
+      "noRepositoriesVisible": "لا توجد مستودعات مرئية. تحقق من وصول المستودع لتطبيق Kilo GitHub، ثم حدّث.",
+      "runOnWithTarget": "التشغيل على: {{target}}",
+      "environment": "البيئة",
+      "couldNotLoadEnvironment": "تعذّر تحميل بيئتك",
+      "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
+      "defaultEnvironment": "البيئة الافتراضية",
+      "environmentSummary": "{{commands}} أوامر · {{mcp}} MCP · {{skills}} مهارات · {{agents}} وكلاء",
+      "changes": "التغييرات",
+      "leaveChanges": "ترك التغييرات",
+      "commitAndPush": "Commit ودفع",
+      "startSession": "بدء الجلسة",
+      "promptPlaceholder": "ما الذي تريد العمل عليه؟",
+      "addAttachment": "إضافة مرفق",
+      "couldNotLoadModels": "تعذّر تحميل النماذج",
+      "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اخترهما أدناه.",
+      "prefillRepoUnavailable": "لم يعد {{repo}} متاحًا. اختر مستودعًا أدناه.",
+      "prefillModelUnavailable": "لم يعد {{model}} متاحًا. سيتم استخدام نموذجك الافتراضي."
+    },
+    "partRenderer": {
+      "updatedFile": "تم تحديث {{count}} ملف",
+      "updatedFiles": "تم تحديث {{count}} ملفات"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
+      "linesOf": "الأسطر {{start}}–{{end}} من {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "فشل الوكيل السحابي {{action}} ({{status}})",
+      "failed": "فشل الوكيل السحابي {{action}}"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[إدخال غير قابل للتسلسل]",
+      "errorPrefix": "خطأ: {{error}}"
     },
     "instancePicker": {
       "runOn": "التشغيل على",
+      "runOnAccessibility": "التشغيل على: {{label}}",
       "couldNotLoad": "تعذّر تحميل المثيلات",
       "couldNotLoadDescription": "تحقق من اتصالك وحاول مرة أخرى.",
       "cloudAgent": "وكيل سحابي",
+      "loading": "جارٍ التحميل…",
       "cloudAgentDescription": "التشغيل على بيئة الاختبار السحابية من Kilo",
       "noCliInstances": "لا توجد مثيلات CLI متصلة",
       "noCliInstancesDescription": "شغّل `kilo remote` في مشروع على جهاز الكمبيوتر الخاص بك، أو حدّث Kilo CLI إذا كان يعمل بالفعل.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "أوضاع مخصصة"
     },
+    "modeSelector": {
+      "accessibility": "الوضع: {{label}}"
+    },
+    "modeOptions": {
+      "code": "الكود",
+      "plan": "التخطيط",
+      "debug": "التصحيح",
+      "orchestrator": "المنسّق",
+      "ask": "اسأل",
+      "codeDescription": "كتابة الكود وتعديله",
+      "planDescription": "تخطيط الحلول وتصميمها",
+      "debugDescription": "إيجاد المشكلات وإصلاحها",
+      "orchestratorDescription": "تنسيق المهام المعقدة",
+      "askDescription": "الحصول على إجابات وشروحات"
+    },
     "repoPicker": {
       "title": "اختيار المستودع",
       "searchLabel": "البحث في المستودعات",
@@ -439,6 +508,279 @@
       "noRepositories": "لا توجد مستودعات متاحة",
       "noRepositoriesDescription": "لا توجد مستودعات متصلة بحسابك.",
       "tryDifferentSearch": "جرّب مصطلح بحث مختلف."
+    },
+    "messageDetails": {
+      "title": "تفاصيل الرسالة",
+      "copyMessage": "نسخ الرسالة",
+      "selectText": "تحديد النص",
+      "reportAiResponse": "الإبلاغ عن رد الذكاء الاصطناعي",
+      "reportAiResponseConfirm": "الإبلاغ عن هذا الرد للمراجعة؟",
+      "report": "إبلاغ",
+      "role": "الدور",
+      "roleUser": "المستخدم",
+      "roleAssistant": "المساعد",
+      "sent": "أُرسلت",
+      "model": "النموذج",
+      "costAndTokens": "التكلفة والرموز",
+      "cost": "التكلفة",
+      "input": "الإدخال",
+      "output": "الإخراج",
+      "reasoning": "الاستدلال",
+      "cacheRead": "قراءة من ذاكرة التخزين المؤقت",
+      "cacheWrite": "كتابة في ذاكرة التخزين المؤقت",
+      "total": "الإجمالي"
+    },
+    "partDetail": {
+      "detailsUnavailable": "التفاصيل غير متاحة",
+      "textDisplay": "عرض النص",
+      "thinking": "التفكير",
+      "thought": "فكرة",
+      "title": "التفاصيل",
+      "showDetails": "عرض التفاصيل"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "تعذّر عرض المحتوى"
+    },
+    "messageFailure": {
+      "deliveryTitle": "تعذّر التسليم",
+      "deliveryInterrupted": "لقد أوقفت هذه الرسالة.",
+      "deliveryExhausted": "تعذّر علينا تسليم هذه الرسالة بعد عدة محاولات.",
+      "deliveryExecution": "تعذّر على الوكيل تشغيل هذه الرسالة.",
+      "assistantTitle": "فشل الرد",
+      "assistantProviderRejected": "رفض المزود الطلب.",
+      "assistantStopped": "تم إيقاف الرد.",
+      "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
+      "assistantFailed": "فشل الرد.",
+      "sendFailed": "تعذّر إرسال الرسالة. يرجى المحاولة مرة أخرى."
+    },
+    "filePart": {
+      "loadingImage": "جارٍ تحميل الصورة",
+      "imageUnavailableRetry": "الصورة غير متاحة، أعد محاولة التحميل",
+      "imageUnavailable": "الصورة غير متاحة",
+      "imageUnavailableWithAlt": "الصورة غير متاحة {{alt}}",
+      "viewImage": "عرض الصورة",
+      "viewImageWithAlt": "عرض الصورة {{alt}}",
+      "imageOutput": "مخرجات الصورة",
+      "imageOutputWithFilename": "مخرجات الصورة، {{filename}}",
+      "defaultName": "ملف",
+      "openFullScreen": "فتح {{name}} بملء الشاشة",
+      "preview": "معاينة {{name}}",
+      "openFile": "فتح {{name}}",
+      "couldNotLoadFile": "تعذّر تحميل هذا الملف.",
+      "couldNotLoadFileRetry": "تعذّر تحميل هذا الملف. حاول مرة أخرى.",
+      "retryLoadingFile": "إعادة محاولة تحميل الملف",
+      "fileEmpty": "هذا الملف فارغ.",
+      "previewUnavailable": "المعاينة غير متاحة",
+      "shareFailed": "فشلت المشاركة",
+      "sharingUnavailable": "مشاركة الملفات غير متاحة على هذا الجهاز.",
+      "shareFailedRetry": "تعذّرت مشاركة الملف. يرجى المحاولة مرة أخرى.",
+      "openAsText": "فتح كنص",
+      "openInExternalApp": "فتح في تطبيق خارجي"
+    },
+    "preparation": {
+      "exitCode": "رمز الخروج: {{code}}",
+      "earlierOutputOmitted": "تم حذف المخرجات السابقة",
+      "preparingEnvironment": "جارٍ تحضير البيئة",
+      "preparationComplete": "اكتمل التحضير",
+      "preparationFailed": "فشل التحضير",
+      "setupCommand": "أمر الإعداد {{index}}",
+      "setupCommandOf": "أمر الإعداد {{index}} من {{count}}"
+    },
+    "permissionCard": {
+      "title": "الإذن مطلوب",
+      "allowQuestion": "السماح بـ {{permission}}؟",
+      "appliesTo": "ينطبق على:",
+      "denyPermission": "رفض الإذن",
+      "deny": "رفض",
+      "allowOnce": "السماح مرة واحدة",
+      "allowOnceAccessibility": "السماح مرة واحدة",
+      "alwaysAllow": "السماح دائمًا",
+      "alwaysAllowAccessibility": "السماح دائمًا",
+      "retrying": "جارٍ إعادة المحاولة…"
+    },
+    "questionCard": {
+      "title": "الوكيل بحاجة إلى إدخال",
+      "skipQuestionsTitle": "تخطي الأسئلة؟",
+      "skipQuestionsMessage": "سيتخطى الوكيل هذه الخطوة.",
+      "selectAllThatApply": "حدد كل ما ينطبق",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}، محدد",
+      "typeYourOwnAnswer": "اكتب إجابتك الخاصة",
+      "typeYourOwnAnswerPlaceholder": "اكتب إجابتك الخاصة…",
+      "skip": "تخطي",
+      "retrySkip": "إعادة محاولة التخطي",
+      "submitting": "جارٍ الإرسال…",
+      "sendAnswers": "إرسال الإجابات"
+    },
+    "blockingCard": {
+      "questionUnavailable": "لم يعد هذا السؤال متاحًا.",
+      "permissionUnavailable": "لم يعد طلب الإذن هذا متاحًا.",
+      "failedToSkipQuestion": "تعذّر تخطي السؤال. يرجى المحاولة مرة أخرى.",
+      "failedToSubmitAnswer": "تعذّر إرسال الإجابة. يرجى المحاولة مرة أخرى.",
+      "failedToRespondToPermission": "تعذّر الرد على الإذن. يرجى المحاولة مرة أخرى.",
+      "submissionFailed": "فشل الإرسال. يرجى المحاولة مرة أخرى.",
+      "questionAnnouncement": "الوكيل بحاجة إلى إدخالك. المحرر متوقف مؤقتًا أثناء إجابتك.",
+      "permissionAnnouncement": "الوكيل بحاجة إلى إذن للمتابعة. المحرر متوقف مؤقتًا أثناء اتخاذك القرار.",
+      "positionHint": "(1 من {{count}})",
+      "movedPastPrompt": "تجاوز الوكيل هذه المطالبة. ستُغلق هذه البطاقة عند استمرار الجلسة.",
+      "waitingForAnswer": "الوكيل في انتظار إجابتك. أثناء فتح هذا السؤال، تتوقف رسالتك إلى الوكيل مؤقتًا.",
+      "waitingForPermission": "الوكيل في انتظار الإذن. أثناء فتح هذا الطلب، تتوقف رسالتك إلى الوكيل مؤقتًا."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
+      "maxNestingDepth": "تم الوصول إلى أقصى عمق تداخل.",
+      "modelAccessibility": "النموذج: {{modelLabel}}",
+      "openHint": "فتح جلسة الوكيل الفرعي",
+      "subagent": "وكيل فرعي",
+      "task": "المهمة",
+      "waitingForActivity": "في انتظار النشاط"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "تعذّر تحميل جلسة الوكيل الفرعي",
+      "failed": "فشلت جلسة الوكيل الفرعي",
+      "noMessages": "لا توجد رسائل وكيل فرعي",
+      "noMessagesDescription": "اكتملت جلسة الوكيل الفرعي هذه دون إنشاء نص.",
+      "loading": "جارٍ تحميل جلسة الوكيل الفرعي",
+      "loadingDescription": "في انتظار رسائل الوكيل الفرعي…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. تتوفر إعادة المحاولة.",
+      "copyToComposer": "نسخ إلى المحرر",
+      "queued": "في قائمة الانتظار",
+      "queuedAccessibility": "الرسالة في قائمة الانتظار",
+      "userMessage": "رسالة المستخدم",
+      "assistantMessage": "رسالة المساعد",
+      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة"
+    },
+    "olderMessages": {
+      "arrived": "تم تحميل الرسائل السابقة"
+    },
+    "markdownTable": {
+      "viewTable": "عرض الجدول",
+      "title": "جدول",
+      "close": "إغلاق الجدول",
+      "column": "عمود",
+      "columns": "أعمدة",
+      "row": "صف",
+      "rows": "صفوف",
+      "opensFullScreen": "يفتح بملء الشاشة"
+    },
+    "sessionFilter": {
+      "title": "تصفية الجلسات",
+      "sortBy": "ترتيب حسب",
+      "sortLastUpdated": "آخر تحديث",
+      "sortCreated": "تاريخ الإنشاء",
+      "platform": "المنصة",
+      "platformCloud": "السحابة",
+      "platformExtension": "الامتداد",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "أخرى",
+      "project": "المشروع",
+      "removeProjectFilter": "إزالة عامل تصفية المشروع {{label}}",
+      "removePlatformFilter": "إزالة عامل تصفية المنصة {{label}}"
+    },
+    "modelPicker": {
+      "title": "اختيار النموذج",
+      "searchPlaceholder": "البحث عن النماذج...",
+      "noModels": "لا توجد نماذج متاحة",
+      "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
+    },
+    "modelSelector": {
+      "model": "النموذج",
+      "provider": "المزود {{id}}",
+      "modelId": "النموذج {{id}}",
+      "unavailable": "غير متاح",
+      "unavailableState": "غير متاح",
+      "selectedState": "محدد",
+      "thinkingEffort": "جهد التفكير",
+      "thinkingEffortAccessibility": "{{label}} جهد التفكير",
+      "thinkingEffortSelected": "{{label}} جهد التفكير، محدد",
+      "thinkingEffortWithModel": "{{model}}، {{variant}} جهد التفكير",
+      "lockedByAgent": "، مقفل بواسطة الوكيل \"{{agent}}\"",
+      "addToFavorites": "إضافة {{name}} إلى المفضلة",
+      "removeFromFavorites": "إزالة {{name}} من المفضلة",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "متوسط"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "تعذّر فتح الملف. يرجى المحاولة مرة أخرى.",
+      "retryUploading": "إعادة محاولة رفع {{filename}}",
+      "removeAttachment": "إزالة المرفق {{filename}}",
+      "uploading": "جارٍ الرفع…",
+      "uploaded": "تم الرفع",
+      "uploadFailedRetry": "تعذّر الرفع. اضغط لإعادة المحاولة.",
+      "uploadFailedTerminal": "لا يمكن رفع هذا الملف."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "لصق صورة من الحافظة",
+      "label": "تم اكتشاف صورة، اضغط للصق"
+    },
+    "attachmentPicker": {
+      "camera": "الكاميرا",
+      "photoLibrary": "مكتبة الصور",
+      "files": "الملفات",
+      "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
+      "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
+    },
+    "composer": {
+      "addAttachment": "إضافة مرفق",
+      "removeOrRetryFailed": "أزل المرفقات الفاشلة أو أعد محاولتها أولًا.",
+      "attachmentsWithSlashCommands": "لا يمكن إرسال المرفقات مع أوامر الشرطة المائلة.",
+      "photoMetadataNotRemoved": "تعذّر إزالة بيانات الصورة الوصفية من مرفق.",
+      "waitForUploads": "انتظر حتى ينتهي رفع المرفقات.",
+      "pasteFromClipboard": "لصق من الحافظة",
+      "stopGenerating": "إيقاف التوليد",
+      "sendMessage": "إرسال الرسالة"
+    },
+    "chatLink": {
+      "linkCopied": "تم نسخ الرابط",
+      "reviewPr": "مراجعة PR",
+      "openLink": "فتح الرابط",
+      "copyLink": "نسخ الرابط",
+      "shareLink": "مشاركة الرابط",
+      "share": "مشاركة",
+      "prLinkActions": "إجراءات رابط PR",
+      "linkActions": "إجراءات الرابط",
+      "couldNotCopyLink": "تعذّر نسخ الرابط",
+      "couldNotShareLink": "تعذّرت مشاركة الرابط",
+      "opensInBrowser": "يُفتح في المتصفح",
+      "showLinkActions": "عرض إجراءات الرابط"
+    },
+    "compaction": {
+      "contextCompacted": "تم ضغط السياق"
+    },
+    "computeStatus": {
+      "exploring": "جارٍ الاستكشاف",
+      "searchingCodebase": "جارٍ البحث في قاعدة الكود",
+      "makingEdits": "جارٍ إجراء التعديلات",
+      "runningCommands": "جارٍ تشغيل الأوامر",
+      "searchingWeb": "جارٍ البحث في الويب",
+      "planningNextSteps": "جارٍ التخطيط للخطوات التالية",
+      "delegatingWork": "جارٍ تفويض العمل",
+      "askingQuestion": "جارٍ طرح سؤال",
+      "consideringNextSteps": "جارٍ النظر في الخطوات التالية",
+      "writingResponse": "جارٍ كتابة الرد"
+    },
+    "slashCommands": {
+      "startNewSession": "بدء جلسة جديدة",
+      "exitSession": "الخروج من الجلسة",
+      "clearSession": "إنهاء هذه الجلسة وبدء جلسة جديدة",
+      "upgradeRequiredFallback": "يرجى تحديث CLI لاستخدام هذا الأمر.",
+      "exitCapabilityUnavailable": "حدّث CLI للخروج من الجلسة.",
+      "clearCapabilityUnavailable": "حدّث CLI لإعادة تشغيل الجلسة.",
+      "argumentError": "{{command}} لا يقبل وسائط."
+    },
+    "contextUsage": {
+      "windowUnavailable": "حجم نافذة السياق غير متاح",
+      "tapToViewDetails": "اضغط لعرض تفاصيل السياق.",
+      "costPrefix": "التكلفة {{cost}}",
+      "costSuffix": "، التكلفة {{cost}}",
+      "tokensWindowUnavailable": "السياق {{used}} رمز، النافذة غير متاحة",
+      "tokensUsage": "السياق {{used}} من {{window}} رمز، تم استخدام {{percentage}}%"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "هذا الرابط لم يعد صالحًا.",
     "goBack": "رجوع",
     "title": "الصفحة غير موجودة"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "تم اقتطاع المحتوى",
+    "truncated": "مقتطع",
+    "wrap": "التفاف",
+    "scroll": "تمرير"
   },
   "offline": {
     "noInternet": "لا يوجد اتصال بالإنترنت",

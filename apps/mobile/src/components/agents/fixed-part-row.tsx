@@ -1,5 +1,6 @@
 import { ChevronRight, type LucideIcon, XCircle } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
@@ -39,6 +40,7 @@ export function FixedPartRow({
   accessibilityLabel,
 }: Readonly<FixedPartRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -54,7 +56,7 @@ export function FixedPartRow({
         disabled={!onPress}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        accessibilityHint={onPress ? 'Show details' : undefined}
+        accessibilityHint={onPress ? t('agentChat.partDetail.showDetails') : undefined}
         accessibilityState={{ disabled: !onPress }}
       >
         {status === 'pending' || status === 'running' ? (

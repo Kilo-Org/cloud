@@ -5,7 +5,13 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
+import {
+  type BuiltinModeOption,
+  getBuiltinModeDescriptionKey,
+  getBuiltinModeLabelKey,
+  getModeIcon,
+  MODE_OPTIONS,
+} from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import {
   dedupeCustomModeOptions,
@@ -58,9 +64,14 @@ export default function ModePickerScreen() {
     currentValue
   );
 
-  function renderItem({ item }: { item: ModeOption }) {
+  function renderItem({ item }: { item: BuiltinModeOption | ModeOption }) {
     const Icon = getModeIcon(item.value);
     const selected = item.value === currentValue;
+    const isBuiltin = 'labelKey' in item;
+    const label = isBuiltin ? t(getBuiltinModeLabelKey(item.value) ?? '') : item.label;
+    const description = isBuiltin
+      ? t(getBuiltinModeDescriptionKey(item.value) ?? '')
+      : item.description;
 
     return (
       <Pressable
@@ -70,14 +81,14 @@ export default function ModePickerScreen() {
         }}
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.modePicker.modeLabel', {
-          label: item.label,
-          description: item.description,
+          label,
+          description,
         })}
       >
         <Icon size={20} color={colors.foreground} />
         <View className="flex-1">
-          <Text className="text-base font-medium text-foreground">{item.label}</Text>
-          <Text className="text-sm text-muted-foreground">{item.description}</Text>
+          <Text className="text-base font-medium text-foreground">{label}</Text>
+          <Text className="text-sm text-muted-foreground">{description}</Text>
         </View>
         {selected && <Check size={18} color={colors.primary} />}
       </Pressable>

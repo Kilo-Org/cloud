@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Bubble } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
@@ -61,6 +62,7 @@ function MessageBubbleImpl({
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const handleLongPress = () => {
     onLongPressDetails?.(message);
@@ -113,7 +115,11 @@ function MessageBubbleImpl({
       <View className="gap-1 px-4 py-1">
         <Text
           className="text-sm text-destructive"
-          accessibilityLabel={`${failure.title}.${failure.canRetry ? ' Retry available.' : ''}`}
+          accessibilityLabel={
+            failure.canRetry
+              ? t('agentChat.messageBubble.failureRetryAvailable', { title: failure.title })
+              : t('agentChat.messageBubble.failure', { title: failure.title })
+          }
         >
           {failure.title}
         </Text>
@@ -127,9 +133,9 @@ function MessageBubbleImpl({
                 onRetryMessage(message);
               }}
               accessibilityRole="button"
-              accessibilityLabel="Retry"
+              accessibilityLabel={t('common.retry')}
             >
-              <Text>Retry</Text>
+              <Text>{t('common.retry')}</Text>
             </Button>
           ) : null}
           {failure.canCopy && onCopyToComposer && copyText !== '' ? (
@@ -140,9 +146,9 @@ function MessageBubbleImpl({
                 onCopyToComposer(copyText);
               }}
               accessibilityRole="button"
-              accessibilityLabel="Copy to composer"
+              accessibilityLabel={t('agentChat.messageBubble.copyToComposer')}
             >
-              <Text>Copy to composer</Text>
+              <Text>{t('agentChat.messageBubble.copyToComposer')}</Text>
             </Button>
           ) : null}
         </View>
@@ -176,7 +182,9 @@ function MessageBubbleImpl({
               <View className="flex-row items-center gap-2 self-end pr-1">
                 <View
                   accessibilityRole={isQueued ? 'text' : undefined}
-                  accessibilityLabel={isQueued ? 'Message queued' : undefined}
+                  accessibilityLabel={
+                    isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                  }
                   accessible={isQueued}
                   {...(!isQueued
                     ? {
@@ -188,7 +196,9 @@ function MessageBubbleImpl({
                   className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
                 >
                   <Clock size={12} color={colors.mutedForeground} />
-                  <Text className="text-xs text-muted-foreground">Queued</Text>
+                  <Text className="text-xs text-muted-foreground">
+                    {t('agentChat.messageBubble.queued')}
+                  </Text>
                 </View>
               </View>
             ) : null}

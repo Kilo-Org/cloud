@@ -16,6 +16,7 @@
     "refresh": "Оновити",
     "couldNotRefresh": "Не вдалося оновити. Потягніть униз, щоб спробувати ще раз.",
     "openInBrowser": "Відкрити у браузері",
+    "openSettings": "Відкрити налаштування",
     "copiedToClipboard": "Скопійовано в буфер обміну",
     "required": "обов'язково",
     "error": "помилка: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Фільтрувати знахідки"
     }
   },
+  "agents": {
+    "activeNow": "Активні зараз"
+  },
   "agentChat": {
     "session": {
       "title": "Сеанс",
@@ -411,14 +415,64 @@
       "notFound": "Не знайдено",
       "notFoundDescription": "Можливо, цей елемент було видалено або він більше недоступний."
     },
+    "remoteSession": {
+      "failedToCreate": "Не вдалося створити віддалений сеанс",
+      "exited": "Сеанс завершено",
+      "failedToExit": "Не вдалося завершити сеанс"
+    },
     "newSession": {
-      "title": "Новий сеанс"
+      "title": "Новий сеанс",
+      "repository": "Репозиторій",
+      "couldNotLoadRepositories": "Не вдалося завантажити репозиторії",
+      "connectGithub": "Підключити GitHub",
+      "connectGithubDescription": "Підключіть GitHub у браузері, потім поверніться сюди, щоб вибрати репозиторій.",
+      "openGithub": "Відкрити GitHub",
+      "refreshRepositories": "Оновити репозиторії",
+      "githubConnectionNotVisible": "Ми поки не бачимо ваше підключення GitHub",
+      "githubConnectionNotVisibleDescription": "Якщо ви встановили або налаштували застосунок Kilo GitHub, перевірте ще раз — або переконайтеся, що його встановлено для цього облікового запису/організації.",
+      "checkAgain": "Перевірити ще раз",
+      "githubConnected": "GitHub підключено",
+      "noRepositoriesVisible": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв для застосунку Kilo GitHub, потім оновіть.",
+      "runOnWithTarget": "Запустити на: {{target}}",
+      "environment": "Середовище",
+      "couldNotLoadEnvironment": "Не вдалося завантажити ваше середовище",
+      "retryLoadingEnvironment": "Повторити завантаження середовища",
+      "defaultEnvironment": "Стандартне середовище",
+      "environmentSummary": "{{commands}} команд · {{mcp}} MCP · {{skills}} навичок · {{agents}} агентів",
+      "changes": "Зміни",
+      "leaveChanges": "Залишити зміни",
+      "commitAndPush": "Закомітити та надіслати",
+      "startSession": "Розпочати сеанс",
+      "promptPlaceholder": "Над чим ви хочете попрацювати?",
+      "addAttachment": "Додати вкладення",
+      "couldNotLoadModels": "Не вдалося завантажити моделі",
+      "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть їх нижче.",
+      "prefillRepoUnavailable": "{{repo}} більше недоступний. Виберіть репозиторій нижче.",
+      "prefillModelUnavailable": "{{model}} більше недоступна. Використовується ваша стандартна модель."
+    },
+    "partRenderer": {
+      "updatedFile": "Оновлено {{count}} файл",
+      "updatedFiles": "Оновлено {{count}} файлів"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "рядки {{start}}–{{end}} (обрізано)",
+      "linesOf": "рядки {{start}}–{{end}} з {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Хмарний агент {{action}} не вдався ({{status}})",
+      "failed": "Хмарний агент {{action}} не вдався"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[не серіалізовний ввід]",
+      "errorPrefix": "Помилка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Запустити на",
+      "runOnAccessibility": "Запустити на: {{label}}",
       "couldNotLoad": "Не вдалося завантажити екземпляри",
       "couldNotLoadDescription": "Перевірте з'єднання та спробуйте ще раз.",
       "cloudAgent": "Хмарний агент",
+      "loading": "Завантаження…",
       "cloudAgentDescription": "Запуск у хмарній пісочниці Kilo",
       "noCliInstances": "Немає підключених екземплярів CLI",
       "noCliInstancesDescription": "Виконайте `kilo remote` у проєкті на своєму комп'ютері або оновіть Kilo CLI, якщо вона вже запущена.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Користувацькі режими"
     },
+    "modeSelector": {
+      "accessibility": "Режим: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Код",
+      "plan": "План",
+      "debug": "Налагодження",
+      "orchestrator": "Оркестратор",
+      "ask": "Запитати",
+      "codeDescription": "Писати та змінювати код",
+      "planDescription": "Планувати та проєктувати рішення",
+      "debugDescription": "Знаходити та виправляти проблеми",
+      "orchestratorDescription": "Координувати складні завдання",
+      "askDescription": "Отримувати відповіді та пояснення"
+    },
     "repoPicker": {
       "title": "Вибрати репозиторій",
       "searchLabel": "Пошук репозиторіїв",
@@ -439,6 +508,279 @@
       "noRepositories": "Немає доступних репозиторіїв",
       "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
       "tryDifferentSearch": "Спробуйте інший пошуковий запит."
+    },
+    "messageDetails": {
+      "title": "Відомості про повідомлення",
+      "copyMessage": "Копіювати повідомлення",
+      "selectText": "Вибрати текст",
+      "reportAiResponse": "Поскаржитися на відповідь ШІ",
+      "reportAiResponseConfirm": "Поскаржитися на цю відповідь для перевірки?",
+      "report": "Поскаржитися",
+      "role": "Роль",
+      "roleUser": "Користувач",
+      "roleAssistant": "Асистент",
+      "sent": "Надіслано",
+      "model": "Модель",
+      "costAndTokens": "Вартість і токени",
+      "cost": "Вартість",
+      "input": "Вхідні дані",
+      "output": "Вихідні дані",
+      "reasoning": "Міркування",
+      "cacheRead": "Читання кешу",
+      "cacheWrite": "Запис кешу",
+      "total": "Разом"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Відомості недоступні",
+      "textDisplay": "Текстове відображення",
+      "thinking": "Мислення",
+      "thought": "Думка",
+      "title": "Відомості",
+      "showDetails": "Показати відомості"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Не вдалося відобразити вміст"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Не вдалося доставити",
+      "deliveryInterrupted": "Ви зупинили це повідомлення.",
+      "deliveryExhausted": "Ми не змогли доставити це повідомлення після кількох спроб.",
+      "deliveryExecution": "Агент не зміг виконати це повідомлення.",
+      "assistantTitle": "Відповідь не вдалася",
+      "assistantProviderRejected": "Постачальник відхилив запит.",
+      "assistantStopped": "Відповідь було зупинено.",
+      "assistantContextOverflow": "Розмова занадто довга для моделі.",
+      "assistantFailed": "Відповідь не вдалася.",
+      "sendFailed": "Не вдалося надіслати повідомлення. Спробуйте ще раз."
+    },
+    "filePart": {
+      "loadingImage": "Завантаження зображення",
+      "imageUnavailableRetry": "Зображення недоступне, повторіть завантаження",
+      "imageUnavailable": "Зображення недоступне",
+      "imageUnavailableWithAlt": "Зображення недоступне {{alt}}",
+      "viewImage": "Переглянути зображення",
+      "viewImageWithAlt": "Переглянути зображення {{alt}}",
+      "imageOutput": "Вихідне зображення",
+      "imageOutputWithFilename": "Вихідне зображення, {{filename}}",
+      "defaultName": "Файл",
+      "openFullScreen": "Відкрити {{name}} на весь екран",
+      "preview": "Попередній перегляд {{name}}",
+      "openFile": "Відкрити {{name}}",
+      "couldNotLoadFile": "Не вдалося завантажити цей файл.",
+      "couldNotLoadFileRetry": "Не вдалося завантажити цей файл. Спробуйте ще раз.",
+      "retryLoadingFile": "Повторити завантаження файлу",
+      "fileEmpty": "Цей файл порожній.",
+      "previewUnavailable": "Попередній перегляд недоступний",
+      "shareFailed": "Не вдалося поділитися",
+      "sharingUnavailable": "Поширення файлів недоступне на цьому пристрої.",
+      "shareFailedRetry": "Не вдалося поділитися файлом. Спробуйте ще раз.",
+      "openAsText": "Відкрити як текст",
+      "openInExternalApp": "Відкрити у зовнішньому застосунку"
+    },
+    "preparation": {
+      "exitCode": "Код виходу: {{code}}",
+      "earlierOutputOmitted": "Попередній вивід пропущено",
+      "preparingEnvironment": "Підготовка середовища",
+      "preparationComplete": "Підготовку завершено",
+      "preparationFailed": "Підготовка не вдалася",
+      "setupCommand": "Команда налаштування {{index}}",
+      "setupCommandOf": "Команда налаштування {{index}} з {{count}}"
+    },
+    "permissionCard": {
+      "title": "Потрібен дозвіл",
+      "allowQuestion": "Дозволити {{permission}}?",
+      "appliesTo": "Стосується:",
+      "denyPermission": "Відхилити дозвіл",
+      "deny": "Відхилити",
+      "allowOnce": "Дозволити один раз",
+      "allowOnceAccessibility": "Дозволити один раз",
+      "alwaysAllow": "Завжди дозволяти",
+      "alwaysAllowAccessibility": "Завжди дозволяти",
+      "retrying": "Повторна спроба…"
+    },
+    "questionCard": {
+      "title": "Агент потребує введення",
+      "skipQuestionsTitle": "Пропустити запитання?",
+      "skipQuestionsMessage": "Агент пропустить цей крок.",
+      "selectAllThatApply": "Виберіть усе, що стосується",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, вибрано",
+      "typeYourOwnAnswer": "Введіть власну відповідь",
+      "typeYourOwnAnswerPlaceholder": "Введіть власну відповідь…",
+      "skip": "Пропустити",
+      "retrySkip": "Повторити пропуск",
+      "submitting": "Надсилання…",
+      "sendAnswers": "Надіслати відповіді"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Це запитання більше недоступне.",
+      "permissionUnavailable": "Цей запит на дозвіл більше недоступний.",
+      "failedToSkipQuestion": "Не вдалося пропустити запитання. Спробуйте ще раз.",
+      "failedToSubmitAnswer": "Не вдалося надіслати відповідь. Спробуйте ще раз.",
+      "failedToRespondToPermission": "Не вдалося відповісти на запит дозволу. Спробуйте ще раз.",
+      "submissionFailed": "Надсилання не вдалося. Спробуйте ще раз.",
+      "questionAnnouncement": "Агент потребує вашого введення. Редактор призупинено, поки ви відповідаєте.",
+      "permissionAnnouncement": "Агенту потрібен дозвіл, щоб продовжити. Редактор призупинено, поки ви вирішуєте.",
+      "positionHint": "(1 з {{count}})",
+      "movedPastPrompt": "Агент пройшов повз цей запит. Ця картка закриється, коли сеанс продовжиться.",
+      "waitingForAnswer": "Агент чекає на вашу відповідь. Поки це запитання відкрите, ваше повідомлення агенту призупинено.",
+      "waitingForPermission": "Агент чекає на дозвіл. Поки цей запит відкритий, ваше повідомлення агенту призупинено."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Досягнуто максимальної глибини вкладеності.",
+      "modelAccessibility": "Модель: {{modelLabel}}",
+      "openHint": "Відкрити сеанс субагента",
+      "subagent": "Субагент",
+      "task": "Завдання",
+      "waitingForActivity": "Очікування активності"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Не вдалося завантажити сеанс субагента",
+      "failed": "Сеанс субагента не вдався",
+      "noMessages": "Немає повідомлень субагента",
+      "noMessagesDescription": "Цей сеанс субагента завершився без створення транскрипту.",
+      "loading": "Завантаження сеансу субагента",
+      "loadingDescription": "Очікування повідомлень субагента…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Доступна повторна спроба.",
+      "copyToComposer": "Копіювати в редактор",
+      "queued": "У черзі",
+      "queuedAccessibility": "Повідомлення в черзі",
+      "userMessage": "Повідомлення користувача",
+      "assistantMessage": "Повідомлення асистента",
+      "longPressHint": "Довге натискання для відомостей про повідомлення"
+    },
+    "olderMessages": {
+      "arrived": "Раніші повідомлення завантажено"
+    },
+    "markdownTable": {
+      "viewTable": "Переглянути таблицю",
+      "title": "Таблиця",
+      "close": "Закрити таблицю",
+      "column": "стовпець",
+      "columns": "стовпці",
+      "row": "рядок",
+      "rows": "рядки",
+      "opensFullScreen": "відкривається на весь екран"
+    },
+    "sessionFilter": {
+      "title": "Фільтрувати сеанси",
+      "sortBy": "Сортувати за",
+      "sortLastUpdated": "Останнє оновлення",
+      "sortCreated": "Створено",
+      "platform": "Платформа",
+      "platformCloud": "Хмара",
+      "platformExtension": "Розширення",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Інше",
+      "project": "Проєкт",
+      "removeProjectFilter": "Видалити фільтр проєкту {{label}}",
+      "removePlatformFilter": "Видалити фільтр платформи {{label}}"
+    },
+    "modelPicker": {
+      "title": "Вибрати модель",
+      "searchPlaceholder": "Пошук моделей...",
+      "noModels": "Немає доступних моделей",
+      "noModelsDescription": "Немає доступних моделей для вибору."
+    },
+    "modelSelector": {
+      "model": "Модель",
+      "provider": "Постачальник {{id}}",
+      "modelId": "Модель {{id}}",
+      "unavailable": "Недоступна",
+      "unavailableState": "недоступна",
+      "selectedState": "вибрано",
+      "thinkingEffort": "Рівень мислення",
+      "thinkingEffortAccessibility": "{{label}} рівень мислення",
+      "thinkingEffortSelected": "{{label}} рівень мислення, вибрано",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} рівень мислення",
+      "lockedByAgent": ", Заблоковано агентом \"{{agent}}\"",
+      "addToFavorites": "Додати {{name}} до обраного",
+      "removeFromFavorites": "Видалити {{name}} з обраного",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Не вдалося відкрити файл. Спробуйте ще раз.",
+      "retryUploading": "Повторити завантаження {{filename}}",
+      "removeAttachment": "Видалити вкладення {{filename}}",
+      "uploading": "Завантаження…",
+      "uploaded": "Завантажено",
+      "uploadFailedRetry": "Завантаження не вдалося. Торкніться, щоб повторити.",
+      "uploadFailedTerminal": "Цей файл не можна завантажити."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Вставити зображення з буфера обміну",
+      "label": "Виявлено зображення, торкніться, щоб вставити"
+    },
+    "attachmentPicker": {
+      "camera": "Камера",
+      "photoLibrary": "Фототека",
+      "files": "Файли",
+      "cameraAccessDisabled": "Доступ до камери вимкнено",
+      "cameraAccessMessage": "Дозвольте доступ до камери в Налаштуваннях, щоб зробити фото."
+    },
+    "composer": {
+      "addAttachment": "Додати вкладення",
+      "removeOrRetryFailed": "Спочатку видаліть або повторіть невдалі вкладення.",
+      "attachmentsWithSlashCommands": "Вкладення не можна надсилати зі слеш-командами.",
+      "photoMetadataNotRemoved": "Не вдалося видалити метадані фото з вкладення.",
+      "waitForUploads": "Зачекайте, поки вкладення завершать завантаження.",
+      "pasteFromClipboard": "Вставити з буфера обміну",
+      "stopGenerating": "Зупинити генерацію",
+      "sendMessage": "Надіслати повідомлення"
+    },
+    "chatLink": {
+      "linkCopied": "Посилання скопійовано",
+      "reviewPr": "Перевірити PR",
+      "openLink": "Відкрити посилання",
+      "copyLink": "Копіювати посилання",
+      "shareLink": "Поділитися посиланням",
+      "share": "Поділитися",
+      "prLinkActions": "Дії з посиланням PR",
+      "linkActions": "Дії з посиланням",
+      "couldNotCopyLink": "Не вдалося скопіювати посилання",
+      "couldNotShareLink": "Не вдалося поділитися посиланням",
+      "opensInBrowser": "Відкривається у браузері",
+      "showLinkActions": "Показати дії з посиланням"
+    },
+    "compaction": {
+      "contextCompacted": "Контекст стиснуто"
+    },
+    "computeStatus": {
+      "exploring": "Дослідження",
+      "searchingCodebase": "Пошук у кодовій базі",
+      "makingEdits": "Внесення змін",
+      "runningCommands": "Виконання команд",
+      "searchingWeb": "Пошук в інтернеті",
+      "planningNextSteps": "Планування наступних кроків",
+      "delegatingWork": "Делегування роботи",
+      "askingQuestion": "Постановка запитання",
+      "consideringNextSteps": "Обмірковування наступних кроків",
+      "writingResponse": "Написання відповіді"
+    },
+    "slashCommands": {
+      "startNewSession": "Розпочати новий сеанс",
+      "exitSession": "Завершити сеанс",
+      "clearSession": "Завершити цей сеанс і розпочати новий",
+      "upgradeRequiredFallback": "Оновіть ваш CLI, щоб використовувати цю команду.",
+      "exitCapabilityUnavailable": "Оновіть ваш CLI, щоб завершити сеанс.",
+      "clearCapabilityUnavailable": "Оновіть ваш CLI, щоб перезапустити сеанс.",
+      "argumentError": "{{command}} не приймає аргументів."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Розмір контекстного вікна недоступний",
+      "tapToViewDetails": "Торкніться, щоб переглянути відомості про контекст.",
+      "costPrefix": "вартість {{cost}}",
+      "costSuffix": ", вартість {{cost}}",
+      "tokensWindowUnavailable": "Контекст {{used}} токенів, вікно недоступне",
+      "tokensUsage": "Контекст {{used}} з {{window}} токенів, використано {{percentage}}%"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Це посилання більше недійсне.",
     "goBack": "Повернутися",
     "title": "Сторінку не знайдено"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Вміст обрізано",
+    "truncated": "Обрізано",
+    "wrap": "Перенесення",
+    "scroll": "Прокрутка"
   },
   "offline": {
     "noInternet": "Немає з'єднання з інтернетом",

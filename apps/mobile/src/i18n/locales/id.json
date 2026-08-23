@@ -16,6 +16,7 @@
     "refresh": "Muat ulang",
     "couldNotRefresh": "Tidak dapat menyegarkan. Tarik ke bawah untuk mencoba lagi.",
     "openInBrowser": "Buka di browser",
+    "openSettings": "Buka Pengaturan",
     "copiedToClipboard": "Disalin ke papan klip",
     "required": "wajib diisi",
     "error": "kesalahan: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Filter temuan"
     }
   },
+  "agents": {
+    "activeNow": "Aktif sekarang"
+  },
   "agentChat": {
     "session": {
       "title": "Sesi",
@@ -411,14 +415,64 @@
       "notFound": "Tidak ditemukan",
       "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia."
     },
+    "remoteSession": {
+      "failedToCreate": "Gagal membuat sesi jarak jauh",
+      "exited": "Sesi keluar",
+      "failedToExit": "Gagal keluar dari sesi"
+    },
     "newSession": {
-      "title": "Sesi baru"
+      "title": "Sesi baru",
+      "repository": "Repositori",
+      "couldNotLoadRepositories": "Tidak dapat memuat repositori",
+      "connectGithub": "Hubungkan GitHub",
+      "connectGithubDescription": "Hubungkan GitHub di browser Anda, lalu kembali ke sini untuk memilih repositori.",
+      "openGithub": "Buka GitHub",
+      "refreshRepositories": "Muat ulang repositori",
+      "githubConnectionNotVisible": "Kami belum dapat melihat koneksi GitHub Anda",
+      "githubConnectionNotVisibleDescription": "Jika Anda memasang atau mengonfigurasi Aplikasi Kilo GitHub, periksa lagi — atau pastikan aplikasi dipasang untuk akun/organisasi ini.",
+      "checkAgain": "Periksa lagi",
+      "githubConnected": "GitHub terhubung",
+      "noRepositoriesVisible": "Tidak ada repositori terlihat. Periksa akses repositori untuk Aplikasi Kilo GitHub, lalu muat ulang.",
+      "runOnWithTarget": "Jalankan di: {{target}}",
+      "environment": "Lingkungan",
+      "couldNotLoadEnvironment": "Tidak dapat memuat lingkungan Anda",
+      "retryLoadingEnvironment": "Coba lagi memuat lingkungan",
+      "defaultEnvironment": "Lingkungan default",
+      "environmentSummary": "{{commands}} perintah · {{mcp}} MCP · {{skills}} keterampilan · {{agents}} agen",
+      "changes": "Perubahan",
+      "leaveChanges": "Biarkan perubahan",
+      "commitAndPush": "Commit dan push",
+      "startSession": "Mulai sesi",
+      "promptPlaceholder": "Apa yang ingin Anda kerjakan?",
+      "addAttachment": "Tambah lampiran",
+      "couldNotLoadModels": "Tidak dapat memuat model",
+      "prefillRepoAndModelUnavailable": "Repositori dan model sesi asli tidak lagi tersedia. Pilih di bawah.",
+      "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
+      "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Menggunakan model default Anda."
+    },
+    "partRenderer": {
+      "updatedFile": "Memperbarui {{count}} file",
+      "updatedFiles": "Memperbarui {{count}} file"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
+      "linesOf": "baris {{start}}–{{end}} dari {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Agen Cloud {{action}} gagal ({{status}})",
+      "failed": "Agen Cloud {{action}} gagal"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[masukan tidak dapat diserialkan]",
+      "errorPrefix": "Kesalahan: {{error}}"
     },
     "instancePicker": {
       "runOn": "Jalankan di",
+      "runOnAccessibility": "Jalankan di: {{label}}",
       "couldNotLoad": "Tidak dapat memuat instans",
       "couldNotLoadDescription": "Periksa koneksi Anda dan coba lagi.",
       "cloudAgent": "Agen Cloud",
+      "loading": "Memuat…",
       "cloudAgentDescription": "Jalankan di sandbox cloud Kilo",
       "noCliInstances": "Tidak ada instans CLI terhubung",
       "noCliInstancesDescription": "Jalankan `kilo remote` di proyek pada komputer Anda, atau perbarui Kilo CLI jika sudah berjalan.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Mode kustom"
     },
+    "modeSelector": {
+      "accessibility": "Mode: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Kode",
+      "plan": "Rencana",
+      "debug": "Debug",
+      "orchestrator": "Orkestrator",
+      "ask": "Tanya",
+      "codeDescription": "Tulis dan ubah kode",
+      "planDescription": "Rencanakan dan rancang solusi",
+      "debugDescription": "Temukan dan perbaiki masalah",
+      "orchestratorDescription": "Koordinasi tugas kompleks",
+      "askDescription": "Dapatkan jawaban dan penjelasan"
+    },
     "repoPicker": {
       "title": "Pilih repositori",
       "searchLabel": "Cari repositori",
@@ -439,6 +508,279 @@
       "noRepositories": "Tidak ada repositori tersedia",
       "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akun Anda.",
       "tryDifferentSearch": "Coba istilah pencarian lain."
+    },
+    "messageDetails": {
+      "title": "Detail pesan",
+      "copyMessage": "Salin pesan",
+      "selectText": "Pilih teks",
+      "reportAiResponse": "Laporkan respons AI",
+      "reportAiResponseConfirm": "Laporkan respons ini untuk ditinjau?",
+      "report": "Laporkan",
+      "role": "Peran",
+      "roleUser": "Pengguna",
+      "roleAssistant": "Asisten",
+      "sent": "Terkirim",
+      "model": "Model",
+      "costAndTokens": "Biaya & token",
+      "cost": "Biaya",
+      "input": "Masukan",
+      "output": "Keluaran",
+      "reasoning": "Penalaran",
+      "cacheRead": "Pembacaan cache",
+      "cacheWrite": "Penulisan cache",
+      "total": "Total"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Detail tidak tersedia",
+      "textDisplay": "Tampilan teks",
+      "thinking": "Pemikiran",
+      "thought": "Pikiran",
+      "title": "Detail",
+      "showDetails": "Tampilkan detail"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Gagal merender konten"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Gagal mengirim",
+      "deliveryInterrupted": "Anda menghentikan pesan ini.",
+      "deliveryExhausted": "Kami tidak dapat mengirim pesan ini setelah beberapa percobaan.",
+      "deliveryExecution": "Agen tidak dapat menjalankan pesan ini.",
+      "assistantTitle": "Respons gagal",
+      "assistantProviderRejected": "Penyedia menolak permintaan.",
+      "assistantStopped": "Respons dihentikan.",
+      "assistantContextOverflow": "Percakapan terlalu panjang untuk model.",
+      "assistantFailed": "Respons gagal.",
+      "sendFailed": "Gagal mengirim pesan. Coba lagi."
+    },
+    "filePart": {
+      "loadingImage": "Memuat gambar",
+      "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
+      "imageUnavailable": "Gambar tidak tersedia",
+      "imageUnavailableWithAlt": "Gambar tidak tersedia {{alt}}",
+      "viewImage": "Lihat gambar",
+      "viewImageWithAlt": "Lihat gambar {{alt}}",
+      "imageOutput": "Keluaran gambar",
+      "imageOutputWithFilename": "Keluaran gambar, {{filename}}",
+      "defaultName": "File",
+      "openFullScreen": "Buka {{name}} layar penuh",
+      "preview": "Pratinjau {{name}}",
+      "openFile": "Buka {{name}}",
+      "couldNotLoadFile": "Tidak dapat memuat file ini.",
+      "couldNotLoadFileRetry": "Tidak dapat memuat file ini. Coba lagi.",
+      "retryLoadingFile": "Coba lagi memuat file",
+      "fileEmpty": "File ini kosong.",
+      "previewUnavailable": "Pratinjau tidak tersedia",
+      "shareFailed": "Gagal membagikan",
+      "sharingUnavailable": "Berbagi file tidak tersedia di perangkat ini.",
+      "shareFailedRetry": "Gagal membagikan file. Coba lagi.",
+      "openAsText": "Buka sebagai teks",
+      "openInExternalApp": "Buka di aplikasi eksternal"
+    },
+    "preparation": {
+      "exitCode": "Kode keluar: {{code}}",
+      "earlierOutputOmitted": "Keluaran sebelumnya dihilangkan",
+      "preparingEnvironment": "Menyiapkan lingkungan",
+      "preparationComplete": "Persiapan selesai",
+      "preparationFailed": "Persiapan gagal",
+      "setupCommand": "Perintah penyiapan {{index}}",
+      "setupCommandOf": "Perintah penyiapan {{index}} dari {{count}}"
+    },
+    "permissionCard": {
+      "title": "Izin diperlukan",
+      "allowQuestion": "Izinkan {{permission}}?",
+      "appliesTo": "Berlaku untuk:",
+      "denyPermission": "Tolak izin",
+      "deny": "Tolak",
+      "allowOnce": "Izinkan Sekali",
+      "allowOnceAccessibility": "Izinkan sekali",
+      "alwaysAllow": "Selalu Izinkan",
+      "alwaysAllowAccessibility": "Selalu izinkan",
+      "retrying": "Mencoba lagi…"
+    },
+    "questionCard": {
+      "title": "Agen membutuhkan masukan",
+      "skipQuestionsTitle": "Lewati pertanyaan?",
+      "skipQuestionsMessage": "Agen akan melewati langkah ini.",
+      "selectAllThatApply": "Pilih semua yang berlaku",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, dipilih",
+      "typeYourOwnAnswer": "Ketik jawaban Anda sendiri",
+      "typeYourOwnAnswerPlaceholder": "Ketik jawaban Anda sendiri…",
+      "skip": "Lewati",
+      "retrySkip": "Coba lagi lewati",
+      "submitting": "Mengirim…",
+      "sendAnswers": "Kirim jawaban"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Pertanyaan ini tidak lagi tersedia.",
+      "permissionUnavailable": "Permintaan izin ini tidak lagi tersedia.",
+      "failedToSkipQuestion": "Gagal melewati pertanyaan. Coba lagi.",
+      "failedToSubmitAnswer": "Gagal mengirim jawaban. Coba lagi.",
+      "failedToRespondToPermission": "Gagal menanggapi izin. Coba lagi.",
+      "submissionFailed": "Pengiriman gagal. Coba lagi.",
+      "questionAnnouncement": "Agen membutuhkan masukan Anda. Komposer dijeda saat Anda menjawab.",
+      "permissionAnnouncement": "Agen membutuhkan izin untuk melanjutkan. Komposer dijeda saat Anda memutuskan.",
+      "positionHint": "(1 dari {{count}})",
+      "movedPastPrompt": "Agen telah melewati prompt ini. Kartu ini akan ditutup saat sesi berlanjut.",
+      "waitingForAnswer": "Agen sedang menunggu jawaban Anda. Saat pertanyaan ini terbuka, pesan Anda ke agen dijeda.",
+      "waitingForPermission": "Agen sedang menunggu izin. Saat permintaan ini terbuka, pesan Anda ke agen dijeda."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Kedalaman sarang maksimum tercapai.",
+      "modelAccessibility": "Model: {{modelLabel}}",
+      "openHint": "Buka sesi subagen",
+      "subagent": "Subagen",
+      "task": "Tugas",
+      "waitingForActivity": "Menunggu aktivitas"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Tidak dapat memuat sesi subagen",
+      "failed": "Sesi subagen gagal",
+      "noMessages": "Tidak ada pesan subagen",
+      "noMessagesDescription": "Sesi subagen ini selesai tanpa menghasilkan transkrip.",
+      "loading": "Memuat sesi subagen",
+      "loadingDescription": "Menunggu pesan subagen…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Coba lagi tersedia.",
+      "copyToComposer": "Salin ke komposer",
+      "queued": "Antre",
+      "queuedAccessibility": "Pesan dalam antrean",
+      "userMessage": "Pesan pengguna",
+      "assistantMessage": "Pesan asisten",
+      "longPressHint": "Tekan lama untuk detail pesan"
+    },
+    "olderMessages": {
+      "arrived": "Pesan sebelumnya dimuat"
+    },
+    "markdownTable": {
+      "viewTable": "Lihat tabel",
+      "title": "Tabel",
+      "close": "Tutup tabel",
+      "column": "kolom",
+      "columns": "kolom",
+      "row": "baris",
+      "rows": "baris",
+      "opensFullScreen": "membuka layar penuh"
+    },
+    "sessionFilter": {
+      "title": "Filter sesi",
+      "sortBy": "Urutkan menurut",
+      "sortLastUpdated": "Terakhir diperbarui",
+      "sortCreated": "Dibuat",
+      "platform": "Platform",
+      "platformCloud": "Cloud",
+      "platformExtension": "Ekstensi",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Lainnya",
+      "project": "Proyek",
+      "removeProjectFilter": "Hapus filter proyek {{label}}",
+      "removePlatformFilter": "Hapus filter platform {{label}}"
+    },
+    "modelPicker": {
+      "title": "Pilih model",
+      "searchPlaceholder": "Cari model...",
+      "noModels": "Tidak ada model tersedia",
+      "noModelsDescription": "Tidak ada model yang tersedia untuk dipilih."
+    },
+    "modelSelector": {
+      "model": "Model",
+      "provider": "Penyedia {{id}}",
+      "modelId": "Model {{id}}",
+      "unavailable": "Tidak tersedia",
+      "unavailableState": "tidak tersedia",
+      "selectedState": "dipilih",
+      "thinkingEffort": "Upaya berpikir",
+      "thinkingEffortAccessibility": "Upaya berpikir {{label}}",
+      "thinkingEffortSelected": "Upaya berpikir {{label}}, dipilih",
+      "thinkingEffortWithModel": "{{model}}, upaya berpikir {{variant}}",
+      "lockedByAgent": ", Dikunci oleh agen \"{{agent}}\"",
+      "addToFavorites": "Tambahkan {{name}} ke favorit",
+      "removeFromFavorites": "Hapus {{name}} dari favorit",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Med"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Gagal membuka file. Coba lagi.",
+      "retryUploading": "Coba lagi mengunggah {{filename}}",
+      "removeAttachment": "Hapus lampiran {{filename}}",
+      "uploading": "Mengunggah…",
+      "uploaded": "Terunggah",
+      "uploadFailedRetry": "Unggahan gagal. Ketuk untuk mencoba lagi.",
+      "uploadFailedTerminal": "File ini tidak dapat diunggah."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Tempel gambar dari papan klip",
+      "label": "Gambar terdeteksi, ketuk untuk menempel"
+    },
+    "attachmentPicker": {
+      "camera": "Kamera",
+      "photoLibrary": "Perpustakaan Foto",
+      "files": "File",
+      "cameraAccessDisabled": "Akses Kamera Dinonaktifkan",
+      "cameraAccessMessage": "Izinkan akses kamera di Pengaturan untuk mengambil foto."
+    },
+    "composer": {
+      "addAttachment": "Tambah lampiran",
+      "removeOrRetryFailed": "Hapus atau coba lagi lampiran yang gagal terlebih dahulu.",
+      "attachmentsWithSlashCommands": "Lampiran tidak dapat dikirim dengan perintah garis miring.",
+      "photoMetadataNotRemoved": "Metadata foto tidak dapat dihapus dari lampiran.",
+      "waitForUploads": "Tunggu lampiran selesai diunggah.",
+      "pasteFromClipboard": "Tempel dari papan klip",
+      "stopGenerating": "Hentikan pembuatan",
+      "sendMessage": "Kirim pesan"
+    },
+    "chatLink": {
+      "linkCopied": "Tautan disalin",
+      "reviewPr": "Tinjau PR",
+      "openLink": "Buka tautan",
+      "copyLink": "Salin tautan",
+      "shareLink": "Bagikan tautan",
+      "share": "Bagikan",
+      "prLinkActions": "Tindakan tautan PR",
+      "linkActions": "Tindakan tautan",
+      "couldNotCopyLink": "Tidak dapat menyalin tautan",
+      "couldNotShareLink": "Tidak dapat membagikan tautan",
+      "opensInBrowser": "Terbuka di browser",
+      "showLinkActions": "Tampilkan tindakan tautan"
+    },
+    "compaction": {
+      "contextCompacted": "Konteks dipadatkan"
+    },
+    "computeStatus": {
+      "exploring": "Menjelajahi",
+      "searchingCodebase": "Mencari basis kode",
+      "makingEdits": "Membuat perubahan",
+      "runningCommands": "Menjalankan perintah",
+      "searchingWeb": "Mencari di web",
+      "planningNextSteps": "Merencanakan langkah berikutnya",
+      "delegatingWork": "Mendelegasikan pekerjaan",
+      "askingQuestion": "Mengajukan pertanyaan",
+      "consideringNextSteps": "Mempertimbangkan langkah berikutnya",
+      "writingResponse": "Menulis respons"
+    },
+    "slashCommands": {
+      "startNewSession": "Mulai sesi baru",
+      "exitSession": "Keluar dari sesi",
+      "clearSession": "Akhiri sesi ini dan mulai yang baru",
+      "upgradeRequiredFallback": "Perbarui CLI Anda untuk menggunakan perintah ini.",
+      "exitCapabilityUnavailable": "Perbarui CLI Anda untuk keluar dari sesi.",
+      "clearCapabilityUnavailable": "Perbarui CLI Anda untuk memulai ulang sesi.",
+      "argumentError": "{{command}} tidak menerima argumen."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Ukuran jendela konteks tidak tersedia",
+      "tapToViewDetails": "Ketuk untuk melihat detail konteks.",
+      "costPrefix": "biaya {{cost}}",
+      "costSuffix": ", biaya {{cost}}",
+      "tokensWindowUnavailable": "Konteks {{used}} token, jendela tidak tersedia",
+      "tokensUsage": "Konteks {{used}} dari {{window}} token, {{percentage}}% digunakan"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Tautan ini tidak lagi valid.",
     "goBack": "Kembali",
     "title": "Halaman tidak ditemukan"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Konten dipotong",
+    "truncated": "Dipotong",
+    "wrap": "Bungkus",
+    "scroll": "Gulir"
   },
   "offline": {
     "noInternet": "Tidak ada koneksi internet",

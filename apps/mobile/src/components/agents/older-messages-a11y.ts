@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 type ShouldAnnounceOlderMessagesArrivalInputs = {
   wasInitialized: boolean;
   previousCount: number;
@@ -33,4 +35,6 @@ export function shouldAnnounceOlderMessagesArrival({
 }
 
 /** Screen-reader copy when an older page actually prepends items. */
-export const OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT = 'Earlier messages loaded';
+export function getOlderMessagesArrivedAnnouncement(): string {
+  return i18n.t('agentChat.olderMessages.arrived');
+}

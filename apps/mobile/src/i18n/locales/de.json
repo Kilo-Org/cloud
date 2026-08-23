@@ -16,6 +16,7 @@
     "refresh": "Aktualisieren",
     "couldNotRefresh": "Aktualisieren nicht möglich. Zum erneuten Versuch nach unten ziehen.",
     "openInBrowser": "Im Browser öffnen",
+    "openSettings": "Einstellungen öffnen",
     "copiedToClipboard": "In die Zwischenablage kopiert",
     "required": "erforderlich",
     "error": "Fehler: {{error}}"
@@ -399,6 +400,9 @@
       "title": "Ergebnisse filtern"
     }
   },
+  "agents": {
+    "activeNow": "Jetzt aktiv"
+  },
   "agentChat": {
     "session": {
       "title": "Sitzung",
@@ -411,14 +415,64 @@
       "notFound": "Nicht gefunden",
       "notFoundDescription": "Dieses Element wurde möglicherweise entfernt oder ist nicht mehr verfügbar."
     },
+    "remoteSession": {
+      "failedToCreate": "Remote-Sitzung konnte nicht erstellt werden",
+      "exited": "Sitzung beendet",
+      "failedToExit": "Sitzung konnte nicht beendet werden"
+    },
     "newSession": {
-      "title": "Neue Sitzung"
+      "title": "Neue Sitzung",
+      "repository": "Repository",
+      "couldNotLoadRepositories": "Repositories konnten nicht geladen werden",
+      "connectGithub": "GitHub verbinden",
+      "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
+      "openGithub": "GitHub öffnen",
+      "refreshRepositories": "Repositories aktualisieren",
+      "githubConnectionNotVisible": "Wir können deine GitHub-Verbindung noch nicht sehen",
+      "githubConnectionNotVisibleDescription": "Wenn du die Kilo GitHub App installiert oder konfiguriert hast, prüfe erneut — oder stelle sicher, dass sie für dieses Konto/diese Organisation installiert wurde.",
+      "checkAgain": "Erneut prüfen",
+      "githubConnected": "GitHub verbunden",
+      "noRepositoriesVisible": "Keine Repositories sichtbar. Prüfe den Repository-Zugriff für die Kilo GitHub App und aktualisiere dann.",
+      "runOnWithTarget": "Ausführen auf: {{target}}",
+      "environment": "Umgebung",
+      "couldNotLoadEnvironment": "Deine Umgebung konnte nicht geladen werden",
+      "retryLoadingEnvironment": "Laden der Umgebung erneut versuchen",
+      "defaultEnvironment": "Standardumgebung",
+      "environmentSummary": "{{commands}} Befehle · {{mcp}} MCP · {{skills}} Skills · {{agents}} Agenten",
+      "changes": "Änderungen",
+      "leaveChanges": "Änderungen belassen",
+      "commitAndPush": "Committen und pushen",
+      "startSession": "Sitzung starten",
+      "promptPlaceholder": "Woran möchtest du arbeiten?",
+      "addAttachment": "Anhang hinzufügen",
+      "couldNotLoadModels": "Modelle konnten nicht geladen werden",
+      "prefillRepoAndModelUnavailable": "Das Repository und das Modell der ursprünglichen Sitzung sind nicht mehr verfügbar. Wähle sie unten aus.",
+      "prefillRepoUnavailable": "{{repo}} ist nicht mehr verfügbar. Wähle unten ein Repository aus.",
+      "prefillModelUnavailable": "{{model}} ist nicht mehr verfügbar. Dein Standardmodell wird verwendet."
+    },
+    "partRenderer": {
+      "updatedFile": "{{count}} Datei aktualisiert",
+      "updatedFiles": "{{count}} Dateien aktualisiert"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "Zeilen {{start}}–{{end}} (abgeschnitten)",
+      "linesOf": "Zeilen {{start}}–{{end}} von {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "Cloud-Agent {{action}} fehlgeschlagen ({{status}})",
+      "failed": "Cloud-Agent {{action}} fehlgeschlagen"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[nicht serialisierbare Eingabe]",
+      "errorPrefix": "Fehler: {{error}}"
     },
     "instancePicker": {
       "runOn": "Ausführen auf",
+      "runOnAccessibility": "Ausführen auf: {{label}}",
       "couldNotLoad": "Instanzen konnten nicht geladen werden",
       "couldNotLoadDescription": "Prüfe deine Verbindung und versuche es erneut.",
       "cloudAgent": "Cloud-Agent",
+      "loading": "Wird geladen…",
       "cloudAgentDescription": "In Kilos Cloud-Sandbox ausführen",
       "noCliInstances": "Keine CLI-Instanzen verbunden",
       "noCliInstancesDescription": "Führe `kilo remote` in einem Projekt auf deinem Computer aus, oder aktualisiere die Kilo CLI, falls bereits eine läuft.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "Benutzerdefinierte Modi"
     },
+    "modeSelector": {
+      "accessibility": "Modus: {{label}}"
+    },
+    "modeOptions": {
+      "code": "Code",
+      "plan": "Plan",
+      "debug": "Debug",
+      "orchestrator": "Orchestrator",
+      "ask": "Fragen",
+      "codeDescription": "Code schreiben und ändern",
+      "planDescription": "Lösungen planen und entwerfen",
+      "debugDescription": "Probleme finden und beheben",
+      "orchestratorDescription": "Komplexe Aufgaben koordinieren",
+      "askDescription": "Antworten und Erklärungen erhalten"
+    },
     "repoPicker": {
       "title": "Repository wählen",
       "searchLabel": "Repositories suchen",
@@ -439,6 +508,279 @@
       "noRepositories": "Keine Repositories verfügbar",
       "noRepositoriesDescription": "Mit deinem Konto sind keine Repositories verbunden.",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff."
+    },
+    "messageDetails": {
+      "title": "Nachrichtendetails",
+      "copyMessage": "Nachricht kopieren",
+      "selectText": "Text auswählen",
+      "reportAiResponse": "KI-Antwort melden",
+      "reportAiResponseConfirm": "Diese Antwort zur Überprüfung melden?",
+      "report": "Melden",
+      "role": "Rolle",
+      "roleUser": "Nutzer",
+      "roleAssistant": "Assistent",
+      "sent": "Gesendet",
+      "model": "Modell",
+      "costAndTokens": "Kosten & Tokens",
+      "cost": "Kosten",
+      "input": "Eingabe",
+      "output": "Ausgabe",
+      "reasoning": "Denken",
+      "cacheRead": "Cache gelesen",
+      "cacheWrite": "Cache geschrieben",
+      "total": "Gesamt"
+    },
+    "partDetail": {
+      "detailsUnavailable": "Details nicht verfügbar",
+      "textDisplay": "Textanzeige",
+      "thinking": "Denken",
+      "thought": "Gedanke",
+      "title": "Details",
+      "showDetails": "Details anzeigen"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "Inhalt konnte nicht gerendert werden"
+    },
+    "messageFailure": {
+      "deliveryTitle": "Zustellung fehlgeschlagen",
+      "deliveryInterrupted": "Du hast diese Nachricht gestoppt.",
+      "deliveryExhausted": "Wir konnten diese Nachricht nach mehreren Versuchen nicht zustellen.",
+      "deliveryExecution": "Der Agent konnte diese Nachricht nicht ausführen.",
+      "assistantTitle": "Antwort fehlgeschlagen",
+      "assistantProviderRejected": "Der Anbieter hat die Anfrage abgelehnt.",
+      "assistantStopped": "Die Antwort wurde gestoppt.",
+      "assistantContextOverflow": "Die Unterhaltung ist zu lang für das Modell.",
+      "assistantFailed": "Die Antwort ist fehlgeschlagen.",
+      "sendFailed": "Nachricht konnte nicht gesendet werden. Bitte versuche es erneut."
+    },
+    "filePart": {
+      "loadingImage": "Bild wird geladen",
+      "imageUnavailableRetry": "Bild nicht verfügbar, Laden erneut versuchen",
+      "imageUnavailable": "Bild nicht verfügbar",
+      "imageUnavailableWithAlt": "Bild nicht verfügbar {{alt}}",
+      "viewImage": "Bild ansehen",
+      "viewImageWithAlt": "Bild ansehen {{alt}}",
+      "imageOutput": "Bildausgabe",
+      "imageOutputWithFilename": "Bildausgabe, {{filename}}",
+      "defaultName": "Datei",
+      "openFullScreen": "{{name}} im Vollbild öffnen",
+      "preview": "Vorschau {{name}}",
+      "openFile": "{{name}} öffnen",
+      "couldNotLoadFile": "Diese Datei konnte nicht geladen werden.",
+      "couldNotLoadFileRetry": "Diese Datei konnte nicht geladen werden. Versuche es erneut.",
+      "retryLoadingFile": "Laden der Datei erneut versuchen",
+      "fileEmpty": "Diese Datei ist leer.",
+      "previewUnavailable": "Vorschau nicht verfügbar",
+      "shareFailed": "Teilen fehlgeschlagen",
+      "sharingUnavailable": "Dateifreigabe ist auf diesem Gerät nicht verfügbar.",
+      "shareFailedRetry": "Datei konnte nicht geteilt werden. Bitte versuche es erneut.",
+      "openAsText": "Als Text öffnen",
+      "openInExternalApp": "In externer App öffnen"
+    },
+    "preparation": {
+      "exitCode": "Exit-Code: {{code}}",
+      "earlierOutputOmitted": "Frühere Ausgabe ausgelassen",
+      "preparingEnvironment": "Umgebung wird vorbereitet",
+      "preparationComplete": "Vorbereitung abgeschlossen",
+      "preparationFailed": "Vorbereitung fehlgeschlagen",
+      "setupCommand": "Einrichtungsbefehl {{index}}",
+      "setupCommandOf": "Einrichtungsbefehl {{index}} von {{count}}"
+    },
+    "permissionCard": {
+      "title": "Berechtigung erforderlich",
+      "allowQuestion": "{{permission}} erlauben?",
+      "appliesTo": "Gilt für:",
+      "denyPermission": "Berechtigung verweigern",
+      "deny": "Verweigern",
+      "allowOnce": "Einmal erlauben",
+      "allowOnceAccessibility": "Einmal erlauben",
+      "alwaysAllow": "Immer erlauben",
+      "alwaysAllowAccessibility": "Immer erlauben",
+      "retrying": "Erneuter Versuch…"
+    },
+    "questionCard": {
+      "title": "Agent benötigt Eingabe",
+      "skipQuestionsTitle": "Fragen überspringen?",
+      "skipQuestionsMessage": "Der Agent überspringt diesen Schritt.",
+      "selectAllThatApply": "Alles Zutreffende auswählen",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, ausgewählt",
+      "typeYourOwnAnswer": "Eigene Antwort eingeben",
+      "typeYourOwnAnswerPlaceholder": "Eigene Antwort eingeben…",
+      "skip": "Überspringen",
+      "retrySkip": "Überspringen erneut versuchen",
+      "submitting": "Wird gesendet…",
+      "sendAnswers": "Antworten senden"
+    },
+    "blockingCard": {
+      "questionUnavailable": "Diese Frage ist nicht mehr verfügbar.",
+      "permissionUnavailable": "Diese Berechtigungsanfrage ist nicht mehr verfügbar.",
+      "failedToSkipQuestion": "Frage konnte nicht übersprungen werden. Bitte versuche es erneut.",
+      "failedToSubmitAnswer": "Antwort konnte nicht gesendet werden. Bitte versuche es erneut.",
+      "failedToRespondToPermission": "Antwort auf die Berechtigung konnte nicht gesendet werden. Bitte versuche es erneut.",
+      "submissionFailed": "Senden fehlgeschlagen. Bitte versuche es erneut.",
+      "questionAnnouncement": "Der Agent benötigt deine Eingabe. Der Composer ist pausiert, während du antwortest.",
+      "permissionAnnouncement": "Der Agent benötigt eine Berechtigung, um fortzufahren. Der Composer ist pausiert, während du entscheidest.",
+      "positionHint": "(1 von {{count}})",
+      "movedPastPrompt": "Der Agent ist über diesen Prompt hinausgegangen. Diese Karte schließt sich, wenn die Sitzung fortgesetzt wird.",
+      "waitingForAnswer": "Der Agent wartet auf deine Antwort. Solange diese Frage offen ist, ist deine Nachricht an den Agenten pausiert.",
+      "waitingForPermission": "Der Agent wartet auf eine Berechtigung. Solange diese Anfrage offen ist, ist deine Nachricht an den Agenten pausiert."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "Maximale Verschachtelungstiefe erreicht.",
+      "modelAccessibility": "Modell: {{modelLabel}}",
+      "openHint": "Subagent-Sitzung öffnen",
+      "subagent": "Subagent",
+      "task": "Aufgabe",
+      "waitingForActivity": "Warte auf Aktivität"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "Subagent-Sitzung konnte nicht geladen werden",
+      "failed": "Subagent-Sitzung fehlgeschlagen",
+      "noMessages": "Keine Subagent-Nachrichten",
+      "noMessagesDescription": "Diese Subagent-Sitzung wurde abgeschlossen, ohne ein Protokoll zu erzeugen.",
+      "loading": "Subagent-Sitzung wird geladen",
+      "loadingDescription": "Warte auf Subagent-Nachrichten…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. Erneuter Versuch verfügbar.",
+      "copyToComposer": "In Composer kopieren",
+      "queued": "In Warteschlange",
+      "queuedAccessibility": "Nachricht in Warteschlange",
+      "userMessage": "Nutzer-Nachricht",
+      "assistantMessage": "Assistenten-Nachricht",
+      "longPressHint": "Lange drücken für Nachrichtendetails"
+    },
+    "olderMessages": {
+      "arrived": "Frühere Nachrichten geladen"
+    },
+    "markdownTable": {
+      "viewTable": "Tabelle ansehen",
+      "title": "Tabelle",
+      "close": "Tabelle schließen",
+      "column": "Spalte",
+      "columns": "Spalten",
+      "row": "Zeile",
+      "rows": "Zeilen",
+      "opensFullScreen": "öffnet Vollbild"
+    },
+    "sessionFilter": {
+      "title": "Sitzungen filtern",
+      "sortBy": "Sortieren nach",
+      "sortLastUpdated": "Zuletzt aktualisiert",
+      "sortCreated": "Erstellt",
+      "platform": "Plattform",
+      "platformCloud": "Cloud",
+      "platformExtension": "Erweiterung",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "Sonstige",
+      "project": "Projekt",
+      "removeProjectFilter": "{{label}}-Projektfilter entfernen",
+      "removePlatformFilter": "{{label}}-Plattformfilter entfernen"
+    },
+    "modelPicker": {
+      "title": "Modell wählen",
+      "searchPlaceholder": "Modelle suchen...",
+      "noModels": "Keine Modelle verfügbar",
+      "noModelsDescription": "Keine Modelle zum Auswählen verfügbar."
+    },
+    "modelSelector": {
+      "model": "Modell",
+      "provider": "Anbieter {{id}}",
+      "modelId": "Modell {{id}}",
+      "unavailable": "Nicht verfügbar",
+      "unavailableState": "nicht verfügbar",
+      "selectedState": "ausgewählt",
+      "thinkingEffort": "Denkaufwand",
+      "thinkingEffortAccessibility": "{{label}} Denkaufwand",
+      "thinkingEffortSelected": "{{label}} Denkaufwand, ausgewählt",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} Denkaufwand",
+      "lockedByAgent": ", Vom Agenten gesperrt \"{{agent}}\"",
+      "addToFavorites": "{{name}} zu Favoriten hinzufügen",
+      "removeFromFavorites": "{{name}} aus Favoriten entfernen",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "Mittel"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "Datei konnte nicht geöffnet werden. Bitte versuche es erneut.",
+      "retryUploading": "Hochladen von {{filename}} erneut versuchen",
+      "removeAttachment": "Anhang {{filename}} entfernen",
+      "uploading": "Wird hochgeladen…",
+      "uploaded": "Hochgeladen",
+      "uploadFailedRetry": "Hochladen fehlgeschlagen. Zum erneuten Versuch tippen.",
+      "uploadFailedTerminal": "Diese Datei kann nicht hochgeladen werden."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "Bild aus der Zwischenablage einfügen",
+      "label": "Bild erkannt, zum Einfügen tippen"
+    },
+    "attachmentPicker": {
+      "camera": "Kamera",
+      "photoLibrary": "Fotomediathek",
+      "files": "Dateien",
+      "cameraAccessDisabled": "Kamerazugriff deaktiviert",
+      "cameraAccessMessage": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen."
+    },
+    "composer": {
+      "addAttachment": "Anhang hinzufügen",
+      "removeOrRetryFailed": "Entferne zuerst fehlgeschlagene Anhänge oder versuche sie erneut.",
+      "attachmentsWithSlashCommands": "Anhänge können nicht mit Slash-Befehlen gesendet werden.",
+      "photoMetadataNotRemoved": "Fotometadaten konnten nicht aus einem Anhang entfernt werden.",
+      "waitForUploads": "Warte, bis die Anhänge hochgeladen sind.",
+      "pasteFromClipboard": "Aus der Zwischenablage einfügen",
+      "stopGenerating": "Generieren stoppen",
+      "sendMessage": "Nachricht senden"
+    },
+    "chatLink": {
+      "linkCopied": "Link kopiert",
+      "reviewPr": "PR prüfen",
+      "openLink": "Link öffnen",
+      "copyLink": "Link kopieren",
+      "shareLink": "Link teilen",
+      "share": "Teilen",
+      "prLinkActions": "PR-Link-Aktionen",
+      "linkActions": "Link-Aktionen",
+      "couldNotCopyLink": "Link konnte nicht kopiert werden",
+      "couldNotShareLink": "Link konnte nicht geteilt werden",
+      "opensInBrowser": "Öffnet im Browser",
+      "showLinkActions": "Link-Aktionen anzeigen"
+    },
+    "compaction": {
+      "contextCompacted": "Kontext komprimiert"
+    },
+    "computeStatus": {
+      "exploring": "Erkunden",
+      "searchingCodebase": "Codebasis durchsuchen",
+      "makingEdits": "Änderungen vornehmen",
+      "runningCommands": "Befehle ausführen",
+      "searchingWeb": "Web durchsuchen",
+      "planningNextSteps": "Nächste Schritte planen",
+      "delegatingWork": "Arbeit delegieren",
+      "askingQuestion": "Frage stellen",
+      "consideringNextSteps": "Nächste Schritte abwägen",
+      "writingResponse": "Antwort schreiben"
+    },
+    "slashCommands": {
+      "startNewSession": "Neue Sitzung starten",
+      "exitSession": "Sitzung beenden",
+      "clearSession": "Diese Sitzung beenden und eine neue starten",
+      "upgradeRequiredFallback": "Bitte aktualisiere deine CLI, um diesen Befehl zu verwenden.",
+      "exitCapabilityUnavailable": "Aktualisiere deine CLI, um die Sitzung zu beenden.",
+      "clearCapabilityUnavailable": "Aktualisiere deine CLI, um die Sitzung neu zu starten.",
+      "argumentError": "{{command}} akzeptiert keine Argumente."
+    },
+    "contextUsage": {
+      "windowUnavailable": "Kontextfenstergröße nicht verfügbar",
+      "tapToViewDetails": "Tippe, um Kontextdetails anzusehen.",
+      "costPrefix": "Kosten {{cost}}",
+      "costSuffix": ", Kosten {{cost}}",
+      "tokensWindowUnavailable": "Kontext {{used}} Tokens, Fenster nicht verfügbar",
+      "tokensUsage": "Kontext {{used}} von {{window}} Tokens, {{percentage}}% verwendet"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "Dieser Link ist nicht mehr gültig.",
     "goBack": "Zurück",
     "title": "Seite nicht gefunden"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "Inhalt abgeschnitten",
+    "truncated": "Abgeschnitten",
+    "wrap": "Umbruch",
+    "scroll": "Scrollen"
   },
   "offline": {
     "noInternet": "Keine Internetverbindung",

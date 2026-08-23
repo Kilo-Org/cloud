@@ -16,6 +16,7 @@
     "refresh": "רענן",
     "couldNotRefresh": "לא ניתן היה לרענן. משוך למטה כדי לנסות שוב.",
     "openInBrowser": "פתח בדפדפן",
+    "openSettings": "פתח הגדרות",
     "copiedToClipboard": "הועתק ללוח",
     "required": "חובה",
     "error": "שגיאה: {{error}}"
@@ -399,6 +400,9 @@
       "title": "סנן ממצאים"
     }
   },
+  "agents": {
+    "activeNow": "פעיל כעת"
+  },
   "agentChat": {
     "session": {
       "title": "הפעלה",
@@ -411,14 +415,64 @@
       "notFound": "לא נמצא",
       "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד."
     },
+    "remoteSession": {
+      "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",
+      "exited": "ההפעלה הסתיימה",
+      "failedToExit": "לא ניתן היה לצאת מההפעלה"
+    },
     "newSession": {
-      "title": "הפעלה חדשה"
+      "title": "הפעלה חדשה",
+      "repository": "מאגר",
+      "couldNotLoadRepositories": "לא ניתן היה לטעון מאגרים",
+      "connectGithub": "חבר GitHub",
+      "connectGithubDescription": "חבר את GitHub בדפדפן שלך, ואז חזור לכאן כדי לבחור מאגר.",
+      "openGithub": "פתח GitHub",
+      "refreshRepositories": "רענן מאגרים",
+      "githubConnectionNotVisible": "אנחנו עדיין לא רואים את חיבור ה-GitHub שלך",
+      "githubConnectionNotVisibleDescription": "אם התקנת או הגדרת את אפליקציית Kilo GitHub, בדוק שוב — או ודא שהיא הותקנה עבור החשבון/הארגון הזה.",
+      "checkAgain": "בדוק שוב",
+      "githubConnected": "GitHub מחובר",
+      "noRepositoriesVisible": "לא נראים מאגרים. בדוק את גישת המאגרים של אפליקציית Kilo GitHub, ואז רענן.",
+      "runOnWithTarget": "הרץ על: {{target}}",
+      "environment": "סביבה",
+      "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך",
+      "retryLoadingEnvironment": "נסה שוב לטעון את הסביבה",
+      "defaultEnvironment": "סביבת ברירת מחדל",
+      "environmentSummary": "{{commands}} פקודות · {{mcp}} MCP · {{skills}} מיומנויות · {{agents}} סוכנים",
+      "changes": "שינויים",
+      "leaveChanges": "השאר שינויים",
+      "commitAndPush": "Commit ודחיפה",
+      "startSession": "התחל הפעלה",
+      "promptPlaceholder": "על מה תרצה לעבוד?",
+      "addAttachment": "הוסף קובץ מצורף",
+      "couldNotLoadModels": "לא ניתן היה לטעון דגמים",
+      "prefillRepoAndModelUnavailable": "המאגר והדגם של ההפעלה המקורית אינם זמינים עוד. בחר אותם למטה.",
+      "prefillRepoUnavailable": "{{repo}} אינו זמין עוד. בחר מאגר למטה.",
+      "prefillModelUnavailable": "{{model}} אינו זמין עוד. נעשה שימוש בדגם ברירת המחדל שלך."
+    },
+    "partRenderer": {
+      "updatedFile": "עודכן {{count}} קובץ",
+      "updatedFiles": "עודכנו {{count}} קבצים"
+    },
+    "readToolMarkdown": {
+      "linesTruncated": "שורות {{start}}–{{end}} (קטום)",
+      "linesOf": "שורות {{start}}–{{end}} מתוך {{total}}"
+    },
+    "mobileSessionDiagnostics": {
+      "failedWithStatus": "סוכן הענן {{action}} נכשל ({{status}})",
+      "failed": "סוכן הענן {{action}} נכשל"
+    },
+    "collectCopyableText": {
+      "unserializableInput": "[קלט שאינו ניתן לסריאליזציה]",
+      "errorPrefix": "שגיאה: {{error}}"
     },
     "instancePicker": {
       "runOn": "הרץ על",
+      "runOnAccessibility": "הרץ על: {{label}}",
       "couldNotLoad": "לא ניתן לטעון מופעים",
       "couldNotLoadDescription": "בדוק את החיבור שלך ונסה שוב.",
       "cloudAgent": "סוכן ענן",
+      "loading": "טוען…",
       "cloudAgentDescription": "הרץ על ארגז החול בענן של Kilo",
       "noCliInstances": "אין מופעי CLI מחוברים",
       "noCliInstancesDescription": "הרץ `kilo remote` בפרויקט במחשב שלך, או עדכן את Kilo CLI אם אחד כבר פועל.",
@@ -431,6 +485,21 @@
       "modeLabel": "{{label}}: {{description}}",
       "customModes": "מצבים מותאמים אישית"
     },
+    "modeSelector": {
+      "accessibility": "מצב: {{label}}"
+    },
+    "modeOptions": {
+      "code": "קוד",
+      "plan": "תכנון",
+      "debug": "ניפוי שגיאות",
+      "orchestrator": "מתזמר",
+      "ask": "שאל",
+      "codeDescription": "כתוב ושנה קוד",
+      "planDescription": "תכנן ועצב פתרונות",
+      "debugDescription": "מצא ותקן בעיות",
+      "orchestratorDescription": "תאם משימות מורכבות",
+      "askDescription": "קבל תשובות והסברים"
+    },
     "repoPicker": {
       "title": "בחר מאגר",
       "searchLabel": "חפש מאגרים",
@@ -439,6 +508,279 @@
       "noRepositories": "אין מאגרים זמינים",
       "noRepositoriesDescription": "לא מחוברים מאגרים לחשבון שלך.",
       "tryDifferentSearch": "נסה מונח חיפוש אחר."
+    },
+    "messageDetails": {
+      "title": "פרטי הודעה",
+      "copyMessage": "העתק הודעה",
+      "selectText": "בחר טקסט",
+      "reportAiResponse": "דווח על תשובת AI",
+      "reportAiResponseConfirm": "לדווח על התשובה הזו לסקירה?",
+      "report": "דווח",
+      "role": "תפקיד",
+      "roleUser": "משתמש",
+      "roleAssistant": "עוזר",
+      "sent": "נשלח",
+      "model": "דגם",
+      "costAndTokens": "עלות ואסימונים",
+      "cost": "עלות",
+      "input": "קלט",
+      "output": "פלט",
+      "reasoning": "חשיבה",
+      "cacheRead": "קריאת מטמון",
+      "cacheWrite": "כתיבת מטמון",
+      "total": "סה״כ"
+    },
+    "partDetail": {
+      "detailsUnavailable": "הפרטים אינם זמינים",
+      "textDisplay": "תצוגת טקסט",
+      "thinking": "חשיבה",
+      "thought": "מחשבה",
+      "title": "פרטים",
+      "showDetails": "הצג פרטים"
+    },
+    "messageErrorBoundary": {
+      "failedToRender": "לא ניתן היה להציג תוכן"
+    },
+    "messageFailure": {
+      "deliveryTitle": "המסירה נכשלה",
+      "deliveryInterrupted": "עצרת את ההודעה הזו.",
+      "deliveryExhausted": "לא הצלחנו למסור את ההודעה הזו לאחר מספר ניסיונות.",
+      "deliveryExecution": "הסוכן לא הצליח להריץ את ההודעה הזו.",
+      "assistantTitle": "התשובה נכשלה",
+      "assistantProviderRejected": "הספק דחה את הבקשה.",
+      "assistantStopped": "התשובה הופסקה.",
+      "assistantContextOverflow": "השיחה ארוכה מדי עבור הדגם.",
+      "assistantFailed": "התשובה נכשלה.",
+      "sendFailed": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
+    },
+    "filePart": {
+      "loadingImage": "טוען תמונה",
+      "imageUnavailableRetry": "התמונה אינה זמינה, נסה שוב לטעון",
+      "imageUnavailable": "התמונה אינה זמינה",
+      "imageUnavailableWithAlt": "התמונה אינה זמינה {{alt}}",
+      "viewImage": "צפה בתמונה",
+      "viewImageWithAlt": "צפה בתמונה {{alt}}",
+      "imageOutput": "פלט תמונה",
+      "imageOutputWithFilename": "פלט תמונה, {{filename}}",
+      "defaultName": "קובץ",
+      "openFullScreen": "פתח את {{name}} במסך מלא",
+      "preview": "תצוגה מקדימה של {{name}}",
+      "openFile": "פתח את {{name}}",
+      "couldNotLoadFile": "לא ניתן היה לטעון את הקובץ הזה.",
+      "couldNotLoadFileRetry": "לא ניתן היה לטעון את הקובץ הזה. נסה שוב.",
+      "retryLoadingFile": "נסה שוב לטעון את הקובץ",
+      "fileEmpty": "הקובץ הזה ריק.",
+      "previewUnavailable": "תצוגה מקדימה אינה זמינה",
+      "shareFailed": "השיתוף נכשל",
+      "sharingUnavailable": "שיתוף קבצים אינו זמין במכשיר הזה.",
+      "shareFailedRetry": "לא ניתן היה לשתף את הקובץ. נסה שוב.",
+      "openAsText": "פתח כטקסט",
+      "openInExternalApp": "פתח באפליקציה חיצונית"
+    },
+    "preparation": {
+      "exitCode": "קוד יציאה: {{code}}",
+      "earlierOutputOmitted": "פלט קודם הושמט",
+      "preparingEnvironment": "מכין סביבה",
+      "preparationComplete": "ההכנה הושלמה",
+      "preparationFailed": "ההכנה נכשלה",
+      "setupCommand": "פקודת הגדרה {{index}}",
+      "setupCommandOf": "פקודת הגדרה {{index}} מתוך {{count}}"
+    },
+    "permissionCard": {
+      "title": "נדרשת הרשאה",
+      "allowQuestion": "לאפשר {{permission}}?",
+      "appliesTo": "חל על:",
+      "denyPermission": "דחה הרשאה",
+      "deny": "דחה",
+      "allowOnce": "אפשר פעם אחת",
+      "allowOnceAccessibility": "אפשר פעם אחת",
+      "alwaysAllow": "אפשר תמיד",
+      "alwaysAllowAccessibility": "אפשר תמיד",
+      "retrying": "מנסה שוב…"
+    },
+    "questionCard": {
+      "title": "הסוכן זקוק לקלט",
+      "skipQuestionsTitle": "לדלג על השאלות?",
+      "skipQuestionsMessage": "הסוכן ידלג על השלב הזה.",
+      "selectAllThatApply": "בחר את כל הרלוונטי",
+      "option": "{{label}}",
+      "optionSelected": "{{label}}, נבחר",
+      "typeYourOwnAnswer": "הקלד תשובה משלך",
+      "typeYourOwnAnswerPlaceholder": "הקלד תשובה משלך…",
+      "skip": "דלג",
+      "retrySkip": "נסה שוב לדלג",
+      "submitting": "שולח…",
+      "sendAnswers": "שלח תשובות"
+    },
+    "blockingCard": {
+      "questionUnavailable": "השאלה הזו אינה זמינה עוד.",
+      "permissionUnavailable": "בקשת ההרשאה הזו אינה זמינה עוד.",
+      "failedToSkipQuestion": "לא ניתן היה לדלג על השאלה. נסה שוב.",
+      "failedToSubmitAnswer": "לא ניתן היה לשלוח את התשובה. נסה שוב.",
+      "failedToRespondToPermission": "לא ניתן היה להגיב להרשאה. נסה שוב.",
+      "submissionFailed": "השליחה נכשלה. נסה שוב.",
+      "questionAnnouncement": "הסוכן זקוק לקלט שלך. המחבר מושהה בזמן שאתה עונה.",
+      "permissionAnnouncement": "הסוכן זקוק להרשאה כדי להמשיך. המחבר מושהה בזמן שאתה מחליט.",
+      "positionHint": "(1 מתוך {{count}})",
+      "movedPastPrompt": "הסוכן עבר מעבר להנחיה הזו. הכרטיס הזה ייסגר כשההפעלה תמשיך.",
+      "waitingForAnswer": "הסוכן ממתין לתשובתך. בזמן שהשאלה הזו פתוחה, ההודעה שלך לסוכן מושהה.",
+      "waitingForPermission": "הסוכן ממתין להרשאה. בזמן שהבקשה הזו פתוחה, ההודעה שלך לסוכן מושהה."
+    },
+    "childSession": {
+      "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
+      "maxNestingDepth": "הגעת לעומק הקינון המרבי.",
+      "modelAccessibility": "דגם: {{modelLabel}}",
+      "openHint": "פתח הפעלת תת-סוכן",
+      "subagent": "תת-סוכן",
+      "task": "משימה",
+      "waitingForActivity": "ממתין לפעילות"
+    },
+    "childSessionSheet": {
+      "couldNotLoad": "לא ניתן היה לטעון הפעלת תת-סוכן",
+      "failed": "הפעלת תת-הסוכן נכשלה",
+      "noMessages": "אין הודעות תת-סוכן",
+      "noMessagesDescription": "הפעלת תת-הסוכן הזו הושלמה ללא תמליל.",
+      "loading": "טוען הפעלת תת-סוכן",
+      "loadingDescription": "ממתין להודעות תת-סוכן…"
+    },
+    "messageBubble": {
+      "failure": "{{title}}.",
+      "failureRetryAvailable": "{{title}}. ניתן לנסות שוב.",
+      "copyToComposer": "העתק למחבר",
+      "queued": "בתור",
+      "queuedAccessibility": "ההודעה בתור",
+      "userMessage": "הודעת משתמש",
+      "assistantMessage": "הודעת עוזר",
+      "longPressHint": "לחיצה ארוכה לפרטי ההודעה"
+    },
+    "olderMessages": {
+      "arrived": "הודעות קודמות נטענו"
+    },
+    "markdownTable": {
+      "viewTable": "צפה בטבלה",
+      "title": "טבלה",
+      "close": "סגור טבלה",
+      "column": "עמודה",
+      "columns": "עמודות",
+      "row": "שורה",
+      "rows": "שורות",
+      "opensFullScreen": "נפתח במסך מלא"
+    },
+    "sessionFilter": {
+      "title": "סנן הפעלות",
+      "sortBy": "מיין לפי",
+      "sortLastUpdated": "עודכן לאחרונה",
+      "sortCreated": "נוצר",
+      "platform": "פלטפורמה",
+      "platformCloud": "ענן",
+      "platformExtension": "תוסף",
+      "platformCli": "CLI",
+      "platformSlack": "Slack",
+      "platformGithub": "GitHub",
+      "platformLinear": "Linear",
+      "platformOther": "אחר",
+      "project": "פרויקט",
+      "removeProjectFilter": "הסר מסנן פרויקט {{label}}",
+      "removePlatformFilter": "הסר מסנן פלטפורמה {{label}}"
+    },
+    "modelPicker": {
+      "title": "בחר דגם",
+      "searchPlaceholder": "חפש דגמים...",
+      "noModels": "אין דגמים זמינים",
+      "noModelsDescription": "אין דגמים זמינים לבחירה."
+    },
+    "modelSelector": {
+      "model": "דגם",
+      "provider": "ספק {{id}}",
+      "modelId": "דגם {{id}}",
+      "unavailable": "לא זמין",
+      "unavailableState": "לא זמין",
+      "selectedState": "נבחר",
+      "thinkingEffort": "מאמץ חשיבה",
+      "thinkingEffortAccessibility": "{{label}} מאמץ חשיבה",
+      "thinkingEffortSelected": "{{label}} מאמץ חשיבה, נבחר",
+      "thinkingEffortWithModel": "{{model}}, {{variant}} מאמץ חשיבה",
+      "lockedByAgent": ", נעול על ידי הסוכן \"{{agent}}\"",
+      "addToFavorites": "הוסף את {{name}} למועדפים",
+      "removeFromFavorites": "הסר את {{name}} מהמועדפים",
+      "thinkingEffortXhigh": "XH",
+      "thinkingEffortMedium": "בינוני"
+    },
+    "attachmentPreview": {
+      "openFailedRetry": "לא ניתן היה לפתוח את הקובץ. נסה שוב.",
+      "retryUploading": "נסה שוב להעלות את {{filename}}",
+      "removeAttachment": "הסר קובץ מצורף {{filename}}",
+      "uploading": "מעלה…",
+      "uploaded": "הועלה",
+      "uploadFailedRetry": "ההעלאה נכשלה. הקש כדי לנסות שוב.",
+      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה."
+    },
+    "attachmentPasteHint": {
+      "accessibility": "הדבק תמונה מהלוח",
+      "label": "זוהתה תמונה, הקש כדי להדביק"
+    },
+    "attachmentPicker": {
+      "camera": "מצלמה",
+      "photoLibrary": "ספריית תמונות",
+      "files": "קבצים",
+      "cameraAccessDisabled": "גישת מצלמה מושבתת",
+      "cameraAccessMessage": "אפשר גישת מצלמה בהגדרות כדי לצלם תמונה."
+    },
+    "composer": {
+      "addAttachment": "הוסף קובץ מצורף",
+      "removeOrRetryFailed": "הסר או נסה שוב תחילה קבצים מצורפים שנכשלו.",
+      "attachmentsWithSlashCommands": "לא ניתן לשלוח קבצים מצורפים עם פקודות לוכסן.",
+      "photoMetadataNotRemoved": "לא ניתן היה להסיר מטא-נתוני תמונה מקובץ מצורף.",
+      "waitForUploads": "המתן לסיום העלאת הקבצים המצורפים.",
+      "pasteFromClipboard": "הדבק מהלוח",
+      "stopGenerating": "עצור יצירה",
+      "sendMessage": "שלח הודעה"
+    },
+    "chatLink": {
+      "linkCopied": "הקישור הועתק",
+      "reviewPr": "סקור PR",
+      "openLink": "פתח קישור",
+      "copyLink": "העתק קישור",
+      "shareLink": "שתף קישור",
+      "share": "שתף",
+      "prLinkActions": "פעולות קישור PR",
+      "linkActions": "פעולות קישור",
+      "couldNotCopyLink": "לא ניתן היה להעתיק את הקישור",
+      "couldNotShareLink": "לא ניתן היה לשתף את הקישור",
+      "opensInBrowser": "נפתח בדפדפן",
+      "showLinkActions": "הצג פעולות קישור"
+    },
+    "compaction": {
+      "contextCompacted": "ההקשר נדחס"
+    },
+    "computeStatus": {
+      "exploring": "חוקר",
+      "searchingCodebase": "מחפש בקוד",
+      "makingEdits": "מבצע עריכות",
+      "runningCommands": "מריץ פקודות",
+      "searchingWeb": "מחפש באינטרנט",
+      "planningNextSteps": "מתכנן את הצעדים הבאים",
+      "delegatingWork": "מאציל עבודה",
+      "askingQuestion": "שואל שאלה",
+      "consideringNextSteps": "שוקל את הצעדים הבאים",
+      "writingResponse": "כותב תשובה"
+    },
+    "slashCommands": {
+      "startNewSession": "התחל הפעלה חדשה",
+      "exitSession": "צא מההפעלה",
+      "clearSession": "סיים הפעלה זו והתחל הפעלה חדשה",
+      "upgradeRequiredFallback": "עדכן את ה-CLI שלך כדי להשתמש בפקודה זו.",
+      "exitCapabilityUnavailable": "עדכן את ה-CLI שלך כדי לצאת מההפעלה.",
+      "clearCapabilityUnavailable": "עדכן את ה-CLI שלך כדי להפעיל מחדש את ההפעלה.",
+      "argumentError": "{{command}} אינו מקבל ארגומנטים."
+    },
+    "contextUsage": {
+      "windowUnavailable": "גודל חלון ההקשר אינו זמין",
+      "tapToViewDetails": "הקש כדי לצפות בפרטי ההקשר.",
+      "costPrefix": "עלות {{cost}}",
+      "costSuffix": ", עלות {{cost}}",
+      "tokensWindowUnavailable": "הקשר {{used}} אסימונים, חלון אינו זמין",
+      "tokensUsage": "הקשר {{used}} מתוך {{window}} אסימונים, {{percentage}}% בשימוש"
     }
   },
   "bootstrap": {
@@ -503,6 +845,12 @@
     "description": "הקישור הזה אינו תקף עוד.",
     "goBack": "חזור אחורה",
     "title": "הדף לא נמצא"
+  },
+  "monoScrollBlock": {
+    "contentTruncated": "התוכן קוצר",
+    "truncated": "קטום",
+    "wrap": "גלישת שורות",
+    "scroll": "גלול"
   },
   "offline": {
     "noInternet": "אין חיבור לאינטרנט",

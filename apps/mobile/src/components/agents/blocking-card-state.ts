@@ -7,6 +7,7 @@
 
 import { type Component, type RefObject } from 'react';
 
+import { i18n } from '@/i18n';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { type BlockingInteraction } from './agent-interaction-policy';
@@ -173,8 +174,8 @@ export function classifyBlockingSubmissionError(
       kind: 'non-retryable',
       message:
         kind === 'question'
-          ? 'This question is no longer available.'
-          : 'This permission request is no longer available.',
+          ? i18n.t('agentChat.blockingCard.questionUnavailable')
+          : i18n.t('agentChat.blockingCard.permissionUnavailable'),
     };
   }
   return {
@@ -187,24 +188,24 @@ export function classifyBlockingSubmissionError(
 function buildRetryableMessage(kind: BlockingCardKind, action: BlockingCardRetryAction): string {
   if (kind === 'question') {
     return action === 'reject'
-      ? 'Failed to skip question. Please try again.'
-      : 'Failed to submit answer. Please try again.';
+      ? i18n.t('agentChat.blockingCard.failedToSkipQuestion')
+      : i18n.t('agentChat.blockingCard.failedToSubmitAnswer');
   }
-  return 'Failed to respond to permission. Please try again.';
+  return i18n.t('agentChat.blockingCard.failedToRespondToPermission');
 }
 
 function buildAnnouncement(kind: BlockingCardKind, state: BlockingCardUiState): string {
   if (state === 'non-retryable') {
     return kind === 'question'
-      ? 'This question is no longer available.'
-      : 'This permission request is no longer available.';
+      ? i18n.t('agentChat.blockingCard.questionUnavailable')
+      : i18n.t('agentChat.blockingCard.permissionUnavailable');
   }
   if (state === 'retryable') {
-    return 'Submission failed. Please try again.';
+    return i18n.t('agentChat.blockingCard.submissionFailed');
   }
   return kind === 'question'
-    ? 'Agent needs your input. The composer is paused while you answer.'
-    : 'Agent needs permission to continue. The composer is paused while you decide.';
+    ? i18n.t('agentChat.blockingCard.questionAnnouncement')
+    : i18n.t('agentChat.blockingCard.permissionAnnouncement');
 }
 
 /**
@@ -214,15 +215,17 @@ function buildAnnouncement(kind: BlockingCardKind, state: BlockingCardUiState): 
  * permissions, so the user sees every waiting request in one number.
  */
 export function formatBlockingCardTitle(baseTitle: string, count: number): string {
-  return count > 1 ? `${baseTitle} (1 of ${count})` : baseTitle;
+  return count > 1
+    ? `${baseTitle} ${i18n.t('agentChat.blockingCard.positionHint', { count })}`
+    : baseTitle;
 }
 
 function buildProtocolExplanation(kind: BlockingCardKind, state: BlockingCardUiState): string {
   if (state === 'non-retryable') {
-    return 'The agent has moved past this prompt. This card will close when the session continues.';
+    return i18n.t('agentChat.blockingCard.movedPastPrompt');
   }
   if (kind === 'question') {
-    return 'The agent is waiting for your answer. While this question is open, your message to the agent is paused.';
+    return i18n.t('agentChat.blockingCard.waitingForAnswer');
   }
-  return 'The agent is waiting for permission. While this request is open, your message to the agent is paused.';
+  return i18n.t('agentChat.blockingCard.waitingForPermission');
 }

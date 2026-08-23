@@ -98,18 +98,15 @@ export function collectEmptyChildSessionIds(
  * fetch failure (it writes an error status), so the retry reads the status
  * rather than catching a rejection.
  */
-// eslint-disable-next-line eslint/max-params -- the hydrate contract needs ids, hydrate, status reader, and the shared retried set
 export async function hydrateEmptyChildSessions(
   ids: readonly KiloSessionId[],
   hydrate: (id: KiloSessionId) => Promise<void>,
-  readHydrationStatus: (id: KiloSessionId) => string,
-  retried: Set<string>
+  readHydrationStatus: (id: KiloSessionId) => string
 ): Promise<void> {
   await Promise.all(
     ids.map(async id => {
       await hydrate(id);
-      if (readHydrationStatus(id) === 'error' && !retried.has(id)) {
-        retried.add(id);
+      if (readHydrationStatus(id) === 'error') {
         await hydrate(id);
       }
     })

@@ -276,10 +276,8 @@ describe('hydrateEmptyChildSessions', () => {
       await Promise.resolve();
     });
     const readHydrationStatus = vi.fn(() => status);
-    const retried = new Set<string>();
-    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus, retried);
+    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus);
     expect(hydrate).toHaveBeenCalledTimes(1);
-    expect(retried.size).toBe(0);
   });
 
   it('retries once when the first hydrate errors and the second readies', async () => {
@@ -289,10 +287,8 @@ describe('hydrateEmptyChildSessions', () => {
       await Promise.resolve();
     });
     const readHydrationStatus = vi.fn(() => status);
-    const retried = new Set<string>();
-    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus, retried);
+    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus);
     expect(hydrate).toHaveBeenCalledTimes(2);
-    expect(retried.has(subagentSessionId)).toBe(true);
   });
 
   it('stops at two hydrates when the retry also errors', async () => {
@@ -300,19 +296,7 @@ describe('hydrateEmptyChildSessions', () => {
       await Promise.resolve();
     });
     const readHydrationStatus = vi.fn(() => 'error');
-    const retried = new Set<string>();
-    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus, retried);
+    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus);
     expect(hydrate).toHaveBeenCalledTimes(2);
-    expect(retried.has(subagentSessionId)).toBe(true);
-  });
-
-  it('does not retry an id already in retried', async () => {
-    const hydrate = vi.fn(async () => {
-      await Promise.resolve();
-    });
-    const readHydrationStatus = vi.fn(() => 'error');
-    const retried = new Set<string>([subagentSessionId]);
-    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus, retried);
-    expect(hydrate).toHaveBeenCalledTimes(1);
   });
 });

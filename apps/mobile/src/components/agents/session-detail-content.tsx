@@ -172,7 +172,6 @@ export function SessionDetailContent({
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerControlRef = useRef<ChatComposerControl | null>(null);
   const childHydrateAttemptedRef = useRef<Set<string>>(new Set());
-  const childHydrateRetriedRef = useRef<Set<string>>(new Set());
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -466,13 +465,12 @@ export function SessionDetailContent({
 
   useEffect(() => {
     childHydrateAttemptedRef.current = new Set();
-    childHydrateRetriedRef.current = new Set();
   }, [sessionId]);
 
   // Hydrate child transcripts for task cards that have no messages yet, so a
   // reopened parent shows each completed child's model on the card without
   // opening the child sheet. An attempted id is never hydrated again for the
-  // same parent session; a hydrate error retries once via the retried set.
+  // same parent session; a hydrate error retries once.
   useEffect(() => {
     if (isLoading) {
       return;
@@ -497,8 +495,7 @@ export function SessionDetailContent({
       async id => {
         await manager.hydrateChildSession(id);
       },
-      readHydrationStatus,
-      childHydrateRetriedRef.current
+      readHydrationStatus
     );
   }, [isLoading, fetchedData?.kiloSessionId, sessionId, messages, manager, store]);
 

@@ -173,41 +173,44 @@ const noLiteralCopyRule = defineRule({
         if (node.callee.type === 'Super' || node.callee.type === 'V8IntrinsicExpression') {
           return;
         }
-        // Alert.alert('title', 'message', [...])
-        if (
-          node.callee.type === 'StaticMemberExpression' &&
-          node.callee.object.type === 'Identifier' &&
-          node.callee.object.name === 'Alert' &&
-          node.callee.property.name === 'alert'
-        ) {
-          const first = node.arguments[0];
-          const second = node.arguments[1];
-          if (first && isStringArgument(first)) {
-            context.report({ node, messageId: 'literalCopy' });
+        // Non-computed member call obj.method(...). oxlint's ESTree reports
+        // static and computed member expressions with type 'MemberExpression';
+        // the `computed` flag tells them apart.
+        if (node.callee.type === 'MemberExpression' && !node.callee.computed) {
+          const object = node.callee.object;
+          const property = node.callee.property;
+          const objectName = object.type === 'Identifier' ? object.name : null;
+          const methodName = property.type === 'Identifier' ? property.name : null;
+          // Alert.alert('title', 'message', [...])
+          if (objectName === 'Alert' && methodName === 'alert') {
+            const first = node.arguments[0];
+            const second = node.arguments[1];
+            if (first && isStringArgument(first)) {
+              context.report({ node, messageId: 'literalCopy' });
+            }
+            if (second && isStringArgument(second)) {
+              context.report({ node, messageId: 'literalCopy' });
+            }
             return;
           }
-          if (second && isStringArgument(second)) {
-            context.report({ node, messageId: 'literalCopy' });
+          // toast.error / toast.success / toast.warning / toast.info /
+          // toast.message / toast.loading, and the announcingToast alias.
+          if (
+            (objectName === 'toast' || objectName === 'announcingToast') &&
+            methodName !== null &&
+            (methodName === 'error' ||
+              methodName === 'success' ||
+              methodName === 'warning' ||
+              methodName === 'info' ||
+              methodName === 'message' ||
+              methodName === 'loading')
+          ) {
+            const first = node.arguments[0];
+            if (first && isStringArgument(first)) {
+              context.report({ node, messageId: 'literalCopy' });
+            }
+            return;
           }
-          return;
-        }
-        // toast.error / toast.success / toast.warning / toast.info / toast(...)
-        if (
-          node.callee.type === 'StaticMemberExpression' &&
-          node.callee.object.type === 'Identifier' &&
-          (node.callee.object.name === 'toast' || node.callee.object.name === 'announcingToast') &&
-          (node.callee.property.name === 'error' ||
-            node.callee.property.name === 'success' ||
-            node.callee.property.name === 'warning' ||
-            node.callee.property.name === 'info' ||
-            node.callee.property.name === 'message' ||
-            node.callee.property.name === 'loading')
-        ) {
-          const first = node.arguments[0];
-          if (first && isStringArgument(first)) {
-            context.report({ node, messageId: 'literalCopy' });
-          }
-          return;
         }
         // Bare toast('message')
         if (node.callee.type === 'Identifier' && node.callee.name === 'toast') {

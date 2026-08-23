@@ -115,7 +115,9 @@ export function CommentRow({
   const reportContent = useMutation(
     trpc.moderation.reportContent.mutationOptions({
       onSuccess: result =>
-        announcingToast.success(t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })),
+        announcingToast.success(
+          t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })
+        ),
       onError: (error, variables) => {
         showModerationFailure('report-content', error, () => {
           reportContent.mutate(variables);
@@ -126,7 +128,9 @@ export function CommentRow({
   const reportUser = useMutation(
     trpc.moderation.reportUser.mutationOptions({
       onSuccess: result =>
-        announcingToast.success(t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })),
+        announcingToast.success(
+          t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })
+        ),
       onError: (error, variables) => {
         showModerationFailure('report-user', error, () => {
           reportUser.mutate(variables);

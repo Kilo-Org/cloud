@@ -60,7 +60,9 @@ export default function ExecPolicyScreen() {
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.execPolicy.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.execPolicy.title')} context={instanceContext} />
+    );
   }
 
   if (statusQuery.isPending) {

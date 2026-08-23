@@ -48,7 +48,9 @@ export default function VersionPinScreen() {
   const isPinMutating = mutations.setMyPin.isPending || mutations.removeMyPin.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.versionPin.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.versionPin.title')} context={instanceContext} />
+    );
   }
 
   if (isLoading) {

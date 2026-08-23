@@ -24,7 +24,9 @@ export default function SecretsScreen() {
   const { t } = useTranslation();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.secrets.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.secrets.title')} context={instanceContext} />
+    );
   }
 
   function renderBody() {

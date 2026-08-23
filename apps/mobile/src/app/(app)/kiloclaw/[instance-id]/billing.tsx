@@ -155,7 +155,10 @@ function PlanDetails({
         <View className="h-px bg-border" />
         <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('kiloclaw.billing.ends')} value={formatBillingDate(billing.trial.endsAt)} />
+        <DetailRow
+          label={t('kiloclaw.billing.ends')}
+          value={formatBillingDate(billing.trial.endsAt)}
+        />
       </View>
     );
   }
@@ -170,7 +173,10 @@ function PlanDetails({
         <View className="h-px bg-border" />
         <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('kiloclaw.billing.expires')} value={formatBillingDate(billing.earlybird.expiresAt)} />
+        <DetailRow
+          label={t('kiloclaw.billing.expires')}
+          value={formatBillingDate(billing.earlybird.expiresAt)}
+        />
       </View>
     );
   }
@@ -196,7 +202,9 @@ export default function BillingScreen() {
   const billing = billingQuery.data;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.billing.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.billing.title')} context={instanceContext} />
+    );
   }
 
   if (isOrg) {

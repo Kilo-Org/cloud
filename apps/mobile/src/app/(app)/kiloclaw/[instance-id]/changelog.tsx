@@ -42,7 +42,9 @@ export default function ChangelogScreen() {
   }
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.changelog.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.changelog.title')} context={instanceContext} />
+    );
   }
 
   function renderBody() {

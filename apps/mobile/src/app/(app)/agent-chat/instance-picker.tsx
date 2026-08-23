@@ -120,7 +120,14 @@ export default function InstancePickerScreen() {
   );
 
   if (!bridge) {
-    return <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false} expired />;
+    return (
+      <PickerSheet
+        title={t('agentChat.instancePicker.runOn')}
+        onDone={closePicker}
+        scrollable={false}
+        expired
+      />
+    );
   }
 
   const current = bridge.currentValue;
@@ -131,7 +138,11 @@ export default function InstancePickerScreen() {
   // a loading screen.
   if (viewState.kind === 'loading') {
     return (
-      <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false}>
+      <PickerSheet
+        title={t('agentChat.instancePicker.runOn')}
+        onDone={closePicker}
+        scrollable={false}
+      >
         <View className="bg-background" style={{ paddingBottom: bottom }}>
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
             <View key={i} className="px-4 py-3">
@@ -149,7 +160,11 @@ export default function InstancePickerScreen() {
   // never collapse them into a single "no instances" surface.
   if (viewState.kind === 'error') {
     return (
-      <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false}>
+      <PickerSheet
+        title={t('agentChat.instancePicker.runOn')}
+        onDone={closePicker}
+        scrollable={false}
+      >
         <View className="flex-1 items-center justify-center" style={{ paddingBottom: bottom }}>
           <EmptyState
             icon={Server}
@@ -220,7 +235,11 @@ export default function InstancePickerScreen() {
   // ("Empty: succeeds, zero instances" with a Refresh CTA) without hiding
   // the only target the user can actually pick right now.
   return (
-    <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false}>
+    <PickerSheet
+      title={t('agentChat.instancePicker.runOn')}
+      onDone={closePicker}
+      scrollable={false}
+    >
       {/* The list must stay a direct child of the sheet header for native
           formSheet sizing, so the radiogroup role and the visible "Run on"
           group name live on the FlatList container instead of a wrapper. */}
@@ -242,7 +261,9 @@ export default function InstancePickerScreen() {
           >
             <Cloud size={18} color={colors.foreground} />
             <View className="flex-1">
-              <Text className="text-base font-medium text-foreground">{t('agentChat.instancePicker.cloudAgent')}</Text>
+              <Text className="text-base font-medium text-foreground">
+                {t('agentChat.instancePicker.cloudAgent')}
+              </Text>
               <Text variant="muted" className="text-sm">
                 {t('agentChat.instancePicker.cloudAgentDescription')}
               </Text>

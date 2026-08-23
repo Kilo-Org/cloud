@@ -175,7 +175,9 @@ function ReactionPill({
         emoji,
         count,
         countLabel:
-          count === 1 ? t('prReview.discussion.reactionSingular') : t('prReview.discussion.reactionPlural'),
+          count === 1
+            ? t('prReview.discussion.reactionSingular')
+            : t('prReview.discussion.reactionPlural'),
       })}
       accessibilityState={{ selected: viewerHasReacted, disabled }}
       onPress={onPress}

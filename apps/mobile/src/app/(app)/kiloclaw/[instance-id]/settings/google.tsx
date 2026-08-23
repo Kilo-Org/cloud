@@ -91,24 +91,20 @@ export default function GoogleScreen() {
   }
 
   function handleDisconnect() {
-    Alert.alert(
-      t('kiloclaw.google.disconnectTitle'),
-      t('kiloclaw.google.disconnectMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('kiloclaw.google.disconnectConfirm'),
-          style: 'destructive',
-          onPress: () => {
-            mutations.disconnectGoogle.mutate(undefined, {
-              onSuccess: () => {
-                setShowRedeployPrompt(true);
-              },
-            });
-          },
+    Alert.alert(t('kiloclaw.google.disconnectTitle'), t('kiloclaw.google.disconnectMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('kiloclaw.google.disconnectConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          mutations.disconnectGoogle.mutate(undefined, {
+            onSuccess: () => {
+              setShowRedeployPrompt(true);
+            },
+          });
         },
-      ]
-    );
+      },
+    ]);
   }
 
   function handleRedeploy() {
@@ -190,7 +186,9 @@ export default function GoogleScreen() {
                 {setupQuery.isPending && <Skeleton className="h-4 w-full rounded" />}
                 {setupQuery.isError && (
                   <View className="gap-2">
-                    <Text className="text-xs text-destructive">{t('kiloclaw.google.failedToLoadCommand')}</Text>
+                    <Text className="text-xs text-destructive">
+                      {t('kiloclaw.google.failedToLoadCommand')}
+                    </Text>
                     <Button
                       size="sm"
                       variant="outline"
@@ -216,7 +214,9 @@ export default function GoogleScreen() {
                   void handleCopy();
                 }}
               >
-                <Text>{copied ? t('kiloclaw.google.copied') : t('kiloclaw.google.copyCommand')}</Text>
+                <Text>
+                  {copied ? t('kiloclaw.google.copied') : t('kiloclaw.google.copyCommand')}
+                </Text>
               </Button>
             </Animated.View>
           )}
@@ -226,14 +226,18 @@ export default function GoogleScreen() {
               <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
                 <View className="flex-row items-center gap-3">
                   <GmailIcon size={20} />
-                  <Text className="flex-1 text-base font-semibold">{t('kiloclaw.google.gmailNotifications')}</Text>
+                  <Text className="flex-1 text-base font-semibold">
+                    {t('kiloclaw.google.gmailNotifications')}
+                  </Text>
                   <Button
                     size="sm"
                     variant={gmailEnabled ? 'default' : 'outline'}
                     onPress={handleToggleGmail}
                     disabled={mutations.setGmailNotifications.isPending}
                   >
-                    <Text>{gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}</Text>
+                    <Text>
+                      {gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}
+                    </Text>
                   </Button>
                 </View>
               </View>

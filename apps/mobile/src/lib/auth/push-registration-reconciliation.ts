@@ -88,7 +88,11 @@ export async function attemptPushRegistrationReconciliation(
     await attemptInFlight;
   }
   const now = Date.now();
-  if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS && lastAttemptUserId === userId && !localeChanged) {
+  if (
+    now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS &&
+    lastAttemptUserId === userId &&
+    !localeChanged
+  ) {
     return { kind: 'spacing-skipped' };
   }
   lastAttemptAtMs = now;

@@ -29,7 +29,9 @@ function chineseScriptFor(tag: string): SupportedLanguage | undefined {
  * map Chinese scripts, then exact match, then same-language fallback. An
  * empty list or no match resolves to `en`.
  */
-export function resolveLanguageTag(locales: readonly { languageTag?: string }[]): SupportedLanguage {
+export function resolveLanguageTag(
+  locales: readonly { languageTag?: string }[]
+): SupportedLanguage {
   for (const locale of locales) {
     const raw = locale.languageTag;
     if (!raw || raw.length === 0) {

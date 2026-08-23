@@ -121,7 +121,11 @@ export default function ReposRoute() {
             {(['all', 'selected'] as const).map(option => (
               <ChoiceRow
                 key={option}
-                label={option === 'all' ? t('codeReviewer.repos.allRepositories') : t('codeReviewer.repos.selectedRepositories')}
+                label={
+                  option === 'all'
+                    ? t('codeReviewer.repos.allRepositories')
+                    : t('codeReviewer.repos.selectedRepositories')
+                }
                 selected={mode === option}
                 disabled={configDisabled}
                 className="border-b-[0.5px] border-hair-soft"

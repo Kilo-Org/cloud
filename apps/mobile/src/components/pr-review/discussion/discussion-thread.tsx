@@ -238,9 +238,13 @@ function ThreadHeader({
         <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
-        {resolved ? <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} /> : null}
+        {resolved ? (
+          <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
+        ) : null}
         {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
-        {fileLevel && !resolved ? <Badge tone="muted" label={t('prReview.discussion.file')} /> : null}
+        {fileLevel && !resolved ? (
+          <Badge tone="muted" label={t('prReview.discussion.file')} />
+        ) : null}
         <Text variant="muted" className="text-xs">
           {commentCount === 1
             ? t('prReview.discussion.oneComment')

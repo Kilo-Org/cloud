@@ -59,7 +59,12 @@ export default function RepoPickerScreen() {
 
   if (!bridge) {
     return (
-      <PickerSheet title={t('agentChat.repoPicker.title')} onDone={closePicker} scrollable={false} expired />
+      <PickerSheet
+        title={t('agentChat.repoPicker.title')}
+        onDone={closePicker}
+        scrollable={false}
+        expired
+      />
     );
   }
 
@@ -93,7 +98,11 @@ export default function RepoPickerScreen() {
           <EmptyState
             icon={search.trim() ? SearchX : Info}
             placement="top"
-            title={search.trim() ? t('agentChat.repoPicker.noMatches') : t('agentChat.repoPicker.noRepositories')}
+            title={
+              search.trim()
+                ? t('agentChat.repoPicker.noMatches')
+                : t('agentChat.repoPicker.noRepositories')
+            }
             description={
               search.trim()
                 ? t('agentChat.repoPicker.tryDifferentSearch')

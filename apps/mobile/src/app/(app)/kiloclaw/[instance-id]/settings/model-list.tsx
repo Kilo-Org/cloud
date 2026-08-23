@@ -158,7 +158,9 @@ export default function ModelListScreen() {
   ];
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.modelList.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.modelList.title')} context={instanceContext} />
+    );
   }
 
   return (
@@ -204,7 +206,9 @@ export default function ModelListScreen() {
           ListEmptyComponent={
             <EmptyState
               icon={Search}
-              title={searchFilter ? t('kiloclaw.modelList.noMatches') : t('kiloclaw.modelList.noModels')}
+              title={
+                searchFilter ? t('kiloclaw.modelList.noMatches') : t('kiloclaw.modelList.noModels')
+              }
               description={
                 searchFilter
                   ? t('kiloclaw.modelList.noResultsFor', { query: searchFilter })

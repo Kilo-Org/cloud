@@ -360,7 +360,8 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     );
   }
 
-  const submitLabel = mode === 'merge' ? t('prReview.merge.merge') : t('prReview.merge.enableAutoMerge');
+  const submitLabel =
+    mode === 'merge' ? t('prReview.merge.merge') : t('prReview.merge.enableAutoMerge');
   // A repository can (rarely) have every merge method disabled. GitHub would
   // reject any submission, so surface it explicitly and block the action
   // rather than sending a method the repo does not allow.

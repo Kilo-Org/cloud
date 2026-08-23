@@ -98,7 +98,9 @@ export default function DashboardScreen() {
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.dashboard.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.dashboard.title')} context={instanceContext} />
+    );
   }
 
   if (isLoading) {
@@ -148,33 +150,30 @@ export default function DashboardScreen() {
   // sandbox id for named instances).
   const contextName =
     instanceContext.status === 'ready' ? instanceContext.instance.name : undefined;
-  const instanceName = contextName ?? status?.name ?? status?.sandboxId ?? t('kiloclaw.dashboard.instance');
+  const instanceName =
+    contextName ?? status?.name ?? status?.sandboxId ?? t('kiloclaw.dashboard.instance');
 
   const handleDestroy = () => {
-    Alert.alert(
-      t('kiloclaw.dashboard.destroyTitle'),
-      t('kiloclaw.dashboard.destroyMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('kiloclaw.dashboard.destroy'),
-          style: 'destructive',
-          onPress: () => {
-            captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
-            // Stay on screen while the mutation is pending — DangerZone shows
-            // its own pending UI — and only navigate away once destruction
-            // actually succeeds. On error the centralized mutation hook
-            // toasts the failure and we stay put with context intact.
-            mutations.destroy.mutate(undefined, {
-              onSuccess: () => {
-                router.dismissAll();
-                router.replace('/(app)/(tabs)/(0_home)' as Href);
-              },
-            });
-          },
+    Alert.alert(t('kiloclaw.dashboard.destroyTitle'), t('kiloclaw.dashboard.destroyMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('kiloclaw.dashboard.destroy'),
+        style: 'destructive',
+        onPress: () => {
+          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
+          // Stay on screen while the mutation is pending — DangerZone shows
+          // its own pending UI — and only navigate away once destruction
+          // actually succeeds. On error the centralized mutation hook
+          // toasts the failure and we stay put with context intact.
+          mutations.destroy.mutate(undefined, {
+            onSuccess: () => {
+              router.dismissAll();
+              router.replace('/(app)/(tabs)/(0_home)' as Href);
+            },
+          });
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (

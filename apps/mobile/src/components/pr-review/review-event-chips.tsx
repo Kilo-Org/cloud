@@ -38,7 +38,11 @@ export function ReviewEventChips(props: {
                 void Haptics.selectionAsync();
                 props.onChange(option.value);
               }}
-              {...radioItemA11y({ label: t(option.labelKey), checked: active, disabled: props.disabled })}
+              {...radioItemA11y({
+                label: t(option.labelKey),
+                checked: active,
+                disabled: props.disabled,
+              })}
               className={cn(
                 'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
                 active ? 'border-primary bg-primary' : 'bg-secondary',

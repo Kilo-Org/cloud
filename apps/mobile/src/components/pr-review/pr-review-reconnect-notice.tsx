@@ -28,10 +28,10 @@ export function PrReviewReconnectNotice() {
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-4">
-      <Text className="text-sm font-medium text-foreground">{t('prReview.reconnectNotice.title')}</Text>
-      <Text className="text-sm text-muted-foreground">
-        {t('prReview.reconnectNotice.message')}
+      <Text className="text-sm font-medium text-foreground">
+        {t('prReview.reconnectNotice.title')}
       </Text>
+      <Text className="text-sm text-muted-foreground">{t('prReview.reconnectNotice.message')}</Text>
       <Button
         variant="outline"
         onPress={handleReconnect}

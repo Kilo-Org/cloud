@@ -114,7 +114,11 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.kiloclaw'), 2, tabCount),
           tabBarLabel: ({ focused }) => (
             <TabLabel
-              label={fontScale > TAB_LABEL_WRAP_FONT_SCALE ? t('tabs.kiloclawWrapped') : t('tabs.kiloclaw')}
+              label={
+                fontScale > TAB_LABEL_WRAP_FONT_SCALE
+                  ? t('tabs.kiloclawWrapped')
+                  : t('tabs.kiloclaw')
+              }
               focused={focused}
             />
           ),

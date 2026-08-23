@@ -86,7 +86,12 @@ export default function DevicePairingScreen() {
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.devicePairing.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary
+        title={t('kiloclaw.devicePairing.title')}
+        context={instanceContext}
+      />
+    );
   }
 
   if (isLoading) {
@@ -141,7 +146,10 @@ export default function DevicePairingScreen() {
     );
   }
 
-  function handleApproveDevice(requestId: string, platform = t('kiloclaw.devicePairing.unknownDevice')) {
+  function handleApproveDevice(
+    requestId: string,
+    platform = t('kiloclaw.devicePairing.unknownDevice')
+  ) {
     Alert.alert(
       t('kiloclaw.devicePairing.approveDeviceTitle'),
       t('kiloclaw.devicePairing.approveDeviceMessage', { platform }),
@@ -251,7 +259,9 @@ export default function DevicePairingScreen() {
                     <View className="flex-row items-center gap-3 px-4 py-3">
                       <Monitor size={18} color={colors.foreground} />
                       <View className="flex-1 gap-0.5">
-                        <Text className="text-sm font-medium">{request.role ?? t('kiloclaw.devicePairing.device')}</Text>
+                        <Text className="text-sm font-medium">
+                          {request.role ?? t('kiloclaw.devicePairing.device')}
+                        </Text>
                         <Text variant="muted" className="text-xs">
                           {[request.platform, request.requestId.slice(0, 12)]
                             .filter(Boolean)

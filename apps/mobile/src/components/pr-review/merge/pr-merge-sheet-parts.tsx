@@ -139,7 +139,9 @@ function CommitMessageField({
   const tight = compact || keyboardVisible;
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium text-foreground">{t('prReview.merge.commitMessage')}</Text>
+      <Text className="text-sm font-medium text-foreground">
+        {t('prReview.merge.commitMessage')}
+      </Text>
       <TextInput
         ref={inputRef}
         defaultValue={messageRef.current}

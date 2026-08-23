@@ -65,7 +65,12 @@ export default function KiloClawTab() {
   if (hasQueryError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('kiloclaw.title')} size="large" showBackButton={false} className="px-[22px]" />
+        <ScreenHeader
+          title={t('kiloclaw.title')}
+          size="large"
+          showBackButton={false}
+          className="px-[22px]"
+        />
         <Animated.View
           entering={FadeIn.duration(200)}
           className="flex-1"
@@ -111,7 +116,12 @@ export default function KiloClawTab() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloclaw.title')} size="large" showBackButton={false} className="px-[22px]" />
+      <ScreenHeader
+        title={t('kiloclaw.title')}
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+      />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
         {showInstanceSkeleton || onboardingQuery.data === undefined ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 pt-5">

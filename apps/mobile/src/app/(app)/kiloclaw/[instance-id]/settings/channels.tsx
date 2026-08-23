@@ -25,7 +25,9 @@ export default function ChannelsScreen() {
   const { t } = useTranslation();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.channels.title')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.channels.title')} context={instanceContext} />
+    );
   }
 
   function renderBody() {
@@ -80,7 +82,9 @@ export default function ChannelsScreen() {
                 item={channel}
                 mutations={mutations}
                 removeAlertTitle={t('kiloclaw.channels.disconnectTitle')}
-                removeAlertMessage={t('kiloclaw.channels.disconnectMessage', { label: channel.label })}
+                removeAlertMessage={t('kiloclaw.channels.disconnectMessage', {
+                  label: channel.label,
+                })}
                 successMessage={t('kiloclaw.channels.connected', { label: channel.label })}
               />
             ))}

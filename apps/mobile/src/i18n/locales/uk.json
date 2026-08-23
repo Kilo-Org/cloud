@@ -18,6 +18,7 @@
     "openInBrowser": "Відкрити у браузері",
     "openSettings": "Відкрити налаштування",
     "copiedToClipboard": "Скопійовано в буфер обміну",
+    "couldNotCopyToClipboard": "Не вдалося скопіювати в буфер обміну",
     "required": "обов'язково",
     "error": "помилка: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Не вдалося завантажити розмову",
       "notFound": "Розмову не знайдено",
-      "untitled": "Без назви"
+      "untitled": "Без назви",
+      "leaveTitle": "Покинути розмову?",
+      "leaveMessage": "Це видалить її зі вашого списку.",
+      "openHint": "Відкриває розмову. Довге натискання для перейменування та виходу.",
+      "unread": "Непрочитані",
+      "optionsFor": "Параметри розмови для {{title}}",
+      "options": "Параметри розмови",
+      "renameTitle": "Перейменувати розмову",
+      "renamePlaceholder": "Введіть нову назву",
+      "couldNotReachBot": "Не вдалося зв'язатися з ботом. Спробуйте ще раз.",
+      "messageDeliveryFailed": "Повідомлення не вдалося доставити боту",
+      "couldNotSignIn": "Не вдалося увійти в чат",
+      "couldNotRefreshMessages": "Не вдалося оновити повідомлення",
+      "couldNotLoadHistory": "Не вдалося завантажити історію розмови",
+      "rename": "Перейменувати",
+      "leave": "Покинути",
+      "untitledConversation": "Розмова без назви",
+      "createFailed": "Не вдалося створити розмову",
+      "leaveFailed": "Не вдалося вийти з розмови"
+    },
+    "reactions": {
+      "title": "Реакції",
+      "close": "Закрити реакції",
+      "recent": "Недавні",
+      "common": "Поширені",
+      "reactWith": "Реагувати з {{reaction}}",
+      "accessibility": "{{emoji}} реакція, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Відповідь на",
+      "cancelReply": "Скасувати відповідь",
+      "openInstance": "Відкрити екземпляр",
+      "attachFile": "Прикріпити файл",
+      "messagePlaceholder": "Повідомлення",
+      "cancelEdit": "Скасувати редагування",
+      "sendMessage": "Надіслати повідомлення"
+    },
+    "conversationList": {
+      "couldNotLoad": "Не вдалося завантажити розмови",
+      "emptyTitle": "Розмов поки немає",
+      "emptyDescription": "Створіть розмову, щоб почати чат зі своїм екземпляром KiloClaw.",
+      "create": "Створити розмову",
+      "starting": "Запуск…",
+      "newConversation": "Нова розмова",
+      "openInstanceSettings": "Відкрити налаштування екземпляра",
+      "today": "Сьогодні",
+      "yesterday": "Вчора",
+      "thisWeek": "Цього тижня",
+      "older": "Старіші"
+    },
+    "attachment": {
+      "open": "Відкрити {{filename}}",
+      "imageUnavailable": "Зображення недоступне",
+      "openFailed": "Не вдалося відкрити вкладення. Перевірте з'єднання та спробуйте ще раз.",
+      "attachFailed": "Не вдалося прикріпити файл",
+      "limit": "Можна прикріпити до {{count}} файлів.",
+      "sizeRejection": "{{filename}} перевищує ліміт вкладення {{limit}}.",
+      "unreadable": "Не вдалося прочитати {{filename}}.",
+      "pastedImage": "вставлене зображення",
+      "defaultName": "Вкладення"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Повторити завантаження для {{filename}}",
+      "remove": "Видалити {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[видалене повідомлення]",
+      "yourMessage": "Ваше повідомлення",
+      "messageFrom": "Повідомлення від {{author}}",
+      "moreActions": "Більше дій",
+      "message": "Повідомлення",
+      "notDelivered": "Не доставлено",
+      "edited": "(відредаговано)"
+    },
+    "messageActions": {
+      "copied": "Скопійовано",
+      "copyFailed": "Не вдалося скопіювати",
+      "title": "Дії з повідомленням",
+      "deleteTitle": "Видалити повідомлення?",
+      "deleteMessage": "Повідомлення буде видалено з розмови.",
+      "delete": "Видалити",
+      "deleteFailed": "Не вдалося видалити повідомлення",
+      "removeReactionFailed": "Не вдалося видалити реакцію",
+      "addReactionFailed": "Не вдалося додати реакцію",
+      "retrySend": "Надіслати повторно",
+      "moreReactions": "Більше реакцій",
+      "reply": "Відповісти",
+      "edit": "Редагувати",
+      "sendFailed": "Не вдалося надіслати повідомлення",
+      "retrySendFailed": "Не вдалося надіслати повторно",
+      "editFailed": "Не вдалося редагувати повідомлення",
+      "executeFailed": "Не вдалося виконати дію"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Зробити фото",
+      "photoLibrary": "Фотоальбом",
+      "files": "Файли",
+      "cameraAccessDisabled": "Доступ до камери вимкнено",
+      "cameraAccessMessage": "Дозвольте доступ до камери в налаштуваннях, щоб зробити фото."
+    },
+    "typingIndicator": {
+      "someone": "Хтось",
+      "oneTyping": "{{name}} друкує...",
+      "manyTyping": "{{names}} друкують..."
+    },
+    "botStatus": {
+      "online": "У мережі",
+      "idle": "Неактивний",
+      "offline": "Не в мережі",
+      "unknown": "Невідомо",
+      "loadingUser": "Завантаження користувача...",
+      "waitingForStatus": "Очікування статусу бота...",
+      "offlineMessage": "Бот не в мережі. Повідомлення відновляться після повторного підключення."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Активні зараз"
+    "activeNow": "Активні зараз",
+    "search": {
+      "searching": "Пошук",
+      "searchSessions": "Пошук сеансів",
+      "searchSessionsPlaceholder": "Пошук сеансів...",
+      "clearSearch": "Очистити пошук",
+      "clearFilters": "Очистити фільтри"
+    },
+    "sessionList": {
+      "couldNotLoad": "Не вдалося завантажити сеанси",
+      "couldNotLoadActive": "Не вдалося завантажити активні сеанси",
+      "noSessionsYet": "Сеансів поки немає",
+      "noSessionsYetDescription": "Розпочніть завдання кодування з телефона. Ваші сеанси з'являться тут.",
+      "noMatches": "Немає відповідних сеансів",
+      "tryDifferentSearch": "Спробуйте інший пошуковий запит.",
+      "tryAdjustFilters": "Спробуйте налаштувати або очистити фільтри.",
+      "couldNotSearch": "Не вдалося виконати пошук сеансів",
+      "allActive": "Усі сеанси активні",
+      "completedWillAppear": "Завершені сеанси з'являться тут.",
+      "noPastSessions": "Немає минулих сеансів",
+      "live": "НАЖИВО"
+    },
+    "sessionRow": {
+      "deleteTitle": "Видалити сеанс?",
+      "deleteMessage": "Це не можна скасувати.",
+      "delete": "Видалити",
+      "deleteSession": "Видалити сеанс",
+      "rename": "Перейменувати",
+      "renameMessage": "Введіть нову назву для цього сеансу",
+      "copyId": "Копіювати ідентифікатор сеансу",
+      "idCopied": "Ідентифікатор сеансу скопійовано",
+      "couldNotCopyId": "Не вдалося скопіювати ідентифікатор сеансу",
+      "untitled": "Сеанс без назви"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Не вдалося завантажити сеанс",
       "failedToLoadDetails": "Не вдалося завантажити відомості про сеанс",
       "notFound": "Не знайдено",
-      "notFoundDescription": "Можливо, цей елемент було видалено або він більше недоступний."
+      "notFoundDescription": "Можливо, цей елемент було видалено або він більше недоступний.",
+      "failedToStopExecution": "Не вдалося зупинити виконання",
+      "renameSession": "Перейменувати сеанс",
+      "renamePlaceholder": "Назва сеансу",
+      "transcriptAccessibility": "Транскрипт сеансу",
+      "readOnly": "Це сеанс лише для читання",
+      "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
+      "scrollToBottom": "Прокрутити вниз",
+      "emptyTitle": "Повідомлень ще немає",
+      "renameAccessibility": "Перейменувати сесію: {{title}}",
+      "connectRepository": "Підключити репозиторій",
+      "cloningSession": "Клонування сесії",
+      "continue": "Продовжити",
+      "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс",
+      "cloneFailed": "Не вдалося клонувати цей сеанс.",
+      "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
+      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити."
     },
     "remoteSession": {
       "failedToCreate": "Не вдалося створити віддалений сеанс",
       "exited": "Сеанс завершено",
-      "failedToExit": "Не вдалося завершити сеанс"
+      "failedToExit": "Не вдалося завершити сеанс",
+      "exitTitle": "Завершити сеанс?",
+      "exitMessage": "Це зупиняє запущений сеанс, але зберігає його історію.",
+      "keepSessionRunning": "Залишити сеанс запущеним",
+      "exitSession": "Завершити сеанс",
+      "restartExitFailed": "Розпочато новий сеанс. Попередній сеанс ще відкритий."
+    },
+    "sessionConnection": {
+      "connecting": "Підключення…",
+      "reconnecting": "Повторне підключення…",
+      "connectionLost": "З'єднання втрачено",
+      "retryConnection": "Повторити підключення"
     },
     "newSession": {
       "title": "Новий сеанс",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Не вдалося завантажити моделі",
       "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть їх нижче.",
       "prefillRepoUnavailable": "{{repo}} більше недоступний. Виберіть репозиторій нижче.",
-      "prefillModelUnavailable": "{{model}} більше недоступна. Використовується ваша стандартна модель."
+      "prefillModelUnavailable": "{{model}} більше недоступна. Використовується ваша стандартна модель.",
+      "couldNotReadPendingSessions": "Не вдалося прочитати сеанси, що очікують. Спробуйте ще раз.",
+      "failedToCreate": "Не вдалося створити сеанс"
     },
     "partRenderer": {
       "updatedFile": "Оновлено {{count}} файл",
       "updatedFiles": "Оновлено {{count}} файлів"
+    },
+    "toolPatch": {
+      "operationAdded": "Додано",
+      "operationDeleted": "Видалено",
+      "operationUpdated": "Оновлено"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} інструмент, {{status}}",
+      "accessibilityLabel": "{{name}} інструмент, {{status}}",
+      "fileEmpty": "Цей файл порожній.",
+      "noTasks": "Немає завдань.",
+      "contentTruncated": "Вміст обрізано",
+      "truncated": "Обрізано",
+      "toolRead": "читати",
+      "toolEdit": "редагувати",
+      "toolWrite": "записати",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "список",
+      "toolPatch": "patch",
+      "toolTask": "завдання",
+      "readTodos": "Читати завдання",
+      "updateTodos": "Оновити завдання",
+      "linesBadge": "{{count}} рядків",
+      "filesBadge": "{{count}} файлів",
+      "matchesBadge": "{{count}} збігів"
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (обрізано)",
@@ -507,11 +710,14 @@
       "noMatches": "Немає збігів",
       "noRepositories": "Немає доступних репозиторіїв",
       "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
-      "tryDifferentSearch": "Спробуйте інший пошуковий запит."
+      "tryDifferentSearch": "Спробуйте інший пошуковий запит.",
+      "loading": "Завантаження...",
+      "accessibility": "Репозиторій: {{label}}"
     },
     "messageDetails": {
       "title": "Відомості про повідомлення",
       "copyMessage": "Копіювати повідомлення",
+      "copyText": "Копіювати текст",
       "selectText": "Вибрати текст",
       "reportAiResponse": "Поскаржитися на відповідь ШІ",
       "reportAiResponseConfirm": "Поскаржитися на цю відповідь для перевірки?",
@@ -528,7 +734,10 @@
       "reasoning": "Міркування",
       "cacheRead": "Читання кешу",
       "cacheWrite": "Запис кешу",
-      "total": "Разом"
+      "total": "Разом",
+      "reportAiResponseFailedRetryable": "Не вдалося поскаржитися на цю відповідь.",
+      "reportAiResponseFailedTerminal": "На цю відповідь не можна поскаржитися.",
+      "reportAiResponseSubmitted": "Скаргу надіслано. Квитанція {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Відомості недоступні",
@@ -536,7 +745,9 @@
       "thinking": "Мислення",
       "thought": "Думка",
       "title": "Відомості",
-      "showDetails": "Показати відомості"
+      "showDetails": "Показати відомості",
+      "pending": "Очікування…",
+      "running": "Виконання…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Не вдалося відобразити вміст"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Зображення недоступне, повторіть завантаження",
       "imageUnavailable": "Зображення недоступне",
       "imageUnavailableWithAlt": "Зображення недоступне {{alt}}",
+      "imagePreviewUnavailableInSession": "Попередній перегляд зображення недоступний у цьому сеансі.",
       "viewImage": "Переглянути зображення",
       "viewImageWithAlt": "Переглянути зображення {{alt}}",
       "imageOutput": "Вихідне зображення",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Повторити завантаження файлу",
       "fileEmpty": "Цей файл порожній.",
       "previewUnavailable": "Попередній перегляд недоступний",
+      "fileUnavailableInSession": "Файл недоступний у цьому сеансі.",
       "shareFailed": "Не вдалося поділитися",
       "sharingUnavailable": "Поширення файлів недоступне на цьому пристрої.",
       "shareFailedRetry": "Не вдалося поділитися файлом. Спробуйте ще раз.",
@@ -654,7 +867,13 @@
       "longPressHint": "Довге натискання для відомостей про повідомлення"
     },
     "olderMessages": {
-      "arrived": "Раніші повідомлення завантажено"
+      "arrived": "Раніші повідомлення завантажено",
+      "retryHint": "Повторює завантаження давніших повідомлень цього сеансу.",
+      "omittedOne": "Один давніший елемент цього сеансу не вдалося відобразити.",
+      "omittedMany": "{{count}} давніших елементів цього сеансу не вдалося відобразити.",
+      "couldNotLoad": "Не вдалося завантажити давніші повідомлення.",
+      "unavailable": "Давніші повідомлення недоступні.",
+      "tooLarge": "Давніші повідомлення завеликі для завантаження."
     },
     "markdownTable": {
       "viewTable": "Переглянути таблицю",
@@ -682,6 +901,13 @@
       "project": "Проєкт",
       "removeProjectFilter": "Видалити фільтр проєкту {{label}}",
       "removePlatformFilter": "Видалити фільтр платформи {{label}}"
+    },
+    "suggestion": {
+      "title": "Пропозиція",
+      "dismiss": "Відхилити пропозицію",
+      "applyFailed": "Не вдалося застосувати цю пропозицію. Спробуйте ще раз.",
+      "dismissFailed": "Не вдалося відхилити цю пропозицію. Спробуйте ще раз.",
+      "dismissed": "Пропозицію відхилено"
     },
     "modelPicker": {
       "title": "Вибрати модель",
@@ -734,7 +960,13 @@
       "waitForUploads": "Зачекайте, поки вкладення завершать завантаження.",
       "pasteFromClipboard": "Вставити з буфера обміну",
       "stopGenerating": "Зупинити генерацію",
-      "sendMessage": "Надіслати повідомлення"
+      "sendMessage": "Надіслати повідомлення",
+      "selectModelBeforeSending": "Виберіть модель перед надсиланням",
+      "preparingPlaceholder": "Налаштування середовища...",
+      "finalizingPlaceholder": "Завершення...",
+      "messagePlaceholder": "Повідомлення...",
+      "cannotReceiveFiles": "Ця сесія не може отримувати файли. Видаліть вкладення, щоб надіслати повідомлення.",
+      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз."
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",
@@ -769,6 +1001,8 @@
       "startNewSession": "Розпочати новий сеанс",
       "exitSession": "Завершити сеанс",
       "clearSession": "Завершити цей сеанс і розпочати новий",
+      "useCommand": "Використати /{{command}}",
+      "insert": "Вставити",
       "upgradeRequiredFallback": "Оновіть ваш CLI, щоб використовувати цю команду.",
       "exitCapabilityUnavailable": "Оновіть ваш CLI, щоб завершити сеанс.",
       "clearCapabilityUnavailable": "Оновіть ваш CLI, щоб перезапустити сеанс.",
@@ -780,7 +1014,36 @@
       "costPrefix": "вартість {{cost}}",
       "costSuffix": ", вартість {{cost}}",
       "tokensWindowUnavailable": "Контекст {{used}} токенів, вікно недоступне",
-      "tokensUsage": "Контекст {{used}} з {{window}} токенів, використано {{percentage}}%"
+      "tokensUsage": "Контекст {{used}} з {{window}} токенів, використано {{percentage}}%",
+      "title": "Використання контексту",
+      "used": "Використано",
+      "remaining": "Залишилося",
+      "provider": "Постачальник",
+      "totalCost": "Загальна вартість",
+      "usageReflectsLatest": "Використання відображає останню завершену відповідь асистента.",
+      "tokenUsage": "Використання токенів",
+      "cacheRate": "Тариф кешу",
+      "modelsCount": "Моделі ({{count}})",
+      "tokenTotalsNote": "Загальна кількість токенів стосується лише цього сеансу та не включає токени субагентів/дочірніх сеансів.",
+      "subagents": "Субагенти",
+      "subagentsDescription": "Залишкова вартість від дочірніх сеансів",
+      "olderActivity": "Старіша активність",
+      "olderActivityDescription": "Вартість, не віднесена до завантаженої історії",
+      "ofWindowTokens": "з {{window}} токенів",
+      "tokens": "токени",
+      "tokensWithPercentage": "токени ({{percentage}})",
+      "stepsCountOne": "{{steps}} крок",
+      "stepsCountMany": "{{steps}} кроків",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "відкритий pull request",
+      "closed": "закритий pull request",
+      "merged": "злитий pull request",
+      "draft": "чернетка pull request",
+      "updating": "Оновлення, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {

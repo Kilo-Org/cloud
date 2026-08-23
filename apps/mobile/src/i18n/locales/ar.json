@@ -18,6 +18,7 @@
     "openInBrowser": "افتح في المتصفح",
     "openSettings": "فتح الإعدادات",
     "copiedToClipboard": "تم النسخ إلى الحافظة",
+    "couldNotCopyToClipboard": "تعذّر النسخ إلى الحافظة",
     "required": "مطلوب",
     "error": "خطأ: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "تعذّر تحميل المحادثة",
       "notFound": "المحادثة غير موجودة",
-      "untitled": "بدون عنوان"
+      "untitled": "بدون عنوان",
+      "leaveTitle": "مغادرة المحادثة؟",
+      "leaveMessage": "سيؤدي هذا إلى إزالتها من قائمتك.",
+      "openHint": "يفتح المحادثة. اضغط مطولًا لخيارات إعادة التسمية والمغادرة.",
+      "unread": "غير مقروء",
+      "optionsFor": "خيارات المحادثة لـ {{title}}",
+      "options": "خيارات المحادثة",
+      "renameTitle": "إعادة تسمية المحادثة",
+      "renamePlaceholder": "أدخل اسمًا جديدًا",
+      "couldNotReachBot": "تعذّر الوصول إلى الروبوت. يرجى المحاولة مرة أخرى.",
+      "messageDeliveryFailed": "تعذّر تسليم الرسالة إلى الروبوت",
+      "couldNotSignIn": "تعذّر تسجيل الدخول إلى الدردشة",
+      "couldNotRefreshMessages": "تعذّر تحديث الرسائل",
+      "couldNotLoadHistory": "تعذّر تحميل سجل المحادثة",
+      "rename": "إعادة تسمية",
+      "leave": "مغادرة",
+      "untitledConversation": "محادثة بدون عنوان",
+      "createFailed": "فشل إنشاء المحادثة",
+      "leaveFailed": "فشل مغادرة المحادثة"
+    },
+    "reactions": {
+      "title": "التفاعلات",
+      "close": "إغلاق التفاعلات",
+      "recent": "الأخيرة",
+      "common": "شائعة",
+      "reactWith": "التفاعل بـ {{reaction}}",
+      "accessibility": "تفاعل {{emoji}}، {{count}}"
+    },
+    "composer": {
+      "replyingTo": "الرد على",
+      "cancelReply": "إلغاء الرد",
+      "openInstance": "فتح المثيل",
+      "attachFile": "إرفاق ملف",
+      "messagePlaceholder": "رسالة",
+      "cancelEdit": "إلغاء التعديل",
+      "sendMessage": "إرسال الرسالة"
+    },
+    "conversationList": {
+      "couldNotLoad": "تعذّر تحميل المحادثات",
+      "emptyTitle": "لا توجد محادثات بعد",
+      "emptyDescription": "أنشئ محادثة لبدء الدردشة مع مثيل KiloClaw الخاص بك.",
+      "create": "إنشاء محادثة",
+      "starting": "جارٍ البدء…",
+      "newConversation": "محادثة جديدة",
+      "openInstanceSettings": "فتح إعدادات المثيل",
+      "today": "اليوم",
+      "yesterday": "أمس",
+      "thisWeek": "هذا الأسبوع",
+      "older": "أقدم"
+    },
+    "attachment": {
+      "open": "فتح {{filename}}",
+      "imageUnavailable": "الصورة غير متاحة",
+      "openFailed": "تعذر فتح المرفق. تحقق من اتصالك وحاول مرة أخرى.",
+      "attachFailed": "فشل إرفاق الملف",
+      "limit": "يمكنك إرفاق ما يصل إلى {{count}} ملفات.",
+      "sizeRejection": "{{filename}} يتجاوز حد المرفقات البالغ {{limit}}.",
+      "unreadable": "تعذر قراءة {{filename}}.",
+      "pastedImage": "الصورة الملصقة",
+      "defaultName": "مرفق"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}، {{status}}",
+      "retryUploading": "إعادة محاولة رفع {{filename}}",
+      "remove": "إزالة {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[رسالة محذوفة]",
+      "yourMessage": "رسالتك",
+      "messageFrom": "رسالة من {{author}}",
+      "moreActions": "مزيد من الإجراءات",
+      "message": "رسالة",
+      "notDelivered": "لم يتم التسليم",
+      "edited": "(مُعدَّل)"
+    },
+    "messageActions": {
+      "copied": "تم النسخ",
+      "copyFailed": "فشل النسخ",
+      "title": "إجراءات الرسالة",
+      "deleteTitle": "حذف الرسالة؟",
+      "deleteMessage": "سيؤدي هذا إلى إزالة الرسالة من المحادثة.",
+      "delete": "حذف",
+      "deleteFailed": "فشل حذف الرسالة",
+      "removeReactionFailed": "فشل إزالة التفاعل",
+      "addReactionFailed": "فشل إضافة التفاعل",
+      "retrySend": "إعادة الإرسال",
+      "moreReactions": "مزيد من التفاعلات",
+      "reply": "رد",
+      "edit": "تعديل",
+      "sendFailed": "فشل إرسال الرسالة",
+      "retrySendFailed": "فشل إعادة الإرسال",
+      "editFailed": "فشل تعديل الرسالة",
+      "executeFailed": "فشل تنفيذ الإجراء"
+    },
+    "attachmentPicker": {
+      "takePhoto": "التقاط صورة",
+      "photoLibrary": "مكتبة الصور",
+      "files": "الملفات",
+      "cameraAccessDisabled": "الوصول إلى الكاميرا معطل",
+      "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
+    },
+    "typingIndicator": {
+      "someone": "شخص ما",
+      "oneTyping": "{{name}} يكتب...",
+      "manyTyping": "{{names}} يكتبون..."
+    },
+    "botStatus": {
+      "online": "متصل",
+      "idle": "خامل",
+      "offline": "غير متصل",
+      "unknown": "غير معروف",
+      "loadingUser": "جارٍ تحميل المستخدم...",
+      "waitingForStatus": "في انتظار حالة الروبوت...",
+      "offlineMessage": "الروبوت غير متصل. ستُستأنف الرسائل عند إعادة اتصاله."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "نشط الآن"
+    "activeNow": "نشط الآن",
+    "search": {
+      "searching": "جارٍ البحث",
+      "searchSessions": "البحث في الجلسات",
+      "searchSessionsPlaceholder": "البحث في الجلسات...",
+      "clearSearch": "مسح البحث",
+      "clearFilters": "مسح عوامل التصفية"
+    },
+    "sessionList": {
+      "couldNotLoad": "تعذّر تحميل الجلسات",
+      "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة",
+      "noSessionsYet": "لا توجد جلسات بعد",
+      "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
+      "noMatches": "لا توجد جلسات مطابقة",
+      "tryDifferentSearch": "جرّب مصطلح بحث مختلف.",
+      "tryAdjustFilters": "جرّب تعديل عوامل التصفية أو مسحها.",
+      "couldNotSearch": "تعذّر البحث في الجلسات",
+      "allActive": "جميع الجلسات نشطة",
+      "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
+      "noPastSessions": "لا توجد جلسات سابقة",
+      "live": "مباشر"
+    },
+    "sessionRow": {
+      "deleteTitle": "حذف الجلسة؟",
+      "deleteMessage": "لا يمكن التراجع عن هذا.",
+      "delete": "حذف",
+      "deleteSession": "حذف الجلسة",
+      "rename": "إعادة تسمية",
+      "renameMessage": "أدخل اسمًا جديدًا لهذه الجلسة",
+      "copyId": "نسخ معرّف الجلسة",
+      "idCopied": "تم نسخ معرّف الجلسة",
+      "couldNotCopyId": "تعذّر نسخ معرّف الجلسة",
+      "untitled": "جلسة بدون عنوان"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "تعذّر تحميل الجلسة",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة",
       "notFound": "غير موجود",
-      "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا."
+      "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
+      "failedToStopExecution": "تعذّر إيقاف التنفيذ",
+      "renameSession": "إعادة تسمية الجلسة",
+      "renamePlaceholder": "اسم الجلسة",
+      "transcriptAccessibility": "نص الجلسة",
+      "readOnly": "هذه جلسة للقراءة فقط",
+      "emptyDescription": "أرسل رسالة أدناه للبدء.",
+      "scrollToBottom": "التمرير إلى الأسفل",
+      "emptyTitle": "لا توجد رسائل بعد",
+      "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
+      "connectRepository": "ربط المستودع",
+      "cloningSession": "جارٍ استنساخ الجلسة",
+      "continue": "متابعة",
+      "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة",
+      "cloneFailed": "تعذّر استنساخ هذه الجلسة.",
+      "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
+      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",
       "exited": "انتهت الجلسة",
-      "failedToExit": "تعذّر الخروج من الجلسة"
+      "failedToExit": "تعذّر الخروج من الجلسة",
+      "exitTitle": "الخروج من الجلسة؟",
+      "exitMessage": "يؤدي هذا إلى إيقاف الجلسة الجارية مع الاحتفاظ بسجلها.",
+      "keepSessionRunning": "إبقاء الجلسة قيد التشغيل",
+      "exitSession": "الخروج من الجلسة",
+      "restartExitFailed": "بدأت جلسة جديدة. الجلسة السابقة ما تزال مفتوحة."
+    },
+    "sessionConnection": {
+      "connecting": "جارٍ الاتصال…",
+      "reconnecting": "جارٍ إعادة الاتصال…",
+      "connectionLost": "انقطع الاتصال",
+      "retryConnection": "إعادة محاولة الاتصال"
     },
     "newSession": {
       "title": "جلسة جديدة",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "تعذّر تحميل النماذج",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اخترهما أدناه.",
       "prefillRepoUnavailable": "لم يعد {{repo}} متاحًا. اختر مستودعًا أدناه.",
-      "prefillModelUnavailable": "لم يعد {{model}} متاحًا. سيتم استخدام نموذجك الافتراضي."
+      "prefillModelUnavailable": "لم يعد {{model}} متاحًا. سيتم استخدام نموذجك الافتراضي.",
+      "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
+      "failedToCreate": "تعذّر إنشاء الجلسة"
     },
     "partRenderer": {
       "updatedFile": "تم تحديث {{count}} ملف",
       "updatedFiles": "تم تحديث {{count}} ملفات"
+    },
+    "toolPatch": {
+      "operationAdded": "مضاف",
+      "operationDeleted": "محذوف",
+      "operationUpdated": "محدّث"
+    },
+    "toolCard": {
+      "accessibility": "أداة {{label}}، {{status}}",
+      "accessibilityLabel": "أداة {{name}}، {{status}}",
+      "fileEmpty": "هذا الملف فارغ.",
+      "noTasks": "لا توجد مهام.",
+      "contentTruncated": "تم اقتطاع المحتوى",
+      "truncated": "مقتطع",
+      "toolRead": "قراءة",
+      "toolEdit": "تعديل",
+      "toolWrite": "كتابة",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "سرد",
+      "toolPatch": "patch",
+      "toolTask": "مهمة",
+      "readTodos": "قراءة المهام",
+      "updateTodos": "تحديث المهام",
+      "linesBadge": "{{count}} أسطر",
+      "filesBadge": "{{count}} ملفات",
+      "matchesBadge": "{{count}} تطابقات"
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
@@ -507,11 +710,14 @@
       "noMatches": "لا توجد نتائج مطابقة",
       "noRepositories": "لا توجد مستودعات متاحة",
       "noRepositoriesDescription": "لا توجد مستودعات متصلة بحسابك.",
-      "tryDifferentSearch": "جرّب مصطلح بحث مختلف."
+      "tryDifferentSearch": "جرّب مصطلح بحث مختلف.",
+      "loading": "جارٍ التحميل...",
+      "accessibility": "المستودع: {{label}}"
     },
     "messageDetails": {
       "title": "تفاصيل الرسالة",
       "copyMessage": "نسخ الرسالة",
+      "copyText": "نسخ النص",
       "selectText": "تحديد النص",
       "reportAiResponse": "الإبلاغ عن رد الذكاء الاصطناعي",
       "reportAiResponseConfirm": "الإبلاغ عن هذا الرد للمراجعة؟",
@@ -528,7 +734,10 @@
       "reasoning": "الاستدلال",
       "cacheRead": "قراءة من ذاكرة التخزين المؤقت",
       "cacheWrite": "كتابة في ذاكرة التخزين المؤقت",
-      "total": "الإجمالي"
+      "total": "الإجمالي",
+      "reportAiResponseFailedRetryable": "تعذّر الإبلاغ عن هذا الرد.",
+      "reportAiResponseFailedTerminal": "لا يمكن الإبلاغ عن هذا الرد.",
+      "reportAiResponseSubmitted": "تم إرسال البلاغ. الإيصال {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "التفاصيل غير متاحة",
@@ -536,7 +745,9 @@
       "thinking": "التفكير",
       "thought": "فكرة",
       "title": "التفاصيل",
-      "showDetails": "عرض التفاصيل"
+      "showDetails": "عرض التفاصيل",
+      "pending": "قيد الانتظار…",
+      "running": "جارٍ التشغيل…"
     },
     "messageErrorBoundary": {
       "failedToRender": "تعذّر عرض المحتوى"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "الصورة غير متاحة، أعد محاولة التحميل",
       "imageUnavailable": "الصورة غير متاحة",
       "imageUnavailableWithAlt": "الصورة غير متاحة {{alt}}",
+      "imagePreviewUnavailableInSession": "معاينة الصورة غير متاحة في هذه الجلسة.",
       "viewImage": "عرض الصورة",
       "viewImageWithAlt": "عرض الصورة {{alt}}",
       "imageOutput": "مخرجات الصورة",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "إعادة محاولة تحميل الملف",
       "fileEmpty": "هذا الملف فارغ.",
       "previewUnavailable": "المعاينة غير متاحة",
+      "fileUnavailableInSession": "الملف غير متاح في هذه الجلسة.",
       "shareFailed": "فشلت المشاركة",
       "sharingUnavailable": "مشاركة الملفات غير متاحة على هذا الجهاز.",
       "shareFailedRetry": "تعذّرت مشاركة الملف. يرجى المحاولة مرة أخرى.",
@@ -654,7 +867,13 @@
       "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة"
     },
     "olderMessages": {
-      "arrived": "تم تحميل الرسائل السابقة"
+      "arrived": "تم تحميل الرسائل السابقة",
+      "retryHint": "يعيد محاولة تحميل الرسائل الأقدم لهذه الجلسة.",
+      "omittedOne": "تعذّر عرض عنصر أقدم من هذه الجلسة.",
+      "omittedMany": "تعذّر عرض {{count}} من العناصر الأقدم من هذه الجلسة.",
+      "couldNotLoad": "تعذّر تحميل الرسائل الأقدم.",
+      "unavailable": "الرسائل الأقدم غير متاحة.",
+      "tooLarge": "الرسائل الأقدم أكبر من أن تُحمَّل."
     },
     "markdownTable": {
       "viewTable": "عرض الجدول",
@@ -682,6 +901,13 @@
       "project": "المشروع",
       "removeProjectFilter": "إزالة عامل تصفية المشروع {{label}}",
       "removePlatformFilter": "إزالة عامل تصفية المنصة {{label}}"
+    },
+    "suggestion": {
+      "title": "اقتراح",
+      "dismiss": "تجاهل الاقتراح",
+      "applyFailed": "تعذّر تطبيق هذا الاقتراح. حاول مرة أخرى.",
+      "dismissFailed": "تعذّر تجاهل هذا الاقتراح. حاول مرة أخرى.",
+      "dismissed": "تم تجاهل الاقتراح"
     },
     "modelPicker": {
       "title": "اختيار النموذج",
@@ -734,7 +960,13 @@
       "waitForUploads": "انتظر حتى ينتهي رفع المرفقات.",
       "pasteFromClipboard": "لصق من الحافظة",
       "stopGenerating": "إيقاف التوليد",
-      "sendMessage": "إرسال الرسالة"
+      "sendMessage": "إرسال الرسالة",
+      "selectModelBeforeSending": "اختر نموذجًا قبل الإرسال",
+      "preparingPlaceholder": "جارٍ إعداد البيئة...",
+      "finalizingPlaceholder": "جارٍ الإنهاء...",
+      "messagePlaceholder": "رسالة...",
+      "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
+      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى."
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",
@@ -769,6 +1001,8 @@
       "startNewSession": "بدء جلسة جديدة",
       "exitSession": "الخروج من الجلسة",
       "clearSession": "إنهاء هذه الجلسة وبدء جلسة جديدة",
+      "useCommand": "استخدام /{{command}}",
+      "insert": "إدراج",
       "upgradeRequiredFallback": "يرجى تحديث CLI لاستخدام هذا الأمر.",
       "exitCapabilityUnavailable": "حدّث CLI للخروج من الجلسة.",
       "clearCapabilityUnavailable": "حدّث CLI لإعادة تشغيل الجلسة.",
@@ -780,7 +1014,36 @@
       "costPrefix": "التكلفة {{cost}}",
       "costSuffix": "، التكلفة {{cost}}",
       "tokensWindowUnavailable": "السياق {{used}} رمز، النافذة غير متاحة",
-      "tokensUsage": "السياق {{used}} من {{window}} رمز، تم استخدام {{percentage}}%"
+      "tokensUsage": "السياق {{used}} من {{window}} رمز، تم استخدام {{percentage}}%",
+      "title": "استخدام السياق",
+      "used": "المستخدم",
+      "remaining": "المتبقي",
+      "provider": "المزود",
+      "totalCost": "التكلفة الإجمالية",
+      "usageReflectsLatest": "يعكس الاستخدام أحدث رد مكتمل من المساعد.",
+      "tokenUsage": "استخدام الرموز",
+      "cacheRate": "معدل ذاكرة التخزين المؤقت",
+      "modelsCount": "النماذج ({{count}})",
+      "tokenTotalsNote": "تغطي إجماليات الرموز هذه الجلسة فقط وتستثني رموز الوكلاء الفرعيين/الجلسات الفرعية.",
+      "subagents": "وكلاء فرعيون",
+      "subagentsDescription": "التكلفة المتبقية من الجلسات الفرعية",
+      "olderActivity": "نشاط أقدم",
+      "olderActivityDescription": "تكلفة غير منسوبة إلى السجل المحمّل",
+      "ofWindowTokens": "من {{window}} رمز",
+      "tokens": "رموز",
+      "tokensWithPercentage": "رموز ({{percentage}})",
+      "stepsCountOne": "{{steps}} خطوة",
+      "stepsCountMany": "{{steps}} خطوات",
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+    },
+    "prBadge": {
+      "open": "طلب سحب مفتوح",
+      "closed": "طلب سحب مغلق",
+      "merged": "طلب سحب مدموج",
+      "draft": "طلب سحب مسودة",
+      "updating": "جارٍ التحديث، {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "طلب سحب"
     }
   },
   "bootstrap": {

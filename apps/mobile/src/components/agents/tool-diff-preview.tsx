@@ -7,6 +7,7 @@
 // the transcript `FlashList` owns all vertical scrolling.
 
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
@@ -19,6 +20,7 @@ type ToolDiffPreviewProps = {
 };
 
 export function ToolDiffPreview({ model, partId }: Readonly<ToolDiffPreviewProps>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-0">
       {model.lines.map((line, index) => (
@@ -30,8 +32,11 @@ export function ToolDiffPreview({ model, partId }: Readonly<ToolDiffPreviewProps
         />
       ))}
       {model.truncated ? (
-        <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-          Truncated
+        <Text
+          accessibilityLabel={t('monoScrollBlock.contentTruncated')}
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          {t('monoScrollBlock.truncated')}
         </Text>
       ) : null}
     </View>

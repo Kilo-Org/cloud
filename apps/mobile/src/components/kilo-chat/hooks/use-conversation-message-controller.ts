@@ -11,6 +11,7 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { captureEvent, MESSAGE_SENT_EVENT } from '@/lib/analytics/posthog';
 
 import { resolveMobileMessageInputAvailability } from '../bot-send-state';
@@ -106,7 +107,7 @@ export function useConversationMessageController({
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: err => {
-            toast.error(formatKiloChatError(err, 'Failed to retry send'));
+            toast.error(formatKiloChatError(err, i18n.t('chat.messageActions.retrySendFailed')));
           },
         }
       );
@@ -150,7 +151,7 @@ export function useConversationMessageController({
           setRemovedEditAttachmentIds([]);
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (error) {
-          toast.error(formatKiloChatError(error, 'Failed to edit message'));
+          toast.error(formatKiloChatError(error, i18n.t('chat.messageActions.editFailed')));
         }
         return;
       }

@@ -18,6 +18,7 @@
     "openInBrowser": "Buka di browser",
     "openSettings": "Buka Pengaturan",
     "copiedToClipboard": "Disalin ke papan klip",
+    "couldNotCopyToClipboard": "Tidak dapat menyalin ke papan klip",
     "required": "wajib diisi",
     "error": "kesalahan: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Gagal memuat percakapan",
       "notFound": "Percakapan tidak ditemukan",
-      "untitled": "Tanpa judul"
+      "untitled": "Tanpa judul",
+      "leaveTitle": "Tinggalkan percakapan?",
+      "leaveMessage": "Ini menghapusnya dari daftar Anda.",
+      "openHint": "Membuka percakapan. Tekan lama untuk opsi ganti nama dan tinggalkan.",
+      "unread": "Belum dibaca",
+      "optionsFor": "Opsi percakapan untuk {{title}}",
+      "options": "Opsi percakapan",
+      "renameTitle": "Ganti nama percakapan",
+      "renamePlaceholder": "Masukkan nama baru",
+      "couldNotReachBot": "Tidak dapat menghubungi bot. Coba lagi.",
+      "messageDeliveryFailed": "Pesan tidak dapat dikirim ke bot",
+      "couldNotSignIn": "Tidak dapat masuk ke obrolan",
+      "couldNotRefreshMessages": "Tidak dapat menyegarkan pesan",
+      "couldNotLoadHistory": "Tidak dapat memuat riwayat percakapan",
+      "rename": "Ganti nama",
+      "leave": "Tinggalkan",
+      "untitledConversation": "Percakapan tanpa judul",
+      "createFailed": "Gagal membuat percakapan",
+      "leaveFailed": "Gagal meninggalkan percakapan"
+    },
+    "reactions": {
+      "title": "Reaksi",
+      "close": "Tutup reaksi",
+      "recent": "Terbaru",
+      "common": "Umum",
+      "reactWith": "Bereaksi dengan {{reaction}}",
+      "accessibility": "Reaksi {{emoji}}, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Membalas ke",
+      "cancelReply": "Batalkan balasan",
+      "openInstance": "Buka instans",
+      "attachFile": "Lampirkan file",
+      "messagePlaceholder": "Pesan",
+      "cancelEdit": "Batalkan pengeditan",
+      "sendMessage": "Kirim pesan"
+    },
+    "conversationList": {
+      "couldNotLoad": "Tidak dapat memuat percakapan",
+      "emptyTitle": "Belum ada percakapan",
+      "emptyDescription": "Buat percakapan untuk mulai mengobrol dengan instans KiloClaw Anda.",
+      "create": "Buat percakapan",
+      "starting": "Memulai…",
+      "newConversation": "Percakapan baru",
+      "openInstanceSettings": "Buka pengaturan instans",
+      "today": "Hari ini",
+      "yesterday": "Kemarin",
+      "thisWeek": "Minggu Ini",
+      "older": "Lebih lama"
+    },
+    "attachment": {
+      "open": "Buka {{filename}}",
+      "imageUnavailable": "Gambar tidak tersedia",
+      "openFailed": "Tidak dapat membuka lampiran. Periksa koneksi Anda dan coba lagi.",
+      "attachFailed": "Gagal melampirkan file",
+      "limit": "Anda dapat melampirkan hingga {{count}} file.",
+      "sizeRejection": "{{filename}} melebihi batas lampiran {{limit}}.",
+      "unreadable": "Tidak dapat membaca {{filename}}.",
+      "pastedImage": "gambar yang ditempel",
+      "defaultName": "Lampiran"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Coba lagi unggah untuk {{filename}}",
+      "remove": "Hapus {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[pesan dihapus]",
+      "yourMessage": "Pesan Anda",
+      "messageFrom": "Pesan dari {{author}}",
+      "moreActions": "Tindakan lainnya",
+      "message": "Pesan",
+      "notDelivered": "Tidak terkirim",
+      "edited": "(diedit)"
+    },
+    "messageActions": {
+      "copied": "Disalin",
+      "copyFailed": "Gagal menyalin",
+      "title": "Tindakan pesan",
+      "deleteTitle": "Hapus pesan?",
+      "deleteMessage": "Ini akan menghapus pesan dari percakapan.",
+      "delete": "Hapus",
+      "deleteFailed": "Gagal menghapus pesan",
+      "removeReactionFailed": "Gagal menghapus reaksi",
+      "addReactionFailed": "Gagal menambahkan reaksi",
+      "retrySend": "Kirim ulang",
+      "moreReactions": "Reaksi lainnya",
+      "reply": "Balas",
+      "edit": "Edit",
+      "sendFailed": "Gagal mengirim pesan",
+      "retrySendFailed": "Gagal mengirim ulang",
+      "editFailed": "Gagal mengedit pesan",
+      "executeFailed": "Gagal menjalankan tindakan"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Ambil foto",
+      "photoLibrary": "Galeri foto",
+      "files": "File",
+      "cameraAccessDisabled": "Akses Kamera Dinonaktifkan",
+      "cameraAccessMessage": "Izinkan akses kamera di Pengaturan untuk mengambil foto."
+    },
+    "typingIndicator": {
+      "someone": "Seseorang",
+      "oneTyping": "{{name}} sedang mengetik...",
+      "manyTyping": "{{names}} sedang mengetik..."
+    },
+    "botStatus": {
+      "online": "Online",
+      "idle": "Idle",
+      "offline": "Offline",
+      "unknown": "Tidak diketahui",
+      "loadingUser": "Memuat pengguna...",
+      "waitingForStatus": "Menunggu status bot...",
+      "offlineMessage": "Bot sedang offline. Pesan akan dilanjutkan saat bot terhubung kembali."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Aktif sekarang"
+    "activeNow": "Aktif sekarang",
+    "search": {
+      "searching": "Mencari",
+      "searchSessions": "Cari sesi",
+      "searchSessionsPlaceholder": "Cari sesi...",
+      "clearSearch": "Hapus pencarian",
+      "clearFilters": "Hapus filter"
+    },
+    "sessionList": {
+      "couldNotLoad": "Tidak dapat memuat sesi",
+      "couldNotLoadActive": "Tidak dapat memuat sesi aktif",
+      "noSessionsYet": "Belum ada sesi",
+      "noSessionsYetDescription": "Mulai tugas coding dari ponsel Anda. Sesi Anda akan muncul di sini.",
+      "noMatches": "Tidak ada sesi yang cocok",
+      "tryDifferentSearch": "Coba istilah pencarian lain.",
+      "tryAdjustFilters": "Coba sesuaikan atau hapus filter Anda.",
+      "couldNotSearch": "Tidak dapat mencari sesi",
+      "allActive": "Semua sesi aktif",
+      "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
+      "noPastSessions": "Tidak ada sesi sebelumnya",
+      "live": "LANGSUNG"
+    },
+    "sessionRow": {
+      "deleteTitle": "Hapus sesi?",
+      "deleteMessage": "Ini tidak dapat dibatalkan.",
+      "delete": "Hapus",
+      "deleteSession": "Hapus sesi",
+      "rename": "Ganti nama",
+      "renameMessage": "Masukkan nama baru untuk sesi ini",
+      "copyId": "Salin ID sesi",
+      "idCopied": "ID sesi disalin",
+      "couldNotCopyId": "Tidak dapat menyalin ID sesi",
+      "untitled": "Sesi tanpa judul"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Tidak dapat memuat sesi",
       "failedToLoadDetails": "Gagal memuat detail sesi",
       "notFound": "Tidak ditemukan",
-      "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia."
+      "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia.",
+      "failedToStopExecution": "Gagal menghentikan eksekusi",
+      "renameSession": "Ganti nama sesi",
+      "renamePlaceholder": "Nama sesi",
+      "transcriptAccessibility": "Transkrip sesi",
+      "readOnly": "Ini adalah sesi hanya-baca",
+      "emptyDescription": "Kirim pesan di bawah untuk memulai.",
+      "scrollToBottom": "Gulir ke bawah",
+      "emptyTitle": "Belum ada pesan",
+      "renameAccessibility": "Ganti nama sesi: {{title}}",
+      "connectRepository": "Hubungkan repositori",
+      "cloningSession": "Mengkloning sesi",
+      "continue": "Lanjutkan",
+      "couldNotLoadThisSession": "Tidak dapat memuat sesi ini",
+      "cloneFailed": "Tidak dapat mengkloning sesi ini.",
+      "cloneFailedRetry": "Tidak dapat mengkloning sesi ini. Coba lagi.",
+      "connectRepositoryToContinue": "Hubungkan repositori untuk melanjutkan."
     },
     "remoteSession": {
       "failedToCreate": "Gagal membuat sesi jarak jauh",
       "exited": "Sesi keluar",
-      "failedToExit": "Gagal keluar dari sesi"
+      "failedToExit": "Gagal keluar dari sesi",
+      "exitTitle": "Keluar dari sesi?",
+      "exitMessage": "Ini menghentikan sesi yang berjalan tetapi menyimpan riwayatnya.",
+      "keepSessionRunning": "Biarkan sesi tetap berjalan",
+      "exitSession": "Keluar dari sesi",
+      "restartExitFailed": "Sesi baru dimulai. Sesi sebelumnya masih terbuka."
+    },
+    "sessionConnection": {
+      "connecting": "Menghubungkan…",
+      "reconnecting": "Menghubungkan ulang…",
+      "connectionLost": "Koneksi terputus",
+      "retryConnection": "Coba lagi koneksi"
     },
     "newSession": {
       "title": "Sesi baru",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Tidak dapat memuat model",
       "prefillRepoAndModelUnavailable": "Repositori dan model sesi asli tidak lagi tersedia. Pilih di bawah.",
       "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
-      "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Menggunakan model default Anda."
+      "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Menggunakan model default Anda.",
+      "couldNotReadPendingSessions": "Tidak dapat membaca sesi tertunda. Coba lagi.",
+      "failedToCreate": "Gagal membuat sesi"
     },
     "partRenderer": {
       "updatedFile": "Memperbarui {{count}} file",
       "updatedFiles": "Memperbarui {{count}} file"
+    },
+    "toolPatch": {
+      "operationAdded": "Ditambahkan",
+      "operationDeleted": "Dihapus",
+      "operationUpdated": "Diperbarui"
+    },
+    "toolCard": {
+      "accessibility": "Alat {{label}}, {{status}}",
+      "accessibilityLabel": "Alat {{name}}, {{status}}",
+      "fileEmpty": "File ini kosong.",
+      "noTasks": "Tidak ada tugas.",
+      "contentTruncated": "Konten dipotong",
+      "truncated": "Dipotong",
+      "toolRead": "baca",
+      "toolEdit": "edit",
+      "toolWrite": "tulis",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "daftar",
+      "toolPatch": "patch",
+      "toolTask": "tugas",
+      "readTodos": "Baca tugas",
+      "updateTodos": "Perbarui tugas",
+      "linesBadge": "{{count}} baris",
+      "filesBadge": "{{count}} file",
+      "matchesBadge": "{{count}} kecocokan"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -507,11 +710,14 @@
       "noMatches": "Tidak ada kecocokan",
       "noRepositories": "Tidak ada repositori tersedia",
       "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akun Anda.",
-      "tryDifferentSearch": "Coba istilah pencarian lain."
+      "tryDifferentSearch": "Coba istilah pencarian lain.",
+      "loading": "Memuat...",
+      "accessibility": "Repositori: {{label}}"
     },
     "messageDetails": {
       "title": "Detail pesan",
       "copyMessage": "Salin pesan",
+      "copyText": "Salin Teks",
       "selectText": "Pilih teks",
       "reportAiResponse": "Laporkan respons AI",
       "reportAiResponseConfirm": "Laporkan respons ini untuk ditinjau?",
@@ -528,7 +734,10 @@
       "reasoning": "Penalaran",
       "cacheRead": "Pembacaan cache",
       "cacheWrite": "Penulisan cache",
-      "total": "Total"
+      "total": "Total",
+      "reportAiResponseFailedRetryable": "Tidak dapat melaporkan respons ini.",
+      "reportAiResponseFailedTerminal": "Respons ini tidak dapat dilaporkan.",
+      "reportAiResponseSubmitted": "Laporan terkirim. Tanda terima {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Detail tidak tersedia",
@@ -536,7 +745,9 @@
       "thinking": "Pemikiran",
       "thought": "Pikiran",
       "title": "Detail",
-      "showDetails": "Tampilkan detail"
+      "showDetails": "Tampilkan detail",
+      "pending": "Tertunda…",
+      "running": "Berjalan…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal merender konten"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
       "imageUnavailable": "Gambar tidak tersedia",
       "imageUnavailableWithAlt": "Gambar tidak tersedia {{alt}}",
+      "imagePreviewUnavailableInSession": "Pratinjau gambar tidak tersedia di sesi ini.",
       "viewImage": "Lihat gambar",
       "viewImageWithAlt": "Lihat gambar {{alt}}",
       "imageOutput": "Keluaran gambar",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Coba lagi memuat file",
       "fileEmpty": "File ini kosong.",
       "previewUnavailable": "Pratinjau tidak tersedia",
+      "fileUnavailableInSession": "File tidak tersedia di sesi ini.",
       "shareFailed": "Gagal membagikan",
       "sharingUnavailable": "Berbagi file tidak tersedia di perangkat ini.",
       "shareFailedRetry": "Gagal membagikan file. Coba lagi.",
@@ -654,7 +867,13 @@
       "longPressHint": "Tekan lama untuk detail pesan"
     },
     "olderMessages": {
-      "arrived": "Pesan sebelumnya dimuat"
+      "arrived": "Pesan sebelumnya dimuat",
+      "retryHint": "Mencoba ulang pemuatan pesan lama untuk sesi ini.",
+      "omittedOne": "Satu item sebelumnya dari sesi ini tidak dapat ditampilkan.",
+      "omittedMany": "{{count}} item sebelumnya dari sesi ini tidak dapat ditampilkan.",
+      "couldNotLoad": "Tidak dapat memuat pesan sebelumnya.",
+      "unavailable": "Pesan sebelumnya tidak tersedia.",
+      "tooLarge": "Pesan sebelumnya terlalu besar untuk dimuat."
     },
     "markdownTable": {
       "viewTable": "Lihat tabel",
@@ -682,6 +901,13 @@
       "project": "Proyek",
       "removeProjectFilter": "Hapus filter proyek {{label}}",
       "removePlatformFilter": "Hapus filter platform {{label}}"
+    },
+    "suggestion": {
+      "title": "Saran",
+      "dismiss": "Tutup saran",
+      "applyFailed": "Tidak dapat menerapkan saran ini. Coba lagi.",
+      "dismissFailed": "Tidak dapat menutup saran ini. Coba lagi.",
+      "dismissed": "Saran ditutup"
     },
     "modelPicker": {
       "title": "Pilih model",
@@ -734,7 +960,13 @@
       "waitForUploads": "Tunggu lampiran selesai diunggah.",
       "pasteFromClipboard": "Tempel dari papan klip",
       "stopGenerating": "Hentikan pembuatan",
-      "sendMessage": "Kirim pesan"
+      "sendMessage": "Kirim pesan",
+      "selectModelBeforeSending": "Pilih model sebelum mengirim",
+      "preparingPlaceholder": "Menyiapkan lingkungan...",
+      "finalizingPlaceholder": "Menyelesaikan...",
+      "messagePlaceholder": "Pesan...",
+      "cannotReceiveFiles": "Sesi ini tidak dapat menerima file. Hapus lampiran untuk mengirim pesan Anda.",
+      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi."
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",
@@ -769,6 +1001,8 @@
       "startNewSession": "Mulai sesi baru",
       "exitSession": "Keluar dari sesi",
       "clearSession": "Akhiri sesi ini dan mulai yang baru",
+      "useCommand": "Gunakan /{{command}}",
+      "insert": "Sisipkan",
       "upgradeRequiredFallback": "Perbarui CLI Anda untuk menggunakan perintah ini.",
       "exitCapabilityUnavailable": "Perbarui CLI Anda untuk keluar dari sesi.",
       "clearCapabilityUnavailable": "Perbarui CLI Anda untuk memulai ulang sesi.",
@@ -780,7 +1014,36 @@
       "costPrefix": "biaya {{cost}}",
       "costSuffix": ", biaya {{cost}}",
       "tokensWindowUnavailable": "Konteks {{used}} token, jendela tidak tersedia",
-      "tokensUsage": "Konteks {{used}} dari {{window}} token, {{percentage}}% digunakan"
+      "tokensUsage": "Konteks {{used}} dari {{window}} token, {{percentage}}% digunakan",
+      "title": "Penggunaan konteks",
+      "used": "Terpakai",
+      "remaining": "Tersisa",
+      "provider": "Penyedia",
+      "totalCost": "Total biaya",
+      "usageReflectsLatest": "Penggunaan mencerminkan respons asisten terakhir yang selesai.",
+      "tokenUsage": "Penggunaan token",
+      "cacheRate": "Tarif cache",
+      "modelsCount": "Model ({{count}})",
+      "tokenTotalsNote": "Total token hanya mencakup sesi ini dan tidak termasuk token subagen/sesi anak.",
+      "subagents": "Subagen",
+      "subagentsDescription": "Biaya sisa dari sesi anak",
+      "olderActivity": "Aktivitas lama",
+      "olderActivityDescription": "Biaya yang tidak diatribusikan ke riwayat yang dimuat",
+      "ofWindowTokens": "dari {{window}} token",
+      "tokens": "token",
+      "tokensWithPercentage": "token ({{percentage}})",
+      "stepsCountOne": "{{steps}} langkah",
+      "stepsCountMany": "{{steps}} langkah",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "pull request terbuka",
+      "closed": "pull request tertutup",
+      "merged": "pull request tergabung",
+      "draft": "pull request draf",
+      "updating": "Memperbarui, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {

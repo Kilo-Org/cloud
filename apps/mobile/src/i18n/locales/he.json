@@ -18,6 +18,7 @@
     "openInBrowser": "פתח בדפדפן",
     "openSettings": "פתח הגדרות",
     "copiedToClipboard": "הועתק ללוח",
+    "couldNotCopyToClipboard": "לא ניתן היה להעתיק ללוח",
     "required": "חובה",
     "error": "שגיאה: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "לא ניתן לטעון את השיחה",
       "notFound": "השיחה לא נמצאה",
-      "untitled": "ללא כותרת"
+      "untitled": "ללא כותרת",
+      "leaveTitle": "לעזוב את השיחה?",
+      "leaveMessage": "פעולה זו מסירה אותה מהרשימה שלך.",
+      "openHint": "פותח את השיחה. לחיצה ארוכה לאפשרויות שינוי שם ועזיבה.",
+      "unread": "לא נקרא",
+      "optionsFor": "אפשרויות שיחה עבור {{title}}",
+      "options": "אפשרויות שיחה",
+      "renameTitle": "שנה שם שיחה",
+      "renamePlaceholder": "הזן שם חדש",
+      "couldNotReachBot": "לא ניתן היה להגיע לבוט. נסה שוב.",
+      "messageDeliveryFailed": "לא ניתן היה למסור את ההודעה לבוט",
+      "couldNotSignIn": "לא ניתן היה להיכנס לצ׳אט",
+      "couldNotRefreshMessages": "לא ניתן היה לרענן הודעות",
+      "couldNotLoadHistory": "לא ניתן היה לטעון את היסטוריית השיחה",
+      "rename": "שינוי שם",
+      "leave": "עזיבה",
+      "untitledConversation": "שיחה ללא כותרת",
+      "createFailed": "יצירת השיחה נכשלה",
+      "leaveFailed": "היציאה מהשיחה נכשלה"
+    },
+    "reactions": {
+      "title": "תגובות",
+      "close": "סגור תגובות",
+      "recent": "אחרונות",
+      "common": "נפוצות",
+      "reactWith": "הגב עם {{reaction}}",
+      "accessibility": "{{emoji}} תגובה, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "משיב ל",
+      "cancelReply": "בטל תשובה",
+      "openInstance": "פתח מופע",
+      "attachFile": "צרף קובץ",
+      "messagePlaceholder": "הודעה",
+      "cancelEdit": "בטל עריכה",
+      "sendMessage": "שלח הודעה"
+    },
+    "conversationList": {
+      "couldNotLoad": "לא ניתן היה לטעון שיחות",
+      "emptyTitle": "אין עדיין שיחות",
+      "emptyDescription": "צור שיחה כדי להתחיל לשוחח עם מופע ה-KiloClaw שלך.",
+      "create": "צור שיחה",
+      "starting": "מתחיל…",
+      "newConversation": "שיחה חדשה",
+      "openInstanceSettings": "פתח הגדרות מופע",
+      "today": "היום",
+      "yesterday": "אתמול",
+      "thisWeek": "השבוע",
+      "older": "ישנים יותר"
+    },
+    "attachment": {
+      "open": "פתח את {{filename}}",
+      "imageUnavailable": "התמונה אינה זמינה",
+      "openFailed": "לא ניתן היה לפתוח את הקובץ המצורף. בדוק את החיבור ונסה שוב.",
+      "attachFailed": "צירוף הקובץ נכשל",
+      "limit": "ניתן לצרף עד {{count}} קבצים.",
+      "sizeRejection": "{{filename}} חורג ממגבלת הצירוף של {{limit}}.",
+      "unreadable": "לא ניתן היה לקרוא את {{filename}}.",
+      "pastedImage": "התמונה שהודבקה",
+      "defaultName": "קובץ מצורף"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "נסה שוב להעלות את {{filename}}",
+      "remove": "הסר את {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[הודעה שנמחקה]",
+      "yourMessage": "ההודעה שלך",
+      "messageFrom": "הודעה מאת {{author}}",
+      "moreActions": "עוד פעולות",
+      "message": "הודעה",
+      "notDelivered": "לא נמסר",
+      "edited": "(נערך)"
+    },
+    "messageActions": {
+      "copied": "הועתק",
+      "copyFailed": "ההעתקה נכשלה",
+      "title": "פעולות הודעה",
+      "deleteTitle": "למחוק את ההודעה?",
+      "deleteMessage": "פעולה זו תסיר את ההודעה מהשיחה.",
+      "delete": "מחיקה",
+      "deleteFailed": "מחיקת ההודעה נכשלה",
+      "removeReactionFailed": "הסרת התגובה נכשלה",
+      "addReactionFailed": "הוספת התגובה נכשלה",
+      "retrySend": "שלח שוב",
+      "moreReactions": "עוד תגובות",
+      "reply": "השב",
+      "edit": "ערוך",
+      "sendFailed": "שליחת ההודעה נכשלה",
+      "retrySendFailed": "שליחה חוזרת נכשלה",
+      "editFailed": "עריכת ההודעה נכשלה",
+      "executeFailed": "ביצוע הפעולה נכשל"
+    },
+    "attachmentPicker": {
+      "takePhoto": "צלם תמונה",
+      "photoLibrary": "ספריית תמונות",
+      "files": "קבצים",
+      "cameraAccessDisabled": "הגישה למצלמה מושבתת",
+      "cameraAccessMessage": "אפשר גישה למצלמה בהגדרות כדי לצלם תמונה."
+    },
+    "typingIndicator": {
+      "someone": "מישהו",
+      "oneTyping": "{{name}} מקליד...",
+      "manyTyping": "{{names}} מקלידים..."
+    },
+    "botStatus": {
+      "online": "מקוון",
+      "idle": "בטל",
+      "offline": "לא מקוון",
+      "unknown": "לא ידוע",
+      "loadingUser": "טוען משתמש...",
+      "waitingForStatus": "ממתין לסטטוס הבוט...",
+      "offlineMessage": "הבוט לא מקוון. ההודעות יתחדשו כשיתחבר מחדש."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "פעיל כעת"
+    "activeNow": "פעיל כעת",
+    "search": {
+      "searching": "מחפש",
+      "searchSessions": "חפש הפעלות",
+      "searchSessionsPlaceholder": "חפש הפעלות...",
+      "clearSearch": "נקה חיפוש",
+      "clearFilters": "נקה מסננים"
+    },
+    "sessionList": {
+      "couldNotLoad": "לא ניתן היה לטעון הפעלות",
+      "couldNotLoadActive": "לא ניתן היה לטעון הפעלות פעילות",
+      "noSessionsYet": "אין עדיין הפעלות",
+      "noSessionsYetDescription": "התחל משימת קידוד מהטלפון שלך. ההפעלות שלך יופיעו כאן.",
+      "noMatches": "אין הפעלות תואמות",
+      "tryDifferentSearch": "נסה מונח חיפוש אחר.",
+      "tryAdjustFilters": "נסה להתאים או לנקות את המסננים שלך.",
+      "couldNotSearch": "לא ניתן היה לחפש הפעלות",
+      "allActive": "כל ההפעלות פעילות",
+      "completedWillAppear": "הפעלות שהושלמו יופיעו כאן.",
+      "noPastSessions": "אין הפעלות עבר",
+      "live": "חי"
+    },
+    "sessionRow": {
+      "deleteTitle": "למחוק הפעלה?",
+      "deleteMessage": "לא ניתן לבטל פעולה זו.",
+      "delete": "מחק",
+      "deleteSession": "מחק הפעלה",
+      "rename": "שנה שם",
+      "renameMessage": "הזן שם חדש להפעלה זו",
+      "copyId": "העתק מזהה הפעלה",
+      "idCopied": "מזהה ההפעלה הועתק",
+      "couldNotCopyId": "לא ניתן היה להעתיק את מזהה ההפעלה",
+      "untitled": "הפעלה ללא כותרת"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "לא ניתן היה לטעון את ההפעלה",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי ההפעלה",
       "notFound": "לא נמצא",
-      "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד."
+      "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
+      "failedToStopExecution": "לא ניתן היה לעצור את הביצוע",
+      "renameSession": "שנה שם ההפעלה",
+      "renamePlaceholder": "שם ההפעלה",
+      "transcriptAccessibility": "תמליל ההפעלה",
+      "readOnly": "זוהי הפעלה לקריאה בלבד",
+      "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
+      "scrollToBottom": "גלול לתחתית",
+      "emptyTitle": "אין עדיין הודעות",
+      "renameAccessibility": "שינוי שם הסשן: {{title}}",
+      "connectRepository": "חיבור מאגר",
+      "cloningSession": "משכפל סשן",
+      "continue": "המשך",
+      "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
+      "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
+      "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
+      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",
       "exited": "ההפעלה הסתיימה",
-      "failedToExit": "לא ניתן היה לצאת מההפעלה"
+      "failedToExit": "לא ניתן היה לצאת מההפעלה",
+      "exitTitle": "לצאת מההפעלה?",
+      "exitMessage": "פעולה זו עוצרת את ההפעלה הרצה אך שומרת על ההיסטוריה שלה.",
+      "keepSessionRunning": "השאר את ההפעלה רצה",
+      "exitSession": "צא מההפעלה",
+      "restartExitFailed": "התחילה הפעלה חדשה. ההפעלה הקודמת עדיין פתוחה."
+    },
+    "sessionConnection": {
+      "connecting": "מתחבר…",
+      "reconnecting": "מתחבר מחדש…",
+      "connectionLost": "החיבור אבד",
+      "retryConnection": "נסה שוב להתחבר"
     },
     "newSession": {
       "title": "הפעלה חדשה",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "לא ניתן היה לטעון דגמים",
       "prefillRepoAndModelUnavailable": "המאגר והדגם של ההפעלה המקורית אינם זמינים עוד. בחר אותם למטה.",
       "prefillRepoUnavailable": "{{repo}} אינו זמין עוד. בחר מאגר למטה.",
-      "prefillModelUnavailable": "{{model}} אינו זמין עוד. נעשה שימוש בדגם ברירת המחדל שלך."
+      "prefillModelUnavailable": "{{model}} אינו זמין עוד. נעשה שימוש בדגם ברירת המחדל שלך.",
+      "couldNotReadPendingSessions": "לא ניתן היה לקרוא הפעלות ממתינות. נסה שוב.",
+      "failedToCreate": "לא ניתן היה ליצור הפעלה"
     },
     "partRenderer": {
       "updatedFile": "עודכן {{count}} קובץ",
       "updatedFiles": "עודכנו {{count}} קבצים"
+    },
+    "toolPatch": {
+      "operationAdded": "נוסף",
+      "operationDeleted": "נמחק",
+      "operationUpdated": "עודכן"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} כלי, {{status}}",
+      "accessibilityLabel": "{{name}} כלי, {{status}}",
+      "fileEmpty": "הקובץ הזה ריק.",
+      "noTasks": "אין משימות.",
+      "contentTruncated": "התוכן קוצר",
+      "truncated": "קטום",
+      "toolRead": "קריאה",
+      "toolEdit": "עריכה",
+      "toolWrite": "כתיבה",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "רשימה",
+      "toolPatch": "patch",
+      "toolTask": "משימה",
+      "readTodos": "קריאת משימות",
+      "updateTodos": "עדכון משימות",
+      "linesBadge": "{{count}} שורות",
+      "filesBadge": "{{count}} קבצים",
+      "matchesBadge": "{{count}} התאמות"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (קטום)",
@@ -507,11 +710,14 @@
       "noMatches": "אין התאמות",
       "noRepositories": "אין מאגרים זמינים",
       "noRepositoriesDescription": "לא מחוברים מאגרים לחשבון שלך.",
-      "tryDifferentSearch": "נסה מונח חיפוש אחר."
+      "tryDifferentSearch": "נסה מונח חיפוש אחר.",
+      "loading": "טוען...",
+      "accessibility": "מאגר: {{label}}"
     },
     "messageDetails": {
       "title": "פרטי הודעה",
       "copyMessage": "העתק הודעה",
+      "copyText": "העתק טקסט",
       "selectText": "בחר טקסט",
       "reportAiResponse": "דווח על תשובת AI",
       "reportAiResponseConfirm": "לדווח על התשובה הזו לסקירה?",
@@ -528,7 +734,10 @@
       "reasoning": "חשיבה",
       "cacheRead": "קריאת מטמון",
       "cacheWrite": "כתיבת מטמון",
-      "total": "סה״כ"
+      "total": "סה״כ",
+      "reportAiResponseFailedRetryable": "לא ניתן היה לדווח על תגובה זו.",
+      "reportAiResponseFailedTerminal": "לא ניתן לדווח על תגובה זו.",
+      "reportAiResponseSubmitted": "הדיווח נשלח. קבלה {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "הפרטים אינם זמינים",
@@ -536,7 +745,9 @@
       "thinking": "חשיבה",
       "thought": "מחשבה",
       "title": "פרטים",
-      "showDetails": "הצג פרטים"
+      "showDetails": "הצג פרטים",
+      "pending": "ממתין…",
+      "running": "רץ…"
     },
     "messageErrorBoundary": {
       "failedToRender": "לא ניתן היה להציג תוכן"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "התמונה אינה זמינה, נסה שוב לטעון",
       "imageUnavailable": "התמונה אינה זמינה",
       "imageUnavailableWithAlt": "התמונה אינה זמינה {{alt}}",
+      "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונה אינה זמינה בהפעלה זו.",
       "viewImage": "צפה בתמונה",
       "viewImageWithAlt": "צפה בתמונה {{alt}}",
       "imageOutput": "פלט תמונה",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "נסה שוב לטעון את הקובץ",
       "fileEmpty": "הקובץ הזה ריק.",
       "previewUnavailable": "תצוגה מקדימה אינה זמינה",
+      "fileUnavailableInSession": "הקובץ אינו זמין בהפעלה זו.",
       "shareFailed": "השיתוף נכשל",
       "sharingUnavailable": "שיתוף קבצים אינו זמין במכשיר הזה.",
       "shareFailedRetry": "לא ניתן היה לשתף את הקובץ. נסה שוב.",
@@ -654,7 +867,13 @@
       "longPressHint": "לחיצה ארוכה לפרטי ההודעה"
     },
     "olderMessages": {
-      "arrived": "הודעות קודמות נטענו"
+      "arrived": "הודעות קודמות נטענו",
+      "retryHint": "מנסה שוב לטעון הודעות ישנות יותר של הפעלה זו.",
+      "omittedOne": "לא ניתן היה להציג פריט מוקדם יותר מהפעלה זו.",
+      "omittedMany": "לא ניתן היה להציג {{count}} פריטים מוקדמים יותר מהפעלה זו.",
+      "couldNotLoad": "לא ניתן היה לטעון הודעות מוקדמות יותר.",
+      "unavailable": "הודעות מוקדמות יותר אינן זמינות.",
+      "tooLarge": "ההודעות המוקדמות יותר גדולות מדי לטעינה."
     },
     "markdownTable": {
       "viewTable": "צפה בטבלה",
@@ -682,6 +901,13 @@
       "project": "פרויקט",
       "removeProjectFilter": "הסר מסנן פרויקט {{label}}",
       "removePlatformFilter": "הסר מסנן פלטפורמה {{label}}"
+    },
+    "suggestion": {
+      "title": "הצעה",
+      "dismiss": "סגור הצעה",
+      "applyFailed": "לא ניתן היה להחיל הצעה זו. נסה שוב.",
+      "dismissFailed": "לא ניתן היה לסגור הצעה זו. נסה שוב.",
+      "dismissed": "ההצעה נסגרה"
     },
     "modelPicker": {
       "title": "בחר דגם",
@@ -734,7 +960,13 @@
       "waitForUploads": "המתן לסיום העלאת הקבצים המצורפים.",
       "pasteFromClipboard": "הדבק מהלוח",
       "stopGenerating": "עצור יצירה",
-      "sendMessage": "שלח הודעה"
+      "sendMessage": "שלח הודעה",
+      "selectModelBeforeSending": "בחר דגם לפני השליחה",
+      "preparingPlaceholder": "מכין את הסביבה...",
+      "finalizingPlaceholder": "מסיים...",
+      "messagePlaceholder": "הודעה...",
+      "cannotReceiveFiles": "סשן זה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה.",
+      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב."
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",
@@ -769,6 +1001,8 @@
       "startNewSession": "התחל הפעלה חדשה",
       "exitSession": "צא מההפעלה",
       "clearSession": "סיים הפעלה זו והתחל הפעלה חדשה",
+      "useCommand": "השתמש ב-/{{command}}",
+      "insert": "הכנס",
       "upgradeRequiredFallback": "עדכן את ה-CLI שלך כדי להשתמש בפקודה זו.",
       "exitCapabilityUnavailable": "עדכן את ה-CLI שלך כדי לצאת מההפעלה.",
       "clearCapabilityUnavailable": "עדכן את ה-CLI שלך כדי להפעיל מחדש את ההפעלה.",
@@ -780,7 +1014,36 @@
       "costPrefix": "עלות {{cost}}",
       "costSuffix": ", עלות {{cost}}",
       "tokensWindowUnavailable": "הקשר {{used}} אסימונים, חלון אינו זמין",
-      "tokensUsage": "הקשר {{used}} מתוך {{window}} אסימונים, {{percentage}}% בשימוש"
+      "tokensUsage": "הקשר {{used}} מתוך {{window}} אסימונים, {{percentage}}% בשימוש",
+      "title": "שימוש בהקשר",
+      "used": "בשימוש",
+      "remaining": "נותר",
+      "provider": "ספק",
+      "totalCost": "עלות כוללת",
+      "usageReflectsLatest": "השימוש משקף את תשובת העוזר האחרונה שהושלמה.",
+      "tokenUsage": "שימוש באסימונים",
+      "cacheRate": "שיעור מטמון",
+      "modelsCount": "דגמים ({{count}})",
+      "tokenTotalsNote": "סך האסימונים מכסה הפעלה זו בלבד ואינו כולל אסימוני תת-סוכן/הפעלת משנה.",
+      "subagents": "תת-סוכנים",
+      "subagentsDescription": "עלות שיורית מהפעלות משנה",
+      "olderActivity": "פעילות ישנה יותר",
+      "olderActivityDescription": "עלות שאינה משויכת להיסטוריה הטעונה",
+      "ofWindowTokens": "מתוך {{window}} אסימונים",
+      "tokens": "אסימונים",
+      "tokensWithPercentage": "אסימונים ({{percentage}})",
+      "stepsCountOne": "{{steps}} צעד",
+      "stepsCountMany": "{{steps}} צעדים",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "בקשת משיכה פתוחה",
+      "closed": "בקשת משיכה סגורה",
+      "merged": "בקשת משיכה ממוזגת",
+      "draft": "טיוטת בקשת משיכה",
+      "updating": "מעדכן, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "בקשת משיכה"
     }
   },
   "bootstrap": {

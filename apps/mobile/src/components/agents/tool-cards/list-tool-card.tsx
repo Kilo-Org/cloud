@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { FolderOpen } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
@@ -36,6 +37,7 @@ export function ListToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function ListToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -44,7 +46,10 @@ export function ListToolCard({ part }: Readonly<{ part: ToolPart }>) {
       icon={FolderOpen}
       label={display.subtitle ?? display.title}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: part.state.status,
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

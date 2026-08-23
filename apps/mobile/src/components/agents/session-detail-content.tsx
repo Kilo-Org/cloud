@@ -1,9 +1,5 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import {
-  type CloudStatus,
-  type KiloSessionId,
-  type StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
@@ -12,6 +8,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
@@ -149,11 +146,6 @@ type SessionDetailContentProps = {
   spawnedMode?: string;
 };
 
-const COMPOSER_PLACEHOLDERS = {
-  preparing: 'Setting up environment...',
-  finalizing: 'Wrapping up...',
-} satisfies Partial<Record<CloudStatus['type'], string>>;
-
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
@@ -164,6 +156,7 @@ export function SessionDetailContent({
   spawnedMode,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
+  const { t } = useTranslation();
   const router = useRouter();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
@@ -662,7 +655,7 @@ export function SessionDetailContent({
       submission?: AgentAttachmentSubmissionPayload
     ) => {
       if (requiresModel && !(pinned.model ?? currentModel)) {
-        toast.error('Select a model before sending');
+        toast.error(t('agentChat.composer.selectModelBeforeSending'));
         return;
       }
       // Pick the wire shape via the same pure helper the unit test covers:
@@ -676,8 +669,7 @@ export function SessionDetailContent({
         attachments !== undefined
       );
       if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
-        const message =
-          "This session can't receive files. Remove the attachments to send your message.";
+        const message = t('agentChat.composer.cannotReceiveFiles');
         toast.error(message);
         throw new Error(message);
       }
@@ -746,6 +738,7 @@ export function SessionDetailContent({
       activeSessionType,
       supportsAttachments,
       analyticsSurface,
+      t,
     ]
   );
 
@@ -829,9 +822,9 @@ export function SessionDetailContent({
     try {
       await manager.interrupt();
     } catch {
-      toast.error('Failed to stop execution');
+      toast.error(t('agentChat.session.failedToStopExecution'));
     }
-  }, [manager]);
+  }, [manager, t]);
 
   const handleBackToSessions = useCallback(() => {
     router.replace('/(app)/(tabs)/(2_agents)' as Href);
@@ -917,7 +910,7 @@ export function SessionDetailContent({
     messageCount: messages.length,
   });
 
-  const emptyStateText = statusIndicator ? null : 'No messages yet';
+  const emptyStateText = statusIndicator ? null : t('agentChat.session.emptyTitle');
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
   const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
@@ -925,7 +918,7 @@ export function SessionDetailContent({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
-    fallbackTitle: 'Session',
+    fallbackTitle: t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
@@ -996,10 +989,15 @@ export function SessionDetailContent({
     // catalog selection resolves.
     hasModel: Boolean(pinned.model ?? currentModel),
   });
-  const composerPlaceholder =
-    (cloudStatus &&
-      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
-    'Message...';
+  const composerPlaceholder = useMemo(() => {
+    if (cloudStatus?.type === 'preparing') {
+      return t('agentChat.composer.preparingPlaceholder');
+    }
+    if (cloudStatus?.type === 'finalizing') {
+      return t('agentChat.composer.finalizingPlaceholder');
+    }
+    return t('agentChat.composer.messagePlaceholder');
+  }, [cloudStatus, t]);
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
@@ -1115,7 +1113,9 @@ export function SessionDetailContent({
           {...(rename.isTitleInteractive
             ? {
                 onTitlePress: rename.openModal,
-                onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+                onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                  title: rename.title,
+                }),
               }
             : {})}
         />
@@ -1203,8 +1203,8 @@ export function SessionDetailContent({
 
         {rename.isTitleInteractive && rename.isModalOpen ? (
           <RenameModal
-            title="Rename session"
-            placeholder="Session name"
+            title={t('agentChat.session.renameSession')}
+            placeholder={t('agentChat.session.renamePlaceholder')}
             initialValue={rename.modalInitialValue}
             onSave={handleRenameSave}
             onClose={handleRenameClose}
@@ -1221,7 +1221,7 @@ export function SessionDetailContent({
           <Text
             ref={transcriptRef}
             accessible
-            accessibilityLabel="Session transcript"
+            accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
             pointerEvents="none"
             className="absolute inset-0 opacity-0"
           />
@@ -1281,7 +1281,7 @@ export function SessionDetailContent({
         {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
-              This is a read-only session
+              {t('agentChat.session.readOnly')}
             </Text>
             {continueGuidance?.kind === 'terminal' ? (
               <>
@@ -1293,8 +1293,8 @@ export function SessionDetailContent({
                   size="sm"
                   accessibilityLabel={
                     continueGuidance.action === 'connect-repository'
-                      ? 'Connect repository'
-                      : 'Back to sessions'
+                      ? t('agentChat.session.connectRepository')
+                      : t('agentChat.session.backToSessions')
                   }
                   onPress={
                     continueGuidance.action === 'connect-repository'
@@ -1304,8 +1304,8 @@ export function SessionDetailContent({
                 >
                   <Text>
                     {continueGuidance.action === 'connect-repository'
-                      ? 'Connect repository'
-                      : 'Back to sessions'}
+                      ? t('agentChat.session.connectRepository')
+                      : t('agentChat.session.backToSessions')}
                   </Text>
                 </Button>
               </>
@@ -1319,11 +1319,19 @@ export function SessionDetailContent({
                 <Button
                   variant="outline"
                   size="sm"
-                  accessibilityLabel={isContinuing ? 'Cloning session' : 'Continue'}
+                  accessibilityLabel={
+                    isContinuing
+                      ? t('agentChat.session.cloningSession')
+                      : t('agentChat.session.continue')
+                  }
                   loading={isContinuing}
                   onPress={handleContinueInNewSession}
                 >
-                  <Text>{isContinuing ? 'Cloning session' : 'Continue'}</Text>
+                  <Text>
+                    {isContinuing
+                      ? t('agentChat.session.cloningSession')
+                      : t('agentChat.session.continue')}
+                  </Text>
                 </Button>
               </>
             )}
@@ -1411,15 +1419,15 @@ export function SessionDetailContent({
           <View className="flex-row gap-3">
             <Button
               variant="ghost"
-              accessibilityLabel="Copy error details"
+              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
               onPress={() => {
                 void performCopy(copyText);
               }}
             >
-              <Text>Copy</Text>
+              <Text>{t('common.copy')}</Text>
             </Button>
             <Button variant="ghost" onPress={handleBackToSessions}>
-              <Text>Back to sessions</Text>
+              <Text>{t('agentChat.session.backToSessions')}</Text>
             </Button>
           </View>
         </View>
@@ -1436,7 +1444,7 @@ export function SessionDetailContent({
             <EmptyState
               icon={MessageSquare}
               title={emptyStateText}
-              description="Send a message below to get started."
+              description={t('agentChat.session.emptyDescription')}
             />
           ) : null}
         </View>

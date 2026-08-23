@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { FilePlus } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -25,6 +26,7 @@ const optionalStringSchema = z.string().optional();
  * `ToolPartDetailBody`.
  */
 export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
+  const { t } = useTranslation();
   const input = part.state.input;
   const filePath = optionalStringSchema.safeParse(input.filePath).data ?? '';
   const content = optionalStringSchema.safeParse(input.content).data ?? '';
@@ -38,7 +40,9 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   } else if (isMarkdownPath(filePath)) {
     body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
   } else if (content === '') {
-    body = <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+    body = (
+      <Text className="text-xs text-muted-foreground">{t('agentChat.toolCard.fileEmpty')}</Text>
+    );
   } else {
     body = (
       <CodeBlock
@@ -59,6 +63,7 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -67,7 +72,10 @@ export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
       icon={FilePlus}
       label={display.subtitle ?? display.title}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: part.state.status,
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

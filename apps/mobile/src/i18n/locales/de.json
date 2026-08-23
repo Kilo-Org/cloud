@@ -18,6 +18,7 @@
     "openInBrowser": "Im Browser öffnen",
     "openSettings": "Einstellungen öffnen",
     "copiedToClipboard": "In die Zwischenablage kopiert",
+    "couldNotCopyToClipboard": "Konnte nicht in die Zwischenablage kopiert werden",
     "required": "erforderlich",
     "error": "Fehler: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Konversation konnte nicht geladen werden",
       "notFound": "Konversation nicht gefunden",
-      "untitled": "Ohne Titel"
+      "untitled": "Ohne Titel",
+      "leaveTitle": "Konversation verlassen?",
+      "leaveMessage": "Dadurch wird sie aus deiner Liste entfernt.",
+      "openHint": "Öffnet die Konversation. Lange drücken für Umbenennen- und Verlassen-Optionen.",
+      "unread": "Ungelesen",
+      "optionsFor": "Konversationsoptionen für {{title}}",
+      "options": "Konversationsoptionen",
+      "renameTitle": "Konversation umbenennen",
+      "renamePlaceholder": "Neuen Namen eingeben",
+      "couldNotReachBot": "Der Bot konnte nicht erreicht werden. Bitte versuche es erneut.",
+      "messageDeliveryFailed": "Nachricht konnte nicht an den Bot zugestellt werden",
+      "couldNotSignIn": "Anmeldung beim Chat nicht möglich",
+      "couldNotRefreshMessages": "Nachrichten konnten nicht aktualisiert werden",
+      "couldNotLoadHistory": "Konversationsverlauf konnte nicht geladen werden",
+      "rename": "Umbenennen",
+      "leave": "Verlassen",
+      "untitledConversation": "Unbenannte Konversation",
+      "createFailed": "Konversation konnte nicht erstellt werden",
+      "leaveFailed": "Konversation konnte nicht verlassen werden"
+    },
+    "reactions": {
+      "title": "Reaktionen",
+      "close": "Reaktionen schließen",
+      "recent": "Zuletzt",
+      "common": "Häufig",
+      "reactWith": "Mit {{reaction}} reagieren",
+      "accessibility": "{{emoji}}-Reaktion, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Antwortet auf",
+      "cancelReply": "Antwort abbrechen",
+      "openInstance": "Instanz öffnen",
+      "attachFile": "Datei anhängen",
+      "messagePlaceholder": "Nachricht",
+      "cancelEdit": "Bearbeitung abbrechen",
+      "sendMessage": "Nachricht senden"
+    },
+    "conversationList": {
+      "couldNotLoad": "Konversationen konnten nicht geladen werden",
+      "emptyTitle": "Noch keine Konversationen",
+      "emptyDescription": "Erstelle eine Konversation, um mit deiner KiloClaw-Instanz zu chatten.",
+      "create": "Konversation erstellen",
+      "starting": "Wird gestartet…",
+      "newConversation": "Neue Konversation",
+      "openInstanceSettings": "Instanzeinstellungen öffnen",
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "thisWeek": "Diese Woche",
+      "older": "Älter"
+    },
+    "attachment": {
+      "open": "{{filename}} öffnen",
+      "imageUnavailable": "Bild nicht verfügbar",
+      "openFailed": "Anhang konnte nicht geöffnet werden. Überprüfe deine Verbindung und versuche es erneut.",
+      "attachFailed": "Datei konnte nicht angehängt werden",
+      "limit": "Du kannst bis zu {{count}} Dateien anhängen.",
+      "sizeRejection": "{{filename}} überschreitet das Anhang-Limit von {{limit}}.",
+      "unreadable": "{{filename}} konnte nicht gelesen werden.",
+      "pastedImage": "das eingefügte Bild",
+      "defaultName": "Anhang"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Hochladen von {{filename}} erneut versuchen",
+      "remove": "{{filename}} entfernen"
+    },
+    "messageBubble": {
+      "deleted": "[gelöschte Nachricht]",
+      "yourMessage": "Deine Nachricht",
+      "messageFrom": "Nachricht von {{author}}",
+      "moreActions": "Weitere Aktionen",
+      "message": "Nachricht",
+      "notDelivered": "Nicht zugestellt",
+      "edited": "(bearbeitet)"
+    },
+    "messageActions": {
+      "copied": "Kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen",
+      "title": "Nachrichtenaktionen",
+      "deleteTitle": "Nachricht löschen?",
+      "deleteMessage": "Dadurch wird die Nachricht aus der Konversation entfernt.",
+      "delete": "Löschen",
+      "deleteFailed": "Nachricht konnte nicht gelöscht werden",
+      "removeReactionFailed": "Reaktion konnte nicht entfernt werden",
+      "addReactionFailed": "Reaktion konnte nicht hinzugefügt werden",
+      "retrySend": "Erneut senden",
+      "moreReactions": "Weitere Reaktionen",
+      "reply": "Antworten",
+      "edit": "Bearbeiten",
+      "sendFailed": "Nachricht konnte nicht gesendet werden",
+      "retrySendFailed": "Erneutes Senden fehlgeschlagen",
+      "editFailed": "Nachricht konnte nicht bearbeitet werden",
+      "executeFailed": "Aktion konnte nicht ausgeführt werden"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Foto aufnehmen",
+      "photoLibrary": "Fotomediathek",
+      "files": "Dateien",
+      "cameraAccessDisabled": "Kamerazugriff deaktiviert",
+      "cameraAccessMessage": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen."
+    },
+    "typingIndicator": {
+      "someone": "Jemand",
+      "oneTyping": "{{name}} tippt...",
+      "manyTyping": "{{names}} tippen..."
+    },
+    "botStatus": {
+      "online": "Online",
+      "idle": "Inaktiv",
+      "offline": "Offline",
+      "unknown": "Unbekannt",
+      "loadingUser": "Benutzer wird geladen...",
+      "waitingForStatus": "Warte auf Bot-Status...",
+      "offlineMessage": "Der Bot ist offline. Nachrichten werden fortgesetzt, sobald er sich wieder verbindet."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Jetzt aktiv"
+    "activeNow": "Jetzt aktiv",
+    "search": {
+      "searching": "Suchen",
+      "searchSessions": "Sitzungen suchen",
+      "searchSessionsPlaceholder": "Sitzungen suchen...",
+      "clearSearch": "Suche löschen",
+      "clearFilters": "Filter löschen"
+    },
+    "sessionList": {
+      "couldNotLoad": "Sitzungen konnten nicht geladen werden",
+      "couldNotLoadActive": "Aktive Sitzungen konnten nicht geladen werden",
+      "noSessionsYet": "Noch keine Sitzungen",
+      "noSessionsYetDescription": "Starte eine Codieraufgabe von deinem Telefon. Deine Sitzungen erscheinen hier.",
+      "noMatches": "Keine Sitzungen gefunden",
+      "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
+      "tryAdjustFilters": "Versuche, deine Filter anzupassen oder zu löschen.",
+      "couldNotSearch": "Sitzungen konnten nicht durchsucht werden",
+      "allActive": "Alle Sitzungen sind aktiv",
+      "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
+      "noPastSessions": "Keine vergangenen Sitzungen",
+      "live": "LIVE"
+    },
+    "sessionRow": {
+      "deleteTitle": "Sitzung löschen?",
+      "deleteMessage": "Dies kann nicht rückgängig gemacht werden.",
+      "delete": "Löschen",
+      "deleteSession": "Sitzung löschen",
+      "rename": "Umbenennen",
+      "renameMessage": "Gib einen neuen Namen für diese Sitzung ein",
+      "copyId": "Sitzungs-ID kopieren",
+      "idCopied": "Sitzungs-ID kopiert",
+      "couldNotCopyId": "Sitzungs-ID konnte nicht kopiert werden",
+      "untitled": "Unbenannte Sitzung"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Sitzung konnte nicht geladen werden",
       "failedToLoadDetails": "Sitzungsdetails konnten nicht geladen werden",
       "notFound": "Nicht gefunden",
-      "notFoundDescription": "Dieses Element wurde möglicherweise entfernt oder ist nicht mehr verfügbar."
+      "notFoundDescription": "Dieses Element wurde möglicherweise entfernt oder ist nicht mehr verfügbar.",
+      "failedToStopExecution": "Ausführung konnte nicht gestoppt werden",
+      "renameSession": "Sitzung umbenennen",
+      "renamePlaceholder": "Sitzungsname",
+      "transcriptAccessibility": "Sitzungsprotokoll",
+      "readOnly": "Dies ist eine schreibgeschützte Sitzung",
+      "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
+      "scrollToBottom": "Nach unten scrollen",
+      "emptyTitle": "Noch keine Nachrichten",
+      "renameAccessibility": "Sitzung umbenennen: {{title}}",
+      "connectRepository": "Repository verbinden",
+      "cloningSession": "Sitzung wird geklont",
+      "continue": "Weiter",
+      "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden",
+      "cloneFailed": "Diese Sitzung konnte nicht geklont werden.",
+      "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
+      "connectRepositoryToContinue": "Verbinde ein Repository, um fortzufahren."
     },
     "remoteSession": {
       "failedToCreate": "Remote-Sitzung konnte nicht erstellt werden",
       "exited": "Sitzung beendet",
-      "failedToExit": "Sitzung konnte nicht beendet werden"
+      "failedToExit": "Sitzung konnte nicht beendet werden",
+      "exitTitle": "Sitzung beenden?",
+      "exitMessage": "Dies stoppt die laufende Sitzung, behält aber ihren Verlauf.",
+      "keepSessionRunning": "Sitzung weiterlaufen lassen",
+      "exitSession": "Sitzung beenden",
+      "restartExitFailed": "Neue Sitzung gestartet. Die vorherige Sitzung ist noch geöffnet."
+    },
+    "sessionConnection": {
+      "connecting": "Verbinde…",
+      "reconnecting": "Verbindung wird wiederhergestellt…",
+      "connectionLost": "Verbindung verloren",
+      "retryConnection": "Verbindung erneut versuchen"
     },
     "newSession": {
       "title": "Neue Sitzung",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Modelle konnten nicht geladen werden",
       "prefillRepoAndModelUnavailable": "Das Repository und das Modell der ursprünglichen Sitzung sind nicht mehr verfügbar. Wähle sie unten aus.",
       "prefillRepoUnavailable": "{{repo}} ist nicht mehr verfügbar. Wähle unten ein Repository aus.",
-      "prefillModelUnavailable": "{{model}} ist nicht mehr verfügbar. Dein Standardmodell wird verwendet."
+      "prefillModelUnavailable": "{{model}} ist nicht mehr verfügbar. Dein Standardmodell wird verwendet.",
+      "couldNotReadPendingSessions": "Ausstehende Sitzungen konnten nicht gelesen werden. Versuche es erneut.",
+      "failedToCreate": "Sitzung konnte nicht erstellt werden"
     },
     "partRenderer": {
       "updatedFile": "{{count}} Datei aktualisiert",
       "updatedFiles": "{{count}} Dateien aktualisiert"
+    },
+    "toolPatch": {
+      "operationAdded": "Hinzugefügt",
+      "operationDeleted": "Gelöscht",
+      "operationUpdated": "Aktualisiert"
+    },
+    "toolCard": {
+      "accessibility": "{{label}}-Tool, {{status}}",
+      "accessibilityLabel": "{{name}}-Tool, {{status}}",
+      "fileEmpty": "Diese Datei ist leer.",
+      "noTasks": "Keine Aufgaben.",
+      "contentTruncated": "Inhalt abgeschnitten",
+      "truncated": "Abgeschnitten",
+      "toolRead": "lesen",
+      "toolEdit": "bearbeiten",
+      "toolWrite": "schreiben",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "auflisten",
+      "toolPatch": "patch",
+      "toolTask": "Aufgabe",
+      "readTodos": "Aufgaben lesen",
+      "updateTodos": "Aufgaben aktualisieren",
+      "linesBadge": "{{count}} Zeilen",
+      "filesBadge": "{{count}} Dateien",
+      "matchesBadge": "{{count}} Treffer"
     },
     "readToolMarkdown": {
       "linesTruncated": "Zeilen {{start}}–{{end}} (abgeschnitten)",
@@ -507,11 +710,14 @@
       "noMatches": "Keine Treffer",
       "noRepositories": "Keine Repositories verfügbar",
       "noRepositoriesDescription": "Mit deinem Konto sind keine Repositories verbunden.",
-      "tryDifferentSearch": "Versuche einen anderen Suchbegriff."
+      "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
+      "loading": "Wird geladen...",
+      "accessibility": "Repository: {{label}}"
     },
     "messageDetails": {
       "title": "Nachrichtendetails",
       "copyMessage": "Nachricht kopieren",
+      "copyText": "Text kopieren",
       "selectText": "Text auswählen",
       "reportAiResponse": "KI-Antwort melden",
       "reportAiResponseConfirm": "Diese Antwort zur Überprüfung melden?",
@@ -528,7 +734,10 @@
       "reasoning": "Denken",
       "cacheRead": "Cache gelesen",
       "cacheWrite": "Cache geschrieben",
-      "total": "Gesamt"
+      "total": "Gesamt",
+      "reportAiResponseFailedRetryable": "Diese Antwort konnte nicht gemeldet werden.",
+      "reportAiResponseFailedTerminal": "Diese Antwort kann nicht gemeldet werden.",
+      "reportAiResponseSubmitted": "Meldung gesendet. Beleg {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Details nicht verfügbar",
@@ -536,7 +745,9 @@
       "thinking": "Denken",
       "thought": "Gedanke",
       "title": "Details",
-      "showDetails": "Details anzeigen"
+      "showDetails": "Details anzeigen",
+      "pending": "Ausstehend…",
+      "running": "Wird ausgeführt…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Inhalt konnte nicht gerendert werden"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Bild nicht verfügbar, Laden erneut versuchen",
       "imageUnavailable": "Bild nicht verfügbar",
       "imageUnavailableWithAlt": "Bild nicht verfügbar {{alt}}",
+      "imagePreviewUnavailableInSession": "Bildvorschau in dieser Sitzung nicht verfügbar.",
       "viewImage": "Bild ansehen",
       "viewImageWithAlt": "Bild ansehen {{alt}}",
       "imageOutput": "Bildausgabe",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Laden der Datei erneut versuchen",
       "fileEmpty": "Diese Datei ist leer.",
       "previewUnavailable": "Vorschau nicht verfügbar",
+      "fileUnavailableInSession": "Datei in dieser Sitzung nicht verfügbar.",
       "shareFailed": "Teilen fehlgeschlagen",
       "sharingUnavailable": "Dateifreigabe ist auf diesem Gerät nicht verfügbar.",
       "shareFailedRetry": "Datei konnte nicht geteilt werden. Bitte versuche es erneut.",
@@ -654,7 +867,13 @@
       "longPressHint": "Lange drücken für Nachrichtendetails"
     },
     "olderMessages": {
-      "arrived": "Frühere Nachrichten geladen"
+      "arrived": "Frühere Nachrichten geladen",
+      "retryHint": "Versucht erneut, ältere Nachrichten dieser Sitzung zu laden.",
+      "omittedOne": "Ein früherer Eintrag dieser Sitzung konnte nicht angezeigt werden.",
+      "omittedMany": "{{count}} frühere Einträge dieser Sitzung konnten nicht angezeigt werden.",
+      "couldNotLoad": "Frühere Nachrichten konnten nicht geladen werden.",
+      "unavailable": "Frühere Nachrichten sind nicht verfügbar.",
+      "tooLarge": "Frühere Nachrichten sind zu groß zum Laden."
     },
     "markdownTable": {
       "viewTable": "Tabelle ansehen",
@@ -682,6 +901,13 @@
       "project": "Projekt",
       "removeProjectFilter": "{{label}}-Projektfilter entfernen",
       "removePlatformFilter": "{{label}}-Plattformfilter entfernen"
+    },
+    "suggestion": {
+      "title": "Vorschlag",
+      "dismiss": "Vorschlag verwerfen",
+      "applyFailed": "Dieser Vorschlag konnte nicht angewendet werden. Versuche es erneut.",
+      "dismissFailed": "Dieser Vorschlag konnte nicht verworfen werden. Versuche es erneut.",
+      "dismissed": "Vorschlag verworfen"
     },
     "modelPicker": {
       "title": "Modell wählen",
@@ -734,7 +960,13 @@
       "waitForUploads": "Warte, bis die Anhänge hochgeladen sind.",
       "pasteFromClipboard": "Aus der Zwischenablage einfügen",
       "stopGenerating": "Generieren stoppen",
-      "sendMessage": "Nachricht senden"
+      "sendMessage": "Nachricht senden",
+      "selectModelBeforeSending": "Wähle vor dem Senden ein Modell aus",
+      "preparingPlaceholder": "Umgebung wird eingerichtet...",
+      "finalizingPlaceholder": "Wird abgeschlossen...",
+      "messagePlaceholder": "Nachricht...",
+      "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
+      "couldNotAttachFiles": "Dateien konnten nicht angehängt werden. Tippe auf Senden, um es erneut zu versuchen."
     },
     "chatLink": {
       "linkCopied": "Link kopiert",
@@ -769,6 +1001,8 @@
       "startNewSession": "Neue Sitzung starten",
       "exitSession": "Sitzung beenden",
       "clearSession": "Diese Sitzung beenden und eine neue starten",
+      "useCommand": "Verwende /{{command}}",
+      "insert": "Einfügen",
       "upgradeRequiredFallback": "Bitte aktualisiere deine CLI, um diesen Befehl zu verwenden.",
       "exitCapabilityUnavailable": "Aktualisiere deine CLI, um die Sitzung zu beenden.",
       "clearCapabilityUnavailable": "Aktualisiere deine CLI, um die Sitzung neu zu starten.",
@@ -780,7 +1014,36 @@
       "costPrefix": "Kosten {{cost}}",
       "costSuffix": ", Kosten {{cost}}",
       "tokensWindowUnavailable": "Kontext {{used}} Tokens, Fenster nicht verfügbar",
-      "tokensUsage": "Kontext {{used}} von {{window}} Tokens, {{percentage}}% verwendet"
+      "tokensUsage": "Kontext {{used}} von {{window}} Tokens, {{percentage}}% verwendet",
+      "title": "Kontextnutzung",
+      "used": "Verwendet",
+      "remaining": "Verbleibend",
+      "provider": "Anbieter",
+      "totalCost": "Gesamtkosten",
+      "usageReflectsLatest": "Die Nutzung spiegelt die letzte abgeschlossene Assistenten-Antwort wider.",
+      "tokenUsage": "Token-Nutzung",
+      "cacheRate": "Cache-Rate",
+      "modelsCount": "Modelle ({{count}})",
+      "tokenTotalsNote": "Token-Gesamtsummen umfassen nur diese Sitzung und schließen Subagenten-/Kindersitzungs-Tokens aus.",
+      "subagents": "Subagenten",
+      "subagentsDescription": "Restkosten aus Kindersitzungen",
+      "olderActivity": "Ältere Aktivität",
+      "olderActivityDescription": "Kosten, die nicht dem geladenen Verlauf zugeordnet sind",
+      "ofWindowTokens": "von {{window}} Tokens",
+      "tokens": "Tokens",
+      "tokensWithPercentage": "Tokens ({{percentage}})",
+      "stepsCountOne": "{{steps}} Schritt",
+      "stepsCountMany": "{{steps}} Schritte",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "offener Pull-Request",
+      "closed": "geschlossener Pull-Request",
+      "merged": "zusammengeführter Pull-Request",
+      "draft": "Pull-Request-Entwurf",
+      "updating": "Wird aktualisiert, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "Pull-Request"
     }
   },
   "bootstrap": {

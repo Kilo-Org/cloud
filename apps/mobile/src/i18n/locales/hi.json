@@ -19,7 +19,8 @@
     "openSettings": "सेटिंग खोलें",
     "copiedToClipboard": "क्लिपबोर्ड पर कॉपी किया गया",
     "required": "आवश्यक",
-    "error": "त्रुटि: {{error}}"
+    "error": "त्रुटि: {{error}}",
+    "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका"
   },
   "language": {
     "title": "भाषा",
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "बातचीत लोड नहीं हो सकी",
       "notFound": "बातचीत नहीं मिली",
-      "untitled": "शीर्षक रहित"
+      "untitled": "शीर्षक रहित",
+      "couldNotLoadHistory": "वार्तालाप इतिहास लोड नहीं हो सका",
+      "couldNotReachBot": "बॉट तक नहीं पहुँच सके। कृपया पुनः प्रयास करें।",
+      "couldNotRefreshMessages": "संदेश रीफ़्रेश नहीं हो सके",
+      "couldNotSignIn": "चैट में साइन इन नहीं हो सका",
+      "leaveMessage": "यह इसे आपकी सूची से हटा देता है।",
+      "leaveTitle": "वार्तालाप छोड़ें?",
+      "messageDeliveryFailed": "संदेश बॉट तक नहीं पहुँचाया जा सका",
+      "openHint": "वार्तालाप खोलता है। नाम बदलने और छोड़ने के विकल्पों के लिए देर तक दबाएँ।",
+      "options": "वार्तालाप विकल्प",
+      "optionsFor": "{{title}} के लिए वार्तालाप विकल्प",
+      "renamePlaceholder": "नया नाम दर्ज करें",
+      "renameTitle": "वार्तालाप का नाम बदलें",
+      "unread": "अपठित",
+      "rename": "नाम बदलें",
+      "leave": "छोड़ें",
+      "untitledConversation": "बिना शीर्षक वाली बातचीत",
+      "createFailed": "बातचीत बनाने में विफल",
+      "leaveFailed": "बातचीत छोड़ने में विफल"
+    },
+    "attachment": {
+      "imageUnavailable": "छवि उपलब्ध नहीं",
+      "open": "{{filename}} खोलें",
+      "openFailed": "अटैचमेंट खोल नहीं सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
+      "attachFailed": "फ़ाइल संलग्न करने में विफल",
+      "limit": "आप अधिकतम {{count}} फ़ाइलें संलग्न कर सकते हैं।",
+      "sizeRejection": "{{filename}} {{limit}} की अटैचमेंट सीमा से अधिक है।",
+      "unreadable": "{{filename}} पढ़ नहीं सका।",
+      "pastedImage": "चिपकाई गई छवि",
+      "defaultName": "अनुलग्नक"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "remove": "{{filename}} हटाएँ",
+      "retryUploading": "{{filename}} के लिए अपलोड पुनः प्रयास करें"
+    },
+    "composer": {
+      "attachFile": "फ़ाइल संलग्न करें",
+      "cancelEdit": "संपादन रद्द करें",
+      "cancelReply": "उत्तर रद्द करें",
+      "messagePlaceholder": "संदेश",
+      "openInstance": "इंस्टेंस खोलें",
+      "replyingTo": "उत्तर दे रहे हैं",
+      "sendMessage": "संदेश भेजें"
+    },
+    "conversationList": {
+      "couldNotLoad": "वार्तालाप लोड नहीं हो सके",
+      "create": "वार्तालाप बनाएँ",
+      "emptyDescription": "अपने KiloClaw इंस्टेंस से चैट शुरू करने के लिए वार्तालाप बनाएँ।",
+      "emptyTitle": "अभी कोई वार्तालाप नहीं",
+      "newConversation": "नया वार्तालाप",
+      "openInstanceSettings": "इंस्टेंस सेटिंग खोलें",
+      "starting": "शुरू हो रहा है…",
+      "today": "आज",
+      "yesterday": "कल",
+      "thisWeek": "इस सप्ताह",
+      "older": "पुराने"
+    },
+    "messageBubble": {
+      "deleted": "[हटाया गया संदेश]",
+      "yourMessage": "आपका संदेश",
+      "messageFrom": "{{author}} का संदेश",
+      "moreActions": "और कार्रवाइयाँ",
+      "message": "संदेश",
+      "notDelivered": "वितरित नहीं हुआ",
+      "edited": "(संपादित)"
+    },
+    "reactions": {
+      "accessibility": "{{emoji}} प्रतिक्रिया, {{count}}",
+      "close": "प्रतिक्रियाएँ बंद करें",
+      "common": "सामान्य",
+      "reactWith": "{{reaction}} से प्रतिक्रिया दें",
+      "recent": "हालिया",
+      "title": "प्रतिक्रियाएँ"
+    },
+    "messageActions": {
+      "copied": "कॉपी किया गया",
+      "copyFailed": "कॉपी करने में विफल",
+      "title": "संदेश क्रियाएँ",
+      "deleteTitle": "संदेश हटाएँ?",
+      "deleteMessage": "इससे संदेश बातचीत से हट जाएगा।",
+      "delete": "हटाएँ",
+      "deleteFailed": "संदेश हटाने में विफल",
+      "removeReactionFailed": "प्रतिक्रिया हटाने में विफल",
+      "addReactionFailed": "प्रतिक्रिया जोड़ने में विफल",
+      "retrySend": "फिर से भेजें",
+      "moreReactions": "और प्रतिक्रियाएँ",
+      "reply": "जवाब दें",
+      "edit": "संपादित करें",
+      "sendFailed": "संदेश भेजने में विफल",
+      "retrySendFailed": "फिर से भेजने में विफल",
+      "editFailed": "संदेश संपादित करने में विफल",
+      "executeFailed": "कार्रवाई निष्पादित करने में विफल"
+    },
+    "attachmentPicker": {
+      "takePhoto": "फ़ोटो लें",
+      "photoLibrary": "फ़ोटो लाइब्रेरी",
+      "files": "फ़ाइलें",
+      "cameraAccessDisabled": "कैमरा एक्सेस अक्षम",
+      "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा एक्सेस की अनुमति दें।"
+    },
+    "typingIndicator": {
+      "someone": "कोई",
+      "oneTyping": "{{name}} टाइप कर रहा है...",
+      "manyTyping": "{{names}} टाइप कर रहे हैं..."
+    },
+    "botStatus": {
+      "online": "ऑनलाइन",
+      "idle": "निष्क्रिय",
+      "offline": "ऑफ़लाइन",
+      "unknown": "अज्ञात",
+      "loadingUser": "उपयोगकर्ता लोड हो रहा है...",
+      "waitingForStatus": "बॉट स्थिति की प्रतीक्षा हो रही है...",
+      "offlineMessage": "बॉट ऑफ़लाइन है। दोबारा कनेक्ट होने पर संदेश फिर से शुरू होंगे।"
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "अभी सक्रिय"
+    "activeNow": "अभी सक्रिय",
+    "search": {
+      "clearFilters": "फ़िल्टर साफ़ करें",
+      "clearSearch": "खोज साफ़ करें",
+      "searchSessions": "सत्र खोजें",
+      "searchSessionsPlaceholder": "सत्र खोजें...",
+      "searching": "खोज रहा है"
+    },
+    "sessionList": {
+      "allActive": "सभी सत्र सक्रिय हैं",
+      "completedWillAppear": "पूर्ण सत्र यहाँ दिखाई देंगे।",
+      "couldNotLoad": "सत्र लोड नहीं हो सके",
+      "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके",
+      "couldNotSearch": "सत्र खोजे नहीं जा सके",
+      "noMatches": "कोई सत्र मेल नहीं खाता",
+      "noPastSessions": "कोई पिछले सत्र नहीं",
+      "noSessionsYet": "अभी कोई सत्र नहीं",
+      "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
+      "tryAdjustFilters": "अपने फ़िल्टर समायोजित करने या साफ़ करने का प्रयास करें।",
+      "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
+      "live": "लाइव"
+    },
+    "sessionRow": {
+      "copyId": "सत्र ID कॉपी करें",
+      "couldNotCopyId": "सत्र ID कॉपी नहीं हो सका",
+      "delete": "हटाएँ",
+      "deleteMessage": "इसे पूर्ववत नहीं किया जा सकता।",
+      "deleteSession": "सत्र हटाएँ",
+      "deleteTitle": "सत्र हटाएँ?",
+      "idCopied": "सत्र ID कॉपी हो गया",
+      "rename": "नाम बदलें",
+      "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें",
+      "untitled": "बिना शीर्षक वाला सत्र"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "सत्र लोड नहीं हो सका",
       "failedToLoadDetails": "सत्र का विवरण लोड नहीं हो सका",
       "notFound": "नहीं मिला",
-      "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो."
+      "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो.",
+      "emptyDescription": "शुरू करने के लिए नीचे एक संदेश भेजें।",
+      "failedToStopExecution": "निष्पादन रोकने में विफल",
+      "readOnly": "यह एक केवल-पढ़ने वाला सत्र है",
+      "renamePlaceholder": "सत्र का नाम",
+      "renameSession": "सत्र का नाम बदलें",
+      "scrollToBottom": "नीचे स्क्रॉल करें",
+      "transcriptAccessibility": "सत्र ट्रांसक्रिप्ट",
+      "emptyTitle": "अभी कोई संदेश नहीं",
+      "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
+      "connectRepository": "रेपॉज़िटरी कनेक्ट करें",
+      "cloningSession": "सत्र क्लोन किया जा रहा है",
+      "continue": "जारी रखें",
+      "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका",
+      "cloneFailed": "यह सत्र क्लोन नहीं हो सका।",
+      "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
+      "connectRepositoryToContinue": "जारी रखने के लिए एक रिपॉज़िटरी कनेक्ट करें।"
+    },
+    "sessionConnection": {
+      "connecting": "कनेक्ट हो रहा है…",
+      "connectionLost": "कनेक्शन खो गया",
+      "reconnecting": "फिर से कनेक्ट हो रहा है…",
+      "retryConnection": "कनेक्शन फिर से कोशिश करें"
     },
     "remoteSession": {
       "failedToCreate": "रिमोट सत्र बनाने में विफल",
       "exited": "सत्र समाप्त हो गया",
-      "failedToExit": "सत्र से बाहर निकलने में विफल"
+      "failedToExit": "सत्र से बाहर निकलने में विफल",
+      "exitMessage": "यह चल रहे सत्र को रोकता है लेकिन उसका इतिहास रखता है।",
+      "exitSession": "सत्र से बाहर निकलें",
+      "exitTitle": "सत्र से बाहर निकलें?",
+      "keepSessionRunning": "सत्र चालू रखें",
+      "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।"
     },
     "newSession": {
       "title": "नया सत्र",
@@ -448,7 +622,9 @@
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके",
       "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे उन्हें चुनें।",
       "prefillRepoUnavailable": "{{repo}} अब उपलब्ध नहीं है। नीचे एक रिपॉज़िटरी चुनें।",
-      "prefillModelUnavailable": "{{model}} अब उपलब्ध नहीं है। आपका डिफ़ॉल्ट मॉडल उपयोग हो रहा है।"
+      "prefillModelUnavailable": "{{model}} अब उपलब्ध नहीं है। आपका डिफ़ॉल्ट मॉडल उपयोग हो रहा है।",
+      "couldNotReadPendingSessions": "लंबित सत्र पढ़े नहीं जा सके। फिर से कोशिश करें।",
+      "failedToCreate": "सत्र बनाने में विफल"
     },
     "partRenderer": {
       "updatedFile": "{{count}} फ़ाइल अपडेट की गई",
@@ -507,7 +683,9 @@
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है.",
-      "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ."
+      "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ.",
+      "accessibility": "रिपॉज़िटरी: {{label}}",
+      "loading": "लोड हो रहा है..."
     },
     "messageDetails": {
       "title": "संदेश विवरण",
@@ -528,7 +706,11 @@
       "reasoning": "रीज़निंग",
       "cacheRead": "कैश रीड",
       "cacheWrite": "कैश राइट",
-      "total": "कुल"
+      "total": "कुल",
+      "copyText": "टेक्स्ट कॉपी करें",
+      "reportAiResponseFailedRetryable": "यह प्रतिक्रिया रिपोर्ट नहीं की जा सकी।",
+      "reportAiResponseFailedTerminal": "यह प्रतिक्रिया रिपोर्ट नहीं की जा सकती।",
+      "reportAiResponseSubmitted": "रिपोर्ट भेजी गई। रसीद {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "विवरण उपलब्ध नहीं",
@@ -536,7 +718,9 @@
       "thinking": "सोच",
       "thought": "विचार",
       "title": "विवरण",
-      "showDetails": "विवरण दिखाएँ"
+      "showDetails": "विवरण दिखाएँ",
+      "pending": "लंबित…",
+      "running": "चल रहा है…"
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री रेंडर नहीं हो सकी"
@@ -575,7 +759,9 @@
       "sharingUnavailable": "इस डिवाइस पर फ़ाइल साझाकरण उपलब्ध नहीं है।",
       "shareFailedRetry": "फ़ाइल साझा नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "openAsText": "टेक्स्ट के रूप में खोलें",
-      "openInExternalApp": "बाहरी ऐप में खोलें"
+      "openInExternalApp": "बाहरी ऐप में खोलें",
+      "fileUnavailableInSession": "यह फ़ाइल इस सत्र में उपलब्ध नहीं है।",
+      "imagePreviewUnavailableInSession": "छवि पूर्वावलोकन इस सत्र में उपलब्ध नहीं है।"
     },
     "preparation": {
       "exitCode": "एग्ज़िट कोड: {{code}}",
@@ -654,7 +840,13 @@
       "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ"
     },
     "olderMessages": {
-      "arrived": "पहले के संदेश लोड हो गए"
+      "arrived": "पहले के संदेश लोड हो गए",
+      "retryHint": "इस सत्र के पुराने संदेशों की लोडिंग फिर से आज़माता है।",
+      "omittedOne": "इस सत्र का एक पुराना आइटम प्रदर्शित नहीं किया जा सका।",
+      "omittedMany": "इस सत्र के {{count}} पुराने आइटम प्रदर्शित नहीं किए जा सके।",
+      "couldNotLoad": "पुराने संदेश लोड नहीं हो सके।",
+      "unavailable": "पुराने संदेश उपलब्ध नहीं हैं।",
+      "tooLarge": "पुराने संदेश लोड करने के लिए बहुत बड़े हैं।"
     },
     "markdownTable": {
       "viewTable": "तालिका देखें",
@@ -734,7 +926,13 @@
       "waitForUploads": "संलग्नकों के अपलोड पूरे होने की प्रतीक्षा करें।",
       "pasteFromClipboard": "क्लिपबोर्ड से पेस्ट करें",
       "stopGenerating": "जनरेट करना रोकें",
-      "sendMessage": "संदेश भेजें"
+      "sendMessage": "संदेश भेजें",
+      "selectModelBeforeSending": "भेजने से पहले एक मॉडल चुनें",
+      "preparingPlaceholder": "वातावरण सेट किया जा रहा है...",
+      "finalizingPlaceholder": "समाप्त किया जा रहा है...",
+      "messagePlaceholder": "संदेश...",
+      "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
+      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",
@@ -772,7 +970,9 @@
       "upgradeRequiredFallback": "इस कमांड का उपयोग करने के लिए कृपया अपना CLI अपग्रेड करें।",
       "exitCapabilityUnavailable": "सत्र से बाहर निकलने के लिए अपना CLI अपडेट करें।",
       "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
-      "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।"
+      "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।",
+      "insert": "डालें",
+      "useCommand": "/{{command}} उपयोग करें"
     },
     "contextUsage": {
       "windowUnavailable": "संदर्भ-विंडो आकार उपलब्ध नहीं",
@@ -780,7 +980,70 @@
       "costPrefix": "लागत {{cost}}",
       "costSuffix": ", लागत {{cost}}",
       "tokensWindowUnavailable": "संदर्भ {{used}} टोकन, विंडो उपलब्ध नहीं",
-      "tokensUsage": "संदर्भ {{window}} में से {{used}} टोकन, {{percentage}}% उपयोग हुआ"
+      "tokensUsage": "संदर्भ {{window}} में से {{used}} टोकन, {{percentage}}% उपयोग हुआ",
+      "cacheRate": "कैश दर",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount": "मॉडल ({{count}})",
+      "ofWindowTokens": "{{window}} टोकन में से",
+      "olderActivity": "पुरानी गतिविधि",
+      "olderActivityDescription": "लोड किए गए इतिहास में शामिल नहीं की गई लागत",
+      "provider": "प्रदाता",
+      "remaining": "शेष",
+      "stepsCountMany": "{{steps}} चरण",
+      "stepsCountOne": "{{steps}} चरण",
+      "subagents": "सबएजेंट",
+      "subagentsDescription": "चाइल्ड सत्रों से शेष लागत",
+      "title": "संदर्भ उपयोग",
+      "tokenTotalsNote": "टोकन कुल केवल इस सत्र को कवर करते हैं और सबएजेंट/चाइल्ड-सत्र टोकन शामिल नहीं करते।",
+      "tokenUsage": "टोकन उपयोग",
+      "tokens": "टोकन",
+      "tokensWithPercentage": "टोकन ({{percentage}})",
+      "totalCost": "कुल लागत",
+      "usageReflectsLatest": "उपयोग नवीनतम पूर्ण सहायक प्रतिक्रिया को दर्शाता है।",
+      "used": "उपयोग हुआ"
+    },
+    "suggestion": {
+      "dismiss": "सुझाव ख़ारिज करें",
+      "title": "सुझाव",
+      "applyFailed": "यह सुझाव लागू नहीं हो सका। फिर से कोशिश करें।",
+      "dismissFailed": "यह सुझाव ख़ारिज नहीं हो सका। फिर से कोशिश करें।",
+      "dismissed": "सुझाव ख़ारिज किया गया"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} टूल, {{status}}",
+      "accessibilityLabel": "{{name}} टूल, {{status}}",
+      "fileEmpty": "यह फ़ाइल खाली है।",
+      "noTasks": "कोई कार्य नहीं।",
+      "contentTruncated": "सामग्री छोटी की गई",
+      "truncated": "छोटा किया गया",
+      "toolRead": "पढ़ें",
+      "toolEdit": "संपादित करें",
+      "toolWrite": "लिखें",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "सूची",
+      "toolPatch": "patch",
+      "toolTask": "कार्य",
+      "readTodos": "कार्य पढ़ें",
+      "updateTodos": "कार्य अपडेट करें",
+      "linesBadge": "{{count}} पंक्तियाँ",
+      "filesBadge": "{{count}} फ़ाइलें",
+      "matchesBadge": "{{count}} मिलान"
+    },
+    "toolPatch": {
+      "operationAdded": "जोड़ा गया",
+      "operationDeleted": "हटाया गया",
+      "operationUpdated": "अपडेट किया गया"
+    },
+    "prBadge": {
+      "open": "खुला पुल अनुरोध",
+      "closed": "बंद पुल अनुरोध",
+      "merged": "मर्ज किया गया पुल अनुरोध",
+      "draft": "ड्राफ़्ट पुल अनुरोध",
+      "updating": "अपडेट हो रहा है, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "पुल अनुरोध"
     }
   },
   "bootstrap": {

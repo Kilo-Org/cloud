@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
 import { formatFileSize } from '@kilocode/kilo-chat';
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry }: Props) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const isImage = isImageMimeType(row.mimeType);
   const failed = row.status === 'failed';
@@ -38,7 +40,10 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
         'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
         isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2'
       )}
-      accessibilityLabel={`${row.filename}, ${row.status}`}
+      accessibilityLabel={t('chat.attachmentPreview.accessibility', {
+        filename: row.filename,
+        status: row.status,
+      })}
     >
       {isImage && localUri ? (
         <Image
@@ -75,7 +80,9 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
           onPress={onRetry}
           className="absolute bottom-1 left-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
           accessibilityRole="button"
-          accessibilityLabel={`Retry upload for ${row.filename}`}
+          accessibilityLabel={t('chat.attachmentPreview.retryUploading', {
+            filename: row.filename,
+          })}
         >
           <RotateCcw size={14} color={colors.foreground} />
         </Pressable>
@@ -85,7 +92,7 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
         onPress={onRemove}
         className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={`Remove ${row.filename}`}
+        accessibilityLabel={t('chat.attachmentPreview.remove', { filename: row.filename })}
       >
         <X size={14} color={colors.foreground} />
       </Pressable>

@@ -18,6 +18,7 @@
     "openInBrowser": "Open in browser",
     "openSettings": "Open Settings",
     "copiedToClipboard": "Copied to clipboard",
+    "couldNotCopyToClipboard": "Could not copy to clipboard",
     "required": "required",
     "error": "error: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Failed to load conversation",
       "notFound": "Conversation not found",
-      "untitled": "Untitled"
+      "untitled": "Untitled",
+      "leaveTitle": "Leave conversation?",
+      "leaveMessage": "This removes it from your list.",
+      "openHint": "Opens the conversation. Long press for rename and leave options.",
+      "unread": "Unread",
+      "optionsFor": "Conversation options for {{title}}",
+      "options": "Conversation options",
+      "renameTitle": "Rename conversation",
+      "renamePlaceholder": "Enter a new name",
+      "couldNotReachBot": "Couldn't reach the bot. Please try again.",
+      "messageDeliveryFailed": "Message could not be delivered to the bot",
+      "couldNotSignIn": "Couldn't sign in to chat",
+      "couldNotRefreshMessages": "Couldn't refresh messages",
+      "couldNotLoadHistory": "Could not load conversation history",
+      "rename": "Rename",
+      "leave": "Leave",
+      "untitledConversation": "Untitled conversation",
+      "createFailed": "Failed to create conversation",
+      "leaveFailed": "Failed to leave conversation"
+    },
+    "reactions": {
+      "title": "Reactions",
+      "close": "Close reactions",
+      "recent": "Recent",
+      "common": "Common",
+      "reactWith": "React with {{reaction}}",
+      "accessibility": "{{emoji}} reaction, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Replying to",
+      "cancelReply": "Cancel reply",
+      "openInstance": "Open instance",
+      "attachFile": "Attach file",
+      "messagePlaceholder": "Message",
+      "cancelEdit": "Cancel edit",
+      "sendMessage": "Send message"
+    },
+    "conversationList": {
+      "couldNotLoad": "Could not load conversations",
+      "emptyTitle": "No conversations yet",
+      "emptyDescription": "Create a conversation to start chatting with your KiloClaw instance.",
+      "create": "Create conversation",
+      "starting": "Starting…",
+      "newConversation": "New conversation",
+      "openInstanceSettings": "Open instance settings",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This Week",
+      "older": "Older"
+    },
+    "attachment": {
+      "open": "Open {{filename}}",
+      "imageUnavailable": "Image unavailable",
+      "openFailed": "Couldn't open attachment. Check your connection and try again.",
+      "attachFailed": "Failed to attach file",
+      "limit": "You can attach up to {{count}} files.",
+      "sizeRejection": "{{filename}} exceeds the {{limit}} attachment limit.",
+      "unreadable": "Couldn't read {{filename}}.",
+      "pastedImage": "the pasted image",
+      "defaultName": "Attachment"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Retry upload for {{filename}}",
+      "remove": "Remove {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[deleted message]",
+      "yourMessage": "Your message",
+      "messageFrom": "Message from {{author}}",
+      "moreActions": "More actions",
+      "message": "Message",
+      "notDelivered": "Not delivered",
+      "edited": "(edited)"
+    },
+    "messageActions": {
+      "copied": "Copied",
+      "copyFailed": "Failed to copy",
+      "title": "Message actions",
+      "deleteTitle": "Delete message?",
+      "deleteMessage": "This will remove the message from the conversation.",
+      "delete": "Delete",
+      "deleteFailed": "Failed to delete message",
+      "removeReactionFailed": "Failed to remove reaction",
+      "addReactionFailed": "Failed to add reaction",
+      "retrySend": "Retry send",
+      "moreReactions": "More reactions",
+      "reply": "Reply",
+      "edit": "Edit",
+      "sendFailed": "Failed to send message",
+      "retrySendFailed": "Failed to retry send",
+      "editFailed": "Failed to edit message",
+      "executeFailed": "Failed to execute action"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Take photo",
+      "photoLibrary": "Photo library",
+      "files": "Files",
+      "cameraAccessDisabled": "Camera Access Disabled",
+      "cameraAccessMessage": "Allow camera access in Settings to take a photo."
+    },
+    "typingIndicator": {
+      "someone": "Someone",
+      "oneTyping": "{{name}} is typing...",
+      "manyTyping": "{{names}} are typing..."
+    },
+    "botStatus": {
+      "online": "Online",
+      "idle": "Idle",
+      "offline": "Offline",
+      "unknown": "Unknown",
+      "loadingUser": "Loading user...",
+      "waitingForStatus": "Waiting for bot status...",
+      "offlineMessage": "Bot is offline. Messages will resume when it reconnects."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Active now"
+    "activeNow": "Active now",
+    "search": {
+      "searching": "Searching",
+      "searchSessions": "Search sessions",
+      "searchSessionsPlaceholder": "Search sessions...",
+      "clearSearch": "Clear search",
+      "clearFilters": "Clear filters"
+    },
+    "sessionList": {
+      "couldNotLoad": "Could not load sessions",
+      "couldNotLoadActive": "Could not load active sessions",
+      "noSessionsYet": "No sessions yet",
+      "noSessionsYetDescription": "Start a coding task from your phone. Your sessions will appear here.",
+      "noMatches": "No sessions match",
+      "tryDifferentSearch": "Try a different search term.",
+      "tryAdjustFilters": "Try adjusting or clearing your filters.",
+      "couldNotSearch": "Could not search sessions",
+      "allActive": "All sessions are active",
+      "completedWillAppear": "Completed sessions will appear here.",
+      "noPastSessions": "No past sessions",
+      "live": "LIVE"
+    },
+    "sessionRow": {
+      "deleteTitle": "Delete session?",
+      "deleteMessage": "This cannot be undone.",
+      "delete": "Delete",
+      "deleteSession": "Delete session",
+      "rename": "Rename",
+      "renameMessage": "Enter a new name for this session",
+      "copyId": "Copy session ID",
+      "idCopied": "Session ID copied",
+      "couldNotCopyId": "Could not copy session ID",
+      "untitled": "Untitled session"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "notFound": "Not found",
-      "notFoundDescription": "This item may have been removed or is no longer available."
+      "notFoundDescription": "This item may have been removed or is no longer available.",
+      "failedToStopExecution": "Failed to stop execution",
+      "renameSession": "Rename session",
+      "renamePlaceholder": "Session name",
+      "transcriptAccessibility": "Session transcript",
+      "readOnly": "This is a read-only session",
+      "emptyDescription": "Send a message below to get started.",
+      "scrollToBottom": "Scroll to bottom",
+      "emptyTitle": "No messages yet",
+      "renameAccessibility": "Rename session: {{title}}",
+      "connectRepository": "Connect repository",
+      "cloningSession": "Cloning session",
+      "continue": "Continue",
+      "couldNotLoadThisSession": "Couldn't load this session",
+      "cloneFailed": "Couldn't clone this session.",
+      "cloneFailedRetry": "Couldn't clone this session. Try again.",
+      "connectRepositoryToContinue": "Connect a repository to continue."
     },
     "remoteSession": {
       "failedToCreate": "Failed to create remote session",
       "exited": "Session exited",
-      "failedToExit": "Failed to exit session"
+      "failedToExit": "Failed to exit session",
+      "exitTitle": "Exit session?",
+      "exitMessage": "This stops the running session but keeps its history.",
+      "keepSessionRunning": "Keep session running",
+      "exitSession": "Exit session",
+      "restartExitFailed": "Started a new session. The previous session is still open."
+    },
+    "sessionConnection": {
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "connectionLost": "Connection lost",
+      "retryConnection": "Retry connection"
     },
     "newSession": {
       "title": "New session",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Couldn't load models",
       "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",
       "prefillRepoUnavailable": "{{repo}} is no longer available. Pick a repository below.",
-      "prefillModelUnavailable": "{{model}} is no longer available. Using your default model."
+      "prefillModelUnavailable": "{{model}} is no longer available. Using your default model.",
+      "couldNotReadPendingSessions": "Could not read pending sessions. Try again.",
+      "failedToCreate": "Failed to create session"
     },
     "partRenderer": {
       "updatedFile": "Updated {{count}} file",
       "updatedFiles": "Updated {{count}} files"
+    },
+    "toolPatch": {
+      "operationAdded": "Added",
+      "operationDeleted": "Deleted",
+      "operationUpdated": "Updated"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} tool, {{status}}",
+      "accessibilityLabel": "{{name}} tool, {{status}}",
+      "fileEmpty": "This file is empty.",
+      "noTasks": "No tasks.",
+      "contentTruncated": "Content truncated",
+      "truncated": "Truncated",
+      "toolRead": "read",
+      "toolEdit": "edit",
+      "toolWrite": "write",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "list",
+      "toolPatch": "patch",
+      "toolTask": "task",
+      "readTodos": "Read todos",
+      "updateTodos": "Update todos",
+      "linesBadge": "{{count}} lines",
+      "filesBadge": "{{count}} files",
+      "matchesBadge": "{{count}} matches"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -507,11 +710,14 @@
       "noMatches": "No matches",
       "noRepositories": "No repositories available",
       "noRepositoriesDescription": "No repositories are connected to your account.",
-      "tryDifferentSearch": "Try a different search term."
+      "tryDifferentSearch": "Try a different search term.",
+      "loading": "Loading...",
+      "accessibility": "Repository: {{label}}"
     },
     "messageDetails": {
       "title": "Message details",
       "copyMessage": "Copy message",
+      "copyText": "Copy Text",
       "selectText": "Select text",
       "reportAiResponse": "Report AI response",
       "reportAiResponseConfirm": "Report this response for review?",
@@ -528,7 +734,10 @@
       "reasoning": "Reasoning",
       "cacheRead": "Cache read",
       "cacheWrite": "Cache write",
-      "total": "Total"
+      "total": "Total",
+      "reportAiResponseFailedRetryable": "Couldn't report this response.",
+      "reportAiResponseFailedTerminal": "This response can't be reported.",
+      "reportAiResponseSubmitted": "Report submitted. Receipt {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Details unavailable",
@@ -536,7 +745,9 @@
       "thinking": "Thinking",
       "thought": "Thought",
       "title": "Details",
-      "showDetails": "Show details"
+      "showDetails": "Show details",
+      "pending": "Pending…",
+      "running": "Running…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Failed to render content"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Image unavailable, retry loading",
       "imageUnavailable": "Image unavailable",
       "imageUnavailableWithAlt": "Image unavailable {{alt}}",
+      "imagePreviewUnavailableInSession": "Image preview unavailable in this session.",
       "viewImage": "View image",
       "viewImageWithAlt": "View image {{alt}}",
       "imageOutput": "Image output",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Retry loading file",
       "fileEmpty": "This file is empty.",
       "previewUnavailable": "Preview unavailable",
+      "fileUnavailableInSession": "File unavailable in this session.",
       "shareFailed": "Share failed",
       "sharingUnavailable": "File sharing is not available on this device.",
       "shareFailedRetry": "Failed to share file. Please try again.",
@@ -654,7 +867,13 @@
       "longPressHint": "Long press for message details"
     },
     "olderMessages": {
-      "arrived": "Earlier messages loaded"
+      "arrived": "Earlier messages loaded",
+      "retryHint": "Reattempts the older-messages load for this session.",
+      "omittedOne": "Some earlier items from this session could not be displayed.",
+      "omittedMany": "{{count}} earlier items from this session could not be displayed.",
+      "couldNotLoad": "Couldn't load earlier messages.",
+      "unavailable": "Earlier messages aren't available.",
+      "tooLarge": "Earlier messages are too large to load."
     },
     "markdownTable": {
       "viewTable": "View table",
@@ -682,6 +901,13 @@
       "project": "Project",
       "removeProjectFilter": "Remove {{label}} project filter",
       "removePlatformFilter": "Remove {{label}} platform filter"
+    },
+    "suggestion": {
+      "title": "Suggestion",
+      "dismiss": "Dismiss suggestion",
+      "applyFailed": "Couldn't apply this suggestion. Try again.",
+      "dismissFailed": "Couldn't dismiss this suggestion. Try again.",
+      "dismissed": "Suggestion dismissed"
     },
     "modelPicker": {
       "title": "Select model",
@@ -734,7 +960,13 @@
       "waitForUploads": "Wait for attachments to finish uploading.",
       "pasteFromClipboard": "Paste from clipboard",
       "stopGenerating": "Stop generating",
-      "sendMessage": "Send message"
+      "sendMessage": "Send message",
+      "selectModelBeforeSending": "Select a model before sending",
+      "preparingPlaceholder": "Setting up environment...",
+      "finalizingPlaceholder": "Wrapping up...",
+      "messagePlaceholder": "Message...",
+      "cannotReceiveFiles": "This session can't receive files. Remove the attachments to send your message.",
+      "couldNotAttachFiles": "Couldn't attach files. Tap send to try again."
     },
     "chatLink": {
       "linkCopied": "Link copied",
@@ -769,6 +1001,8 @@
       "startNewSession": "Start a new session",
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
+      "useCommand": "Use /{{command}}",
+      "insert": "Insert",
       "upgradeRequiredFallback": "Please upgrade your CLI to use this command.",
       "exitCapabilityUnavailable": "Update your CLI to exit the session.",
       "clearCapabilityUnavailable": "Update your CLI to restart the session.",
@@ -780,7 +1014,36 @@
       "costPrefix": "cost {{cost}}",
       "costSuffix": ", cost {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, window unavailable",
-      "tokensUsage": "Context {{used}} of {{window}} tokens, {{percentage}}% used"
+      "tokensUsage": "Context {{used}} of {{window}} tokens, {{percentage}}% used",
+      "title": "Context usage",
+      "used": "Used",
+      "remaining": "Remaining",
+      "provider": "Provider",
+      "totalCost": "Total cost",
+      "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
+      "tokenUsage": "Token usage",
+      "cacheRate": "Cache rate",
+      "modelsCount": "Models ({{count}})",
+      "tokenTotalsNote": "Token totals cover this session only and exclude subagent/child-session tokens.",
+      "subagents": "Subagents",
+      "subagentsDescription": "Residual cost from child sessions",
+      "olderActivity": "Older activity",
+      "olderActivityDescription": "Cost not attributed to the loaded history",
+      "ofWindowTokens": "of {{window}} tokens",
+      "tokens": "tokens",
+      "tokensWithPercentage": "tokens ({{percentage}})",
+      "stepsCountOne": "{{steps}} step",
+      "stepsCountMany": "{{steps}} steps",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "open pull request",
+      "closed": "closed pull request",
+      "merged": "merged pull request",
+      "draft": "draft pull request",
+      "updating": "Updating, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {

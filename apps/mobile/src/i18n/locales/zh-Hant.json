@@ -18,6 +18,7 @@
     "openInBrowser": "在瀏覽器中開啟",
     "openSettings": "開啟設定",
     "copiedToClipboard": "已複製到剪貼簿",
+    "couldNotCopyToClipboard": "無法複製到剪貼簿",
     "required": "必填",
     "error": "錯誤：{{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "載入對話失敗",
       "notFound": "找不到對話",
-      "untitled": "無標題"
+      "untitled": "無標題",
+      "leaveTitle": "離開對話？",
+      "leaveMessage": "這會將它從您的清單中移除。",
+      "openHint": "開啟對話。長按可重新命名與離開。",
+      "unread": "未讀",
+      "optionsFor": "{{title}} 的對話選項",
+      "options": "對話選項",
+      "renameTitle": "重新命名對話",
+      "renamePlaceholder": "輸入新名稱",
+      "couldNotReachBot": "無法連上機器人。請再試一次。",
+      "messageDeliveryFailed": "訊息無法傳送給機器人",
+      "couldNotSignIn": "無法登入聊天",
+      "couldNotRefreshMessages": "無法重新整理訊息",
+      "couldNotLoadHistory": "無法載入對話記錄",
+      "rename": "重新命名",
+      "leave": "離開",
+      "untitledConversation": "無標題對話",
+      "createFailed": "建立對話失敗",
+      "leaveFailed": "離開對話失敗"
+    },
+    "reactions": {
+      "title": "反應",
+      "close": "關閉反應",
+      "recent": "最近",
+      "common": "常用",
+      "reactWith": "以 {{reaction}} 回應",
+      "accessibility": "{{emoji}} 反應，{{count}}"
+    },
+    "composer": {
+      "replyingTo": "回覆",
+      "cancelReply": "取消回覆",
+      "openInstance": "開啟執行個體",
+      "attachFile": "附加檔案",
+      "messagePlaceholder": "訊息",
+      "cancelEdit": "取消編輯",
+      "sendMessage": "傳送訊息"
+    },
+    "conversationList": {
+      "couldNotLoad": "無法載入對話",
+      "emptyTitle": "尚無對話",
+      "emptyDescription": "建立對話以開始與您的 KiloClaw 執行個體聊天。",
+      "create": "建立對話",
+      "starting": "正在開始…",
+      "newConversation": "新對話",
+      "openInstanceSettings": "開啟執行個體設定",
+      "today": "今天",
+      "yesterday": "昨天",
+      "thisWeek": "本週",
+      "older": "較早"
+    },
+    "attachment": {
+      "open": "開啟 {{filename}}",
+      "imageUnavailable": "圖片無法使用",
+      "openFailed": "無法開啟附件。請檢查連線後再試一次。",
+      "attachFailed": "附加檔案失敗",
+      "limit": "最多可附加 {{count}} 個檔案。",
+      "sizeRejection": "{{filename}} 超出 {{limit}} 的附件大小限制。",
+      "unreadable": "無法讀取 {{filename}}。",
+      "pastedImage": "貼上的圖片",
+      "defaultName": "附件"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}，{{status}}",
+      "retryUploading": "重試上傳 {{filename}}",
+      "remove": "移除 {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[已刪除的訊息]",
+      "yourMessage": "你的訊息",
+      "messageFrom": "來自 {{author}} 的訊息",
+      "moreActions": "更多動作",
+      "message": "訊息",
+      "notDelivered": "未送達",
+      "edited": "（已編輯）"
+    },
+    "messageActions": {
+      "copied": "已複製",
+      "copyFailed": "複製失敗",
+      "title": "訊息操作",
+      "deleteTitle": "刪除訊息？",
+      "deleteMessage": "這會將該訊息從對話中移除。",
+      "delete": "刪除",
+      "deleteFailed": "刪除訊息失敗",
+      "removeReactionFailed": "移除回應失敗",
+      "addReactionFailed": "新增回應失敗",
+      "retrySend": "重新傳送",
+      "moreReactions": "更多回應",
+      "reply": "回覆",
+      "edit": "編輯",
+      "sendFailed": "傳送訊息失敗",
+      "retrySendFailed": "重新傳送失敗",
+      "editFailed": "編輯訊息失敗",
+      "executeFailed": "執行動作失敗"
+    },
+    "attachmentPicker": {
+      "takePhoto": "拍照",
+      "photoLibrary": "照片圖庫",
+      "files": "檔案",
+      "cameraAccessDisabled": "相機存取已停用",
+      "cameraAccessMessage": "請在設定中允許相機存取以拍照。"
+    },
+    "typingIndicator": {
+      "someone": "某人",
+      "oneTyping": "{{name}} 正在輸入...",
+      "manyTyping": "{{names}} 正在輸入..."
+    },
+    "botStatus": {
+      "online": "線上",
+      "idle": "閒置",
+      "offline": "離線",
+      "unknown": "未知",
+      "loadingUser": "正在載入使用者...",
+      "waitingForStatus": "正在等待機器人狀態...",
+      "offlineMessage": "機器人已離線。重新連線後訊息將繼續。"
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "目前使用中"
+    "activeNow": "目前使用中",
+    "search": {
+      "searching": "搜尋中",
+      "searchSessions": "搜尋工作階段",
+      "searchSessionsPlaceholder": "搜尋工作階段...",
+      "clearSearch": "清除搜尋",
+      "clearFilters": "清除篩選條件"
+    },
+    "sessionList": {
+      "couldNotLoad": "無法載入工作階段",
+      "couldNotLoadActive": "無法載入使用中的工作階段",
+      "noSessionsYet": "尚無工作階段",
+      "noSessionsYetDescription": "從手機開始程式設計任務。您的工作階段將顯示在這裡。",
+      "noMatches": "沒有相符的工作階段",
+      "tryDifferentSearch": "請嘗試其他搜尋字詞。",
+      "tryAdjustFilters": "請嘗試調整或清除您的篩選條件。",
+      "couldNotSearch": "無法搜尋工作階段",
+      "allActive": "所有工作階段皆在使用中",
+      "completedWillAppear": "已完成的工作階段將顯示在這裡。",
+      "noPastSessions": "沒有過去的工作階段",
+      "live": "即時"
+    },
+    "sessionRow": {
+      "deleteTitle": "刪除工作階段？",
+      "deleteMessage": "此操作無法復原。",
+      "delete": "刪除",
+      "deleteSession": "刪除工作階段",
+      "rename": "重新命名",
+      "renameMessage": "輸入此工作階段的新名稱",
+      "copyId": "複製工作階段 ID",
+      "idCopied": "工作階段 ID 已複製",
+      "couldNotCopyId": "無法複製工作階段 ID",
+      "untitled": "無標題工作階段"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "無法載入工作階段",
       "failedToLoadDetails": "無法載入工作階段詳細資料",
       "notFound": "找不到",
-      "notFoundDescription": "此項目可能已遭移除或不再可用。"
+      "notFoundDescription": "此項目可能已遭移除或不再可用。",
+      "failedToStopExecution": "無法停止執行",
+      "renameSession": "重新命名工作階段",
+      "renamePlaceholder": "工作階段名稱",
+      "transcriptAccessibility": "工作階段逐字稿",
+      "readOnly": "這是唯讀工作階段",
+      "emptyDescription": "在下方傳送訊息以開始。",
+      "scrollToBottom": "捲動到底部",
+      "emptyTitle": "尚無訊息",
+      "renameAccessibility": "重新命名工作階段：{{title}}",
+      "connectRepository": "連線存放庫",
+      "cloningSession": "正在複製工作階段",
+      "continue": "繼續",
+      "couldNotLoadThisSession": "無法載入此工作階段",
+      "cloneFailed": "無法複製此工作階段。",
+      "cloneFailedRetry": "無法複製此工作階段。請重試。",
+      "connectRepositoryToContinue": "連接一個存放庫以繼續。"
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段",
       "exited": "工作階段已結束",
-      "failedToExit": "無法結束工作階段"
+      "failedToExit": "無法結束工作階段",
+      "exitTitle": "結束工作階段？",
+      "exitMessage": "這會停止執行中的工作階段，但保留其記錄。",
+      "keepSessionRunning": "保持工作階段執行",
+      "exitSession": "結束工作階段",
+      "restartExitFailed": "已開始新工作階段。上一個工作階段仍處於開啟狀態。"
+    },
+    "sessionConnection": {
+      "connecting": "連線中…",
+      "reconnecting": "重新連線中…",
+      "connectionLost": "連線中斷",
+      "retryConnection": "重試連線"
     },
     "newSession": {
       "title": "新工作階段",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "無法載入模型",
       "prefillRepoAndModelUnavailable": "原始工作階段的存放庫與模型已不再可用。請在下方選取。",
       "prefillRepoUnavailable": "{{repo}} 已不再可用。請在下方選取存放庫。",
-      "prefillModelUnavailable": "{{model}} 已不再可用。將使用您的預設模型。"
+      "prefillModelUnavailable": "{{model}} 已不再可用。將使用您的預設模型。",
+      "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
+      "failedToCreate": "無法建立工作階段"
     },
     "partRenderer": {
       "updatedFile": "已更新 {{count}} 個檔案",
       "updatedFiles": "已更新 {{count}} 個檔案"
+    },
+    "toolPatch": {
+      "operationAdded": "已新增",
+      "operationDeleted": "已刪除",
+      "operationUpdated": "已更新"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} 工具，{{status}}",
+      "accessibilityLabel": "{{name}} 工具，{{status}}",
+      "fileEmpty": "此檔案為空。",
+      "noTasks": "沒有任務。",
+      "contentTruncated": "內容已截斷",
+      "truncated": "已截斷",
+      "toolRead": "讀取",
+      "toolEdit": "編輯",
+      "toolWrite": "寫入",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "清單",
+      "toolPatch": "patch",
+      "toolTask": "任務",
+      "readTodos": "讀取待辦事項",
+      "updateTodos": "更新待辦事項",
+      "linesBadge": "{{count}} 行",
+      "filesBadge": "{{count}} 個檔案",
+      "matchesBadge": "{{count}} 個相符"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -507,11 +710,14 @@
       "noMatches": "無相符項目",
       "noRepositories": "沒有可用的存放庫",
       "noRepositoriesDescription": "您的帳戶沒有連接任何存放庫。",
-      "tryDifferentSearch": "請嘗試其他搜尋字詞。"
+      "tryDifferentSearch": "請嘗試其他搜尋字詞。",
+      "loading": "載入中...",
+      "accessibility": "存放庫：{{label}}"
     },
     "messageDetails": {
       "title": "訊息詳細資料",
       "copyMessage": "複製訊息",
+      "copyText": "複製文字",
       "selectText": "選取文字",
       "reportAiResponse": "檢舉 AI 回覆",
       "reportAiResponseConfirm": "要檢舉此回覆以供審查嗎？",
@@ -528,7 +734,10 @@
       "reasoning": "推理",
       "cacheRead": "快取讀取",
       "cacheWrite": "快取寫入",
-      "total": "總計"
+      "total": "總計",
+      "reportAiResponseFailedRetryable": "無法檢舉此回覆。",
+      "reportAiResponseFailedTerminal": "此回覆無法檢舉。",
+      "reportAiResponseSubmitted": "檢舉已提交。回執 {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "詳細資料無法使用",
@@ -536,7 +745,9 @@
       "thinking": "思考",
       "thought": "想法",
       "title": "詳細資料",
-      "showDetails": "顯示詳細資料"
+      "showDetails": "顯示詳細資料",
+      "pending": "待處理…",
+      "running": "執行中…"
     },
     "messageErrorBoundary": {
       "failedToRender": "無法轉譯內容"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "圖片無法使用，重試載入",
       "imageUnavailable": "圖片無法使用",
       "imageUnavailableWithAlt": "圖片無法使用 {{alt}}",
+      "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片 {{alt}}",
       "imageOutput": "圖片輸出",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "重試載入檔案",
       "fileEmpty": "此檔案為空。",
       "previewUnavailable": "無法預覽",
+      "fileUnavailableInSession": "此工作階段中無法使用檔案。",
       "shareFailed": "分享失敗",
       "sharingUnavailable": "此裝置無法分享檔案。",
       "shareFailedRetry": "無法分享檔案。請再試一次。",
@@ -654,7 +867,13 @@
       "longPressHint": "長按以檢視訊息詳細資料"
     },
     "olderMessages": {
-      "arrived": "已載入較早的訊息"
+      "arrived": "已載入較早的訊息",
+      "retryHint": "重新嘗試載入此工作階段的較早訊息。",
+      "omittedOne": "此工作階段中的一個較早項目無法顯示。",
+      "omittedMany": "此工作階段中的 {{count}} 個較早項目無法顯示。",
+      "couldNotLoad": "無法載入較早的訊息。",
+      "unavailable": "較早的訊息無法使用。",
+      "tooLarge": "較早的訊息太大，無法載入。"
     },
     "markdownTable": {
       "viewTable": "檢視表格",
@@ -682,6 +901,13 @@
       "project": "專案",
       "removeProjectFilter": "移除 {{label}} 專案篩選條件",
       "removePlatformFilter": "移除 {{label}} 平台篩選條件"
+    },
+    "suggestion": {
+      "title": "建議",
+      "dismiss": "關閉建議",
+      "applyFailed": "無法套用此建議。請重試。",
+      "dismissFailed": "無法關閉此建議。請重試。",
+      "dismissed": "建議已關閉"
     },
     "modelPicker": {
       "title": "選取模型",
@@ -734,7 +960,13 @@
       "waitForUploads": "請等待附件上傳完成。",
       "pasteFromClipboard": "從剪貼簿貼上",
       "stopGenerating": "停止產生",
-      "sendMessage": "傳送訊息"
+      "sendMessage": "傳送訊息",
+      "selectModelBeforeSending": "傳送前請先選取模型",
+      "preparingPlaceholder": "正在設定環境...",
+      "finalizingPlaceholder": "正在收尾...",
+      "messagePlaceholder": "訊息...",
+      "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
+      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。"
     },
     "chatLink": {
       "linkCopied": "連結已複製",
@@ -769,6 +1001,8 @@
       "startNewSession": "開始新工作階段",
       "exitSession": "結束工作階段",
       "clearSession": "結束此工作階段並開始新的",
+      "useCommand": "使用 /{{command}}",
+      "insert": "插入",
       "upgradeRequiredFallback": "請升級您的 CLI 以使用此指令。",
       "exitCapabilityUnavailable": "請更新您的 CLI 以結束工作階段。",
       "clearCapabilityUnavailable": "請更新您的 CLI 以重新啟動工作階段。",
@@ -780,7 +1014,36 @@
       "costPrefix": "成本 {{cost}}",
       "costSuffix": "，成本 {{cost}}",
       "tokensWindowUnavailable": "內容 {{used}} 個 token，視窗無法使用",
-      "tokensUsage": "內容 {{used}} / {{window}} 個 token，已使用 {{percentage}}%"
+      "tokensUsage": "內容 {{used}} / {{window}} 個 token，已使用 {{percentage}}%",
+      "title": "內容用量",
+      "used": "已使用",
+      "remaining": "剩餘",
+      "provider": "供應商",
+      "totalCost": "總成本",
+      "usageReflectsLatest": "用量反映最近一次完成的助理回覆。",
+      "tokenUsage": "Token 用量",
+      "cacheRate": "快取費率",
+      "modelsCount": "模型（{{count}}）",
+      "tokenTotalsNote": "Token 總計僅涵蓋此工作階段，不包含子代理/子工作階段的 token。",
+      "subagents": "子代理",
+      "subagentsDescription": "子工作階段的剩餘成本",
+      "olderActivity": "較早的活動",
+      "olderActivityDescription": "未歸屬於已載入記錄的成本",
+      "ofWindowTokens": "共 {{window}} 個 token",
+      "tokens": "token",
+      "tokensWithPercentage": "token（{{percentage}}）",
+      "stepsCountOne": "{{steps}} 個步驟",
+      "stepsCountMany": "{{steps}} 個步驟",
+      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
+    },
+    "prBadge": {
+      "open": "開啟的拉取請求",
+      "closed": "已關閉的拉取請求",
+      "merged": "已合併的拉取請求",
+      "draft": "草稿拉取請求",
+      "updating": "正在更新，{{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "拉取請求"
     }
   },
   "bootstrap": {

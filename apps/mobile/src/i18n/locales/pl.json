@@ -18,6 +18,7 @@
     "openInBrowser": "Otwórz w przeglądarce",
     "openSettings": "Otwórz Ustawienia",
     "copiedToClipboard": "Skopiowano do schowka",
+    "couldNotCopyToClipboard": "Nie udało się skopiować do schowka",
     "required": "wymagane",
     "error": "błąd: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Nie udało się załadować rozmowy",
       "notFound": "Nie znaleziono konwersacji",
-      "untitled": "Bez tytułu"
+      "untitled": "Bez tytułu",
+      "leaveTitle": "Opuścić rozmowę?",
+      "leaveMessage": "Spowoduje to usunięcie jej z Twojej listy.",
+      "openHint": "Otwiera rozmowę. Przytrzymaj, aby zobaczyć opcje zmiany nazwy i opuszczenia.",
+      "unread": "Nieprzeczytane",
+      "optionsFor": "Opcje rozmowy dla {{title}}",
+      "options": "Opcje rozmowy",
+      "renameTitle": "Zmień nazwę rozmowy",
+      "renamePlaceholder": "Wpisz nową nazwę",
+      "couldNotReachBot": "Nie udało się połączyć z botem. Spróbuj ponownie.",
+      "messageDeliveryFailed": "Nie udało się dostarczyć wiadomości do bota",
+      "couldNotSignIn": "Nie udało się zalogować do czatu",
+      "couldNotRefreshMessages": "Nie udało się odświeżyć wiadomości",
+      "couldNotLoadHistory": "Nie udało się załadować historii rozmowy",
+      "rename": "Zmień nazwę",
+      "leave": "Opuść",
+      "untitledConversation": "Rozmowa bez tytułu",
+      "createFailed": "Nie udało się utworzyć rozmowy",
+      "leaveFailed": "Nie udało się opuścić rozmowy"
+    },
+    "reactions": {
+      "title": "Reakcje",
+      "close": "Zamknij reakcje",
+      "recent": "Ostatnie",
+      "common": "Popularne",
+      "reactWith": "Zareaguj za pomocą {{reaction}}",
+      "accessibility": "{{emoji}} reakcja, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Odpowiadanie na",
+      "cancelReply": "Anuluj odpowiedź",
+      "openInstance": "Otwórz instancję",
+      "attachFile": "Dołącz plik",
+      "messagePlaceholder": "Wiadomość",
+      "cancelEdit": "Anuluj edycję",
+      "sendMessage": "Wyślij wiadomość"
+    },
+    "conversationList": {
+      "couldNotLoad": "Nie udało się załadować rozmów",
+      "emptyTitle": "Nie ma jeszcze rozmów",
+      "emptyDescription": "Utwórz rozmowę, aby rozpocząć czat ze swoją instancją KiloClaw.",
+      "create": "Utwórz rozmowę",
+      "starting": "Rozpoczynanie…",
+      "newConversation": "Nowa rozmowa",
+      "openInstanceSettings": "Otwórz ustawienia instancji",
+      "today": "Dzisiaj",
+      "yesterday": "Wczoraj",
+      "thisWeek": "W tym tygodniu",
+      "older": "Starsze"
+    },
+    "attachment": {
+      "open": "Otwórz {{filename}}",
+      "imageUnavailable": "Obraz niedostępny",
+      "openFailed": "Nie udało się otworzyć załącznika. Sprawdź połączenie i spróbuj ponownie.",
+      "attachFailed": "Nie udało się dołączyć pliku",
+      "limit": "Możesz dołączyć maksymalnie {{count}} plików.",
+      "sizeRejection": "{{filename}} przekracza limit załączników wynoszący {{limit}}.",
+      "unreadable": "Nie udało się odczytać pliku {{filename}}.",
+      "pastedImage": "wklejony obraz",
+      "defaultName": "Załącznik"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Spróbuj ponownie przesłać {{filename}}",
+      "remove": "Usuń {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[usunięta wiadomość]",
+      "yourMessage": "Twoja wiadomość",
+      "messageFrom": "Wiadomość od {{author}}",
+      "moreActions": "Więcej akcji",
+      "message": "Wiadomość",
+      "notDelivered": "Nie dostarczono",
+      "edited": "(edytowano)"
+    },
+    "messageActions": {
+      "copied": "Skopiowano",
+      "copyFailed": "Nie udało się skopiować",
+      "title": "Akcje wiadomości",
+      "deleteTitle": "Usunąć wiadomość?",
+      "deleteMessage": "Spowoduje to usunięcie wiadomości z rozmowy.",
+      "delete": "Usuń",
+      "deleteFailed": "Nie udało się usunąć wiadomości",
+      "removeReactionFailed": "Nie udało się usunąć reakcji",
+      "addReactionFailed": "Nie udało się dodać reakcji",
+      "retrySend": "Wyślij ponownie",
+      "moreReactions": "Więcej reakcji",
+      "reply": "Odpowiedz",
+      "edit": "Edytuj",
+      "sendFailed": "Nie udało się wysłać wiadomości",
+      "retrySendFailed": "Nie udało się wysłać ponownie",
+      "editFailed": "Nie udało się edytować wiadomości",
+      "executeFailed": "Nie udało się wykonać akcji"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Zrób zdjęcie",
+      "photoLibrary": "Biblioteka zdjęć",
+      "files": "Pliki",
+      "cameraAccessDisabled": "Dostęp do aparatu wyłączony",
+      "cameraAccessMessage": "Zezwól na dostęp do aparatu w Ustawieniach, aby zrobić zdjęcie."
+    },
+    "typingIndicator": {
+      "someone": "Ktoś",
+      "oneTyping": "{{name}} pisze...",
+      "manyTyping": "{{names}} piszą..."
+    },
+    "botStatus": {
+      "online": "Online",
+      "idle": "Bezczynny",
+      "offline": "Offline",
+      "unknown": "Nieznany",
+      "loadingUser": "Ładowanie użytkownika...",
+      "waitingForStatus": "Oczekiwanie na status bota...",
+      "offlineMessage": "Bot jest offline. Wiadomości zostaną wznowione po ponownym połączeniu."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Aktywne teraz"
+    "activeNow": "Aktywne teraz",
+    "search": {
+      "searching": "Wyszukiwanie",
+      "searchSessions": "Szukaj sesji",
+      "searchSessionsPlaceholder": "Szukaj sesji...",
+      "clearSearch": "Wyczyść wyszukiwanie",
+      "clearFilters": "Wyczyść filtry"
+    },
+    "sessionList": {
+      "couldNotLoad": "Nie udało się załadować sesji",
+      "couldNotLoadActive": "Nie udało się załadować aktywnych sesji",
+      "noSessionsYet": "Nie ma jeszcze sesji",
+      "noSessionsYetDescription": "Rozpocznij zadanie kodowania z telefonu. Twoje sesje pojawią się tutaj.",
+      "noMatches": "Brak pasujących sesji",
+      "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania.",
+      "tryAdjustFilters": "Spróbuj dostosować lub wyczyścić filtry.",
+      "couldNotSearch": "Nie udało się wyszukać sesji",
+      "allActive": "Wszystkie sesje są aktywne",
+      "completedWillAppear": "Ukończone sesje pojawią się tutaj.",
+      "noPastSessions": "Brak poprzednich sesji",
+      "live": "NA ŻYWO"
+    },
+    "sessionRow": {
+      "deleteTitle": "Usunąć sesję?",
+      "deleteMessage": "Tej akcji nie można cofnąć.",
+      "delete": "Usuń",
+      "deleteSession": "Usuń sesję",
+      "rename": "Zmień nazwę",
+      "renameMessage": "Wpisz nową nazwę dla tej sesji",
+      "copyId": "Kopiuj identyfikator sesji",
+      "idCopied": "Skopiowano identyfikator sesji",
+      "couldNotCopyId": "Nie udało się skopiować identyfikatora sesji",
+      "untitled": "Sesja bez tytułu"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Nie udało się wczytać sesji",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji",
       "notFound": "Nie znaleziono",
-      "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny."
+      "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
+      "failedToStopExecution": "Nie udało się zatrzymać wykonywania",
+      "renameSession": "Zmień nazwę sesji",
+      "renamePlaceholder": "Nazwa sesji",
+      "transcriptAccessibility": "Transkrypt sesji",
+      "readOnly": "To jest sesja tylko do odczytu",
+      "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
+      "scrollToBottom": "Przewiń na dół",
+      "emptyTitle": "Brak wiadomości",
+      "renameAccessibility": "Zmień nazwę sesji: {{title}}",
+      "connectRepository": "Połącz repozytorium",
+      "cloningSession": "Klonowanie sesji",
+      "continue": "Kontynuuj",
+      "couldNotLoadThisSession": "Nie udało się załadować tej sesji",
+      "cloneFailed": "Nie udało się sklonować tej sesji.",
+      "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
+      "connectRepositoryToContinue": "Połącz repozytorium, aby kontynuować."
     },
     "remoteSession": {
       "failedToCreate": "Nie udało się utworzyć sesji zdalnej",
       "exited": "Sesja zakończona",
-      "failedToExit": "Nie udało się zakończyć sesji"
+      "failedToExit": "Nie udało się zakończyć sesji",
+      "exitTitle": "Zakończyć sesję?",
+      "exitMessage": "Spowoduje to zatrzymanie działającej sesji, ale zachowa jej historię.",
+      "keepSessionRunning": "Pozostaw sesję uruchomioną",
+      "exitSession": "Zakończ sesję",
+      "restartExitFailed": "Rozpoczęto nową sesję. Poprzednia sesja jest nadal otwarta."
+    },
+    "sessionConnection": {
+      "connecting": "Łączenie…",
+      "reconnecting": "Ponowne łączenie…",
+      "connectionLost": "Utracono połączenie",
+      "retryConnection": "Spróbuj ponownie połączyć"
     },
     "newSession": {
       "title": "Nowa sesja",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Nie udało się załadować modeli",
       "prefillRepoAndModelUnavailable": "Repozytorium i model oryginalnej sesji nie są już dostępne. Wybierz je poniżej.",
       "prefillRepoUnavailable": "{{repo}} nie jest już dostępne. Wybierz repozytorium poniżej.",
-      "prefillModelUnavailable": "{{model}} nie jest już dostępny. Używany jest Twój domyślny model."
+      "prefillModelUnavailable": "{{model}} nie jest już dostępny. Używany jest Twój domyślny model.",
+      "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
+      "failedToCreate": "Nie udało się utworzyć sesji"
     },
     "partRenderer": {
       "updatedFile": "Zaktualizowano {{count}} plik",
       "updatedFiles": "Zaktualizowano {{count}} pliki"
+    },
+    "toolPatch": {
+      "operationAdded": "Dodano",
+      "operationDeleted": "Usunięto",
+      "operationUpdated": "Zaktualizowano"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} narzędzie, {{status}}",
+      "accessibilityLabel": "{{name}} narzędzie, {{status}}",
+      "fileEmpty": "Ten plik jest pusty.",
+      "noTasks": "Brak zadań.",
+      "contentTruncated": "Treść obcięta",
+      "truncated": "Obcięto",
+      "toolRead": "czytaj",
+      "toolEdit": "edytuj",
+      "toolWrite": "zapisz",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "lista",
+      "toolPatch": "patch",
+      "toolTask": "zadanie",
+      "readTodos": "Czytaj zadania",
+      "updateTodos": "Zaktualizuj zadania",
+      "linesBadge": "{{count}} wiersze",
+      "filesBadge": "{{count}} pliki",
+      "matchesBadge": "{{count}} dopasowania"
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (obcięte)",
@@ -507,11 +710,14 @@
       "noMatches": "Brak dopasowań",
       "noRepositories": "Brak dostępnych repozytoriów",
       "noRepositoriesDescription": "Z Twoim kontem nie są połączone żadne repozytoria.",
-      "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania."
+      "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania.",
+      "loading": "Ładowanie...",
+      "accessibility": "Repozytorium: {{label}}"
     },
     "messageDetails": {
       "title": "Szczegóły wiadomości",
       "copyMessage": "Kopiuj wiadomość",
+      "copyText": "Kopiuj tekst",
       "selectText": "Zaznacz tekst",
       "reportAiResponse": "Zgłoś odpowiedź AI",
       "reportAiResponseConfirm": "Zgłosić tę odpowiedź do przeglądu?",
@@ -528,7 +734,10 @@
       "reasoning": "Rozumowanie",
       "cacheRead": "Odczyt pamięci podręcznej",
       "cacheWrite": "Zapis pamięci podręcznej",
-      "total": "Razem"
+      "total": "Razem",
+      "reportAiResponseFailedRetryable": "Nie udało się zgłosić tej odpowiedzi.",
+      "reportAiResponseFailedTerminal": "Tej odpowiedzi nie można zgłosić.",
+      "reportAiResponseSubmitted": "Zgłoszenie wysłane. Potwierdzenie {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Szczegóły niedostępne",
@@ -536,7 +745,9 @@
       "thinking": "Myślenie",
       "thought": "Myśl",
       "title": "Szczegóły",
-      "showDetails": "Pokaż szczegóły"
+      "showDetails": "Pokaż szczegóły",
+      "pending": "Oczekiwanie…",
+      "running": "Uruchamianie…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Nie udało się wyrenderować treści"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Obraz niedostępny, spróbuj załadować ponownie",
       "imageUnavailable": "Obraz niedostępny",
       "imageUnavailableWithAlt": "Obraz niedostępny {{alt}}",
+      "imagePreviewUnavailableInSession": "Podgląd obrazu niedostępny w tej sesji.",
       "viewImage": "Wyświetl obraz",
       "viewImageWithAlt": "Wyświetl obraz {{alt}}",
       "imageOutput": "Wyjście obrazu",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Spróbuj ponownie załadować plik",
       "fileEmpty": "Ten plik jest pusty.",
       "previewUnavailable": "Podgląd niedostępny",
+      "fileUnavailableInSession": "Plik niedostępny w tej sesji.",
       "shareFailed": "Udostępnianie nie powiodło się",
       "sharingUnavailable": "Udostępnianie plików nie jest dostępne na tym urządzeniu.",
       "shareFailedRetry": "Nie udało się udostępnić pliku. Spróbuj ponownie.",
@@ -654,7 +867,13 @@
       "longPressHint": "Przytrzymaj, aby zobaczyć szczegóły wiadomości"
     },
     "olderMessages": {
-      "arrived": "Załadowano wcześniejsze wiadomości"
+      "arrived": "Załadowano wcześniejsze wiadomości",
+      "retryHint": "Ponawia ładowanie starszych wiadomości tej sesji.",
+      "omittedOne": "Nie można wyświetlić jednego wcześniejszego elementu tej sesji.",
+      "omittedMany": "Nie można wyświetlić {{count}} wcześniejszych elementów tej sesji.",
+      "couldNotLoad": "Nie udało się załadować wcześniejszych wiadomości.",
+      "unavailable": "Wcześniejsze wiadomości nie są dostępne.",
+      "tooLarge": "Wcześniejsze wiadomości są zbyt duże, aby je załadować."
     },
     "markdownTable": {
       "viewTable": "Wyświetl tabelę",
@@ -682,6 +901,13 @@
       "project": "Projekt",
       "removeProjectFilter": "Usuń filtr projektu {{label}}",
       "removePlatformFilter": "Usuń filtr platformy {{label}}"
+    },
+    "suggestion": {
+      "title": "Sugestia",
+      "dismiss": "Odrzuć sugestię",
+      "applyFailed": "Nie udało się zastosować tej sugestii. Spróbuj ponownie.",
+      "dismissFailed": "Nie udało się odrzucić tej sugestii. Spróbuj ponownie.",
+      "dismissed": "Sugestia odrzucona"
     },
     "modelPicker": {
       "title": "Wybierz model",
@@ -734,7 +960,13 @@
       "waitForUploads": "Poczekaj, aż załączniki zakończą przesyłanie.",
       "pasteFromClipboard": "Wklej ze schowka",
       "stopGenerating": "Zatrzymaj generowanie",
-      "sendMessage": "Wyślij wiadomość"
+      "sendMessage": "Wyślij wiadomość",
+      "selectModelBeforeSending": "Wybierz model przed wysłaniem",
+      "preparingPlaceholder": "Konfigurowanie środowiska...",
+      "finalizingPlaceholder": "Kończenie...",
+      "messagePlaceholder": "Wiadomość...",
+      "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
+      "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij Wyślij, aby spróbować ponownie."
     },
     "chatLink": {
       "linkCopied": "Link skopiowany",
@@ -769,6 +1001,8 @@
       "startNewSession": "Rozpocznij nową sesję",
       "exitSession": "Zakończ sesję",
       "clearSession": "Zakończ tę sesję i rozpocznij nową",
+      "useCommand": "Użyj /{{command}}",
+      "insert": "Wstaw",
       "upgradeRequiredFallback": "Zaktualizuj swoje CLI, aby użyć tego polecenia.",
       "exitCapabilityUnavailable": "Zaktualizuj swoje CLI, aby zakończyć sesję.",
       "clearCapabilityUnavailable": "Zaktualizuj swoje CLI, aby ponownie uruchomić sesję.",
@@ -780,7 +1014,36 @@
       "costPrefix": "koszt {{cost}}",
       "costSuffix": ", koszt {{cost}}",
       "tokensWindowUnavailable": "Kontekst {{used}} tokenów, okno niedostępne",
-      "tokensUsage": "Kontekst {{used}} z {{window}} tokenów, wykorzystano {{percentage}}%"
+      "tokensUsage": "Kontekst {{used}} z {{window}} tokenów, wykorzystano {{percentage}}%",
+      "title": "Użycie kontekstu",
+      "used": "Wykorzystano",
+      "remaining": "Pozostało",
+      "provider": "Dostawca",
+      "totalCost": "Całkowity koszt",
+      "usageReflectsLatest": "Użycie odzwierciedla ostatnią ukończoną odpowiedź asystenta.",
+      "tokenUsage": "Zużycie tokenów",
+      "cacheRate": "Współczynnik pamięci podręcznej",
+      "modelsCount": "Modele ({{count}})",
+      "tokenTotalsNote": "Sumy tokenów obejmują tylko tę sesję i nie uwzględniają tokenów podagentów/sesji podrzędnych.",
+      "subagents": "Podagenci",
+      "subagentsDescription": "Pozostały koszt z sesji podrzędnych",
+      "olderActivity": "Starsza aktywność",
+      "olderActivityDescription": "Koszt nieprzypisany do załadowanej historii",
+      "ofWindowTokens": "z {{window}} tokenów",
+      "tokens": "tokeny",
+      "tokensWithPercentage": "tokeny ({{percentage}})",
+      "stepsCountOne": "{{steps}} krok",
+      "stepsCountMany": "{{steps}} kroki",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "otwarty pull request",
+      "closed": "zamknięty pull request",
+      "merged": "scalony pull request",
+      "draft": "szkic pull requesta",
+      "updating": "Aktualizowanie, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {

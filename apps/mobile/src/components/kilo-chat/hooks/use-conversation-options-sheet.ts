@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { i18n } from '@/i18n';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 import { useConversationRename } from './use-conversation-rename';
@@ -35,7 +36,11 @@ export function useConversationOptionsSheet({
     showActionSheetWithOptions(
       {
         title: conversationTitle,
-        options: ['Rename', 'Leave', 'Cancel'],
+        options: [
+          i18n.t('chat.conversation.rename'),
+          i18n.t('chat.conversation.leave'),
+          i18n.t('common.cancel'),
+        ],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
         containerStyle: { paddingBottom: bottom },
@@ -47,23 +52,27 @@ export function useConversationOptionsSheet({
         }
         if (index === 1) {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          Alert.alert('Leave conversation?', 'This removes it from your list.', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Leave',
-              style: 'destructive',
-              onPress: () => {
-                leaveConversation.mutate(
-                  { conversationId, sandboxId },
-                  {
-                    onSuccess: () => {
-                      router.replace(chatSandboxPath(sandboxId));
-                    },
-                  }
-                );
+          Alert.alert(
+            i18n.t('chat.conversation.leaveTitle'),
+            i18n.t('chat.conversation.leaveMessage'),
+            [
+              { text: i18n.t('common.cancel'), style: 'cancel' },
+              {
+                text: i18n.t('chat.conversation.leave'),
+                style: 'destructive',
+                onPress: () => {
+                  leaveConversation.mutate(
+                    { conversationId, sandboxId },
+                    {
+                      onSuccess: () => {
+                        router.replace(chatSandboxPath(sandboxId));
+                      },
+                    }
+                  );
+                },
               },
-            },
-          ]);
+            ]
+          );
         }
       }
     );

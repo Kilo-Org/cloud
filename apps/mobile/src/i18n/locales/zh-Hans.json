@@ -18,6 +18,7 @@
     "openInBrowser": "在浏览器中打开",
     "openSettings": "打开设置",
     "copiedToClipboard": "已复制到剪贴板",
+    "couldNotCopyToClipboard": "无法复制到剪贴板",
     "required": "必填",
     "error": "错误：{{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "加载对话失败",
       "notFound": "未找到对话",
-      "untitled": "无标题"
+      "untitled": "无标题",
+      "leaveTitle": "离开对话？",
+      "leaveMessage": "这会将其从您的列表中移除。",
+      "openHint": "打开对话。长按可重命名和离开。",
+      "unread": "未读",
+      "optionsFor": "{{title}} 的对话选项",
+      "options": "对话选项",
+      "renameTitle": "重命名对话",
+      "renamePlaceholder": "输入新名称",
+      "couldNotReachBot": "无法连接到机器人。请重试。",
+      "messageDeliveryFailed": "消息无法发送给机器人",
+      "couldNotSignIn": "无法登录聊天",
+      "couldNotRefreshMessages": "无法刷新消息",
+      "couldNotLoadHistory": "无法加载对话历史",
+      "rename": "重命名",
+      "leave": "离开",
+      "untitledConversation": "无标题对话",
+      "createFailed": "创建对话失败",
+      "leaveFailed": "退出对话失败"
+    },
+    "reactions": {
+      "title": "回应",
+      "close": "关闭回应",
+      "recent": "最近",
+      "common": "常用",
+      "reactWith": "使用 {{reaction}} 回应",
+      "accessibility": "{{emoji}} 回应，{{count}}"
+    },
+    "composer": {
+      "replyingTo": "回复",
+      "cancelReply": "取消回复",
+      "openInstance": "打开实例",
+      "attachFile": "附加文件",
+      "messagePlaceholder": "消息",
+      "cancelEdit": "取消编辑",
+      "sendMessage": "发送消息"
+    },
+    "conversationList": {
+      "couldNotLoad": "无法加载对话",
+      "emptyTitle": "暂无对话",
+      "emptyDescription": "创建对话以开始与您的 KiloClaw 实例聊天。",
+      "create": "创建对话",
+      "starting": "正在开始…",
+      "newConversation": "新对话",
+      "openInstanceSettings": "打开实例设置",
+      "today": "今天",
+      "yesterday": "昨天",
+      "thisWeek": "本周",
+      "older": "更早"
+    },
+    "attachment": {
+      "open": "打开 {{filename}}",
+      "imageUnavailable": "图片不可用",
+      "openFailed": "无法打开附件。请检查网络连接后重试。",
+      "attachFailed": "附加文件失败",
+      "limit": "最多可附加 {{count}} 个文件。",
+      "sizeRejection": "{{filename}} 超出了 {{limit}} 的附件大小限制。",
+      "unreadable": "无法读取 {{filename}}。",
+      "pastedImage": "粘贴的图片",
+      "defaultName": "附件"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}，{{status}}",
+      "retryUploading": "重试上传 {{filename}}",
+      "remove": "移除 {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[已删除的消息]",
+      "yourMessage": "你的消息",
+      "messageFrom": "来自 {{author}} 的消息",
+      "moreActions": "更多操作",
+      "message": "消息",
+      "notDelivered": "未送达",
+      "edited": "（已编辑）"
+    },
+    "messageActions": {
+      "copied": "已复制",
+      "copyFailed": "复制失败",
+      "title": "消息操作",
+      "deleteTitle": "删除消息？",
+      "deleteMessage": "这将从对话中移除该消息。",
+      "delete": "删除",
+      "deleteFailed": "删除消息失败",
+      "removeReactionFailed": "移除回应失败",
+      "addReactionFailed": "添加回应失败",
+      "retrySend": "重新发送",
+      "moreReactions": "更多回应",
+      "reply": "回复",
+      "edit": "编辑",
+      "sendFailed": "发送消息失败",
+      "retrySendFailed": "重新发送失败",
+      "editFailed": "编辑消息失败",
+      "executeFailed": "执行操作失败"
+    },
+    "attachmentPicker": {
+      "takePhoto": "拍照",
+      "photoLibrary": "照片图库",
+      "files": "文件",
+      "cameraAccessDisabled": "相机访问已禁用",
+      "cameraAccessMessage": "请在设置中允许相机访问以拍照。"
+    },
+    "typingIndicator": {
+      "someone": "某人",
+      "oneTyping": "{{name}} 正在输入...",
+      "manyTyping": "{{names}} 正在输入..."
+    },
+    "botStatus": {
+      "online": "在线",
+      "idle": "空闲",
+      "offline": "离线",
+      "unknown": "未知",
+      "loadingUser": "正在加载用户...",
+      "waitingForStatus": "正在等待机器人状态...",
+      "offlineMessage": "机器人已离线。重新连接后消息将继续。"
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "当前活跃"
+    "activeNow": "当前活跃",
+    "search": {
+      "searching": "正在搜索",
+      "searchSessions": "搜索会话",
+      "searchSessionsPlaceholder": "搜索会话...",
+      "clearSearch": "清除搜索",
+      "clearFilters": "清除筛选"
+    },
+    "sessionList": {
+      "couldNotLoad": "无法加载会话",
+      "couldNotLoadActive": "无法加载活动会话",
+      "noSessionsYet": "暂无会话",
+      "noSessionsYetDescription": "从您的手机开始编程任务。您的会话将显示在这里。",
+      "noMatches": "没有匹配的会话",
+      "tryDifferentSearch": "请尝试其他搜索词。",
+      "tryAdjustFilters": "请尝试调整或清除您的筛选条件。",
+      "couldNotSearch": "无法搜索会话",
+      "allActive": "所有会话均处于活动状态",
+      "completedWillAppear": "已完成的会话将显示在这里。",
+      "noPastSessions": "没有过去的会话",
+      "live": "实时"
+    },
+    "sessionRow": {
+      "deleteTitle": "删除会话？",
+      "deleteMessage": "此操作无法撤销。",
+      "delete": "删除",
+      "deleteSession": "删除会话",
+      "rename": "重命名",
+      "renameMessage": "为此会话输入新名称",
+      "copyId": "复制会话 ID",
+      "idCopied": "会话 ID 已复制",
+      "couldNotCopyId": "无法复制会话 ID",
+      "untitled": "无标题会话"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "无法加载会话",
       "failedToLoadDetails": "无法加载会话详情",
       "notFound": "未找到",
-      "notFoundDescription": "此项目可能已被删除或不再可用。"
+      "notFoundDescription": "此项目可能已被删除或不再可用。",
+      "failedToStopExecution": "停止执行失败",
+      "renameSession": "重命名会话",
+      "renamePlaceholder": "会话名称",
+      "transcriptAccessibility": "会话记录",
+      "readOnly": "这是一个只读会话",
+      "emptyDescription": "在下方发送消息以开始。",
+      "scrollToBottom": "滚动到底部",
+      "emptyTitle": "暂无消息",
+      "renameAccessibility": "重命名会话：{{title}}",
+      "connectRepository": "连接仓库",
+      "cloningSession": "正在克隆会话",
+      "continue": "继续",
+      "couldNotLoadThisSession": "无法加载此会话",
+      "cloneFailed": "无法克隆此会话。",
+      "cloneFailedRetry": "无法克隆此会话。请重试。",
+      "connectRepositoryToContinue": "连接一个仓库以继续。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",
       "exited": "会话已退出",
-      "failedToExit": "退出会话失败"
+      "failedToExit": "退出会话失败",
+      "exitTitle": "退出会话？",
+      "exitMessage": "这会停止正在运行的会话，但保留其历史记录。",
+      "keepSessionRunning": "保持会话运行",
+      "exitSession": "退出会话",
+      "restartExitFailed": "已开始新会话。上一个会话仍处于打开状态。"
+    },
+    "sessionConnection": {
+      "connecting": "正在连接…",
+      "reconnecting": "正在重新连接…",
+      "connectionLost": "连接已断开",
+      "retryConnection": "重试连接"
     },
     "newSession": {
       "title": "新会话",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "无法加载模型",
       "prefillRepoAndModelUnavailable": "原始会话的仓库和模型已不再可用。请在下方选择。",
       "prefillRepoUnavailable": "{{repo}} 已不再可用。请在下方选择一个仓库。",
-      "prefillModelUnavailable": "{{model}} 已不再可用。正在使用您的默认模型。"
+      "prefillModelUnavailable": "{{model}} 已不再可用。正在使用您的默认模型。",
+      "couldNotReadPendingSessions": "无法读取待处理的会话。请重试。",
+      "failedToCreate": "创建会话失败"
     },
     "partRenderer": {
       "updatedFile": "已更新 {{count}} 个文件",
       "updatedFiles": "已更新 {{count}} 个文件"
+    },
+    "toolPatch": {
+      "operationAdded": "已添加",
+      "operationDeleted": "已删除",
+      "operationUpdated": "已更新"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} 工具，{{status}}",
+      "accessibilityLabel": "{{name}} 工具，{{status}}",
+      "fileEmpty": "此文件为空。",
+      "noTasks": "没有任务。",
+      "contentTruncated": "内容已截断",
+      "truncated": "已截断",
+      "toolRead": "读取",
+      "toolEdit": "编辑",
+      "toolWrite": "写入",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "列表",
+      "toolPatch": "patch",
+      "toolTask": "任务",
+      "readTodos": "读取待办事项",
+      "updateTodos": "更新待办事项",
+      "linesBadge": "{{count}} 行",
+      "filesBadge": "{{count}} 个文件",
+      "matchesBadge": "{{count}} 个匹配"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
@@ -507,11 +710,14 @@
       "noMatches": "无匹配项",
       "noRepositories": "没有可用的仓库",
       "noRepositoriesDescription": "您的账户没有连接任何仓库。",
-      "tryDifferentSearch": "请尝试其他搜索词。"
+      "tryDifferentSearch": "请尝试其他搜索词。",
+      "loading": "加载中...",
+      "accessibility": "仓库：{{label}}"
     },
     "messageDetails": {
       "title": "消息详情",
       "copyMessage": "复制消息",
+      "copyText": "复制文本",
       "selectText": "选择文本",
       "reportAiResponse": "举报 AI 回复",
       "reportAiResponseConfirm": "举报此回复以供审查？",
@@ -528,7 +734,10 @@
       "reasoning": "推理",
       "cacheRead": "缓存读取",
       "cacheWrite": "缓存写入",
-      "total": "总计"
+      "total": "总计",
+      "reportAiResponseFailedRetryable": "无法举报此回复。",
+      "reportAiResponseFailedTerminal": "此回复无法举报。",
+      "reportAiResponseSubmitted": "举报已提交。回执 {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "详情不可用",
@@ -536,7 +745,9 @@
       "thinking": "思考",
       "thought": "想法",
       "title": "详情",
-      "showDetails": "显示详情"
+      "showDetails": "显示详情",
+      "pending": "待处理…",
+      "running": "正在运行…"
     },
     "messageErrorBoundary": {
       "failedToRender": "内容渲染失败"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "图片不可用，重试加载",
       "imageUnavailable": "图片不可用",
       "imageUnavailableWithAlt": "图片不可用 {{alt}}",
+      "imagePreviewUnavailableInSession": "此会话中图片预览不可用。",
       "viewImage": "查看图片",
       "viewImageWithAlt": "查看图片 {{alt}}",
       "imageOutput": "图片输出",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "重试加载文件",
       "fileEmpty": "此文件为空。",
       "previewUnavailable": "预览不可用",
+      "fileUnavailableInSession": "此会话中文件不可用。",
       "shareFailed": "分享失败",
       "sharingUnavailable": "此设备不支持文件分享。",
       "shareFailedRetry": "分享文件失败。请重试。",
@@ -654,7 +867,13 @@
       "longPressHint": "长按查看消息详情"
     },
     "olderMessages": {
-      "arrived": "已加载较早的消息"
+      "arrived": "已加载较早的消息",
+      "retryHint": "重新尝试加载此会话的较早消息。",
+      "omittedOne": "此会话中的一个较早条目无法显示。",
+      "omittedMany": "此会话中的 {{count}} 个较早条目无法显示。",
+      "couldNotLoad": "无法加载较早的消息。",
+      "unavailable": "较早的消息不可用。",
+      "tooLarge": "较早的消息太大，无法加载。"
     },
     "markdownTable": {
       "viewTable": "查看表格",
@@ -682,6 +901,13 @@
       "project": "项目",
       "removeProjectFilter": "移除 {{label}} 项目筛选",
       "removePlatformFilter": "移除 {{label}} 平台筛选"
+    },
+    "suggestion": {
+      "title": "建议",
+      "dismiss": "关闭建议",
+      "applyFailed": "无法应用此建议。请重试。",
+      "dismissFailed": "无法关闭此建议。请重试。",
+      "dismissed": "建议已关闭"
     },
     "modelPicker": {
       "title": "选择模型",
@@ -734,7 +960,13 @@
       "waitForUploads": "请等待附件上传完成。",
       "pasteFromClipboard": "从剪贴板粘贴",
       "stopGenerating": "停止生成",
-      "sendMessage": "发送消息"
+      "sendMessage": "发送消息",
+      "selectModelBeforeSending": "发送前请选择模型",
+      "preparingPlaceholder": "正在设置环境...",
+      "finalizingPlaceholder": "正在收尾...",
+      "messagePlaceholder": "消息...",
+      "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
+      "couldNotAttachFiles": "无法附加文件。点击发送以重试。"
     },
     "chatLink": {
       "linkCopied": "链接已复制",
@@ -769,6 +1001,8 @@
       "startNewSession": "开始一个新会话",
       "exitSession": "退出会话",
       "clearSession": "结束此会话并开始一个新会话",
+      "useCommand": "使用 /{{command}}",
+      "insert": "插入",
       "upgradeRequiredFallback": "请升级您的 CLI 以使用此命令。",
       "exitCapabilityUnavailable": "更新您的 CLI 以退出会话。",
       "clearCapabilityUnavailable": "更新您的 CLI 以重新启动会话。",
@@ -780,7 +1014,36 @@
       "costPrefix": "费用 {{cost}}",
       "costSuffix": "，费用 {{cost}}",
       "tokensWindowUnavailable": "上下文 {{used}} 个令牌，窗口不可用",
-      "tokensUsage": "上下文 {{used}}/{{window}} 个令牌，已使用 {{percentage}}%"
+      "tokensUsage": "上下文 {{used}}/{{window}} 个令牌，已使用 {{percentage}}%",
+      "title": "上下文使用情况",
+      "used": "已使用",
+      "remaining": "剩余",
+      "provider": "提供商",
+      "totalCost": "总费用",
+      "usageReflectsLatest": "使用情况反映最近一次完成的助手回复。",
+      "tokenUsage": "令牌使用情况",
+      "cacheRate": "缓存费率",
+      "modelsCount": "模型（{{count}}）",
+      "tokenTotalsNote": "令牌总数仅涵盖此会话，不包括子代理/子会话的令牌。",
+      "subagents": "子代理",
+      "subagentsDescription": "子会话的剩余费用",
+      "olderActivity": "较早的活动",
+      "olderActivityDescription": "未计入已加载历史的费用",
+      "ofWindowTokens": "共 {{window}} 个令牌",
+      "tokens": "令牌",
+      "tokensWithPercentage": "令牌（{{percentage}}）",
+      "stepsCountOne": "{{steps}} 步",
+      "stepsCountMany": "{{steps}} 步",
+      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
+    },
+    "prBadge": {
+      "open": "打开的拉取请求",
+      "closed": "已关闭的拉取请求",
+      "merged": "已合并的拉取请求",
+      "draft": "草稿拉取请求",
+      "updating": "正在更新，{{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "拉取请求"
     }
   },
   "bootstrap": {

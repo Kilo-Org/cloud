@@ -11,6 +11,8 @@ import {
 import * as Crypto from 'expo-crypto';
 import { ulid } from 'ulid';
 
+import { i18n } from '@/i18n';
+
 type SendMessageVariables = CreateMessageRequest & { clientId: string };
 export type ReplyPreviewSource = Message | ReplyToMessageSnapshot;
 export type MessageAuthorMember = ConversationDetailResponse['members'][number];
@@ -60,16 +62,16 @@ function expoCryptoPrng(): number {
 
 export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string {
   if (replyToMessage.deleted) {
-    return '[deleted message]';
+    return i18n.t('chat.messageBubble.deleted');
   }
   if ('previewText' in replyToMessage) {
-    return replyToMessage.previewText ?? 'Message';
+    return replyToMessage.previewText ?? i18n.t('chat.messageBubble.message');
   }
-  return contentBlocksPreviewText(replyToMessage.content) || 'Message';
+  return contentBlocksPreviewText(replyToMessage.content) || i18n.t('chat.messageBubble.message');
 }
 
 export function getDeliveryFailureLabel(message: Message): string | null {
-  return message.deliveryFailed ? 'Not delivered' : null;
+  return message.deliveryFailed ? i18n.t('chat.messageBubble.notDelivered') : null;
 }
 
 export function isMessageTextSelectionEnabled(): boolean {
@@ -117,7 +119,7 @@ export function resolveMessageAuthorLabel({
 }): string {
   const member = members.find(candidate => candidate.id === senderId);
   if (senderId.startsWith('bot:')) {
-    return firstDisplayValue([botName, member?.displayName]) ?? 'KiloClaw';
+    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('kiloclaw.title');
   }
   return firstDisplayValue([member?.displayName]) ?? senderId;
 }

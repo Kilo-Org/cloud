@@ -18,6 +18,7 @@
     "openInBrowser": "Mở trong trình duyệt",
     "openSettings": "Mở Cài đặt",
     "copiedToClipboard": "Đã sao chép vào bảng nhớ tạm",
+    "couldNotCopyToClipboard": "Không thể sao chép vào bảng nhớ tạm",
     "required": "bắt buộc",
     "error": "lỗi: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Không thể tải cuộc trò chuyện",
       "notFound": "Không tìm thấy cuộc trò chuyện",
-      "untitled": "Không có tiêu đề"
+      "untitled": "Không có tiêu đề",
+      "leaveTitle": "Rời khỏi cuộc trò chuyện?",
+      "leaveMessage": "Thao tác này sẽ xóa nó khỏi danh sách của bạn.",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên và tùy chọn rời khỏi.",
+      "unread": "Chưa đọc",
+      "optionsFor": "Tùy chọn cuộc trò chuyện cho {{title}}",
+      "options": "Tùy chọn cuộc trò chuyện",
+      "renameTitle": "Đổi tên cuộc trò chuyện",
+      "renamePlaceholder": "Nhập tên mới",
+      "couldNotReachBot": "Không thể kết nối với bot. Vui lòng thử lại.",
+      "messageDeliveryFailed": "Không thể gửi tin nhắn đến bot",
+      "couldNotSignIn": "Không thể đăng nhập vào trò chuyện",
+      "couldNotRefreshMessages": "Không thể làm mới tin nhắn",
+      "couldNotLoadHistory": "Không thể tải lịch sử cuộc trò chuyện",
+      "rename": "Đổi tên",
+      "leave": "Rời khỏi",
+      "untitledConversation": "Cuộc trò chuyện không có tiêu đề",
+      "createFailed": "Không tạo được cuộc trò chuyện",
+      "leaveFailed": "Không rời được cuộc trò chuyện"
+    },
+    "reactions": {
+      "title": "Phản ứng",
+      "close": "Đóng phản ứng",
+      "recent": "Gần đây",
+      "common": "Phổ biến",
+      "reactWith": "Phản ứng bằng {{reaction}}",
+      "accessibility": "{{emoji}} phản ứng, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Đang trả lời",
+      "cancelReply": "Hủy trả lời",
+      "openInstance": "Mở phiên bản",
+      "attachFile": "Đính kèm tệp",
+      "messagePlaceholder": "Tin nhắn",
+      "cancelEdit": "Hủy chỉnh sửa",
+      "sendMessage": "Gửi tin nhắn"
+    },
+    "conversationList": {
+      "couldNotLoad": "Không thể tải các cuộc trò chuyện",
+      "emptyTitle": "Chưa có cuộc trò chuyện nào",
+      "emptyDescription": "Tạo cuộc trò chuyện để bắt đầu trò chuyện với phiên bản KiloClaw của bạn.",
+      "create": "Tạo cuộc trò chuyện",
+      "starting": "Đang bắt đầu…",
+      "newConversation": "Cuộc trò chuyện mới",
+      "openInstanceSettings": "Mở cài đặt phiên bản",
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "thisWeek": "Tuần này",
+      "older": "Cũ hơn"
+    },
+    "attachment": {
+      "open": "Mở {{filename}}",
+      "imageUnavailable": "Hình ảnh không khả dụng",
+      "openFailed": "Không mở được tệp đính kèm. Kiểm tra kết nối và thử lại.",
+      "attachFailed": "Không đính kèm được tệp",
+      "limit": "Bạn có thể đính kèm tối đa {{count}} tệp.",
+      "sizeRejection": "{{filename}} vượt quá giới hạn đính kèm {{limit}}.",
+      "unreadable": "Không đọc được {{filename}}.",
+      "pastedImage": "hình ảnh đã dán",
+      "defaultName": "Tệp đính kèm"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Thử tải lên lại {{filename}}",
+      "remove": "Xóa {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[tin nhắn đã xóa]",
+      "yourMessage": "Tin nhắn của bạn",
+      "messageFrom": "Tin nhắn từ {{author}}",
+      "moreActions": "Thêm hành động",
+      "message": "Tin nhắn",
+      "notDelivered": "Chưa được gửi",
+      "edited": "(đã chỉnh sửa)"
+    },
+    "messageActions": {
+      "copied": "Đã sao chép",
+      "copyFailed": "Sao chép thất bại",
+      "title": "Thao tác với tin nhắn",
+      "deleteTitle": "Xóa tin nhắn?",
+      "deleteMessage": "Thao tác này sẽ xóa tin nhắn khỏi cuộc trò chuyện.",
+      "delete": "Xóa",
+      "deleteFailed": "Không thể xóa tin nhắn",
+      "removeReactionFailed": "Không thể gỡ biểu cảm",
+      "addReactionFailed": "Không thể thêm biểu cảm",
+      "retrySend": "Gửi lại",
+      "moreReactions": "Thêm phản ứng",
+      "reply": "Trả lời",
+      "edit": "Chỉnh sửa",
+      "sendFailed": "Không gửi được tin nhắn",
+      "retrySendFailed": "Không gửi lại được",
+      "editFailed": "Không chỉnh sửa được tin nhắn",
+      "executeFailed": "Không thực hiện được hành động"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Chụp ảnh",
+      "photoLibrary": "Thư viện ảnh",
+      "files": "Tệp",
+      "cameraAccessDisabled": "Quyền truy cập camera đã bị tắt",
+      "cameraAccessMessage": "Cho phép truy cập camera trong Cài đặt để chụp ảnh."
+    },
+    "typingIndicator": {
+      "someone": "Ai đó",
+      "oneTyping": "{{name}} đang nhập...",
+      "manyTyping": "{{names}} đang nhập..."
+    },
+    "botStatus": {
+      "online": "Trực tuyến",
+      "idle": "Không hoạt động",
+      "offline": "Ngoại tuyến",
+      "unknown": "Không xác định",
+      "loadingUser": "Đang tải người dùng...",
+      "waitingForStatus": "Đang chờ trạng thái bot...",
+      "offlineMessage": "Bot đang ngoại tuyến. Tin nhắn sẽ tiếp tục khi bot kết nối lại."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Đang hoạt động"
+    "activeNow": "Đang hoạt động",
+    "search": {
+      "searching": "Đang tìm kiếm",
+      "searchSessions": "Tìm kiếm phiên",
+      "searchSessionsPlaceholder": "Tìm kiếm phiên...",
+      "clearSearch": "Xóa tìm kiếm",
+      "clearFilters": "Xóa bộ lọc"
+    },
+    "sessionList": {
+      "couldNotLoad": "Không thể tải các phiên",
+      "couldNotLoadActive": "Không thể tải các phiên đang hoạt động",
+      "noSessionsYet": "Chưa có phiên nào",
+      "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
+      "noMatches": "Không có phiên nào khớp",
+      "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
+      "tryAdjustFilters": "Hãy thử điều chỉnh hoặc xóa bộ lọc của bạn.",
+      "couldNotSearch": "Không thể tìm kiếm phiên",
+      "allActive": "Tất cả phiên đang hoạt động",
+      "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
+      "noPastSessions": "Không có phiên trước đây",
+      "live": "TRỰC TIẾP"
+    },
+    "sessionRow": {
+      "deleteTitle": "Xóa phiên?",
+      "deleteMessage": "Không thể hoàn tác thao tác này.",
+      "delete": "Xóa",
+      "deleteSession": "Xóa phiên",
+      "rename": "Đổi tên",
+      "renameMessage": "Nhập tên mới cho phiên này",
+      "copyId": "Sao chép ID phiên",
+      "idCopied": "Đã sao chép ID phiên",
+      "couldNotCopyId": "Không thể sao chép ID phiên",
+      "untitled": "Phiên không có tiêu đề"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Không thể tải phiên",
       "failedToLoadDetails": "Không thể tải chi tiết phiên",
       "notFound": "Không tìm thấy",
-      "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn khả dụng."
+      "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn khả dụng.",
+      "failedToStopExecution": "Không thể dừng thực thi",
+      "renameSession": "Đổi tên phiên",
+      "renamePlaceholder": "Tên phiên",
+      "transcriptAccessibility": "Bản ghi phiên",
+      "readOnly": "Đây là phiên chỉ đọc",
+      "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
+      "scrollToBottom": "Cuộn xuống dưới cùng",
+      "emptyTitle": "Chưa có tin nhắn",
+      "renameAccessibility": "Đổi tên phiên: {{title}}",
+      "connectRepository": "Kết nối kho lưu trữ",
+      "cloningSession": "Đang sao chép phiên",
+      "continue": "Tiếp tục",
+      "couldNotLoadThisSession": "Không thể tải phiên này",
+      "cloneFailed": "Không thể sao chép phiên này.",
+      "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
+      "connectRepositoryToContinue": "Kết nối một kho lưu trữ để tiếp tục."
     },
     "remoteSession": {
       "failedToCreate": "Không thể tạo phiên từ xa",
       "exited": "Phiên đã thoát",
-      "failedToExit": "Không thể thoát phiên"
+      "failedToExit": "Không thể thoát phiên",
+      "exitTitle": "Thoát phiên?",
+      "exitMessage": "Thao tác này dừng phiên đang chạy nhưng giữ lại lịch sử của nó.",
+      "keepSessionRunning": "Giữ phiên chạy",
+      "exitSession": "Thoát phiên",
+      "restartExitFailed": "Đã bắt đầu phiên mới. Phiên trước vẫn đang mở."
+    },
+    "sessionConnection": {
+      "connecting": "Đang kết nối…",
+      "reconnecting": "Đang kết nối lại…",
+      "connectionLost": "Mất kết nối",
+      "retryConnection": "Thử kết nối lại"
     },
     "newSession": {
       "title": "Phiên mới",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Không thể tải các mô hình",
       "prefillRepoAndModelUnavailable": "Kho lưu trữ và mô hình của phiên gốc không còn khả dụng. Hãy chọn chúng bên dưới.",
       "prefillRepoUnavailable": "{{repo}} không còn khả dụng. Hãy chọn một kho lưu trữ bên dưới.",
-      "prefillModelUnavailable": "{{model}} không còn khả dụng. Đang sử dụng mô hình mặc định của bạn."
+      "prefillModelUnavailable": "{{model}} không còn khả dụng. Đang sử dụng mô hình mặc định của bạn.",
+      "couldNotReadPendingSessions": "Không thể đọc các phiên đang chờ. Thử lại.",
+      "failedToCreate": "Không thể tạo phiên"
     },
     "partRenderer": {
       "updatedFile": "Đã cập nhật {{count}} tệp",
       "updatedFiles": "Đã cập nhật {{count}} tệp"
+    },
+    "toolPatch": {
+      "operationAdded": "Đã thêm",
+      "operationDeleted": "Đã xóa",
+      "operationUpdated": "Đã cập nhật"
+    },
+    "toolCard": {
+      "accessibility": "công cụ {{label}}, {{status}}",
+      "accessibilityLabel": "công cụ {{name}}, {{status}}",
+      "fileEmpty": "Tệp này trống.",
+      "noTasks": "Không có nhiệm vụ.",
+      "contentTruncated": "Nội dung bị cắt bớt",
+      "truncated": "Đã cắt bớt",
+      "toolRead": "đọc",
+      "toolEdit": "sửa",
+      "toolWrite": "ghi",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "liệt kê",
+      "toolPatch": "patch",
+      "toolTask": "tác vụ",
+      "readTodos": "Đọc việc cần làm",
+      "updateTodos": "Cập nhật việc cần làm",
+      "linesBadge": "{{count}} dòng",
+      "filesBadge": "{{count}} tệp",
+      "matchesBadge": "{{count}} kết quả khớp"
     },
     "readToolMarkdown": {
       "linesTruncated": "các dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -507,11 +710,14 @@
       "noMatches": "Không có kết quả khớp",
       "noRepositories": "Không có kho lưu trữ khả dụng",
       "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
-      "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác."
+      "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
+      "loading": "Đang tải...",
+      "accessibility": "Kho lưu trữ: {{label}}"
     },
     "messageDetails": {
       "title": "Chi tiết tin nhắn",
       "copyMessage": "Sao chép tin nhắn",
+      "copyText": "Sao chép văn bản",
       "selectText": "Chọn văn bản",
       "reportAiResponse": "Báo cáo phản hồi AI",
       "reportAiResponseConfirm": "Báo cáo phản hồi này để xem xét?",
@@ -528,7 +734,10 @@
       "reasoning": "Suy luận",
       "cacheRead": "Đọc bộ nhớ đệm",
       "cacheWrite": "Ghi bộ nhớ đệm",
-      "total": "Tổng"
+      "total": "Tổng",
+      "reportAiResponseFailedRetryable": "Không thể báo cáo phản hồi này.",
+      "reportAiResponseFailedTerminal": "Không thể báo cáo phản hồi này.",
+      "reportAiResponseSubmitted": "Đã gửi báo cáo. Biên nhận {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Chi tiết không khả dụng",
@@ -536,7 +745,9 @@
       "thinking": "Suy nghĩ",
       "thought": "Ý nghĩ",
       "title": "Chi tiết",
-      "showDetails": "Hiển thị chi tiết"
+      "showDetails": "Hiển thị chi tiết",
+      "pending": "Đang chờ…",
+      "running": "Đang chạy…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Không thể hiển thị nội dung"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Hình ảnh không khả dụng, thử tải lại",
       "imageUnavailable": "Hình ảnh không khả dụng",
       "imageUnavailableWithAlt": "Hình ảnh không khả dụng {{alt}}",
+      "imagePreviewUnavailableInSession": "Xem trước hình ảnh không khả dụng trong phiên này.",
       "viewImage": "Xem hình ảnh",
       "viewImageWithAlt": "Xem hình ảnh {{alt}}",
       "imageOutput": "Đầu ra hình ảnh",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Thử tải lại tệp",
       "fileEmpty": "Tệp này trống.",
       "previewUnavailable": "Xem trước không khả dụng",
+      "fileUnavailableInSession": "Tệp không khả dụng trong phiên này.",
       "shareFailed": "Chia sẻ thất bại",
       "sharingUnavailable": "Chia sẻ tệp không khả dụng trên thiết bị này.",
       "shareFailedRetry": "Không thể chia sẻ tệp. Vui lòng thử lại.",
@@ -654,7 +867,13 @@
       "longPressHint": "Nhấn giữ để xem chi tiết tin nhắn"
     },
     "olderMessages": {
-      "arrived": "Đã tải các tin nhắn trước đó"
+      "arrived": "Đã tải các tin nhắn trước đó",
+      "retryHint": "Thử lại việc tải các tin nhắn cũ hơn của phiên này.",
+      "omittedOne": "Không thể hiển thị một mục trước đó của phiên này.",
+      "omittedMany": "Không thể hiển thị {{count}} mục trước đó của phiên này.",
+      "couldNotLoad": "Không thể tải các tin nhắn trước đó.",
+      "unavailable": "Các tin nhắn trước đó không khả dụng.",
+      "tooLarge": "Các tin nhắn trước đó quá lớn để tải."
     },
     "markdownTable": {
       "viewTable": "Xem bảng",
@@ -682,6 +901,13 @@
       "project": "Dự án",
       "removeProjectFilter": "Xóa bộ lọc dự án {{label}}",
       "removePlatformFilter": "Xóa bộ lọc nền tảng {{label}}"
+    },
+    "suggestion": {
+      "title": "Gợi ý",
+      "dismiss": "Bỏ qua gợi ý",
+      "applyFailed": "Không thể áp dụng đề xuất này. Hãy thử lại.",
+      "dismissFailed": "Không thể bỏ qua đề xuất này. Hãy thử lại.",
+      "dismissed": "Đã bỏ qua đề xuất"
     },
     "modelPicker": {
       "title": "Chọn mô hình",
@@ -734,7 +960,13 @@
       "waitForUploads": "Chờ các tệp đính kèm tải lên xong.",
       "pasteFromClipboard": "Dán từ bảng nhớ tạm",
       "stopGenerating": "Dừng tạo",
-      "sendMessage": "Gửi tin nhắn"
+      "sendMessage": "Gửi tin nhắn",
+      "selectModelBeforeSending": "Chọn mô hình trước khi gửi",
+      "preparingPlaceholder": "Đang thiết lập môi trường...",
+      "finalizingPlaceholder": "Đang hoàn tất...",
+      "messagePlaceholder": "Tin nhắn...",
+      "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
+      "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại."
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",
@@ -769,6 +1001,8 @@
       "startNewSession": "Bắt đầu phiên mới",
       "exitSession": "Thoát phiên",
       "clearSession": "Kết thúc phiên này và bắt đầu phiên mới",
+      "useCommand": "Dùng /{{command}}",
+      "insert": "Chèn",
       "upgradeRequiredFallback": "Vui lòng nâng cấp CLI của bạn để sử dụng lệnh này.",
       "exitCapabilityUnavailable": "Cập nhật CLI của bạn để thoát phiên.",
       "clearCapabilityUnavailable": "Cập nhật CLI của bạn để khởi động lại phiên.",
@@ -780,7 +1014,36 @@
       "costPrefix": "chi phí {{cost}}",
       "costSuffix": ", chi phí {{cost}}",
       "tokensWindowUnavailable": "Ngữ cảnh {{used}} token, cửa sổ không khả dụng",
-      "tokensUsage": "Ngữ cảnh {{used}} trên {{window}} token, đã dùng {{percentage}}%"
+      "tokensUsage": "Ngữ cảnh {{used}} trên {{window}} token, đã dùng {{percentage}}%",
+      "title": "Mức sử dụng ngữ cảnh",
+      "used": "Đã dùng",
+      "remaining": "Còn lại",
+      "provider": "Nhà cung cấp",
+      "totalCost": "Tổng chi phí",
+      "usageReflectsLatest": "Mức sử dụng phản ánh phản hồi trợ lý hoàn tất gần nhất.",
+      "tokenUsage": "Mức sử dụng token",
+      "cacheRate": "Tỷ lệ bộ nhớ đệm",
+      "modelsCount": "Mô hình ({{count}})",
+      "tokenTotalsNote": "Tổng token chỉ tính phiên này và không bao gồm token của tác nhân phụ/phiên con.",
+      "subagents": "Tác nhân phụ",
+      "subagentsDescription": "Chi phí còn lại từ các phiên con",
+      "olderActivity": "Hoạt động cũ hơn",
+      "olderActivityDescription": "Chi phí không được quy cho lịch sử đã tải",
+      "ofWindowTokens": "trên {{window}} token",
+      "tokens": "token",
+      "tokensWithPercentage": "token ({{percentage}})",
+      "stepsCountOne": "{{steps}} bước",
+      "stepsCountMany": "{{steps}} bước",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "yêu cầu kéo đang mở",
+      "closed": "yêu cầu kéo đã đóng",
+      "merged": "yêu cầu kéo đã hợp nhất",
+      "draft": "yêu cầu kéo bản nháp",
+      "updating": "Đang cập nhật, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "yêu cầu kéo"
     }
   },
   "bootstrap": {

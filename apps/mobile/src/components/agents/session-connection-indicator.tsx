@@ -2,6 +2,7 @@ import { type AgentStatus, type ResolvedSession } from '@kilocode/cloud-agent-sd
 import { WifiOff } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
@@ -22,6 +23,7 @@ export function SessionConnectionIndicator({
   const { isConnected: userWebConnected, reconnectExhausted } = useUserWebConnectionHealth();
   const connection = useUserWebConnection();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const state = resolveSessionConnectionState({
     activeSessionType,
     agentStatusType,
@@ -40,9 +42,11 @@ export function SessionConnectionIndicator({
   }, [state]);
   let label: string | null = null;
   if (state === 'down') {
-    label = wasUpRef.current ? 'Reconnecting…' : 'Connecting…';
+    label = wasUpRef.current
+      ? t('agentChat.sessionConnection.reconnecting')
+      : t('agentChat.sessionConnection.connecting');
   } else if (state === 'exhausted') {
-    label = 'Connection lost';
+    label = t('agentChat.sessionConnection.connectionLost');
   }
   // The exhausted state adds an interactive `Retry` action. The row stays a
   // single accessibility element for the non-interactive labels only; with a
@@ -69,9 +73,9 @@ export function SessionConnectionIndicator({
               hitSlop={8}
               className="active:opacity-70"
               accessibilityRole="button"
-              accessibilityLabel="Retry connection"
+              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
             >
-              <Text className="text-xs font-medium text-primary">Retry</Text>
+              <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
             </Pressable>
           ) : null}
         </>

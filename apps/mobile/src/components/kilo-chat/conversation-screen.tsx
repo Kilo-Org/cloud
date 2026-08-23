@@ -2,6 +2,7 @@ import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationDetailResponse } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
@@ -58,6 +59,7 @@ export function ConversationScreen({
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
   const activeAndFocused = useAppActiveAndFocused();
+  const { t } = useTranslation();
   const router = useRouter();
   const currentUserId = useCurrentUserId();
   const tokenError = useKiloChatTokenError();
@@ -125,11 +127,11 @@ export function ConversationScreen({
   useConversationPresence(sandboxId, conversationId);
   useConversationEventSubscription(sandboxId, conversationId);
   const handleActionFailed = useCallback(() => {
-    toast.error("Couldn't reach the bot. Please try again.");
-  }, []);
+    toast.error(t('chat.conversation.couldNotReachBot'));
+  }, [t]);
   const handleMessageDeliveryFailed = useCallback(() => {
-    toast.error('Message could not be delivered to the bot');
-  }, []);
+    toast.error(t('chat.conversation.messageDeliveryFailed'));
+  }, [t]);
   useMessageCacheUpdater(
     client,
     sandboxId,
@@ -183,7 +185,7 @@ export function ConversationScreen({
       />
       {tokenError.hasError ? (
         <ConversationInlineRetryBanner
-          message="Couldn't sign in to chat"
+          message={t('chat.conversation.couldNotSignIn')}
           onRetry={() => {
             tokenError.retry();
           }}
@@ -191,7 +193,7 @@ export function ConversationScreen({
       ) : null}
       {messageHistoryState === 'stale-error' ? (
         <ConversationInlineRetryBanner
-          message="Couldn't refresh messages"
+          message={t('chat.conversation.couldNotRefreshMessages')}
           onRetry={() => {
             void messagesQuery.refetch();
           }}
@@ -265,8 +267,8 @@ export function ConversationScreen({
       />
       {renaming && (
         <RenameModal
-          title="Rename conversation"
-          placeholder="Enter a new name"
+          title={t('chat.conversation.renameTitle')}
+          placeholder={t('chat.conversation.renamePlaceholder')}
           initialValue={conversationRenameTitle}
           maxLength={CONVERSATION_TITLE_MAX_CHARS}
           onSave={saveRename}

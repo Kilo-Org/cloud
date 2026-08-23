@@ -1,6 +1,7 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import {
   getDirectoryName,
@@ -71,63 +72,89 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         badgeParts.push(`L${offset}`);
       }
       if (limit !== undefined) {
-        badgeParts.push(`${limit} lines`);
+        badgeParts.push(i18n.t('agentChat.toolCard.linesBadge', { count: limit }));
       }
       const badge = badgeParts.length > 0 ? badgeParts.join(', ') : undefined;
 
-      return { title: 'read', subtitle: filePath ? getFilename(filePath) : 'read', badge };
+      return {
+        title: i18n.t('agentChat.toolCard.toolRead'),
+        subtitle: filePath ? getFilename(filePath) : i18n.t('agentChat.toolCard.toolRead'),
+        badge,
+      };
     }
     case 'edit': {
       const filePath = fields.filePath ?? '';
-      return { title: 'edit', subtitle: filePath ? getFilename(filePath) : 'edit' };
+      return {
+        title: i18n.t('agentChat.toolCard.toolEdit'),
+        subtitle: filePath ? getFilename(filePath) : i18n.t('agentChat.toolCard.toolEdit'),
+      };
     }
     case 'write': {
       const filePath = fields.filePath ?? '';
-      return { title: 'write', subtitle: filePath ? getFilename(filePath) : 'write' };
+      return {
+        title: i18n.t('agentChat.toolCard.toolWrite'),
+        subtitle: filePath ? getFilename(filePath) : i18n.t('agentChat.toolCard.toolWrite'),
+      };
     }
     case 'bash': {
       const command = fields.command ?? '';
       const description = fields.description;
-      const subtitle = description ?? (command ? truncateText(command, 60) : 'bash');
-      return { title: 'bash', subtitle };
+      const subtitle =
+        description ??
+        (command ? truncateText(command, 60) : i18n.t('agentChat.toolCard.toolBash'));
+      return { title: i18n.t('agentChat.toolCard.toolBash'), subtitle };
     }
     case 'glob': {
       const pattern = fields.pattern ?? '';
       const output = status === 'completed' ? part.state.output : undefined;
       const matchCount = output ? countResultRows(output, 'glob') : undefined;
-      const badge = matchCount !== undefined && matchCount > 0 ? `${matchCount} files` : undefined;
-      return { title: 'glob', subtitle: pattern || 'glob', badge };
+      const badge =
+        matchCount !== undefined && matchCount > 0
+          ? i18n.t('agentChat.toolCard.filesBadge', { count: matchCount })
+          : undefined;
+      return {
+        title: i18n.t('agentChat.toolCard.toolGlob'),
+        subtitle: pattern || i18n.t('agentChat.toolCard.toolGlob'),
+        badge,
+      };
     }
     case 'grep': {
       const pattern = fields.pattern ?? '';
       const include = fields.include;
-      let subtitle = pattern || 'grep';
+      let subtitle = pattern || i18n.t('agentChat.toolCard.toolGrep');
       if (include) {
         subtitle += ` (${include})`;
       }
       const output = status === 'completed' ? part.state.output : undefined;
       const matchCount = output ? countResultRows(output, 'grep') : undefined;
       const badge =
-        matchCount !== undefined && matchCount > 0 ? `${matchCount} matches` : undefined;
-      return { title: 'grep', subtitle, badge };
+        matchCount !== undefined && matchCount > 0
+          ? i18n.t('agentChat.toolCard.matchesBadge', { count: matchCount })
+          : undefined;
+      return { title: i18n.t('agentChat.toolCard.toolGrep'), subtitle, badge };
     }
     case 'list': {
       const filePath = fields.filePath;
       const path = fields.path;
       const resolvedPath = filePath ?? path ?? '';
-      return { title: 'list', subtitle: resolvedPath ? getDirectoryName(resolvedPath) : 'list' };
+      return {
+        title: i18n.t('agentChat.toolCard.toolList'),
+        subtitle: resolvedPath
+          ? getDirectoryName(resolvedPath)
+          : i18n.t('agentChat.toolCard.toolList'),
+      };
     }
     case 'patch':
     case 'apply_patch': {
       const patchText = fields.patchText ?? '';
       const files = patchText ? listPatchFilePaths(patchText) : [];
-      let subtitle = 'patch';
+      let subtitle = i18n.t('agentChat.toolCard.toolPatch');
       if (files.length === 1) {
         subtitle = getFilename(files[0] ?? '');
       } else if (files.length > 1) {
-        subtitle = `${files.length} files`;
+        subtitle = i18n.t('agentChat.toolCard.filesBadge', { count: files.length });
       }
-      return { title: 'patch', subtitle };
+      return { title: i18n.t('agentChat.toolCard.toolPatch'), subtitle };
     }
     case 'websearch':
     case 'codesearch':
@@ -139,21 +166,25 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return { title: part.tool, subtitle: search ? truncateText(search, 60) : part.tool };
     }
     case 'todoread': {
-      return { title: part.tool, subtitle: 'Read todos' };
+      return { title: part.tool, subtitle: i18n.t('agentChat.toolCard.readTodos') };
     }
     case 'todowrite': {
-      return { title: part.tool, subtitle: 'Update todos' };
+      return { title: part.tool, subtitle: i18n.t('agentChat.toolCard.updateTodos') };
     }
     case 'task': {
       const description = fields.description;
       const prompt = fields.prompt;
-      const subtitle = description ?? (prompt ? truncateText(prompt, 60) : 'task');
-      return { title: 'task', subtitle };
+      const subtitle =
+        description ?? (prompt ? truncateText(prompt, 60) : i18n.t('agentChat.toolCard.toolTask'));
+      return { title: i18n.t('agentChat.toolCard.toolTask'), subtitle };
     }
     case 'suggest': {
       return {
-        title: 'Suggestion',
-        subtitle: status === 'error' ? 'Suggestion dismissed' : 'Suggestion',
+        title: i18n.t('agentChat.suggestion.title'),
+        subtitle:
+          status === 'error'
+            ? i18n.t('agentChat.suggestion.dismissed')
+            : i18n.t('agentChat.suggestion.title'),
       };
     }
     default: {

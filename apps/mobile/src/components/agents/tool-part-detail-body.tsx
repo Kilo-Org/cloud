@@ -1,5 +1,6 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 
@@ -75,15 +76,16 @@ function renderToolBody(part: ToolPart): React.ReactNode {
  * body. Suggest parts have no body; unknown tools use the generic body.
  */
 export function ToolPartDetailBody({ part }: Readonly<{ part: ToolPart }>) {
+  const { t } = useTranslation();
   const status = part.state.status;
 
   return (
     <View className="gap-2">
       {status === 'pending' ? (
-        <Text className="text-xs text-muted-foreground">Pending…</Text>
+        <Text className="text-xs text-muted-foreground">{t('agentChat.partDetail.pending')}</Text>
       ) : null}
       {status === 'running' ? (
-        <Text className="text-xs text-muted-foreground">Running…</Text>
+        <Text className="text-xs text-muted-foreground">{t('agentChat.partDetail.running')}</Text>
       ) : null}
       {getToolImageAttachments(part).length > 0 ? <ToolCardImageAttachments part={part} /> : null}
       {getToolFileAttachments(part).length > 0 ? <ToolCardFileAttachments part={part} /> : null}

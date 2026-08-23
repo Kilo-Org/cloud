@@ -1,6 +1,8 @@
 import { type ExecApprovalDecision, formatKiloChatError, type Message } from '@kilocode/kilo-chat';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 type ExecuteActionVariables = {
   messageId: string;
   groupId: string;
@@ -32,7 +34,7 @@ export function executeActionWithMobileFeedback({
 }) {
   const options = {
     onError: (err: unknown) => {
-      toast.error(formatKiloChatError(err, 'Failed to execute action'));
+      toast.error(formatKiloChatError(err, i18n.t('chat.messageActions.executeFailed')));
     },
     ...(onSettled ? { onSettled } : {}),
   };

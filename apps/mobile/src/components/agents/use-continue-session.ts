@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { resolveContinuationResolution } from '@/components/agents/continuation-seed';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useTRPC } from '@/lib/trpc';
 
@@ -17,10 +18,6 @@ type RepositoriesResult =
 // Six clone attempts with the five gaps between them. The sixth retryable
 // failure ends the intent with persistent retry guidance.
 const CONTINUE_RETRY_DELAYS_MS: number[] = [500, 1000, 2000, 4000, 5000];
-
-const CONTINUE_TERMINAL_MESSAGE = "Couldn't clone this session.";
-const CONTINUE_RETRY_MESSAGE = "Couldn't clone this session. Try again.";
-const CONTINUE_CONNECT_REPOSITORY_MESSAGE = 'Connect a repository to continue.';
 
 export type ContinueSessionGuidance =
   | {
@@ -75,7 +72,7 @@ export function useContinueSession(args: {
           // The destination model cannot resolve until the catalog loads.
           // Return retry guidance so Continue stays enabled; never resolve a
           // destination against an empty model list.
-          setGuidance({ kind: 'retry', message: CONTINUE_RETRY_MESSAGE });
+          setGuidance({ kind: 'retry', message: i18n.t('agentChat.session.cloneFailedRetry') });
           return;
         }
         let repoData: RepositoriesResult | undefined = undefined;
@@ -92,7 +89,7 @@ export function useContinueSession(args: {
             staleTime: 0,
           });
         } catch {
-          setGuidance({ kind: 'retry', message: CONTINUE_RETRY_MESSAGE });
+          setGuidance({ kind: 'retry', message: i18n.t('agentChat.session.cloneFailedRetry') });
           return;
         }
 
@@ -109,7 +106,7 @@ export function useContinueSession(args: {
           setGuidance({
             kind: 'terminal',
             action: 'connect-repository',
-            message: CONTINUE_CONNECT_REPOSITORY_MESSAGE,
+            message: i18n.t('agentChat.session.connectRepositoryToContinue'),
           });
           return;
         }
@@ -118,7 +115,7 @@ export function useContinueSession(args: {
           setGuidance({
             kind: 'terminal',
             action: 'back-to-sessions',
-            message: CONTINUE_TERMINAL_MESSAGE,
+            message: i18n.t('agentChat.session.cloneFailed'),
           });
           return;
         }
@@ -135,7 +132,7 @@ export function useContinueSession(args: {
               setGuidance({
                 kind: 'terminal',
                 action: 'back-to-sessions',
-                message: CONTINUE_TERMINAL_MESSAGE,
+                message: i18n.t('agentChat.session.cloneFailed'),
               });
               return;
             }
@@ -143,7 +140,7 @@ export function useContinueSession(args: {
             if (delay === undefined) {
               // The sixth retryable failure ends the intent; Continue stays
               // enabled so the user can retry the same operation key.
-              setGuidance({ kind: 'retry', message: CONTINUE_RETRY_MESSAGE });
+              setGuidance({ kind: 'retry', message: i18n.t('agentChat.session.cloneFailedRetry') });
               return;
             }
             // eslint-disable-next-line no-await-in-loop -- clone retry backoff cadence

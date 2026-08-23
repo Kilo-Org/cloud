@@ -12,17 +12,12 @@
 // `Text` from `@/components/ui/text`.
 
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
 
 import { type ToolPatchFile, type ToolPatchModel } from './tool-patch-model';
-
-const OPERATION_LABEL = {
-  add: 'Added',
-  delete: 'Deleted',
-  update: 'Updated',
-} satisfies Record<ToolPatchFile['operation'], string>;
 
 type ToolPatchPreviewProps = {
   model: ToolPatchModel;
@@ -30,13 +25,20 @@ type ToolPatchPreviewProps = {
 };
 
 export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewProps>) {
+  const { t } = useTranslation();
+  const operationLabel = {
+    add: t('agentChat.toolPatch.operationAdded'),
+    delete: t('agentChat.toolPatch.operationDeleted'),
+    update: t('agentChat.toolPatch.operationUpdated'),
+  } satisfies Record<ToolPatchFile['operation'], string>;
+
   return (
     <View className="gap-2">
       {model.files.map((file, fileIndex) => (
         <View key={`${partId}:${fileIndex}`}>
           <View className="flex-row items-center gap-2 px-1 py-1">
             <Text className="font-mono text-xs font-medium text-foreground">{file.path}</Text>
-            <Text className="text-xs text-muted-foreground">{OPERATION_LABEL[file.operation]}</Text>
+            <Text className="text-xs text-muted-foreground">{operationLabel[file.operation]}</Text>
           </View>
           {file.lines.map((line, lineIndex) => (
             <DiffLine
@@ -49,8 +51,11 @@ export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewPro
         </View>
       ))}
       {model.truncated ? (
-        <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-          Truncated
+        <Text
+          accessibilityLabel={t('monoScrollBlock.contentTruncated')}
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          {t('monoScrollBlock.truncated')}
         </Text>
       ) : null}
     </View>

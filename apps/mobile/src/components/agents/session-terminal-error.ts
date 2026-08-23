@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
 
 /**
@@ -38,12 +39,12 @@ function variantForClass(cls: TerminalErrorClass): QueryErrorVariant {
 
 function titleForClass(cls: TerminalErrorClass): string {
   if (cls === 'not-found') {
-    return 'Not found';
+    return i18n.t('agentChat.session.notFound');
   }
   if (cls === 'permission') {
-    return 'Access denied';
+    return i18n.t('agentChat.session.accessDenied');
   }
-  return "Couldn't load this session";
+  return i18n.t('agentChat.session.couldNotLoadThisSession');
 }
 
 /**
@@ -76,7 +77,7 @@ export function resolveSessionTerminalError(input: {
   if (input.error !== null) {
     return {
       variant: 'server',
-      title: "Couldn't load this session",
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: input.error,
       retryable: true,
     };

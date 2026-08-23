@@ -18,6 +18,7 @@
     "openInBrowser": "Открыть в браузере",
     "openSettings": "Открыть настройки",
     "copiedToClipboard": "Скопировано в буфер обмена",
+    "couldNotCopyToClipboard": "Не удалось скопировать в буфер обмена",
     "required": "обязательно",
     "error": "ошибка: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Не удалось загрузить разговор",
       "notFound": "Беседа не найдена",
-      "untitled": "Без названия"
+      "untitled": "Без названия",
+      "leaveTitle": "Покинуть разговор?",
+      "leaveMessage": "Это удалит его из вашего списка.",
+      "openHint": "Открывает разговор. Долгое нажатие для переименования и выхода.",
+      "unread": "Непрочитано",
+      "optionsFor": "Параметры разговора для {{title}}",
+      "options": "Параметры разговора",
+      "renameTitle": "Переименовать разговор",
+      "renamePlaceholder": "Введите новое имя",
+      "couldNotReachBot": "Не удалось связаться с ботом. Попробуйте снова.",
+      "messageDeliveryFailed": "Сообщение не удалось доставить боту",
+      "couldNotSignIn": "Не удалось войти в чат",
+      "couldNotRefreshMessages": "Не удалось обновить сообщения",
+      "couldNotLoadHistory": "Не удалось загрузить историю разговора",
+      "rename": "Переименовать",
+      "leave": "Покинуть",
+      "untitledConversation": "Беседа без названия",
+      "createFailed": "Не удалось создать беседу",
+      "leaveFailed": "Не удалось покинуть беседу"
+    },
+    "reactions": {
+      "title": "Реакции",
+      "close": "Закрыть реакции",
+      "recent": "Недавние",
+      "common": "Обычные",
+      "reactWith": "Отреагировать: {{reaction}}",
+      "accessibility": "{{emoji}} реакция, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Ответ на",
+      "cancelReply": "Отменить ответ",
+      "openInstance": "Открыть экземпляр",
+      "attachFile": "Прикрепить файл",
+      "messagePlaceholder": "Сообщение",
+      "cancelEdit": "Отменить редактирование",
+      "sendMessage": "Отправить сообщение"
+    },
+    "conversationList": {
+      "couldNotLoad": "Не удалось загрузить разговоры",
+      "emptyTitle": "Разговоров пока нет",
+      "emptyDescription": "Создайте разговор, чтобы начать общение с вашим экземпляром KiloClaw.",
+      "create": "Создать разговор",
+      "starting": "Запуск…",
+      "newConversation": "Новый разговор",
+      "openInstanceSettings": "Открыть настройки экземпляра",
+      "today": "Сегодня",
+      "yesterday": "Вчера",
+      "thisWeek": "На этой неделе",
+      "older": "Старее"
+    },
+    "attachment": {
+      "open": "Открыть {{filename}}",
+      "imageUnavailable": "Изображение недоступно",
+      "openFailed": "Не удалось открыть вложение. Проверьте подключение и попробуйте ещё раз.",
+      "attachFailed": "Не удалось прикрепить файл",
+      "limit": "Можно прикрепить до {{count}} файлов.",
+      "sizeRejection": "{{filename}} превышает лимит вложения {{limit}}.",
+      "unreadable": "Не удалось прочитать {{filename}}.",
+      "pastedImage": "вставленное изображение",
+      "defaultName": "Вложение"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Повторить загрузку {{filename}}",
+      "remove": "Убрать {{filename}}"
+    },
+    "messageBubble": {
+      "deleted": "[сообщение удалено]",
+      "yourMessage": "Ваше сообщение",
+      "messageFrom": "Сообщение от {{author}}",
+      "moreActions": "Больше действий",
+      "message": "Сообщение",
+      "notDelivered": "Не доставлено",
+      "edited": "(изменено)"
+    },
+    "messageActions": {
+      "copied": "Скопировано",
+      "copyFailed": "Не удалось скопировать",
+      "title": "Действия с сообщением",
+      "deleteTitle": "Удалить сообщение?",
+      "deleteMessage": "Сообщение будет удалено из беседы.",
+      "delete": "Удалить",
+      "deleteFailed": "Не удалось удалить сообщение",
+      "removeReactionFailed": "Не удалось удалить реакцию",
+      "addReactionFailed": "Не удалось добавить реакцию",
+      "retrySend": "Отправить повторно",
+      "moreReactions": "Больше реакций",
+      "reply": "Ответить",
+      "edit": "Редактировать",
+      "sendFailed": "Не удалось отправить сообщение",
+      "retrySendFailed": "Не удалось отправить повторно",
+      "editFailed": "Не удалось изменить сообщение",
+      "executeFailed": "Не удалось выполнить действие"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Сделать фото",
+      "photoLibrary": "Фотоальбом",
+      "files": "Файлы",
+      "cameraAccessDisabled": "Доступ к камере отключён",
+      "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото."
+    },
+    "typingIndicator": {
+      "someone": "Кто-то",
+      "oneTyping": "{{name}} печатает...",
+      "manyTyping": "{{names}} печатают..."
+    },
+    "botStatus": {
+      "online": "В сети",
+      "idle": "Неактивен",
+      "offline": "Не в сети",
+      "unknown": "Неизвестно",
+      "loadingUser": "Загрузка пользователя...",
+      "waitingForStatus": "Ожидание статуса бота...",
+      "offlineMessage": "Бот не в сети. Сообщения возобновятся после повторного подключения."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сейчас"
+    "activeNow": "Активен сейчас",
+    "search": {
+      "searching": "Поиск",
+      "searchSessions": "Поиск сеансов",
+      "searchSessionsPlaceholder": "Поиск сеансов...",
+      "clearSearch": "Очистить поиск",
+      "clearFilters": "Очистить фильтры"
+    },
+    "sessionList": {
+      "couldNotLoad": "Не удалось загрузить сеансы",
+      "couldNotLoadActive": "Не удалось загрузить активные сеансы",
+      "noSessionsYet": "Сеансов пока нет",
+      "noSessionsYetDescription": "Начните задачу кодирования с телефона. Ваши сеансы появятся здесь.",
+      "noMatches": "Нет подходящих сеансов",
+      "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
+      "tryAdjustFilters": "Попробуйте изменить или очистить фильтры.",
+      "couldNotSearch": "Не удалось выполнить поиск сеансов",
+      "allActive": "Все сеансы активны",
+      "completedWillAppear": "Завершенные сеансы появятся здесь.",
+      "noPastSessions": "Нет прошлых сеансов",
+      "live": "LIVE"
+    },
+    "sessionRow": {
+      "deleteTitle": "Удалить сеанс?",
+      "deleteMessage": "Это действие нельзя отменить.",
+      "delete": "Удалить",
+      "deleteSession": "Удалить сеанс",
+      "rename": "Переименовать",
+      "renameMessage": "Введите новое имя для этого сеанса",
+      "copyId": "Копировать идентификатор сеанса",
+      "idCopied": "Идентификатор сеанса скопирован",
+      "couldNotCopyId": "Не удалось скопировать идентификатор сеанса",
+      "untitled": "Сеанс без названия"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Не удалось загрузить сеанс",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе",
       "notFound": "Не найдено",
-      "notFoundDescription": "Возможно, этот элемент был удален или больше недоступен."
+      "notFoundDescription": "Возможно, этот элемент был удален или больше недоступен.",
+      "failedToStopExecution": "Не удалось остановить выполнение",
+      "renameSession": "Переименовать сеанс",
+      "renamePlaceholder": "Имя сеанса",
+      "transcriptAccessibility": "Протокол сеанса",
+      "readOnly": "Это сеанс только для чтения",
+      "emptyDescription": "Отправьте сообщение ниже, чтобы начать.",
+      "scrollToBottom": "Прокрутить вниз",
+      "emptyTitle": "Сообщений пока нет",
+      "renameAccessibility": "Переименовать сессию: {{title}}",
+      "connectRepository": "Подключить репозиторий",
+      "cloningSession": "Клонирование сессии",
+      "continue": "Продолжить",
+      "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
+      "cloneFailed": "Не удалось клонировать эту сессию.",
+      "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
+      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить."
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
       "exited": "Сеанс завершен",
-      "failedToExit": "Не удалось выйти из сеанса"
+      "failedToExit": "Не удалось выйти из сеанса",
+      "exitTitle": "Выйти из сеанса?",
+      "exitMessage": "Это остановит текущий сеанс, но сохранит его историю.",
+      "keepSessionRunning": "Оставить сеанс запущенным",
+      "exitSession": "Выйти из сеанса",
+      "restartExitFailed": "Начата новая сессия. Предыдущая сессия всё ещё открыта."
+    },
+    "sessionConnection": {
+      "connecting": "Подключение…",
+      "reconnecting": "Переподключение…",
+      "connectionLost": "Соединение потеряно",
+      "retryConnection": "Повторить подключение"
     },
     "newSession": {
       "title": "Новый сеанс",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Не удалось загрузить модели",
       "prefillRepoAndModelUnavailable": "Репозиторий и модель исходного сеанса больше недоступны. Выберите их ниже.",
       "prefillRepoUnavailable": "{{repo}} больше недоступен. Выберите репозиторий ниже.",
-      "prefillModelUnavailable": "{{model}} больше недоступна. Используется ваша модель по умолчанию."
+      "prefillModelUnavailable": "{{model}} больше недоступна. Используется ваша модель по умолчанию.",
+      "couldNotReadPendingSessions": "Не удалось прочитать ожидающие сеансы. Попробуйте снова.",
+      "failedToCreate": "Не удалось создать сеанс"
     },
     "partRenderer": {
       "updatedFile": "Обновлен {{count}} файл",
       "updatedFiles": "Обновлено {{count}} файлов"
+    },
+    "toolPatch": {
+      "operationAdded": "Добавлено",
+      "operationDeleted": "Удалено",
+      "operationUpdated": "Обновлено"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} инструмент, {{status}}",
+      "accessibilityLabel": "{{name}} инструмент, {{status}}",
+      "fileEmpty": "Этот файл пуст.",
+      "noTasks": "Нет задач.",
+      "contentTruncated": "Содержимое обрезано",
+      "truncated": "Обрезано",
+      "toolRead": "читать",
+      "toolEdit": "изменить",
+      "toolWrite": "записать",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "список",
+      "toolPatch": "patch",
+      "toolTask": "задача",
+      "readTodos": "Читать задачи",
+      "updateTodos": "Обновить задачи",
+      "linesBadge": "{{count}} строк",
+      "filesBadge": "{{count}} файлов",
+      "matchesBadge": "{{count}} совпадений"
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (обрезано)",
@@ -507,11 +710,14 @@
       "noMatches": "Нет совпадений",
       "noRepositories": "Нет доступных репозиториев",
       "noRepositoriesDescription": "К вашей учетной записи не подключены репозитории.",
-      "tryDifferentSearch": "Попробуйте другой поисковый запрос."
+      "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
+      "loading": "Загрузка...",
+      "accessibility": "Репозиторий: {{label}}"
     },
     "messageDetails": {
       "title": "Сведения о сообщении",
       "copyMessage": "Копировать сообщение",
+      "copyText": "Копировать текст",
       "selectText": "Выделить текст",
       "reportAiResponse": "Пожаловаться на ответ ИИ",
       "reportAiResponseConfirm": "Отправить этот ответ на проверку?",
@@ -528,7 +734,10 @@
       "reasoning": "Рассуждение",
       "cacheRead": "Чтение кэша",
       "cacheWrite": "Запись кэша",
-      "total": "Итого"
+      "total": "Итого",
+      "reportAiResponseFailedRetryable": "Не удалось пожаловаться на этот ответ.",
+      "reportAiResponseFailedTerminal": "На этот ответ нельзя пожаловаться.",
+      "reportAiResponseSubmitted": "Жалоба отправлена. Квитанция {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Сведения недоступны",
@@ -536,7 +745,9 @@
       "thinking": "Мышление",
       "thought": "Мысль",
       "title": "Сведения",
-      "showDetails": "Показать сведения"
+      "showDetails": "Показать сведения",
+      "pending": "Ожидание…",
+      "running": "Выполняется…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Не удалось отобразить содержимое"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
       "imageUnavailable": "Изображение недоступно",
       "imageUnavailableWithAlt": "Изображение недоступно {{alt}}",
+      "imagePreviewUnavailableInSession": "Предпросмотр изображения недоступен в этом сеансе.",
       "viewImage": "Просмотреть изображение",
       "viewImageWithAlt": "Просмотреть изображение {{alt}}",
       "imageOutput": "Вывод изображения",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Повторить загрузку файла",
       "fileEmpty": "Этот файл пуст.",
       "previewUnavailable": "Предпросмотр недоступен",
+      "fileUnavailableInSession": "Файл недоступен в этом сеансе.",
       "shareFailed": "Не удалось поделиться",
       "sharingUnavailable": "Обмен файлами недоступен на этом устройстве.",
       "shareFailedRetry": "Не удалось поделиться файлом. Попробуйте снова.",
@@ -654,7 +867,13 @@
       "longPressHint": "Долгое нажатие для сведений о сообщении"
     },
     "olderMessages": {
-      "arrived": "Более ранние сообщения загружены"
+      "arrived": "Более ранние сообщения загружены",
+      "retryHint": "Повторяет загрузку более ранних сообщений этой сессии.",
+      "omittedOne": "Один более ранний элемент этой сессии не удалось отобразить.",
+      "omittedMany": "{{count}} более ранних элементов этой сессии не удалось отобразить.",
+      "couldNotLoad": "Не удалось загрузить более ранние сообщения.",
+      "unavailable": "Более ранние сообщения недоступны.",
+      "tooLarge": "Более ранние сообщения слишком велики для загрузки."
     },
     "markdownTable": {
       "viewTable": "Просмотреть таблицу",
@@ -682,6 +901,13 @@
       "project": "Проект",
       "removeProjectFilter": "Убрать фильтр проекта {{label}}",
       "removePlatformFilter": "Убрать фильтр платформы {{label}}"
+    },
+    "suggestion": {
+      "title": "Предложение",
+      "dismiss": "Скрыть предложение",
+      "applyFailed": "Не удалось применить это предложение. Попробуйте снова.",
+      "dismissFailed": "Не удалось отклонить это предложение. Попробуйте снова.",
+      "dismissed": "Предложение отклонено"
     },
     "modelPicker": {
       "title": "Выбрать модель",
@@ -734,7 +960,13 @@
       "waitForUploads": "Дождитесь завершения загрузки вложений.",
       "pasteFromClipboard": "Вставить из буфера обмена",
       "stopGenerating": "Остановить генерацию",
-      "sendMessage": "Отправить сообщение"
+      "sendMessage": "Отправить сообщение",
+      "selectModelBeforeSending": "Выберите модель перед отправкой",
+      "preparingPlaceholder": "Настройка окружения...",
+      "finalizingPlaceholder": "Завершение...",
+      "messagePlaceholder": "Сообщение...",
+      "cannotReceiveFiles": "Эта сессия не может получать файлы. Удалите вложения, чтобы отправить сообщение.",
+      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить."
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",
@@ -769,6 +1001,8 @@
       "startNewSession": "Начать новый сеанс",
       "exitSession": "Выйти из сеанса",
       "clearSession": "Завершить этот сеанс и начать новый",
+      "useCommand": "Использовать /{{command}}",
+      "insert": "Вставить",
       "upgradeRequiredFallback": "Обновите ваш CLI, чтобы использовать эту команду.",
       "exitCapabilityUnavailable": "Обновите ваш CLI, чтобы выйти из сеанса.",
       "clearCapabilityUnavailable": "Обновите ваш CLI, чтобы перезапустить сеанс.",
@@ -780,7 +1014,36 @@
       "costPrefix": "стоимость {{cost}}",
       "costSuffix": ", стоимость {{cost}}",
       "tokensWindowUnavailable": "Контекст {{used}} токенов, окно недоступно",
-      "tokensUsage": "Контекст {{used}} из {{window}} токенов, использовано {{percentage}}%"
+      "tokensUsage": "Контекст {{used}} из {{window}} токенов, использовано {{percentage}}%",
+      "title": "Использование контекста",
+      "used": "Использовано",
+      "remaining": "Осталось",
+      "provider": "Провайдер",
+      "totalCost": "Общая стоимость",
+      "usageReflectsLatest": "Использование отражает последний завершенный ответ ассистента.",
+      "tokenUsage": "Использование токенов",
+      "cacheRate": "Тариф кэша",
+      "modelsCount": "Модели ({{count}})",
+      "tokenTotalsNote": "Общее количество токенов относится только к этому сеансу и не включает токены субагентов и дочерних сеансов.",
+      "subagents": "Субагенты",
+      "subagentsDescription": "Остаточная стоимость дочерних сеансов",
+      "olderActivity": "Более ранняя активность",
+      "olderActivityDescription": "Стоимость, не отнесенная к загруженной истории",
+      "ofWindowTokens": "из {{window}} токенов",
+      "tokens": "токенов",
+      "tokensWithPercentage": "токенов ({{percentage}})",
+      "stepsCountOne": "{{steps}} шаг",
+      "stepsCountMany": "{{steps}} шагов",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "открытый pull request",
+      "closed": "закрытый pull request",
+      "merged": "слитый pull request",
+      "draft": "черновик pull request",
+      "updating": "Обновление, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {

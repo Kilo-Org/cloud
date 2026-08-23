@@ -2,6 +2,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
@@ -48,10 +49,11 @@ export function RemoteSessionRow({
   interactive = true,
 }: Readonly<RemoteSessionRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const { renameSession } = useSessionMutations();
-  const title = session.title.length > 0 ? session.title : 'Untitled session';
+  const title = session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);
@@ -152,8 +154,8 @@ export function RemoteSessionRow({
 
       {renameVisible && (
         <RenameModal
-          title="Rename session"
-          placeholder="Session name"
+          title={t('agentChat.session.renameSession')}
+          placeholder={t('agentChat.session.renamePlaceholder')}
           initialValue={title}
           onClose={() => {
             setRenameVisible(false);

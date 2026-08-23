@@ -1,19 +1,28 @@
 import { type ConversationListItem } from '@kilocode/kilo-chat';
 
-type ConversationListGroupLabel = 'Today' | 'Yesterday' | 'This Week' | 'Older';
+import { i18n } from '@/i18n';
+
+type ConversationListGroupKey = 'today' | 'yesterday' | 'thisWeek' | 'older';
 
 type ConversationListGroup = {
-  label: ConversationListGroupLabel;
+  label: string;
   items: ConversationListItem[];
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const GROUP_LABELS: readonly ConversationListGroupLabel[] = [
-  'Today',
-  'Yesterday',
-  'This Week',
-  'Older',
+const GROUP_ORDER: readonly ConversationListGroupKey[] = [
+  'today',
+  'yesterday',
+  'thisWeek',
+  'older',
 ];
+
+const GROUP_LABEL_KEYS = {
+  today: 'chat.conversationList.today',
+  yesterday: 'chat.conversationList.yesterday',
+  thisWeek: 'chat.conversationList.thisWeek',
+  older: 'chat.conversationList.older',
+} as const;
 
 function conversationTimestamp(conversation: ConversationListItem): number {
   return conversation.lastActivityAt ?? conversation.joinedAt;
@@ -27,28 +36,28 @@ export function groupConversationsByActivity(
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterdayStart = todayStart - DAY_MS;
   const weekStart = todayStart - 6 * DAY_MS;
-  const groups = {
-    Today: [] as ConversationListItem[],
-    Yesterday: [] as ConversationListItem[],
-    'This Week': [] as ConversationListItem[],
-    Older: [] as ConversationListItem[],
-  } satisfies Record<ConversationListGroupLabel, ConversationListItem[]>;
+  const groups: Record<ConversationListGroupKey, ConversationListItem[]> = {
+    today: [],
+    yesterday: [],
+    thisWeek: [],
+    older: [],
+  };
 
   for (const conversation of conversations) {
     const timestamp = conversationTimestamp(conversation);
     if (timestamp >= todayStart) {
-      groups.Today.push(conversation);
+      groups.today.push(conversation);
     } else if (timestamp >= yesterdayStart) {
-      groups.Yesterday.push(conversation);
+      groups.yesterday.push(conversation);
     } else if (timestamp >= weekStart) {
-      groups['This Week'].push(conversation);
+      groups.thisWeek.push(conversation);
     } else {
-      groups.Older.push(conversation);
+      groups.older.push(conversation);
     }
   }
 
-  return GROUP_LABELS.filter(label => groups[label].length > 0).map(label => ({
-    label,
-    items: groups[label],
+  return GROUP_ORDER.filter(key => groups[key].length > 0).map(key => ({
+    label: i18n.t(GROUP_LABEL_KEYS[key]),
+    items: groups[key],
   }));
 }

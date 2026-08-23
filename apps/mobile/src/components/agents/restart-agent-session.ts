@@ -1,9 +1,14 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
 import { createRemoteSessionWithFeedback } from '@/components/agents/create-remote-session-with-feedback';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { type AgentSessionRouterLike } from '@/components/agents/session-router-like';
 
+/**
+ * Test-visible pin: the restart test asserts this exact surfaced message. The
+ * production path resolves the same copy through the catalog at call time.
+ */
 export const RESTART_EXIT_FAILED_MESSAGE =
   'Started a new session. The previous session is still open.';
 
@@ -54,7 +59,7 @@ export async function restartAgentSession({
   try {
     await exit();
   } catch {
-    onError(RESTART_EXIT_FAILED_MESSAGE);
+    onError(i18n.t('agentChat.remoteSession.restartExitFailed'));
   }
   replaceWithAgentSession(router, created.sessionId, organizationId);
   return { success: true, sessionId: created.sessionId };

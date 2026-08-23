@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { type AddFileInput, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
 
+import { i18n } from '@/i18n';
 import {
   buildAttachmentSizeRejectionToast,
   buildAttachmentUnreadableToast,
@@ -96,7 +97,9 @@ export function MessageInputWithAttachmentQueue({
         const selected = await pickAttachmentsFromSource(source);
         await addSelectedAttachments(selected);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to attach file');
+        toast.error(
+          error instanceof Error ? error.message : i18n.t('chat.attachment.attachFailed')
+        );
       }
     },
     [addSelectedAttachments]

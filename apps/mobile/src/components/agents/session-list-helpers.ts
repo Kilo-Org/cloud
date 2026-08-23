@@ -1,5 +1,6 @@
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
+import { i18n } from '@/i18n';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { platformLabel } from '@/lib/platform-label';
@@ -216,7 +217,7 @@ export function selectRemoteRowSpokenMeta(params: {
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
   if (!createdOnPlatform || createdOnPlatform === 'unknown') {
-    return 'LIVE';
+    return i18n.t('agents.sessionList.live');
   }
   return platformLabel(createdOnPlatform);
 }

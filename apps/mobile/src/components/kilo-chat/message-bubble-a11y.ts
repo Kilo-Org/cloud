@@ -1,5 +1,7 @@
 import { type AccessibilityActionInfo } from 'react-native';
 
+import { i18n } from '@/i18n';
+
 type MessageBubbleA11yInput = {
   isFromMe: boolean;
   authorLabel: string;
@@ -45,14 +47,16 @@ type MessageBubbleAccessibility = {
 export function buildMessageBubbleAccessibilityProps(
   input: MessageBubbleA11yInput
 ): MessageBubbleAccessibility {
-  const label = input.isFromMe ? 'Your message' : `Message from ${input.authorLabel}`;
+  const label = input.isFromMe
+    ? i18n.t('chat.messageBubble.yourMessage')
+    : i18n.t('chat.messageBubble.messageFrom', { author: input.authorLabel });
 
   const actions: AccessibilityActionInfo[] = [];
   if (input.canSwipeReply) {
-    actions.push({ name: 'reply', label: 'Reply' });
+    actions.push({ name: 'reply', label: i18n.t('chat.messageActions.reply') });
   }
   if (input.canLongPress) {
-    actions.push({ name: 'more-actions', label: 'More actions' });
+    actions.push({ name: 'more-actions', label: i18n.t('chat.messageBubble.moreActions') });
   }
 
   return {

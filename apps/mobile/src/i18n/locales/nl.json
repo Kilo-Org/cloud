@@ -18,6 +18,7 @@
     "openInBrowser": "Openen in browser",
     "openSettings": "Instellingen openen",
     "copiedToClipboard": "Gekopieerd naar klembord",
+    "couldNotCopyToClipboard": "Kon niet naar klembord kopiëren",
     "required": "verplicht",
     "error": "fout: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Kon gesprek niet laden",
       "notFound": "Gesprek niet gevonden",
-      "untitled": "Naamloos"
+      "untitled": "Naamloos",
+      "leaveTitle": "Gesprek verlaten?",
+      "leaveMessage": "Dit verwijdert het uit je lijst.",
+      "openHint": "Opent het gesprek. Houd lang ingedrukt voor hernoemen en verlaten.",
+      "unread": "Ongelezen",
+      "optionsFor": "Gespreksopties voor {{title}}",
+      "options": "Gespreksopties",
+      "renameTitle": "Gesprek hernoemen",
+      "renamePlaceholder": "Voer een nieuwe naam in",
+      "couldNotReachBot": "Kon de bot niet bereiken. Probeer het opnieuw.",
+      "messageDeliveryFailed": "Bericht kon niet bij de bot worden bezorgd",
+      "couldNotSignIn": "Kon niet aanmelden bij chat",
+      "couldNotRefreshMessages": "Kon berichten niet vernieuwen",
+      "couldNotLoadHistory": "Kon gespreksgeschiedenis niet laden",
+      "rename": "Hernoemen",
+      "leave": "Verlaten",
+      "untitledConversation": "Gesprek zonder titel",
+      "createFailed": "Gesprek maken mislukt",
+      "leaveFailed": "Gesprek verlaten mislukt"
+    },
+    "reactions": {
+      "title": "Reacties",
+      "close": "Reacties sluiten",
+      "recent": "Recent",
+      "common": "Algemeen",
+      "reactWith": "Reageren met {{reaction}}",
+      "accessibility": "{{emoji}} reactie, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Antwoorden op",
+      "cancelReply": "Antwoord annuleren",
+      "openInstance": "Instantie openen",
+      "attachFile": "Bestand bijvoegen",
+      "messagePlaceholder": "Bericht",
+      "cancelEdit": "Bewerken annuleren",
+      "sendMessage": "Bericht verzenden"
+    },
+    "conversationList": {
+      "couldNotLoad": "Kon gesprekken niet laden",
+      "emptyTitle": "Nog geen gesprekken",
+      "emptyDescription": "Maak een gesprek om te beginnen met chatten met je KiloClaw-instantie.",
+      "create": "Gesprek maken",
+      "starting": "Starten…",
+      "newConversation": "Nieuw gesprek",
+      "openInstanceSettings": "Instantie-instellingen openen",
+      "today": "Vandaag",
+      "yesterday": "Gisteren",
+      "thisWeek": "Deze week",
+      "older": "Ouder"
+    },
+    "attachment": {
+      "open": "{{filename}} openen",
+      "imageUnavailable": "Afbeelding niet beschikbaar",
+      "openFailed": "Bijlage kon niet worden geopend. Controleer je verbinding en probeer het opnieuw.",
+      "attachFailed": "Bestand bijvoegen mislukt",
+      "limit": "Je kunt maximaal {{count}} bestanden bijvoegen.",
+      "sizeRejection": "{{filename}} overschrijdt de bijlagelimiet van {{limit}}.",
+      "unreadable": "{{filename}} kon niet worden gelezen.",
+      "pastedImage": "de geplakte afbeelding",
+      "defaultName": "Bijlage"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "Upload opnieuw voor {{filename}}",
+      "remove": "{{filename}} verwijderen"
+    },
+    "messageBubble": {
+      "deleted": "[verwijderd bericht]",
+      "yourMessage": "Jouw bericht",
+      "messageFrom": "Bericht van {{author}}",
+      "moreActions": "Meer acties",
+      "message": "Bericht",
+      "notDelivered": "Niet bezorgd",
+      "edited": "(bewerkt)"
+    },
+    "messageActions": {
+      "copied": "Gekopieerd",
+      "copyFailed": "Kopiëren mislukt",
+      "title": "Berichtacties",
+      "deleteTitle": "Bericht verwijderen?",
+      "deleteMessage": "Hiermee wordt het bericht uit het gesprek verwijderd.",
+      "delete": "Verwijderen",
+      "deleteFailed": "Bericht verwijderen mislukt",
+      "removeReactionFailed": "Reactie verwijderen mislukt",
+      "addReactionFailed": "Reactie toevoegen mislukt",
+      "retrySend": "Opnieuw verzenden",
+      "moreReactions": "Meer reacties",
+      "reply": "Beantwoorden",
+      "edit": "Bewerken",
+      "sendFailed": "Bericht verzenden mislukt",
+      "retrySendFailed": "Opnieuw verzenden mislukt",
+      "editFailed": "Bericht bewerken mislukt",
+      "executeFailed": "Actie uitvoeren mislukt"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Foto maken",
+      "photoLibrary": "Fotobibliotheek",
+      "files": "Bestanden",
+      "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
+      "cameraAccessMessage": "Sta cameratoegang toe in Instellingen om een foto te maken."
+    },
+    "typingIndicator": {
+      "someone": "Iemand",
+      "oneTyping": "{{name}} typt...",
+      "manyTyping": "{{names}} typen..."
+    },
+    "botStatus": {
+      "online": "Online",
+      "idle": "Inactief",
+      "offline": "Offline",
+      "unknown": "Onbekend",
+      "loadingUser": "Gebruiker laden...",
+      "waitingForStatus": "Wachten op botstatus...",
+      "offlineMessage": "De bot is offline. Berichten worden hervat zodra deze opnieuw verbinding maakt."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Nu actief"
+    "activeNow": "Nu actief",
+    "search": {
+      "searching": "Zoeken",
+      "searchSessions": "Sessies zoeken",
+      "searchSessionsPlaceholder": "Sessies zoeken...",
+      "clearSearch": "Zoekopdracht wissen",
+      "clearFilters": "Filters wissen"
+    },
+    "sessionList": {
+      "couldNotLoad": "Kon sessies niet laden",
+      "couldNotLoadActive": "Kon actieve sessies niet laden",
+      "noSessionsYet": "Nog geen sessies",
+      "noSessionsYetDescription": "Start een codeertaak vanaf je telefoon. Je sessies verschijnen hier.",
+      "noMatches": "Geen sessies komen overeen",
+      "tryDifferentSearch": "Probeer een andere zoekterm.",
+      "tryAdjustFilters": "Probeer je filters aan te passen of te wissen.",
+      "couldNotSearch": "Kon sessies niet doorzoeken",
+      "allActive": "Alle sessies zijn actief",
+      "completedWillAppear": "Voltooide sessies verschijnen hier.",
+      "noPastSessions": "Geen eerdere sessies",
+      "live": "LIVE"
+    },
+    "sessionRow": {
+      "deleteTitle": "Sessie verwijderen?",
+      "deleteMessage": "Dit kan niet ongedaan worden gemaakt.",
+      "delete": "Verwijderen",
+      "deleteSession": "Sessie verwijderen",
+      "rename": "Hernoemen",
+      "renameMessage": "Voer een nieuwe naam in voor deze sessie",
+      "copyId": "Sessie-ID kopiëren",
+      "idCopied": "Sessie-ID gekopieerd",
+      "couldNotCopyId": "Kon sessie-ID niet kopiëren",
+      "untitled": "Naamloze sessie"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Sessie kon niet worden geladen",
       "failedToLoadDetails": "Sessiedetails konden niet worden geladen",
       "notFound": "Niet gevonden",
-      "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar."
+      "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
+      "failedToStopExecution": "Uitvoering stoppen mislukt",
+      "renameSession": "Sessie hernoemen",
+      "renamePlaceholder": "Sessienaam",
+      "transcriptAccessibility": "Sessietranscript",
+      "readOnly": "Dit is een alleen-lezensessie",
+      "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
+      "scrollToBottom": "Naar beneden scrollen",
+      "emptyTitle": "Nog geen berichten",
+      "renameAccessibility": "Sessie hernoemen: {{title}}",
+      "connectRepository": "Repository verbinden",
+      "cloningSession": "Sessie klonen",
+      "continue": "Doorgaan",
+      "couldNotLoadThisSession": "Deze sessie kon niet worden geladen",
+      "cloneFailed": "Deze sessie kon niet worden gekloond.",
+      "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
+      "connectRepositoryToContinue": "Verbind een repository om door te gaan."
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",
       "exited": "Sessie beëindigd",
-      "failedToExit": "Sessie afsluiten mislukt"
+      "failedToExit": "Sessie afsluiten mislukt",
+      "exitTitle": "Sessie afsluiten?",
+      "exitMessage": "Dit stopt de lopende sessie maar behoudt de geschiedenis.",
+      "keepSessionRunning": "Sessie laten draaien",
+      "exitSession": "Sessie afsluiten",
+      "restartExitFailed": "Nieuwe sessie gestart. De vorige sessie is nog open."
+    },
+    "sessionConnection": {
+      "connecting": "Verbinden…",
+      "reconnecting": "Opnieuw verbinden…",
+      "connectionLost": "Verbinding verbroken",
+      "retryConnection": "Opnieuw verbinden"
     },
     "newSession": {
       "title": "Nieuwe sessie",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Kon modellen niet laden",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies ze hieronder.",
       "prefillRepoUnavailable": "{{repo}} is niet meer beschikbaar. Kies hieronder een repository.",
-      "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt."
+      "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
+      "couldNotReadPendingSessions": "Kon openstaande sessies niet lezen. Probeer opnieuw.",
+      "failedToCreate": "Sessie maken mislukt"
     },
     "partRenderer": {
       "updatedFile": "{{count}} bestand bijgewerkt",
       "updatedFiles": "{{count}} bestanden bijgewerkt"
+    },
+    "toolPatch": {
+      "operationAdded": "Toegevoegd",
+      "operationDeleted": "Verwijderd",
+      "operationUpdated": "Bijgewerkt"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} tool, {{status}}",
+      "accessibilityLabel": "{{name}} tool, {{status}}",
+      "fileEmpty": "Dit bestand is leeg.",
+      "noTasks": "Geen taken.",
+      "contentTruncated": "Inhoud afgekapt",
+      "truncated": "Afgekapt",
+      "toolRead": "lezen",
+      "toolEdit": "bewerken",
+      "toolWrite": "schrijven",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "weergeven",
+      "toolPatch": "patch",
+      "toolTask": "taak",
+      "readTodos": "Taken lezen",
+      "updateTodos": "Taken bijwerken",
+      "linesBadge": "{{count}} regels",
+      "filesBadge": "{{count}} bestanden",
+      "matchesBadge": "{{count}} overeenkomsten"
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
@@ -507,11 +710,14 @@
       "noMatches": "Geen overeenkomsten",
       "noRepositories": "Geen repositories beschikbaar",
       "noRepositoriesDescription": "Er zijn geen repositories verbonden met je account.",
-      "tryDifferentSearch": "Probeer een andere zoekterm."
+      "tryDifferentSearch": "Probeer een andere zoekterm.",
+      "loading": "Laden...",
+      "accessibility": "Repository: {{label}}"
     },
     "messageDetails": {
       "title": "Berichtdetails",
       "copyMessage": "Bericht kopiëren",
+      "copyText": "Tekst kopiëren",
       "selectText": "Tekst selecteren",
       "reportAiResponse": "AI-antwoord rapporteren",
       "reportAiResponseConfirm": "Dit antwoord rapporteren voor beoordeling?",
@@ -528,7 +734,10 @@
       "reasoning": "Redeneren",
       "cacheRead": "Cache gelezen",
       "cacheWrite": "Cache geschreven",
-      "total": "Totaal"
+      "total": "Totaal",
+      "reportAiResponseFailedRetryable": "Deze reactie kon niet worden gerapporteerd.",
+      "reportAiResponseFailedTerminal": "Deze reactie kan niet worden gerapporteerd.",
+      "reportAiResponseSubmitted": "Melding verzonden. Ontvangstbewijs {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Details niet beschikbaar",
@@ -536,7 +745,9 @@
       "thinking": "Denken",
       "thought": "Gedachte",
       "title": "Details",
-      "showDetails": "Details tonen"
+      "showDetails": "Details tonen",
+      "pending": "In behandeling…",
+      "running": "Bezig…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Inhoud kon niet worden weergegeven"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
       "imageUnavailable": "Afbeelding niet beschikbaar",
       "imageUnavailableWithAlt": "Afbeelding niet beschikbaar {{alt}}",
+      "imagePreviewUnavailableInSession": "Afbeeldingsvoorbeeld niet beschikbaar in deze sessie.",
       "viewImage": "Afbeelding bekijken",
       "viewImageWithAlt": "Afbeelding bekijken {{alt}}",
       "imageOutput": "Afbeeldingsuitvoer",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Bestand opnieuw laden",
       "fileEmpty": "Dit bestand is leeg.",
       "previewUnavailable": "Voorbeeld niet beschikbaar",
+      "fileUnavailableInSession": "Bestand niet beschikbaar in deze sessie.",
       "shareFailed": "Delen mislukt",
       "sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
       "shareFailedRetry": "Bestand delen mislukt. Probeer het opnieuw.",
@@ -654,7 +867,13 @@
       "longPressHint": "Lang indrukken voor berichtdetails"
     },
     "olderMessages": {
-      "arrived": "Eerdere berichten geladen"
+      "arrived": "Eerdere berichten geladen",
+      "retryHint": "Probeert het laden van oudere berichten van deze sessie opnieuw.",
+      "omittedOne": "Een eerder item uit deze sessie kon niet worden weergegeven.",
+      "omittedMany": "{{count}} eerdere items uit deze sessie konden niet worden weergegeven.",
+      "couldNotLoad": "Eerdere berichten konden niet worden geladen.",
+      "unavailable": "Eerdere berichten zijn niet beschikbaar.",
+      "tooLarge": "Eerdere berichten zijn te groot om te laden."
     },
     "markdownTable": {
       "viewTable": "Tabel bekijken",
@@ -682,6 +901,13 @@
       "project": "Project",
       "removeProjectFilter": "Projectfilter {{label}} verwijderen",
       "removePlatformFilter": "Platformfilter {{label}} verwijderen"
+    },
+    "suggestion": {
+      "title": "Suggestie",
+      "dismiss": "Suggestie negeren",
+      "applyFailed": "Deze suggestie kon niet worden toegepast. Probeer het opnieuw.",
+      "dismissFailed": "Deze suggestie kon niet worden gesloten. Probeer het opnieuw.",
+      "dismissed": "Suggestie gesloten"
     },
     "modelPicker": {
       "title": "Model selecteren",
@@ -734,7 +960,13 @@
       "waitForUploads": "Wacht tot bijlagen klaar zijn met uploaden.",
       "pasteFromClipboard": "Plakken vanaf klembord",
       "stopGenerating": "Stoppen met genereren",
-      "sendMessage": "Bericht verzenden"
+      "sendMessage": "Bericht verzenden",
+      "selectModelBeforeSending": "Selecteer een model voordat je verzendt",
+      "preparingPlaceholder": "Omgeving instellen...",
+      "finalizingPlaceholder": "Afronden...",
+      "messagePlaceholder": "Bericht...",
+      "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
+      "couldNotAttachFiles": "Bestanden konden niet worden bijgevoegd. Tik op Verzenden om opnieuw te proberen."
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",
@@ -769,6 +1001,8 @@
       "startNewSession": "Een nieuwe sessie starten",
       "exitSession": "De sessie afsluiten",
       "clearSession": "Deze sessie beëindigen en een nieuwe starten",
+      "useCommand": "Gebruik /{{command}}",
+      "insert": "Invoegen",
       "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
       "exitCapabilityUnavailable": "Werk je CLI bij om de sessie af te sluiten.",
       "clearCapabilityUnavailable": "Werk je CLI bij om de sessie opnieuw te starten.",
@@ -780,7 +1014,36 @@
       "costPrefix": "kosten {{cost}}",
       "costSuffix": ", kosten {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, venster niet beschikbaar",
-      "tokensUsage": "Context {{used}} van {{window}} tokens, {{percentage}}% gebruikt"
+      "tokensUsage": "Context {{used}} van {{window}} tokens, {{percentage}}% gebruikt",
+      "title": "Contextgebruik",
+      "used": "Gebruikt",
+      "remaining": "Resterend",
+      "provider": "Provider",
+      "totalCost": "Totale kosten",
+      "usageReflectsLatest": "Het gebruik weerspiegelt het laatst voltooide assistent-antwoord.",
+      "tokenUsage": "Tokenverbruik",
+      "cacheRate": "Cachetarief",
+      "modelsCount": "Modellen ({{count}})",
+      "tokenTotalsNote": "Tokentotalen gelden alleen voor deze sessie en sluiten subagent-/kindsessietokens uit.",
+      "subagents": "Subagents",
+      "subagentsDescription": "Restkosten van kindsessies",
+      "olderActivity": "Eerdere activiteit",
+      "olderActivityDescription": "Kosten die niet aan de geladen geschiedenis zijn toegewezen",
+      "ofWindowTokens": "van {{window}} tokens",
+      "tokens": "tokens",
+      "tokensWithPercentage": "tokens ({{percentage}})",
+      "stepsCountOne": "{{steps}} stap",
+      "stepsCountMany": "{{steps}} stappen",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "open pull-aanvraag",
+      "closed": "gesloten pull-aanvraag",
+      "merged": "samengevoegde pull-aanvraag",
+      "draft": "concept-pull-aanvraag",
+      "updating": "Bijwerken, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull-aanvraag"
     }
   },
   "bootstrap": {

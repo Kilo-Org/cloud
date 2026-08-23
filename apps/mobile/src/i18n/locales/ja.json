@@ -18,6 +18,7 @@
     "openInBrowser": "ブラウザーで開く",
     "openSettings": "設定を開く",
     "copiedToClipboard": "クリップボードにコピーしました",
+    "couldNotCopyToClipboard": "クリップボードにコピーできませんでした",
     "required": "必須",
     "error": "エラー: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "会話を読み込めませんでした",
       "notFound": "会話が見つかりません",
-      "untitled": "無題"
+      "untitled": "無題",
+      "leaveTitle": "会話を退出しますか？",
+      "leaveMessage": "これによりリストから削除されます。",
+      "openHint": "会話を開きます。長押しで名前変更と退出のオプションが表示されます。",
+      "unread": "未読",
+      "optionsFor": "{{title}}の会話オプション",
+      "options": "会話オプション",
+      "renameTitle": "会話名を変更",
+      "renamePlaceholder": "新しい名前を入力",
+      "couldNotReachBot": "ボットに接続できませんでした。もう一度お試しください。",
+      "messageDeliveryFailed": "メッセージをボットに配信できませんでした",
+      "couldNotSignIn": "チャットにサインインできませんでした",
+      "couldNotRefreshMessages": "メッセージを更新できませんでした",
+      "couldNotLoadHistory": "会話履歴を読み込めませんでした",
+      "rename": "名前を変更",
+      "leave": "退出",
+      "untitledConversation": "無題の会話",
+      "createFailed": "会話を作成できませんでした",
+      "leaveFailed": "会話を退出できませんでした"
+    },
+    "reactions": {
+      "title": "リアクション",
+      "close": "リアクションを閉じる",
+      "recent": "最近",
+      "common": "共通",
+      "reactWith": "{{reaction}}でリアクション",
+      "accessibility": "{{emoji}}のリアクション、{{count}}"
+    },
+    "composer": {
+      "replyingTo": "返信先",
+      "cancelReply": "返信をキャンセル",
+      "openInstance": "インスタンスを開く",
+      "attachFile": "ファイルを添付",
+      "messagePlaceholder": "メッセージ",
+      "cancelEdit": "編集をキャンセル",
+      "sendMessage": "メッセージを送信"
+    },
+    "conversationList": {
+      "couldNotLoad": "会話を読み込めませんでした",
+      "emptyTitle": "まだ会話はありません",
+      "emptyDescription": "KiloClawインスタンスとチャットを開始するには会話を作成してください。",
+      "create": "会話を作成",
+      "starting": "開始中…",
+      "newConversation": "新しい会話",
+      "openInstanceSettings": "インスタンス設定を開く",
+      "today": "今日",
+      "yesterday": "昨日",
+      "thisWeek": "今週",
+      "older": "以前"
+    },
+    "attachment": {
+      "open": "{{filename}}を開く",
+      "imageUnavailable": "画像を利用できません",
+      "openFailed": "添付ファイルを開けませんでした。接続を確認して、もう一度お試しください。",
+      "attachFailed": "ファイルを添付できませんでした",
+      "limit": "最大{{count}}個のファイルを添付できます。",
+      "sizeRejection": "{{filename}}は添付上限の{{limit}}を超えています。",
+      "unreadable": "{{filename}}を読み取れませんでした。",
+      "pastedImage": "貼り付けた画像",
+      "defaultName": "添付ファイル"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}、{{status}}",
+      "retryUploading": "{{filename}}のアップロードを再試行",
+      "remove": "{{filename}}を削除"
+    },
+    "messageBubble": {
+      "deleted": "[削除されたメッセージ]",
+      "yourMessage": "あなたのメッセージ",
+      "messageFrom": "{{author}}からのメッセージ",
+      "moreActions": "その他のアクション",
+      "message": "メッセージ",
+      "notDelivered": "未配信",
+      "edited": "(編集済み)"
+    },
+    "messageActions": {
+      "copied": "コピーしました",
+      "copyFailed": "コピーに失敗しました",
+      "title": "メッセージの操作",
+      "deleteTitle": "メッセージを削除しますか？",
+      "deleteMessage": "会話からこのメッセージが削除されます。",
+      "delete": "削除",
+      "deleteFailed": "メッセージを削除できませんでした",
+      "removeReactionFailed": "リアクションを削除できませんでした",
+      "addReactionFailed": "リアクションを追加できませんでした",
+      "retrySend": "再送",
+      "moreReactions": "その他のリアクション",
+      "reply": "返信",
+      "edit": "編集",
+      "sendFailed": "メッセージを送信できませんでした",
+      "retrySendFailed": "再送できませんでした",
+      "editFailed": "メッセージを編集できませんでした",
+      "executeFailed": "アクションを実行できませんでした"
+    },
+    "attachmentPicker": {
+      "takePhoto": "写真を撮る",
+      "photoLibrary": "フォトライブラリ",
+      "files": "ファイル",
+      "cameraAccessDisabled": "カメラへのアクセスが無効です",
+      "cameraAccessMessage": "写真を撮るには、設定でカメラへのアクセスを許可してください。"
+    },
+    "typingIndicator": {
+      "someone": "誰か",
+      "oneTyping": "{{name}}が入力しています...",
+      "manyTyping": "{{names}}が入力しています..."
+    },
+    "botStatus": {
+      "online": "オンライン",
+      "idle": "アイドル",
+      "offline": "オフライン",
+      "unknown": "不明",
+      "loadingUser": "ユーザーを読み込み中...",
+      "waitingForStatus": "ボットのステータスを待機中...",
+      "offlineMessage": "ボットはオフラインです。再接続するとメッセージが再開されます。"
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "現在アクティブ"
+    "activeNow": "現在アクティブ",
+    "search": {
+      "searching": "検索中",
+      "searchSessions": "セッションを検索",
+      "searchSessionsPlaceholder": "セッションを検索...",
+      "clearSearch": "検索をクリア",
+      "clearFilters": "フィルターをクリア"
+    },
+    "sessionList": {
+      "couldNotLoad": "セッションを読み込めませんでした",
+      "couldNotLoadActive": "アクティブなセッションを読み込めませんでした",
+      "noSessionsYet": "まだセッションはありません",
+      "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
+      "noMatches": "一致するセッションはありません",
+      "tryDifferentSearch": "別の検索語をお試しください。",
+      "tryAdjustFilters": "フィルターを調整またはクリアしてお試しください。",
+      "couldNotSearch": "セッションを検索できませんでした",
+      "allActive": "すべてのセッションがアクティブです",
+      "completedWillAppear": "完了したセッションがここに表示されます。",
+      "noPastSessions": "過去のセッションはありません",
+      "live": "ライブ"
+    },
+    "sessionRow": {
+      "deleteTitle": "セッションを削除しますか？",
+      "deleteMessage": "この操作は元に戻せません。",
+      "delete": "削除",
+      "deleteSession": "セッションを削除",
+      "rename": "名前を変更",
+      "renameMessage": "このセッションの新しい名前を入力",
+      "copyId": "セッションIDをコピー",
+      "idCopied": "セッションIDをコピーしました",
+      "couldNotCopyId": "セッションIDをコピーできませんでした",
+      "untitled": "無題のセッション"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "セッションを読み込めませんでした",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした",
       "notFound": "見つかりません",
-      "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。"
+      "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。",
+      "failedToStopExecution": "実行を停止できませんでした",
+      "renameSession": "セッション名を変更",
+      "renamePlaceholder": "セッション名",
+      "transcriptAccessibility": "セッションのトランスクリプト",
+      "readOnly": "これは読み取り専用のセッションです",
+      "emptyDescription": "開始するには下にメッセージを送信してください。",
+      "scrollToBottom": "一番下までスクロール",
+      "emptyTitle": "メッセージはまだありません",
+      "renameAccessibility": "セッション名を変更: {{title}}",
+      "connectRepository": "リポジトリを接続",
+      "cloningSession": "セッションをクローン中",
+      "continue": "続行",
+      "couldNotLoadThisSession": "このセッションを読み込めませんでした",
+      "cloneFailed": "このセッションを複製できませんでした。",
+      "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
+      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。"
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",
       "exited": "セッションが終了しました",
-      "failedToExit": "セッションを終了できませんでした"
+      "failedToExit": "セッションを終了できませんでした",
+      "exitTitle": "セッションを終了しますか？",
+      "exitMessage": "実行中のセッションは停止しますが、履歴は保持されます。",
+      "keepSessionRunning": "セッションを実行したままにする",
+      "exitSession": "セッションを終了",
+      "restartExitFailed": "新しいセッションを開始しました。前のセッションはまだ開いています。"
+    },
+    "sessionConnection": {
+      "connecting": "接続中…",
+      "reconnecting": "再接続中…",
+      "connectionLost": "接続が失われました",
+      "retryConnection": "接続を再試行"
     },
     "newSession": {
       "title": "新しいセッション",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "モデルを読み込めませんでした",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
       "prefillRepoUnavailable": "{{repo}}は利用できなくなりました。以下でリポジトリを選択してください。",
-      "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。"
+      "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
+      "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
+      "failedToCreate": "セッションを作成できませんでした"
     },
     "partRenderer": {
       "updatedFile": "{{count}}件のファイルを更新しました",
       "updatedFiles": "{{count}}件のファイルを更新しました"
+    },
+    "toolPatch": {
+      "operationAdded": "追加",
+      "operationDeleted": "削除",
+      "operationUpdated": "更新"
+    },
+    "toolCard": {
+      "accessibility": "{{label}}ツール、{{status}}",
+      "accessibilityLabel": "{{name}}ツール、{{status}}",
+      "fileEmpty": "このファイルは空です。",
+      "noTasks": "タスクはありません。",
+      "contentTruncated": "コンテンツが切り詰められました",
+      "truncated": "切り詰め",
+      "toolRead": "読み取り",
+      "toolEdit": "編集",
+      "toolWrite": "書き込み",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "一覧",
+      "toolPatch": "patch",
+      "toolTask": "タスク",
+      "readTodos": "タスクを読む",
+      "updateTodos": "タスクを更新",
+      "linesBadge": "{{count}}行",
+      "filesBadge": "{{count}}ファイル",
+      "matchesBadge": "{{count}}件"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}行目（切り詰め）",
@@ -507,11 +710,14 @@
       "noMatches": "一致なし",
       "noRepositories": "利用可能なリポジトリはありません",
       "noRepositoriesDescription": "アカウントに接続されたリポジトリはありません。",
-      "tryDifferentSearch": "別の検索語をお試しください。"
+      "tryDifferentSearch": "別の検索語をお試しください。",
+      "loading": "読み込み中...",
+      "accessibility": "リポジトリ: {{label}}"
     },
     "messageDetails": {
       "title": "メッセージの詳細",
       "copyMessage": "メッセージをコピー",
+      "copyText": "テキストをコピー",
       "selectText": "テキストを選択",
       "reportAiResponse": "AI応答を報告",
       "reportAiResponseConfirm": "この応答をレビュー対象として報告しますか？",
@@ -528,7 +734,10 @@
       "reasoning": "推論",
       "cacheRead": "キャッシュ読み取り",
       "cacheWrite": "キャッシュ書き込み",
-      "total": "合計"
+      "total": "合計",
+      "reportAiResponseFailedRetryable": "この応答を報告できませんでした。",
+      "reportAiResponseFailedTerminal": "この応答は報告できません。",
+      "reportAiResponseSubmitted": "報告を送信しました。受領番号 {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "詳細を利用できません",
@@ -536,7 +745,9 @@
       "thinking": "思考",
       "thought": "思考",
       "title": "詳細",
-      "showDetails": "詳細を表示"
+      "showDetails": "詳細を表示",
+      "pending": "保留中…",
+      "running": "実行中…"
     },
     "messageErrorBoundary": {
       "failedToRender": "コンテンツを描画できませんでした"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "画像を利用できません。読み込みを再試行してください",
       "imageUnavailable": "画像を利用できません",
       "imageUnavailableWithAlt": "画像を利用できません {{alt}}",
+      "imagePreviewUnavailableInSession": "このセッションでは画像プレビューを利用できません。",
       "viewImage": "画像を表示",
       "viewImageWithAlt": "画像を表示 {{alt}}",
       "imageOutput": "画像出力",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "ファイルの読み込みを再試行",
       "fileEmpty": "このファイルは空です。",
       "previewUnavailable": "プレビューを利用できません",
+      "fileUnavailableInSession": "このセッションではファイルを利用できません。",
       "shareFailed": "共有に失敗しました",
       "sharingUnavailable": "このデバイスではファイル共有を利用できません。",
       "shareFailedRetry": "ファイルを共有できませんでした。もう一度お試しください。",
@@ -654,7 +867,13 @@
       "longPressHint": "メッセージの詳細は長押し"
     },
     "olderMessages": {
-      "arrived": "以前のメッセージを読み込みました"
+      "arrived": "以前のメッセージを読み込みました",
+      "retryHint": "このセッションの古いメッセージの読み込みを再試行します。",
+      "omittedOne": "このセッションの以前の項目を1件表示できませんでした。",
+      "omittedMany": "このセッションの以前の項目{{count}}件を表示できませんでした。",
+      "couldNotLoad": "以前のメッセージを読み込めませんでした。",
+      "unavailable": "以前のメッセージは利用できません。",
+      "tooLarge": "以前のメッセージが大きすぎて読み込めません。"
     },
     "markdownTable": {
       "viewTable": "テーブルを表示",
@@ -682,6 +901,13 @@
       "project": "プロジェクト",
       "removeProjectFilter": "{{label}}プロジェクトフィルターを削除",
       "removePlatformFilter": "{{label}}プラットフォームフィルターを削除"
+    },
+    "suggestion": {
+      "title": "提案",
+      "dismiss": "提案を閉じる",
+      "applyFailed": "この提案を適用できませんでした。もう一度お試しください。",
+      "dismissFailed": "この提案を閉じられませんでした。もう一度お試しください。",
+      "dismissed": "提案を閉じました"
     },
     "modelPicker": {
       "title": "モデルを選択",
@@ -734,7 +960,13 @@
       "waitForUploads": "添付ファイルのアップロードが完了するまでお待ちください。",
       "pasteFromClipboard": "クリップボードから貼り付け",
       "stopGenerating": "生成を停止",
-      "sendMessage": "メッセージを送信"
+      "sendMessage": "メッセージを送信",
+      "selectModelBeforeSending": "送信前にモデルを選択してください",
+      "preparingPlaceholder": "環境をセットアップ中...",
+      "finalizingPlaceholder": "終了処理中...",
+      "messagePlaceholder": "メッセージ...",
+      "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
+      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",
@@ -769,6 +1001,8 @@
       "startNewSession": "新しいセッションを開始",
       "exitSession": "セッションを終了",
       "clearSession": "このセッションを終了して新しいセッションを開始",
+      "useCommand": "/{{command}}を使用",
+      "insert": "挿入",
       "upgradeRequiredFallback": "このコマンドを使用するにはCLIをアップグレードしてください。",
       "exitCapabilityUnavailable": "セッションを終了するにはCLIを更新してください。",
       "clearCapabilityUnavailable": "セッションを再開するにはCLIを更新してください。",
@@ -780,7 +1014,36 @@
       "costPrefix": "コスト {{cost}}",
       "costSuffix": "、コスト {{cost}}",
       "tokensWindowUnavailable": "コンテキスト {{used}}トークン、ウィンドウを利用できません",
-      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}%使用"
+      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}%使用",
+      "title": "コンテキスト使用量",
+      "used": "使用済み",
+      "remaining": "残り",
+      "provider": "プロバイダー",
+      "totalCost": "合計コスト",
+      "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
+      "tokenUsage": "トークン使用量",
+      "cacheRate": "キャッシュ率",
+      "modelsCount": "モデル（{{count}}）",
+      "tokenTotalsNote": "トークン合計はこのセッションのみを対象とし、サブエージェント/子セッションのトークンは含みません。",
+      "subagents": "サブエージェント",
+      "subagentsDescription": "子セッションからの残余コスト",
+      "olderActivity": "以前のアクティビティ",
+      "olderActivityDescription": "読み込まれた履歴に帰属しないコスト",
+      "ofWindowTokens": "{{window}}トークン中",
+      "tokens": "トークン",
+      "tokensWithPercentage": "トークン（{{percentage}}）",
+      "stepsCountOne": "{{steps}}ステップ",
+      "stepsCountMany": "{{steps}}ステップ",
+      "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}"
+    },
+    "prBadge": {
+      "open": "開いているプルリクエスト",
+      "closed": "閉じているプルリクエスト",
+      "merged": "マージ済みのプルリクエスト",
+      "draft": "下書きのプルリクエスト",
+      "updating": "更新中、{{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "プルリクエスト"
     }
   },
   "bootstrap": {

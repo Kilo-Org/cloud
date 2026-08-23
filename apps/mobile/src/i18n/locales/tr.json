@@ -18,6 +18,7 @@
     "openInBrowser": "Tarayıcıda aç",
     "openSettings": "Ayarları Aç",
     "copiedToClipboard": "Panoya kopyalandı",
+    "couldNotCopyToClipboard": "Panoya kopyalanamadı",
     "required": "zorunlu",
     "error": "hata: {{error}}"
   },
@@ -207,7 +208,120 @@
     "conversation": {
       "failedToLoad": "Konuşma yüklenemedi",
       "notFound": "Sohbet bulunamadı",
-      "untitled": "Başlıksız"
+      "untitled": "Başlıksız",
+      "leaveTitle": "Konuşmadan ayrılınsın mı?",
+      "leaveMessage": "Bu, onu listenizden kaldırır.",
+      "openHint": "Konuşmayı açar. Yeniden adlandırma ve ayrılma seçenekleri için uzun basın.",
+      "unread": "Okunmamış",
+      "optionsFor": "{{title}} için konuşma seçenekleri",
+      "options": "Konuşma seçenekleri",
+      "renameTitle": "Konuşmayı yeniden adlandır",
+      "renamePlaceholder": "Yeni bir ad girin",
+      "couldNotReachBot": "Bota ulaşılamadı. Lütfen tekrar deneyin.",
+      "messageDeliveryFailed": "Mesaj bota teslim edilemedi",
+      "couldNotSignIn": "Sohbete oturum açılamadı",
+      "couldNotRefreshMessages": "Mesajlar yenilenemedi",
+      "couldNotLoadHistory": "Konuşma geçmişi yüklenemedi",
+      "rename": "Yeniden adlandır",
+      "leave": "Ayrıl",
+      "untitledConversation": "Başlıksız sohbet",
+      "createFailed": "Sohbet oluşturulamadı",
+      "leaveFailed": "Sohbetten ayrılınamadı"
+    },
+    "reactions": {
+      "title": "Tepkiler",
+      "close": "Tepkileri kapat",
+      "recent": "Son",
+      "common": "Yaygın",
+      "reactWith": "{{reaction}} ile tepki ver",
+      "accessibility": "{{emoji}} tepki, {{count}}"
+    },
+    "composer": {
+      "replyingTo": "Yanıtlanıyor",
+      "cancelReply": "Yanıtı iptal et",
+      "openInstance": "Örneği aç",
+      "attachFile": "Dosya ekle",
+      "messagePlaceholder": "Mesaj",
+      "cancelEdit": "Düzenlemeyi iptal et",
+      "sendMessage": "Mesaj gönder"
+    },
+    "conversationList": {
+      "couldNotLoad": "Konuşmalar yüklenemedi",
+      "emptyTitle": "Henüz konuşma yok",
+      "emptyDescription": "KiloClaw örneğinizle sohbet etmeye başlamak için bir konuşma oluşturun.",
+      "create": "Konuşma oluştur",
+      "starting": "Başlatılıyor…",
+      "newConversation": "Yeni konuşma",
+      "openInstanceSettings": "Örnek ayarlarını aç",
+      "today": "Bugün",
+      "yesterday": "Dün",
+      "thisWeek": "Bu Hafta",
+      "older": "Daha eski"
+    },
+    "attachment": {
+      "open": "{{filename}} aç",
+      "imageUnavailable": "Görüntü kullanılamıyor",
+      "openFailed": "Ek açılamadı. Bağlantını kontrol et ve tekrar dene.",
+      "attachFailed": "Dosya eklenemedi",
+      "limit": "En fazla {{count}} dosya ekleyebilirsin.",
+      "sizeRejection": "{{filename}}, {{limit}} ek sınırını aşıyor.",
+      "unreadable": "{{filename}} okunamadı.",
+      "pastedImage": "yapıştırılan görsel",
+      "defaultName": "Ek"
+    },
+    "attachmentPreview": {
+      "accessibility": "{{filename}}, {{status}}",
+      "retryUploading": "{{filename}} için yüklemeyi tekrar dene",
+      "remove": "{{filename}} kaldır"
+    },
+    "messageBubble": {
+      "deleted": "[silinen mesaj]",
+      "yourMessage": "Senin mesajın",
+      "messageFrom": "{{author}} adlı kişiden mesaj",
+      "moreActions": "Daha fazla eylem",
+      "message": "Mesaj",
+      "notDelivered": "Teslim edilmedi",
+      "edited": "(düzenlendi)"
+    },
+    "messageActions": {
+      "copied": "Kopyalandı",
+      "copyFailed": "Kopyalama başarısız",
+      "title": "Mesaj işlemleri",
+      "deleteTitle": "Mesaj silinsin mi?",
+      "deleteMessage": "Bu, mesajı sohbetten kaldırır.",
+      "delete": "Sil",
+      "deleteFailed": "Mesaj silinemedi",
+      "removeReactionFailed": "Tepki kaldırılamadı",
+      "addReactionFailed": "Tepki eklenemedi",
+      "retrySend": "Tekrar gönder",
+      "moreReactions": "Daha fazla tepki",
+      "reply": "Yanıtla",
+      "edit": "Düzenle",
+      "sendFailed": "Mesaj gönderilemedi",
+      "retrySendFailed": "Tekrar gönderilemedi",
+      "editFailed": "Mesaj düzenlenemedi",
+      "executeFailed": "Eylem yürütülemedi"
+    },
+    "attachmentPicker": {
+      "takePhoto": "Fotoğraf çek",
+      "photoLibrary": "Fotoğraf arşivi",
+      "files": "Dosyalar",
+      "cameraAccessDisabled": "Kamera Erişimi Devre Dışı",
+      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin ver."
+    },
+    "typingIndicator": {
+      "someone": "Biri",
+      "oneTyping": "{{name}} yazıyor...",
+      "manyTyping": "{{names}} yazıyor..."
+    },
+    "botStatus": {
+      "online": "Çevrimiçi",
+      "idle": "Boşta",
+      "offline": "Çevrimdışı",
+      "unknown": "Bilinmiyor",
+      "loadingUser": "Kullanıcı yükleniyor...",
+      "waitingForStatus": "Bot durumu bekleniyor...",
+      "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlar devam edecek."
     }
   },
   "kiloclaw": {
@@ -401,7 +515,40 @@
     }
   },
   "agents": {
-    "activeNow": "Şu anda etkin"
+    "activeNow": "Şu anda etkin",
+    "search": {
+      "searching": "Aranıyor",
+      "searchSessions": "Oturumları ara",
+      "searchSessionsPlaceholder": "Oturum ara...",
+      "clearSearch": "Aramayı temizle",
+      "clearFilters": "Filtreleri temizle"
+    },
+    "sessionList": {
+      "couldNotLoad": "Oturumlar yüklenemedi",
+      "couldNotLoadActive": "Etkin oturumlar yüklenemedi",
+      "noSessionsYet": "Henüz oturum yok",
+      "noSessionsYetDescription": "Telefonunuzdan bir kodlama görevi başlatın. Oturumlarınız burada görünecek.",
+      "noMatches": "Eşleşen oturum yok",
+      "tryDifferentSearch": "Farklı bir arama terimi deneyin.",
+      "tryAdjustFilters": "Filtrelerinizi ayarlamayı veya temizlemeyi deneyin.",
+      "couldNotSearch": "Oturumlar aranamadı",
+      "allActive": "Tüm oturumlar etkin",
+      "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
+      "noPastSessions": "Geçmiş oturum yok",
+      "live": "CANLI"
+    },
+    "sessionRow": {
+      "deleteTitle": "Oturum silinsin mi?",
+      "deleteMessage": "Bu geri alınamaz.",
+      "delete": "Sil",
+      "deleteSession": "Oturumu sil",
+      "rename": "Yeniden adlandır",
+      "renameMessage": "Bu oturum için yeni bir ad girin",
+      "copyId": "Oturum kimliğini kopyala",
+      "idCopied": "Oturum kimliği kopyalandı",
+      "couldNotCopyId": "Oturum kimliği kopyalanamadı",
+      "untitled": "Başlıksız oturum"
+    }
   },
   "agentChat": {
     "session": {
@@ -413,12 +560,39 @@
       "couldNotLoad": "Oturum yüklenemedi",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi",
       "notFound": "Bulunamadı",
-      "notFoundDescription": "Bu öğe kaldırılmış olabilir veya artık kullanılamıyor olabilir."
+      "notFoundDescription": "Bu öğe kaldırılmış olabilir veya artık kullanılamıyor olabilir.",
+      "failedToStopExecution": "Yürütme durdurulamadı",
+      "renameSession": "Oturumu yeniden adlandır",
+      "renamePlaceholder": "Oturum adı",
+      "transcriptAccessibility": "Oturum dökümü",
+      "readOnly": "Bu salt okunur bir oturumdur",
+      "emptyDescription": "Başlamak için aşağıdan bir mesaj gönderin.",
+      "scrollToBottom": "En alta kaydır",
+      "emptyTitle": "Henüz mesaj yok",
+      "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
+      "connectRepository": "Depoyu bağla",
+      "cloningSession": "Oturum klonlanıyor",
+      "continue": "Devam et",
+      "couldNotLoadThisSession": "Bu oturum yüklenemedi",
+      "cloneFailed": "Bu oturum kopyalanamadı.",
+      "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar deneyin.",
+      "connectRepositoryToContinue": "Devam etmek için bir depo bağlayın."
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",
       "exited": "Oturum sona erdi",
-      "failedToExit": "Oturumdan çıkılamadı"
+      "failedToExit": "Oturumdan çıkılamadı",
+      "exitTitle": "Oturumdan çıkılsın mı?",
+      "exitMessage": "Bu, çalışan oturumu durdurur ancak geçmişini korur.",
+      "keepSessionRunning": "Oturumu çalışır durumda tut",
+      "exitSession": "Oturumdan çık",
+      "restartExitFailed": "Yeni oturum başlatıldı. Önceki oturum hâlâ açık."
+    },
+    "sessionConnection": {
+      "connecting": "Bağlanıyor…",
+      "reconnecting": "Yeniden bağlanıyor…",
+      "connectionLost": "Bağlantı koptu",
+      "retryConnection": "Bağlantıyı tekrar dene"
     },
     "newSession": {
       "title": "Yeni oturum",
@@ -448,11 +622,40 @@
       "couldNotLoadModels": "Modeller yüklenemedi",
       "prefillRepoAndModelUnavailable": "Orijinal oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan seçin.",
       "prefillRepoUnavailable": "{{repo}} artık kullanılamıyor. Aşağıdan bir depo seçin.",
-      "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modeliniz kullanılıyor."
+      "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modeliniz kullanılıyor.",
+      "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar deneyin.",
+      "failedToCreate": "Oturum oluşturulamadı"
     },
     "partRenderer": {
       "updatedFile": "{{count}} dosya güncellendi",
       "updatedFiles": "{{count}} dosya güncellendi"
+    },
+    "toolPatch": {
+      "operationAdded": "Eklendi",
+      "operationDeleted": "Silindi",
+      "operationUpdated": "Güncellendi"
+    },
+    "toolCard": {
+      "accessibility": "{{label}} aracı, {{status}}",
+      "accessibilityLabel": "{{name}} aracı, {{status}}",
+      "fileEmpty": "Bu dosya boş.",
+      "noTasks": "Görev yok.",
+      "contentTruncated": "İçerik kısaltıldı",
+      "truncated": "Kısaltıldı",
+      "toolRead": "oku",
+      "toolEdit": "düzenle",
+      "toolWrite": "yaz",
+      "toolBash": "bash",
+      "toolGlob": "glob",
+      "toolGrep": "grep",
+      "toolList": "listele",
+      "toolPatch": "patch",
+      "toolTask": "görev",
+      "readTodos": "Görevleri oku",
+      "updateTodos": "Görevleri güncelle",
+      "linesBadge": "{{count}} satır",
+      "filesBadge": "{{count}} dosya",
+      "matchesBadge": "{{count}} eşleşme"
     },
     "readToolMarkdown": {
       "linesTruncated": "satırlar {{start}}–{{end}} (kısaltıldı)",
@@ -507,11 +710,14 @@
       "noMatches": "Eşleşme yok",
       "noRepositories": "Kullanılabilir depo yok",
       "noRepositoriesDescription": "Hesabınıza bağlı depo yok.",
-      "tryDifferentSearch": "Farklı bir arama terimi deneyin."
+      "tryDifferentSearch": "Farklı bir arama terimi deneyin.",
+      "loading": "Yükleniyor...",
+      "accessibility": "Depo: {{label}}"
     },
     "messageDetails": {
       "title": "Mesaj ayrıntıları",
       "copyMessage": "Mesajı kopyala",
+      "copyText": "Metni Kopyala",
       "selectText": "Metni seç",
       "reportAiResponse": "Yapay zeka yanıtını bildir",
       "reportAiResponseConfirm": "Bu yanıt inceleme için bildirilsin mi?",
@@ -528,7 +734,10 @@
       "reasoning": "Akıl yürütme",
       "cacheRead": "Önbellek okuma",
       "cacheWrite": "Önbellek yazma",
-      "total": "Toplam"
+      "total": "Toplam",
+      "reportAiResponseFailedRetryable": "Bu yanıt bildirilemedi.",
+      "reportAiResponseFailedTerminal": "Bu yanıt bildirilemez.",
+      "reportAiResponseSubmitted": "Bildirim gönderildi. Makbuz {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "Ayrıntılar kullanılamıyor",
@@ -536,7 +745,9 @@
       "thinking": "Düşünme",
       "thought": "Düşünce",
       "title": "Ayrıntılar",
-      "showDetails": "Ayrıntıları göster"
+      "showDetails": "Ayrıntıları göster",
+      "pending": "Bekliyor…",
+      "running": "Çalışıyor…"
     },
     "messageErrorBoundary": {
       "failedToRender": "İçerik oluşturulamadı"
@@ -558,6 +769,7 @@
       "imageUnavailableRetry": "Görüntü kullanılamıyor, yüklemeyi tekrar dene",
       "imageUnavailable": "Görüntü kullanılamıyor",
       "imageUnavailableWithAlt": "Görüntü kullanılamıyor {{alt}}",
+      "imagePreviewUnavailableInSession": "Görüntü önizlemesi bu oturumda kullanılamıyor.",
       "viewImage": "Görüntüyü görüntüle",
       "viewImageWithAlt": "Görüntüyü görüntüle {{alt}}",
       "imageOutput": "Görüntü çıktısı",
@@ -571,6 +783,7 @@
       "retryLoadingFile": "Dosyayı yüklemeyi tekrar dene",
       "fileEmpty": "Bu dosya boş.",
       "previewUnavailable": "Önizleme kullanılamıyor",
+      "fileUnavailableInSession": "Dosya bu oturumda kullanılamıyor.",
       "shareFailed": "Paylaşım başarısız oldu",
       "sharingUnavailable": "Dosya paylaşımı bu cihazda kullanılamıyor.",
       "shareFailedRetry": "Dosya paylaşılamadı. Lütfen tekrar deneyin.",
@@ -654,7 +867,13 @@
       "longPressHint": "Mesaj ayrıntıları için uzun basın"
     },
     "olderMessages": {
-      "arrived": "Önceki mesajlar yüklendi"
+      "arrived": "Önceki mesajlar yüklendi",
+      "retryHint": "Bu oturumun eski mesajlarının yüklenmesini yeniden dener.",
+      "omittedOne": "Bu oturumdaki daha eski bir öğe görüntülenemedi.",
+      "omittedMany": "Bu oturumdaki {{count}} eski öğe görüntülenemedi.",
+      "couldNotLoad": "Eski mesajlar yüklenemedi.",
+      "unavailable": "Eski mesajlar kullanılamıyor.",
+      "tooLarge": "Eski mesajlar yüklenemeyecek kadar büyük."
     },
     "markdownTable": {
       "viewTable": "Tabloyu görüntüle",
@@ -682,6 +901,13 @@
       "project": "Proje",
       "removeProjectFilter": "{{label}} proje filtresini kaldır",
       "removePlatformFilter": "{{label}} platform filtresini kaldır"
+    },
+    "suggestion": {
+      "title": "Öneri",
+      "dismiss": "Öneriyi kapat",
+      "applyFailed": "Bu öneri uygulanamadı. Tekrar deneyin.",
+      "dismissFailed": "Bu öneri kapatılamadı. Tekrar deneyin.",
+      "dismissed": "Öneri kapatıldı"
     },
     "modelPicker": {
       "title": "Model seç",
@@ -734,7 +960,13 @@
       "waitForUploads": "Eklerin yüklenmesinin bitmesini bekleyin.",
       "pasteFromClipboard": "Panodan yapıştır",
       "stopGenerating": "Oluşturmayı durdur",
-      "sendMessage": "Mesaj gönder"
+      "sendMessage": "Mesaj gönder",
+      "selectModelBeforeSending": "Göndermeden önce bir model seçin",
+      "preparingPlaceholder": "Ortam hazırlanıyor...",
+      "finalizingPlaceholder": "Tamamlanıyor...",
+      "messagePlaceholder": "Mesaj...",
+      "cannotReceiveFiles": "Bu oturum dosya alamaz. Mesajınızı göndermek için ekleri kaldırın.",
+      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun."
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",
@@ -769,6 +1001,8 @@
       "startNewSession": "Yeni bir oturum başlat",
       "exitSession": "Oturumdan çık",
       "clearSession": "Bu oturumu sonlandır ve yeni bir tane başlat",
+      "useCommand": "/{{command}} kullan",
+      "insert": "Ekle",
       "upgradeRequiredFallback": "Bu komutu kullanmak için lütfen CLI'nizi yükseltin.",
       "exitCapabilityUnavailable": "Oturumdan çıkmak için CLI'nizi güncelleyin.",
       "clearCapabilityUnavailable": "Oturumu yeniden başlatmak için CLI'nizi güncelleyin.",
@@ -780,7 +1014,36 @@
       "costPrefix": "maliyet {{cost}}",
       "costSuffix": ", maliyet {{cost}}",
       "tokensWindowUnavailable": "Bağlam {{used}} jeton, pencere kullanılamıyor",
-      "tokensUsage": "Bağlam {{window}} jetonun {{used}} kadarı, %{{percentage}} kullanıldı"
+      "tokensUsage": "Bağlam {{window}} jetonun {{used}} kadarı, %{{percentage}} kullanıldı",
+      "title": "Bağlam kullanımı",
+      "used": "Kullanılan",
+      "remaining": "Kalan",
+      "provider": "Sağlayıcı",
+      "totalCost": "Toplam maliyet",
+      "usageReflectsLatest": "Kullanım, tamamlanan en son asistan yanıtını yansıtır.",
+      "tokenUsage": "Jeton kullanımı",
+      "cacheRate": "Önbellek oranı",
+      "modelsCount": "Modeller ({{count}})",
+      "tokenTotalsNote": "Jeton toplamları yalnızca bu oturumu kapsar ve alt ajan/alt oturum jetonlarını hariç tutar.",
+      "subagents": "Alt ajanlar",
+      "subagentsDescription": "Alt oturumlardan kalan maliyet",
+      "olderActivity": "Eski etkinlik",
+      "olderActivityDescription": "Yüklenen geçmişe atfedilmeyen maliyet",
+      "ofWindowTokens": "{{window}} jetonun",
+      "tokens": "jeton",
+      "tokensWithPercentage": "jeton (%{{percentage}})",
+      "stepsCountOne": "{{steps}} adım",
+      "stepsCountMany": "{{steps}} adım",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "prBadge": {
+      "open": "açık pull request",
+      "closed": "kapalı pull request",
+      "merged": "birleştirilmiş pull request",
+      "draft": "taslak pull request",
+      "updating": "Güncelleniyor, {{label}} #{{number}}",
+      "label": "{{label}} #{{number}}",
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {

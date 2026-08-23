@@ -1,5 +1,7 @@
 import { formatFileSize } from '@kilocode/kilo-chat';
 
+import { i18n } from '@/i18n';
+
 const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
 
 /**
@@ -14,10 +16,7 @@ const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
  */
 export const MOBILE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-const DEFAULT_ATTACHMENT_FILENAME = 'Attachment';
 const DEFAULT_ATTACHMENT_MIME_TYPE = 'application/octet-stream';
-
-const ATTACHMENT_ACTION_SHEET_OPTIONS = ['Take photo', 'Photo library', 'Files', 'Cancel'] as const;
 
 type AttachmentActionSheetConfig = {
   options: readonly string[];
@@ -55,9 +54,15 @@ type AttachmentSelectionResult = {
 };
 
 export function getAttachmentActionSheetConfig(): AttachmentActionSheetConfig {
+  const options = [
+    i18n.t('chat.attachmentPicker.takePhoto'),
+    i18n.t('chat.attachmentPicker.photoLibrary'),
+    i18n.t('chat.attachmentPicker.files'),
+    i18n.t('common.cancel'),
+  ];
   return {
-    options: ATTACHMENT_ACTION_SHEET_OPTIONS,
-    cancelButtonIndex: ATTACHMENT_ACTION_SHEET_OPTIONS.length - 1,
+    options,
+    cancelButtonIndex: options.length - 1,
   };
 }
 
@@ -80,15 +85,18 @@ export function normalizeAttachmentSelection(
 }
 
 export function buildAttachmentLimitToast(): string {
-  return `You can attach up to ${MESSAGE_ATTACHMENT_MAX_COUNT} files.`;
+  return i18n.t('chat.attachment.limit', { count: MESSAGE_ATTACHMENT_MAX_COUNT });
 }
 
 export function buildAttachmentSizeRejectionToast(filename: string): string {
-  return `${filename} exceeds the ${formatFileSize(MOBILE_ATTACHMENT_MAX_BYTES)} attachment limit.`;
+  return i18n.t('chat.attachment.sizeRejection', {
+    filename,
+    limit: formatFileSize(MOBILE_ATTACHMENT_MAX_BYTES),
+  });
 }
 
 export function buildAttachmentUnreadableToast(filename: string): string {
-  return `Couldn't read ${filename}.`;
+  return i18n.t('chat.attachment.unreadable', { filename });
 }
 
 export function selectAllowedAttachments({
@@ -159,7 +167,7 @@ function filenameFromSelection(selection: NativeAttachmentSelection): string {
     normalizedText(selection.name) ??
     normalizedText(selection.fileName) ??
     filenameFromUri(selection.uri) ??
-    DEFAULT_ATTACHMENT_FILENAME
+    i18n.t('chat.attachment.defaultName')
   );
 }
 

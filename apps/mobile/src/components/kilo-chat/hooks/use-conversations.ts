@@ -8,12 +8,14 @@ import {
 } from '@kilocode/kilo-chat-hooks';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 export { useConversations, useConversationDetail };
 
 export function useCreateConversation(client: KiloChatClient) {
   return useSharedCreateConversation(client, {
     onError: err => {
-      toast.error(formatKiloChatError(err, 'Failed to create conversation'));
+      toast.error(formatKiloChatError(err, i18n.t('chat.conversation.createFailed')));
     },
   });
 }
@@ -27,7 +29,7 @@ export function useRenameConversation(client: KiloChatClient) {
 export function useLeaveConversation(client: KiloChatClient) {
   return useSharedLeaveConversation(client, {
     onError: err => {
-      toast.error(formatKiloChatError(err, 'Failed to leave conversation'));
+      toast.error(formatKiloChatError(err, i18n.t('chat.conversation.leaveFailed')));
     },
   });
 }

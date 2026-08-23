@@ -1,6 +1,7 @@
 import { Activity, History, SearchX } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -30,6 +31,7 @@ export function BodyEmpty({
   clearQueryAction,
   onRetry,
 }: Readonly<BodyEmptyProps>) {
+  const { t } = useTranslation();
   if (kind === 'filtered-empty') {
     // Active search/filter narrowed the results to zero matches — never
     // show the "create a task" CTA here, it's not the fix for a filter
@@ -38,9 +40,11 @@ export function BodyEmpty({
       <View className="items-center justify-center pt-16">
         <EmptyState
           icon={SearchX}
-          title="No sessions match"
+          title={t('agents.sessionList.noMatches')}
           description={
-            isSearching ? 'Try a different search term.' : 'Try adjusting or clearing your filters.'
+            isSearching
+              ? t('agents.sessionList.tryDifferentSearch')
+              : t('agents.sessionList.tryAdjustFilters')
           }
           action={clearQueryAction}
         />
@@ -57,7 +61,11 @@ export function BodyEmpty({
         <QueryError
           placement="top"
           className="pt-0"
-          message={isSearching ? 'Could not search sessions' : 'Could not load sessions'}
+          message={
+            isSearching
+              ? t('agents.sessionList.couldNotSearch')
+              : t('agents.sessionList.couldNotLoad')
+          }
           onRetry={onRetry}
         />
         {secondaryAction === 'clear-search' || secondaryAction === 'clear-filters'
@@ -76,8 +84,8 @@ export function BodyEmpty({
       <View className="items-center justify-center pt-12">
         <EmptyState
           icon={Activity}
-          title="All sessions are active"
-          description="Completed sessions will appear here."
+          title={t('agents.sessionList.allActive')}
+          description={t('agents.sessionList.completedWillAppear')}
           placement="top"
         />
       </View>
@@ -90,8 +98,8 @@ export function BodyEmpty({
     <View className="items-center justify-center pt-12">
       <EmptyState
         icon={History}
-        title="No past sessions"
-        description="Completed sessions will appear here."
+        title={t('agents.sessionList.noPastSessions')}
+        description={t('agents.sessionList.completedWillAppear')}
         action={emptyStateAction}
         placement="top"
       />

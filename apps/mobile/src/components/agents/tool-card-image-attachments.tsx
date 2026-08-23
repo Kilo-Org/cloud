@@ -2,6 +2,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { AlertCircle, ImageOff } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
@@ -43,17 +44,23 @@ function ToolCardImageAttachment({
   part: ToolPart;
   label: string;
 }>) {
+  const { t } = useTranslation();
   const uri = useToolCardImageUri(part.id);
   const [aspectRatio, setAspectRatio] = useState<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
 
   if (uri === undefined) {
-    return <UnavailableRow icon={ImageOff} message="Image preview unavailable in this session." />;
+    return (
+      <UnavailableRow
+        icon={ImageOff}
+        message={t('agentChat.filePart.imagePreviewUnavailableInSession')}
+      />
+    );
   }
 
   if (failed) {
-    return <UnavailableRow icon={AlertCircle} message="Image unavailable" />;
+    return <UnavailableRow icon={AlertCircle} message={t('agentChat.filePart.imageUnavailable')} />;
   }
 
   return (
@@ -64,7 +71,7 @@ function ToolCardImageAttachment({
         }}
         className="w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
-        accessibilityLabel={`Open ${label} full screen`}
+        accessibilityLabel={t('agentChat.filePart.openFullScreen', { name: label })}
         // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
         style={{ aspectRatio: aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
       >

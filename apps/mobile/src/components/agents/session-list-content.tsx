@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { Bot, Plus } from '@/components/ui/icons';
 import {
@@ -18,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
@@ -131,6 +133,7 @@ export function AgentSessionListContent({
   }, [searchQuery]);
 
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
@@ -192,19 +195,21 @@ export function AgentSessionListContent({
     () => (
       <Button variant="outline" onPress={onCreateSession}>
         <Plus size={16} color={colors.foreground} />
-        <Text>New coding task</Text>
+        <Text>{t('home.newCodingTask')}</Text>
       </Button>
     ),
-    [colors.foreground, onCreateSession]
+    [colors.foreground, onCreateSession, t]
   );
 
   const clearQueryAction = useMemo(
     () => (
       <Button variant="outline" onPress={onClearQuery}>
-        <Text>{isSearching ? 'Clear search' : 'Clear filters'}</Text>
+        <Text>
+          {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
+        </Text>
       </Button>
     ),
-    [isSearching, onClearQuery]
+    [isSearching, onClearQuery, t]
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -277,7 +282,7 @@ export function AgentSessionListContent({
         className="flex-1 items-center justify-center"
         style={tabBarOnlyClearanceStyle}
       >
-        <QueryError message="Could not load sessions" onRetry={onRetry} />
+        <QueryError message={t('agents.sessionList.couldNotLoad')} onRetry={onRetry} />
       </Animated.View>
     );
   }
@@ -294,7 +299,7 @@ export function AgentSessionListContent({
         className="flex-1 items-center justify-center"
         style={tabBarOnlyClearanceStyle}
       >
-        <QueryError message="Could not load active sessions" onRetry={onRetry} />
+        <QueryError message={t('agents.sessionList.couldNotLoadActive')} onRetry={onRetry} />
       </Animated.View>
     );
   }
@@ -313,8 +318,8 @@ export function AgentSessionListContent({
       >
         <EmptyState
           icon={Bot}
-          title="No sessions yet"
-          description="Start a coding task from your phone. Your sessions will appear here."
+          title={t('agents.sessionList.noSessionsYet')}
+          description={t('agents.sessionList.noSessionsYetDescription')}
           action={emptyStateAction}
         />
       </Animated.View>

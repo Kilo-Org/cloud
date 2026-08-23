@@ -1,5 +1,7 @@
 import { type AssociatedPrData } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
 type ReviewDecision = NonNullable<AssociatedPrData['reviewDecision']>;
 
 type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft' | 'unknown';
@@ -14,14 +16,14 @@ type PrBadgeDescriptor = Readonly<{
   accessibilityLabel: string;
 }>;
 
-const STATE_ARIA_LABELS = {
-  open: 'open pull request',
-  closed: 'closed pull request',
-  merged: 'merged pull request',
-  draft: 'draft pull request',
+const STATE_ARIA_LABEL_KEYS = {
+  open: 'agentChat.prBadge.open',
+  closed: 'agentChat.prBadge.closed',
+  merged: 'agentChat.prBadge.merged',
+  draft: 'agentChat.prBadge.draft',
   // Mobile keeps `unknown` on the open presentation (never mapped to closed),
   // so it speaks as an open PR.
-  unknown: 'open pull request',
+  unknown: 'agentChat.prBadge.open',
 } satisfies Readonly<Record<PrBadgeState, string>>;
 
 /**
@@ -103,9 +105,10 @@ export function describePrBadge(
 
   const { icon, accent } = prBadgeVisual(stateBucket, args.reviewDecision, updating);
 
+  const label = i18n.t(STATE_ARIA_LABEL_KEYS[stateBucket]);
   const accessibilityLabel = updating
-    ? `Updating, ${STATE_ARIA_LABELS[stateBucket]} #${args.number}`
-    : `${STATE_ARIA_LABELS[stateBucket]} #${args.number}`;
+    ? i18n.t('agentChat.prBadge.updating', { label, number: args.number })
+    : i18n.t('agentChat.prBadge.label', { label, number: args.number });
 
   return { icon, accent, accessibilityLabel };
 }

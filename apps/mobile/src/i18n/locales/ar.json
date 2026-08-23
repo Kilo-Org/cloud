@@ -7,7 +7,13 @@
     "device": "الجهاز",
     "share": "مشاركة",
     "justNow": "الآن",
-    "couldNotSaveSetting": "تعذّر حفظ الإعداد"
+    "couldNotSaveSetting": "تعذّر حفظ الإعداد",
+    "apply": "تطبيق",
+    "save": "حفظ",
+    "copy": "نسخ",
+    "approve": "موافقة",
+    "refresh": "تحديث",
+    "couldNotRefresh": "تعذّر التحديث. اسحب للأسفل للمحاولة مرة أخرى."
   },
   "language": {
     "title": "اللغة",
@@ -31,5 +37,260 @@
       "balance": "تنبيهات الرصيد",
       "security": "نتائج الأمان"
     }
+  },
+  "tabs": {
+    "home": "الرئيسية",
+    "agents": "الوكلاء",
+    "profile": "الملف الشخصي",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "تبديل المثيل",
+      "couldNotLoadInstances": "تعذّر تحميل المثيلات",
+      "noInstances": "لا توجد مثيلات KiloClaw",
+      "noInstancesDescription": "أعد مثيلًا لبدء الدردشة.",
+      "setUpKiloclaw": "إعداد KiloClaw",
+      "currentInstance": "{{title}}، الحالي",
+      "personal": "شخصي"
+    },
+    "conversation": {
+      "failedToLoad": "تعذّر تحميل المحادثة",
+      "notFound": "المحادثة غير موجودة",
+      "untitled": "بدون عنوان"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "تعذّر تحميل مثيلات KiloClaw",
+    "billing": {
+      "title": "الفوترة",
+      "continueMonthToMonth": "المتابعة شهريًا",
+      "plan": "الخطة",
+      "finalTermEnds": "تنتهي المدة النهائية",
+      "afterFinalTerm": "بعد المدة النهائية",
+      "remaining": "المتبقي",
+      "ends": "ينتهي",
+      "expires": "تنتهي صلاحيته",
+      "noActivePlan": "لا توجد خطة نشطة",
+      "noActivePlanDescription": "ليس لديك اشتراك KiloClaw نشط.",
+      "managedByAdmin": "يدير مسؤول مؤسستك الفوترة.",
+      "couldNotLoad": "تعذّر تحميل معلومات الفوترة",
+      "manageOnWeb": "إدارة الفوترة على الويب",
+      "commitPlan": "Commit",
+      "daysLeft": "متبقٍ {{count}} يوم",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "تنتهي فترة Commit الأخيرة في {{date}}. تابع كـ Standard مقابل {{price}}، أو سينتهي الاستضافة.",
+      "freeTrial": "نسخة تجريبية مجانية",
+      "hostingEnds": "تنتهي الاستضافة",
+      "oneDayLeft": "متبقٍ يوم واحد",
+      "renews": "يتجدد",
+      "standardMonthToMonth": "Standard شهريًا",
+      "standardStartsOn": "يبدأ Standard في {{date}} مقابل {{price}}.",
+      "yourStandardMonthlyPrice": "سعر Standard الشهري الخاص بك"
+    },
+    "changelog": {
+      "title": "ما الجديد",
+      "couldNotLoad": "تعذّر تحميل سجل التغييرات",
+      "noUpdates": "لا توجد تحديثات بعد",
+      "noUpdatesDescription": "ستظهر إدخالات سجل التغييرات هنا.",
+      "recentUpdates": "التحديثات الأخيرة"
+    },
+    "dashboard": {
+      "title": "لوحة التحكم",
+      "couldNotLoad": "تعذّر تحميل لوحة التحكم",
+      "renameInstance": "إعادة تسمية المثيل",
+      "renamePlaceholder": "أدخل اسمًا جديدًا (50 حرفًا كحد أقصى)",
+      "someDetailsFailed": "تعذّر تحميل بعض التفاصيل المباشرة",
+      "destroy": "تدمير",
+      "destroyMessage": "سيؤدي هذا إلى تدمير مثيل KiloClaw وجميع بياناته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.",
+      "destroyTitle": "تدمير المثيل",
+      "instance": "المثيل"
+    },
+    "channels": {
+      "title": "القنوات",
+      "couldNotLoad": "تعذّر تحميل القنوات",
+      "noChannels": "لا توجد قنوات متاحة",
+      "noChannelsDescription": "ستظهر عمليات تكامل القنوات هنا.",
+      "connected": "تم توصيل {{label}}",
+      "disconnectMessage": "إزالة {{label}}؟ سيتم قطع اتصال هذه القناة.",
+      "disconnectTitle": "قطع اتصال القناة"
+    },
+    "devicePairing": {
+      "title": "إقران الأجهزة",
+      "refreshRequests": "تحديث طلبات الإقران",
+      "couldNotLoad": "تعذّر تحميل طلبات الإقران",
+      "noPending": "لا توجد طلبات معلقة",
+      "noPendingDescription": "ستظهر طلبات إقران القنوات والأجهزة هنا.",
+      "channelRequests": "طلبات القنوات",
+      "deviceRequests": "طلبات الأجهزة",
+      "approveDeviceMessage": "السماح لـ {{platform}} بالاتصال بمثيلك؟",
+      "approveDeviceTitle": "الموافقة على الجهاز",
+      "approveMessage": "السماح لـ {{label}} (الرمز: {{code}}) بالاتصال بمثيلك؟",
+      "approveTitle": "الموافقة على طلب الاقتران",
+      "device": "الجهاز",
+      "unknownDevice": "جهاز غير معروف"
+    },
+    "execPolicy": {
+      "title": "سياسة التنفيذ",
+      "couldNotLoad": "تعذّر تحميل سياسة التنفيذ"
+    },
+    "google": {
+      "title": "حساب Google",
+      "couldNotLoad": "تعذّر تحميل حالة حساب Google",
+      "disconnected": "تم فصل حساب Google. أعد نشر مثيلك لتطبيق التغيير.",
+      "redeploy": "إعادة النشر",
+      "setupCommand": "أمر الإعداد",
+      "setupCommandHelp": "شغّل هذا الأمر في طرفية مثبت عليها Docker على جهاز الكمبيوتر الخاص بك لربط حساب Google الخاص بك.",
+      "failedToLoadCommand": "تعذّر تحميل أمر الإعداد",
+      "gmailNotifications": "إشعارات Gmail",
+      "disconnect": "فصل حساب Google",
+      "connected": "متصل",
+      "copied": "تم النسخ!",
+      "copyCommand": "نسخ الأمر",
+      "disabled": "معطّل",
+      "disconnectConfirm": "قطع الاتصال",
+      "disconnectMessage": "إزالة حساب Google من هذا المثيل؟ سيؤدي هذا إلى تعطيل إشعارات Gmail. أعد النشر بعد قطع الاتصال لتطبيق التغييرات.",
+      "disconnectTitle": "قطع اتصال Google",
+      "enabled": "ممكّن",
+      "notConnected": "غير متصل"
+    },
+    "modelList": {
+      "title": "جميع النماذج",
+      "searchPlaceholder": "البحث عن النماذج...",
+      "couldNotLoad": "تعذّر تحميل النماذج",
+      "clearSearch": "مسح البحث",
+      "noMatches": "لا توجد نماذج تطابق بحثك",
+      "noModels": "لا توجد نماذج متاحة",
+      "noModelsDescription": "ستظهر النماذج هنا عندما تصبح متاحة.",
+      "noResultsFor": "لا توجد نتائج لـ \"{{query}}\"",
+      "recommended": "موصى به"
+    },
+    "model": {
+      "title": "النموذج"
+    },
+    "secrets": {
+      "title": "الأسرار",
+      "couldNotLoad": "تعذّر تحميل الأسرار",
+      "noSecrets": "لا توجد أسرار متاحة",
+      "noSecretsDescription": "ستظهر عمليات تكامل الأسرار هنا.",
+      "removeMessage": "إزالة {{label}}؟ ستفقد هذه الأداة الوصول إلى بيانات اعتمادها.",
+      "removeTitle": "إزالة السر",
+      "saved": "تم حفظ {{label}}"
+    },
+    "versionPin": {
+      "title": "تثبيت الإصدار",
+      "couldNotLoad": "تعذّر تحميل معلومات الإصدار",
+      "couldNotLoadMore": "تعذّر تحميل المزيد من الإصدارات",
+      "loadMore": "تحميل المزيد من الإصدارات",
+      "showingLatest": "عرض أحدث 100 إصدار",
+      "availableVersions": "الإصدارات المتاحة",
+      "noVersions": "لا توجد إصدارات متاحة",
+      "noVersionsDescription": "ستظهر إصدارات OpenClaw المتاحة هنا.",
+      "unpin": "إلغاء التثبيت",
+      "unpinMessage": "العودة إلى أحدث إصدار متاح؟",
+      "unpinTitle": "إلغاء تثبيت الإصدار"
+    },
+    "redeploy": "إعادة النشر",
+    "redeployMessage": "هل أنت متأكد من رغبتك في إعادة نشر هذا المثيل؟",
+    "redeployTitle": "إعادة نشر المثيل"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "مجالات التركيز",
+      "hint": "اترك الكل دون تحديد لمراجعة كل شيء."
+    },
+    "gate": {
+      "title": "بوابة الدمج",
+      "all": "الفشل عند أي ملاحظة",
+      "critical": "الفشل عند الملاحظات الحرجة فقط",
+      "off": "عدم إفشال فحص PR أبدًا",
+      "warning": "الفشل عند التحذيرات والملاحظات الحرجة"
+    },
+    "instructions": {
+      "title": "تعليمات مخصصة",
+      "deprecation": "من المخطط إيقاف التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا من ذلك.",
+      "placeholder": "مثال: فرض اصطلاحات معالجة الأخطاء لدينا…"
+    },
+    "repos": {
+      "title": "المستودعات",
+      "couldNotLoad": "تعذّر تحميل المستودعات",
+      "unavailable": "المستودعات غير متاحة — أكمل إعداد Bitbucket على kilo.ai.",
+      "finishSetup": "إنهاء الإعداد",
+      "manageAccess": "إدارة الوصول",
+      "allRepositories": "جميع المستودعات",
+      "bitbucketNoRepositoriesDescription": "لا توجد مستودعات متاحة في مساحة عمل Bitbucket هذه.",
+      "bitbucketSetup": "إعداد Bitbucket",
+      "couldNotOpenGithubSettings": "تعذّر فتح إعدادات تطبيق GitHub",
+      "gitlabNoRepositoriesDescription": "قد تحتاج إلى منح الوصول إلى مزيد من المجموعات أو المشاريع على GitLab.",
+      "installGithubApp": "تثبيت تطبيق GitHub على المستودعات",
+      "installGithubAppDescription": "امنح تطبيق Kilo GitHub حق الوصول إلى المستودعات التي تريد مراجعتها.",
+      "noRepositoriesFound": "لم يتم العثور على مستودعات",
+      "repositoryAccess": "الوصول إلى المستودع",
+      "selectedRepositories": "المستودعات المحددة"
+    },
+    "style": {
+      "title": "أسلوب المراجعة",
+      "balanced": "ملاحظات ذات معنى بدون تشويش",
+      "lenient": "المشكلات الخطيرة فقط",
+      "roast": "صادق بلا رحمة وبطريقة مسلية",
+      "strict": "وضع علامة على كل شيء والحفاظ على مستوى عالٍ"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "لا توجد عوامل تصفية متاحة",
+      "noFiltersDescription": "ارجع وأعد فتح عوامل التصفية من قائمة النتائج.",
+      "title": "تصفية النتائج"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "الجلسة",
+      "copyErrorDetails": "نسخ تفاصيل الخطأ",
+      "backToSessions": "العودة إلى الجلسات",
+      "accessDenied": "تم رفض الوصول",
+      "accessDeniedDescription": "ليس لديك إذن لعرض هذا.",
+      "couldNotLoad": "تعذّر تحميل الجلسة",
+      "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة",
+      "notFound": "غير موجود",
+      "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا."
+    },
+    "newSession": {
+      "title": "جلسة جديدة"
+    },
+    "instancePicker": {
+      "runOn": "التشغيل على",
+      "couldNotLoad": "تعذّر تحميل المثيلات",
+      "couldNotLoadDescription": "تحقق من اتصالك وحاول مرة أخرى.",
+      "cloudAgent": "وكيل سحابي",
+      "cloudAgentDescription": "التشغيل على بيئة الاختبار السحابية من Kilo",
+      "noCliInstances": "لا توجد مثيلات CLI متصلة",
+      "noCliInstancesDescription": "شغّل `kilo remote` في مشروع على جهاز الكمبيوتر الخاص بك، أو حدّث Kilo CLI إذا كان يعمل بالفعل.",
+      "instanceOnProject": "{{name}} على {{project}}",
+      "instanceOnProjectSuffix": "{{name}} على {{project}} ({{suffix}})",
+      "runOnCloudAgent": "التشغيل على وكيل سحابي"
+    },
+    "modePicker": {
+      "title": "اختيار الوضع",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "أوضاع مخصصة"
+    },
+    "repoPicker": {
+      "title": "اختيار المستودع",
+      "searchLabel": "البحث في المستودعات",
+      "searchPlaceholder": "البحث في المستودعات...",
+      "noMatches": "لا توجد نتائج مطابقة",
+      "noRepositories": "لا توجد مستودعات متاحة",
+      "noRepositoriesDescription": "لا توجد مستودعات متصلة بحسابك.",
+      "tryDifferentSearch": "جرّب مصطلح بحث مختلف."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "تعذّر تحميل حسابك",
+    "couldNotLoadAccountDescription": "تحقق من اتصالك وحاول مرة أخرى.",
+    "couldNotLoadPrivacy": "تعذّر تحميل خيارات الخصوصية",
+    "couldNotLoadPrivacyDescription": "تحقق من إعدادات أمان جهازك وحاول مرة أخرى."
   }
 }

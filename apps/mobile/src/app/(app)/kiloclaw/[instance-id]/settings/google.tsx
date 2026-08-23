@@ -2,6 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { RefreshCw, Unplug } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -30,6 +31,7 @@ export default function GoogleScreen() {
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const [copied, setCopied] = useState(false);
   const [showRedeployPrompt, setShowRedeployPrompt] = useState(false);
@@ -40,13 +42,13 @@ export default function GoogleScreen() {
   const setupQuery = useKiloClawGoogleSetup(organizationId, !statusQuery.isPending && !isConnected);
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Google Account" context={instanceContext} />;
+    return <InstanceContextBoundary title={t('kiloclaw.google.title')} context={instanceContext} />;
   }
 
   if (statusQuery.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Google Account" />
+        <ScreenHeader title={t('kiloclaw.google.title')} />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-16 w-full rounded-lg" />
@@ -59,10 +61,10 @@ export default function GoogleScreen() {
   if (statusQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Google Account" />
+        <ScreenHeader title={t('kiloclaw.google.title')} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load Google account status"
+            message={t('kiloclaw.google.couldNotLoad')}
             onRetry={() => {
               void statusQuery.refetch();
             }}
@@ -90,12 +92,12 @@ export default function GoogleScreen() {
 
   function handleDisconnect() {
     Alert.alert(
-      'Disconnect Google',
-      'Remove your Google account from this instance? This will disable Gmail notifications. Redeploy after disconnecting to apply changes.',
+      t('kiloclaw.google.disconnectTitle'),
+      t('kiloclaw.google.disconnectMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Disconnect',
+          text: t('kiloclaw.google.disconnectConfirm'),
           style: 'destructive',
           onPress: () => {
             mutations.disconnectGoogle.mutate(undefined, {
@@ -110,10 +112,10 @@ export default function GoogleScreen() {
   }
 
   function handleRedeploy() {
-    Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('kiloclaw.redeployTitle'), t('kiloclaw.redeployMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Redeploy',
+        text: t('kiloclaw.redeploy'),
         onPress: () => {
           captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'redeploy' });
           mutations.restartMachine.mutate(undefined, {
@@ -128,7 +130,7 @@ export default function GoogleScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Google Account" />
+      <ScreenHeader title={t('kiloclaw.google.title')} />
       <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
         showsVerticalScrollIndicator={false}
@@ -138,7 +140,7 @@ export default function GoogleScreen() {
           <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
             <View className="flex-row items-center gap-3">
               <GoogleIcon size={20} />
-              <Text className="flex-1 text-base font-semibold">Google Account</Text>
+              <Text className="flex-1 text-base font-semibold">{t('kiloclaw.google.title')}</Text>
               <View
                 className={cn(
                   'px-2 py-1 rounded-full',
@@ -151,7 +153,7 @@ export default function GoogleScreen() {
                     isConnected ? 'text-good' : 'text-muted-foreground'
                   )}
                 >
-                  {isConnected ? 'Connected' : 'Not connected'}
+                  {isConnected ? t('kiloclaw.google.connected') : t('kiloclaw.google.notConnected')}
                 </Text>
               </View>
             </View>
@@ -162,7 +164,7 @@ export default function GoogleScreen() {
               {showRedeployPrompt && (
                 <View className="flex-row items-center gap-3 rounded-lg bg-warn-tile-bg p-3">
                   <Text className="flex-1 text-xs text-warn">
-                    Google account disconnected. Redeploy your instance to apply the change.
+                    {t('kiloclaw.google.disconnected')}
                   </Text>
                   <Button
                     size="sm"
@@ -174,22 +176,21 @@ export default function GoogleScreen() {
                     {!mutations.restartMachine.isPending && (
                       <RefreshCw size={14} color={colors.foreground} />
                     )}
-                    <Text>Redeploy</Text>
+                    <Text>{t('kiloclaw.google.redeploy')}</Text>
                   </Button>
                 </View>
               )}
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Setup command
+                {t('kiloclaw.google.setupCommand')}
               </Text>
               <Text variant="muted" className="text-xs">
-                Run this command in a terminal with Docker installed on your own computer to connect
-                your Google account.
+                {t('kiloclaw.google.setupCommandHelp')}
               </Text>
               <View className="rounded-lg bg-muted p-3 gap-2">
                 {setupQuery.isPending && <Skeleton className="h-4 w-full rounded" />}
                 {setupQuery.isError && (
                   <View className="gap-2">
-                    <Text className="text-xs text-destructive">Failed to load setup command</Text>
+                    <Text className="text-xs text-destructive">{t('kiloclaw.google.failedToLoadCommand')}</Text>
                     <Button
                       size="sm"
                       variant="outline"
@@ -198,7 +199,7 @@ export default function GoogleScreen() {
                         void setupQuery.refetch();
                       }}
                     >
-                      <Text>Retry</Text>
+                      <Text>{t('common.retry')}</Text>
                     </Button>
                   </View>
                 )}
@@ -215,7 +216,7 @@ export default function GoogleScreen() {
                   void handleCopy();
                 }}
               >
-                <Text>{copied ? 'Copied!' : 'Copy command'}</Text>
+                <Text>{copied ? t('kiloclaw.google.copied') : t('kiloclaw.google.copyCommand')}</Text>
               </Button>
             </Animated.View>
           )}
@@ -225,14 +226,14 @@ export default function GoogleScreen() {
               <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
                 <View className="flex-row items-center gap-3">
                   <GmailIcon size={20} />
-                  <Text className="flex-1 text-base font-semibold">Gmail notifications</Text>
+                  <Text className="flex-1 text-base font-semibold">{t('kiloclaw.google.gmailNotifications')}</Text>
                   <Button
                     size="sm"
                     variant={gmailEnabled ? 'default' : 'outline'}
                     onPress={handleToggleGmail}
                     disabled={mutations.setGmailNotifications.isPending}
                   >
-                    <Text>{gmailEnabled ? 'Enabled' : 'Disabled'}</Text>
+                    <Text>{gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}</Text>
                   </Button>
                 </View>
               </View>
@@ -244,7 +245,7 @@ export default function GoogleScreen() {
                 className="flex-row gap-2"
               >
                 {!mutations.disconnectGoogle.isPending && <Unplug size={16} color="#ef4444" />}
-                <Text className="text-destructive">Disconnect Google Account</Text>
+                <Text className="text-destructive">{t('kiloclaw.google.disconnect')}</Text>
               </Button>
             </Animated.View>
           )}

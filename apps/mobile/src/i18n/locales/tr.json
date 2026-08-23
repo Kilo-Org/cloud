@@ -7,7 +7,13 @@
     "device": "Cihaz",
     "share": "Paylaş",
     "justNow": "Az önce",
-    "couldNotSaveSetting": "Ayar kaydedilemedi"
+    "couldNotSaveSetting": "Ayar kaydedilemedi",
+    "apply": "Uygula",
+    "save": "Kaydet",
+    "copy": "Kopyala",
+    "approve": "Onayla",
+    "refresh": "Yenile",
+    "couldNotRefresh": "Yenilenemedi. Tekrar denemek için aşağı çekin."
   },
   "language": {
     "title": "Dil",
@@ -31,5 +37,260 @@
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları"
     }
+  },
+  "tabs": {
+    "home": "Ana Sayfa",
+    "agents": "Ajanlar",
+    "profile": "Profil",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Örneği değiştir",
+      "couldNotLoadInstances": "Örnekler yüklenemedi",
+      "noInstances": "KiloClaw örneği yok",
+      "noInstancesDescription": "Sohbete başlamak için bir örnek kurun.",
+      "setUpKiloclaw": "KiloClaw'ı kur",
+      "currentInstance": "{{title}}, geçerli",
+      "personal": "Kişisel"
+    },
+    "conversation": {
+      "failedToLoad": "Konuşma yüklenemedi",
+      "notFound": "Sohbet bulunamadı",
+      "untitled": "Başlıksız"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "KiloClaw örnekleri yüklenemedi",
+    "billing": {
+      "title": "Faturalandırma",
+      "continueMonthToMonth": "Aylık devam et",
+      "plan": "Plan",
+      "finalTermEnds": "Son dönem sona eriyor",
+      "afterFinalTerm": "Son dönemden sonra",
+      "remaining": "Kalan",
+      "ends": "Sona eriyor",
+      "expires": "Süresi doluyor",
+      "noActivePlan": "Etkin plan yok",
+      "noActivePlanDescription": "Etkin bir KiloClaw aboneliğiniz yok.",
+      "managedByAdmin": "Faturalandırma, kuruluş yöneticiniz tarafından yönetilir.",
+      "couldNotLoad": "Faturalandırma bilgileri yüklenemedi",
+      "manageOnWeb": "Faturalandırmayı Web'de Yönet",
+      "commitPlan": "Commit",
+      "daysLeft": "{{count}} gün kaldı",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Son Commit döneminiz {{date}} tarihinde sona eriyor. {{price}} karşılığında Standard olarak devam edin, aksi takdirde barındırma sona erer.",
+      "freeTrial": "Ücretsiz Deneme",
+      "hostingEnds": "Barındırma sona eriyor",
+      "oneDayLeft": "1 gün kaldı",
+      "renews": "Yenilenir",
+      "standardMonthToMonth": "Standard aylık",
+      "standardStartsOn": "Standard {{date}} tarihinde {{price}} ile başlıyor.",
+      "yourStandardMonthlyPrice": "aylık Standard fiyatınız"
+    },
+    "changelog": {
+      "title": "Yenilikler",
+      "couldNotLoad": "Değişiklik günlüğü yüklenemedi",
+      "noUpdates": "Henüz güncelleme yok",
+      "noUpdatesDescription": "Değişiklik günlüğü girişleri burada görünecek.",
+      "recentUpdates": "Son güncellemeler"
+    },
+    "dashboard": {
+      "title": "Panel",
+      "couldNotLoad": "Panel yüklenemedi",
+      "renameInstance": "Örneği yeniden adlandır",
+      "renamePlaceholder": "Yeni bir ad girin (en fazla 50 karakter)",
+      "someDetailsFailed": "Bazı canlı ayrıntılar yüklenemedi",
+      "destroy": "Yok et",
+      "destroyMessage": "Bu, KiloClaw örneğinizi ve tüm verilerini kalıcı olarak yok eder. Bu işlem geri alınamaz.",
+      "destroyTitle": "Örneği yok et",
+      "instance": "Örnek"
+    },
+    "channels": {
+      "title": "Kanallar",
+      "couldNotLoad": "Kanallar yüklenemedi",
+      "noChannels": "Kullanılabilir kanal yok",
+      "noChannelsDescription": "Kanal entegrasyonları burada görünecek.",
+      "connected": "{{label}} bağlandı",
+      "disconnectMessage": "{{label}} kaldırılsın mı? Bu kanalın bağlantısı kesilecek.",
+      "disconnectTitle": "Kanalın bağlantısını kes"
+    },
+    "devicePairing": {
+      "title": "Cihaz eşleştirme",
+      "refreshRequests": "Eşleştirme isteklerini yenile",
+      "couldNotLoad": "Eşleştirme istekleri yüklenemedi",
+      "noPending": "Bekleyen istek yok",
+      "noPendingDescription": "Kanal ve cihaz eşleştirme istekleri burada görünecek.",
+      "channelRequests": "Kanal istekleri",
+      "deviceRequests": "Cihaz istekleri",
+      "approveDeviceMessage": "{{platform}} cihazının örneğinize bağlanmasına izin verilsin mi?",
+      "approveDeviceTitle": "Cihazı onayla",
+      "approveMessage": "{{label}} (kod: {{code}}) öğesinin örneğinize bağlanmasına izin verilsin mi?",
+      "approveTitle": "Eşleştirme isteğini onayla",
+      "device": "Cihaz",
+      "unknownDevice": "Bilinmeyen cihaz"
+    },
+    "execPolicy": {
+      "title": "Yürütme ilkesi",
+      "couldNotLoad": "Yürütme ilkesi yüklenemedi"
+    },
+    "google": {
+      "title": "Google Hesabı",
+      "couldNotLoad": "Google hesabı durumu yüklenemedi",
+      "disconnected": "Google hesabı bağlantısı kesildi. Değişikliği uygulamak için örneğinizi yeniden dağıtın.",
+      "redeploy": "Yeniden dağıt",
+      "setupCommand": "Kurulum komutu",
+      "setupCommandHelp": "Google hesabınızı bağlamak için bu komutu kendi bilgisayarınızda Docker yüklü bir terminalde çalıştırın.",
+      "failedToLoadCommand": "Kurulum komutu yüklenemedi",
+      "gmailNotifications": "Gmail bildirimleri",
+      "disconnect": "Google Hesabının Bağlantısını Kes",
+      "connected": "Bağlı",
+      "copied": "Kopyalandı!",
+      "copyCommand": "Komutu kopyala",
+      "disabled": "Devre dışı",
+      "disconnectConfirm": "Bağlantıyı kes",
+      "disconnectMessage": "Google hesabınız bu örnekten kaldırılsın mı? Bu, Gmail bildirimlerini devre dışı bırakır. Değişiklikleri uygulamak için bağlantıyı kestikten sonra yeniden dağıtın.",
+      "disconnectTitle": "Google bağlantısını kes",
+      "enabled": "Etkin",
+      "notConnected": "Bağlı değil"
+    },
+    "modelList": {
+      "title": "Tüm modeller",
+      "searchPlaceholder": "Model ara...",
+      "couldNotLoad": "Modeller yüklenemedi",
+      "clearSearch": "Aramayı temizle",
+      "noMatches": "Aramanızla eşleşen model yok",
+      "noModels": "Kullanılabilir model yok",
+      "noModelsDescription": "Modeller kullanılabilir olduğunda burada görünecek.",
+      "noResultsFor": "\"{{query}}\" için sonuç yok",
+      "recommended": "Önerilen"
+    },
+    "model": {
+      "title": "Model"
+    },
+    "secrets": {
+      "title": "Sırlar",
+      "couldNotLoad": "Sırlar yüklenemedi",
+      "noSecrets": "Kullanılabilir sır yok",
+      "noSecretsDescription": "Sır entegrasyonları burada görünecek.",
+      "removeMessage": "{{label}} kaldırılsın mı? Bu araç kimlik bilgilerine erişimini kaybeder.",
+      "removeTitle": "Gizli anahtarı kaldır",
+      "saved": "{{label}} kaydedildi"
+    },
+    "versionPin": {
+      "title": "Sürüm sabitleme",
+      "couldNotLoad": "Sürüm bilgileri yüklenemedi",
+      "couldNotLoadMore": "Daha fazla sürüm yüklenemedi",
+      "loadMore": "Daha fazla sürüm yükle",
+      "showingLatest": "Son 100 sürüm gösteriliyor",
+      "availableVersions": "Kullanılabilir sürümler",
+      "noVersions": "Kullanılabilir sürüm yok",
+      "noVersionsDescription": "Kullanılabilir OpenClaw sürümleri burada görünecek.",
+      "unpin": "Sabitlemeyi kaldır",
+      "unpinMessage": "Kullanılabilir en son sürüme geri dönülsün mü?",
+      "unpinTitle": "Sürüm sabitlemesini kaldır"
+    },
+    "redeploy": "Yeniden dağıt",
+    "redeployMessage": "Bu örneği yeniden dağıtmak istediğinizden emin misiniz?",
+    "redeployTitle": "Örneği yeniden dağıt"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Odak alanları",
+      "hint": "Her şeyi incelemek için tümünü seçili bırakmayın."
+    },
+    "gate": {
+      "title": "Birleştirme kapısı",
+      "all": "Her bulguda başarısız ol",
+      "critical": "Yalnızca kritik bulgularda başarısız ol",
+      "off": "PR kontrolünü hiçbir zaman başarısız yapma",
+      "warning": "Uyarılarda ve kritik bulgularda başarısız ol"
+    },
+    "instructions": {
+      "title": "Özel talimatlar",
+      "deprecation": "Özel Talimatlar kullanımdan kaldırılacak. Bu yönergeleri bunun yerine deponuzdaki bir REVIEW.md dosyasına taşıyın.",
+      "placeholder": "örn. Hata işleme kurallarımızı uygulayın…"
+    },
+    "repos": {
+      "title": "Depolar",
+      "couldNotLoad": "Depolar yüklenemedi",
+      "unavailable": "Depolar kullanılamıyor — kilo.ai üzerinde Bitbucket kurulumunu tamamlayın.",
+      "finishSetup": "Kurulumu tamamla",
+      "manageAccess": "Erişimi yönet",
+      "allRepositories": "Tüm depolar",
+      "bitbucketNoRepositoriesDescription": "Bu Bitbucket çalışma alanında kullanılabilir depo yok.",
+      "bitbucketSetup": "Bitbucket kurulumu",
+      "couldNotOpenGithubSettings": "GitHub Uygulaması ayarları açılamadı",
+      "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim vermeniz gerekebilir.",
+      "installGithubApp": "GitHub uygulamasını depolara yükle",
+      "installGithubAppDescription": "İncelenmesini istediğiniz depolara Kilo GitHub Uygulaması erişimi verin.",
+      "noRepositoriesFound": "Depo bulunamadı",
+      "repositoryAccess": "depo erişimi",
+      "selectedRepositories": "Seçilen depolar"
+    },
+    "style": {
+      "title": "İnceleme stili",
+      "balanced": "Gürültüsüz anlamlı bulgular",
+      "lenient": "Yalnızca ciddi sorunlar",
+      "roast": "Acımasızca dürüst ve eğlenceli",
+      "strict": "Her şeyi işaretle, yüksek standart uygula"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Kullanılabilir filtre yok",
+      "noFiltersDescription": "Geri dönün ve filtreleri bulgular listesinden yeniden açın.",
+      "title": "Bulguları filtrele"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Oturum",
+      "copyErrorDetails": "Hata ayrıntılarını kopyala",
+      "backToSessions": "Oturumlara geri dön",
+      "accessDenied": "Erişim reddedildi",
+      "accessDeniedDescription": "Bunu görüntüleme izniniz yok.",
+      "couldNotLoad": "Oturum yüklenemedi",
+      "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi",
+      "notFound": "Bulunamadı",
+      "notFoundDescription": "Bu öğe kaldırılmış olabilir veya artık kullanılamıyor olabilir."
+    },
+    "newSession": {
+      "title": "Yeni oturum"
+    },
+    "instancePicker": {
+      "runOn": "Çalıştırma yeri",
+      "couldNotLoad": "Örnekler yüklenemedi",
+      "couldNotLoadDescription": "Bağlantınızı kontrol edip tekrar deneyin.",
+      "cloudAgent": "Bulut Ajanı",
+      "cloudAgentDescription": "Kilo'nun bulut korumalı alanında çalıştır",
+      "noCliInstances": "Bağlı CLI örneği yok",
+      "noCliInstancesDescription": "Bilgisayarınızdaki bir projede `kilo remote` çalıştırın veya zaten çalışıyorsa Kilo CLI'yi güncelleyin.",
+      "instanceOnProject": "{{project}} üzerinde {{name}}",
+      "instanceOnProjectSuffix": "{{project}} üzerinde {{name}} ({{suffix}})",
+      "runOnCloudAgent": "Bulut Ajanında çalıştır"
+    },
+    "modePicker": {
+      "title": "Mod seç",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Özel modlar"
+    },
+    "repoPicker": {
+      "title": "Depo seç",
+      "searchLabel": "Depo ara",
+      "searchPlaceholder": "Depo ara...",
+      "noMatches": "Eşleşme yok",
+      "noRepositories": "Kullanılabilir depo yok",
+      "noRepositoriesDescription": "Hesabınıza bağlı depo yok.",
+      "tryDifferentSearch": "Farklı bir arama terimi deneyin."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Hesabınız yüklenemedi",
+    "couldNotLoadAccountDescription": "Bağlantınızı kontrol edip tekrar deneyin.",
+    "couldNotLoadPrivacy": "Gizlilik tercihleri yüklenemedi",
+    "couldNotLoadPrivacyDescription": "Cihazınızın güvenlik ayarlarını kontrol edip tekrar deneyin."
   }
 }

@@ -7,7 +7,13 @@
     "device": "Urządzenie",
     "share": "Udostępnij",
     "justNow": "Przed chwilą",
-    "couldNotSaveSetting": "Nie udało się zapisać ustawienia"
+    "couldNotSaveSetting": "Nie udało się zapisać ustawienia",
+    "apply": "Zastosuj",
+    "save": "Zapisz",
+    "copy": "Kopiuj",
+    "approve": "Zatwierdź",
+    "refresh": "Odśwież",
+    "couldNotRefresh": "Nie udało się odświeżyć. Przeciągnij w dół, aby spróbować ponownie."
   },
   "language": {
     "title": "Język",
@@ -31,5 +37,260 @@
       "balance": "Alerty o saldzie",
       "security": "Ustalenia bezpieczeństwa"
     }
+  },
+  "tabs": {
+    "home": "Strona główna",
+    "agents": "Agenci",
+    "profile": "Profil",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Przełącz instancję",
+      "couldNotLoadInstances": "Nie można załadować instancji",
+      "noInstances": "Brak instancji KiloClaw",
+      "noInstancesDescription": "Skonfiguruj instancję, aby rozpocząć czat.",
+      "setUpKiloclaw": "Skonfiguruj KiloClaw",
+      "currentInstance": "{{title}}, bieżąca",
+      "personal": "Osobiste"
+    },
+    "conversation": {
+      "failedToLoad": "Nie udało się załadować rozmowy",
+      "notFound": "Nie znaleziono konwersacji",
+      "untitled": "Bez tytułu"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Nie można załadować instancji KiloClaw",
+    "billing": {
+      "title": "Rozliczenia",
+      "continueMonthToMonth": "Kontynuuj co miesiąc",
+      "plan": "Plan",
+      "finalTermEnds": "Ostatni okres kończy się",
+      "afterFinalTerm": "Po ostatnim okresie",
+      "remaining": "Pozostało",
+      "ends": "Kończy się",
+      "expires": "Wygasa",
+      "noActivePlan": "Brak aktywnego planu",
+      "noActivePlanDescription": "Nie masz aktywnej subskrypcji KiloClaw.",
+      "managedByAdmin": "Rozliczeniami zarządza administrator Twojej organizacji.",
+      "couldNotLoad": "Nie można załadować informacji o rozliczeniach",
+      "manageOnWeb": "Zarządzaj rozliczeniami w sieci",
+      "commitPlan": "Commit",
+      "daysLeft": "Pozostało {{count}} dni",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Twoja ostatnia subskrypcja Commit kończy się {{date}}. Kontynuuj jako Standard za {{price}} albo hosting się zakończy.",
+      "freeTrial": "Bezpłatny okres próbny",
+      "hostingEnds": "Hosting się kończy",
+      "oneDayLeft": "Pozostał 1 dzień",
+      "renews": "Odnawia się",
+      "standardMonthToMonth": "Standard co miesiąc",
+      "standardStartsOn": "Standard rozpoczyna się {{date}} za {{price}}.",
+      "yourStandardMonthlyPrice": "Twoja miesięczna cena Standard"
+    },
+    "changelog": {
+      "title": "Co nowego",
+      "couldNotLoad": "Nie można załadować dziennika zmian",
+      "noUpdates": "Brak aktualizacji",
+      "noUpdatesDescription": "Wpisy dziennika zmian pojawią się tutaj.",
+      "recentUpdates": "Ostatnie aktualizacje"
+    },
+    "dashboard": {
+      "title": "Panel",
+      "couldNotLoad": "Nie można załadować panelu",
+      "renameInstance": "Zmień nazwę instancji",
+      "renamePlaceholder": "Wpisz nową nazwę (maks. 50 znaków)",
+      "someDetailsFailed": "Nie udało się załadować niektórych danych na żywo",
+      "destroy": "Zniszcz",
+      "destroyMessage": "To trwale zniszczy Twoją instancję KiloClaw i wszystkie jej dane. Tej akcji nie można cofnąć.",
+      "destroyTitle": "Zniszcz instancję",
+      "instance": "Instancja"
+    },
+    "channels": {
+      "title": "Kanały",
+      "couldNotLoad": "Nie można załadować kanałów",
+      "noChannels": "Brak dostępnych kanałów",
+      "noChannelsDescription": "Integracje kanałów pojawią się tutaj.",
+      "connected": "{{label}} połączony",
+      "disconnectMessage": "Usunąć {{label}}? Ten kanał zostanie rozłączony.",
+      "disconnectTitle": "Rozłącz kanał"
+    },
+    "devicePairing": {
+      "title": "Parowanie urządzeń",
+      "refreshRequests": "Odśwież prośby o parowanie",
+      "couldNotLoad": "Nie można załadować próśb o parowanie",
+      "noPending": "Brak oczekujących próśb",
+      "noPendingDescription": "Prośby o parowanie kanałów i urządzeń pojawią się tutaj.",
+      "channelRequests": "Prośby kanałów",
+      "deviceRequests": "Prośby urządzeń",
+      "approveDeviceMessage": "Zezwolić urządzeniu {{platform}} na połączenie z Twoją instancją?",
+      "approveDeviceTitle": "Zatwierdź urządzenie",
+      "approveMessage": "Zezwolić {{label}} (kod: {{code}}) na połączenie z Twoją instancją?",
+      "approveTitle": "Zatwierdź prośbę o parowanie",
+      "device": "Urządzenie",
+      "unknownDevice": "Nieznane urządzenie"
+    },
+    "execPolicy": {
+      "title": "Zasady wykonywania",
+      "couldNotLoad": "Nie można załadować zasad wykonywania"
+    },
+    "google": {
+      "title": "Konto Google",
+      "couldNotLoad": "Nie można załadować statusu konta Google",
+      "disconnected": "Konto Google odłączone. Wdróż ponownie instancję, aby zastosować zmianę.",
+      "redeploy": "Wdróż ponownie",
+      "setupCommand": "Polecenie konfiguracji",
+      "setupCommandHelp": "Uruchom to polecenie w terminalu z zainstalowanym Dockerem na własnym komputerze, aby połączyć konto Google.",
+      "failedToLoadCommand": "Nie udało się załadować polecenia konfiguracji",
+      "gmailNotifications": "Powiadomienia Gmail",
+      "disconnect": "Odłącz konto Google",
+      "connected": "Połączono",
+      "copied": "Skopiowano!",
+      "copyCommand": "Kopiuj polecenie",
+      "disabled": "Wyłączone",
+      "disconnectConfirm": "Rozłącz",
+      "disconnectMessage": "Usunąć konto Google z tej instancji? To wyłączy powiadomienia Gmail. Po rozłączeniu wdróż ponownie, aby zastosować zmiany.",
+      "disconnectTitle": "Rozłącz Google",
+      "enabled": "Włączone",
+      "notConnected": "Niepołączone"
+    },
+    "modelList": {
+      "title": "Wszystkie modele",
+      "searchPlaceholder": "Szukaj modeli...",
+      "couldNotLoad": "Nie można załadować modeli",
+      "clearSearch": "Wyczyść wyszukiwanie",
+      "noMatches": "Żaden model nie pasuje do Twojego wyszukiwania",
+      "noModels": "Brak dostępnych modeli",
+      "noModelsDescription": "Modele pojawią się tutaj, gdy będą dostępne.",
+      "noResultsFor": "Brak wyników dla \"{{query}}\"",
+      "recommended": "Polecane"
+    },
+    "model": {
+      "title": "Model"
+    },
+    "secrets": {
+      "title": "Tajemnice",
+      "couldNotLoad": "Nie można załadować tajemnic",
+      "noSecrets": "Brak dostępnych tajemnic",
+      "noSecretsDescription": "Integracje tajemnic pojawią się tutaj.",
+      "removeMessage": "Usunąć {{label}}? To narzędzie utraci dostęp do swoich poświadczeń.",
+      "removeTitle": "Usuń sekret",
+      "saved": "Zapisano {{label}}"
+    },
+    "versionPin": {
+      "title": "Przypinanie wersji",
+      "couldNotLoad": "Nie można załadować informacji o wersji",
+      "couldNotLoadMore": "Nie można załadować kolejnych wersji",
+      "loadMore": "Załaduj kolejne wersje",
+      "showingLatest": "Wyświetlanie 100 najnowszych wersji",
+      "availableVersions": "Dostępne wersje",
+      "noVersions": "Brak dostępnych wersji",
+      "noVersionsDescription": "Dostępne wersje OpenClaw pojawią się tutaj.",
+      "unpin": "Odepnij",
+      "unpinMessage": "Wrócić do najnowszej dostępnej wersji?",
+      "unpinTitle": "Odepnij wersję"
+    },
+    "redeploy": "Wdróż ponownie",
+    "redeployMessage": "Czy na pewno chcesz ponownie wdrożyć tę instancję?",
+    "redeployTitle": "Wdróż instancję ponownie"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Obszary uwagi",
+      "hint": "Pozostaw wszystkie niezaznaczone, aby przejrzeć wszystko."
+    },
+    "gate": {
+      "title": "Bramka scalania",
+      "all": "Niepowodzenie przy każdym znalezisku",
+      "critical": "Niepowodzenie tylko przy krytycznych znaleziskach",
+      "off": "Nigdy nie oznaczaj kontroli PR jako nieudanej",
+      "warning": "Niepowodzenie przy ostrzeżeniach i krytycznych znaleziskach"
+    },
+    "instructions": {
+      "title": "Niestandardowe instrukcje",
+      "deprecation": "Niestandardowe instrukcje zostaną wycofane. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
+      "placeholder": "np. Wymuszaj nasze konwencje obsługi błędów…"
+    },
+    "repos": {
+      "title": "Repozytoria",
+      "couldNotLoad": "Nie można załadować repozytoriów",
+      "unavailable": "Repozytoria niedostępne — dokończ konfigurację Bitbucket na kilo.ai.",
+      "finishSetup": "Dokończ konfigurację",
+      "manageAccess": "Zarządzaj dostępem",
+      "allRepositories": "Wszystkie repozytoria",
+      "bitbucketNoRepositoriesDescription": "W tym obszarze roboczym Bitbucket nie ma dostępnych repozytoriów.",
+      "bitbucketSetup": "Konfiguracja Bitbucket",
+      "couldNotOpenGithubSettings": "Nie udało się otworzyć ustawień aplikacji GitHub",
+      "gitlabNoRepositoriesDescription": "Być może musisz przyznać dostęp do większej liczby grup lub projektów w GitLab.",
+      "installGithubApp": "Zainstaluj aplikację GitHub na repozytoriach",
+      "installGithubAppDescription": "Przyznaj aplikacji Kilo GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
+      "noRepositoriesFound": "Nie znaleziono repozytoriów",
+      "repositoryAccess": "dostęp do repozytorium",
+      "selectedRepositories": "Wybrane repozytoria"
+    },
+    "style": {
+      "title": "Styl przeglądu",
+      "balanced": "Znaczące znaleziska bez szumu",
+      "lenient": "Tylko poważne problemy",
+      "roast": "Brutalnie szczery, w zabawny sposób",
+      "strict": "Oznaczaj wszystko, trzymaj wysoki poziom"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Brak dostępnych filtrów",
+      "noFiltersDescription": "Wróć i otwórz ponownie filtry z listy ustaleń.",
+      "title": "Filtruj ustalenia"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Sesja",
+      "copyErrorDetails": "Kopiuj szczegóły błędu",
+      "backToSessions": "Wróć do sesji",
+      "accessDenied": "Odmowa dostępu",
+      "accessDeniedDescription": "Nie masz uprawnień, aby to wyświetlić.",
+      "couldNotLoad": "Nie udało się wczytać sesji",
+      "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji",
+      "notFound": "Nie znaleziono",
+      "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny."
+    },
+    "newSession": {
+      "title": "Nowa sesja"
+    },
+    "instancePicker": {
+      "runOn": "Uruchom na",
+      "couldNotLoad": "Nie można załadować instancji",
+      "couldNotLoadDescription": "Sprawdź połączenie i spróbuj ponownie.",
+      "cloudAgent": "Agent w chmurze",
+      "cloudAgentDescription": "Uruchom w piaskownicy chmurowej Kilo",
+      "noCliInstances": "Brak połączonych instancji CLI",
+      "noCliInstancesDescription": "Uruchom `kilo remote` w projekcie na swoim komputerze lub zaktualizuj Kilo CLI, jeśli już działa.",
+      "instanceOnProject": "{{name}} na {{project}}",
+      "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Uruchom na agencie w chmurze"
+    },
+    "modePicker": {
+      "title": "Wybierz tryb",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Tryby niestandardowe"
+    },
+    "repoPicker": {
+      "title": "Wybierz repozytorium",
+      "searchLabel": "Szukaj repozytoriów",
+      "searchPlaceholder": "Szukaj repozytoriów...",
+      "noMatches": "Brak dopasowań",
+      "noRepositories": "Brak dostępnych repozytoriów",
+      "noRepositoriesDescription": "Z Twoim kontem nie są połączone żadne repozytoria.",
+      "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Nie można załadować Twojego konta",
+    "couldNotLoadAccountDescription": "Sprawdź połączenie i spróbuj ponownie.",
+    "couldNotLoadPrivacy": "Nie można załadować wyborów prywatności",
+    "couldNotLoadPrivacyDescription": "Sprawdź ustawienia zabezpieczeń urządzenia i spróbuj ponownie."
   }
 }

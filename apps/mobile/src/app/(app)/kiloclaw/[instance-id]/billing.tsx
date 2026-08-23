@@ -1,8 +1,9 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { CreditCard, ExternalLink } from '@/components/ui/icons';
 import { Linking, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -14,7 +15,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
+import { formatMoney } from '@/lib/format';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { formatBillingDate, formatRemainingDays } from '@/lib/hooks/use-kiloclaw-billing';
@@ -39,14 +42,15 @@ function DetailRow({
 
 function formatStandardPrice(microdollars: number | null | undefined): string {
   return microdollars == null
-    ? 'your Standard monthly price'
-    : `${formatDollars(fromMicrodollars(microdollars))}/month`;
+    ? i18n.t('kiloclaw.billing.yourStandardMonthlyPrice')
+    : `${formatMoney(fromMicrodollars(microdollars), i18n.language)}/month`;
 }
 
 /** "Continue month-to-month" CTA shown during a Commit plan's final term. */
 function ContinueMonthToMonthAction({ instanceId }: Readonly<{ instanceId: string }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const mutation = useMutation(
     trpc.kiloclaw.continueCommitAsStandard.mutationOptions({
       onSuccess: () => {
@@ -69,7 +73,7 @@ function ContinueMonthToMonthAction({ instanceId }: Readonly<{ instanceId: strin
       }}
       className="self-start"
     >
-      <Text>Continue month-to-month</Text>
+      <Text>{t('kiloclaw.billing.continueMonthToMonth')}</Text>
     </Button>
   );
 }
@@ -79,6 +83,7 @@ function FinalCommitTermDetails({
 }: Readonly<{
   billing: NonNullable<ReturnType<typeof useKiloClawBillingStatus>['data']>;
 }>) {
+  const { t } = useTranslation();
   const subscription = billing.subscription;
   if (!subscription) {
     return null;
@@ -91,21 +96,23 @@ function FinalCommitTermDetails({
 
   return (
     <View>
-      <DetailRow label="Plan" value="Commit" />
+      <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.commitPlan')} />
       <View className="h-px bg-border" />
-      <DetailRow label="Final term ends" value={finalDate} />
+      <DetailRow label={t('kiloclaw.billing.finalTermEnds')} value={finalDate} />
       <View className="h-px bg-border" />
       <DetailRow
-        label="After final term"
+        label={t('kiloclaw.billing.afterFinalTerm')}
         value={
-          subscription.standardContinuationScheduled ? 'Standard month-to-month' : 'Hosting ends'
+          subscription.standardContinuationScheduled
+            ? t('kiloclaw.billing.standardMonthToMonth')
+            : t('kiloclaw.billing.hostingEnds')
         }
       />
       <View className="gap-3 py-3">
         <Text variant="muted" className="text-sm">
           {subscription.standardContinuationScheduled
-            ? `Standard starts on ${finalDate} at ${priceText}.`
-            : `Your final Commit term ends on ${finalDate}. Continue as Standard at ${priceText}, or hosting ends.`}
+            ? t('kiloclaw.billing.standardStartsOn', { date: finalDate, price: priceText })
+            : t('kiloclaw.billing.finalCommitTermEndsOn', { date: finalDate, price: priceText })}
         </Text>
         {!subscription.standardContinuationScheduled && instanceId ? (
           <ContinueMonthToMonthAction instanceId={instanceId} />
@@ -120,6 +127,7 @@ function PlanDetails({
 }: Readonly<{
   billing: NonNullable<ReturnType<typeof useKiloClawBillingStatus>['data']>;
 }>) {
+  const { t } = useTranslation();
   if (billing.subscription?.isFinalCommitTerm) {
     return <FinalCommitTermDetails billing={billing} />;
   }
@@ -129,10 +137,10 @@ function PlanDetails({
     const cancelling = billing.subscription.cancelAtPeriodEnd;
     return (
       <View>
-        <DetailRow label="Plan" value={planName} />
+        <DetailRow label={t('kiloclaw.billing.plan')} value={planName} />
         <View className="h-px bg-border" />
         <DetailRow
-          label={cancelling ? 'Ends' : 'Renews'}
+          label={cancelling ? t('kiloclaw.billing.ends') : t('kiloclaw.billing.renews')}
           value={formatBillingDate(billing.subscription.currentPeriodEnd)}
           valueClassName={cancelling ? 'text-destructive' : undefined}
         />
@@ -143,31 +151,34 @@ function PlanDetails({
     const daysText = formatRemainingDays(billing.trial.daysRemaining);
     return (
       <View>
-        <DetailRow label="Plan" value="Free Trial" />
+        <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.freeTrial')} />
         <View className="h-px bg-border" />
-        <DetailRow label="Remaining" value={daysText} />
+        <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
         <View className="h-px bg-border" />
-        <DetailRow label="Ends" value={formatBillingDate(billing.trial.endsAt)} />
+        <DetailRow label={t('kiloclaw.billing.ends')} value={formatBillingDate(billing.trial.endsAt)} />
       </View>
     );
   }
   if (billing.earlybird) {
-    const daysText = `${String(billing.earlybird.daysRemaining)} day${billing.earlybird.daysRemaining === 1 ? '' : 's'} left`;
+    const daysText =
+      billing.earlybird.daysRemaining === 1
+        ? t('kiloclaw.billing.oneDayLeft')
+        : t('kiloclaw.billing.daysLeft', { count: billing.earlybird.daysRemaining });
     return (
       <View>
-        <DetailRow label="Plan" value="Earlybird" />
+        <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.earlybird')} />
         <View className="h-px bg-border" />
-        <DetailRow label="Remaining" value={daysText} />
+        <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
         <View className="h-px bg-border" />
-        <DetailRow label="Expires" value={formatBillingDate(billing.earlybird.expiresAt)} />
+        <DetailRow label={t('kiloclaw.billing.expires')} value={formatBillingDate(billing.earlybird.expiresAt)} />
       </View>
     );
   }
   return (
     <EmptyState
       icon={CreditCard}
-      title="No active plan"
-      description="You don't have an active KiloClaw subscription."
+      title={t('kiloclaw.billing.noActivePlan')}
+      description={t('kiloclaw.billing.noActivePlanDescription')}
       placement="top"
       className="py-4"
     />
@@ -179,21 +190,22 @@ export default function BillingScreen() {
   const instanceContext = useInstanceContext(instanceId);
   const isOrg = instanceContext.status === 'ready' && instanceContext.isOrg;
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const billingQuery = useKiloClawBillingStatus(instanceContext.status === 'ready' && !isOrg);
   const billing = billingQuery.data;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Billing" context={instanceContext} />;
+    return <InstanceContextBoundary title={t('kiloclaw.billing.title')} context={instanceContext} />;
   }
 
   if (isOrg) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Billing" />
+        <ScreenHeader title={t('kiloclaw.billing.title')} />
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-muted-foreground">
-            Billing is managed by your organization admin.
+            {t('kiloclaw.billing.managedByAdmin')}
           </Text>
         </View>
       </View>
@@ -203,7 +215,7 @@ export default function BillingScreen() {
   if (billingQuery.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Billing" />
+        <ScreenHeader title={t('kiloclaw.billing.title')} />
         <Animated.View layout={LinearTransition} className="flex-1 gap-4 px-4 pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
             <View className="gap-0 rounded-lg bg-secondary px-4">
@@ -232,10 +244,10 @@ export default function BillingScreen() {
   if (billingQuery.isError || !billing) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Billing" />
+        <ScreenHeader title={t('kiloclaw.billing.title')} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load billing information"
+            message={t('kiloclaw.billing.couldNotLoad')}
             onRetry={() => {
               void billingQuery.refetch();
             }}
@@ -247,7 +259,7 @@ export default function BillingScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Billing" />
+      <ScreenHeader title={t('kiloclaw.billing.title')} />
       <DetailScreenScrollView
         contentContainerClassName="gap-4 px-4 pt-4"
         showsVerticalScrollIndicator={false}
@@ -267,7 +279,7 @@ export default function BillingScreen() {
             className="flex-row gap-2"
           >
             <ExternalLink size={16} color={colors.foreground} />
-            <Text className="font-medium">Manage Billing on Web</Text>
+            <Text className="font-medium">{t('kiloclaw.billing.manageOnWeb')}</Text>
           </Button>
         </Animated.View>
       </DetailScreenScrollView>

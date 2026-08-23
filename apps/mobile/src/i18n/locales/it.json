@@ -7,7 +7,13 @@
     "device": "Dispositivo",
     "share": "Condividi",
     "justNow": "Proprio ora",
-    "couldNotSaveSetting": "Impossibile salvare l’impostazione"
+    "couldNotSaveSetting": "Impossibile salvare l’impostazione",
+    "apply": "Applica",
+    "save": "Salva",
+    "copy": "Copia",
+    "approve": "Approva",
+    "refresh": "Aggiorna",
+    "couldNotRefresh": "Impossibile aggiornare. Trascina verso il basso per riprovare."
   },
   "language": {
     "title": "Lingua",
@@ -31,5 +37,260 @@
       "balance": "Avvisi di saldo",
       "security": "Risultati di sicurezza"
     }
+  },
+  "tabs": {
+    "home": "Home",
+    "agents": "Agenti",
+    "profile": "Profilo",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Cambia istanza",
+      "couldNotLoadInstances": "Impossibile caricare le istanze",
+      "noInstances": "Nessuna istanza KiloClaw",
+      "noInstancesDescription": "Configura un'istanza per iniziare a chattare.",
+      "setUpKiloclaw": "Configura KiloClaw",
+      "currentInstance": "{{title}}, attuale",
+      "personal": "Personale"
+    },
+    "conversation": {
+      "failedToLoad": "Impossibile caricare la conversazione",
+      "notFound": "Conversazione non trovata",
+      "untitled": "Senza titolo"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Impossibile caricare le istanze KiloClaw",
+    "billing": {
+      "title": "Fatturazione",
+      "continueMonthToMonth": "Continua mese per mese",
+      "plan": "Piano",
+      "finalTermEnds": "Il periodo finale termina",
+      "afterFinalTerm": "Dopo il periodo finale",
+      "remaining": "Rimanente",
+      "ends": "Termina",
+      "expires": "Scade",
+      "noActivePlan": "Nessun piano attivo",
+      "noActivePlanDescription": "Non hai un abbonamento KiloClaw attivo.",
+      "managedByAdmin": "La fatturazione è gestita dall'amministratore della tua organizzazione.",
+      "couldNotLoad": "Impossibile caricare le informazioni di fatturazione",
+      "manageOnWeb": "Gestisci la fatturazione sul Web",
+      "commitPlan": "Commit",
+      "daysLeft": "{{count}} giorni rimanenti",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Il tuo ultimo periodo Commit termina il {{date}}. Continua come Standard a {{price}}, oppure l'hosting termina.",
+      "freeTrial": "Prova gratuita",
+      "hostingEnds": "L'hosting termina",
+      "oneDayLeft": "1 giorno rimanente",
+      "renews": "Si rinnova",
+      "standardMonthToMonth": "Standard mese per mese",
+      "standardStartsOn": "Standard inizia il {{date}} a {{price}}.",
+      "yourStandardMonthlyPrice": "il tuo prezzo mensile Standard"
+    },
+    "changelog": {
+      "title": "Novità",
+      "couldNotLoad": "Impossibile caricare il registro delle modifiche",
+      "noUpdates": "Ancora nessun aggiornamento",
+      "noUpdatesDescription": "Le voci del registro delle modifiche appariranno qui.",
+      "recentUpdates": "Aggiornamenti recenti"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "couldNotLoad": "Impossibile caricare la dashboard",
+      "renameInstance": "Rinomina istanza",
+      "renamePlaceholder": "Inserisci un nuovo nome (max 50 caratteri)",
+      "someDetailsFailed": "Alcuni dettagli in tempo reale non sono stati caricati",
+      "destroy": "Distruggi",
+      "destroyMessage": "Questo distruggerà definitivamente la tua istanza KiloClaw e tutti i suoi dati. Questa azione non può essere annullata.",
+      "destroyTitle": "Distruggi istanza",
+      "instance": "Istanza"
+    },
+    "channels": {
+      "title": "Canali",
+      "couldNotLoad": "Impossibile caricare i canali",
+      "noChannels": "Nessun canale disponibile",
+      "noChannelsDescription": "Le integrazioni dei canali appariranno qui.",
+      "connected": "{{label}} connesso",
+      "disconnectMessage": "Rimuovere {{label}}? Questo canale verrà disconnesso.",
+      "disconnectTitle": "Disconnetti canale"
+    },
+    "devicePairing": {
+      "title": "Associazione dispositivi",
+      "refreshRequests": "Aggiorna le richieste di associazione",
+      "couldNotLoad": "Impossibile caricare le richieste di associazione",
+      "noPending": "Nessuna richiesta in sospeso",
+      "noPendingDescription": "Le richieste di associazione di canali e dispositivi appariranno qui.",
+      "channelRequests": "Richieste di canali",
+      "deviceRequests": "Richieste di dispositivi",
+      "approveDeviceMessage": "Consentire a {{platform}} di connettersi alla tua istanza?",
+      "approveDeviceTitle": "Approva dispositivo",
+      "approveMessage": "Consentire a {{label}} (codice: {{code}}) di connettersi alla tua istanza?",
+      "approveTitle": "Approva richiesta di associazione",
+      "device": "Dispositivo",
+      "unknownDevice": "Dispositivo sconosciuto"
+    },
+    "execPolicy": {
+      "title": "Criterio di esecuzione",
+      "couldNotLoad": "Impossibile caricare il criterio di esecuzione"
+    },
+    "google": {
+      "title": "Account Google",
+      "couldNotLoad": "Impossibile caricare lo stato dell'account Google",
+      "disconnected": "Account Google disconnesso. Ridistribuisci la tua istanza per applicare la modifica.",
+      "redeploy": "Ridistribuisci",
+      "setupCommand": "Comando di configurazione",
+      "setupCommandHelp": "Esegui questo comando in un terminale con Docker installato sul tuo computer per collegare il tuo account Google.",
+      "failedToLoadCommand": "Impossibile caricare il comando di configurazione",
+      "gmailNotifications": "Notifiche Gmail",
+      "disconnect": "Disconnetti account Google",
+      "connected": "Connesso",
+      "copied": "Copiato!",
+      "copyCommand": "Copia comando",
+      "disabled": "Disattivato",
+      "disconnectConfirm": "Disconnetti",
+      "disconnectMessage": "Rimuovere il tuo account Google da questa istanza? Questo disattiverà le notifiche Gmail. Ridistribuisci dopo la disconnessione per applicare le modifiche.",
+      "disconnectTitle": "Disconnetti Google",
+      "enabled": "Attivato",
+      "notConnected": "Non connesso"
+    },
+    "modelList": {
+      "title": "Tutti i modelli",
+      "searchPlaceholder": "Cerca modelli...",
+      "couldNotLoad": "Impossibile caricare i modelli",
+      "clearSearch": "Cancella ricerca",
+      "noMatches": "Nessun modello corrisponde alla tua ricerca",
+      "noModels": "Nessun modello disponibile",
+      "noModelsDescription": "I modelli appariranno qui quando saranno disponibili.",
+      "noResultsFor": "Nessun risultato per \"{{query}}\"",
+      "recommended": "Consigliato"
+    },
+    "model": {
+      "title": "Modello"
+    },
+    "secrets": {
+      "title": "Segreti",
+      "couldNotLoad": "Impossibile caricare i segreti",
+      "noSecrets": "Nessun segreto disponibile",
+      "noSecretsDescription": "Le integrazioni dei segreti appariranno qui.",
+      "removeMessage": "Rimuovere {{label}}? Questo strumento perderà l'accesso alle sue credenziali.",
+      "removeTitle": "Rimuovi segreto",
+      "saved": "{{label}} salvato"
+    },
+    "versionPin": {
+      "title": "Blocco della versione",
+      "couldNotLoad": "Impossibile caricare le informazioni sulla versione",
+      "couldNotLoadMore": "Impossibile caricare altre versioni",
+      "loadMore": "Carica altre versioni",
+      "showingLatest": "Mostra le ultime 100 versioni",
+      "availableVersions": "Versioni disponibili",
+      "noVersions": "Nessuna versione disponibile",
+      "noVersionsDescription": "Le versioni OpenClaw disponibili appariranno qui.",
+      "unpin": "Sblocca",
+      "unpinMessage": "Tornare all'ultima versione disponibile?",
+      "unpinTitle": "Sblocca versione"
+    },
+    "redeploy": "Ridistribuisci",
+    "redeployMessage": "Vuoi davvero ridistribuire questa istanza?",
+    "redeployTitle": "Ridistribuisci istanza"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Aree di interesse",
+      "hint": "Lascia tutto deselezionato per esaminare tutto."
+    },
+    "gate": {
+      "title": "Gate di merge",
+      "all": "Fallisce su qualsiasi rilievo",
+      "critical": "Fallisce solo sui rilievi critici",
+      "off": "Non far mai fallire il controllo della PR",
+      "warning": "Fallisce su avvisi e rilievi critici"
+    },
+    "instructions": {
+      "title": "Istruzioni personalizzate",
+      "deprecation": "Le istruzioni personalizzate saranno presto rimosse. Sposta queste linee guida in un file REVIEW.md nel tuo repository.",
+      "placeholder": "ad es. applica le nostre convenzioni di gestione degli errori…"
+    },
+    "repos": {
+      "title": "Repository",
+      "couldNotLoad": "Impossibile caricare i repository",
+      "unavailable": "Repository non disponibili — completa la configurazione di Bitbucket su kilo.ai.",
+      "finishSetup": "Completa la configurazione",
+      "manageAccess": "Gestisci accesso",
+      "allRepositories": "Tutti i repository",
+      "bitbucketNoRepositoriesDescription": "Nessun repository è disponibile in questo workspace Bitbucket.",
+      "bitbucketSetup": "Configurazione Bitbucket",
+      "couldNotOpenGithubSettings": "Impossibile aprire le impostazioni della GitHub App",
+      "gitlabNoRepositoriesDescription": "Potresti dover concedere l'accesso a più gruppi o progetti su GitLab.",
+      "installGithubApp": "Installa l'app GitHub sui repository",
+      "installGithubAppDescription": "Concedi alla Kilo GitHub App l'accesso ai repository che vuoi far revisionare.",
+      "noRepositoriesFound": "Nessun repository trovato",
+      "repositoryAccess": "accesso al repository",
+      "selectedRepositories": "Repository selezionati"
+    },
+    "style": {
+      "title": "Stile di revisione",
+      "balanced": "Rilievi significativi senza rumore",
+      "lenient": "Solo problemi gravi",
+      "roast": "Brutalmente onesto, in modo divertente",
+      "strict": "Segnala tutto, mantieni uno standard elevato"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Nessun filtro disponibile",
+      "noFiltersDescription": "Torna indietro e riapri i filtri dall'elenco dei risultati.",
+      "title": "Filtra risultati"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Sessione",
+      "copyErrorDetails": "Copia i dettagli dell'errore",
+      "backToSessions": "Torna alle sessioni",
+      "accessDenied": "Accesso negato",
+      "accessDeniedDescription": "Non hai il permesso di visualizzare questo contenuto.",
+      "couldNotLoad": "Impossibile caricare la sessione",
+      "failedToLoadDetails": "Impossibile caricare i dettagli della sessione",
+      "notFound": "Non trovato",
+      "notFoundDescription": "Questo elemento potrebbe essere stato rimosso o non essere più disponibile."
+    },
+    "newSession": {
+      "title": "Nuova sessione"
+    },
+    "instancePicker": {
+      "runOn": "Esegui su",
+      "couldNotLoad": "Impossibile caricare le istanze",
+      "couldNotLoadDescription": "Controlla la connessione e riprova.",
+      "cloudAgent": "Agente cloud",
+      "cloudAgentDescription": "Esegui sul sandbox cloud di Kilo",
+      "noCliInstances": "Nessuna istanza CLI collegata",
+      "noCliInstancesDescription": "Esegui `kilo remote` in un progetto sul tuo computer, oppure aggiorna la CLI di Kilo se è già in esecuzione.",
+      "instanceOnProject": "{{name}} su {{project}}",
+      "instanceOnProjectSuffix": "{{name}} su {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Esegui su Agente cloud"
+    },
+    "modePicker": {
+      "title": "Seleziona modalità",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Modalità personalizzate"
+    },
+    "repoPicker": {
+      "title": "Seleziona repository",
+      "searchLabel": "Cerca repository",
+      "searchPlaceholder": "Cerca repository...",
+      "noMatches": "Nessuna corrispondenza",
+      "noRepositories": "Nessun repository disponibile",
+      "noRepositoriesDescription": "Nessun repository è collegato al tuo account.",
+      "tryDifferentSearch": "Prova un termine di ricerca diverso."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Impossibile caricare il tuo account",
+    "couldNotLoadAccountDescription": "Controlla la connessione e riprova.",
+    "couldNotLoadPrivacy": "Impossibile caricare le scelte sulla privacy",
+    "couldNotLoadPrivacyDescription": "Controlla le impostazioni di sicurezza del dispositivo e riprova."
   }
 }

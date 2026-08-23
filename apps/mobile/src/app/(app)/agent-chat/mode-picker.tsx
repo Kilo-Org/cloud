@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
@@ -19,6 +20,7 @@ import { clearModePickerBridge, getModePickerBridge } from '@/lib/picker-bridge'
 export default function ModePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   // Lazy init reads the bridge synchronously on first render — no effect, no
   // "No options available" flash before a later effect populates state.
   const [bridge] = useState(() => getModePickerBridge());
@@ -40,7 +42,7 @@ export default function ModePickerScreen() {
   if (!bridge) {
     return (
       <PickerSheet
-        title="Select mode"
+        title={t('agentChat.modePicker.title')}
         onDone={() => {
           router.back();
         }}
@@ -67,7 +69,10 @@ export default function ModePickerScreen() {
           handleSelect(item.value);
         }}
         accessibilityRole="button"
-        accessibilityLabel={`${item.label}: ${item.description}`}
+        accessibilityLabel={t('agentChat.modePicker.modeLabel', {
+          label: item.label,
+          description: item.description,
+        })}
       >
         <Icon size={20} color={colors.foreground} />
         <View className="flex-1">
@@ -83,7 +88,7 @@ export default function ModePickerScreen() {
 
   return (
     <PickerSheet
-      title="Select mode"
+      title={t('agentChat.modePicker.title')}
       onDone={() => {
         router.back();
       }}
@@ -106,7 +111,7 @@ export default function ModePickerScreen() {
             </View>
           ))}
           <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Custom modes
+            {t('agentChat.modePicker.customModes')}
           </Text>
           {custom.map((item, index) => (
             <View key={item.value}>

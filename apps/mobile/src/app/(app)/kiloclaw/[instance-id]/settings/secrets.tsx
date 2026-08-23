@@ -1,5 +1,6 @@
 import { KeyRound } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -20,9 +21,10 @@ export default function SecretsScreen() {
   const mutations = useKiloClawMutations(organizationId);
   const catalogQuery = useKiloClawSecretCatalog(organizationId);
   const isLoading = catalogQuery.isPending;
+  const { t } = useTranslation();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Secrets" context={instanceContext} />;
+    return <InstanceContextBoundary title={t('kiloclaw.secrets.title')} context={instanceContext} />;
   }
 
   function renderBody() {
@@ -41,7 +43,7 @@ export default function SecretsScreen() {
       return (
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load secrets"
+            message={t('kiloclaw.secrets.couldNotLoad')}
             onRetry={() => {
               void catalogQuery.refetch();
             }}
@@ -55,8 +57,8 @@ export default function SecretsScreen() {
         <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={KeyRound}
-            title="No secrets available"
-            description="Secret integrations will appear here."
+            title={t('kiloclaw.secrets.noSecrets')}
+            description={t('kiloclaw.secrets.noSecretsDescription')}
           />
         </View>
       );
@@ -77,9 +79,9 @@ export default function SecretsScreen() {
                 key={secret.id}
                 item={secret}
                 mutations={mutations}
-                removeAlertTitle="Remove secret"
-                removeAlertMessage={`Remove ${secret.label}? This tool will lose access to its credentials.`}
-                successMessage={`${secret.label} saved`}
+                removeAlertTitle={t('kiloclaw.secrets.removeTitle')}
+                removeAlertMessage={t('kiloclaw.secrets.removeMessage', { label: secret.label })}
+                successMessage={t('kiloclaw.secrets.saved', { label: secret.label })}
               />
             ))}
           </Animated.View>
@@ -90,7 +92,7 @@ export default function SecretsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Secrets" />
+      <ScreenHeader title={t('kiloclaw.secrets.title')} />
       {renderBody()}
     </View>
   );

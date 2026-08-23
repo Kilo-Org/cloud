@@ -7,7 +7,13 @@
     "device": "Dispositivo",
     "share": "Compartilhar",
     "justNow": "Agora mesmo",
-    "couldNotSaveSetting": "Não foi possível salvar a configuração"
+    "couldNotSaveSetting": "Não foi possível salvar a configuração",
+    "apply": "Aplicar",
+    "save": "Salvar",
+    "copy": "Copiar",
+    "approve": "Aprovar",
+    "refresh": "Atualizar",
+    "couldNotRefresh": "Não foi possível atualizar. Puxe para baixo para tentar novamente."
   },
   "language": {
     "title": "Idioma",
@@ -31,5 +37,260 @@
       "balance": "Alertas de saldo",
       "security": "Descobertas de segurança"
     }
+  },
+  "tabs": {
+    "home": "Início",
+    "agents": "Agentes",
+    "profile": "Perfil",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Trocar instância",
+      "couldNotLoadInstances": "Não foi possível carregar as instâncias",
+      "noInstances": "Nenhuma instância do KiloClaw",
+      "noInstancesDescription": "Configure uma instância para começar a conversar.",
+      "setUpKiloclaw": "Configurar o KiloClaw",
+      "currentInstance": "{{title}}, atual",
+      "personal": "Pessoal"
+    },
+    "conversation": {
+      "failedToLoad": "Falha ao carregar a conversa",
+      "notFound": "Conversa não encontrada",
+      "untitled": "Sem título"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Não foi possível carregar as instâncias do KiloClaw",
+    "billing": {
+      "title": "Cobrança",
+      "continueMonthToMonth": "Continuar mês a mês",
+      "plan": "Plano",
+      "finalTermEnds": "O período final termina",
+      "afterFinalTerm": "Após o período final",
+      "remaining": "Restante",
+      "ends": "Termina",
+      "expires": "Expira",
+      "noActivePlan": "Nenhum plano ativo",
+      "noActivePlanDescription": "Você não tem uma assinatura ativa do KiloClaw.",
+      "managedByAdmin": "A cobrança é gerenciada pelo administrador da sua organização.",
+      "couldNotLoad": "Não foi possível carregar as informações de cobrança",
+      "manageOnWeb": "Gerenciar cobrança na web",
+      "commitPlan": "Commit",
+      "daysLeft": "{{count}} dias restantes",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Seu último período Commit termina em {{date}}. Continue como Standard por {{price}}, ou a hospedagem termina.",
+      "freeTrial": "Teste grátis",
+      "hostingEnds": "A hospedagem termina",
+      "oneDayLeft": "1 dia restante",
+      "renews": "Renova",
+      "standardMonthToMonth": "Standard mês a mês",
+      "standardStartsOn": "Standard começa em {{date}} por {{price}}.",
+      "yourStandardMonthlyPrice": "seu preço mensal do Standard"
+    },
+    "changelog": {
+      "title": "Novidades",
+      "couldNotLoad": "Não foi possível carregar o changelog",
+      "noUpdates": "Ainda sem atualizações",
+      "noUpdatesDescription": "As entradas do changelog aparecerão aqui.",
+      "recentUpdates": "Atualizações recentes"
+    },
+    "dashboard": {
+      "title": "Painel",
+      "couldNotLoad": "Não foi possível carregar o painel",
+      "renameInstance": "Renomear instância",
+      "renamePlaceholder": "Digite um novo nome (máx. 50 caracteres)",
+      "someDetailsFailed": "Alguns detalhes ao vivo falharam ao carregar",
+      "destroy": "Destruir",
+      "destroyMessage": "Isso destruirá permanentemente sua instância do KiloClaw e todos os seus dados. Esta ação não pode ser desfeita.",
+      "destroyTitle": "Destruir instância",
+      "instance": "Instância"
+    },
+    "channels": {
+      "title": "Canais",
+      "couldNotLoad": "Não foi possível carregar os canais",
+      "noChannels": "Nenhum canal disponível",
+      "noChannelsDescription": "As integrações de canal aparecerão aqui.",
+      "connected": "{{label}} conectado",
+      "disconnectMessage": "Remover {{label}}? Este canal será desconectado.",
+      "disconnectTitle": "Desconectar canal"
+    },
+    "devicePairing": {
+      "title": "Pareamento de dispositivos",
+      "refreshRequests": "Atualizar solicitações de pareamento",
+      "couldNotLoad": "Não foi possível carregar as solicitações de pareamento",
+      "noPending": "Nenhuma solicitação pendente",
+      "noPendingDescription": "As solicitações de pareamento de canais e dispositivos aparecerão aqui.",
+      "channelRequests": "Solicitações de canal",
+      "deviceRequests": "Solicitações de dispositivo",
+      "approveDeviceMessage": "Permitir que {{platform}} se conecte à sua instância?",
+      "approveDeviceTitle": "Aprovar dispositivo",
+      "approveMessage": "Permitir que {{label}} (código: {{code}}) se conecte à sua instância?",
+      "approveTitle": "Aprovar solicitação de pareamento",
+      "device": "Dispositivo",
+      "unknownDevice": "Dispositivo desconhecido"
+    },
+    "execPolicy": {
+      "title": "Política de execução",
+      "couldNotLoad": "Não foi possível carregar a política de execução"
+    },
+    "google": {
+      "title": "Conta do Google",
+      "couldNotLoad": "Não foi possível carregar o status da conta do Google",
+      "disconnected": "Conta do Google desconectada. Reimplante sua instância para aplicar a alteração.",
+      "redeploy": "Reimplantar",
+      "setupCommand": "Comando de configuração",
+      "setupCommandHelp": "Execute este comando em um terminal com o Docker instalado no seu próprio computador para conectar sua conta do Google.",
+      "failedToLoadCommand": "Falha ao carregar o comando de configuração",
+      "gmailNotifications": "Notificações do Gmail",
+      "disconnect": "Desconectar conta do Google",
+      "connected": "Conectado",
+      "copied": "Copiado!",
+      "copyCommand": "Copiar comando",
+      "disabled": "Desativado",
+      "disconnectConfirm": "Desconectar",
+      "disconnectMessage": "Remover sua conta do Google desta instância? Isso desativará as notificações do Gmail. Reimplante após desconectar para aplicar as alterações.",
+      "disconnectTitle": "Desconectar Google",
+      "enabled": "Ativado",
+      "notConnected": "Não conectado"
+    },
+    "modelList": {
+      "title": "Todos os modelos",
+      "searchPlaceholder": "Pesquisar modelos...",
+      "couldNotLoad": "Não foi possível carregar os modelos",
+      "clearSearch": "Limpar pesquisa",
+      "noMatches": "Nenhum modelo corresponde à sua busca",
+      "noModels": "Nenhum modelo disponível",
+      "noModelsDescription": "Os modelos aparecerão aqui quando estiverem disponíveis.",
+      "noResultsFor": "Nenhum resultado para \"{{query}}\"",
+      "recommended": "Recomendado"
+    },
+    "model": {
+      "title": "Modelo"
+    },
+    "secrets": {
+      "title": "Segredos",
+      "couldNotLoad": "Não foi possível carregar os segredos",
+      "noSecrets": "Nenhum segredo disponível",
+      "noSecretsDescription": "As integrações de segredos aparecerão aqui.",
+      "removeMessage": "Remover {{label}}? Esta ferramenta perderá o acesso às suas credenciais.",
+      "removeTitle": "Remover segredo",
+      "saved": "{{label}} salvo"
+    },
+    "versionPin": {
+      "title": "Fixação de versão",
+      "couldNotLoad": "Não foi possível carregar as informações de versão",
+      "couldNotLoadMore": "Não foi possível carregar mais versões",
+      "loadMore": "Carregar mais versões",
+      "showingLatest": "Mostrando as 100 versões mais recentes",
+      "availableVersions": "Versões disponíveis",
+      "noVersions": "Nenhuma versão disponível",
+      "noVersionsDescription": "As versões disponíveis do OpenClaw aparecerão aqui.",
+      "unpin": "Desafixar",
+      "unpinMessage": "Voltar para a versão mais recente disponível?",
+      "unpinTitle": "Desafixar versão"
+    },
+    "redeploy": "Reimplantar",
+    "redeployMessage": "Tem certeza de que deseja reimplantar esta instância?",
+    "redeployTitle": "Reimplantar instância"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Áreas de foco",
+      "hint": "Deixe tudo desmarcado para revisar tudo."
+    },
+    "gate": {
+      "title": "Portão de merge",
+      "all": "Falha em qualquer achado",
+      "critical": "Falha apenas em achados críticos",
+      "off": "Nunca reprovar a verificação do PR",
+      "warning": "Falha em avisos e achados críticos"
+    },
+    "instructions": {
+      "title": "Instruções personalizadas",
+      "deprecation": "As Instruções Personalizadas serão descontinuadas. Mova estas diretrizes para um arquivo REVIEW.md no seu repositório.",
+      "placeholder": "ex.: Aplique nossas convenções de tratamento de erros…"
+    },
+    "repos": {
+      "title": "Repositórios",
+      "couldNotLoad": "Não foi possível carregar os repositórios",
+      "unavailable": "Repositórios indisponíveis — conclua a configuração do Bitbucket em kilo.ai.",
+      "finishSetup": "Concluir configuração",
+      "manageAccess": "Gerenciar acesso",
+      "allRepositories": "Todos os repositórios",
+      "bitbucketNoRepositoriesDescription": "Nenhum repositório está disponível neste workspace do Bitbucket.",
+      "bitbucketSetup": "Configuração do Bitbucket",
+      "couldNotOpenGithubSettings": "Não foi possível abrir as configurações do GitHub App",
+      "gitlabNoRepositoriesDescription": "Talvez você precise conceder acesso a mais grupos ou projetos no GitLab.",
+      "installGithubApp": "Instalar o app do GitHub nos repositórios",
+      "installGithubAppDescription": "Conceda ao Kilo GitHub App acesso aos repositórios que você quer revisar.",
+      "noRepositoriesFound": "Nenhum repositório encontrado",
+      "repositoryAccess": "acesso ao repositório",
+      "selectedRepositories": "Repositórios selecionados"
+    },
+    "style": {
+      "title": "Estilo de revisão",
+      "balanced": "Achados significativos sem ruído",
+      "lenient": "Apenas problemas sérios",
+      "roast": "Brutalmente honesto, de forma divertida",
+      "strict": "Sinalizar tudo, manter um padrão alto"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Nenhum filtro disponível",
+      "noFiltersDescription": "Volte e reabra os filtros da lista de descobertas.",
+      "title": "Filtrar descobertas"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Sessão",
+      "copyErrorDetails": "Copiar detalhes do erro",
+      "backToSessions": "Voltar para as sessões",
+      "accessDenied": "Acesso negado",
+      "accessDeniedDescription": "Você não tem permissão para ver isto.",
+      "couldNotLoad": "Não foi possível carregar a sessão",
+      "failedToLoadDetails": "Falha ao carregar os detalhes da sessão",
+      "notFound": "Não encontrado",
+      "notFoundDescription": "Este item pode ter sido removido ou não está mais disponível."
+    },
+    "newSession": {
+      "title": "Nova sessão"
+    },
+    "instancePicker": {
+      "runOn": "Executar em",
+      "couldNotLoad": "Não foi possível carregar as instâncias",
+      "couldNotLoadDescription": "Verifique sua conexão e tente novamente.",
+      "cloudAgent": "Agente na nuvem",
+      "cloudAgentDescription": "Executar no sandbox de nuvem do Kilo",
+      "noCliInstances": "Nenhuma instância de CLI conectada",
+      "noCliInstancesDescription": "Execute `kilo remote` em um projeto no seu computador ou atualize a Kilo CLI se uma já estiver em execução.",
+      "instanceOnProject": "{{name}} em {{project}}",
+      "instanceOnProjectSuffix": "{{name}} em {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Executar em Agente na nuvem"
+    },
+    "modePicker": {
+      "title": "Selecionar modo",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Modos personalizados"
+    },
+    "repoPicker": {
+      "title": "Selecionar repositório",
+      "searchLabel": "Pesquisar repositórios",
+      "searchPlaceholder": "Pesquisar repositórios...",
+      "noMatches": "Nenhuma correspondência",
+      "noRepositories": "Nenhum repositório disponível",
+      "noRepositoriesDescription": "Nenhum repositório está conectado à sua conta.",
+      "tryDifferentSearch": "Tente um termo de busca diferente."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Não foi possível carregar sua conta",
+    "couldNotLoadAccountDescription": "Verifique sua conexão e tente novamente.",
+    "couldNotLoadPrivacy": "Não foi possível carregar as escolhas de privacidade",
+    "couldNotLoadPrivacyDescription": "Verifique as configurações de segurança do seu dispositivo e tente novamente."
   }
 }

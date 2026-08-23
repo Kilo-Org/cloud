@@ -7,7 +7,13 @@
     "device": "Thiết bị",
     "share": "Chia sẻ",
     "justNow": "Vừa xong",
-    "couldNotSaveSetting": "Không thể lưu cài đặt"
+    "couldNotSaveSetting": "Không thể lưu cài đặt",
+    "apply": "Áp dụng",
+    "save": "Lưu",
+    "copy": "Sao chép",
+    "approve": "Phê duyệt",
+    "refresh": "Làm mới",
+    "couldNotRefresh": "Không thể làm mới. Kéo xuống để thử lại."
   },
   "language": {
     "title": "Ngôn ngữ",
@@ -31,5 +37,260 @@
       "balance": "Cảnh báo số dư",
       "security": "Phát hiện bảo mật"
     }
+  },
+  "tabs": {
+    "home": "Trang chủ",
+    "agents": "Tác nhân",
+    "profile": "Hồ sơ",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Chuyển phiên bản",
+      "couldNotLoadInstances": "Không thể tải các phiên bản",
+      "noInstances": "Không có phiên bản KiloClaw",
+      "noInstancesDescription": "Thiết lập một phiên bản để bắt đầu trò chuyện.",
+      "setUpKiloclaw": "Thiết lập KiloClaw",
+      "currentInstance": "{{title}}, hiện tại",
+      "personal": "Cá nhân"
+    },
+    "conversation": {
+      "failedToLoad": "Không thể tải cuộc trò chuyện",
+      "notFound": "Không tìm thấy cuộc trò chuyện",
+      "untitled": "Không có tiêu đề"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Không thể tải các phiên bản KiloClaw",
+    "billing": {
+      "title": "Thanh toán",
+      "continueMonthToMonth": "Tiếp tục theo từng tháng",
+      "plan": "Gói",
+      "finalTermEnds": "Kỳ hạn cuối kết thúc",
+      "afterFinalTerm": "Sau kỳ hạn cuối",
+      "remaining": "Còn lại",
+      "ends": "Kết thúc",
+      "expires": "Hết hạn",
+      "noActivePlan": "Không có gói đang hoạt động",
+      "noActivePlanDescription": "Bạn không có gói đăng ký KiloClaw đang hoạt động.",
+      "managedByAdmin": "Việc thanh toán do quản trị viên tổ chức của bạn quản lý.",
+      "couldNotLoad": "Không thể tải thông tin thanh toán",
+      "manageOnWeb": "Quản lý thanh toán trên web",
+      "commitPlan": "Commit",
+      "daysLeft": "Còn {{count}} ngày",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Gói Commit cuối cùng của bạn kết thúc vào {{date}}. Tiếp tục với gói Standard với giá {{price}}, hoặc dịch vụ lưu trữ sẽ kết thúc.",
+      "freeTrial": "Dùng thử miễn phí",
+      "hostingEnds": "Dịch vụ lưu trữ kết thúc",
+      "oneDayLeft": "Còn 1 ngày",
+      "renews": "Gia hạn",
+      "standardMonthToMonth": "Standard theo tháng",
+      "standardStartsOn": "Standard bắt đầu vào {{date}} với giá {{price}}.",
+      "yourStandardMonthlyPrice": "giá Standard hằng tháng của bạn"
+    },
+    "changelog": {
+      "title": "Có gì mới",
+      "couldNotLoad": "Không thể tải nhật ký thay đổi",
+      "noUpdates": "Chưa có bản cập nhật",
+      "noUpdatesDescription": "Các mục nhật ký thay đổi sẽ xuất hiện tại đây.",
+      "recentUpdates": "Cập nhật gần đây"
+    },
+    "dashboard": {
+      "title": "Bảng điều khiển",
+      "couldNotLoad": "Không thể tải bảng điều khiển",
+      "renameInstance": "Đổi tên phiên bản",
+      "renamePlaceholder": "Nhập tên mới (tối đa 50 ký tự)",
+      "someDetailsFailed": "Một số chi tiết trực tiếp không tải được",
+      "destroy": "Hủy",
+      "destroyMessage": "Thao tác này sẽ hủy vĩnh viễn phiên bản KiloClaw của bạn và toàn bộ dữ liệu của nó. Không thể hoàn tác hành động này.",
+      "destroyTitle": "Hủy phiên bản",
+      "instance": "Phiên bản"
+    },
+    "channels": {
+      "title": "Kênh",
+      "couldNotLoad": "Không thể tải các kênh",
+      "noChannels": "Không có kênh khả dụng",
+      "noChannelsDescription": "Các tích hợp kênh sẽ xuất hiện tại đây.",
+      "connected": "{{label}} đã kết nối",
+      "disconnectMessage": "Xóa {{label}}? Kênh này sẽ bị ngắt kết nối.",
+      "disconnectTitle": "Ngắt kết nối kênh"
+    },
+    "devicePairing": {
+      "title": "Ghép nối thiết bị",
+      "refreshRequests": "Làm mới yêu cầu ghép nối",
+      "couldNotLoad": "Không thể tải các yêu cầu ghép nối",
+      "noPending": "Không có yêu cầu đang chờ",
+      "noPendingDescription": "Các yêu cầu ghép nối kênh và thiết bị sẽ xuất hiện tại đây.",
+      "channelRequests": "Yêu cầu kênh",
+      "deviceRequests": "Yêu cầu thiết bị",
+      "approveDeviceMessage": "Cho phép {{platform}} kết nối với phiên bản của bạn?",
+      "approveDeviceTitle": "Phê duyệt thiết bị",
+      "approveMessage": "Cho phép {{label}} (mã: {{code}}) kết nối với phiên bản của bạn?",
+      "approveTitle": "Phê duyệt yêu cầu ghép nối",
+      "device": "Thiết bị",
+      "unknownDevice": "Thiết bị không xác định"
+    },
+    "execPolicy": {
+      "title": "Chính sách thực thi",
+      "couldNotLoad": "Không thể tải chính sách thực thi"
+    },
+    "google": {
+      "title": "Tài khoản Google",
+      "couldNotLoad": "Không thể tải trạng thái tài khoản Google",
+      "disconnected": "Tài khoản Google đã ngắt kết nối. Triển khai lại phiên bản để áp dụng thay đổi.",
+      "redeploy": "Triển khai lại",
+      "setupCommand": "Lệnh thiết lập",
+      "setupCommandHelp": "Chạy lệnh này trong một terminal có cài Docker trên máy tính của bạn để kết nối tài khoản Google.",
+      "failedToLoadCommand": "Không thể tải lệnh thiết lập",
+      "gmailNotifications": "Thông báo Gmail",
+      "disconnect": "Ngắt kết nối tài khoản Google",
+      "connected": "Đã kết nối",
+      "copied": "Đã sao chép!",
+      "copyCommand": "Sao chép lệnh",
+      "disabled": "Đã tắt",
+      "disconnectConfirm": "Ngắt kết nối",
+      "disconnectMessage": "Xóa tài khoản Google của bạn khỏi phiên bản này? Thao tác này sẽ tắt thông báo Gmail. Triển khai lại sau khi ngắt kết nối để áp dụng thay đổi.",
+      "disconnectTitle": "Ngắt kết nối Google",
+      "enabled": "Đã bật",
+      "notConnected": "Chưa kết nối"
+    },
+    "modelList": {
+      "title": "Tất cả mô hình",
+      "searchPlaceholder": "Tìm kiếm mô hình...",
+      "couldNotLoad": "Không thể tải các mô hình",
+      "clearSearch": "Xóa tìm kiếm",
+      "noMatches": "Không có mô hình nào khớp với tìm kiếm của bạn",
+      "noModels": "Không có mô hình khả dụng",
+      "noModelsDescription": "Mô hình sẽ xuất hiện ở đây khi khả dụng.",
+      "noResultsFor": "Không có kết quả cho \"{{query}}\"",
+      "recommended": "Được đề xuất"
+    },
+    "model": {
+      "title": "Mô hình"
+    },
+    "secrets": {
+      "title": "Bí mật",
+      "couldNotLoad": "Không thể tải các bí mật",
+      "noSecrets": "Không có bí mật khả dụng",
+      "noSecretsDescription": "Các tích hợp bí mật sẽ xuất hiện tại đây.",
+      "removeMessage": "Xóa {{label}}? Công cụ này sẽ mất quyền truy cập vào thông tin xác thực của nó.",
+      "removeTitle": "Xóa bí mật",
+      "saved": "Đã lưu {{label}}"
+    },
+    "versionPin": {
+      "title": "Ghim phiên bản",
+      "couldNotLoad": "Không thể tải thông tin phiên bản",
+      "couldNotLoadMore": "Không thể tải thêm phiên bản",
+      "loadMore": "Tải thêm phiên bản",
+      "showingLatest": "Đang hiển thị 100 phiên bản mới nhất",
+      "availableVersions": "Phiên bản khả dụng",
+      "noVersions": "Không có phiên bản khả dụng",
+      "noVersionsDescription": "Các phiên bản OpenClaw khả dụng sẽ xuất hiện tại đây.",
+      "unpin": "Bỏ ghim",
+      "unpinMessage": "Quay lại phiên bản mới nhất khả dụng?",
+      "unpinTitle": "Bỏ ghim phiên bản"
+    },
+    "redeploy": "Triển khai lại",
+    "redeployMessage": "Bạn có chắc muốn triển khai lại phiên bản này không?",
+    "redeployTitle": "Triển khai lại phiên bản"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Lĩnh vực trọng tâm",
+      "hint": "Để trống tất cả để xem xét mọi thứ."
+    },
+    "gate": {
+      "title": "Cổng hợp nhất",
+      "all": "Thất bại với mọi phát hiện",
+      "critical": "Chỉ thất bại với các phát hiện nghiêm trọng",
+      "off": "Không bao giờ làm kiểm tra PR thất bại",
+      "warning": "Thất bại với cảnh báo và phát hiện nghiêm trọng"
+    },
+    "instructions": {
+      "title": "Hướng dẫn tùy chỉnh",
+      "deprecation": "Hướng dẫn tùy chỉnh dự kiến sẽ bị loại bỏ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ của bạn.",
+      "placeholder": "ví dụ: Thực thi các quy ước xử lý lỗi của chúng tôi…"
+    },
+    "repos": {
+      "title": "Kho lưu trữ",
+      "couldNotLoad": "Không thể tải các kho lưu trữ",
+      "unavailable": "Kho lưu trữ không khả dụng — hãy hoàn tất thiết lập Bitbucket trên kilo.ai.",
+      "finishSetup": "Hoàn tất thiết lập",
+      "manageAccess": "Quản lý quyền truy cập",
+      "allRepositories": "Tất cả kho lưu trữ",
+      "bitbucketNoRepositoriesDescription": "Không có kho lưu trữ nào khả dụng trong không gian làm việc Bitbucket này.",
+      "bitbucketSetup": "Thiết lập Bitbucket",
+      "couldNotOpenGithubSettings": "Không thể mở cài đặt ứng dụng GitHub",
+      "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập cho nhiều nhóm hoặc dự án hơn trên GitLab.",
+      "installGithubApp": "Cài đặt ứng dụng GitHub trên kho lưu trữ",
+      "installGithubAppDescription": "Cấp cho ứng dụng Kilo GitHub quyền truy cập vào các kho lưu trữ bạn muốn xem xét.",
+      "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
+      "repositoryAccess": "quyền truy cập kho lưu trữ",
+      "selectedRepositories": "Các kho lưu trữ đã chọn"
+    },
+    "style": {
+      "title": "Phong cách xem xét",
+      "balanced": "Phát hiện có ý nghĩa, không nhiễu",
+      "lenient": "Chỉ các vấn đề nghiêm trọng",
+      "roast": "Thẳng thắn tàn nhẫn, và thú vị",
+      "strict": "Gắn cờ mọi thứ, giữ tiêu chuẩn cao"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Không có bộ lọc khả dụng",
+      "noFiltersDescription": "Quay lại và mở lại bộ lọc từ danh sách phát hiện.",
+      "title": "Lọc phát hiện"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Phiên",
+      "copyErrorDetails": "Sao chép chi tiết lỗi",
+      "backToSessions": "Quay lại các phiên",
+      "accessDenied": "Truy cập bị từ chối",
+      "accessDeniedDescription": "Bạn không có quyền xem nội dung này.",
+      "couldNotLoad": "Không thể tải phiên",
+      "failedToLoadDetails": "Không thể tải chi tiết phiên",
+      "notFound": "Không tìm thấy",
+      "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn khả dụng."
+    },
+    "newSession": {
+      "title": "Phiên mới"
+    },
+    "instancePicker": {
+      "runOn": "Chạy trên",
+      "couldNotLoad": "Không thể tải các phiên bản",
+      "couldNotLoadDescription": "Kiểm tra kết nối của bạn và thử lại.",
+      "cloudAgent": "Tác nhân đám mây",
+      "cloudAgentDescription": "Chạy trên hộp cát đám mây của Kilo",
+      "noCliInstances": "Không có phiên bản CLI nào được kết nối",
+      "noCliInstancesDescription": "Chạy `kilo remote` trong một dự án trên máy tính của bạn, hoặc cập nhật Kilo CLI nếu một phiên bản đang chạy.",
+      "instanceOnProject": "{{name}} trên {{project}}",
+      "instanceOnProjectSuffix": "{{name}} trên {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Chạy trên tác nhân đám mây"
+    },
+    "modePicker": {
+      "title": "Chọn chế độ",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Chế độ tùy chỉnh"
+    },
+    "repoPicker": {
+      "title": "Chọn kho lưu trữ",
+      "searchLabel": "Tìm kiếm kho lưu trữ",
+      "searchPlaceholder": "Tìm kiếm kho lưu trữ...",
+      "noMatches": "Không có kết quả khớp",
+      "noRepositories": "Không có kho lưu trữ khả dụng",
+      "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
+      "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Không thể tải tài khoản của bạn",
+    "couldNotLoadAccountDescription": "Kiểm tra kết nối của bạn và thử lại.",
+    "couldNotLoadPrivacy": "Không thể tải các lựa chọn quyền riêng tư",
+    "couldNotLoadPrivacyDescription": "Kiểm tra cài đặt bảo mật của thiết bị và thử lại."
   }
 }

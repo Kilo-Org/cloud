@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
@@ -19,6 +20,7 @@ export default function FocusAreasRoute() {
   const readConfig = useReviewConfigCacheReader(scope, platform);
   const selected = data?.focusAreas ?? [];
   const disabled = data == null;
+  const { t } = useTranslation();
 
   const toggleArea = (area: string) => {
     // Read the cache at call time, not the render-time snapshot above, so
@@ -33,10 +35,10 @@ export default function FocusAreasRoute() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Focus areas" />
+      <ScreenHeader title={t('codeReviewer.focusAreas.title')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Text variant="muted" className="mb-2 text-xs">
-          Leave all unselected to review everything.
+          {t('codeReviewer.focusAreas.hint')}
         </Text>
         {REVIEW_FOCUS_AREAS.map(area => (
           <ChoiceRow

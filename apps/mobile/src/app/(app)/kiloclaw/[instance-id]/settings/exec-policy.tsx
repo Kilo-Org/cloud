@@ -1,5 +1,6 @@
-import { type LucideIcon, ShieldCheck, Zap } from '@/components/ui/icons';
+import { ShieldCheck, Zap } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -15,30 +16,24 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ExecPreset, execPresetToConfig } from '@/lib/onboarding';
 import { cn } from '@/lib/utils';
 
-type PolicyOption = {
-  id: ExecPreset;
-  icon: LucideIcon;
-  iconColor: string;
-  label: string;
-  description: string;
-};
-
-const POLICY_OPTIONS: PolicyOption[] = [
+const POLICY_OPTIONS = [
   {
     id: 'always-ask',
     icon: ShieldCheck,
     iconColor: '#10b981',
-    label: 'Always ask',
-    description: 'Confirm every command before execution. Most secure.',
+    labelKey: 'kiloclaw.execPolicy.alwaysAsk',
+    descriptionKey: 'kiloclaw.execPolicy.alwaysAskDescription',
   },
   {
     id: 'never-ask',
     icon: Zap,
     iconColor: '#f59e0b',
-    label: 'Never ask',
-    description: 'Execute commands without confirmation. Faster but less safe.',
+    labelKey: 'kiloclaw.execPolicy.neverAsk',
+    descriptionKey: 'kiloclaw.execPolicy.neverAskDescription',
   },
-];
+] as const;
+
+type PolicyOption = (typeof POLICY_OPTIONS)[number];
 
 function resolvePreset(
   execSecurity: string | null | undefined,
@@ -60,17 +55,18 @@ export default function ExecPolicyScreen() {
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Execution policy" context={instanceContext} />;
+    return <InstanceContextBoundary title={t('kiloclaw.execPolicy.title')} context={instanceContext} />;
   }
 
   if (statusQuery.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Execution policy" />
+        <ScreenHeader title={t('kiloclaw.execPolicy.title')} />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-20 w-full rounded-lg" />
@@ -86,10 +82,10 @@ export default function ExecPolicyScreen() {
   if (statusQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Execution policy" />
+        <ScreenHeader title={t('kiloclaw.execPolicy.title')} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load execution policy"
+            message={t('kiloclaw.execPolicy.couldNotLoad')}
             onRetry={() => {
               void statusQuery.refetch();
             }}
@@ -120,7 +116,7 @@ export default function ExecPolicyScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Execution policy" />
+      <ScreenHeader title={t('kiloclaw.execPolicy.title')} />
       <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
         showsVerticalScrollIndicator={false}
@@ -151,7 +147,7 @@ export default function ExecPolicyScreen() {
               >
                 <View className="flex-row items-center gap-3">
                   <Icon size={20} color={option.iconColor} />
-                  <Text className="flex-1 text-base font-semibold">{option.label}</Text>
+                  <Text className="flex-1 text-base font-semibold">{t(option.labelKey)}</Text>
                   {isRowPending ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
@@ -166,7 +162,7 @@ export default function ExecPolicyScreen() {
                   )}
                 </View>
                 <Text variant="muted" className="text-sm">
-                  {option.description}
+                  {t(option.descriptionKey)}
                 </Text>
               </Pressable>
             );

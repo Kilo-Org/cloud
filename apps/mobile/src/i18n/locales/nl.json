@@ -7,7 +7,13 @@
     "device": "Apparaat",
     "share": "Delen",
     "justNow": "Zojuist",
-    "couldNotSaveSetting": "Instelling kon niet worden opgeslagen"
+    "couldNotSaveSetting": "Instelling kon niet worden opgeslagen",
+    "apply": "Toepassen",
+    "save": "Opslaan",
+    "copy": "Kopiëren",
+    "approve": "Goedkeuren",
+    "refresh": "Vernieuwen",
+    "couldNotRefresh": "Vernieuwen mislukt. Trek omlaag om opnieuw te proberen."
   },
   "language": {
     "title": "Taal",
@@ -31,5 +37,260 @@
       "balance": "Saldo-waarschuwingen",
       "security": "Beveiligingsbevindingen"
     }
+  },
+  "tabs": {
+    "home": "Home",
+    "agents": "Agenten",
+    "profile": "Profiel",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Wissel van instantie",
+      "couldNotLoadInstances": "Kon instanties niet laden",
+      "noInstances": "Geen KiloClaw-instanties",
+      "noInstancesDescription": "Stel een instantie in om te beginnen met chatten.",
+      "setUpKiloclaw": "KiloClaw instellen",
+      "currentInstance": "{{title}}, huidig",
+      "personal": "Persoonlijk"
+    },
+    "conversation": {
+      "failedToLoad": "Kon gesprek niet laden",
+      "notFound": "Gesprek niet gevonden",
+      "untitled": "Naamloos"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Kon KiloClaw-instanties niet laden",
+    "billing": {
+      "title": "Facturering",
+      "continueMonthToMonth": "Maandelijks doorgaan",
+      "plan": "Abonnement",
+      "finalTermEnds": "Laatste termijn eindigt",
+      "afterFinalTerm": "Na de laatste termijn",
+      "remaining": "Resterend",
+      "ends": "Eindigt",
+      "expires": "Verloopt",
+      "noActivePlan": "Geen actief abonnement",
+      "noActivePlanDescription": "Je hebt geen actief KiloClaw-abonnement.",
+      "managedByAdmin": "Facturering wordt beheerd door je organisatiebeheerder.",
+      "couldNotLoad": "Kon factureringsgegevens niet laden",
+      "manageOnWeb": "Facturering beheren op het web",
+      "commitPlan": "Commit",
+      "daysLeft": "{{count}} dagen resterend",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Je laatste Commit-periode eindigt op {{date}}. Ga verder als Standard voor {{price}}, of de hosting stopt.",
+      "freeTrial": "Gratis proefperiode",
+      "hostingEnds": "Hosting stopt",
+      "oneDayLeft": "1 dag resterend",
+      "renews": "Verlengt",
+      "standardMonthToMonth": "Standard per maand",
+      "standardStartsOn": "Standard start op {{date}} voor {{price}}.",
+      "yourStandardMonthlyPrice": "je maandelijkse Standard-prijs"
+    },
+    "changelog": {
+      "title": "Wat is er nieuw",
+      "couldNotLoad": "Kon changelog niet laden",
+      "noUpdates": "Nog geen updates",
+      "noUpdatesDescription": "Changelog-vermeldingen verschijnen hier.",
+      "recentUpdates": "Recente updates"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "couldNotLoad": "Kon dashboard niet laden",
+      "renameInstance": "Instantie hernoemen",
+      "renamePlaceholder": "Voer een nieuwe naam in (max. 50 tekens)",
+      "someDetailsFailed": "Sommige live details konden niet worden geladen",
+      "destroy": "Vernietigen",
+      "destroyMessage": "Dit vernietigt je KiloClaw-instantie en al zijn gegevens permanent. Deze actie kan niet ongedaan worden gemaakt.",
+      "destroyTitle": "Instantie vernietigen",
+      "instance": "Instantie"
+    },
+    "channels": {
+      "title": "Kanalen",
+      "couldNotLoad": "Kon kanalen niet laden",
+      "noChannels": "Geen kanalen beschikbaar",
+      "noChannelsDescription": "Kanaalintegraties verschijnen hier.",
+      "connected": "{{label}} verbonden",
+      "disconnectMessage": "{{label}} verwijderen? Dit kanaal wordt losgekoppeld.",
+      "disconnectTitle": "Kanaal loskoppelen"
+    },
+    "devicePairing": {
+      "title": "Apparaatkoppeling",
+      "refreshRequests": "Koppelingsverzoeken vernieuwen",
+      "couldNotLoad": "Kon koppelingsverzoeken niet laden",
+      "noPending": "Geen openstaande verzoeken",
+      "noPendingDescription": "Kanaal- en apparaatkoppelingsverzoeken verschijnen hier.",
+      "channelRequests": "Kanaalverzoeken",
+      "deviceRequests": "Apparaatverzoeken",
+      "approveDeviceMessage": "{{platform}} toestaan om verbinding te maken met je instantie?",
+      "approveDeviceTitle": "Apparaat goedkeuren",
+      "approveMessage": "{{label}} (code: {{code}}) toestaan om verbinding te maken met je instantie?",
+      "approveTitle": "Koppelingsverzoek goedkeuren",
+      "device": "Apparaat",
+      "unknownDevice": "Onbekend apparaat"
+    },
+    "execPolicy": {
+      "title": "Uitvoeringsbeleid",
+      "couldNotLoad": "Kon uitvoeringsbeleid niet laden"
+    },
+    "google": {
+      "title": "Google-account",
+      "couldNotLoad": "Kon Google-accountstatus niet laden",
+      "disconnected": "Google-account losgekoppeld. Implementeer je instantie opnieuw om de wijziging toe te passen.",
+      "redeploy": "Opnieuw implementeren",
+      "setupCommand": "Installatieopdracht",
+      "setupCommandHelp": "Voer deze opdracht uit in een terminal met Docker op je eigen computer om je Google-account te verbinden.",
+      "failedToLoadCommand": "Kon installatieopdracht niet laden",
+      "gmailNotifications": "Gmail-meldingen",
+      "disconnect": "Google-account loskoppelen",
+      "connected": "Verbonden",
+      "copied": "Gekopieerd!",
+      "copyCommand": "Opdracht kopiëren",
+      "disabled": "Uitgeschakeld",
+      "disconnectConfirm": "Loskoppelen",
+      "disconnectMessage": "Je Google-account van deze instantie verwijderen? Dit schakelt Gmail-meldingen uit. Implementeer opnieuw na het loskoppelen om wijzigingen toe te passen.",
+      "disconnectTitle": "Google loskoppelen",
+      "enabled": "Ingeschakeld",
+      "notConnected": "Niet verbonden"
+    },
+    "modelList": {
+      "title": "Alle modellen",
+      "searchPlaceholder": "Modellen zoeken...",
+      "couldNotLoad": "Kon modellen niet laden",
+      "clearSearch": "Zoekopdracht wissen",
+      "noMatches": "Geen modellen komen overeen met je zoekopdracht",
+      "noModels": "Geen modellen beschikbaar",
+      "noModelsDescription": "Modellen verschijnen hier zodra ze beschikbaar zijn.",
+      "noResultsFor": "Geen resultaten voor \"{{query}}\"",
+      "recommended": "Aanbevolen"
+    },
+    "model": {
+      "title": "Model"
+    },
+    "secrets": {
+      "title": "Geheimen",
+      "couldNotLoad": "Kon geheimen niet laden",
+      "noSecrets": "Geen geheimen beschikbaar",
+      "noSecretsDescription": "Geheime integraties verschijnen hier.",
+      "removeMessage": "{{label}} verwijderen? Deze tool verliest de toegang tot zijn inloggegevens.",
+      "removeTitle": "Geheim verwijderen",
+      "saved": "{{label}} opgeslagen"
+    },
+    "versionPin": {
+      "title": "Versiepinning",
+      "couldNotLoad": "Kon versie-informatie niet laden",
+      "couldNotLoadMore": "Kon niet meer versies laden",
+      "loadMore": "Meer versies laden",
+      "showingLatest": "Toont de nieuwste 100 versies",
+      "availableVersions": "Beschikbare versies",
+      "noVersions": "Geen versies beschikbaar",
+      "noVersionsDescription": "Beschikbare OpenClaw-versies verschijnen hier.",
+      "unpin": "Losmaken",
+      "unpinMessage": "Terugschakelen naar de nieuwste beschikbare versie?",
+      "unpinTitle": "Versie losmaken"
+    },
+    "redeploy": "Opnieuw implementeren",
+    "redeployMessage": "Weet je zeker dat je deze instantie opnieuw wilt implementeren?",
+    "redeployTitle": "Instantie opnieuw implementeren"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Focusgebieden",
+      "hint": "Laat alles gedeselecteerd om alles te beoordelen."
+    },
+    "gate": {
+      "title": "Merge-poort",
+      "all": "Falen bij elke bevinding",
+      "critical": "Alleen falen bij kritieke bevindingen",
+      "off": "De PR-controle nooit laten falen",
+      "warning": "Falen bij waarschuwingen en kritieke bevindingen"
+    },
+    "instructions": {
+      "title": "Aangepaste instructies",
+      "deprecation": "Aangepaste instructies worden afgeschaft. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
+      "placeholder": "bijv. Handhaaf onze foutafhandelingsconventies…"
+    },
+    "repos": {
+      "title": "Repositories",
+      "couldNotLoad": "Kon repositories niet laden",
+      "unavailable": "Repositories niet beschikbaar — voltooi de Bitbucket-installatie op kilo.ai.",
+      "finishSetup": "Installatie voltooien",
+      "manageAccess": "Toegang beheren",
+      "allRepositories": "Alle repositories",
+      "bitbucketNoRepositoriesDescription": "Er zijn geen repositories beschikbaar in deze Bitbucket-werkruimte.",
+      "bitbucketSetup": "Bitbucket-instellingen",
+      "couldNotOpenGithubSettings": "Instellingen van de GitHub-app konden niet worden geopend",
+      "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
+      "installGithubApp": "Installeer de GitHub-app op repositories",
+      "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
+      "noRepositoriesFound": "Geen repositories gevonden",
+      "repositoryAccess": "repositorytoegang",
+      "selectedRepositories": "Geselecteerde repositories"
+    },
+    "style": {
+      "title": "Beoordelingsstijl",
+      "balanced": "Zinvolle bevindingen zonder ruis",
+      "lenient": "Alleen ernstige problemen",
+      "roast": "Bruut eerlijk, op een vermakelijke manier",
+      "strict": "Alles markeren, hoge lat aanhouden"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Geen filters beschikbaar",
+      "noFiltersDescription": "Ga terug en open filters opnieuw vanuit de bevindingenlijst.",
+      "title": "Bevindingen filteren"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Sessie",
+      "copyErrorDetails": "Foutdetails kopiëren",
+      "backToSessions": "Terug naar sessies",
+      "accessDenied": "Toegang geweigerd",
+      "accessDeniedDescription": "Je hebt geen toestemming om dit te bekijken.",
+      "couldNotLoad": "Sessie kon niet worden geladen",
+      "failedToLoadDetails": "Sessiedetails konden niet worden geladen",
+      "notFound": "Niet gevonden",
+      "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar."
+    },
+    "newSession": {
+      "title": "Nieuwe sessie"
+    },
+    "instancePicker": {
+      "runOn": "Uitvoeren op",
+      "couldNotLoad": "Kon instanties niet laden",
+      "couldNotLoadDescription": "Controleer je verbinding en probeer het opnieuw.",
+      "cloudAgent": "Cloudagent",
+      "cloudAgentDescription": "Uitvoeren in Kilo's cloudsandbox",
+      "noCliInstances": "Geen CLI-instanties verbonden",
+      "noCliInstancesDescription": "Voer `kilo remote` uit in een project op je computer, of werk Kilo CLI bij als er al een draait.",
+      "instanceOnProject": "{{name}} op {{project}}",
+      "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Uitvoeren op Cloudagent"
+    },
+    "modePicker": {
+      "title": "Selecteer modus",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Aangepaste modi"
+    },
+    "repoPicker": {
+      "title": "Selecteer repository",
+      "searchLabel": "Repositories zoeken",
+      "searchPlaceholder": "Repositories zoeken...",
+      "noMatches": "Geen overeenkomsten",
+      "noRepositories": "Geen repositories beschikbaar",
+      "noRepositoriesDescription": "Er zijn geen repositories verbonden met je account.",
+      "tryDifferentSearch": "Probeer een andere zoekterm."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Kon je account niet laden",
+    "couldNotLoadAccountDescription": "Controleer je verbinding en probeer het opnieuw.",
+    "couldNotLoadPrivacy": "Kon privacykeuzes niet laden",
+    "couldNotLoadPrivacyDescription": "Controleer de beveiligingsinstellingen van je apparaat en probeer het opnieuw."
   }
 }

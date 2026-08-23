@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
@@ -26,6 +27,7 @@ export default function ChatConversationRoute() {
   const openedVia = params.via === 'push' ? 'push' : 'app';
   const router = useRouter();
   const client = useKiloChatClient();
+  const { t } = useTranslation();
   const conversationDetail = useConversationDetail(client, conversationId);
   const redirectPath = chatSandboxPath(sandboxId);
   const routeDecision = getConversationRouteDecision({
@@ -48,7 +50,7 @@ export default function ChatConversationRoute() {
 
   useEffect(() => {
     if (routeDecision === 'not-found') {
-      toast.error('Conversation not found');
+      toast.error(t('chat.conversation.notFound'));
       router.replace(redirectPath);
     }
   }, [redirectPath, routeDecision, router]);
@@ -60,7 +62,7 @@ export default function ChatConversationRoute() {
   if (routeDecision === 'retryable-error') {
     return (
       <ConversationHistoryErrorView
-        message="Failed to load conversation"
+        message={t('chat.conversation.failedToLoad')}
         onRetry={() => {
           void conversationDetail.refetch();
         }}
@@ -78,7 +80,7 @@ export default function ChatConversationRoute() {
       <ConversationScreen
         sandboxId={sandboxId}
         conversationId={conversationId}
-        conversationTitle={conversationDetail.data.title ?? 'Untitled'}
+        conversationTitle={conversationDetail.data.title ?? t('chat.conversation.untitled')}
         conversationRenameTitle={conversationDetail.data.title ?? ''}
         conversationMembers={conversationDetail.data.members}
       />

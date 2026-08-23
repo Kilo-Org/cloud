@@ -4,6 +4,7 @@ import { Check, Cloud, Server } from '@/components/ui/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -32,6 +33,7 @@ export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [bridge, setBridge] = useState(() => getInstancePickerBridge());
   const bridgeRef = useRef(bridge);
 
@@ -118,7 +120,7 @@ export default function InstancePickerScreen() {
   );
 
   if (!bridge) {
-    return <PickerSheet title="Run on" onDone={closePicker} scrollable={false} expired />;
+    return <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false} expired />;
   }
 
   const current = bridge.currentValue;
@@ -129,7 +131,7 @@ export default function InstancePickerScreen() {
   // a loading screen.
   if (viewState.kind === 'loading') {
     return (
-      <PickerSheet title="Run on" onDone={closePicker} scrollable={false}>
+      <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false}>
         <View className="bg-background" style={{ paddingBottom: bottom }}>
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
             <View key={i} className="px-4 py-3">
@@ -147,13 +149,13 @@ export default function InstancePickerScreen() {
   // never collapse them into a single "no instances" surface.
   if (viewState.kind === 'error') {
     return (
-      <PickerSheet title="Run on" onDone={closePicker} scrollable={false}>
+      <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false}>
         <View className="flex-1 items-center justify-center" style={{ paddingBottom: bottom }}>
           <EmptyState
             icon={Server}
             placement="center"
-            title="Couldn't load instances"
-            description="Check your connection and try again."
+            title={t('agentChat.instancePicker.couldNotLoad')}
+            description={t('agentChat.instancePicker.couldNotLoadDescription')}
             action={
               <Button
                 variant="outline"
@@ -161,9 +163,9 @@ export default function InstancePickerScreen() {
                   void refetchInstances();
                 }}
                 loading={isRefetching}
-                accessibilityLabel="Retry"
+                accessibilityLabel={t('common.retry')}
               >
-                <Text>Retry</Text>
+                <Text>{t('common.retry')}</Text>
               </Button>
             }
           />
@@ -175,8 +177,15 @@ export default function InstancePickerScreen() {
   const renderItem = ({ item }: { item: LabeledInstance }) => {
     const selected = item.connectionId === currentConnectionId;
     const label = item.dedupSuffix
-      ? `${item.name} on ${item.projectName} (${item.dedupSuffix})`
-      : `${item.name} on ${item.projectName}`;
+      ? t('agentChat.instancePicker.instanceOnProjectSuffix', {
+          name: item.name,
+          project: item.projectName,
+          suffix: item.dedupSuffix,
+        })
+      : t('agentChat.instancePicker.instanceOnProject', {
+          name: item.name,
+          project: item.projectName,
+        });
     return (
       <Pressable
         className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
@@ -211,14 +220,14 @@ export default function InstancePickerScreen() {
   // ("Empty: succeeds, zero instances" with a Refresh CTA) without hiding
   // the only target the user can actually pick right now.
   return (
-    <PickerSheet title="Run on" onDone={closePicker} scrollable={false}>
+    <PickerSheet title={t('agentChat.instancePicker.runOn')} onDone={closePicker} scrollable={false}>
       {/* The list must stay a direct child of the sheet header for native
           formSheet sizing, so the radiogroup role and the visible "Run on"
           group name live on the FlatList container instead of a wrapper. */}
       <FlatList
         className="flex-1 bg-background"
         accessibilityRole="radiogroup"
-        accessibilityLabel="Run on"
+        accessibilityLabel={t('agentChat.instancePicker.runOn')}
         data={labeled}
         keyExtractor={item => item.connectionId}
         contentContainerStyle={{ paddingBottom: bottom }}
@@ -227,15 +236,15 @@ export default function InstancePickerScreen() {
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
             onPress={handleSelectCloudAgent}
             {...radioItemA11y({
-              label: 'Run on Cloud Agent',
+              label: t('agentChat.instancePicker.runOnCloudAgent'),
               checked: currentConnectionId === null,
             })}
           >
             <Cloud size={18} color={colors.foreground} />
             <View className="flex-1">
-              <Text className="text-base font-medium text-foreground">Cloud Agent</Text>
+              <Text className="text-base font-medium text-foreground">{t('agentChat.instancePicker.cloudAgent')}</Text>
               <Text variant="muted" className="text-sm">
-                Run on Kilo's cloud sandbox
+                {t('agentChat.instancePicker.cloudAgentDescription')}
               </Text>
             </View>
             {currentConnectionId === null ? <Check size={18} color={colors.primary} /> : null}
@@ -246,8 +255,8 @@ export default function InstancePickerScreen() {
             <EmptyState
               icon={Server}
               placement="top"
-              title="No CLI instances connected"
-              description="Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running."
+              title={t('agentChat.instancePicker.noCliInstances')}
+              description={t('agentChat.instancePicker.noCliInstancesDescription')}
               action={
                 <Button
                   variant="outline"
@@ -255,9 +264,9 @@ export default function InstancePickerScreen() {
                     void refetchInstances();
                   }}
                   loading={isRefetching}
-                  accessibilityLabel="Refresh"
+                  accessibilityLabel={t('common.refresh')}
                 >
-                  <Text>Refresh</Text>
+                  <Text>{t('common.refresh')}</Text>
                 </Button>
               }
             />

@@ -2,6 +2,7 @@ import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   SessionDetailContent,
@@ -61,6 +62,7 @@ export default function SessionDetailScreen() {
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const trpc = useTRPC();
   const router = useRouter();
+  const { t } = useTranslation();
   useRouteForegroundRefresh([[['cliSessionsV2']], [['modelPreferences']]]);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
@@ -104,7 +106,7 @@ export default function SessionDetailScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title="Session"
+          title={t('agentChat.session.title')}
           headerRight={
             <SessionContextMetrics
               info={undefined}
@@ -128,22 +130,22 @@ export default function SessionDetailScreen() {
     const errorCode = sessionQuery.error.data?.code;
     const notFound = errorCode === 'NOT_FOUND';
     const unauthorized = errorCode === 'UNAUTHORIZED';
-    let title = 'Could not load session';
-    let message = 'Failed to load session details';
+    let title = t('agentChat.session.couldNotLoad');
+    let message = t('agentChat.session.failedToLoadDetails');
     let variant: 'not-found' | 'permission' | 'server' = 'server';
     if (notFound) {
-      title = 'Not found';
-      message = 'This item may have been removed or is no longer available.';
+      title = t('agentChat.session.notFound');
+      message = t('agentChat.session.notFoundDescription');
       variant = 'not-found';
     } else if (unauthorized) {
-      title = 'Access denied';
-      message = "You don't have permission to view this.";
+      title = t('agentChat.session.accessDenied');
+      message = t('agentChat.session.accessDeniedDescription');
       variant = 'permission';
     }
     const copyText = buildTerminalErrorCopyText(sessionId, title, message);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Session" />
+        <ScreenHeader title={t('agentChat.session.title')} />
         <SessionConnectionIndicator />
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
@@ -158,12 +160,12 @@ export default function SessionDetailScreen() {
           <View className="flex-row gap-3">
             <Button
               variant="ghost"
-              accessibilityLabel="Copy error details"
+              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
               onPress={() => {
                 void performCopy(copyText);
               }}
             >
-              <Text>Copy</Text>
+              <Text>{t('common.copy')}</Text>
             </Button>
             <Button
               variant="ghost"
@@ -171,7 +173,7 @@ export default function SessionDetailScreen() {
                 router.replace('/(app)/(tabs)/(2_agents)' as Href);
               }}
             >
-              <Text>Back to sessions</Text>
+              <Text>{t('agentChat.session.backToSessions')}</Text>
             </Button>
           </View>
         </View>

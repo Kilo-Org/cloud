@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Monitor, RefreshCw } from '@/components/ui/icons';
 import { useCallback } from 'react';
 import { Alert, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
   FadeIn,
@@ -43,6 +44,7 @@ export default function DevicePairingScreen() {
   const organizationId = instanceOrgId(instanceContext);
   const colors = useThemeColors();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const pairingQuery = useKiloClawPairing(organizationId);
   const devicePairingQuery = useKiloClawDevicePairing(organizationId);
   const mutations = useKiloClawMutations(organizationId);
@@ -75,7 +77,7 @@ export default function DevicePairingScreen() {
       // 18px icon + p-2 = 34pt; slop brings the target to 44pt.
       hitSlop={5}
       accessibilityRole="button"
-      accessibilityLabel="Refresh pairing requests"
+      accessibilityLabel={t('kiloclaw.devicePairing.refreshRequests')}
     >
       <Animated.View style={spinStyle}>
         <RefreshCw size={18} color={colors.foreground} />
@@ -84,13 +86,13 @@ export default function DevicePairingScreen() {
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Device pairing" context={instanceContext} />;
+    return <InstanceContextBoundary title={t('kiloclaw.devicePairing.title')} context={instanceContext} />;
   }
 
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device pairing" headerRight={refreshButton} />
+        <ScreenHeader title={t('kiloclaw.devicePairing.title')} headerRight={refreshButton} />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-16 w-full rounded-lg" />
@@ -103,10 +105,10 @@ export default function DevicePairingScreen() {
   if (pairingQuery.isError || devicePairingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device pairing" headerRight={refreshButton} />
+        <ScreenHeader title={t('kiloclaw.devicePairing.title')} headerRight={refreshButton} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load pairing requests"
+            message={t('kiloclaw.devicePairing.couldNotLoad')}
             onRetry={() => {
               void handleRefresh();
             }}
@@ -125,12 +127,12 @@ export default function DevicePairingScreen() {
       ? CHANNEL_LABELS[channel as keyof typeof CHANNEL_LABELS]
       : channel.charAt(0).toUpperCase() + channel.slice(1);
     Alert.alert(
-      'Approve pairing request',
-      `Allow ${label} (code: ${code}) to connect to your instance?`,
+      t('kiloclaw.devicePairing.approveTitle'),
+      t('kiloclaw.devicePairing.approveMessage', { label, code }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Approve',
+          text: t('common.approve'),
           onPress: () => {
             mutations.approvePairingRequest.mutate({ channel, code });
           },
@@ -139,30 +141,34 @@ export default function DevicePairingScreen() {
     );
   }
 
-  function handleApproveDevice(requestId: string, platform = 'Unknown device') {
-    Alert.alert('Approve device', `Allow ${platform} to connect to your instance?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Approve',
-        onPress: () => {
-          mutations.approveDevicePairingRequest.mutate({ requestId });
+  function handleApproveDevice(requestId: string, platform = t('kiloclaw.devicePairing.unknownDevice')) {
+    Alert.alert(
+      t('kiloclaw.devicePairing.approveDeviceTitle'),
+      t('kiloclaw.devicePairing.approveDeviceMessage', { platform }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.approve'),
+          onPress: () => {
+            mutations.approveDevicePairingRequest.mutate({ requestId });
+          },
         },
-      },
-    ]);
+      ]
+    );
   }
 
   if (!hasAnyRequests) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device pairing" headerRight={refreshButton} />
+        <ScreenHeader title={t('kiloclaw.devicePairing.title')} headerRight={refreshButton} />
         <Animated.View
           entering={FadeIn.duration(200)}
           className="flex-1 items-center justify-center"
         >
           <EmptyState
             icon={Monitor}
-            title="No pending requests"
-            description="Channel and device pairing requests will appear here."
+            title={t('kiloclaw.devicePairing.noPending')}
+            description={t('kiloclaw.devicePairing.noPendingDescription')}
           />
         </Animated.View>
       </View>
@@ -171,7 +177,7 @@ export default function DevicePairingScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Device pairing" headerRight={refreshButton} />
+      <ScreenHeader title={t('kiloclaw.devicePairing.title')} headerRight={refreshButton} />
       <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
         showsVerticalScrollIndicator={false}
@@ -179,7 +185,7 @@ export default function DevicePairingScreen() {
         {channelRequests.length > 0 && (
           <Animated.View entering={FadeIn.duration(200)} className="gap-3">
             <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Channel requests
+              {t('kiloclaw.devicePairing.channelRequests')}
             </Text>
             <View className="rounded-lg bg-secondary overflow-hidden">
               {channelRequests.map((request, index) => {
@@ -219,7 +225,7 @@ export default function DevicePairingScreen() {
                           handleApproveChannel(request.channel, request.code);
                         }}
                       >
-                        <Text>Approve</Text>
+                        <Text>{t('common.approve')}</Text>
                       </Button>
                     </View>
                   </View>
@@ -232,7 +238,7 @@ export default function DevicePairingScreen() {
         {deviceRequests.length > 0 && (
           <Animated.View entering={FadeIn.duration(200)} className="gap-3">
             <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Device requests
+              {t('kiloclaw.devicePairing.deviceRequests')}
             </Text>
             <View className="rounded-lg bg-secondary overflow-hidden">
               {deviceRequests.map((request, index) => {
@@ -245,7 +251,7 @@ export default function DevicePairingScreen() {
                     <View className="flex-row items-center gap-3 px-4 py-3">
                       <Monitor size={18} color={colors.foreground} />
                       <View className="flex-1 gap-0.5">
-                        <Text className="text-sm font-medium">{request.role ?? 'Device'}</Text>
+                        <Text className="text-sm font-medium">{request.role ?? t('kiloclaw.devicePairing.device')}</Text>
                         <Text variant="muted" className="text-xs">
                           {[request.platform, request.requestId.slice(0, 12)]
                             .filter(Boolean)
@@ -260,7 +266,7 @@ export default function DevicePairingScreen() {
                           handleApproveDevice(request.requestId, request.platform);
                         }}
                       >
-                        <Text>Approve</Text>
+                        <Text>{t('common.approve')}</Text>
                       </Button>
                     </View>
                   </View>

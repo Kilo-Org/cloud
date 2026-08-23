@@ -7,7 +7,13 @@
     "device": "Device",
     "share": "Share",
     "justNow": "Just now",
-    "couldNotSaveSetting": "Could not save setting"
+    "couldNotSaveSetting": "Could not save setting",
+    "apply": "Apply",
+    "save": "Save",
+    "copy": "Copy",
+    "approve": "Approve",
+    "refresh": "Refresh",
+    "couldNotRefresh": "Couldn't refresh. Pull down to try again."
   },
   "language": {
     "title": "Language",
@@ -31,5 +37,260 @@
       "balance": "Balance alerts",
       "security": "Security findings"
     }
+  },
+  "tabs": {
+    "home": "Home",
+    "agents": "Agents",
+    "profile": "Profile",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Switch instance",
+      "couldNotLoadInstances": "Could not load instances",
+      "noInstances": "No KiloClaw instances",
+      "noInstancesDescription": "Set up an instance to start chatting.",
+      "setUpKiloclaw": "Set up KiloClaw",
+      "currentInstance": "{{title}}, current",
+      "personal": "Personal"
+    },
+    "conversation": {
+      "failedToLoad": "Failed to load conversation",
+      "notFound": "Conversation not found",
+      "untitled": "Untitled"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Could not load KiloClaw instances",
+    "billing": {
+      "title": "Billing",
+      "continueMonthToMonth": "Continue month-to-month",
+      "plan": "Plan",
+      "finalTermEnds": "Final term ends",
+      "afterFinalTerm": "After final term",
+      "remaining": "Remaining",
+      "ends": "Ends",
+      "expires": "Expires",
+      "noActivePlan": "No active plan",
+      "noActivePlanDescription": "You don't have an active KiloClaw subscription.",
+      "managedByAdmin": "Billing is managed by your organization admin.",
+      "couldNotLoad": "Could not load billing information",
+      "manageOnWeb": "Manage Billing on Web",
+      "commitPlan": "Commit",
+      "daysLeft": "{{count}} days left",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Your final Commit term ends on {{date}}. Continue as Standard at {{price}}, or hosting ends.",
+      "freeTrial": "Free Trial",
+      "hostingEnds": "Hosting ends",
+      "oneDayLeft": "1 day left",
+      "renews": "Renews",
+      "standardMonthToMonth": "Standard month-to-month",
+      "standardStartsOn": "Standard starts on {{date}} at {{price}}.",
+      "yourStandardMonthlyPrice": "your Standard monthly price"
+    },
+    "changelog": {
+      "title": "What's New",
+      "couldNotLoad": "Could not load changelog",
+      "noUpdates": "No updates yet",
+      "noUpdatesDescription": "Changelog entries will appear here.",
+      "recentUpdates": "Recent updates"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "couldNotLoad": "Could not load dashboard",
+      "renameInstance": "Rename instance",
+      "renamePlaceholder": "Enter a new name (max 50 characters)",
+      "someDetailsFailed": "Some live details failed to load",
+      "destroy": "Destroy",
+      "destroyMessage": "This will permanently destroy your KiloClaw instance and all its data. This action cannot be undone.",
+      "destroyTitle": "Destroy instance",
+      "instance": "Instance"
+    },
+    "channels": {
+      "title": "Channels",
+      "couldNotLoad": "Could not load channels",
+      "noChannels": "No channels available",
+      "noChannelsDescription": "Channel integrations will appear here.",
+      "connected": "{{label}} connected",
+      "disconnectMessage": "Remove {{label}}? This channel will be disconnected.",
+      "disconnectTitle": "Disconnect channel"
+    },
+    "devicePairing": {
+      "title": "Device pairing",
+      "refreshRequests": "Refresh pairing requests",
+      "couldNotLoad": "Could not load pairing requests",
+      "noPending": "No pending requests",
+      "noPendingDescription": "Channel and device pairing requests will appear here.",
+      "channelRequests": "Channel requests",
+      "deviceRequests": "Device requests",
+      "approveDeviceMessage": "Allow {{platform}} to connect to your instance?",
+      "approveDeviceTitle": "Approve device",
+      "approveMessage": "Allow {{label}} (code: {{code}}) to connect to your instance?",
+      "approveTitle": "Approve pairing request",
+      "device": "Device",
+      "unknownDevice": "Unknown device"
+    },
+    "execPolicy": {
+      "title": "Execution policy",
+      "couldNotLoad": "Could not load execution policy"
+    },
+    "google": {
+      "title": "Google Account",
+      "couldNotLoad": "Could not load Google account status",
+      "disconnected": "Google account disconnected. Redeploy your instance to apply the change.",
+      "redeploy": "Redeploy",
+      "setupCommand": "Setup command",
+      "setupCommandHelp": "Run this command in a terminal with Docker installed on your own computer to connect your Google account.",
+      "failedToLoadCommand": "Failed to load setup command",
+      "gmailNotifications": "Gmail notifications",
+      "disconnect": "Disconnect Google Account",
+      "connected": "Connected",
+      "copied": "Copied!",
+      "copyCommand": "Copy command",
+      "disabled": "Disabled",
+      "disconnectConfirm": "Disconnect",
+      "disconnectMessage": "Remove your Google account from this instance? This will disable Gmail notifications. Redeploy after disconnecting to apply changes.",
+      "disconnectTitle": "Disconnect Google",
+      "enabled": "Enabled",
+      "notConnected": "Not connected"
+    },
+    "modelList": {
+      "title": "All models",
+      "searchPlaceholder": "Search models...",
+      "couldNotLoad": "Could not load models",
+      "clearSearch": "Clear search",
+      "noMatches": "No models match your search",
+      "noModels": "No models available",
+      "noModelsDescription": "Models will appear here once available.",
+      "noResultsFor": "No results for \"{{query}}\"",
+      "recommended": "Recommended"
+    },
+    "model": {
+      "title": "Model"
+    },
+    "secrets": {
+      "title": "Secrets",
+      "couldNotLoad": "Could not load secrets",
+      "noSecrets": "No secrets available",
+      "noSecretsDescription": "Secret integrations will appear here.",
+      "removeMessage": "Remove {{label}}? This tool will lose access to its credentials.",
+      "removeTitle": "Remove secret",
+      "saved": "{{label}} saved"
+    },
+    "versionPin": {
+      "title": "Version pinning",
+      "couldNotLoad": "Could not load version information",
+      "couldNotLoadMore": "Could not load more versions",
+      "loadMore": "Load more versions",
+      "showingLatest": "Showing latest 100 versions",
+      "availableVersions": "Available versions",
+      "noVersions": "No versions available",
+      "noVersionsDescription": "Available OpenClaw versions will appear here.",
+      "unpin": "Unpin",
+      "unpinMessage": "Switch back to the latest available version?",
+      "unpinTitle": "Unpin version"
+    },
+    "redeploy": "Redeploy",
+    "redeployMessage": "Are you sure you want to redeploy this instance?",
+    "redeployTitle": "Redeploy instance"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Focus areas",
+      "hint": "Leave all unselected to review everything."
+    },
+    "gate": {
+      "title": "Merge gate",
+      "all": "Fail on any finding",
+      "critical": "Fail on critical findings only",
+      "off": "Never fail the PR check",
+      "warning": "Fail on warnings and critical findings"
+    },
+    "instructions": {
+      "title": "Custom instructions",
+      "deprecation": "Custom Instructions is planned for deprecation. Move these guidelines into a REVIEW.md file in your repository instead.",
+      "placeholder": "e.g. Enforce our error-handling conventions…"
+    },
+    "repos": {
+      "title": "Repositories",
+      "couldNotLoad": "Could not load repositories",
+      "unavailable": "Repositories unavailable — finish Bitbucket setup on kilo.ai.",
+      "finishSetup": "Finish setup",
+      "manageAccess": "Manage access",
+      "allRepositories": "All repositories",
+      "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
+      "bitbucketSetup": "Bitbucket setup",
+      "couldNotOpenGithubSettings": "Could not open GitHub App settings",
+      "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
+      "installGithubApp": "Install the GitHub app on repositories",
+      "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
+      "noRepositoriesFound": "No repositories found",
+      "repositoryAccess": "repository access",
+      "selectedRepositories": "Selected repositories"
+    },
+    "style": {
+      "title": "Review style",
+      "balanced": "Meaningful findings without noise",
+      "lenient": "Only serious problems",
+      "roast": "Brutally honest, entertainingly so",
+      "strict": "Flag everything, hold a high bar"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "No filters available",
+      "noFiltersDescription": "Go back and reopen filters from the findings list.",
+      "title": "Filter findings"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Session",
+      "copyErrorDetails": "Copy error details",
+      "backToSessions": "Back to sessions",
+      "accessDenied": "Access denied",
+      "accessDeniedDescription": "You don't have permission to view this.",
+      "couldNotLoad": "Could not load session",
+      "failedToLoadDetails": "Failed to load session details",
+      "notFound": "Not found",
+      "notFoundDescription": "This item may have been removed or is no longer available."
+    },
+    "newSession": {
+      "title": "New session"
+    },
+    "instancePicker": {
+      "runOn": "Run on",
+      "couldNotLoad": "Couldn't load instances",
+      "couldNotLoadDescription": "Check your connection and try again.",
+      "cloudAgent": "Cloud Agent",
+      "cloudAgentDescription": "Run on Kilo's cloud sandbox",
+      "noCliInstances": "No CLI instances connected",
+      "noCliInstancesDescription": "Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running.",
+      "instanceOnProject": "{{name}} on {{project}}",
+      "instanceOnProjectSuffix": "{{name}} on {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Run on Cloud Agent"
+    },
+    "modePicker": {
+      "title": "Select mode",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Custom modes"
+    },
+    "repoPicker": {
+      "title": "Select repository",
+      "searchLabel": "Search repositories",
+      "searchPlaceholder": "Search repositories...",
+      "noMatches": "No matches",
+      "noRepositories": "No repositories available",
+      "noRepositoriesDescription": "No repositories are connected to your account.",
+      "tryDifferentSearch": "Try a different search term."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Could not load your account",
+    "couldNotLoadAccountDescription": "Check your connection and try again.",
+    "couldNotLoadPrivacy": "Could not load privacy choices",
+    "couldNotLoadPrivacyDescription": "Check your device security settings and try again."
   }
 }

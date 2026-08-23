@@ -7,7 +7,13 @@
     "device": "デバイス",
     "share": "共有",
     "justNow": "たった今",
-    "couldNotSaveSetting": "設定を保存できませんでした"
+    "couldNotSaveSetting": "設定を保存できませんでした",
+    "apply": "適用",
+    "save": "保存",
+    "copy": "コピー",
+    "approve": "承認",
+    "refresh": "更新",
+    "couldNotRefresh": "更新できませんでした。下に引いて再試行してください。"
   },
   "language": {
     "title": "言語",
@@ -31,5 +37,260 @@
       "balance": "残高アラート",
       "security": "セキュリティ所見"
     }
+  },
+  "tabs": {
+    "home": "ホーム",
+    "agents": "エージェント",
+    "profile": "プロフィール",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "インスタンスを切り替え",
+      "couldNotLoadInstances": "インスタンスを読み込めませんでした",
+      "noInstances": "KiloClawインスタンスがありません",
+      "noInstancesDescription": "チャットを開始するにはインスタンスを設定してください。",
+      "setUpKiloclaw": "KiloClawを設定",
+      "currentInstance": "{{title}}、現在",
+      "personal": "個人"
+    },
+    "conversation": {
+      "failedToLoad": "会話を読み込めませんでした",
+      "notFound": "会話が見つかりません",
+      "untitled": "無題"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "KiloClawインスタンスを読み込めませんでした",
+    "billing": {
+      "title": "請求",
+      "continueMonthToMonth": "月ごとに継続",
+      "plan": "プラン",
+      "finalTermEnds": "最終期間の終了",
+      "afterFinalTerm": "最終期間の後",
+      "remaining": "残り",
+      "ends": "終了",
+      "expires": "失効",
+      "noActivePlan": "アクティブなプランがありません",
+      "noActivePlanDescription": "アクティブなKiloClawサブスクリプションがありません。",
+      "managedByAdmin": "請求は組織の管理者が管理しています。",
+      "couldNotLoad": "請求情報を読み込めませんでした",
+      "manageOnWeb": "Webで請求を管理",
+      "commitPlan": "Commit",
+      "daysLeft": "残り{{count}}日",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "最後のCommit期間は{{date}}に終了します。{{price}}でStandardとして続行するか、ホスティングが終了します。",
+      "freeTrial": "無料トライアル",
+      "hostingEnds": "ホスティング終了",
+      "oneDayLeft": "残り1日",
+      "renews": "更新",
+      "standardMonthToMonth": "Standard月額",
+      "standardStartsOn": "Standardは{{date}}に{{price}}で開始します。",
+      "yourStandardMonthlyPrice": "Standardの月額料金"
+    },
+    "changelog": {
+      "title": "新着情報",
+      "couldNotLoad": "変更履歴を読み込めませんでした",
+      "noUpdates": "まだ更新はありません",
+      "noUpdatesDescription": "変更履歴のエントリがここに表示されます。",
+      "recentUpdates": "最近の更新"
+    },
+    "dashboard": {
+      "title": "ダッシュボード",
+      "couldNotLoad": "ダッシュボードを読み込めませんでした",
+      "renameInstance": "インスタンス名を変更",
+      "renamePlaceholder": "新しい名前を入力（最大50文字）",
+      "someDetailsFailed": "一部のライブ詳細を読み込めませんでした",
+      "destroy": "破棄",
+      "destroyMessage": "これにより、KiloClawインスタンスとそのすべてのデータが完全に破棄されます。この操作は元に戻せません。",
+      "destroyTitle": "インスタンスを破棄",
+      "instance": "インスタンス"
+    },
+    "channels": {
+      "title": "チャンネル",
+      "couldNotLoad": "チャンネルを読み込めませんでした",
+      "noChannels": "利用可能なチャンネルがありません",
+      "noChannelsDescription": "チャンネル連携がここに表示されます。",
+      "connected": "{{label}}が接続されました",
+      "disconnectMessage": "{{label}}を削除しますか？このチャンネルは切断されます。",
+      "disconnectTitle": "チャンネルを切断"
+    },
+    "devicePairing": {
+      "title": "デバイスペアリング",
+      "refreshRequests": "ペアリングリクエストを更新",
+      "couldNotLoad": "ペアリングリクエストを読み込めませんでした",
+      "noPending": "保留中のリクエストはありません",
+      "noPendingDescription": "チャンネルとデバイスのペアリングリクエストがここに表示されます。",
+      "channelRequests": "チャンネルリクエスト",
+      "deviceRequests": "デバイスリクエスト",
+      "approveDeviceMessage": "{{platform}}がインスタンスに接続することを許可しますか？",
+      "approveDeviceTitle": "デバイスを承認",
+      "approveMessage": "{{label}}（コード: {{code}}）がインスタンスに接続することを許可しますか？",
+      "approveTitle": "ペアリングリクエストを承認",
+      "device": "デバイス",
+      "unknownDevice": "不明なデバイス"
+    },
+    "execPolicy": {
+      "title": "実行ポリシー",
+      "couldNotLoad": "実行ポリシーを読み込めませんでした"
+    },
+    "google": {
+      "title": "Googleアカウント",
+      "couldNotLoad": "Googleアカウントの状態を読み込めませんでした",
+      "disconnected": "Googleアカウントが切断されました。変更を適用するにはインスタンスを再デプロイしてください。",
+      "redeploy": "再デプロイ",
+      "setupCommand": "セットアップコマンド",
+      "setupCommandHelp": "Googleアカウントを接続するには、Dockerがインストールされた自分のコンピューターのターミナルでこのコマンドを実行してください。",
+      "failedToLoadCommand": "セットアップコマンドを読み込めませんでした",
+      "gmailNotifications": "Gmail通知",
+      "disconnect": "Googleアカウントを切断",
+      "connected": "接続済み",
+      "copied": "コピーしました！",
+      "copyCommand": "コマンドをコピー",
+      "disabled": "無効",
+      "disconnectConfirm": "切断",
+      "disconnectMessage": "このインスタンスからGoogleアカウントを削除しますか？これによりGmail通知が無効になります。変更を適用するには、切断後に再デプロイしてください。",
+      "disconnectTitle": "Googleを切断",
+      "enabled": "有効",
+      "notConnected": "未接続"
+    },
+    "modelList": {
+      "title": "すべてのモデル",
+      "searchPlaceholder": "モデルを検索...",
+      "couldNotLoad": "モデルを読み込めませんでした",
+      "clearSearch": "検索をクリア",
+      "noMatches": "検索に一致するモデルはありません",
+      "noModels": "利用可能なモデルはありません",
+      "noModelsDescription": "モデルは利用可能になるとここに表示されます。",
+      "noResultsFor": "\"{{query}}\"の結果はありません",
+      "recommended": "おすすめ"
+    },
+    "model": {
+      "title": "モデル"
+    },
+    "secrets": {
+      "title": "シークレット",
+      "couldNotLoad": "シークレットを読み込めませんでした",
+      "noSecrets": "利用可能なシークレットがありません",
+      "noSecretsDescription": "シークレット連携がここに表示されます。",
+      "removeMessage": "{{label}}を削除しますか？このツールは認証情報へのアクセスを失います。",
+      "removeTitle": "シークレットを削除",
+      "saved": "{{label}}を保存しました"
+    },
+    "versionPin": {
+      "title": "バージョン固定",
+      "couldNotLoad": "バージョン情報を読み込めませんでした",
+      "couldNotLoadMore": "これ以上バージョンを読み込めませんでした",
+      "loadMore": "さらにバージョンを読み込む",
+      "showingLatest": "最新100バージョンを表示中",
+      "availableVersions": "利用可能なバージョン",
+      "noVersions": "利用可能なバージョンがありません",
+      "noVersionsDescription": "利用可能なOpenClawバージョンがここに表示されます。",
+      "unpin": "固定を解除",
+      "unpinMessage": "利用可能な最新バージョンに戻しますか？",
+      "unpinTitle": "バージョンの固定を解除"
+    },
+    "redeploy": "再デプロイ",
+    "redeployMessage": "このインスタンスを再デプロイしてもよろしいですか？",
+    "redeployTitle": "インスタンスを再デプロイ"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "重点領域",
+      "hint": "すべてをレビューするには、すべて選択解除のままにしてください。"
+    },
+    "gate": {
+      "title": "マージゲート",
+      "all": "指摘があれば失敗",
+      "critical": "重大な指摘のみで失敗",
+      "off": "PRチェックを失敗させない",
+      "warning": "警告と重大な指摘で失敗"
+    },
+    "instructions": {
+      "title": "カスタム指示",
+      "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
+      "placeholder": "例：エラー処理の規則を適用…"
+    },
+    "repos": {
+      "title": "リポジトリ",
+      "couldNotLoad": "リポジトリを読み込めませんでした",
+      "unavailable": "リポジトリを利用できません — kilo.aiでBitbucketのセットアップを完了してください。",
+      "finishSetup": "セットアップを完了",
+      "manageAccess": "アクセスを管理",
+      "allRepositories": "すべてのリポジトリ",
+      "bitbucketNoRepositoriesDescription": "このBitbucketワークスペースに利用可能なリポジトリはありません。",
+      "bitbucketSetup": "Bitbucketのセットアップ",
+      "couldNotOpenGithubSettings": "GitHub Appの設定を開けませんでした",
+      "gitlabNoRepositoriesDescription": "GitLabでより多くのグループまたはプロジェクトへのアクセスを許可する必要がある場合があります。",
+      "installGithubApp": "リポジトリにGitHubアプリをインストール",
+      "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可します。",
+      "noRepositoriesFound": "リポジトリが見つかりません",
+      "repositoryAccess": "リポジトリアクセス",
+      "selectedRepositories": "選択したリポジトリ"
+    },
+    "style": {
+      "title": "レビュースタイル",
+      "balanced": "ノイズのない有意義な指摘",
+      "lenient": "重大な問題のみ",
+      "roast": "容赦なく正直に、そして楽しく",
+      "strict": "すべてを指摘し、高い基準を保つ"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "利用可能なフィルターがありません",
+      "noFiltersDescription": "戻って、検出結果リストからフィルターを再度開いてください。",
+      "title": "検出結果をフィルター"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "セッション",
+      "copyErrorDetails": "エラー詳細をコピー",
+      "backToSessions": "セッションに戻る",
+      "accessDenied": "アクセスが拒否されました",
+      "accessDeniedDescription": "これを表示する権限がありません。",
+      "couldNotLoad": "セッションを読み込めませんでした",
+      "failedToLoadDetails": "セッションの詳細を読み込めませんでした",
+      "notFound": "見つかりません",
+      "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。"
+    },
+    "newSession": {
+      "title": "新しいセッション"
+    },
+    "instancePicker": {
+      "runOn": "実行先",
+      "couldNotLoad": "インスタンスを読み込めませんでした",
+      "couldNotLoadDescription": "接続を確認して、もう一度お試しください。",
+      "cloudAgent": "クラウドエージェント",
+      "cloudAgentDescription": "Kiloのクラウドサンドボックスで実行",
+      "noCliInstances": "接続されたCLIインスタンスがありません",
+      "noCliInstancesDescription": "コンピューター上のプロジェクトで`kilo remote`を実行するか、すでに実行中の場合はKilo CLIを更新してください。",
+      "instanceOnProject": "{{project}} の {{name}}",
+      "instanceOnProjectSuffix": "{{project}} の {{name}} ({{suffix}})",
+      "runOnCloudAgent": "クラウドエージェントで実行"
+    },
+    "modePicker": {
+      "title": "モードを選択",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "カスタムモード"
+    },
+    "repoPicker": {
+      "title": "リポジトリを選択",
+      "searchLabel": "リポジトリを検索",
+      "searchPlaceholder": "リポジトリを検索...",
+      "noMatches": "一致なし",
+      "noRepositories": "利用可能なリポジトリはありません",
+      "noRepositoriesDescription": "アカウントに接続されたリポジトリはありません。",
+      "tryDifferentSearch": "別の検索語をお試しください。"
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "アカウントを読み込めませんでした",
+    "couldNotLoadAccountDescription": "接続を確認して、もう一度お試しください。",
+    "couldNotLoadPrivacy": "プライバシー設定を読み込めませんでした",
+    "couldNotLoadPrivacyDescription": "デバイスのセキュリティ設定を確認して、もう一度お試しください。"
   }
 }

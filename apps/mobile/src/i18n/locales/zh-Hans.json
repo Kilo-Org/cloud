@@ -7,7 +7,13 @@
     "device": "设备",
     "share": "分享",
     "justNow": "刚刚",
-    "couldNotSaveSetting": "无法保存设置"
+    "couldNotSaveSetting": "无法保存设置",
+    "apply": "应用",
+    "save": "保存",
+    "copy": "复制",
+    "approve": "批准",
+    "refresh": "刷新",
+    "couldNotRefresh": "无法刷新。下拉重试。"
   },
   "language": {
     "title": "语言",
@@ -31,5 +37,260 @@
       "balance": "余额提醒",
       "security": "安全发现"
     }
+  },
+  "tabs": {
+    "home": "首页",
+    "agents": "代理",
+    "profile": "个人资料",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "切换实例",
+      "couldNotLoadInstances": "无法加载实例",
+      "noInstances": "没有 KiloClaw 实例",
+      "noInstancesDescription": "设置实例以开始聊天。",
+      "setUpKiloclaw": "设置 KiloClaw",
+      "currentInstance": "{{title}}, 当前",
+      "personal": "个人"
+    },
+    "conversation": {
+      "failedToLoad": "加载对话失败",
+      "notFound": "未找到对话",
+      "untitled": "无标题"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "无法加载 KiloClaw 实例",
+    "billing": {
+      "title": "账单",
+      "continueMonthToMonth": "按月继续",
+      "plan": "方案",
+      "finalTermEnds": "最终期限结束",
+      "afterFinalTerm": "最终期限之后",
+      "remaining": "剩余",
+      "ends": "结束",
+      "expires": "到期",
+      "noActivePlan": "没有生效的方案",
+      "noActivePlanDescription": "您没有生效的 KiloClaw 订阅。",
+      "managedByAdmin": "账单由您的组织管理员管理。",
+      "couldNotLoad": "无法加载账单信息",
+      "manageOnWeb": "在网页上管理账单",
+      "commitPlan": "Commit",
+      "daysLeft": "剩余 {{count}} 天",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "您的最后一个 Commit 期限将于 {{date}} 结束。以 {{price}} 继续使用 Standard，否则托管将终止。",
+      "freeTrial": "免费试用",
+      "hostingEnds": "托管终止",
+      "oneDayLeft": "剩余 1 天",
+      "renews": "续订",
+      "standardMonthToMonth": "Standard 按月",
+      "standardStartsOn": "Standard 将于 {{date}} 以 {{price}} 开始。",
+      "yourStandardMonthlyPrice": "您的 Standard 月费"
+    },
+    "changelog": {
+      "title": "新功能",
+      "couldNotLoad": "无法加载更新日志",
+      "noUpdates": "暂无更新",
+      "noUpdatesDescription": "更新日志条目将显示在这里。",
+      "recentUpdates": "最近更新"
+    },
+    "dashboard": {
+      "title": "仪表盘",
+      "couldNotLoad": "无法加载仪表盘",
+      "renameInstance": "重命名实例",
+      "renamePlaceholder": "输入新名称（最多 50 个字符）",
+      "someDetailsFailed": "部分实时详情加载失败",
+      "destroy": "销毁",
+      "destroyMessage": "这将永久销毁您的 KiloClaw 实例及其所有数据。此操作无法撤销。",
+      "destroyTitle": "销毁实例",
+      "instance": "实例"
+    },
+    "channels": {
+      "title": "频道",
+      "couldNotLoad": "无法加载频道",
+      "noChannels": "没有可用频道",
+      "noChannelsDescription": "频道集成将显示在这里。",
+      "connected": "{{label}} 已连接",
+      "disconnectMessage": "移除 {{label}}？此渠道将被断开。",
+      "disconnectTitle": "断开渠道"
+    },
+    "devicePairing": {
+      "title": "设备配对",
+      "refreshRequests": "刷新配对请求",
+      "couldNotLoad": "无法加载配对请求",
+      "noPending": "没有待处理的请求",
+      "noPendingDescription": "频道和设备配对请求将显示在这里。",
+      "channelRequests": "频道请求",
+      "deviceRequests": "设备请求",
+      "approveDeviceMessage": "允许 {{platform}} 连接到您的实例？",
+      "approveDeviceTitle": "批准设备",
+      "approveMessage": "允许 {{label}}（代码：{{code}}）连接到您的实例？",
+      "approveTitle": "批准配对请求",
+      "device": "设备",
+      "unknownDevice": "未知设备"
+    },
+    "execPolicy": {
+      "title": "执行策略",
+      "couldNotLoad": "无法加载执行策略"
+    },
+    "google": {
+      "title": "Google 账号",
+      "couldNotLoad": "无法加载 Google 账号状态",
+      "disconnected": "Google 账号已断开连接。请重新部署实例以应用更改。",
+      "redeploy": "重新部署",
+      "setupCommand": "设置命令",
+      "setupCommandHelp": "在您自己电脑上已安装 Docker 的终端中运行此命令，以连接您的 Google 账号。",
+      "failedToLoadCommand": "加载设置命令失败",
+      "gmailNotifications": "Gmail 通知",
+      "disconnect": "断开 Google 账号",
+      "connected": "已连接",
+      "copied": "已复制！",
+      "copyCommand": "复制命令",
+      "disabled": "已禁用",
+      "disconnectConfirm": "断开连接",
+      "disconnectMessage": "从此实例移除您的 Google 账户？这将禁用 Gmail 通知。断开连接后请重新部署以应用更改。",
+      "disconnectTitle": "断开 Google",
+      "enabled": "已启用",
+      "notConnected": "未连接"
+    },
+    "modelList": {
+      "title": "所有模型",
+      "searchPlaceholder": "搜索模型...",
+      "couldNotLoad": "无法加载模型",
+      "clearSearch": "清除搜索",
+      "noMatches": "没有模型与您的搜索匹配",
+      "noModels": "没有可用的模型",
+      "noModelsDescription": "模型可用后将显示在此处。",
+      "noResultsFor": "没有 \"{{query}}\" 的结果",
+      "recommended": "推荐"
+    },
+    "model": {
+      "title": "模型"
+    },
+    "secrets": {
+      "title": "密钥",
+      "couldNotLoad": "无法加载密钥",
+      "noSecrets": "没有可用密钥",
+      "noSecretsDescription": "密钥集成将显示在这里。",
+      "removeMessage": "移除 {{label}}？此工具将失去对其凭据的访问权限。",
+      "removeTitle": "移除密钥",
+      "saved": "{{label}} 已保存"
+    },
+    "versionPin": {
+      "title": "版本锁定",
+      "couldNotLoad": "无法加载版本信息",
+      "couldNotLoadMore": "无法加载更多版本",
+      "loadMore": "加载更多版本",
+      "showingLatest": "显示最新 100 个版本",
+      "availableVersions": "可用版本",
+      "noVersions": "没有可用版本",
+      "noVersionsDescription": "可用的 OpenClaw 版本将显示在这里。",
+      "unpin": "取消固定",
+      "unpinMessage": "切换回最新可用版本？",
+      "unpinTitle": "取消固定版本"
+    },
+    "redeploy": "重新部署",
+    "redeployMessage": "确定要重新部署此实例吗？",
+    "redeployTitle": "重新部署实例"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "关注领域",
+      "hint": "全部不选即可审查所有内容。"
+    },
+    "gate": {
+      "title": "合并门禁",
+      "all": "发现任何问题即失败",
+      "critical": "仅在发现严重问题时失败",
+      "off": "永不使 PR 检查失败",
+      "warning": "发现警告和严重问题时失败"
+    },
+    "instructions": {
+      "title": "自定义说明",
+      "deprecation": "自定义说明计划弃用。请将这些准则移到仓库中的 REVIEW.md 文件。",
+      "placeholder": "例如：执行我们的错误处理约定…"
+    },
+    "repos": {
+      "title": "仓库",
+      "couldNotLoad": "无法加载仓库",
+      "unavailable": "仓库不可用 — 请在 kilo.ai 上完成 Bitbucket 设置。",
+      "finishSetup": "完成设置",
+      "manageAccess": "管理访问权限",
+      "allRepositories": "所有仓库",
+      "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作区中没有可用的仓库。",
+      "bitbucketSetup": "Bitbucket 设置",
+      "couldNotOpenGithubSettings": "无法打开 GitHub App 设置",
+      "gitlabNoRepositoriesDescription": "您可能需要授予对 GitLab 上更多群组或项目的访问权限。",
+      "installGithubApp": "在仓库上安装 GitHub 应用",
+      "installGithubAppDescription": "向 Kilo GitHub App 授予对您要审查的仓库的访问权限。",
+      "noRepositoriesFound": "未找到仓库",
+      "repositoryAccess": "仓库访问权限",
+      "selectedRepositories": "已选仓库"
+    },
+    "style": {
+      "title": "审查风格",
+      "balanced": "有意义的发现，无噪音",
+      "lenient": "仅严重问题",
+      "roast": "毫不留情地诚实，且有趣",
+      "strict": "标记所有内容，保持高标准"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "没有可用筛选器",
+      "noFiltersDescription": "返回并从发现列表重新打开筛选器。",
+      "title": "筛选发现"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "会话",
+      "copyErrorDetails": "复制错误详情",
+      "backToSessions": "返回会话列表",
+      "accessDenied": "访问被拒绝",
+      "accessDeniedDescription": "您没有权限查看此内容。",
+      "couldNotLoad": "无法加载会话",
+      "failedToLoadDetails": "无法加载会话详情",
+      "notFound": "未找到",
+      "notFoundDescription": "此项目可能已被删除或不再可用。"
+    },
+    "newSession": {
+      "title": "新会话"
+    },
+    "instancePicker": {
+      "runOn": "运行于",
+      "couldNotLoad": "无法加载实例",
+      "couldNotLoadDescription": "请检查连接后重试。",
+      "cloudAgent": "云端代理",
+      "cloudAgentDescription": "在 Kilo 的云端沙盒中运行",
+      "noCliInstances": "未连接 CLI 实例",
+      "noCliInstancesDescription": "在您电脑上的项目中运行 `kilo remote`，或如果已有 Kilo CLI 在运行，请更新它。",
+      "instanceOnProject": "{{project}} 上的 {{name}}",
+      "instanceOnProjectSuffix": "{{project}} 上的 {{name}} ({{suffix}})",
+      "runOnCloudAgent": "在云端代理上运行"
+    },
+    "modePicker": {
+      "title": "选择模式",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "自定义模式"
+    },
+    "repoPicker": {
+      "title": "选择仓库",
+      "searchLabel": "搜索仓库",
+      "searchPlaceholder": "搜索仓库...",
+      "noMatches": "无匹配项",
+      "noRepositories": "没有可用的仓库",
+      "noRepositoriesDescription": "您的账户没有连接任何仓库。",
+      "tryDifferentSearch": "请尝试其他搜索词。"
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "无法加载您的账号",
+    "couldNotLoadAccountDescription": "请检查连接后重试。",
+    "couldNotLoadPrivacy": "无法加载隐私选项",
+    "couldNotLoadPrivacyDescription": "请检查设备安全设置后重试。"
   }
 }

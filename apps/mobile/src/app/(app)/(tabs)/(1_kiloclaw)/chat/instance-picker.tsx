@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Server } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
@@ -26,6 +27,7 @@ function InstanceRow({
   onSelect: (sandboxId: string) => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const title = kiloclawInstanceSwitcherTitle(instance);
   return (
     <Pressable
@@ -34,7 +36,7 @@ function InstanceRow({
         onSelect(instance.sandboxId);
       }}
       accessibilityRole="button"
-      accessibilityLabel={`${title}${isCurrent ? ', current' : ''}`}
+      accessibilityLabel={isCurrent ? t('chat.instancePicker.currentInstance', { title }) : title}
     >
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
@@ -42,7 +44,7 @@ function InstanceRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text variant="muted" numberOfLines={1}>
-            {instance.organizationName ?? 'Personal'}
+            {instance.organizationName ?? t('chat.instancePicker.personal')}
           </Text>
           <StatusBadge status={instance.status} />
         </View>
@@ -57,6 +59,7 @@ export default function InstancePickerScreen() {
   const { currentId } = useLocalSearchParams<{ currentId: string }>();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
+  const { t } = useTranslation();
 
   const handleSelect = (sandboxId: string) => {
     void Haptics.selectionAsync();
@@ -73,7 +76,7 @@ export default function InstancePickerScreen() {
 
   return (
     <PickerSheet
-      title="Switch instance"
+      title={t('chat.instancePicker.switchInstance')}
       onDone={() => {
         router.back();
       }}
@@ -88,7 +91,7 @@ export default function InstancePickerScreen() {
       {instancesQuery.isError ? (
         <QueryError
           className="py-12"
-          message="Could not load instances"
+          message={t('chat.instancePicker.couldNotLoadInstances')}
           onRetry={() => {
             void instancesQuery.refetch();
           }}
@@ -98,8 +101,8 @@ export default function InstancePickerScreen() {
         <EmptyState
           className="py-12"
           icon={Server}
-          title="No KiloClaw instances"
-          description="Set up an instance to start chatting."
+          title={t('chat.instancePicker.noInstances')}
+          description={t('chat.instancePicker.noInstancesDescription')}
           action={
             <Button
               variant="outline"
@@ -107,7 +110,7 @@ export default function InstancePickerScreen() {
                 router.push('/(app)/onboarding' as Href);
               }}
             >
-              <Text>Set up KiloClaw</Text>
+              <Text>{t('chat.instancePicker.setUpKiloclaw')}</Text>
             </Button>
           }
         />

@@ -7,7 +7,13 @@
     "device": "Устройство",
     "share": "Поделиться",
     "justNow": "Только что",
-    "couldNotSaveSetting": "Не удалось сохранить настройку"
+    "couldNotSaveSetting": "Не удалось сохранить настройку",
+    "apply": "Применить",
+    "save": "Сохранить",
+    "copy": "Копировать",
+    "approve": "Одобрить",
+    "refresh": "Обновить",
+    "couldNotRefresh": "Не удалось обновить. Потяните вниз, чтобы повторить."
   },
   "language": {
     "title": "Язык",
@@ -31,5 +37,260 @@
       "balance": "Оповещения о балансе",
       "security": "Находки безопасности"
     }
+  },
+  "tabs": {
+    "home": "Главная",
+    "agents": "Агенты",
+    "profile": "Профиль",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Сменить экземпляр",
+      "couldNotLoadInstances": "Не удалось загрузить экземпляры",
+      "noInstances": "Нет экземпляров KiloClaw",
+      "noInstancesDescription": "Настройте экземпляр, чтобы начать чат.",
+      "setUpKiloclaw": "Настроить KiloClaw",
+      "currentInstance": "{{title}}, текущий",
+      "personal": "Личное"
+    },
+    "conversation": {
+      "failedToLoad": "Не удалось загрузить разговор",
+      "notFound": "Беседа не найдена",
+      "untitled": "Без названия"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Не удалось загрузить экземпляры KiloClaw",
+    "billing": {
+      "title": "Оплата",
+      "continueMonthToMonth": "Продолжить помесячно",
+      "plan": "Тариф",
+      "finalTermEnds": "Последний период заканчивается",
+      "afterFinalTerm": "После последнего периода",
+      "remaining": "Осталось",
+      "ends": "Заканчивается",
+      "expires": "Истекает",
+      "noActivePlan": "Нет активного тарифа",
+      "noActivePlanDescription": "У вас нет активной подписки KiloClaw.",
+      "managedByAdmin": "Оплатой управляет администратор вашей организации.",
+      "couldNotLoad": "Не удалось загрузить информацию об оплате",
+      "manageOnWeb": "Управление оплатой в веб-версии",
+      "commitPlan": "Commit",
+      "daysLeft": "Осталось {{count}} дн.",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Ваш последний период Commit заканчивается {{date}}. Продолжите как Standard за {{price}}, или хостинг завершится.",
+      "freeTrial": "Бесплатная пробная версия",
+      "hostingEnds": "Хостинг завершается",
+      "oneDayLeft": "Остался 1 день",
+      "renews": "Продлевается",
+      "standardMonthToMonth": "Standard помесячно",
+      "standardStartsOn": "Standard начинается {{date}} за {{price}}.",
+      "yourStandardMonthlyPrice": "ваша месячная цена Standard"
+    },
+    "changelog": {
+      "title": "Что нового",
+      "couldNotLoad": "Не удалось загрузить журнал изменений",
+      "noUpdates": "Обновлений пока нет",
+      "noUpdatesDescription": "Записи журнала изменений появятся здесь.",
+      "recentUpdates": "Недавние обновления"
+    },
+    "dashboard": {
+      "title": "Панель управления",
+      "couldNotLoad": "Не удалось загрузить панель управления",
+      "renameInstance": "Переименовать экземпляр",
+      "renamePlaceholder": "Введите новое имя (не более 50 символов)",
+      "someDetailsFailed": "Не удалось загрузить некоторые актуальные данные",
+      "destroy": "Уничтожить",
+      "destroyMessage": "Это навсегда уничтожит ваш экземпляр KiloClaw и все его данные. Это действие нельзя отменить.",
+      "destroyTitle": "Уничтожить экземпляр",
+      "instance": "Экземпляр"
+    },
+    "channels": {
+      "title": "Каналы",
+      "couldNotLoad": "Не удалось загрузить каналы",
+      "noChannels": "Нет доступных каналов",
+      "noChannelsDescription": "Интеграции каналов появятся здесь.",
+      "connected": "{{label}} подключен",
+      "disconnectMessage": "Удалить {{label}}? Этот канал будет отключен.",
+      "disconnectTitle": "Отключить канал"
+    },
+    "devicePairing": {
+      "title": "Сопряжение устройств",
+      "refreshRequests": "Обновить запросы на сопряжение",
+      "couldNotLoad": "Не удалось загрузить запросы на сопряжение",
+      "noPending": "Нет ожидающих запросов",
+      "noPendingDescription": "Запросы на сопряжение каналов и устройств появятся здесь.",
+      "channelRequests": "Запросы каналов",
+      "deviceRequests": "Запросы устройств",
+      "approveDeviceMessage": "Разрешить {{platform}} подключиться к вашему экземпляру?",
+      "approveDeviceTitle": "Одобрить устройство",
+      "approveMessage": "Разрешить {{label}} (код: {{code}}) подключиться к вашему экземпляру?",
+      "approveTitle": "Одобрить запрос на сопряжение",
+      "device": "Устройство",
+      "unknownDevice": "Неизвестное устройство"
+    },
+    "execPolicy": {
+      "title": "Политика выполнения",
+      "couldNotLoad": "Не удалось загрузить политику выполнения"
+    },
+    "google": {
+      "title": "Аккаунт Google",
+      "couldNotLoad": "Не удалось загрузить статус аккаунта Google",
+      "disconnected": "Аккаунт Google отключен. Повторно разверните экземпляр, чтобы применить изменение.",
+      "redeploy": "Развернуть повторно",
+      "setupCommand": "Команда настройки",
+      "setupCommandHelp": "Выполните эту команду в терминале с установленным Docker на своем компьютере, чтобы подключить аккаунт Google.",
+      "failedToLoadCommand": "Не удалось загрузить команду настройки",
+      "gmailNotifications": "Уведомления Gmail",
+      "disconnect": "Отключить аккаунт Google",
+      "connected": "Подключено",
+      "copied": "Скопировано!",
+      "copyCommand": "Копировать команду",
+      "disabled": "Отключено",
+      "disconnectConfirm": "Отключить",
+      "disconnectMessage": "Удалить аккаунт Google из этого экземпляра? Это отключит уведомления Gmail. Повторно разверните после отключения, чтобы применить изменения.",
+      "disconnectTitle": "Отключить Google",
+      "enabled": "Включено",
+      "notConnected": "Не подключено"
+    },
+    "modelList": {
+      "title": "Все модели",
+      "searchPlaceholder": "Поиск моделей...",
+      "couldNotLoad": "Не удалось загрузить модели",
+      "clearSearch": "Очистить поиск",
+      "noMatches": "Ни одна модель не соответствует вашему запросу",
+      "noModels": "Нет доступных моделей",
+      "noModelsDescription": "Модели появятся здесь, когда станут доступны.",
+      "noResultsFor": "Нет результатов по запросу \"{{query}}\"",
+      "recommended": "Рекомендуемые"
+    },
+    "model": {
+      "title": "Модель"
+    },
+    "secrets": {
+      "title": "Секреты",
+      "couldNotLoad": "Не удалось загрузить секреты",
+      "noSecrets": "Нет доступных секретов",
+      "noSecretsDescription": "Интеграции секретов появятся здесь.",
+      "removeMessage": "Удалить {{label}}? Этот инструмент потеряет доступ к своим учетным данным.",
+      "removeTitle": "Удалить секрет",
+      "saved": "{{label}} сохранен"
+    },
+    "versionPin": {
+      "title": "Закрепление версии",
+      "couldNotLoad": "Не удалось загрузить информацию о версии",
+      "couldNotLoadMore": "Не удалось загрузить больше версий",
+      "loadMore": "Загрузить больше версий",
+      "showingLatest": "Показаны последние 100 версий",
+      "availableVersions": "Доступные версии",
+      "noVersions": "Нет доступных версий",
+      "noVersionsDescription": "Доступные версии OpenClaw появятся здесь.",
+      "unpin": "Открепить",
+      "unpinMessage": "Вернуться к последней доступной версии?",
+      "unpinTitle": "Открепить версию"
+    },
+    "redeploy": "Развернуть повторно",
+    "redeployMessage": "Вы уверены, что хотите повторно развернуть этот экземпляр?",
+    "redeployTitle": "Повторно развернуть экземпляр"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Области внимания",
+      "hint": "Оставьте все невыбранными, чтобы проверить всё."
+    },
+    "gate": {
+      "title": "Шлюз слияния",
+      "all": "Провал при любом замечании",
+      "critical": "Провал только при критических замечаниях",
+      "off": "Никогда не проваливать проверку PR",
+      "warning": "Провал при предупреждениях и критических замечаниях"
+    },
+    "instructions": {
+      "title": "Пользовательские инструкции",
+      "deprecation": "Пользовательские инструкции планируется вывести из эксплуатации. Перенесите эти рекомендации в файл REVIEW.md в вашем репозитории.",
+      "placeholder": "напр., применяйте наши правила обработки ошибок…"
+    },
+    "repos": {
+      "title": "Репозитории",
+      "couldNotLoad": "Не удалось загрузить репозитории",
+      "unavailable": "Репозитории недоступны — завершите настройку Bitbucket на kilo.ai.",
+      "finishSetup": "Завершить настройку",
+      "manageAccess": "Управление доступом",
+      "allRepositories": "Все репозитории",
+      "bitbucketNoRepositoriesDescription": "В этом рабочем пространстве Bitbucket нет доступных репозиториев.",
+      "bitbucketSetup": "Настройка Bitbucket",
+      "couldNotOpenGithubSettings": "Не удалось открыть настройки приложения GitHub",
+      "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к большему числу групп или проектов в GitLab.",
+      "installGithubApp": "Установить приложение GitHub на репозитории",
+      "installGithubAppDescription": "Предоставьте приложению Kilo GitHub доступ к репозиториям, которые нужно проверить.",
+      "noRepositoriesFound": "Репозитории не найдены",
+      "repositoryAccess": "доступ к репозиторию",
+      "selectedRepositories": "Выбранные репозитории"
+    },
+    "style": {
+      "title": "Стиль проверки",
+      "balanced": "Значимые замечания без шума",
+      "lenient": "Только серьезные проблемы",
+      "roast": "Безжалостно честно и занимательно",
+      "strict": "Отмечать все, держать высокую планку"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Нет доступных фильтров",
+      "noFiltersDescription": "Вернитесь и снова откройте фильтры из списка находок.",
+      "title": "Фильтровать находки"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Сеанс",
+      "copyErrorDetails": "Копировать сведения об ошибке",
+      "backToSessions": "Назад к сеансам",
+      "accessDenied": "Доступ запрещен",
+      "accessDeniedDescription": "У вас нет разрешения на просмотр.",
+      "couldNotLoad": "Не удалось загрузить сеанс",
+      "failedToLoadDetails": "Не удалось загрузить сведения о сеансе",
+      "notFound": "Не найдено",
+      "notFoundDescription": "Возможно, этот элемент был удален или больше недоступен."
+    },
+    "newSession": {
+      "title": "Новый сеанс"
+    },
+    "instancePicker": {
+      "runOn": "Запустить на",
+      "couldNotLoad": "Не удалось загрузить экземпляры",
+      "couldNotLoadDescription": "Проверьте подключение и попробуйте снова.",
+      "cloudAgent": "Облачный агент",
+      "cloudAgentDescription": "Запуск в облачной песочнице Kilo",
+      "noCliInstances": "Нет подключенных экземпляров CLI",
+      "noCliInstancesDescription": "Выполните `kilo remote` в проекте на своем компьютере или обновите Kilo CLI, если она уже запущена.",
+      "instanceOnProject": "{{name}} на {{project}}",
+      "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Запустить на облачном агенте"
+    },
+    "modePicker": {
+      "title": "Выбрать режим",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Пользовательские режимы"
+    },
+    "repoPicker": {
+      "title": "Выбрать репозиторий",
+      "searchLabel": "Поиск репозиториев",
+      "searchPlaceholder": "Поиск репозиториев...",
+      "noMatches": "Нет совпадений",
+      "noRepositories": "Нет доступных репозиториев",
+      "noRepositoriesDescription": "К вашей учетной записи не подключены репозитории.",
+      "tryDifferentSearch": "Попробуйте другой поисковый запрос."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Не удалось загрузить ваш аккаунт",
+    "couldNotLoadAccountDescription": "Проверьте подключение и попробуйте снова.",
+    "couldNotLoadPrivacy": "Не удалось загрузить настройки конфиденциальности",
+    "couldNotLoadPrivacyDescription": "Проверьте настройки безопасности устройства и попробуйте снова."
   }
 }

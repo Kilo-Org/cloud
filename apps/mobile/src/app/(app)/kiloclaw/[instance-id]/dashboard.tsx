@@ -2,6 +2,7 @@ import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CreditCard, Newspaper, Pencil } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -38,6 +39,7 @@ import { formatModelName, stripModelPrefix } from '@/lib/model-id';
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
   const organizationId = instanceOrgId(instanceContext);
@@ -92,17 +94,17 @@ export default function DashboardScreen() {
   ]);
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchAll,
-    "Couldn't refresh. Pull down to try again."
+    t('common.couldNotRefresh')
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Dashboard" context={instanceContext} />;
+    return <InstanceContextBoundary title={t('kiloclaw.dashboard.title')} context={instanceContext} />;
   }
 
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dashboard" />
+        <ScreenHeader title={t('kiloclaw.dashboard.title')} />
         <Animated.View layout={LinearTransition} className="flex-1 gap-4 px-[22px] pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
             {/* Hero */}
@@ -127,10 +129,10 @@ export default function DashboardScreen() {
   if (statusQuery.isError || billingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dashboard" />
+        <ScreenHeader title={t('kiloclaw.dashboard.title')} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load dashboard"
+            message={t('kiloclaw.dashboard.couldNotLoad')}
             onRetry={() => {
               void statusQuery.refetch();
               void billingQuery.refetch();
@@ -146,16 +148,16 @@ export default function DashboardScreen() {
   // sandbox id for named instances).
   const contextName =
     instanceContext.status === 'ready' ? instanceContext.instance.name : undefined;
-  const instanceName = contextName ?? status?.name ?? status?.sandboxId ?? 'Instance';
+  const instanceName = contextName ?? status?.name ?? status?.sandboxId ?? t('kiloclaw.dashboard.instance');
 
   const handleDestroy = () => {
     Alert.alert(
-      'Destroy instance',
-      'This will permanently destroy your KiloClaw instance and all its data. This action cannot be undone.',
+      t('kiloclaw.dashboard.destroyTitle'),
+      t('kiloclaw.dashboard.destroyMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Destroy',
+          text: t('kiloclaw.dashboard.destroy'),
           style: 'destructive',
           onPress: () => {
             captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
@@ -185,7 +187,7 @@ export default function DashboardScreen() {
             }}
             // 18px icon + 13 slop each side = 44pt minimum touch target
             hitSlop={13}
-            accessibilityLabel="Rename instance"
+            accessibilityLabel={t('kiloclaw.dashboard.renameInstance')}
             className="active:opacity-70"
           >
             <Pencil size={18} color={colors.mutedForeground} />
@@ -248,7 +250,7 @@ export default function DashboardScreen() {
               <QueryError
                 variant="neutral"
                 placement="top"
-                title="Some live details failed to load"
+                title={t('kiloclaw.dashboard.someDetailsFailed')}
                 onRetry={() => {
                   void gatewayQuery.refetch();
                   void configQuery.refetch();
@@ -271,7 +273,7 @@ export default function DashboardScreen() {
             {isPersonal && Platform.OS !== 'ios' ? (
               <ConfigureRow
                 icon={CreditCard}
-                title="Billing"
+                title={t('kiloclaw.billing.title')}
                 onPress={() => {
                   router.push(`/(app)/kiloclaw/${instanceId}/billing` as Href);
                 }}
@@ -279,7 +281,7 @@ export default function DashboardScreen() {
             ) : null}
             <ConfigureRow
               icon={Newspaper}
-              title="What's New"
+              title={t('kiloclaw.changelog.title')}
               last
               onPress={() => {
                 router.push(`/(app)/kiloclaw/${instanceId}/changelog` as Href);
@@ -293,8 +295,8 @@ export default function DashboardScreen() {
 
       {renameVisible && (
         <RenameModal
-          title="Rename instance"
-          placeholder="Enter a new name (max 50 characters)"
+          title={t('kiloclaw.dashboard.renameInstance')}
+          placeholder={t('kiloclaw.dashboard.renamePlaceholder')}
           initialValue={contextName ?? status?.name ?? ''}
           onSave={async name => {
             await mutations.renameInstance.mutateAsync({ name });

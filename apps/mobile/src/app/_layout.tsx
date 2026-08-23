@@ -30,6 +30,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -203,6 +204,7 @@ function RootLayoutNav() {
   const router = useRouter();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
+  const { t } = useTranslation();
   // True once the active catalog is loaded (or English after a catalog
   // failure), so the splash never hides on an unlocalized tree.
   const [languageReady, setLanguageReady] = useState(false);
@@ -739,8 +741,8 @@ function RootLayoutNav() {
   if (hasUserBootstrapError) {
     return (
       <BootstrapErrorScreen
-        title="Could not load your account"
-        description="Check your connection and try again."
+        title={t('bootstrap.couldNotLoadAccount')}
+        description={t('bootstrap.couldNotLoadAccountDescription')}
         primaryLabel="Retry"
         primaryAccessibilityLabel="Retry loading account"
         onPrimaryPress={refetchUserId}
@@ -756,8 +758,8 @@ function RootLayoutNav() {
   if (hasConsentBootstrapError) {
     return (
       <BootstrapErrorScreen
-        title="Could not load privacy choices"
-        description="Check your device security settings and try again."
+        title={t('bootstrap.couldNotLoadPrivacy')}
+        description={t('bootstrap.couldNotLoadPrivacyDescription')}
         primaryLabel="Retry"
         primaryAccessibilityLabel="Retry loading privacy choices"
         onPrimaryPress={() => {

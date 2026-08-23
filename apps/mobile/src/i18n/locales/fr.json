@@ -7,7 +7,13 @@
     "device": "Appareil",
     "share": "Partager",
     "justNow": "À l’instant",
-    "couldNotSaveSetting": "Impossible d’enregistrer le réglage"
+    "couldNotSaveSetting": "Impossible d’enregistrer le réglage",
+    "apply": "Appliquer",
+    "save": "Enregistrer",
+    "copy": "Copier",
+    "approve": "Approuver",
+    "refresh": "Actualiser",
+    "couldNotRefresh": "Actualisation impossible. Tirez vers le bas pour réessayer."
   },
   "language": {
     "title": "Langue",
@@ -31,5 +37,260 @@
       "balance": "Alertes de solde",
       "security": "Résultats de sécurité"
     }
+  },
+  "tabs": {
+    "home": "Accueil",
+    "agents": "Agents",
+    "profile": "Profil",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Changer d'instance",
+      "couldNotLoadInstances": "Impossible de charger les instances",
+      "noInstances": "Aucune instance KiloClaw",
+      "noInstancesDescription": "Configurez une instance pour commencer à discuter.",
+      "setUpKiloclaw": "Configurer KiloClaw",
+      "currentInstance": "{{title}}, actuelle",
+      "personal": "Personnel"
+    },
+    "conversation": {
+      "failedToLoad": "Impossible de charger la conversation",
+      "notFound": "Conversation introuvable",
+      "untitled": "Sans titre"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Impossible de charger les instances KiloClaw",
+    "billing": {
+      "title": "Facturation",
+      "continueMonthToMonth": "Continuer au mois",
+      "plan": "Forfait",
+      "finalTermEnds": "La période finale se termine",
+      "afterFinalTerm": "Après la période finale",
+      "remaining": "Restant",
+      "ends": "Se termine",
+      "expires": "Expire",
+      "noActivePlan": "Aucun forfait actif",
+      "noActivePlanDescription": "Vous n'avez pas d'abonnement KiloClaw actif.",
+      "managedByAdmin": "La facturation est gérée par l'administrateur de votre organisation.",
+      "couldNotLoad": "Impossible de charger les informations de facturation",
+      "manageOnWeb": "Gérer la facturation sur le Web",
+      "commitPlan": "Commit",
+      "daysLeft": "{{count}} jours restants",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Votre dernière période Commit se termine le {{date}}. Passez en Standard à {{price}}, ou l'hébergement prend fin.",
+      "freeTrial": "Essai gratuit",
+      "hostingEnds": "L'hébergement prend fin",
+      "oneDayLeft": "1 jour restant",
+      "renews": "Se renouvelle",
+      "standardMonthToMonth": "Standard au mois",
+      "standardStartsOn": "Standard commence le {{date}} à {{price}}.",
+      "yourStandardMonthlyPrice": "votre prix mensuel Standard"
+    },
+    "changelog": {
+      "title": "Nouveautés",
+      "couldNotLoad": "Impossible de charger le journal des modifications",
+      "noUpdates": "Aucune mise à jour pour le moment",
+      "noUpdatesDescription": "Les entrées du journal des modifications apparaîtront ici.",
+      "recentUpdates": "Mises à jour récentes"
+    },
+    "dashboard": {
+      "title": "Tableau de bord",
+      "couldNotLoad": "Impossible de charger le tableau de bord",
+      "renameInstance": "Renommer l'instance",
+      "renamePlaceholder": "Saisissez un nouveau nom (50 caractères max)",
+      "someDetailsFailed": "Certains détails en direct n'ont pas pu être chargés",
+      "destroy": "Détruire",
+      "destroyMessage": "Cela détruira définitivement votre instance KiloClaw et toutes ses données. Cette action est irréversible.",
+      "destroyTitle": "Détruire l'instance",
+      "instance": "Instance"
+    },
+    "channels": {
+      "title": "Canaux",
+      "couldNotLoad": "Impossible de charger les canaux",
+      "noChannels": "Aucun canal disponible",
+      "noChannelsDescription": "Les intégrations de canaux apparaîtront ici.",
+      "connected": "{{label}} connecté",
+      "disconnectMessage": "Supprimer {{label}} ? Ce canal sera déconnecté.",
+      "disconnectTitle": "Déconnecter le canal"
+    },
+    "devicePairing": {
+      "title": "Association d'appareils",
+      "refreshRequests": "Actualiser les demandes d'association",
+      "couldNotLoad": "Impossible de charger les demandes d'association",
+      "noPending": "Aucune demande en attente",
+      "noPendingDescription": "Les demandes d'association de canaux et d'appareils apparaîtront ici.",
+      "channelRequests": "Demandes de canaux",
+      "deviceRequests": "Demandes d'appareils",
+      "approveDeviceMessage": "Autoriser {{platform}} à se connecter à votre instance ?",
+      "approveDeviceTitle": "Approuver l'appareil",
+      "approveMessage": "Autoriser {{label}} (code : {{code}}) à se connecter à votre instance ?",
+      "approveTitle": "Approuver la demande d'appairage",
+      "device": "Appareil",
+      "unknownDevice": "Appareil inconnu"
+    },
+    "execPolicy": {
+      "title": "Politique d'exécution",
+      "couldNotLoad": "Impossible de charger la politique d'exécution"
+    },
+    "google": {
+      "title": "Compte Google",
+      "couldNotLoad": "Impossible de charger l'état du compte Google",
+      "disconnected": "Compte Google déconnecté. Redéployez votre instance pour appliquer la modification.",
+      "redeploy": "Redéployer",
+      "setupCommand": "Commande de configuration",
+      "setupCommandHelp": "Exécutez cette commande dans un terminal avec Docker installé sur votre propre ordinateur pour connecter votre compte Google.",
+      "failedToLoadCommand": "Impossible de charger la commande de configuration",
+      "gmailNotifications": "Notifications Gmail",
+      "disconnect": "Déconnecter le compte Google",
+      "connected": "Connecté",
+      "copied": "Copié !",
+      "copyCommand": "Copier la commande",
+      "disabled": "Désactivé",
+      "disconnectConfirm": "Déconnecter",
+      "disconnectMessage": "Supprimer votre compte Google de cette instance ? Cela désactivera les notifications Gmail. Redéployez après la déconnexion pour appliquer les changements.",
+      "disconnectTitle": "Déconnecter Google",
+      "enabled": "Activé",
+      "notConnected": "Non connecté"
+    },
+    "modelList": {
+      "title": "Tous les modèles",
+      "searchPlaceholder": "Rechercher des modèles...",
+      "couldNotLoad": "Impossible de charger les modèles",
+      "clearSearch": "Effacer la recherche",
+      "noMatches": "Aucun modèle ne correspond à votre recherche",
+      "noModels": "Aucun modèle disponible",
+      "noModelsDescription": "Les modèles apparaîtront ici dès qu'ils seront disponibles.",
+      "noResultsFor": "Aucun résultat pour « {{query}} »",
+      "recommended": "Recommandé"
+    },
+    "model": {
+      "title": "Modèle"
+    },
+    "secrets": {
+      "title": "Secrets",
+      "couldNotLoad": "Impossible de charger les secrets",
+      "noSecrets": "Aucun secret disponible",
+      "noSecretsDescription": "Les intégrations de secrets apparaîtront ici.",
+      "removeMessage": "Supprimer {{label}} ? Cet outil perdra l'accès à ses identifiants.",
+      "removeTitle": "Supprimer le secret",
+      "saved": "{{label}} enregistré"
+    },
+    "versionPin": {
+      "title": "Épinglage de version",
+      "couldNotLoad": "Impossible de charger les informations de version",
+      "couldNotLoadMore": "Impossible de charger plus de versions",
+      "loadMore": "Charger plus de versions",
+      "showingLatest": "Affichage des 100 dernières versions",
+      "availableVersions": "Versions disponibles",
+      "noVersions": "Aucune version disponible",
+      "noVersionsDescription": "Les versions OpenClaw disponibles apparaîtront ici.",
+      "unpin": "Désépingler",
+      "unpinMessage": "Revenir à la dernière version disponible ?",
+      "unpinTitle": "Désépingler la version"
+    },
+    "redeploy": "Redéployer",
+    "redeployMessage": "Voulez-vous vraiment redéployer cette instance ?",
+    "redeployTitle": "Redéployer l'instance"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Domaines d'intérêt",
+      "hint": "Laissez tout désélectionné pour tout examiner."
+    },
+    "gate": {
+      "title": "Porte de fusion",
+      "all": "Échouer sur tout signalement",
+      "critical": "Échouer uniquement sur les signalements critiques",
+      "off": "Ne jamais faire échouer la vérification de la PR",
+      "warning": "Échouer sur les avertissements et les signalements critiques"
+    },
+    "instructions": {
+      "title": "Instructions personnalisées",
+      "deprecation": "Les instructions personnalisées seront bientôt retirées. Déplacez ces consignes dans un fichier REVIEW.md de votre dépôt.",
+      "placeholder": "p. ex. appliquer nos conventions de gestion des erreurs…"
+    },
+    "repos": {
+      "title": "Dépôts",
+      "couldNotLoad": "Impossible de charger les dépôts",
+      "unavailable": "Dépôts indisponibles — terminez la configuration Bitbucket sur kilo.ai.",
+      "finishSetup": "Terminer la configuration",
+      "manageAccess": "Gérer l'accès",
+      "allRepositories": "Tous les dépôts",
+      "bitbucketNoRepositoriesDescription": "Aucun dépôt n'est disponible dans cet espace de travail Bitbucket.",
+      "bitbucketSetup": "Configuration Bitbucket",
+      "couldNotOpenGithubSettings": "Impossible d'ouvrir les paramètres de la GitHub App",
+      "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
+      "installGithubApp": "Installer l'application GitHub sur les dépôts",
+      "installGithubAppDescription": "Accordez à la Kilo GitHub App l'accès aux dépôts que vous souhaitez faire réviser.",
+      "noRepositoriesFound": "Aucun dépôt trouvé",
+      "repositoryAccess": "accès au dépôt",
+      "selectedRepositories": "Dépôts sélectionnés"
+    },
+    "style": {
+      "title": "Style de révision",
+      "balanced": "Des signalements utiles sans bruit",
+      "lenient": "Uniquement les problèmes graves",
+      "roast": "Brutalement honnête, et divertissant",
+      "strict": "Tout signaler, maintenir un niveau élevé"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Aucun filtre disponible",
+      "noFiltersDescription": "Revenez en arrière et rouvrez les filtres depuis la liste des résultats.",
+      "title": "Filtrer les résultats"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Session",
+      "copyErrorDetails": "Copier les détails de l'erreur",
+      "backToSessions": "Retour aux sessions",
+      "accessDenied": "Accès refusé",
+      "accessDeniedDescription": "Vous n'avez pas l'autorisation de voir ceci.",
+      "couldNotLoad": "Impossible de charger la session",
+      "failedToLoadDetails": "Impossible de charger les détails de la session",
+      "notFound": "Introuvable",
+      "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible."
+    },
+    "newSession": {
+      "title": "Nouvelle session"
+    },
+    "instancePicker": {
+      "runOn": "Exécuter sur",
+      "couldNotLoad": "Impossible de charger les instances",
+      "couldNotLoadDescription": "Vérifiez votre connexion et réessayez.",
+      "cloudAgent": "Agent cloud",
+      "cloudAgentDescription": "Exécuter sur le bac à sable cloud de Kilo",
+      "noCliInstances": "Aucune instance CLI connectée",
+      "noCliInstancesDescription": "Exécutez `kilo remote` dans un projet sur votre ordinateur, ou mettez à jour la CLI Kilo si elle est déjà en cours d'exécution.",
+      "instanceOnProject": "{{name}} sur {{project}}",
+      "instanceOnProjectSuffix": "{{name}} sur {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Exécuter sur Agent cloud"
+    },
+    "modePicker": {
+      "title": "Sélectionner le mode",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Modes personnalisés"
+    },
+    "repoPicker": {
+      "title": "Sélectionner le dépôt",
+      "searchLabel": "Rechercher des dépôts",
+      "searchPlaceholder": "Rechercher des dépôts...",
+      "noMatches": "Aucun résultat",
+      "noRepositories": "Aucun dépôt disponible",
+      "noRepositoriesDescription": "Aucun dépôt n'est connecté à votre compte.",
+      "tryDifferentSearch": "Essayez un autre terme de recherche."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Impossible de charger votre compte",
+    "couldNotLoadAccountDescription": "Vérifiez votre connexion et réessayez.",
+    "couldNotLoadPrivacy": "Impossible de charger les choix de confidentialité",
+    "couldNotLoadPrivacyDescription": "Vérifiez les paramètres de sécurité de votre appareil et réessayez."
   }
 }

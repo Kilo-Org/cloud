@@ -7,7 +7,13 @@
     "device": "Пристрій",
     "share": "Поділитися",
     "justNow": "Щойно",
-    "couldNotSaveSetting": "Не вдалося зберегти налаштування"
+    "couldNotSaveSetting": "Не вдалося зберегти налаштування",
+    "apply": "Застосувати",
+    "save": "Зберегти",
+    "copy": "Копіювати",
+    "approve": "Схвалити",
+    "refresh": "Оновити",
+    "couldNotRefresh": "Не вдалося оновити. Потягніть униз, щоб спробувати ще раз."
   },
   "language": {
     "title": "Мова",
@@ -31,5 +37,260 @@
       "balance": "Сповіщення про баланс",
       "security": "Висновки безпеки"
     }
+  },
+  "tabs": {
+    "home": "Головна",
+    "agents": "Агенти",
+    "profile": "Профіль",
+    "kiloclaw": "KiloClaw",
+    "kiloclawWrapped": "Kilo\nClaw"
+  },
+  "chat": {
+    "instancePicker": {
+      "switchInstance": "Змінити екземпляр",
+      "couldNotLoadInstances": "Не вдалося завантажити екземпляри",
+      "noInstances": "Немає екземплярів KiloClaw",
+      "noInstancesDescription": "Налаштуйте екземпляр, щоб почати чат.",
+      "setUpKiloclaw": "Налаштувати KiloClaw",
+      "currentInstance": "{{title}}, поточний",
+      "personal": "Особисте"
+    },
+    "conversation": {
+      "failedToLoad": "Не вдалося завантажити розмову",
+      "notFound": "Розмову не знайдено",
+      "untitled": "Без назви"
+    }
+  },
+  "kiloclaw": {
+    "title": "KiloClaw",
+    "couldNotLoadInstances": "Не вдалося завантажити екземпляри KiloClaw",
+    "billing": {
+      "title": "Оплата",
+      "continueMonthToMonth": "Продовжити щомісячно",
+      "plan": "Тариф",
+      "finalTermEnds": "Останній період завершується",
+      "afterFinalTerm": "Після останнього періоду",
+      "remaining": "Залишилося",
+      "ends": "Завершується",
+      "expires": "Спливає",
+      "noActivePlan": "Немає активного тарифу",
+      "noActivePlanDescription": "У вас немає активної підписки KiloClaw.",
+      "managedByAdmin": "Оплатою керує адміністратор вашої організації.",
+      "couldNotLoad": "Не вдалося завантажити інформацію про оплату",
+      "manageOnWeb": "Керування оплатою у вебверсії",
+      "commitPlan": "Commit",
+      "daysLeft": "Залишилося {{count}} дн.",
+      "earlybird": "Earlybird",
+      "finalCommitTermEndsOn": "Ваш останній період Commit закінчується {{date}}. Продовжте як Standard за {{price}}, або хостинг завершиться.",
+      "freeTrial": "Безкоштовний пробний період",
+      "hostingEnds": "Хостинг завершується",
+      "oneDayLeft": "Залишився 1 день",
+      "renews": "Продовжується",
+      "standardMonthToMonth": "Standard щомісяця",
+      "standardStartsOn": "Standard починається {{date}} за {{price}}.",
+      "yourStandardMonthlyPrice": "ваша щомісячна ціна Standard"
+    },
+    "changelog": {
+      "title": "Що нового",
+      "couldNotLoad": "Не вдалося завантажити журнал змін",
+      "noUpdates": "Оновлень поки немає",
+      "noUpdatesDescription": "Записи журналу змін з'являться тут.",
+      "recentUpdates": "Останні оновлення"
+    },
+    "dashboard": {
+      "title": "Панель керування",
+      "couldNotLoad": "Не вдалося завантажити панель керування",
+      "renameInstance": "Перейменувати екземпляр",
+      "renamePlaceholder": "Введіть нову назву (не більше 50 символів)",
+      "someDetailsFailed": "Не вдалося завантажити деякі актуальні дані",
+      "destroy": "Знищити",
+      "destroyMessage": "Це назавжди знищить ваш екземпляр KiloClaw і всі його дані. Цю дію не можна скасувати.",
+      "destroyTitle": "Знищити екземпляр",
+      "instance": "Екземпляр"
+    },
+    "channels": {
+      "title": "Канали",
+      "couldNotLoad": "Не вдалося завантажити канали",
+      "noChannels": "Немає доступних каналів",
+      "noChannelsDescription": "Інтеграції каналів з'являться тут.",
+      "connected": "{{label}} підключено",
+      "disconnectMessage": "Видалити {{label}}? Цей канал буде відключено.",
+      "disconnectTitle": "Відключити канал"
+    },
+    "devicePairing": {
+      "title": "Сполучення пристроїв",
+      "refreshRequests": "Оновити запити на сполучення",
+      "couldNotLoad": "Не вдалося завантажити запити на сполучення",
+      "noPending": "Немає запитів, що очікують",
+      "noPendingDescription": "Запити на сполучення каналів і пристроїв з'являться тут.",
+      "channelRequests": "Запити каналів",
+      "deviceRequests": "Запити пристроїв",
+      "approveDeviceMessage": "Дозволити {{platform}} підключитися до вашого екземпляра?",
+      "approveDeviceTitle": "Схвалити пристрій",
+      "approveMessage": "Дозволити {{label}} (код: {{code}}) підключитися до вашого екземпляра?",
+      "approveTitle": "Схвалити запит на сполучення",
+      "device": "Пристрій",
+      "unknownDevice": "Невідомий пристрій"
+    },
+    "execPolicy": {
+      "title": "Політика виконання",
+      "couldNotLoad": "Не вдалося завантажити політику виконання"
+    },
+    "google": {
+      "title": "Обліковий запис Google",
+      "couldNotLoad": "Не вдалося завантажити стан облікового запису Google",
+      "disconnected": "Обліковий запис Google відключено. Повторно розгорніть екземпляр, щоб застосувати зміну.",
+      "redeploy": "Розгорнути повторно",
+      "setupCommand": "Команда налаштування",
+      "setupCommandHelp": "Виконайте цю команду в терміналі зі встановленим Docker на власному комп'ютері, щоб підключити обліковий запис Google.",
+      "failedToLoadCommand": "Не вдалося завантажити команду налаштування",
+      "gmailNotifications": "Сповіщення Gmail",
+      "disconnect": "Відключити обліковий запис Google",
+      "connected": "Підключено",
+      "copied": "Скопійовано!",
+      "copyCommand": "Копіювати команду",
+      "disabled": "Вимкнено",
+      "disconnectConfirm": "Відключити",
+      "disconnectMessage": "Видалити обліковий запис Google із цього екземпляра? Це вимкне сповіщення Gmail. Повторно розгорніть після відключення, щоб застосувати зміни.",
+      "disconnectTitle": "Відключити Google",
+      "enabled": "Увімкнено",
+      "notConnected": "Не підключено"
+    },
+    "modelList": {
+      "title": "Усі моделі",
+      "searchPlaceholder": "Пошук моделей...",
+      "couldNotLoad": "Не вдалося завантажити моделі",
+      "clearSearch": "Очистити пошук",
+      "noMatches": "Жодна модель не відповідає вашому запиту",
+      "noModels": "Немає доступних моделей",
+      "noModelsDescription": "Моделі з'являться тут, коли стануть доступні.",
+      "noResultsFor": "Немає результатів для \"{{query}}\"",
+      "recommended": "Рекомендовані"
+    },
+    "model": {
+      "title": "Модель"
+    },
+    "secrets": {
+      "title": "Секрети",
+      "couldNotLoad": "Не вдалося завантажити секрети",
+      "noSecrets": "Немає доступних секретів",
+      "noSecretsDescription": "Інтеграції секретів з'являться тут.",
+      "removeMessage": "Видалити {{label}}? Цей інструмент втратить доступ до своїх облікових даних.",
+      "removeTitle": "Видалити секрет",
+      "saved": "{{label}} збережено"
+    },
+    "versionPin": {
+      "title": "Закріплення версії",
+      "couldNotLoad": "Не вдалося завантажити інформацію про версію",
+      "couldNotLoadMore": "Не вдалося завантажити більше версій",
+      "loadMore": "Завантажити більше версій",
+      "showingLatest": "Показано останні 100 версій",
+      "availableVersions": "Доступні версії",
+      "noVersions": "Немає доступних версій",
+      "noVersionsDescription": "Доступні версії OpenClaw з'являться тут.",
+      "unpin": "Відкріпити",
+      "unpinMessage": "Повернутися до останньої доступної версії?",
+      "unpinTitle": "Відкріпити версію"
+    },
+    "redeploy": "Розгорнути повторно",
+    "redeployMessage": "Ви впевнені, що хочете повторно розгорнути цей екземпляр?",
+    "redeployTitle": "Повторно розгорнути екземпляр"
+  },
+  "codeReviewer": {
+    "focusAreas": {
+      "title": "Області уваги",
+      "hint": "Залиште все невибраним, щоб перевірити все."
+    },
+    "gate": {
+      "title": "Шлюз злиття",
+      "all": "Невдача за будь-якого зауваження",
+      "critical": "Невдача лише за критичних зауважень",
+      "off": "Ніколи не провалювати перевірку PR",
+      "warning": "Невдача за попереджень і критичних зауважень"
+    },
+    "instructions": {
+      "title": "Користувацькі інструкції",
+      "deprecation": "Користувацькі інструкції планується вивести з експлуатації. Перенесіть ці настанови у файл REVIEW.md у вашому репозиторії.",
+      "placeholder": "напр., застосовуйте наші правила обробки помилок…"
+    },
+    "repos": {
+      "title": "Репозиторії",
+      "couldNotLoad": "Не вдалося завантажити репозиторії",
+      "unavailable": "Репозиторії недоступні — завершіть налаштування Bitbucket на kilo.ai.",
+      "finishSetup": "Завершити налаштування",
+      "manageAccess": "Керування доступом",
+      "allRepositories": "Усі репозиторії",
+      "bitbucketNoRepositoriesDescription": "У цьому робочому просторі Bitbucket немає доступних репозиторіїв.",
+      "bitbucketSetup": "Налаштування Bitbucket",
+      "couldNotOpenGithubSettings": "Не вдалося відкрити налаштування застосунку GitHub",
+      "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
+      "installGithubApp": "Установити застосунок GitHub на репозиторії",
+      "installGithubAppDescription": "Надайте застосунку Kilo GitHub доступ до репозиторіїв, які потрібно перевірити.",
+      "noRepositoriesFound": "Репозиторіїв не знайдено",
+      "repositoryAccess": "доступ до репозиторію",
+      "selectedRepositories": "Вибрані репозиторії"
+    },
+    "style": {
+      "title": "Стиль перевірки",
+      "balanced": "Змістовні зауваження без шуму",
+      "lenient": "Лише серйозні проблеми",
+      "roast": "Безжально чесно й кумедно",
+      "strict": "Позначати все, тримати високу планку"
+    }
+  },
+  "securityAgent": {
+    "filter": {
+      "noFilters": "Немає доступних фільтрів",
+      "noFiltersDescription": "Поверніться та знову відкрийте фільтри зі списку знахідок.",
+      "title": "Фільтрувати знахідки"
+    }
+  },
+  "agentChat": {
+    "session": {
+      "title": "Сеанс",
+      "copyErrorDetails": "Копіювати відомості про помилку",
+      "backToSessions": "Назад до сеансів",
+      "accessDenied": "Доступ заборонено",
+      "accessDeniedDescription": "У вас немає дозволу переглядати це.",
+      "couldNotLoad": "Не вдалося завантажити сеанс",
+      "failedToLoadDetails": "Не вдалося завантажити відомості про сеанс",
+      "notFound": "Не знайдено",
+      "notFoundDescription": "Можливо, цей елемент було видалено або він більше недоступний."
+    },
+    "newSession": {
+      "title": "Новий сеанс"
+    },
+    "instancePicker": {
+      "runOn": "Запустити на",
+      "couldNotLoad": "Не вдалося завантажити екземпляри",
+      "couldNotLoadDescription": "Перевірте з'єднання та спробуйте ще раз.",
+      "cloudAgent": "Хмарний агент",
+      "cloudAgentDescription": "Запуск у хмарній пісочниці Kilo",
+      "noCliInstances": "Немає підключених екземплярів CLI",
+      "noCliInstancesDescription": "Виконайте `kilo remote` у проєкті на своєму комп'ютері або оновіть Kilo CLI, якщо вона вже запущена.",
+      "instanceOnProject": "{{name}} на {{project}}",
+      "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
+      "runOnCloudAgent": "Запустити на хмарному агенті"
+    },
+    "modePicker": {
+      "title": "Вибрати режим",
+      "modeLabel": "{{label}}: {{description}}",
+      "customModes": "Користувацькі режими"
+    },
+    "repoPicker": {
+      "title": "Вибрати репозиторій",
+      "searchLabel": "Пошук репозиторіїв",
+      "searchPlaceholder": "Пошук репозиторіїв...",
+      "noMatches": "Немає збігів",
+      "noRepositories": "Немає доступних репозиторіїв",
+      "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
+      "tryDifferentSearch": "Спробуйте інший пошуковий запит."
+    }
+  },
+  "bootstrap": {
+    "couldNotLoadAccount": "Не вдалося завантажити ваш обліковий запис",
+    "couldNotLoadAccountDescription": "Перевірте з'єднання та спробуйте ще раз.",
+    "couldNotLoadPrivacy": "Не вдалося завантажити налаштування конфіденційності",
+    "couldNotLoadPrivacyDescription": "Перевірте налаштування безпеки пристрою та спробуйте ще раз."
   }
 }

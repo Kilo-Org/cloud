@@ -1,5 +1,6 @@
 import { Bug, RefreshCw, Sparkles } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -12,21 +13,21 @@ type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data'
 
 const DEPLOY_HINTS = {
   redeploy_suggested: {
-    label: 'Redeploy suggested',
+    labelKey: 'kiloclaw.changelog.redeploySuggested',
     bgClass: 'bg-info-tile-bg',
     textClass: 'text-info',
   },
   redeploy_required: {
-    label: 'Redeploy required',
+    labelKey: 'kiloclaw.changelog.redeployRequired',
     bgClass: 'bg-warn-tile-bg',
     textClass: 'text-warn',
   },
   upgrade_required: {
-    label: 'Upgrade required',
+    labelKey: 'kiloclaw.changelog.upgradeRequired',
     bgClass: 'bg-danger-tile-bg',
     textClass: 'text-destructive',
   },
-} satisfies Record<string, { label: string; bgClass: string; textClass: string }>;
+} as const satisfies Record<string, { labelKey: string; bgClass: string; textClass: string }>;
 
 export function ChangelogList({
   entries,
@@ -40,6 +41,7 @@ export function ChangelogList({
   onUpgrade: () => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View className="gap-3">
@@ -58,7 +60,9 @@ export function ChangelogList({
               </Text>
               {deployHint && (
                 <View className={cn('rounded px-1.5 py-0.5', deployHint.bgClass)}>
-                  <Text className={cn('text-xs', deployHint.textClass)}>{deployHint.label}</Text>
+                  <Text className={cn('text-xs', deployHint.textClass)}>
+                    {t(deployHint.labelKey)}
+                  </Text>
                 </View>
               )}
             </View>
@@ -75,12 +79,12 @@ export function ChangelogList({
                 className="flex-row gap-1.5 self-start"
               >
                 {!isRedeploying && <RefreshCw size={14} color={colors.foreground} />}
-                <Text>Redeploy</Text>
+                <Text>{t('kiloclaw.redeploy')}</Text>
               </Button>
             )}
             {entry.deployHint === 'upgrade_required' && (
               <Button size="sm" variant="outline" onPress={onUpgrade} className="self-start">
-                <Text>Manage version</Text>
+                <Text>{t('kiloclaw.changelog.manageVersion')}</Text>
               </Button>
             )}
           </View>

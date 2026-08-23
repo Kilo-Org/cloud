@@ -2,10 +2,12 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { formatDollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
@@ -20,12 +22,16 @@ type MemberRowProps = {
   last?: boolean;
 };
 
-export const ROLE_LABEL = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-  billing_manager: 'Billing manager',
-} satisfies Record<OrgRole, string>;
+const ROLE_LABEL_KEYS = {
+  owner: 'organization.members.roles.owner',
+  admin: 'organization.members.roles.admin',
+  member: 'organization.members.roles.member',
+  billing_manager: 'organization.members.roles.billingManager',
+} as const;
+
+export function roleLabel(role: OrgRole): string {
+  return i18n.t(ROLE_LABEL_KEYS[role]);
+}
 
 const ROLE_OPTIONS: OrgRole[] = ['owner', 'admin', 'member', 'billing_manager'];
 
@@ -37,13 +43,14 @@ export function MemberRow({
   last,
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const mutations = useOrganizationMutations(organizationId);
   const displayName = firstNonEmpty(member.name, member.email);
 
   function openRoleSheet() {
-    const options = [...ROLE_OPTIONS.map(role => ROLE_LABEL[role]), 'Cancel'];
+    const options = [...ROLE_OPTIONS.map(role => roleLabel(role)), t('common.cancel')];
     showActionSheetWithOptions(
       {
         options,
@@ -68,31 +75,38 @@ export function MemberRow({
   }
 
   function confirmRemove() {
-    Alert.alert('Remove member', `Remove ${displayName} from this organization?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          mutations.removeMember.mutate(
-            { memberId: member.id },
-            {
-              onSuccess: () => {
-                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              },
-            }
-          );
+    Alert.alert(
+      t('organization.members.removeMember'),
+      t('organization.members.removeMemberMessage', { name: displayName }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('organization.members.removeConfirm'),
+          style: 'destructive',
+          onPress: () => {
+            mutations.removeMember.mutate(
+              { memberId: member.id },
+              {
+                onSuccess: () => {
+                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                },
+              }
+            );
+          },
         },
-      },
-    ]);
+      ]
+    );
   }
 
   function openActions() {
+    const changeRoleLabel = t('organization.members.changeRole');
+    const setDailyUsageLimitLabel = t('organization.members.setDailyUsageLimit');
+    const removeMemberLabel = t('organization.members.removeMember');
     const options = [
-      'Change role',
-      ...(enableUsageLimits ? ['Set daily usage limit'] : []),
-      'Remove member',
-      'Cancel',
+      changeRoleLabel,
+      ...(enableUsageLimits ? [setDailyUsageLimitLabel] : []),
+      removeMemberLabel,
+      t('common.cancel'),
     ];
     showActionSheetWithOptions(
       {
@@ -103,13 +117,13 @@ export function MemberRow({
       },
       index => {
         const label = index !== undefined ? options[index] : undefined;
-        if (label === 'Change role') {
+        if (label === changeRoleLabel) {
           openRoleSheet();
-        } else if (label === 'Set daily usage limit') {
+        } else if (label === setDailyUsageLimitLabel) {
           router.push(
             `/(app)/(tabs)/(3_profile)/organization/member-limit?memberId=${member.id}` as Href
           );
-        } else if (label === 'Remove member') {
+        } else if (label === removeMemberLabel) {
           confirmRemove();
         }
       }
@@ -134,12 +148,14 @@ export function MemberRow({
       <View className="items-end gap-1">
         <View className="rounded-full bg-muted px-2 py-0.5">
           <Text className="text-[11px] font-medium text-muted-foreground">
-            {ROLE_LABEL[member.role]}
+            {roleLabel(member.role)}
           </Text>
         </View>
         {member.dailyUsageLimitUsd != null && (
           <Text className="text-xs text-muted-foreground">
-            {formatDollars(member.dailyUsageLimitUsd)}/day
+            {t('organization.members.limitPerDay', {
+              amount: formatDollars(member.dailyUsageLimitUsd),
+            })}
           </Text>
         )}
       </View>
@@ -154,7 +170,7 @@ export function MemberRow({
     <Pressable
       onPress={openActions}
       accessibilityRole="button"
-      accessibilityLabel={`Manage ${displayName}`}
+      accessibilityLabel={t('organization.members.manageA11y', { name: displayName })}
       className="px-3 active:opacity-70"
     >
       {inner}

@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
 import { Linking, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   FINDING_TONE_TEXT_CLASS,
@@ -33,6 +34,7 @@ function DismissalOrSupersessionNote({
   supersedingFindingId,
 }: Readonly<{ finding: SecurityFinding; scope: string; supersedingFindingId: string | null }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   if (supersedingFindingId) {
@@ -45,10 +47,12 @@ function DismissalOrSupersessionNote({
       >
         <View className="flex-row items-center gap-2">
           <GitMerge size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">Superseded by a current finding</Text>
+          <Text className="text-sm font-medium">
+            {t('securityAgent.findingDetails.supersededBy')}
+          </Text>
         </View>
         <Text variant="muted" className="text-xs">
-          Tap to open the current record for status, analysis, and remediation.
+          {t('securityAgent.findingDetails.supersededByDescription')}
         </Text>
       </Pressable>
     );
@@ -60,9 +64,11 @@ function DismissalOrSupersessionNote({
 
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">Dismissed</Text>
+      <Text className="text-sm font-medium">{t('securityAgent.findingDetails.dismissed')}</Text>
       <Text variant="muted" className="text-xs" selectable>
-        Dismissed because {getDismissalReasonLabel(finding.ignored_reason)}.
+        {t('securityAgent.findingDetails.dismissedBecause', {
+          reason: getDismissalReasonLabel(finding.ignored_reason),
+        })}
       </Text>
     </View>
   );
@@ -73,6 +79,7 @@ function DismissalOrSupersessionNote({
 // dismissal/supersession context as plain facts rather than the web's
 // hero + next-step action card (Task 7 owns actions).
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
@@ -88,7 +95,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[severity.tone])}>
-            {severity.label} severity
+            {t('securityAgent.findingDetails.severityLabel', { severity: severity.label })}
           </Text>
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
             {status.label}
@@ -109,47 +116,72 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       />
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label="Package" value={`${finding.package_name} (${finding.package_ecosystem})`} />
         <KvRow
-          label="Vulnerable versions"
-          value={firstNonEmpty(finding.vulnerable_version_range, 'Unknown')}
+          label={t('securityAgent.findingDetails.package')}
+          value={`${finding.package_name} (${finding.package_ecosystem})`}
+        />
+        <KvRow
+          label={t('securityAgent.findingDetails.vulnerableVersions')}
+          value={firstNonEmpty(
+            finding.vulnerable_version_range,
+            t('securityAgent.findingDetails.unknown')
+          )}
           selectable
         />
         <KvRow
-          label="Patched version"
-          value={firstNonEmpty(finding.patched_version, 'No patch available')}
+          label={t('securityAgent.findingDetails.patchedVersion')}
+          value={firstNonEmpty(
+            finding.patched_version,
+            t('securityAgent.findingDetails.noPatchAvailable')
+          )}
           selectable
         />
-        {finding.cve_id ? <KvRow label="CVE" value={finding.cve_id} selectable /> : null}
-        {finding.ghsa_id ? <KvRow label="GHSA" value={finding.ghsa_id} selectable /> : null}
+        {finding.cve_id ? (
+          <KvRow label={t('securityAgent.findingDetails.cve')} value={finding.cve_id} selectable />
+        ) : null}
+        {finding.ghsa_id ? (
+          <KvRow
+            label={t('securityAgent.findingDetails.ghsa')}
+            value={finding.ghsa_id}
+            selectable
+          />
+        ) : null}
         <KvRow
-          label="Repository"
+          label={t('securityAgent.findingDetails.repository')}
           value={finding.repo_full_name}
           last={!finding.manifest_path}
           selectable
         />
         {finding.manifest_path ? (
-          <KvRow label="Manifest" value={finding.manifest_path} last selectable />
+          <KvRow
+            label={t('securityAgent.findingDetails.manifest')}
+            value={finding.manifest_path}
+            last
+            selectable
+          />
         ) : null}
       </View>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label="Detected" value={timeAgo(parseTimestamp(finding.first_detected_at))} />
         <KvRow
-          label="Updated"
+          label={t('securityAgent.findingDetails.detected')}
+          value={timeAgo(parseTimestamp(finding.first_detected_at))}
+        />
+        <KvRow
+          label={t('securityAgent.findingDetails.updated')}
           value={timeAgo(parseTimestamp(finding.updated_at))}
           last={!finding.fixed_at && !finding.sla_due_at}
         />
         {finding.fixed_at ? (
           <KvRow
-            label="Fixed"
+            label={t('securityAgent.findingDetails.fixed')}
             value={timeAgo(parseTimestamp(finding.fixed_at))}
             last={!finding.sla_due_at}
           />
         ) : null}
         {finding.sla_due_at ? (
           <KvRow
-            label="SLA deadline"
+            label={t('securityAgent.findingDetails.slaDeadline')}
             value={deadline.detail}
             valueTone={FINDING_TONE_TO_KV_ROW_TONE[deadline.tone]}
             last
@@ -157,9 +189,17 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         ) : null}
       </View>
 
-      <CollapsibleSection title="Source record">
-        <KvRow label="Source" value={getFindingSourceLabel(finding.source)} />
-        <KvRow label="Source ID" value={finding.source_id} last selectable />
+      <CollapsibleSection title={t('securityAgent.findingDetails.sourceRecord')}>
+        <KvRow
+          label={t('securityAgent.findingDetails.source')}
+          value={getFindingSourceLabel(finding.source)}
+        />
+        <KvRow
+          label={t('securityAgent.findingDetails.sourceId')}
+          value={finding.source_id}
+          last
+          selectable
+        />
       </CollapsibleSection>
 
       {advisoryUrl ? (
@@ -171,7 +211,9 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           accessibilityRole="link"
         >
           <ExternalLink size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">View advisory on GitHub</Text>
+          <Text className="text-sm font-medium">
+            {t('securityAgent.findingDetails.viewAdvisory')}
+          </Text>
         </Pressable>
       ) : null}
     </View>

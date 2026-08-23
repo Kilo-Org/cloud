@@ -1,5 +1,6 @@
 import { AlertTriangle } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -26,6 +27,7 @@ export function SecurityCommandRetryCard({
   onDiscard,
 }: Readonly<SecurityCommandRetryCardProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="gap-3 rounded-lg border border-destructive bg-red-50 p-3 dark:bg-red-950">
       <View className="flex-row items-start gap-2">
@@ -35,10 +37,10 @@ export function SecurityCommandRetryCard({
       {retryable ? (
         <View className="flex-row gap-2">
           <Button size="sm" className="flex-1" onPress={onRetry}>
-            <Text>Retry</Text>
+            <Text>{t('common.retry')}</Text>
           </Button>
           <Button size="sm" variant="ghost" onPress={onDiscard}>
-            <Text>Discard</Text>
+            <Text>{t('securityAgent.commandRetry.discard')}</Text>
           </Button>
         </View>
       ) : null}

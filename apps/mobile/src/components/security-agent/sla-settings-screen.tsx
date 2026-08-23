@@ -5,6 +5,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
@@ -28,9 +29,10 @@ import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
 function SlaSettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="SLA policy" />
+      <ScreenHeader title={t('securityAgent.sla.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -44,16 +46,32 @@ function SlaSettingsSkeleton() {
 
 type SlaSeverity = 'critical' | 'high' | 'medium' | 'low';
 
-const SLA_ROWS: { key: SlaSeverity; label: string; description: string }[] = [
+const SLA_ROWS = [
   {
     key: 'critical',
-    label: 'Critical',
-    description: 'Remote exploitation without authentication.',
+    labelKey: 'securityAgent.sla.critical',
+    descriptionKey: 'securityAgent.sla.criticalDescription',
   },
-  { key: 'high', label: 'High', description: 'Potential significant data exposure.' },
-  { key: 'medium', label: 'Medium', description: 'Limited impact or specific conditions.' },
-  { key: 'low', label: 'Low', description: 'Minimal security impact.' },
-];
+  {
+    key: 'high',
+    labelKey: 'securityAgent.sla.high',
+    descriptionKey: 'securityAgent.sla.highDescription',
+  },
+  {
+    key: 'medium',
+    labelKey: 'securityAgent.sla.medium',
+    descriptionKey: 'securityAgent.sla.mediumDescription',
+  },
+  {
+    key: 'low',
+    labelKey: 'securityAgent.sla.low',
+    descriptionKey: 'securityAgent.sla.lowDescription',
+  },
+] as const satisfies readonly {
+  key: SlaSeverity;
+  labelKey: string;
+  descriptionKey: string;
+}[];
 
 // Uncontrolled numeric TextInput — never pass `value` back on iOS (see
 // apps/mobile/AGENTS.md). The ref holds the raw typed text; `days` holds
@@ -73,6 +91,7 @@ function SlaDayRow({
   onChangeValue: (value: number) => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const rawRef = useRef(String(initialValue));
   const [days, setDays] = useState(initialValue);
 
@@ -89,13 +108,15 @@ function SlaDayRow({
           {description}
         </Text>
         {!isValidDayCount(days) && (
-          <Text className="mt-1 text-xs text-destructive">1-365 days, whole numbers only.</Text>
+          <Text className="mt-1 text-xs text-destructive">
+            {t('securityAgent.sla.invalidDayCount')}
+          </Text>
         )}
       </View>
       <TextInput
-        accessibilityLabel={`${label} remediation deadline in days`}
+        accessibilityLabel={t('securityAgent.sla.remediationDeadlineA11y', { label })}
         accessibilityHint={
-          isValidDayCount(days) ? undefined : 'Enter a whole number between 1 and 365'
+          isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
         }
         className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-[normal] text-foreground"
         textAlign="center"
@@ -116,6 +137,7 @@ function SlaDayRow({
 }
 
 export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -205,9 +227,9 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="SLA policy"
+        title={t('securityAgent.sla.title')}
         variant="offline"
-        message="Could not load SLA settings"
+        message={t('securityAgent.sla.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -222,7 +244,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="SLA policy"
+        title={t('securityAgent.sla.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -243,12 +265,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
         <ToggleRow
-          title="Enable SLA tracking"
-          subtitle="Set remediation deadlines based on finding severity."
+          title={t('securityAgent.sla.enableTracking')}
+          subtitle={t('securityAgent.sla.enableTrackingSubtitle')}
           value={slaEnabled}
           disabled={!canManage}
           onValueChange={setSlaEnabled}
@@ -257,13 +279,13 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         {hydratedRef.current && slaEnabled && (
           <View className="gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Remediation deadlines (days)
+              {t('securityAgent.sla.deadlinesHeading')}
             </Text>
             {SLA_ROWS.map(row => (
               <SlaDayRow
                 key={row.key}
-                label={row.label}
-                description={row.description}
+                label={t(row.labelKey)}
+                description={t(row.descriptionKey)}
                 initialValue={slaDays[row.key]}
                 disabled={!canManage}
                 onChangeValue={value => {

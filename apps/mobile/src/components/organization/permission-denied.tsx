@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Lock } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -17,12 +18,13 @@ type PermissionDeniedProps = Readonly<{
  */
 export function PermissionDenied({ description }: PermissionDeniedProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <View className="flex-1 bg-background">
       <EmptyState
         icon={Lock}
-        title="Access denied"
+        title={t('organization.permissionDenied.title')}
         description={description}
         action={
           <Button
@@ -31,7 +33,7 @@ export function PermissionDenied({ description }: PermissionDeniedProps) {
               router.back();
             }}
           >
-            <Text>Back</Text>
+            <Text>{t('organization.permissionDenied.back')}</Text>
           </Button>
         }
       />

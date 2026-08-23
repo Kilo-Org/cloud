@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -41,11 +42,14 @@ function FindingsListFooter({
   error,
   onRetry,
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
+  const { t } = useTranslation();
   if (loading) {
     return <Skeleton className="h-24 w-full rounded-lg" />;
   }
   if (error) {
-    return <QueryError message="Could not load more findings" onRetry={onRetry} />;
+    return (
+      <QueryError message={t('securityAgent.findingList.couldNotLoadMore')} onRetry={onRetry} />
+    );
   }
   return null;
 }
@@ -54,6 +58,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const router = useRouter();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
+  const { t } = useTranslation();
   const [filters, setFilters] = useState(() => parseSecurityFindingFilters(routeParams));
   const [refreshing, setRefreshing] = useState(false);
 
@@ -82,7 +87,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         // Refresh only — never triggers a new sync.
         const result = await findings.refetch();
         if (result.isError) {
-          toast.error("Couldn't refresh. Pull down to try again.");
+          toast.error(t('common.couldNotRefresh'));
         }
       } finally {
         setRefreshing(false);
@@ -93,7 +98,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Findings"
+        title={t('securityAgent.findingList.title')}
         headerRight={
           <Pressable
             onPress={() => {
@@ -109,7 +114,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             }}
             disabled={filterUnavailable}
             accessibilityRole="button"
-            accessibilityLabel="Filter findings"
+            accessibilityLabel={t('securityAgent.filter.title')}
             accessibilityState={{ disabled: filterUnavailable }}
             className={cn(
               'size-11 items-center justify-center active:opacity-70',
@@ -134,7 +139,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
 
       {!findings.isLoading && findings.isError && !findings.data && (
         <View className="flex-1 items-center justify-center">
-          <QueryError message="Could not load findings" onRetry={() => void findings.refetch()} />
+          <QueryError
+            message={t('securityAgent.findingList.couldNotLoad')}
+            onRetry={() => void findings.refetch()}
+          />
         </View>
       )}
 
@@ -171,11 +179,15 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           ListEmptyComponent={
             <EmptyState
               icon={ShieldCheck}
-              title={filtersActive ? 'No findings match filters' : 'No open findings'}
+              title={
+                filtersActive
+                  ? t('securityAgent.findingList.noMatchesTitle')
+                  : t('securityAgent.findingList.emptyTitle')
+              }
               description={
                 filtersActive
-                  ? 'Try adjusting or clearing the selected filters.'
-                  : 'No open findings need attention right now.'
+                  ? t('securityAgent.findingList.noMatchesDescription')
+                  : t('securityAgent.findingList.emptyDescription')
               }
               action={
                 filtersActive ? (
@@ -185,7 +197,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                       setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
                     }}
                   >
-                    <Text>Clear filters</Text>
+                    <Text>{t('securityAgent.findingList.clearFilters')}</Text>
                   </Button>
                 ) : undefined
               }

@@ -9,64 +9,66 @@ import {
   Shield,
   Sparkles,
 } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
 
 type SettingsItem = {
   icon: LucideIcon;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   path: string;
 };
 
-const SETTINGS_ITEMS: SettingsItem[] = [
+const SETTINGS_ITEMS = [
   {
     icon: Sparkles,
-    label: 'Model',
-    description: 'AI model selection',
+    labelKey: 'kiloclaw.settings.modelLabel',
+    descriptionKey: 'kiloclaw.settings.modelDescription',
     path: 'settings/model',
   },
   {
     icon: Lock,
-    label: 'Secrets',
-    description: 'Encrypted credentials',
+    labelKey: 'kiloclaw.settings.secretsLabel',
+    descriptionKey: 'kiloclaw.settings.secretsDescription',
     path: 'settings/secrets',
   },
   {
     icon: MessageSquare,
-    label: 'Channels',
-    description: 'Telegram, Discord, Slack',
+    labelKey: 'kiloclaw.settings.channelsLabel',
+    descriptionKey: 'kiloclaw.settings.channelsDescription',
     path: 'settings/channels',
   },
   {
     icon: Link2,
-    label: 'Device pairing',
-    description: 'Approve device requests',
+    labelKey: 'kiloclaw.settings.devicePairingLabel',
+    descriptionKey: 'kiloclaw.settings.devicePairingDescription',
     path: 'settings/device-pairing',
   },
   {
     icon: Shield,
-    label: 'Execution policy',
-    description: 'Security settings',
+    labelKey: 'kiloclaw.settings.execPolicyLabel',
+    descriptionKey: 'kiloclaw.settings.execPolicyDescription',
     path: 'settings/exec-policy',
   },
   {
     icon: Pin,
-    label: 'Version pinning',
-    description: 'Pin to a specific version',
+    labelKey: 'kiloclaw.settings.versionPinLabel',
+    descriptionKey: 'kiloclaw.settings.versionPinDescription',
     path: 'settings/version-pin',
   },
   {
     icon: Mail,
-    label: 'Google Account',
-    description: 'Gmail, Calendar, Docs',
+    labelKey: 'kiloclaw.settings.googleLabel',
+    descriptionKey: 'kiloclaw.settings.googleDescription',
     path: 'settings/google',
   },
-];
+] as const satisfies readonly SettingsItem[];
 
 export function SettingsList() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
 
   return (
@@ -77,8 +79,8 @@ export function SettingsList() {
           <ConfigureRow
             key={item.path}
             icon={item.icon}
-            title={item.label}
-            subtitle={item.description}
+            title={t(item.labelKey)}
+            subtitle={t(item.descriptionKey)}
             last={isLast}
             onPress={() => {
               router.push(`/(app)/kiloclaw/${instanceId}/${item.path}` as Href);

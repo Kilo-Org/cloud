@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, ChevronRight, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -45,9 +46,10 @@ export function OrganizationHubScreen() {
   const kiloPassSummary = useOrgKiloPassSummary(organizationId, showKiloPass);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
+  const { t } = useTranslation();
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title="Organization" />;
+    return <OrganizationBoundary title={t('organization.hub.title')} />;
   }
 
   const showMoney = isMoneyRole(role);
@@ -58,7 +60,9 @@ export function OrganizationHubScreen() {
   const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   const lowBalanceSubtitle =
-    minimumBalance != null ? `Below ${formatDollars(minimumBalance)}` : 'Off';
+    minimumBalance != null
+      ? t('organization.hub.lowBalanceBelow', { amount: formatDollars(minimumBalance) })
+      : t('organization.hub.lowBalanceOff');
 
   return (
     <View className="flex-1 bg-background">
@@ -80,7 +84,7 @@ export function OrganizationHubScreen() {
                 }}
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel="Rename organization"
+                accessibilityLabel={t('organization.hub.renameTitle')}
                 className="active:opacity-70"
               >
                 <Pencil size={16} color={colors.mutedForeground} />
@@ -88,7 +92,10 @@ export function OrganizationHubScreen() {
             )}
           </View>
           {showMoney && (
-            <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
+            <KvRow
+              label={t('organization.hub.balance')}
+              value={formatDollars(fromMicrodollars(org.balance))}
+            />
           )}
           {showMoney && org.balance === 0 && (
             <AddCreditsRow
@@ -97,7 +104,7 @@ export function OrganizationHubScreen() {
             />
           )}
           <KvRow
-            label="Organization seats"
+            label={t('organization.hub.organizationSeats')}
             // `requireSeats` is the enforcement switch; total is the raw
             // purchased capacity and can legitimately be zero.
             value={
@@ -114,7 +121,7 @@ export function OrganizationHubScreen() {
         <View className="rounded-lg bg-secondary px-3">
           <ConfigureRow
             icon={Users}
-            title="Members"
+            title={t('organization.members.title')}
             last={!showMoney}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/members' as Href);
@@ -124,14 +131,14 @@ export function OrganizationHubScreen() {
             <>
               <ConfigureRow
                 icon={Receipt}
-                title="Credit activity"
+                title={t('organization.creditActivity.title')}
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/organization/credit-activity' as Href);
                 }}
               />
               <ConfigureRow
                 icon={FileText}
-                title="Invoices"
+                title={t('organization.invoices.title')}
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/organization/invoices' as Href);
                 }}
@@ -141,12 +148,12 @@ export function OrganizationHubScreen() {
                   state={kiloPassRowState}
                   onManage={() => {
                     void openExternalUrl(kiloPassManagementUrl, {
-                      label: 'Kilo Pass management',
+                      label: t('kiloPass.kiloPassManagement'),
                     });
                   }}
                   onSetup={() => {
                     void openExternalUrl(kiloPassSetupUrl, {
-                      label: 'Kilo Pass setup',
+                      label: t('kiloPass.kiloPassSetup'),
                     });
                   }}
                   onRetry={() => {
@@ -156,7 +163,7 @@ export function OrganizationHubScreen() {
               )}
               <ConfigureRow
                 icon={Bell}
-                title="Low balance alert"
+                title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
                 last
                 onPress={() => {
@@ -170,8 +177,8 @@ export function OrganizationHubScreen() {
 
       {renameVisible && (
         <RenameModal
-          title="Rename organization"
-          placeholder="Enter organization name"
+          title={t('organization.hub.renameTitle')}
+          placeholder={t('organization.hub.renamePlaceholder')}
           initialValue={org.organizationName}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
@@ -203,6 +210,7 @@ type OrgKiloPassRowProps = Readonly<{
  */
 function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const tint: Tint = state.attention ? toneColor('warn') : agentColor('Kilo Pass');
   let onPress: (() => void) | null = null;
   if (state.action === 'manage') {
@@ -214,8 +222,8 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
   }
   const opensWeb = state.action === 'manage' || state.action === 'setup';
   const accessibilityLabel = state.actionLabel
-    ? `Kilo Pass. ${state.subtitle}. ${state.actionLabel}`
-    : `Kilo Pass. ${state.subtitle}`;
+    ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
+    : `${t('kiloPass.title')}. ${state.subtitle}`;
 
   const inner = (
     <View className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft py-3">
@@ -229,7 +237,7 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
         <KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />
       </View>
       <View className="flex-1">
-        <Text className="text-sm font-medium text-foreground">Kilo Pass</Text>
+        <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
         <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
       </View>
       {state.action === 'retry' ? (

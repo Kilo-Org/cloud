@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -30,6 +31,7 @@ type MemberLimitFormProps = Readonly<{
 
 function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '', {
     silenceUpdateMemberToast: true,
   });
@@ -58,9 +60,9 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   return (
     <>
       <FormField
-        label="Limit (USD per day)"
+        label={t('organization.memberLimit.limitLabel')}
         required
-        placeholder="No limit"
+        placeholder={t('organization.memberLimit.noLimitPlaceholder')}
         keyboardType="decimal-pad"
         defaultValue={currentLimit != null ? String(currentLimit) : undefined}
         validate={limitError}
@@ -79,7 +81,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
       />
 
       <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">Save</Text>
+        <Text className="text-primary-foreground">{t('common.save')}</Text>
       </Button>
 
       {currentLimit != null && (
@@ -88,7 +90,9 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
           disabled={mutations.updateMember.isPending}
           onPress={onRemove}
         >
-          <Text className="text-destructive-foreground">Remove limit</Text>
+          <Text className="text-destructive-foreground">
+            {t('organization.memberLimit.removeLimit')}
+          </Text>
         </Button>
       )}
     </>
@@ -96,6 +100,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 }
 
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
+  const { t } = useTranslation();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const members: OrgMember[] = orgWithMembers.data?.members ?? [];
@@ -108,7 +113,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
         <View className="gap-1">
           <Text className="text-center text-lg font-semibold text-foreground">
-            Daily usage limit
+            {t('organization.memberLimit.title')}
           </Text>
         </View>
         <Skeleton className="h-11 rounded-lg" />
@@ -121,13 +126,15 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   }
 
   if (role !== 'owner') {
-    return <PermissionDenied description="Only the organization owner can manage usage limits." />;
+    return <PermissionDenied description={t('organization.memberLimit.permissionDenied')} />;
   }
 
   if (orgWithMembers.isError && !orgWithMembers.data) {
     return (
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <Text className="text-center text-lg font-semibold text-foreground">
+          {t('organization.memberLimit.title')}
+        </Text>
         <QueryError
           onRetry={() => void orgWithMembers.refetch()}
           isRetrying={orgWithMembers.isFetching}
@@ -140,8 +147,12 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   if (!member) {
     return (
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
-        <Text className="text-center text-sm text-muted-foreground">Member not found</Text>
+        <Text className="text-center text-lg font-semibold text-foreground">
+          {t('organization.memberLimit.title')}
+        </Text>
+        <Text className="text-center text-sm text-muted-foreground">
+          {t('organization.memberLimit.memberNotFound')}
+        </Text>
       </ScrollView>
     );
   }
@@ -154,7 +165,9 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
       keyboardShouldPersistTaps="handled"
     >
       <View className="gap-1">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <Text className="text-center text-lg font-semibold text-foreground">
+          {t('organization.memberLimit.title')}
+        </Text>
         <Text className="text-center text-sm text-muted-foreground" numberOfLines={1}>
           {firstNonEmpty(member.name, member.email)}
         </Text>

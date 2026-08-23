@@ -1,5 +1,6 @@
 import { AlertTriangle, Bot, RefreshCw, Trash2 } from '@/components/ui/icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
 import { QueryError } from '@/components/query-error';
@@ -30,6 +31,7 @@ type DashboardHeroProps = {
 
 export function DashboardHero({ name, status, uptime }: Readonly<DashboardHeroProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const tone = statusTone(status);
   const label = statusLabel(status);
   const uptimeStr = uptime == null ? null : formatUptime(uptime);
@@ -55,7 +57,7 @@ export function DashboardHero({ name, status, uptime }: Readonly<DashboardHeroPr
             variant="mono"
             className="text-[10px] uppercase tracking-[1px] text-muted-foreground"
           >
-            {uptimeStr ? `${label} · UP ${uptimeStr}` : label}
+            {uptimeStr ? `${label} · ${t('kiloclaw.dashboard.up')} ${uptimeStr}` : label}
           </Text>
         </View>
       </View>
@@ -78,6 +80,7 @@ function ServiceDegradedBanner({
   isRetrying,
 }: Readonly<ServiceDegradedBannerProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const danger = toneColor('danger');
   return (
     <View className="mx-[22px] flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3">
@@ -92,7 +95,7 @@ function ServiceDegradedBanner({
           <AlertTriangle size={16} color={colors.destructive} />
         </View>
         <Text className="flex-1 text-[13px] font-medium text-foreground">
-          Service degraded — tap to view status
+          {t('kiloclaw.dashboard.serviceDegraded')}
         </Text>
       </Pressable>
       {stale && onRetry ? (
@@ -101,7 +104,7 @@ function ServiceDegradedBanner({
           disabled={isRetrying}
           onPress={onRetry}
           accessibilityRole="button"
-          accessibilityLabel="Retry"
+          accessibilityLabel={t('common.retry')}
           accessibilityState={{ busy: isRetrying }}
           className="p-1 active:opacity-70"
         >
@@ -138,6 +141,7 @@ export function DashboardServiceStatus({
   onRetry,
   onOpenStatusPage,
 }: Readonly<DashboardServiceStatusProps>) {
+  const { t } = useTranslation();
   if (isDegraded) {
     return (
       <ServiceDegradedBanner
@@ -154,7 +158,7 @@ export function DashboardServiceStatus({
         <QueryError
           variant="neutral"
           placement="top"
-          title="Could not check service status"
+          title={t('kiloclaw.dashboard.couldNotCheckStatus')}
           onRetry={onRetry}
           isRetrying={isFetching}
           className="rounded-2xl border border-border bg-card py-4"
@@ -194,15 +198,16 @@ type DangerZoneProps = {
 
 export function DangerZone({ pending, onDestroy }: Readonly<DangerZoneProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="mx-[22px] gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4">
       <Text variant="eyebrow" className="text-destructive">
-        DANGER ZONE
+        {t('kiloclaw.dashboard.dangerZone')}
       </Text>
       <Pressable
         disabled={pending}
         accessibilityRole="button"
-        accessibilityLabel="Destroy instance"
+        accessibilityLabel={t('kiloclaw.dashboard.destroyTitle')}
         accessibilityState={{ busy: pending }}
         className="flex-row items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-2.5 active:opacity-70"
         onPress={onDestroy}
@@ -215,7 +220,7 @@ export function DangerZone({ pending, onDestroy }: Readonly<DangerZoneProps>) {
           <Trash2 size={16} color={colors.primaryForeground} />
         )}
         <Text className="text-sm font-semibold text-primary-foreground">
-          {pending ? 'Destroying…' : 'Destroy instance'}
+          {pending ? t('kiloclaw.dashboard.destroying') : t('kiloclaw.dashboard.destroyTitle')}
         </Text>
       </Pressable>
     </View>

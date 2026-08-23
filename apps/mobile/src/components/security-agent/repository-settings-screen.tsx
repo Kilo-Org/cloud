@@ -4,6 +4,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { FolderGit2 } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -38,9 +39,10 @@ import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/l
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
 function RepositorySettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Repositories" />
+      <ScreenHeader title={t('securityAgent.repositories.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -52,6 +54,7 @@ function RepositorySettingsSkeleton() {
 }
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -97,9 +100,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Repositories"
+        title={t('securityAgent.repositories.title')}
         variant="offline"
-        message="Could not load repository settings"
+        message={t('securityAgent.repositories.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -121,7 +124,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Repositories"
+        title={t('securityAgent.repositories.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -138,14 +141,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {!canManage && (
           <Text className="pb-4 text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.repositories.readOnly')}
           </Text>
         )}
-        <RadioGroup label="Repositories">
+        <RadioGroup label={t('securityAgent.repositories.title')}>
           {(['all', 'selected'] as const).map(option => (
             <ChoiceRow
               key={option}
-              label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+              label={
+                option === 'all'
+                  ? t('securityAgent.repositories.allRepositories')
+                  : t('securityAgent.repositories.selectedRepositories')
+              }
               selected={mode === option}
               disabled={!canManage}
               className="border-b-[0.5px] border-hair-soft"
@@ -159,7 +166,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         {mode === 'selected' && (
           <View className="mt-6">
             <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              Repositories
+              {t('securityAgent.repositories.title')}
             </Text>
             {repositories.isLoading && (
               <View className="gap-3 pt-2">
@@ -171,7 +178,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               <QueryError
                 variant="server"
                 placement="top"
-                title="Could not load repositories"
+                title={t('securityAgent.repositories.couldNotLoadRepositories')}
                 onRetry={() => void repositories.refetch()}
                 isRetrying={repositories.isFetching}
               />
@@ -180,8 +187,8 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               <EmptyState
                 placement="top"
                 icon={FolderGit2}
-                title="No repositories"
-                description="Grant the Kilo GitHub App access to repositories"
+                title={t('securityAgent.repositories.noRepositories')}
+                description={t('securityAgent.repositories.noRepositoriesDescription')}
                 action={
                   <Button
                     variant="outline"
@@ -196,16 +203,16 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                           await openExternalUrl(
                             getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token),
                             {
-                              label: 'GitHub App settings',
+                              label: t('securityAgent.repositories.githubAppSettings'),
                             }
                           );
                         } catch {
-                          toast.error('Could not open GitHub App settings');
+                          toast.error(t('securityAgent.repositories.couldNotOpenGithubSettings'));
                         }
                       })();
                     }}
                   >
-                    <Text>Manage GitHub App access</Text>
+                    <Text>{t('securityAgent.repositories.manageAccess')}</Text>
                   </Button>
                 }
               />
@@ -229,7 +236,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               (repositories.data?.length ?? 0) > 0 &&
               selectedIds.length === 0 && (
                 <Text className="pt-2 text-xs text-destructive">
-                  Select at least one repository.
+                  {t('securityAgent.repositories.selectAtLeastOne')}
                 </Text>
               )}
           </View>

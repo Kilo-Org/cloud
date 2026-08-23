@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { Building2 } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -39,6 +40,7 @@ export function OrganizationBoundary({
   organizationIdOverride,
 }: OrganizationBoundaryProps = {}) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, isResolving, isError, isFetching, refetch } =
     useOrgBoundary(organizationIdOverride);
@@ -53,8 +55,8 @@ export function OrganizationBoundary({
   } else if (isError) {
     content = (
       <QueryError
-        title="Couldn't load your organizations"
-        message="Check your connection and try again."
+        title={t('organization.boundary.loadErrorTitle')}
+        message={t('organization.boundary.loadErrorMessage')}
         onRetry={() => void refetch()}
         isRetrying={isFetching}
       />
@@ -64,11 +66,15 @@ export function OrganizationBoundary({
     content = (
       <EmptyState
         icon={Building2}
-        title={noSelection ? 'Select an organization' : 'Organization unavailable'}
+        title={
+          noSelection
+            ? t('organization.boundary.selectOrganization')
+            : t('organization.boundary.organizationUnavailable')
+        }
         description={
           noSelection
-            ? 'Choose an organization from your profile to continue.'
-            : 'This organization is no longer available. Choose one from your profile to continue.'
+            ? t('organization.boundary.selectDescription')
+            : t('organization.boundary.unavailableDescription')
         }
         action={
           <Button
@@ -77,7 +83,7 @@ export function OrganizationBoundary({
               router.replace(PROFILE_HREF);
             }}
           >
-            <Text>Back to profile</Text>
+            <Text>{t('organization.boundary.backToProfile')}</Text>
           </Button>
         }
       />

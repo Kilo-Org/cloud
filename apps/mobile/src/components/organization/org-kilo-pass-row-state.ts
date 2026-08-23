@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { formatDate, parseTimestamp } from '@/lib/utils';
 
 /**
@@ -63,7 +64,10 @@ const TIER_LABELS = {
 } satisfies Record<'tier_19' | 'tier_49' | 'tier_199', string>;
 
 function paidSeatsLabel(count: number): string {
-  return `${count} paid ${count === 1 ? 'seat' : 'seats'}`;
+  return i18n.t(
+    count === 1 ? 'organization.kiloPass.paidSeatOne' : 'organization.kiloPass.paidSeatOther',
+    { count }
+  );
 }
 
 function activeSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
@@ -82,8 +86,8 @@ function formatPeriodEnd(iso: string | null): string | null {
 function cancelingSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
   const ends = formatPeriodEnd(agreement.paidThrough);
   return ends
-    ? `Ends ${ends} · ${activeSubtitle(agreement)}`
-    : `Canceling · ${activeSubtitle(agreement)}`;
+    ? `${i18n.t('organization.kiloPass.endsOn', { date: ends })} · ${activeSubtitle(agreement)}`
+    : `${i18n.t('organization.kiloPass.canceling')} · ${activeSubtitle(agreement)}`;
 }
 
 function manage(subtitle: string, attention = false): OrgKiloPassRowState {
@@ -92,7 +96,7 @@ function manage(subtitle: string, attention = false): OrgKiloPassRowState {
     attention,
     action: 'manage',
     actionLabel: null,
-    accessibilityHint: 'Opens Kilo Pass management on web.',
+    accessibilityHint: i18n.t('organization.kiloPass.manageHint'),
     loading: false,
   };
 }
@@ -102,19 +106,19 @@ function conditionRow(
   condition: OrgKiloPassSummary['processingCondition']
 ): OrgKiloPassRowState | null {
   if (condition === 'suspended_for_review') {
-    return manage('Payment needs attention', true);
+    return manage(i18n.t('organization.kiloPass.paymentNeedsAttention'), true);
   }
   if (condition === 'manual') {
-    return manage('Processing needs review', true);
+    return manage(i18n.t('organization.kiloPass.processingNeedsReview'), true);
   }
   if (condition === 'blocked') {
-    return manage('Processing blocked', true);
+    return manage(i18n.t('organization.kiloPass.processingBlocked'), true);
   }
   if (condition === 'overallocated') {
-    return manage('Pass assignments exceed paid seats', true);
+    return manage(i18n.t('organization.kiloPass.overallocated'), true);
   }
   if (condition === 'failed') {
-    return manage('Credit processing delayed · retrying automatically', true);
+    return manage(i18n.t('organization.kiloPass.creditProcessingDelayed'), true);
   }
   return null;
 }
@@ -127,16 +131,16 @@ export function getOrgKiloPassRowState(params: {
   if (data == null) {
     if (params.isError) {
       return {
-        subtitle: 'Could not load status',
+        subtitle: i18n.t('organization.kiloPass.couldNotLoadStatus'),
         attention: true,
         action: 'retry',
-        actionLabel: 'Retry',
-        accessibilityHint: 'Retries loading Kilo Pass status.',
+        actionLabel: i18n.t('organization.kiloPass.retry'),
+        accessibilityHint: i18n.t('organization.kiloPass.retryHint'),
         loading: false,
       };
     }
     return {
-      subtitle: 'Loading…',
+      subtitle: i18n.t('organization.kiloPass.loading'),
       attention: false,
       action: 'none',
       actionLabel: null,
@@ -153,11 +157,11 @@ export function getOrgKiloPassRowState(params: {
     // at all (`state: 'unavailable'`). The web detail page's `detail` query
     // throws for those orgs, so the setup flow is the only safe destination.
     return {
-      subtitle: 'Not subscribed',
+      subtitle: i18n.t('organization.kiloPass.notSubscribed'),
       attention: false,
       action: 'setup',
       actionLabel: null,
-      accessibilityHint: 'Opens Kilo Pass setup on web.',
+      accessibilityHint: i18n.t('organization.kiloPass.setupHint'),
       loading: false,
     };
   }
@@ -174,23 +178,23 @@ export function getOrgKiloPassRowState(params: {
     return manage(cancelingSubtitle(agreement));
   }
   if (data.commercialState === 'pending_payment' || data.state === 'pending_payment') {
-    return manage('Payment pending');
+    return manage(i18n.t('organization.kiloPass.paymentPending'));
   }
   if (data.state === 'requires_action') {
-    return manage('Payment needs attention', true);
+    return manage(i18n.t('organization.kiloPass.paymentNeedsAttention'), true);
   }
   if (data.state === 'activating') {
-    return manage('Activating');
+    return manage(i18n.t('organization.kiloPass.activating'));
   }
   if (data.commercialState === 'ended' || data.state === 'ended') {
-    return manage('Ended');
+    return manage(i18n.t('organization.kiloPass.ended'));
   }
   if (data.state === 'blocked') {
-    return manage('Processing blocked', true);
+    return manage(i18n.t('organization.kiloPass.processingBlocked'), true);
   }
   if (data.state === 'failed') {
-    return manage('Credit processing delayed · retrying automatically', true);
+    return manage(i18n.t('organization.kiloPass.creditProcessingDelayed'), true);
   }
   // Remainder with an agreement row: safe to open detail.
-  return manage('Not subscribed');
+  return manage(i18n.t('organization.kiloPass.notSubscribed'));
 }

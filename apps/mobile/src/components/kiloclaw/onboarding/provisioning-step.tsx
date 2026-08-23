@@ -7,6 +7,7 @@ import {
 } from '@/lib/onboarding';
 import { AlertTriangle } from '@/components/ui/icons';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -26,6 +27,7 @@ import { Text } from '@/components/ui/text';
 import { agentColor, toneColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { i18n } from '@/i18n';
 
 import { DEFAULT_BOT_IDENTITY } from './state';
 
@@ -47,34 +49,31 @@ const PULSE_DURATION_MS = 1400;
 
 const TERMINAL_CONTENT = {
   query_error: {
-    title: "Couldn't check on setup",
-    body: name =>
-      `We lost the connection while checking on ${name}'s setup. It may still be running. Try again, or check back shortly.`,
+    titleKey: 'kiloclaw.onboarding.provisioning.queryErrorTitle',
+    bodyKey: 'kiloclaw.onboarding.provisioning.queryErrorBody',
   },
   instance_stopped: {
-    title: 'Setup stopped',
-    body: name => `${name}'s instance stopped unexpectedly during setup.`,
+    titleKey: 'kiloclaw.onboarding.provisioning.stoppedTitle',
+    bodyKey: 'kiloclaw.onboarding.provisioning.stoppedBody',
   },
   gateway_502: {
-    title: 'Something stalled',
-    body: name =>
-      `We couldn't finish setting up ${name}. Try again, or email hi@kilo.ai if this keeps happening.`,
+    titleKey: 'kiloclaw.onboarding.provisioning.stalledTitle',
+    bodyKey: 'kiloclaw.onboarding.provisioning.stalledBody',
   },
   timeout: {
-    title: 'Taking longer than expected',
-    body: name =>
-      `Setup for ${name} is taking longer than usual (over ${OVERALL_TIMEOUT_MS / 60_000} minutes).`,
+    titleKey: 'kiloclaw.onboarding.provisioning.timeoutTitle',
+    bodyKey: 'kiloclaw.onboarding.provisioning.timeoutBody',
   },
-} satisfies Record<ProvisioningTerminalReason, { title: string; body: (name: string) => string }>;
+} as const satisfies Record<ProvisioningTerminalReason, { titleKey: string; bodyKey: string }>;
 
 function provisioningStageMessage(state: OnboardingState): string {
   if (state.instanceStatus === 'running' && state.gatewayReady && !state.gatewaySettled) {
-    return 'Finishing setup';
+    return i18n.t('kiloclaw.onboarding.provisioning.finishingSetup');
   }
   if (state.instanceStatus === 'running' && !state.gatewayReady) {
-    return 'Connecting to the agent';
+    return i18n.t('kiloclaw.onboarding.provisioning.connectingToAgent');
   }
-  return 'Starting the sandbox';
+  return i18n.t('kiloclaw.onboarding.provisioning.startingSandbox');
 }
 
 export function ProvisioningStep({
@@ -85,6 +84,7 @@ export function ProvisioningStep({
   onContinueInBackground,
 }: Readonly<ProvisioningStepProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const botEmoji = state.botIdentity?.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji;
   const botName = state.botIdentity?.botName ?? DEFAULT_BOT_IDENTITY.botName;
@@ -186,19 +186,21 @@ export function ProvisioningStep({
         </View>
         <View className="items-center gap-2">
           <Text variant="eyebrow" className="text-xs">
-            Provisioning
+            {t('kiloclaw.onboarding.flow.provisioning')}
           </Text>
-          <Text className="text-center text-2xl font-semibold">{content.title}</Text>
+          <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
           <Text variant="muted" className="text-center text-base">
-            {content.body(botName)}
+            {t(content.bodyKey, { name: botName, minutes: OVERALL_TIMEOUT_MS / 60_000 })}
           </Text>
         </View>
         <View className="w-full gap-3">
           <Button size="lg" className="w-full" onPress={onRetry}>
-            <Text className="text-base">Try again</Text>
+            <Text className="text-base">{t('common.tryAgain')}</Text>
           </Button>
           <Button variant="ghost" size="lg" className="w-full" onPress={onContinueInBackground}>
-            <Text className="text-base">Continue in background</Text>
+            <Text className="text-base">
+              {t('kiloclaw.onboarding.provisioning.continueInBackground')}
+            </Text>
           </Button>
         </View>
       </Animated.View>
@@ -224,9 +226,11 @@ export function ProvisioningStep({
       <View className="items-center gap-3">
         <View className="items-center gap-1">
           <Text variant="eyebrow" className="text-xs">
-            Provisioning
+            {t('kiloclaw.onboarding.flow.provisioning')}
           </Text>
-          <Text className="text-center text-2xl font-semibold">Setting up {botName}</Text>
+          <Text className="text-center text-2xl font-semibold">
+            {t('kiloclaw.onboarding.provisioning.settingUp', { name: botName })}
+          </Text>
         </View>
 
         <Animated.View
@@ -241,8 +245,7 @@ export function ProvisioningStep({
       </View>
 
       <Text variant="muted" className="text-center">
-        Usually takes under a minute. You can close this — we&apos;ll keep working in the
-        background.
+        {t('kiloclaw.onboarding.provisioning.backgroundHint')}
       </Text>
     </Animated.View>
   );

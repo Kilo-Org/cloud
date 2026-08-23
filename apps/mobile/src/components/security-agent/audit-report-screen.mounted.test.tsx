@@ -11,6 +11,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { AuditReportScreen } from './audit-report-screen';
 
 const personalQueryOptions = vi.hoisted(() => vi.fn());

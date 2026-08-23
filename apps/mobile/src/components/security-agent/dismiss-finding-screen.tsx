@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -24,11 +25,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
 // pairs from the task brief, matching web's dismissal reason picker.
 const DISMISS_REASONS = [
-  { value: 'fix_started', label: 'A fix has already started' },
-  { value: 'no_bandwidth', label: 'No bandwidth is available' },
-  { value: 'tolerable_risk', label: 'The risk is tolerable' },
-  { value: 'inaccurate', label: 'The finding is inaccurate' },
-  { value: 'not_used', label: 'Vulnerable code is not used' },
+  { value: 'fix_started', labelKey: 'securityAgent.dismiss.reasonFixStarted' },
+  { value: 'no_bandwidth', labelKey: 'securityAgent.dismiss.reasonNoBandwidth' },
+  { value: 'tolerable_risk', labelKey: 'securityAgent.dismiss.reasonTolerableRisk' },
+  { value: 'inaccurate', labelKey: 'securityAgent.dismiss.reasonInaccurate' },
+  { value: 'not_used', labelKey: 'securityAgent.dismiss.reasonNotUsed' },
 ] as const;
 
 type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
@@ -43,9 +44,10 @@ type DismissFindingScreenProps = {
 };
 
 function DismissFindingSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Dismiss finding" modal />
+      <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
       <View className="gap-6 px-6 pt-4">
         <Skeleton className="h-[224px] w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
@@ -57,6 +59,7 @@ function DismissFindingSkeleton() {
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
@@ -140,12 +143,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
-          title="Finding not found"
-          description="This finding may have been removed, or you no longer have access to it."
+          title={t('securityAgent.dismiss.notFoundTitle')}
+          description={t('securityAgent.dismiss.notFoundDescription')}
         />
       </View>
     );
@@ -154,10 +157,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <QueryError
           className="flex-1"
-          message="Could not load this finding"
+          message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </View>
@@ -167,10 +170,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <QueryError
           className="flex-1"
-          message="Could not check dismiss permissions"
+          message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
       </View>
@@ -191,12 +194,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
-          title="Can't dismiss this finding"
-          description="Only organization owners and billing managers can dismiss findings."
+          title={t('securityAgent.dismiss.cannotDismissTitle')}
+          description={t('securityAgent.dismiss.cannotDismissDescription')}
         />
       </View>
     );
@@ -205,12 +208,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss finding" modal />
+        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
-          title="Can't dismiss this finding"
-          description="This finding has already been resolved and no longer accepts a dismissal."
+          title={t('securityAgent.dismiss.cannotDismissTitle')}
+          description={t('securityAgent.dismiss.alreadyResolvedDescription')}
         />
       </View>
     );
@@ -222,7 +225,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Dismiss finding" modal />
+      <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
       <ScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pb-8 pt-4"
@@ -230,8 +233,11 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         keyboardShouldPersistTaps="handled"
       >
         <PillGroup
-          label="Reason"
-          options={DISMISS_REASONS}
+          label={t('securityAgent.dismiss.reason')}
+          options={DISMISS_REASONS.map(option => ({
+            value: option.value,
+            label: t(option.labelKey),
+          }))}
           value={reason}
           disabled={false}
           onChange={value => {
@@ -242,14 +248,14 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Comment (optional)
+            {t('securityAgent.dismiss.commentLabel')}
           </Text>
           <TextInput
-            accessibilityLabel="Dismissal comment"
+            accessibilityLabel={t('securityAgent.dismiss.commentAccessibility')}
             className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
             multiline
             textAlignVertical="top"
-            placeholder="Add context for this dismissal…"
+            placeholder={t('securityAgent.dismiss.commentPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={dismissDraft.draft?.comment ?? ''}
             onChangeText={value => {
@@ -271,7 +277,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           {dismissFinding.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text className="text-primary-foreground">Dismiss finding</Text>
+          <Text className="text-primary-foreground">{t('securityAgent.dismiss.submit')}</Text>
         </Button>
       </ScrollView>
     </View>

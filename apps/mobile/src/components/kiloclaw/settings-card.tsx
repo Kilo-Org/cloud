@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- i18n extraction adds one t() call per rendered string */
 import {
   Check,
   ChevronDown,
@@ -9,6 +10,7 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
@@ -33,11 +35,12 @@ function ExpandButton({
   onPress,
 }: Readonly<{ expanded: boolean; label: string; onPress: () => void }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const ExpandIcon = expanded ? ChevronUp : ChevronDown;
   return (
     <Button variant="outline" size="sm" className="flex-1 dark:bg-background" onPress={onPress}>
       <ExpandIcon size={14} color={colors.foreground} />
-      <Text className="text-xs">{expanded ? 'Cancel' : label}</Text>
+      <Text className="text-xs">{expanded ? t('common.cancel') : label}</Text>
     </Button>
   );
 }
@@ -52,6 +55,7 @@ function SecretField({
   onChangeText: (val: string) => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
 
   return (
@@ -73,7 +77,11 @@ function SecretField({
           setRevealed(r => !r);
         }}
         accessibilityRole="button"
-        accessibilityLabel={revealed ? `Hide ${field.label}` : `Show ${field.label}`}
+        accessibilityLabel={
+          revealed
+            ? t('kiloclaw.secrets.hide', { label: field.label })
+            : t('kiloclaw.secrets.show', { label: field.label })
+        }
         className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center active:opacity-70"
       >
         {revealed ? (
@@ -100,27 +108,32 @@ function ExpandedFields({
   onSave: () => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const guideUrl = item.guideUrl;
   return (
     <Animated.View entering={FadeIn.duration(150)}>
       <View className="gap-3 border-t border-neutral-200 px-4 pb-3 pt-3 dark:border-neutral-700">
         {item.allFieldsRequired && item.fields.length > 1 && !item.configured && (
           <Text className="text-xs text-muted-foreground">
-            All fields are required to connect {item.label}.
+            {t('kiloclaw.secrets.allFieldsRequired', { label: item.label })}
           </Text>
         )}
         {guideUrl && (
           <Pressable
             onPress={() => {
-              void openExternalUrl(guideUrl, { label: item.guideText ?? 'setup guide' });
+              void openExternalUrl(guideUrl, {
+                label: item.guideText ?? t('kiloclaw.secrets.setupGuideFallback'),
+              });
             }}
             accessibilityRole="link"
-            accessibilityLabel={item.guideText ?? `${item.label} setup guide`}
+            accessibilityLabel={
+              item.guideText ?? t('kiloclaw.secrets.setupGuideA11y', { label: item.label })
+            }
             className="flex-row items-center gap-1.5 active:opacity-70"
           >
             <ExternalLink size={12} color={colors.primary} />
             <Text className="text-xs font-medium text-primary">
-              {item.guideText ?? 'Setup guide'}
+              {item.guideText ?? t('kiloclaw.secrets.setupGuide')}
             </Text>
           </Pressable>
         )}
@@ -140,7 +153,9 @@ function ExpandedFields({
           ) : (
             <Check size={14} color={colors.primaryForeground} />
           )}
-          <Text className="text-xs text-primary-foreground">{isSaving ? 'Saving…' : 'Save'}</Text>
+          <Text className="text-xs text-primary-foreground">
+            {isSaving ? t('kiloclaw.secrets.saving') : t('common.save')}
+          </Text>
         </Button>
       </View>
     </Animated.View>
@@ -166,6 +181,7 @@ export function SettingsCard({
   const [isRemoving, setIsRemoving] = useState(false);
   const fieldValuesRef = useRef<Record<string, string>>({});
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const ItemIcon = CATALOG_ICONS[item.id];
 
   const updateCanSave = useCallback(() => {
@@ -211,9 +227,9 @@ export function SettingsCard({
 
   function handleRemove() {
     Alert.alert(removeAlertTitle, removeAlertMessage, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('kiloclaw.secrets.remove'),
         style: 'destructive',
         onPress: () => {
           setIsRemoving(true);
@@ -267,11 +283,13 @@ export function SettingsCard({
         </View>
         {item.configured ? (
           <View className="rounded-full bg-good-tile-bg px-2 py-0.5">
-            <Text className="text-xs font-medium text-good">Connected</Text>
+            <Text className="text-xs font-medium text-good">{t('kiloclaw.secrets.connected')}</Text>
           </View>
         ) : (
           <View className="rounded-full bg-muted px-2 py-0.5">
-            <Text className="text-xs text-muted-foreground">Not connected</Text>
+            <Text className="text-xs text-muted-foreground">
+              {t('kiloclaw.secrets.notConnected')}
+            </Text>
           </View>
         )}
       </View>
@@ -280,7 +298,9 @@ export function SettingsCard({
       <View className="flex-row gap-2 px-4 pb-3">
         <ExpandButton
           expanded={expanded}
-          label={item.configured ? 'Update Token' : 'Connect'}
+          label={
+            item.configured ? t('kiloclaw.secrets.updateToken') : t('kiloclaw.secrets.connect')
+          }
           onPress={toggleExpanded}
         />
         {item.configured && (
@@ -291,7 +311,7 @@ export function SettingsCard({
               <Trash2 size={14} color="white" />
             )}
             <Text className="text-xs text-destructive-foreground">
-              {isRemoving ? 'Removing…' : 'Remove'}
+              {isRemoving ? t('kiloclaw.secrets.removing') : t('kiloclaw.secrets.remove')}
             </Text>
           </Button>
         )}

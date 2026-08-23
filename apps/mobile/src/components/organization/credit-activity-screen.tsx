@@ -2,6 +2,7 @@ import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
 import { type ReactNode, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -36,12 +37,13 @@ function CreditRowSkeleton() {
 }
 
 function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>) {
+  const { t } = useTranslation();
   const amount = fromMicrodollars(transaction.amount_microdollars);
   const isPositive = amount >= 0;
   const title = firstNonEmpty(
     transaction.description,
     transaction.credit_category ? humanizeCategory(transaction.credit_category) : undefined,
-    'Credit transaction'
+    t('organization.creditActivity.transactionFallback')
   );
 
   return (
@@ -61,7 +63,9 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            Expires {formatDate(parseTimestamp(transaction.expiry_date))}
+            {t('organization.creditActivity.expires', {
+              date: formatDate(parseTimestamp(transaction.expiry_date)),
+            })}
           </Text>
         )}
       </View>
@@ -80,6 +84,7 @@ function firstSearchParam(value: string | string[] | undefined): string | undefi
 }
 
 export function OrganizationCreditActivityScreen() {
+  const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
   const orgParam = firstSearchParam(orgParamRaw);
 
@@ -122,7 +127,12 @@ export function OrganizationCreditActivityScreen() {
     org == null;
 
   if (showBoundary) {
-    return <OrganizationBoundary title="Credit activity" organizationIdOverride={orgParam} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.creditActivity.title')}
+        organizationIdOverride={orgParam}
+      />
+    );
   }
 
   const isLoading = query.isLoading;
@@ -155,8 +165,8 @@ export function OrganizationCreditActivityScreen() {
           ListEmptyComponent={
             <EmptyState
               icon={Receipt}
-              title="No credit activity"
-              description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
+              title={t('organization.creditActivity.emptyTitle')}
+              description={t('organization.creditActivity.emptyDescription')}
             />
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
@@ -167,7 +177,7 @@ export function OrganizationCreditActivityScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Credit activity" />
+      <ScreenHeader title={t('organization.creditActivity.title')} />
       {body}
     </View>
   );

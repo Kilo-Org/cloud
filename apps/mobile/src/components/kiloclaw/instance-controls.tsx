@@ -1,5 +1,6 @@
 import { Play, Power, RefreshCw, RotateCcw } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
@@ -28,6 +29,7 @@ const START_BLOCKING_STATUSES = new Set([
 ]);
 
 export function InstanceControls({ status, mutations }: Readonly<InstanceControlsProps>) {
+  const { t } = useTranslation();
   const canStart = status == null || !START_BLOCKING_STATUSES.has(status);
   const canStop = status === 'running';
   const canRestartOpenClaw = status === 'running';
@@ -44,10 +46,10 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
     mutations.destroy.isPending;
 
   const handleStart = () => {
-    Alert.alert('Start instance', 'Are you sure you want to start this instance?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('kiloclaw.controls.startTitle'), t('kiloclaw.controls.startMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Start',
+        text: t('kiloclaw.controls.start'),
         onPress: () => {
           captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'start' });
           mutations.start.mutate(undefined);
@@ -57,10 +59,10 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   };
 
   const handleStop = () => {
-    Alert.alert('Stop instance', 'Are you sure you want to stop this instance?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('kiloclaw.controls.stopTitle'), t('kiloclaw.controls.stopMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Stop',
+        text: t('kiloclaw.controls.stop'),
         style: 'destructive',
         onPress: () => {
           captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'stop' });
@@ -71,23 +73,27 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   };
 
   const handleRestartOpenClaw = () => {
-    Alert.alert('Restart OpenClaw', 'Are you sure you want to restart the OpenClaw process?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Restart',
-        onPress: () => {
-          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'restart_openclaw' });
-          mutations.restartOpenClaw.mutate(undefined);
+    Alert.alert(
+      t('kiloclaw.controls.restartOpenClawTitle'),
+      t('kiloclaw.controls.restartOpenClawMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('kiloclaw.controls.restart'),
+          onPress: () => {
+            captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'restart_openclaw' });
+            mutations.restartOpenClaw.mutate(undefined);
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleRedeploy = () => {
-    Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('kiloclaw.redeployTitle'), t('kiloclaw.redeployMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Redeploy',
+        text: t('kiloclaw.redeploy'),
         onPress: () => {
           captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'redeploy' });
           mutations.restartMachine.mutate(undefined);
@@ -101,7 +107,11 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       <View className="flex-row gap-2">
         <ActionButton
           icon={Play}
-          label={mutations.start.isPending ? 'Starting…' : 'Start'}
+          label={
+            mutations.start.isPending
+              ? t('kiloclaw.controls.starting')
+              : t('kiloclaw.controls.start')
+          }
           tone="accent"
           disabled={!canStart || isLifecycleBusy}
           loading={mutations.start.isPending}
@@ -109,7 +119,9 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
         />
         <ActionButton
           icon={Power}
-          label={mutations.stop.isPending ? 'Stopping…' : 'Stop'}
+          label={
+            mutations.stop.isPending ? t('kiloclaw.controls.stopping') : t('kiloclaw.controls.stop')
+          }
           tone="danger"
           disabled={!canStop || isLifecycleBusy}
           loading={mutations.stop.isPending}
@@ -119,7 +131,11 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       <View className="flex-row gap-2">
         <ActionButton
           icon={RotateCcw}
-          label={mutations.restartOpenClaw.isPending ? 'Restarting…' : 'Restart'}
+          label={
+            mutations.restartOpenClaw.isPending
+              ? t('kiloclaw.controls.restarting')
+              : t('kiloclaw.controls.restart')
+          }
           tone="warn"
           disabled={!canRestartOpenClaw || isLifecycleBusy}
           loading={mutations.restartOpenClaw.isPending}
@@ -127,7 +143,11 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
         />
         <ActionButton
           icon={RefreshCw}
-          label={mutations.restartMachine.isPending ? 'Redeploying…' : 'Redeploy'}
+          label={
+            mutations.restartMachine.isPending
+              ? t('kiloclaw.controls.redeploying')
+              : t('kiloclaw.redeploy')
+          }
           tone="accent"
           disabled={!canRedeploy || isLifecycleBusy}
           loading={mutations.restartMachine.isPending}

@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Bot, ChevronRight } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
@@ -7,16 +8,16 @@ import { agentColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-const TITLE = 'Kilo Agents';
-
 type AgentsPromoCardProps = {
   organizationId: string | null;
 };
 
 export function AgentsPromoCard({ organizationId }: Readonly<AgentsPromoCardProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
-  const tint = agentColor(TITLE);
+  const title = t('home.kiloAgents');
+  const tint = agentColor('Kilo Agents');
 
   return (
     <Pressable
@@ -27,7 +28,7 @@ export function AgentsPromoCard({ organizationId }: Readonly<AgentsPromoCardProp
         router.push(path as Href);
       }}
       className="mx-4 gap-3 rounded-2xl border border-border bg-card p-4 active:opacity-80"
-      accessibilityLabel="Start a new Kilo Agent session"
+      accessibilityLabel={t('home.startNewAgentSession')}
     >
       <View className="flex-row items-start gap-3">
         <View
@@ -40,18 +41,18 @@ export function AgentsPromoCard({ organizationId }: Readonly<AgentsPromoCardProp
           <Bot size={18} color={colors[tint.hueThemeKey]} />
         </View>
         <View className="flex-1">
-          <Text className="text-[17px] font-semibold text-foreground">{TITLE}</Text>
+          <Text className="text-[17px] font-semibold text-foreground">{title}</Text>
           <Text variant="muted" className="mt-0.5 text-[13px]">
-            AI coding sessions
+            {t('home.aiCodingSessions')}
           </Text>
         </View>
       </View>
       <Text variant="muted" className="text-[14px] leading-5">
-        Start a coding task from your phone or continue a session from your CLI.
+        {t('home.startCodingTaskFromPhone')}
       </Text>
       <View className="flex-row items-center justify-between">
         <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
-          Try it
+          {t('home.tryIt')}
         </Text>
         <ChevronRight size={16} color={colors.mutedForeground} />
       </View>

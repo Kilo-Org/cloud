@@ -1,5 +1,6 @@
 import { Search, Terminal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,11 +33,12 @@ type ShareDestinationListProps = {
 
 function DestinationSearch({ onChange }: { onChange: (next: string) => void }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="mx-4 mb-3 mt-1 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
       <Search size={18} color={colors.mutedForeground} />
       <TextInput
-        placeholder="Search recent sessions"
+        placeholder={t('share.searchPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"
         autoCorrect={false}
@@ -45,7 +47,7 @@ function DestinationSearch({ onChange }: { onChange: (next: string) => void }) {
         className="h-8 flex-1 p-0 text-base text-foreground"
         style={{ color: colors.foreground }}
         onChangeText={onChange}
-        accessibilityLabel="Search recent sessions"
+        accessibilityLabel={t('share.searchPlaceholder')}
       />
     </View>
   );
@@ -82,16 +84,17 @@ function CliInstanceRows({
   instanceRowsDisabled: boolean;
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View>
-      <SessionListSectionHeader title="On a connected CLI" count={instances.length} />
+      <SessionListSectionHeader title={t('share.connectedCli')} count={instances.length} />
       {instances.map(row => (
         <DestinationOptionRow
           key={row.connectionId}
           icon={Terminal}
           title={row.name}
           subtitle={row.projectName}
-          accessibilityLabel={`New session on ${row.name}`}
+          accessibilityLabel={t('share.newSessionOn', { name: row.name })}
           disabled={instanceRowsDisabled}
           busy={spawningConnectionId === row.connectionId}
           onPress={() => {
@@ -121,6 +124,7 @@ export function ShareDestinationList({
   onSpawnInstance,
 }: Readonly<ShareDestinationListProps>) {
   const { bottom } = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
 
   const showSearch = destinations.length > SEARCH_THRESHOLD;
@@ -255,7 +259,9 @@ export function ShareDestinationList({
           />
         </View>
       )}
-      ListEmptyComponent={search.trim() ? <EmptyMessage message="No matching sessions." /> : null}
+      ListEmptyComponent={
+        search.trim() ? <EmptyMessage message={t('share.noMatchingSessions')} /> : null
+      }
     />
   );
 }

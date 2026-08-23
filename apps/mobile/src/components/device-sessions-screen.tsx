@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -18,9 +19,10 @@ import {
   deviceSessionLabel,
   sortDeviceSessions,
 } from '@/lib/device-sessions';
+import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { parseTimestamp } from '@/lib/utils';
 
 type SessionRowProps = {
   session: DeviceSession;
@@ -30,6 +32,7 @@ type SessionRowProps = {
 
 function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const colors = useThemeColors();
+  const { t, i18n } = useTranslation();
 
   return (
     <View className="flex-row items-start gap-3 rounded-lg bg-secondary p-3">
@@ -42,14 +45,16 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
           {session.isCurrent && (
             <View className="rounded-full bg-primary px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase leading-[normal] text-primary-foreground">
-                This device
+                {t('deviceSessions.thisDevice')}
               </Text>
             </View>
           )}
         </View>
         <Text variant="muted" className="mt-0.5 text-xs">
-          Signed in {formatDate(parseTimestamp(session.created_at))} · Last seen{' '}
-          {formatDate(parseTimestamp(session.last_seen_at))}
+          {t('deviceSessions.signedIn', {
+            signedIn: formatDate(parseTimestamp(session.created_at), i18n.language),
+            lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
+          })}
         </Text>
       </View>
       <Pressable
@@ -59,7 +64,11 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         disabled={disabled}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel={session.isCurrent ? 'Sign out this device' : 'Sign out this session'}
+        accessibilityLabel={
+          session.isCurrent
+            ? t('deviceSessions.signOutThisDevice')
+            : t('deviceSessions.signOutThisSession')
+        }
         className="shrink-0 active:opacity-70"
       >
         <LogOut size={16} color={colors.destructive} />
@@ -72,6 +81,7 @@ export function DeviceSessionsScreen() {
   const router = useRouter();
   const { signOut, token } = useAuth();
   const trpc = useTRPC();
+  const { t } = useTranslation();
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     ...trpc.user.listDeviceSessions.queryOptions(),
@@ -84,7 +94,7 @@ export function DeviceSessionsScreen() {
   const revokeSession = useMutation(
     trpc.user.revokeDeviceSessionById.mutationOptions({
       onSuccess: () => {
-        toast.success('Session signed out.');
+        toast.success(t('deviceSessions.sessionSignedOut'));
         void refetch();
       },
       onError: error => {
@@ -97,29 +107,27 @@ export function DeviceSessionsScreen() {
     if (session.isCurrent) {
       // The current device signs out through the normal signOut() flow so the
       // full local teardown (tokens, metadata, cache) stays truthful.
-      Alert.alert(
-        'Sign out this device?',
-        'You will need to sign in again to access your workspace.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign out',
-            style: 'destructive',
-            onPress: () => {
-              void signOut();
-            },
+      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('deviceSessions.signOutMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('deviceSessions.signOutConfirm'),
+          style: 'destructive',
+          onPress: () => {
+            void signOut();
           },
-        ]
-      );
+        },
+      ]);
       return;
     }
     Alert.alert(
-      'Sign out this session?',
-      `${deviceSessionLabel(session.user_agent)} will be signed out. It can keep API access for up to an hour.`,
+      t('deviceSessions.signOutThisSessionTitle'),
+      t('deviceSessions.signOutThisSessionMessage', {
+        device: deviceSessionLabel(session.user_agent),
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sign out',
+          text: t('deviceSessions.signOutConfirm'),
           style: 'destructive',
           onPress: () => {
             revokeSession.mutate({ sessionId: session.id });
@@ -131,7 +139,7 @@ export function DeviceSessionsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Device sessions" />
+      <ScreenHeader title={t('deviceSessions.title')} />
       <DetailScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pt-4"
@@ -156,8 +164,8 @@ export function DeviceSessionsScreen() {
           <QueryError
             variant="server"
             placement="top"
-            title="Could not load sessions"
-            message="Your active sessions are unavailable until this loads."
+            title={t('deviceSessions.couldNotLoad')}
+            message={t('deviceSessions.couldNotLoadDescription')}
             onRetry={() => void refetch()}
             isRetrying={isFetching}
           />
@@ -167,8 +175,8 @@ export function DeviceSessionsScreen() {
           <EmptyState
             icon={Smartphone}
             placement="top"
-            title="No active sessions"
-            description="Sign in with the Kilo app on another device and it will show up here."
+            title={t('deviceSessions.noSessions')}
+            description={t('deviceSessions.noSessionsDescription')}
             action={
               <Button
                 variant="outline"
@@ -176,7 +184,7 @@ export function DeviceSessionsScreen() {
                   router.back();
                 }}
               >
-                <Text>View profile</Text>
+                <Text>{t('deviceSessions.viewProfile')}</Text>
               </Button>
             }
           />
@@ -194,11 +202,11 @@ export function DeviceSessionsScreen() {
             ))}
             {state === 'no-current' && (
               <Text variant="muted" className="text-center text-xs">
-                Current device could not be identified
+                {t('deviceSessions.currentDeviceUnidentified')}
               </Text>
             )}
             <Text variant="muted" className="text-xs">
-              Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.
+              {t('deviceSessions.onlyKiloAppSignIns')}
             </Text>
           </View>
         )}

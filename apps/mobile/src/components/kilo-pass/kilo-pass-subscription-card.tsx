@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Linking, Platform, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Text } from '@/components/ui/text';
@@ -19,6 +20,7 @@ export function KiloPassSubscriptionCard() {
   const router = useRouter();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
   const presentationQuery = useQuery(
@@ -114,7 +116,7 @@ export function KiloPassSubscriptionCard() {
     <View className="gap-2">
       {contentState.kind === 'loading' ? (
         <View
-          accessibilityLabel="Kilo Pass subscription loading"
+          accessibilityLabel={t('kiloPass.subscriptionLoading')}
           accessibilityState={{ busy: true }}
           className="rounded-lg border border-border bg-card p-3"
         >
@@ -130,8 +132,12 @@ export function KiloPassSubscriptionCard() {
 
       {contentState.kind === 'error' ? (
         <Pressable
-          accessibilityHint="Retries Kilo Pass state."
-          accessibilityLabel={`${contentState.title}. ${contentState.description}. ${contentState.actionLabel}`}
+          accessibilityHint={t('kiloPass.retryHint')}
+          accessibilityLabel={t('kiloPass.cardAccessibility', {
+            title: contentState.title,
+            description: contentState.description,
+            actionLabel: contentState.actionLabel,
+          })}
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handleRetryPress}
@@ -206,7 +212,7 @@ export function KiloPassSubscriptionCard() {
           onPress={handleDevRefundPress}
         >
           <Text className="text-center text-xs font-medium text-destructive">
-            Dev: Request App Store refund
+            {t('kiloPass.devRefund')}
           </Text>
         </Pressable>
       ) : null}

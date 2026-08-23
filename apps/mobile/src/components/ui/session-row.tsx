@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
@@ -73,6 +74,7 @@ export function SessionRow({
   className,
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const color = agentColor(agentLabel);
   const dimStrip = !live && !needsInput;
 
@@ -93,7 +95,7 @@ export function SessionRow({
       <View className="flex-row items-center gap-1.5">
         <StatusDot tone="warn" pulse />
         <Text variant="mono" className="shrink text-xs text-warn">
-          NEEDS INPUT
+          {t('sessionRow.needsInput')}
         </Text>
       </View>
     );

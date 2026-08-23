@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ type RestorePurchasesButtonProps = {
 export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesButtonProps> = {}) {
   const colors = useThemeColors();
   const { isPending, isRestoringPurchases, restorePurchases } = useKiloPassNativeIap();
+  const { t } = useTranslation();
 
   const disabled = isPending || isRestoringPurchases;
 
@@ -28,17 +30,17 @@ export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesBu
         return;
       }
       if (result === 'restored') {
-        toast.success('Subscription restored.');
+        toast.success(t('kiloPass.subscriptionRestored'));
       }
       if (result === 'empty') {
-        toast.info('No purchases to restore.');
+        toast.info(t('kiloPass.noPurchasesToRestore'));
       }
     })();
   };
 
   return (
     <Button
-      accessibilityLabel="Restore Purchases"
+      accessibilityLabel={t('kiloPass.restorePurchases')}
       accessibilityState={{ busy: isRestoringPurchases, disabled }}
       className="self-center px-3"
       disabled={disabled}
@@ -46,7 +48,9 @@ export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesBu
       variant="link"
     >
       {isRestoringPurchases && <ActivityIndicator size="small" color={colors.primary} />}
-      <Text>{isRestoringPurchases ? 'Restoring Purchases' : 'Restore Purchases'}</Text>
+      <Text>
+        {isRestoringPurchases ? t('kiloPass.restoringPurchases') : t('kiloPass.restorePurchases')}
+      </Text>
     </Button>
   );
 }

@@ -9,6 +9,7 @@ import {
   User,
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,6 +34,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const { bottom, top } = useSafeAreaInsets();
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
+  const { t } = useTranslation();
   const actions = getConsentActions(mode);
   const rootStyle = { paddingTop: top };
   const contentContainerStyle = {
@@ -66,7 +68,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       },
       () => {
         if (active) {
-          setError('Could not load your consent settings. Please try again.');
+          setError(t('consent.couldNotLoadConsentSettings'));
         }
       }
     );
@@ -82,7 +84,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     }
 
     if (!userId) {
-      setError('Could not load your account. Please try again.');
+      setError(t('consent.couldNotLoadAccount'));
       return;
     }
 
@@ -92,7 +94,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       await acceptConsent(userId, optionalToggle);
       router.replace('/(app)/(tabs)' as Href);
     } catch {
-      setError('Could not save your consent. Please try again.');
+      setError(t('consent.couldNotSaveConsent'));
       setPendingAction(null);
     }
   };
@@ -103,7 +105,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
     if (mode === 'review') {
       if (!userId) {
-        setError('Could not load your account. Please try again.');
+        setError(t('consent.couldNotLoadAccount'));
         setPendingAction(null);
         return;
       }
@@ -111,7 +113,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       try {
         await revokeConsent(userId);
       } catch {
-        setError('Could not revoke consent. Please try again.');
+        setError(t('consent.couldNotRevokeConsent'));
         setPendingAction(null);
         return;
       }
@@ -121,9 +123,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       await signOut();
     } catch {
       setError(
-        mode === 'review'
-          ? 'Consent was revoked, but sign-out failed. Please try again.'
-          : 'Could not sign out. Please try again.'
+        mode === 'review' ? t('consent.revokedSignOutFailed') : t('consent.couldNotSignOut')
       );
       setPendingAction(null);
     }
@@ -131,12 +131,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
   const handleSecondaryAction = () => {
     const message =
-      mode === 'review'
-        ? 'Kilo needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.'
-        : 'Kilo needs to share data with AI providers to work. If you decline, you will be signed out.';
+      mode === 'review' ? t('consent.revokeSignOutMessage') : t('consent.declineSignOutMessage');
 
     Alert.alert(actions.destructiveTitle, message, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
       {
         text: actions.destructiveLabel,
         style: 'destructive',
@@ -167,13 +165,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           },
           () => {
             setOptionalToggle(!next);
-            setError('Could not save your choice. Please try again.');
+            setError(t('consent.couldNotSaveChoice'));
             setSavingOptional(false);
           }
         );
       } else if (mode === 'review') {
         setOptionalToggle(!next);
-        setError('Could not load your account. Please try again.');
+        setError(t('consent.couldNotLoadAccount'));
       }
     },
     [mode, userId]
@@ -190,52 +188,54 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
             <Shield size={20} color={colors.foreground} />
           </View>
-          <Text className="text-base font-semibold text-foreground">Kilo</Text>
+          <Text className="text-base font-semibold text-foreground">{t('consent.kilo')}</Text>
         </View>
 
-        <Text className="mt-6 text-2xl font-bold text-foreground">Before we get started</Text>
+        <Text className="mt-6 text-2xl font-bold text-foreground">
+          {t('consent.beforeWeGetStarted')}
+        </Text>
         <Text className="mt-3 text-base text-muted-foreground">
-          Kilo sends your messages to AI providers to generate responses. Here&apos;s what&apos;s
-          shared and with whom.
+          {t('consent.introDescription')}
         </Text>
 
-        <Text className="mt-6 text-sm font-semibold text-foreground">Required to use Kilo</Text>
+        <Text className="mt-6 text-sm font-semibold text-foreground">{t('consent.required')}</Text>
 
         <View className="mt-3 gap-5">
           <ConsentRow
             icon={MessageSquare}
-            title="Your prompts and conversations"
-            description="Sent to AI model providers (Anthropic, OpenAI, Google, and others) to generate replies."
+            title={t('consent.promptsTitle')}
+            description={t('consent.promptsDescription')}
           />
           <ConsentRow
             icon={User}
-            title="Account & usage data"
-            description="Your Kilo account ID and request metadata, used to authenticate you and meter usage."
+            title={t('consent.accountTitle')}
+            description={t('consent.accountDescription')}
           />
           <ConsentRow
             icon={Smartphone}
-            title="App diagnostics"
-            description="Crash and error reports, with app content removed, used to keep the app stable."
+            title={t('consent.diagnosticsTitle')}
+            description={t('consent.diagnosticsDescription')}
           />
         </View>
 
-        <Text className="mt-6 text-sm font-semibold text-foreground">Optional</Text>
+        <Text className="mt-6 text-sm font-semibold text-foreground">{t('consent.optional')}</Text>
 
         <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
           <View className="mt-0.5">
             <LineChart size={18} color={colors.mutedForeground} />
           </View>
           <View className="flex-1 shrink gap-1">
-            <Text className="text-base font-semibold text-foreground">Help improve Kilo</Text>
+            <Text className="text-base font-semibold text-foreground">
+              {t('consent.helpImprove')}
+            </Text>
             <Text className="text-sm text-muted-foreground">
-              Share anonymous product analytics and install source. You can change this any time in
-              Settings.
+              {t('consent.helpImproveDescription')}
             </Text>
           </View>
           <Switch
             value={optionalToggle}
             disabled={mode === 'review' && savingOptional}
-            accessibilityLabel="Help improve Kilo"
+            accessibilityLabel={t('consent.helpImprove')}
             onValueChange={handleToggleOptional}
           />
         </View>
@@ -249,17 +249,17 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             );
           }}
           hitSlop={8}
-          accessibilityLabel="See full details"
+          accessibilityLabel={t('consent.seeFullDetails')}
           className="mt-6 flex-row items-center gap-1 active:opacity-70"
         >
-          <Text className="text-sm font-semibold text-primary">See full details</Text>
+          <Text className="text-sm font-semibold text-primary">{t('consent.seeFullDetails')}</Text>
           <ChevronRight size={16} color={colors.primary} />
         </Pressable>
 
         <Text className="mt-6 text-xs text-muted-foreground">
-          Your data is handled per the{' '}
+          {t('consent.privacyPolicyPrefix')}{' '}
           <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-            Kilo privacy policy
+            {t('consent.privacyPolicy')}
           </Text>
           .
         </Text>

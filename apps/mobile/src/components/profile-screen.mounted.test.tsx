@@ -4,6 +4,8 @@ import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import '@/i18n';
+import { ProfileScreen } from './profile-screen';
 import { type DeleteAccountPhase, useDeleteAccount } from './use-delete-account';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -13,6 +15,9 @@ const executeFn = vi.hoisted(() => vi.fn());
 const signOutFn = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
+const authToken = vi.hoisted(() => ({ value: 'token-1' as string | null }));
+const providersQueryFn = vi.hoisted(() => vi.fn());
+const organizationsQueryFn = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -31,17 +36,104 @@ vi.mock('@/lib/trpc', () => ({
           mutationKey: ['delete-account-execute'],
         }),
       },
+      getAuthProviders: {
+        queryOptions: () => ({ queryKey: ['user', 'getAuthProviders'], queryFn: providersQueryFn }),
+      },
+    },
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations', 'list'],
+          queryFn: organizationsQueryFn,
+        }),
+      },
     },
   }),
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ signOut: signOutFn }),
+  useAuth: () => ({ signOut: signOutFn, token: authToken.value }),
 }));
 
 vi.mock('sonner-native', () => ({
   toast: { success: toastSuccess, error: toastError },
 }));
+
+vi.mock('react-native', () => ({
+  Alert: { alert: vi.fn() },
+  View: 'View',
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  FadeIn: { duration: vi.fn() },
+  FadeOut: { duration: vi.fn() },
+  LinearTransition: {},
+}));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.0',
+  nativeBuildVersion: '1',
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
+  useFeatureFlag: () => true,
+}));
+vi.mock('@/lib/hooks/use-after-interactions', () => ({
+  useAfterInteractions: () => false,
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+  useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#000000' }),
+}));
+vi.mock('@/lib/profile-agent-navigation', () => ({
+  getCodeReviewerProfilePath: () => '/code-reviewer',
+  getProfileAgentScope: () => 'personal',
+  getPrReviewEntryPath: () => '/pr-review',
+}));
+vi.mock('@/lib/security-agent', () => ({
+  getSecurityAgentPath: () => '/security-agent',
+}));
+vi.mock('@/lib/feedback', () => ({
+  showFeedbackPrompt: vi.fn(),
+}));
+vi.mock('@/components/ui/icons', () => ({
+  Building2: 'Building2',
+  GitMerge: 'GitMerge',
+  GitPullRequest: 'GitPullRequest',
+  Globe: 'Globe',
+  KeyRound: 'KeyRound',
+  Lock: 'Lock',
+  LogOut: 'LogOut',
+  MessageSquare: 'MessageSquare',
+  ShieldCheck: 'ShieldCheck',
+  SlidersHorizontal: 'SlidersHorizontal',
+  Smartphone: 'Smartphone',
+  Trash2: 'Trash2',
+}));
+vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
+vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
+vi.mock('@/components/language-picker-sheet', () => ({
+  LanguagePickerSheet: 'LanguagePickerSheet',
+}));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -230,5 +322,30 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
     expect(current(holder).isPending).toBe(false);
+  });
+});
+
+describe('ProfileScreen language row', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    authToken.value = 'token-1';
+    providersQueryFn.mockReset();
+    organizationsQueryFn.mockReset();
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([]);
+  });
+
+  it('renders a Language row in the App section', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
+
+    const rows = renderer.root.findAll(
+      node => typeof node.type === 'string' && node.type === 'ConfigureRow'
+    );
+    const languageRows = rows.filter(row => row.props.title === 'Language');
+
+    expect(languageRows).toHaveLength(1);
+    expect(languageRows[0]?.props.icon).toBe('Globe');
+
+    unmount();
   });
 });

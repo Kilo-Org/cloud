@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 import { type SharePayloadValidation } from './share-payload-validation';
 
 export type ShareDestinationAdmission =
@@ -45,18 +47,16 @@ export function resolveShareDestinationAdmission(input: {
   if (!input.live) {
     return {
       ok: false,
-      title: 'Session not connected',
-      message:
-        "This session runs on a Kilo CLI that isn't connected, so it can't receive messages right now. Reconnect the CLI on that machine, or pick another session.",
+      title: i18n.t('share.cliNotConnectedTitle'),
+      message: i18n.t('share.cliNotConnectedMessage'),
     };
   }
 
   if (input.hasFiles && !input.attachmentsCapable) {
     return {
       ok: false,
-      title: "This session can't receive files",
-      message:
-        "The Kilo CLI running this session can't receive files. Update the CLI on that machine, or share to a new session instead.",
+      title: i18n.t('share.cliCantReceiveFilesTitle'),
+      message: i18n.t('share.cliCantReceiveFilesMessage'),
     };
   }
 

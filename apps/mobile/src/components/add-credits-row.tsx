@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ type AddCreditsRowProps = Readonly<{
 
 /** Zero-balance CTA row: muted copy + an "Add credits" button to the web billing page. */
 export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
+  const { t } = useTranslation();
   // App Store review: iOS must not show an in-app CTA that opens an external
   // purchase/billing page. Credits are managed on the web there, so this row is
   // Android-only — gate it here so no call site can surface it on iOS.
@@ -21,7 +23,7 @@ export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
   return (
     <View className={cn('flex-row items-center justify-between', className)}>
       <Text className="flex-1 pr-3 text-xs text-muted-foreground">
-        Add credits to keep usage running.
+        {t('addCredits.description')}
       </Text>
       <Button
         size="sm"
@@ -30,7 +32,7 @@ export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
           void openExternalUrl(url, { label: 'billing page' });
         }}
       >
-        <Text className="text-xs font-semibold">Add credits</Text>
+        <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
       </Button>
     </View>
   );

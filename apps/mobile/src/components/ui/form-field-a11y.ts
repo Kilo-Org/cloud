@@ -7,6 +7,8 @@
  * visible field presents state: label, then `required`, then the error.
  */
 
+import { i18n } from '@/i18n';
+
 export function formFieldA11y({
   label,
   required,
@@ -18,10 +20,10 @@ export function formFieldA11y({
 }>): string {
   const parts = [label];
   if (required) {
-    parts.push('required');
+    parts.push(i18n.t('common.required'));
   }
   if (error) {
-    parts.push(`error: ${error}`);
+    parts.push(i18n.t('common.error', { error }));
   }
   return parts.join(', ');
 }

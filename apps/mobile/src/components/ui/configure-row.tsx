@@ -1,4 +1,5 @@
-import { ChevronRight, type LucideIcon } from '@/components/ui/icons';
+import { type LucideIcon } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
@@ -53,7 +54,7 @@ export function ConfigureRow({
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = Boolean(onPress) && !disabled;
   const trailingNode =
-    trailing ?? (showChevron ? <ChevronRight size={14} color={colors.mutedForeground} /> : null);
+    trailing ?? (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
 
   const iconTile = (
     <View

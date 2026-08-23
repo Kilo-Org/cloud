@@ -2,6 +2,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +12,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -36,10 +38,6 @@ import { RestorePurchasesButton } from './restore-purchases-button';
 
 type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
 
-/** Shown when the App Store account already owns a pass on another Kilo account. */
-export const KILO_PASS_OTHER_ACCOUNT_COPY =
-  'The Kilo Pass on this Apple Account belongs to a different Kilo account. Sign in to that Kilo account to manage it.';
-
 /**
  * A failed preflight is either retryable (transient network/5xx) or
  * non-retryable (the server refused the purchase). The retryable variant keeps
@@ -51,26 +49,27 @@ type PreflightFailure =
 
 function getPreflightFailureMessage(reason: string | null): string {
   if (reason === 'already_subscribed') {
-    return 'You already have a Kilo Pass subscription.';
+    return i18n.t('kiloPass.alreadySubscribed');
   }
   if (reason === 'owned_by_another_account') {
-    return KILO_PASS_OTHER_ACCOUNT_COPY;
+    return i18n.t('kiloPass.otherAccountCopy');
   }
-  return 'Kilo Pass purchase is not available right now.';
+  return i18n.t('kiloPass.purchaseUnavailable');
 }
 
 function formatTier(product: AppStoreKiloPassProduct): string {
-  return `$${product.webMonthlyPriceUsd} in credits`;
+  return i18n.t('kiloPass.tierCredits', { amount: product.webMonthlyPriceUsd });
 }
 
 function formatStorePrice(product: AppStoreKiloPassProduct): string {
-  return `${product.displayPrice}/mo`;
+  return i18n.t('kiloPass.perMonth', { price: product.displayPrice });
 }
 
 function KiloPassLoadingScreen() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
+      <ScreenHeader title={t('kiloPass.title')} modal />
       <View className="flex-1 px-5">
         <DetailScreenScrollView
           className="-mx-1 flex-1"
@@ -88,16 +87,19 @@ function KiloPassLoadingScreen() {
 }
 
 function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
+      <ScreenHeader title={t('kiloPass.title')} modal />
       <View className="flex-1 items-center justify-center gap-3 px-6">
-        <Text className="text-center font-semibold text-foreground">Kilo Pass unavailable</Text>
-        <Text className="text-center text-sm text-muted-foreground">
-          Kilo Pass could not be loaded. Try again.
+        <Text className="text-center font-semibold text-foreground">
+          {t('kiloPass.unavailable')}
         </Text>
-        <Button accessibilityLabel="Retry loading Kilo Pass" onPress={onRetry} variant="outline">
-          <Text>Retry</Text>
+        <Text className="text-center text-sm text-muted-foreground">
+          {t('kiloPass.couldNotLoad')}
+        </Text>
+        <Button accessibilityLabel={t('kiloPass.retryLoading')} onPress={onRetry} variant="outline">
+          <Text>{t('common.retry')}</Text>
         </Button>
       </View>
     </View>
@@ -114,6 +116,7 @@ function KiloPassUnavailableScreen({
 }: {
   presentation: { kind: PurchasePresentationKind; webUrl: string | null };
 }) {
+  const { t } = useTranslation();
   const isWebManagement = presentation.kind === 'web_management';
   const description = isWebManagement
     ? KILO_PASS_WEB_MANAGEMENT_DESCRIPTION
@@ -121,7 +124,7 @@ function KiloPassUnavailableScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
+      <ScreenHeader title={t('kiloPass.title')} modal />
       <View className="flex-1 px-5">
         <DetailScreenScrollView
           className="-mx-1 flex-1"
@@ -143,7 +146,7 @@ function KiloPassUnavailableScreen({
                     return;
                   }
                   void openExternalUrl(presentation.webUrl, {
-                    label: 'Kilo Pass management',
+                    label: t('kiloPass.kiloPassManagement'),
                   });
                 }}
                 variant="outline"
@@ -163,6 +166,7 @@ function KiloPassNativeIapContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const {
     clearError,
     errorMessage,
@@ -192,7 +196,7 @@ function KiloPassNativeIapContent() {
   const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
   let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
   if (ownedByAnotherAccount) {
-    feedback = { type: 'error', text: KILO_PASS_OTHER_ACCOUNT_COPY };
+    feedback = { type: 'error', text: t('kiloPass.otherAccountCopy') };
   } else if (errorMessage) {
     feedback = { type: 'error', text: errorMessage };
   } else if (preflightFailure) {
@@ -236,7 +240,7 @@ function KiloPassNativeIapContent() {
     } catch {
       setPreflightFailure({
         kind: 'retryable',
-        message: "Couldn't verify your purchase. Check your connection and try again.",
+        message: t('kiloPass.verifyPurchaseFailed'),
         product,
       });
       return;
@@ -280,7 +284,7 @@ function KiloPassNativeIapContent() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo Pass" modal />
+      <ScreenHeader title={t('kiloPass.title')} modal />
       <View className="flex-1 px-5">
         <DetailScreenScrollView
           className="-mx-1 flex-1"
@@ -305,14 +309,14 @@ function KiloPassNativeIapContent() {
 
           {preflightFailure?.kind === 'retryable' && (
             <Button
-              accessibilityLabel="Try verifying purchase again"
+              accessibilityLabel={t('kiloPass.tryVerifyingPurchaseAgain')}
               className="self-start"
               onPress={() => {
                 void runPreflight(preflightFailure.product);
               }}
               variant="outline"
             >
-              <Text>Try again</Text>
+              <Text>{t('common.tryAgain')}</Text>
             </Button>
           )}
 
@@ -323,7 +327,7 @@ function KiloPassNativeIapContent() {
 
           {!productsIsLoading && products.length === 0 && (
             <Pressable
-              accessibilityLabel="Try loading Kilo Pass products again"
+              accessibilityLabel={t('kiloPass.tryLoadingProductsAgain')}
               accessibilityRole="button"
               accessibilityState={{
                 busy: productsIsRefetching,
@@ -335,12 +339,14 @@ function KiloPassNativeIapContent() {
                 void productsRefetch();
               }}
             >
-              <Text className="font-semibold text-foreground">App Store products unavailable</Text>
+              <Text className="font-semibold text-foreground">
+                {t('kiloPass.productsUnavailable')}
+              </Text>
               <Text className="mt-1 text-sm text-muted-foreground">
-                {productsError ?? 'Kilo Pass products could not be loaded from App Store.'}
+                {productsError ?? t('kiloPass.productsCouldNotLoad')}
               </Text>
               <Text className="mt-3 text-sm font-medium text-primary">
-                {productsIsRefetching ? 'Trying again...' : 'Try again'}
+                {productsIsRefetching ? t('kiloPass.tryingAgain') : t('common.tryAgain')}
               </Text>
             </Pressable>
           )}
@@ -349,7 +355,10 @@ function KiloPassNativeIapContent() {
             products.map(product => (
               <Pressable
                 key={product.appleProductId}
-                accessibilityLabel={`${formatTier(product)}, ${formatStorePrice(product)}`}
+                accessibilityLabel={t('kiloPass.productAccessibility', {
+                  tier: formatTier(product),
+                  price: formatStorePrice(product),
+                })}
                 accessibilityRole="button"
                 accessibilityState={{
                   busy: isPending || preflightPurchase.isPending,
@@ -381,10 +390,10 @@ function KiloPassNativeIapContent() {
           <RestorePurchasesButton
             onResult={result => {
               if (result === 'restored') {
-                setRestoreFeedback({ type: 'success', text: 'Subscription restored.' });
+                setRestoreFeedback({ type: 'success', text: t('kiloPass.subscriptionRestored') });
                 ensureProfileAfterKiloPassPurchase(router);
               } else if (result === 'empty') {
-                setRestoreFeedback({ type: 'info', text: 'No purchases to restore.' });
+                setRestoreFeedback({ type: 'info', text: t('kiloPass.noPurchasesToRestore') });
               } else {
                 setRestoreFeedback(null);
               }
@@ -393,7 +402,7 @@ function KiloPassNativeIapContent() {
 
           <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
             {KILO_PASS_LEGAL_DISCLOSURE}
-            {' By subscribing, you agree to the '}
+            {t('kiloPass.legalConnectorTerms')}
             <Text
               accessibilityRole="link"
               className="text-xs text-primary underline active:opacity-70"
@@ -403,7 +412,7 @@ function KiloPassNativeIapContent() {
             >
               {termsOfUseLink.label}
             </Text>
-            {' and acknowledge the '}
+            {t('kiloPass.legalConnectorPrivacy')}
             <Text
               accessibilityRole="link"
               className="text-xs text-primary underline active:opacity-70"
@@ -420,13 +429,13 @@ function KiloPassNativeIapContent() {
         {isPending && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <Button
-              accessibilityLabel="Completing Kilo Pass purchase"
+              accessibilityLabel={t('kiloPass.completingPurchaseAccessibility')}
               accessibilityState={{ busy: true, disabled: true }}
               className="mt-4"
               disabled
             >
               <ActivityIndicator size="small" color={colors.primaryForeground} />
-              <Text>Completing purchase</Text>
+              <Text>{t('kiloPass.completingPurchase')}</Text>
             </Button>
           </View>
         )}

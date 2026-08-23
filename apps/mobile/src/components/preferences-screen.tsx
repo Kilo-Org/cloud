@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { Bell, Brain, type LucideIcon, Smartphone } from '@/components/ui/icons';
 import { Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -73,10 +74,11 @@ export function PreferencesScreen() {
     hasLoaded: keepScreenOnLoaded,
     setKeepScreenOn,
   } = useKeepScreenOnPreference();
+  const { t } = useTranslation();
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Preferences" />
+      <ScreenHeader title={t('preferences.title')} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-3 pt-4"
@@ -84,16 +86,16 @@ export function PreferencesScreen() {
       >
         <PreferenceRow
           icon={Brain}
-          title="Auto expand thinking"
-          subtitle="Show the agent's thinking expanded when it finishes."
+          title={t('preferences.autoExpandThinking')}
+          subtitle={t('preferences.autoExpandThinkingSubtitle')}
           value={defaultExpanded}
           disabled={!reasoningLoaded}
           onValueChange={setDefaultExpanded}
         />
         <PreferenceRow
           icon={Smartphone}
-          title="Keep screen on while on session page"
-          subtitle="Hold the screen awake while the session is working."
+          title={t('preferences.keepScreenOn')}
+          subtitle={t('preferences.keepScreenOnSubtitle')}
           value={keepScreenOn}
           disabled={!keepScreenOnLoaded}
           onValueChange={setKeepScreenOn}
@@ -102,14 +104,14 @@ export function PreferencesScreen() {
         {/* Appearance */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Appearance
+            {t('preferences.appearance')}
           </Text>
           <SegmentedControl<ThemePreference>
-            accessibilityLabel="Appearance"
+            accessibilityLabel={t('preferences.appearance')}
             options={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: t('preferences.appearanceSystem') },
+              { value: 'light', label: t('preferences.appearanceLight') },
+              { value: 'dark', label: t('preferences.appearanceDark') },
             ]}
             value={themePreference}
             onChange={setThemePreference}
@@ -119,12 +121,12 @@ export function PreferencesScreen() {
         {/* Notifications */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Notifications
+            {t('preferences.notifications')}
           </Text>
           <ConfigureRow
             icon={Bell}
-            title="Notifications"
-            subtitle="Push preferences"
+            title={t('preferences.notifications')}
+            subtitle={t('preferences.notificationsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {

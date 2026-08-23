@@ -2,10 +2,13 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Building2,
   GitMerge,
   GitPullRequest,
+  Globe,
   KeyRound,
   Lock,
   LogOut,
@@ -20,6 +23,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
+import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -29,11 +33,14 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
+import { i18n } from '@/i18n';
+import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -44,18 +51,18 @@ import {
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
-const PROVIDER_LABELS = {
-  anaconda: 'Anaconda',
-  apple: 'Apple',
-  discord: 'Discord',
-  email: 'Email',
-  'fake-login': 'Test Account',
-  github: 'GitHub',
-  gitlab: 'GitLab',
-  google: 'Google',
-  linkedin: 'LinkedIn',
-  workos: 'Enterprise SSO',
-} satisfies Record<string, string>;
+const PROVIDER_LABEL_KEYS = {
+  anaconda: 'profile.providerAnaconda',
+  apple: 'profile.providerApple',
+  discord: 'profile.providerDiscord',
+  email: 'profile.providerEmail',
+  'fake-login': 'profile.providerTestAccount',
+  github: 'profile.providerGithub',
+  gitlab: 'profile.providerGitlab',
+  google: 'profile.providerGoogle',
+  linkedin: 'profile.providerLinkedin',
+  workos: 'profile.providerEnterpriseSso',
+} as const;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
@@ -63,7 +70,8 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 }
 
 function providerLabel(provider: string) {
-  return lookup(PROVIDER_LABELS, provider) ?? provider;
+  const key = lookup(PROVIDER_LABEL_KEYS, provider);
+  return key ? i18n.t(key) : provider;
 }
 
 export function ProfileScreen() {
@@ -103,6 +111,16 @@ export function ProfileScreen() {
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
 
+  const { t } = useTranslation();
+  const { preference: languagePreference } = useLanguagePreference();
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const resolvedLanguage = getResolvedLanguage();
+  const languageEndonym = LANGUAGE_ENDONYMS[resolvedLanguage];
+  const languageSubtitle =
+    languagePreference === 'device'
+      ? `${t('common.device')} · ${languageEndonym}`
+      : languageEndonym;
+
   const {
     phase: deletePhase,
     isPending: deletePending,
@@ -113,25 +131,21 @@ export function ProfileScreen() {
   } = useDeleteAccount();
 
   const confirmDeleteAccount = () => {
-    Alert.alert(
-      'Delete account?',
-      'This permanently deletes your account and signs you out. We will email a confirmation code.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete account',
-          style: 'destructive',
-          onPress: beginDelete,
-        },
-      ]
-    );
+    Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('profile.deleteAccountConfirm'),
+        style: 'destructive',
+        onPress: beginDelete,
+      },
+    ]);
   };
 
   const confirmSignOut = () => {
-    Alert.alert('Sign out?', 'You will need to sign in again to access your workspace.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sign out',
+        text: t('profile.signOutConfirm'),
         style: 'destructive',
         onPress: () => {
           void signOut();
@@ -146,7 +160,7 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Profile" size="large" showBackButton={false} />
+      <ScreenHeader title={t('profile.title')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="pt-4"
@@ -158,12 +172,12 @@ export function ProfileScreen() {
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Agents
+            {t('profile.agents')}
           </Text>
           <ConfigureRow
             icon={GitPullRequest}
-            title="Code Reviewer"
-            subtitle="Automatic PR reviews"
+            title={t('profile.codeReviewer')}
+            subtitle={t('profile.codeReviewerSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             onPress={() => {
@@ -174,8 +188,8 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={ShieldCheck}
-            title="Security Agent"
-            subtitle="Find and remediate vulnerabilities"
+            title={t('profile.securityAgent')}
+            subtitle={t('profile.securityAgentSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             last
@@ -191,12 +205,12 @@ export function ProfileScreen() {
         {prReviewEnabled && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Reviews
+              {t('profile.reviews')}
             </Text>
             <ConfigureRow
               icon={GitMerge}
-              title="PR Review"
-              subtitle="Review pull requests on mobile"
+              title={t('profile.prReview')}
+              subtitle={t('profile.prReviewSubtitle')}
               className="rounded-lg bg-secondary px-3"
               last
               onPress={() => {
@@ -210,21 +224,25 @@ export function ProfileScreen() {
         {organizationId != null && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Organization
+              {t('profile.organization')}
             </Text>
             {organizationsError ? (
               <QueryError
                 variant="server"
                 placement="top"
-                title="Could not load organization"
-                message="Organization and agent settings are unavailable until this loads."
+                title={t('profile.couldNotLoadOrganization')}
+                message={t('profile.couldNotLoadOrganizationDescription')}
                 onRetry={() => void refetchOrganizations()}
                 isRetrying={organizationsFetching}
               />
             ) : (
               <ConfigureRow
                 icon={Building2}
-                title={orgRole === 'member' ? 'View organization' : 'Manage organization'}
+                title={
+                  orgRole === 'member'
+                    ? t('profile.viewOrganization')
+                    : t('profile.manageOrganization')
+                }
                 subtitle={orgName}
                 className="rounded-lg bg-secondary px-3"
                 disabled={!orgRole}
@@ -248,7 +266,7 @@ export function ProfileScreen() {
           (!afterInteractions && !data)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Linked accounts
+              {t('profile.linkedAccounts')}
             </Text>
 
             {(isLoading || !afterInteractions) && !data && !providersError && (
@@ -261,7 +279,7 @@ export function ProfileScreen() {
               <QueryError
                 variant="server"
                 placement="top"
-                title="Could not load accounts"
+                title={t('profile.couldNotLoadAccounts')}
                 onRetry={() => void refetchProviders()}
                 isRetrying={providersFetching}
               />
@@ -284,21 +302,30 @@ export function ProfileScreen() {
         {/* App */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            App
+            {t('profile.app')}
           </Text>
           <ConfigureRow
             icon={SlidersHorizontal}
-            title="Preferences"
-            subtitle="Appearance, notifications, thinking, and screen behavior"
+            title={t('profile.preferences')}
+            subtitle={t('profile.preferencesSubtitle')}
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
             }}
           />
           <ConfigureRow
+            icon={Globe}
+            title={t('common.language')}
+            subtitle={languageSubtitle}
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              setLanguagePickerOpen(true);
+            }}
+          />
+          <ConfigureRow
             icon={Smartphone}
-            title="Device sessions"
-            subtitle="Review and sign out other devices"
+            title={t('profile.deviceSessions')}
+            subtitle={t('profile.deviceSessionsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
@@ -311,7 +338,7 @@ export function ProfileScreen() {
         <View className="mt-6 gap-3">
           <ActionTile
             icon={MessageSquare}
-            label="Feedback"
+            label={t('profile.feedback')}
             color={colors.mutedForeground}
             onPress={() => {
               showFeedbackPrompt(userId);
@@ -319,19 +346,19 @@ export function ProfileScreen() {
           />
           <ActionTile
             icon={Lock}
-            label="Privacy choices"
+            label={t('profile.privacyChoices')}
             color={colors.mutedForeground}
             onPress={showPrivacyChoices}
           />
           <ActionTile
             icon={LogOut}
-            label="Sign Out"
+            label={t('profile.signOut')}
             color={colors.mutedForeground}
             onPress={confirmSignOut}
           />
           <ActionTile
             icon={Trash2}
-            label="Delete Account"
+            label={t('profile.deleteAccount')}
             color={colors.destructive}
             destructive
             disabled={deletePending}
@@ -341,8 +368,8 @@ export function ProfileScreen() {
           {(deletePhase === 'awaiting-code' || deletePhase === 'executing') && (
             <View className="gap-3 rounded-lg bg-secondary p-3">
               <FormField
-                label="Confirmation code"
-                placeholder="6-digit code"
+                label={t('profile.confirmationCode')}
+                placeholder={t('profile.confirmationCodePlaceholder')}
                 keyboardType="number-pad"
                 defaultValue={devCode ?? undefined}
                 onChangeText={setCode}
@@ -354,7 +381,7 @@ export function ProfileScreen() {
                 disabled={deletePhase === 'executing'}
                 onPress={submitCode}
               >
-                <Text>Confirm deletion</Text>
+                <Text>{t('profile.confirmDeletion')}</Text>
               </Button>
             </View>
           )}
@@ -364,6 +391,13 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
+      <LanguagePickerSheet
+        visible={languagePickerOpen}
+        onClose={() => {
+          setLanguagePickerOpen(false);
+        }}
+        returnTarget="profile"
+      />
     </View>
   );
 }

@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { I18nManager, Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -8,9 +9,10 @@ export function SheetHeader({
   title,
   onDone,
   onCancel,
-  doneLabel = 'Done',
+  doneLabel,
   onShare,
   sharing = false,
+  disabled = false,
 }: {
   title: string;
   onDone: () => void;
@@ -18,8 +20,16 @@ export function SheetHeader({
   doneLabel?: string;
   onShare?: () => void;
   sharing?: boolean;
+  disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
+  const resolvedDoneLabel = doneLabel ?? t('common.done');
+  // NativeWind may not honor the logical `start-*`/`end-*` utilities in this
+  // project, so derive the physical side from the native direction: Cancel and
+  // Share stay on the leading edge, Done on the trailing edge.
+  const leadingClass = I18nManager.isRTL ? 'right-0' : 'left-0';
+  const trailingClass = I18nManager.isRTL ? 'left-0' : 'right-0';
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a
@@ -38,12 +48,12 @@ export function SheetHeader({
         {onShare !== undefined ? (
           <Pressable
             onPress={onShare}
-            disabled={sharing}
+            disabled={sharing || disabled}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={`Share ${title}`}
-            accessibilityState={{ disabled: false, busy: sharing }}
-            className="absolute left-0 px-2 py-2 active:opacity-70 disabled:opacity-50"
+            accessibilityLabel={t('common.share', { title })}
+            accessibilityState={{ disabled: sharing || disabled, busy: sharing }}
+            className={`absolute ${leadingClass} px-2 py-2 active:opacity-70 disabled:opacity-50`}
           >
             <Share size={20} color={colors.foreground} />
           </Pressable>
@@ -51,22 +61,24 @@ export function SheetHeader({
         {onCancel ? (
           <Pressable
             onPress={onCancel}
+            disabled={disabled}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Cancel"
-            className="absolute left-0 px-2 py-2 active:opacity-70"
+            accessibilityLabel={t('common.cancel')}
+            className={`absolute ${leadingClass} px-2 py-2 active:opacity-70 disabled:opacity-50`}
           >
-            <Text className="text-base font-medium text-foreground">Cancel</Text>
+            <Text className="text-base font-medium text-foreground">{t('common.cancel')}</Text>
           </Pressable>
         ) : null}
         <Pressable
           onPress={onDone}
+          disabled={disabled}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={doneLabel}
-          className="absolute right-0 rounded-full bg-secondary px-4 py-2 active:opacity-70 will-change-pressable"
+          accessibilityLabel={resolvedDoneLabel}
+          className={`absolute ${trailingClass} rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable`}
         >
-          <Text className="text-base font-medium text-foreground">{doneLabel}</Text>
+          <Text className="text-base font-medium text-foreground">{resolvedDoneLabel}</Text>
         </Pressable>
       </View>
     </View>

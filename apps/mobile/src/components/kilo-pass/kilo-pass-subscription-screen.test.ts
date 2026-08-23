@@ -4,10 +4,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  KILO_PASS_OTHER_ACCOUNT_COPY,
-  KiloPassSubscriptionScreen,
-} from './kilo-pass-subscription-screen';
+import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
 
 // ── Mutable state ────────────────────────────────────────────────────
 
@@ -350,7 +347,9 @@ describe('KiloPassSubscriptionScreen', () => {
 
     const renderer = await renderScreen();
     const tiles = productTiles(renderer);
-    expect(allText(renderer)).toContain(KILO_PASS_OTHER_ACCOUNT_COPY);
+    expect(allText(renderer)).toContain(
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account. Sign in to that Kilo account to manage it.'
+    );
     expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
     expect(
       (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState

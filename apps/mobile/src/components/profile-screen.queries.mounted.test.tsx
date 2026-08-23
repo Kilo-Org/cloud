@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { ProfileScreen } from '@/components/profile-screen';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -99,6 +100,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
 
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+  useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
+}));
+
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',
   getProfileAgentScope: getProfileAgentScopeMock,
@@ -117,6 +123,7 @@ vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
+  Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
   LogOut: 'LogOut',
@@ -129,6 +136,9 @@ vi.mock('@/components/ui/icons', () => ({
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
+vi.mock('@/components/language-picker-sheet', () => ({
+  LanguagePickerSheet: 'LanguagePickerSheet',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));

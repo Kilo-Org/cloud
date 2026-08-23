@@ -6,6 +6,8 @@ import {
   ServerCrash,
   WifiOff,
 } from '@/components/ui/icons';
+import { type TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -14,33 +16,32 @@ import { Text } from '@/components/ui/text';
 
 export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
-const VARIANT_META = {
-  neutral: {
-    icon: AlertCircle,
-    title: 'Something went wrong',
-    description: 'Please try again.',
-  },
-  offline: {
-    icon: WifiOff,
-    title: 'Failed to load',
-    description: 'Something went wrong',
-  },
+const VARIANT_ICONS = {
+  neutral: AlertCircle,
+  offline: WifiOff,
+  permission: Lock,
+  'not-found': SearchX,
+  server: ServerCrash,
+} satisfies Record<QueryErrorVariant, LucideIcon>;
+
+const VARIANT_META_KEYS = {
+  neutral: { title: 'queryError.neutralTitle', description: 'queryError.neutralDescription' },
+  offline: { title: 'queryError.offlineTitle', description: 'queryError.offlineDescription' },
   permission: {
-    icon: Lock,
-    title: 'Access denied',
-    description: "You don't have permission to view this.",
+    title: 'queryError.permissionTitle',
+    description: 'queryError.permissionDescription',
   },
   'not-found': {
-    icon: SearchX,
-    title: 'Not found',
-    description: 'This item may have been removed or is no longer available.',
+    title: 'queryError.notFoundTitle',
+    description: 'queryError.notFoundDescription',
   },
-  server: {
-    icon: ServerCrash,
-    title: 'Could not load',
-    description: 'Something went wrong on our end. Please try again.',
-  },
-} satisfies Record<QueryErrorVariant, { icon: LucideIcon; title: string; description: string }>;
+  server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },
+} as const;
+
+function variantMeta(t: TFunction, variant: QueryErrorVariant) {
+  const meta = VARIANT_META_KEYS[variant];
+  return { title: t(meta.title), description: t(meta.description) };
+}
 
 type QueryErrorProps = {
   variant?: QueryErrorVariant;
@@ -64,13 +65,14 @@ export function QueryError({
   className,
   placement = 'center',
 }: Readonly<QueryErrorProps>) {
-  const meta = VARIANT_META[variant];
+  const { t } = useTranslation();
+  const meta = variantMeta(t, variant);
   const titleText = title ?? meta.title;
   const descriptionText = message ?? meta.description;
 
   return (
     <EmptyState
-      icon={meta.icon}
+      icon={VARIANT_ICONS[variant]}
       title={titleText}
       description={
         <AccessibleStatus message={descriptionText} tone="error" className="text-center text-sm" />
@@ -87,9 +89,9 @@ export function QueryError({
             variant="outline"
             onPress={onRetry}
             loading={isRetrying}
-            accessibilityLabel="Retry"
+            accessibilityLabel={t('common.retry')}
           >
-            <Text>Retry</Text>
+            <Text>{t('common.retry')}</Text>
           </Button>
         )
       }

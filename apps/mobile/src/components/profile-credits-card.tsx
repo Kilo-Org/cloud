@@ -1,8 +1,9 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from '@/components/ui/icons';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -11,11 +12,12 @@ import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subsc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { formatDate, formatMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { parseTimestamp } from '@/lib/utils';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
@@ -25,6 +27,7 @@ type CreditsCardProps = {
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const { t, i18n } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
   const { organizationId, setOrganizationId } = useOrganization();
@@ -73,8 +76,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     .sort((a, b) => a.localeCompare(b))[0];
 
   const selectedLabel = selectedOrgId
-    ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ?? 'Organization')
-    : 'Personal';
+    ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
+      t('profile.organization'))
+    : t('profile.personal');
 
   const hasOrgs = orgs && orgs.length > 0;
 
@@ -94,13 +98,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     if (!orgs || orgs.length === 0) {
       return;
     }
-    const options = ['Personal', ...orgs.map(o => o.organizationName), 'Cancel'];
+    const options = [
+      t('profile.personal'),
+      ...orgs.map(o => o.organizationName),
+      t('common.cancel'),
+    ];
     const cancelButtonIndex = options.length - 1;
     showActionSheetWithOptions(
       {
         options,
         cancelButtonIndex,
-        title: 'Select account',
+        title: t('profile.selectAccount'),
         containerStyle: { paddingBottom: bottom },
       },
       index => {
@@ -123,7 +131,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Credits
+          {t('profile.credits')}
         </Text>
         {hasOrgs && (
           <Pressable
@@ -143,13 +151,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
           onPress={() => void refetchBalance()}
         >
-          <Text className="text-sm text-destructive">Failed to load balance. Tap to retry.</Text>
+          <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
       {!balanceLoading && !balancePending && !balanceError && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
-            <Text className="text-2xl font-bold">{formatDollars(balanceDollars)}</Text>
+            <Text className="text-2xl font-bold">{formatMoney(balanceDollars, i18n.language)}</Text>
             {creditsLoading ? (
               <Animated.View exiting={FadeOut.duration(150)}>
                 <Skeleton className="mt-1 h-3 w-48 rounded" />
@@ -159,8 +167,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               earliestExpiry != null && (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
                   <Text className="text-xs text-muted-foreground">
-                    {formatDollars(expiringTotal)} in bonus credits expiring{' '}
-                    {formatDate(parseTimestamp(earliestExpiry))}
+                    {t('profile.bonusCreditsExpiring', {
+                      amount: formatMoney(expiringTotal, i18n.language),
+                      date: formatDate(parseTimestamp(earliestExpiry), i18n.language),
+                    })}
                   </Text>
                 </Animated.View>
               )
@@ -187,8 +197,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         selectedOrgId == null && (
           <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
             <Text className="flex-1 pr-3 text-xs text-muted-foreground">
-              Your credit balance is empty. Credits are managed outside the iOS app for this
-              account.
+              {t('profile.creditBalanceEmpty')}
             </Text>
           </View>
         )}

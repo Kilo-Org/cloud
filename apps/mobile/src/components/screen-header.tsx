@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronLeft } from '@/components/ui/icons';
 import { Platform, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -48,6 +49,7 @@ export function ScreenHeader({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const canGoBack = showBackButton ?? router.canGoBack();
 
   // iOS modals are presented as cards already inset from the status bar
@@ -78,7 +80,8 @@ export function ScreenHeader({
         hitSlop={{ top: 13, right: 13, bottom: 13, left: 0 }}
         accessibilityRole="button"
         accessibilityLabel={
-          onTitlePressAccessibilityLabel ?? (title ? `Open menu for ${title}` : 'Open menu')
+          onTitlePressAccessibilityLabel ??
+          (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'))
         }
         className="active:opacity-70"
       >
@@ -103,7 +106,9 @@ export function ScreenHeader({
                 }
               }}
               accessibilityRole="button"
-              accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
+              accessibilityLabel={
+                resolvedBackIcon === 'close' ? t('screenHeader.close') : t('screenHeader.goBack')
+              }
               className="-ml-4 h-11 w-11 shrink-0 items-center justify-center active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (

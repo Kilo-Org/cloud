@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one harness holds the reconciliation single-flight, spacing, epoch, and switch-mid-attempt suites */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const logoutMock = vi.hoisted(() => ({
   attemptLogoutReconciliation: vi.fn(),
@@ -35,6 +35,10 @@ const expoNotificationsMock = vi.hoisted(() => {
   };
 });
 
+const languageMock = vi.hoisted(() => ({
+  getResolvedLanguage: vi.fn(() => 'en'),
+}));
+
 /* eslint-disable import/first */
 vi.mock('@/lib/auth/logout-reconciliation', () => logoutMock);
 vi.mock('@/lib/notifications', () => notificationsMock);
@@ -44,6 +48,7 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/lib/query-client', () => ({
   queryClient: queryClientMock,
 }));
+vi.mock('@/lib/hooks/use-language-preference', () => languageMock);
 vi.mock('expo-notifications', () => ({
   addPushTokenListener: expoNotificationsMock.addPushTokenListener,
 }));
@@ -66,7 +71,12 @@ describe('attemptPushRegistrationReconciliation', () => {
     logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'no-tombstone' });
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     notificationsMock.getPlatform.mockReturnValue('ios');
+    languageMock.getResolvedLanguage.mockReturnValue('en');
     queryClientMock.invalidateQueries.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('returns no-permission and makes no network call when the device holds no token', async () => {
@@ -89,18 +99,27 @@ describe('attemptPushRegistrationReconciliation', () => {
     expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
   });
 
-  it('returns already-registered and performs no write when the token is present', async () => {
+  it('returns already-registered and performs no write when the token is present and the locale was already sent', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
       kind: 'token',
       token: 'push-1',
     });
     trpcMock.getMyPushTokens.query.mockResolvedValue([{ token: 'push-1', platform: 'ios' }]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
 
-    const outcome = await attemptPushRegistrationReconciliation('u1');
+    // The first attempt sends the locale because none has been sent yet.
+    const first = await attemptPushRegistrationReconciliation('u1');
+    expect(first.kind).toBe('registered');
 
-    expect(outcome).toEqual({ kind: 'already-registered' });
-    expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
-    expect(queryClientMock.invalidateQueries).not.toHaveBeenCalled();
+    // Advance past the 60s spacing window so the second attempt reaches the
+    // already-registered check instead of spacing-skipped.
+    vi.setSystemTime(new Date('2026-08-23T12:02:00Z'));
+    const second = await attemptPushRegistrationReconciliation('u1');
+    expect(second).toEqual({ kind: 'already-registered' });
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledTimes(1);
+    expect(queryClientMock.invalidateQueries).toHaveBeenCalledTimes(1);
   });
 
   it('registers the Expo token on a fresh sign-in and invalidates the query', async () => {
@@ -118,6 +137,7 @@ describe('attemptPushRegistrationReconciliation', () => {
       token: 'push-1',
       platform: 'ios',
       appVersion: '1.0.4',
+      locale: 'en',
     });
     expect(queryClientMock.invalidateQueries).toHaveBeenCalledTimes(1);
   });
@@ -329,6 +349,78 @@ describe('attemptPushRegistrationReconciliation', () => {
     expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
     expect(queryClientMock.invalidateQueries).not.toHaveBeenCalled();
   });
+
+  it('bypasses the spacing skip when the resolved locale changed', async () => {
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+
+    const first = await attemptPushRegistrationReconciliation('u1');
+    expect(first.kind).toBe('registered');
+
+    languageMock.getResolvedLanguage.mockReturnValue('es');
+    const second = await attemptPushRegistrationReconciliation('u1');
+
+    expect(second.kind).toBe('registered');
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenLastCalledWith({
+      token: 'push-1',
+      platform: 'ios',
+      appVersion: '1.0.4',
+      locale: 'es',
+    });
+  });
+
+  it('still mutates when the token row exists but the locale changed', async () => {
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([{ token: 'push-1', platform: 'ios' }]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+
+    const first = await attemptPushRegistrationReconciliation('u1');
+    expect(first.kind).toBe('registered');
+
+    languageMock.getResolvedLanguage.mockReturnValue('es');
+    const second = await attemptPushRegistrationReconciliation('u1');
+
+    expect(second.kind).toBe('registered');
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledWith({
+      token: 'push-1',
+      platform: 'ios',
+      appVersion: '1.0.4',
+      locale: 'es',
+    });
+  });
+
+  it('retries a failed locale upsert on the next attempt', async () => {
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([]);
+    trpcMock.registerPushToken.mutate.mockRejectedValueOnce(new Error('server 500'));
+
+    languageMock.getResolvedLanguage.mockReturnValue('es');
+    const first = await attemptPushRegistrationReconciliation('u1');
+    expect(first.kind).toBe('register-failed');
+
+    // The failed upsert must not mark the locale as sent, so the next attempt
+    // (still 'es') retries instead of spacing-skipping or already-registered.
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+    const second = await attemptPushRegistrationReconciliation('u1');
+
+    expect(second.kind).toBe('registered');
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenLastCalledWith({
+      token: 'push-1',
+      platform: 'ios',
+      appVersion: '1.0.4',
+      locale: 'es',
+    });
+  });
 });
 
 describe('subscribeToPushTokenRotation', () => {
@@ -338,6 +430,7 @@ describe('subscribeToPushTokenRotation', () => {
     logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'no-tombstone' });
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     notificationsMock.getPlatform.mockReturnValue('ios');
+    languageMock.getResolvedLanguage.mockReturnValue('en');
     queryClientMock.invalidateQueries.mockResolvedValue(undefined);
   });
 
@@ -370,6 +463,7 @@ describe('subscribeToPushTokenRotation', () => {
         token: 'push-1',
         platform: 'ios',
         appVersion: '1.0.4',
+        locale: 'en',
       });
     });
 

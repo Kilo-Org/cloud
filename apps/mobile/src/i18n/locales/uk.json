@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Скасувати",
+    "done": "Готово",
+    "retry": "Повторити",
+    "language": "Мова",
+    "device": "Пристрій",
+    "share": "Поділитися",
+    "justNow": "Щойно",
+    "couldNotSaveSetting": "Не вдалося зберегти налаштування"
+  },
+  "language": {
+    "title": "Мова",
+    "restarting": "Перезапуск для застосування мови",
+    "couldNotRestart": "Не вдалося перезапустити",
+    "languageSaved": "Вашу мову збережено.",
+    "retry": "Повторити"
+  },
+  "login": {
+    "welcome": "Ласкаво просимо до Kilo",
+    "language": "Мова"
+  },
+  "profile": {
+    "language": "Мова"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Сесії агента",
+      "chat": "Повідомлення чату",
+      "kiloclaw": "Активність KiloClaw",
+      "balance": "Сповіщення про баланс",
+      "security": "Висновки безпеки"
+    }
+  }
+}

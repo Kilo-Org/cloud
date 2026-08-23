@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Batal",
+    "done": "Selesai",
+    "retry": "Coba lagi",
+    "language": "Bahasa",
+    "device": "Perangkat",
+    "share": "Bagikan",
+    "justNow": "Baru saja",
+    "couldNotSaveSetting": "Tidak dapat menyimpan pengaturan"
+  },
+  "language": {
+    "title": "Bahasa",
+    "restarting": "Memulai ulang untuk menerapkan bahasa",
+    "couldNotRestart": "Tidak dapat memulai ulang",
+    "languageSaved": "Bahasa Anda telah disimpan.",
+    "retry": "Coba lagi"
+  },
+  "login": {
+    "welcome": "Selamat datang di Kilo",
+    "language": "Bahasa"
+  },
+  "profile": {
+    "language": "Bahasa"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Sesi agen",
+      "chat": "Pesan obrolan",
+      "kiloclaw": "Aktivitas KiloClaw",
+      "balance": "Peringatan saldo",
+      "security": "Temuan keamanan"
+    }
+  }
+}

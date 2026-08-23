@@ -18,6 +18,7 @@ export default defineProject({
     name: 'mobile-pure',
     environment: 'node',
     include: [
+      'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',

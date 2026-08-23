@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "done": "完了",
+    "retry": "再試行",
+    "language": "言語",
+    "device": "デバイス",
+    "share": "共有",
+    "justNow": "たった今",
+    "couldNotSaveSetting": "設定を保存できませんでした"
+  },
+  "language": {
+    "title": "言語",
+    "restarting": "言語を適用するために再起動しています",
+    "couldNotRestart": "再起動できませんでした",
+    "languageSaved": "言語を保存しました。",
+    "retry": "再試行"
+  },
+  "login": {
+    "welcome": "Kiloへようこそ",
+    "language": "言語"
+  },
+  "profile": {
+    "language": "言語"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "エージェントセッション",
+      "chat": "チャットメッセージ",
+      "kiloclaw": "KiloClawアクティビティ",
+      "balance": "残高アラート",
+      "security": "セキュリティ所見"
+    }
+  }
+}

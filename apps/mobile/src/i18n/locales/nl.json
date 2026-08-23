@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Annuleren",
+    "done": "Klaar",
+    "retry": "Opnieuw proberen",
+    "language": "Taal",
+    "device": "Apparaat",
+    "share": "Delen",
+    "justNow": "Zojuist",
+    "couldNotSaveSetting": "Instelling kon niet worden opgeslagen"
+  },
+  "language": {
+    "title": "Taal",
+    "restarting": "Opnieuw opstarten om de taal toe te passen",
+    "couldNotRestart": "Opnieuw opstarten niet mogelijk",
+    "languageSaved": "Je taal is opgeslagen.",
+    "retry": "Opnieuw proberen"
+  },
+  "login": {
+    "welcome": "Welkom bij Kilo",
+    "language": "Taal"
+  },
+  "profile": {
+    "language": "Taal"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Agentsessies",
+      "chat": "Chatberichten",
+      "kiloclaw": "KiloClaw-activiteit",
+      "balance": "Saldo-waarschuwingen",
+      "security": "Beveiligingsbevindingen"
+    }
+  }
+}

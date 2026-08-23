@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "done": "Done",
+    "retry": "Retry",
+    "language": "Language",
+    "device": "Device",
+    "share": "Share",
+    "justNow": "Just now",
+    "couldNotSaveSetting": "Could not save setting"
+  },
+  "language": {
+    "title": "Language",
+    "restarting": "Restarting to apply language",
+    "couldNotRestart": "Could not restart",
+    "languageSaved": "Your language is saved.",
+    "retry": "Retry"
+  },
+  "login": {
+    "welcome": "Welcome to Kilo",
+    "language": "Language"
+  },
+  "profile": {
+    "language": "Language"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Agent sessions",
+      "chat": "Chat messages",
+      "kiloclaw": "KiloClaw activity",
+      "balance": "Balance alerts",
+      "security": "Security findings"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "إلغاء",
+    "done": "تم",
+    "retry": "إعادة المحاولة",
+    "language": "اللغة",
+    "device": "الجهاز",
+    "share": "مشاركة",
+    "justNow": "الآن",
+    "couldNotSaveSetting": "تعذّر حفظ الإعداد"
+  },
+  "language": {
+    "title": "اللغة",
+    "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
+    "couldNotRestart": "تعذّرت إعادة التشغيل",
+    "languageSaved": "تم حفظ لغتك.",
+    "retry": "إعادة المحاولة"
+  },
+  "login": {
+    "welcome": "مرحبًا بك في Kilo",
+    "language": "اللغة"
+  },
+  "profile": {
+    "language": "اللغة"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "جلسات الوكيل",
+      "chat": "رسائل الدردشة",
+      "kiloclaw": "نشاط KiloClaw",
+      "balance": "تنبيهات الرصيد",
+      "security": "نتائج الأمان"
+    }
+  }
+}

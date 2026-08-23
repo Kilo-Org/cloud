@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "done": "Terminé",
+    "retry": "Réessayer",
+    "language": "Langue",
+    "device": "Appareil",
+    "share": "Partager",
+    "justNow": "À l’instant",
+    "couldNotSaveSetting": "Impossible d’enregistrer le réglage"
+  },
+  "language": {
+    "title": "Langue",
+    "restarting": "Redémarrage pour appliquer la langue",
+    "couldNotRestart": "Impossible de redémarrer",
+    "languageSaved": "Votre langue est enregistrée.",
+    "retry": "Réessayer"
+  },
+  "login": {
+    "welcome": "Bienvenue sur Kilo",
+    "language": "Langue"
+  },
+  "profile": {
+    "language": "Langue"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Sessions de l’agent",
+      "chat": "Messages de chat",
+      "kiloclaw": "Activité KiloClaw",
+      "balance": "Alertes de solde",
+      "security": "Résultats de sécurité"
+    }
+  }
+}

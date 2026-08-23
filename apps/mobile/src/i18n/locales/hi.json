@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "रद्द करें",
+    "done": "हो गया",
+    "retry": "फिर से प्रयास करें",
+    "language": "भाषा",
+    "device": "डिवाइस",
+    "share": "साझा करें",
+    "justNow": "अभी",
+    "couldNotSaveSetting": "सेटिंग सहेजी नहीं जा सकी"
+  },
+  "language": {
+    "title": "भाषा",
+    "restarting": "भाषा लागू करने के लिए पुनः आरंभ हो रहा है",
+    "couldNotRestart": "पुनः आरंभ नहीं हो सका",
+    "languageSaved": "आपकी भाषा सहेज ली गई है।",
+    "retry": "फिर से प्रयास करें"
+  },
+  "login": {
+    "welcome": "Kilo में आपका स्वागत है",
+    "language": "भाषा"
+  },
+  "profile": {
+    "language": "भाषा"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "एजेंट सत्र",
+      "chat": "चैट संदेश",
+      "kiloclaw": "KiloClaw गतिविधि",
+      "balance": "बैलेंस अलर्ट",
+      "security": "सुरक्षा निष्कर्ष"
+    }
+  }
+}

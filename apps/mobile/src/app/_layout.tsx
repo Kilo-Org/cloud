@@ -1,4 +1,7 @@
 /* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
+// Must run before the first view mounts: allowRTL(true) makes the native
+// direction known before any layout pass (see src/i18n/rtl.ts).
+import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
@@ -11,7 +14,7 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
-import { isRunningInExpoGo } from 'expo';
+import { isRunningInExpoGo, reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
   ErrorBoundary as ExpoRouterErrorBoundary,
@@ -54,6 +57,13 @@ import {
   preloadThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
+import { i18n } from '@/i18n';
+import { syncRtl } from '@/i18n/rtl';
+import {
+  getResolvedLanguage,
+  preloadLanguagePreference,
+  useLanguagePreference,
+} from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import {
   captureLaunchDeepLink,
@@ -177,6 +187,7 @@ checkInitialNotification();
 captureLaunchDeepLink();
 prefetchCurrentUser();
 preloadThemePreference();
+preloadLanguagePreference();
 preloadStartupFonts();
 
 function RootLayoutNav() {
@@ -191,6 +202,10 @@ function RootLayoutNav() {
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
+  const { hasLoaded: languageHasLoaded } = useLanguagePreference();
+  // True once the active catalog is loaded (or English after a catalog
+  // failure), so the splash never hides on an unlocalized tree.
+  const [languageReady, setLanguageReady] = useState(false);
   const {
     userId,
     email,
@@ -268,7 +283,8 @@ function RootLayoutNav() {
   // holding first paint for it only ever costs time. `updateRequired` starts
   // false, first paint happens, and the effect below routes to /force-update
   // if the check later says an update is required.
-  const isLoading = authLoading || !fontsReady || !themeHasLoaded;
+  const isLoading =
+    authLoading || !fontsReady || !themeHasLoaded || !languageHasLoaded || !languageReady;
 
   // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
   // effect re-runs freely as gates settle. `userIdLoading` is false while the
@@ -296,6 +312,42 @@ function RootLayoutNav() {
       applyThemePreference(themePreference);
     }
   }, [themeHasLoaded, themePreference]);
+
+  // Resolve the active language once the stored preference has loaded, then
+  // prepare the direction and catalog before first paint. A direction change
+  // forces RTL and reloads the app; a catalog failure falls back to English so
+  // the splash still hides. Held in `isLoading` so the tree never paints
+  // English and then swaps.
+  useEffect(() => {
+    if (!languageHasLoaded) {
+      return;
+    }
+    let cancelled = false;
+
+    const prepareLanguage = async () => {
+      const resolved = getResolvedLanguage();
+      if (syncRtl(resolved)) {
+        try {
+          await reloadAppAsync();
+        } catch {
+          // Reload failed: fall through so the splash still hides.
+        }
+      }
+      try {
+        await i18n.changeLanguage(resolved);
+      } catch {
+        await i18n.changeLanguage('en');
+      }
+      if (!cancelled) {
+        setLanguageReady(true);
+      }
+    };
+
+    void prepareLanguage();
+    return () => {
+      cancelled = true;
+    };
+  }, [languageHasLoaded]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';

@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Anuluj",
+    "done": "Gotowe",
+    "retry": "Spróbuj ponownie",
+    "language": "Język",
+    "device": "Urządzenie",
+    "share": "Udostępnij",
+    "justNow": "Przed chwilą",
+    "couldNotSaveSetting": "Nie udało się zapisać ustawienia"
+  },
+  "language": {
+    "title": "Język",
+    "restarting": "Ponowne uruchamianie w celu zastosowania języka",
+    "couldNotRestart": "Nie udało się ponownie uruchomić",
+    "languageSaved": "Twój język został zapisany.",
+    "retry": "Spróbuj ponownie"
+  },
+  "login": {
+    "welcome": "Witamy w Kilo",
+    "language": "Język"
+  },
+  "profile": {
+    "language": "Język"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Sesje agenta",
+      "chat": "Wiadomości czatu",
+      "kiloclaw": "Aktywność KiloClaw",
+      "balance": "Alerty o saldzie",
+      "security": "Ustalenia bezpieczeństwa"
+    }
+  }
+}

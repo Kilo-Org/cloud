@@ -18,6 +18,13 @@ export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
 export const PR_REVIEW_RECENTS_KEY = 'pr-review-recents';
 export const PR_REVIEW_VIEWED_KEY = 'pr-review-viewed';
 export const THEME_PREFERENCE_KEY = 'theme-preference';
+export const LANGUAGE_PREFERENCE_KEY = 'language-preference';
+/** One-shot screen to reopen after an RTL language reload. */
+export const LANGUAGE_RETURN_TARGET_KEY = 'language-return-target';
+/** Login email draft, persisted before an RTL language reload. */
+export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
+/** Login SSO-recovery banner draft, persisted before an RTL language reload. */
+export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';

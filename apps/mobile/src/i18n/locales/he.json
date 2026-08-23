@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "ביטול",
+    "done": "סיום",
+    "retry": "נסה שוב",
+    "language": "שפה",
+    "device": "מכשיר",
+    "share": "שתף",
+    "justNow": "עכשיו",
+    "couldNotSaveSetting": "לא ניתן היה לשמור את ההגדרה"
+  },
+  "language": {
+    "title": "שפה",
+    "restarting": "מפעיל מחדש כדי להחיל את השפה",
+    "couldNotRestart": "לא ניתן היה להפעיל מחדש",
+    "languageSaved": "השפה שלך נשמרה.",
+    "retry": "נסה שוב"
+  },
+  "login": {
+    "welcome": "ברוך הבא ל-Kilo",
+    "language": "שפה"
+  },
+  "profile": {
+    "language": "שפה"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "הפעלות הסוכן",
+      "chat": "הודעות צ׳אט",
+      "kiloclaw": "פעילות KiloClaw",
+      "balance": "התראות יתרה",
+      "security": "ממצאי אבטחה"
+    }
+  }
+}

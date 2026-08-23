@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Hủy",
+    "done": "Xong",
+    "retry": "Thử lại",
+    "language": "Ngôn ngữ",
+    "device": "Thiết bị",
+    "share": "Chia sẻ",
+    "justNow": "Vừa xong",
+    "couldNotSaveSetting": "Không thể lưu cài đặt"
+  },
+  "language": {
+    "title": "Ngôn ngữ",
+    "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
+    "couldNotRestart": "Không thể khởi động lại",
+    "languageSaved": "Ngôn ngữ của bạn đã được lưu.",
+    "retry": "Thử lại"
+  },
+  "login": {
+    "welcome": "Chào mừng đến với Kilo",
+    "language": "Ngôn ngữ"
+  },
+  "profile": {
+    "language": "Ngôn ngữ"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Phiên tác nhân",
+      "chat": "Tin nhắn trò chuyện",
+      "kiloclaw": "Hoạt động KiloClaw",
+      "balance": "Cảnh báo số dư",
+      "security": "Phát hiện bảo mật"
+    }
+  }
+}

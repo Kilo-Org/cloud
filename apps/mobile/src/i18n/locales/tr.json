@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "İptal",
+    "done": "Bitti",
+    "retry": "Tekrar dene",
+    "language": "Dil",
+    "device": "Cihaz",
+    "share": "Paylaş",
+    "justNow": "Az önce",
+    "couldNotSaveSetting": "Ayar kaydedilemedi"
+  },
+  "language": {
+    "title": "Dil",
+    "restarting": "Dili uygulamak için yeniden başlatılıyor",
+    "couldNotRestart": "Yeniden başlatılamadı",
+    "languageSaved": "Diliniz kaydedildi.",
+    "retry": "Tekrar dene"
+  },
+  "login": {
+    "welcome": "Kilo’ya hoş geldiniz",
+    "language": "Dil"
+  },
+  "profile": {
+    "language": "Dil"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Aracı oturumları",
+      "chat": "Sohbet mesajları",
+      "kiloclaw": "KiloClaw etkinliği",
+      "balance": "Bakiye uyarıları",
+      "security": "Güvenlik bulguları"
+    }
+  }
+}

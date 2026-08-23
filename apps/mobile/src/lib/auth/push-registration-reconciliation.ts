@@ -8,6 +8,7 @@ import {
   attemptLogoutReconciliation,
   awaitLogoutReconciliationSettled,
 } from '@/lib/auth/logout-reconciliation';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { getDevicePushTokenOutcome, getPlatform } from '@/lib/notifications';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient } from '@/lib/trpc';
@@ -31,6 +32,10 @@ const MIN_ATTEMPT_SPACING_MS = 60_000;
 let attemptInFlight: Promise<PushRegistrationOutcome> | null = null;
 let lastAttemptAtMs = 0;
 let lastAttemptUserId: string | null = null;
+// The last locale sent with registerPushToken. A resolved-language change
+// bypasses both the spacing skip and the already-registered early return so
+// the server row is upserted with the new locale.
+let lastSentLocale: string | null = null;
 
 export type PushRegistrationOutcome =
   | { kind: 'in-flight' }
@@ -46,6 +51,7 @@ export function resetPushRegistrationReconciliationForTests(): void {
   attemptInFlight = null;
   lastAttemptAtMs = 0;
   lastAttemptUserId = null;
+  lastSentLocale = null;
 }
 
 /**
@@ -67,6 +73,9 @@ export async function attemptPushRegistrationReconciliation(
   void attemptLogoutReconciliation(userId);
   await awaitLogoutReconciliationSettled();
 
+  const locale = getResolvedLanguage();
+  const localeChanged = lastSentLocale !== locale;
+
   if (attemptInFlight) {
     if (lastAttemptUserId === userId) {
       return { kind: 'in-flight' };
@@ -79,12 +88,12 @@ export async function attemptPushRegistrationReconciliation(
     await attemptInFlight;
   }
   const now = Date.now();
-  if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS && lastAttemptUserId === userId) {
+  if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS && lastAttemptUserId === userId && !localeChanged) {
     return { kind: 'spacing-skipped' };
   }
   lastAttemptAtMs = now;
   lastAttemptUserId = userId;
-  attemptInFlight = runReconciliation();
+  attemptInFlight = runReconciliation(locale);
   try {
     return await attemptInFlight;
   } finally {
@@ -92,7 +101,7 @@ export async function attemptPushRegistrationReconciliation(
   }
 }
 
-async function runReconciliation(): Promise<PushRegistrationOutcome> {
+async function runReconciliation(locale: string): Promise<PushRegistrationOutcome> {
   const epoch = currentAuthEpoch();
 
   const deviceOutcome = await getDevicePushTokenOutcome();
@@ -113,7 +122,7 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
     // retries after the spacing window.
     return { kind: 'register-failed' };
   }
-  if (tokens.some(t => t.token === token)) {
+  if (tokens.some(t => t.token === token) && lastSentLocale === locale) {
     return { kind: 'already-registered' };
   }
 
@@ -128,6 +137,7 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
       token,
       platform: getPlatform(),
       appVersion: Application.nativeApplicationVersion ?? undefined,
+      locale,
     });
   } catch {
     return { kind: 'register-failed' };
@@ -139,6 +149,7 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
     return { kind: 'register-failed' };
   }
 
+  lastSentLocale = locale;
   void queryClient.invalidateQueries({ queryKey: trpcOptions.user.getMyPushTokens.queryKey() });
   return { kind: 'registered' };
 }

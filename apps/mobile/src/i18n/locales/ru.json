@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Отмена",
+    "done": "Готово",
+    "retry": "Повторить",
+    "language": "Язык",
+    "device": "Устройство",
+    "share": "Поделиться",
+    "justNow": "Только что",
+    "couldNotSaveSetting": "Не удалось сохранить настройку"
+  },
+  "language": {
+    "title": "Язык",
+    "restarting": "Перезапуск для применения языка",
+    "couldNotRestart": "Не удалось перезапустить",
+    "languageSaved": "Ваш язык сохранён.",
+    "retry": "Повторить"
+  },
+  "login": {
+    "welcome": "Добро пожаловать в Kilo",
+    "language": "Язык"
+  },
+  "profile": {
+    "language": "Язык"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "Сессии агента",
+      "chat": "Сообщения чата",
+      "kiloclaw": "Активность KiloClaw",
+      "balance": "Оповещения о балансе",
+      "security": "Находки безопасности"
+    }
+  }
+}

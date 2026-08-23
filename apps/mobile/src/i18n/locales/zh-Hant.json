@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "取消",
+    "done": "完成",
+    "retry": "重試",
+    "language": "語言",
+    "device": "裝置",
+    "share": "分享",
+    "justNow": "剛剛",
+    "couldNotSaveSetting": "無法儲存設定"
+  },
+  "language": {
+    "title": "語言",
+    "restarting": "正在重新啟動以套用語言",
+    "couldNotRestart": "無法重新啟動",
+    "languageSaved": "你的語言已儲存。",
+    "retry": "重試"
+  },
+  "login": {
+    "welcome": "歡迎使用 Kilo",
+    "language": "語言"
+  },
+  "profile": {
+    "language": "語言"
+  },
+  "notifications": {
+    "channel": {
+      "agent": "代理程式工作階段",
+      "chat": "聊天訊息",
+      "kiloclaw": "KiloClaw 活動",
+      "balance": "餘額提醒",
+      "security": "安全性發現"
+    }
+  }
+}

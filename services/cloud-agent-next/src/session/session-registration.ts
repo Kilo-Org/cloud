@@ -1004,6 +1004,15 @@ async function registerAllocatedSession(
   // prior attempt whose response was lost. The DO method is not idempotent, so
   // the retry returns this rejection; treat it as idempotent success instead of
   // rolling back a live clone, tombstoning its IDs, or settling the row failed.
+  //
+  // The rejection can only come from this caller's own retry, because the DO name
+  // `${userId}:${cloudAgentSessionId}` is request-identity bound on both entries:
+  // a first attempt allocates a fresh random `cloudAgentSessionId`
+  // (`generateSessionId`), so only `withDORetry` can reach that DO again; a
+  // same-operationKey replay rebuilds the ID from `row.canonical_result` in
+  // `rebuildCloneAllocation`, so the DO belongs to the same ledger row. Keep that
+  // property if either entry changes; otherwise an unrelated conflict would be
+  // swallowed as success here.
   logger.info('Session registered for lazy preparation');
   const result = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,

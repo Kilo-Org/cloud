@@ -88,7 +88,8 @@
       "renews": "Продовжується",
       "standardMonthToMonth": "Standard щомісяця",
       "standardStartsOn": "Standard починається {{date}} за {{price}}.",
-      "yourStandardMonthlyPrice": "ваша щомісячна ціна Standard"
+      "yourStandardMonthlyPrice": "ваша щомісячна ціна Standard",
+      "perMonth": "/міс"
     },
     "changelog": {
       "title": "Що нового",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "Політика виконання",
-      "couldNotLoad": "Не вдалося завантажити політику виконання"
+      "couldNotLoad": "Не вдалося завантажити політику виконання",
+      "alwaysAsk": "Завжди запитувати",
+      "alwaysAskDescription": "Підтверджуйте кожну команду перед виконанням. Найбезпечніше.",
+      "neverAsk": "Ніколи не запитувати",
+      "neverAskDescription": "Виконуйте команди без підтвердження. Швидше, але менш безпечно."
     },
     "google": {
       "title": "Обліковий запис Google",

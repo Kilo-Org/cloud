@@ -88,7 +88,8 @@
       "renews": "Verlängert sich",
       "standardMonthToMonth": "Standard monatlich",
       "standardStartsOn": "Standard beginnt am {{date}} für {{price}}.",
-      "yourStandardMonthlyPrice": "dein monatlicher Standard-Preis"
+      "yourStandardMonthlyPrice": "dein monatlicher Standard-Preis",
+      "perMonth": "/Monat"
     },
     "changelog": {
       "title": "Neuigkeiten",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "Ausführungsrichtlinie",
-      "couldNotLoad": "Ausführungsrichtlinie konnte nicht geladen werden"
+      "couldNotLoad": "Ausführungsrichtlinie konnte nicht geladen werden",
+      "alwaysAsk": "Immer nachfragen",
+      "alwaysAskDescription": "Jeden Befehl vor der Ausführung bestätigen. Am sichersten.",
+      "neverAsk": "Nie nachfragen",
+      "neverAskDescription": "Befehle ohne Bestätigung ausführen. Schneller, aber weniger sicher."
     },
     "google": {
       "title": "Google-Konto",

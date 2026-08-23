@@ -88,7 +88,8 @@
       "renews": "Yenilenir",
       "standardMonthToMonth": "Standard aylık",
       "standardStartsOn": "Standard {{date}} tarihinde {{price}} ile başlıyor.",
-      "yourStandardMonthlyPrice": "aylık Standard fiyatınız"
+      "yourStandardMonthlyPrice": "aylık Standard fiyatınız",
+      "perMonth": "/ay"
     },
     "changelog": {
       "title": "Yenilikler",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "Yürütme ilkesi",
-      "couldNotLoad": "Yürütme ilkesi yüklenemedi"
+      "couldNotLoad": "Yürütme ilkesi yüklenemedi",
+      "alwaysAsk": "Her zaman sor",
+      "alwaysAskDescription": "Yürütmeden önce her komutu onaylayın. En güvenli.",
+      "neverAsk": "Asla sorma",
+      "neverAskDescription": "Komutları onay olmadan yürütün. Daha hızlı ama daha az güvenli."
     },
     "google": {
       "title": "Google Hesabı",

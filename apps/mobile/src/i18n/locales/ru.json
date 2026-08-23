@@ -88,7 +88,8 @@
       "renews": "Продлевается",
       "standardMonthToMonth": "Standard помесячно",
       "standardStartsOn": "Standard начинается {{date}} за {{price}}.",
-      "yourStandardMonthlyPrice": "ваша месячная цена Standard"
+      "yourStandardMonthlyPrice": "ваша месячная цена Standard",
+      "perMonth": "/мес"
     },
     "changelog": {
       "title": "Что нового",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "Политика выполнения",
-      "couldNotLoad": "Не удалось загрузить политику выполнения"
+      "couldNotLoad": "Не удалось загрузить политику выполнения",
+      "alwaysAsk": "Всегда спрашивать",
+      "alwaysAskDescription": "Подтверждайте каждую команду перед выполнением. Самый безопасный вариант.",
+      "neverAsk": "Никогда не спрашивать",
+      "neverAskDescription": "Выполняйте команды без подтверждения. Быстрее, но менее безопасно."
     },
     "google": {
       "title": "Аккаунт Google",

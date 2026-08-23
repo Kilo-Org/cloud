@@ -88,7 +88,8 @@
       "renews": "מתחדש",
       "standardMonthToMonth": "Standard חודשי",
       "standardStartsOn": "Standard מתחיל ב-{{date}} תמורת {{price}}.",
-      "yourStandardMonthlyPrice": "המחיר החודשי שלך ל-Standard"
+      "yourStandardMonthlyPrice": "המחיר החודשי שלך ל-Standard",
+      "perMonth": "/חודש"
     },
     "changelog": {
       "title": "מה חדש",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "מדיניות ביצוע",
-      "couldNotLoad": "לא ניתן לטעון מדיניות ביצוע"
+      "couldNotLoad": "לא ניתן לטעון מדיניות ביצוע",
+      "alwaysAsk": "שאל תמיד",
+      "alwaysAskDescription": "אשר כל פקודה לפני ביצוע. המאובטח ביותר.",
+      "neverAsk": "לעולם אל תשאל",
+      "neverAskDescription": "בצע פקודות ללא אישור. מהיר יותר אך פחות בטוח."
     },
     "google": {
       "title": "חשבון Google",

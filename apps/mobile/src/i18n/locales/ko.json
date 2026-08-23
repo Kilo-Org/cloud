@@ -88,7 +88,8 @@
       "renews": "갱신",
       "standardMonthToMonth": "Standard 월간",
       "standardStartsOn": "Standard는 {{date}}에 {{price}}로 시작됩니다.",
-      "yourStandardMonthlyPrice": "Standard 월간 가격"
+      "yourStandardMonthlyPrice": "Standard 월간 가격",
+      "perMonth": "/월"
     },
     "changelog": {
       "title": "새로운 기능",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "실행 정책",
-      "couldNotLoad": "실행 정책을 불러올 수 없습니다"
+      "couldNotLoad": "실행 정책을 불러올 수 없습니다",
+      "alwaysAsk": "항상 확인",
+      "alwaysAskDescription": "실행 전에 모든 명령을 확인합니다. 가장 안전합니다.",
+      "neverAsk": "확인 안 함",
+      "neverAskDescription": "확인 없이 명령을 실행합니다. 빠르지만 덜 안전합니다."
     },
     "google": {
       "title": "Google 계정",

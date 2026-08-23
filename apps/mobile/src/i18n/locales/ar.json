@@ -88,7 +88,8 @@
       "renews": "يتجدد",
       "standardMonthToMonth": "Standard شهريًا",
       "standardStartsOn": "يبدأ Standard في {{date}} مقابل {{price}}.",
-      "yourStandardMonthlyPrice": "سعر Standard الشهري الخاص بك"
+      "yourStandardMonthlyPrice": "سعر Standard الشهري الخاص بك",
+      "perMonth": "/شهر"
     },
     "changelog": {
       "title": "ما الجديد",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "سياسة التنفيذ",
-      "couldNotLoad": "تعذّر تحميل سياسة التنفيذ"
+      "couldNotLoad": "تعذّر تحميل سياسة التنفيذ",
+      "alwaysAsk": "اسأل دائمًا",
+      "alwaysAskDescription": "أكّد كل أمر قبل التنفيذ. الأكثر أمانًا.",
+      "neverAsk": "لا تسأل أبدًا",
+      "neverAskDescription": "نفّذ الأوامر دون تأكيد. أسرع لكن أقل أمانًا."
     },
     "google": {
       "title": "حساب Google",

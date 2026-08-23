@@ -88,7 +88,8 @@
       "renews": "更新",
       "standardMonthToMonth": "Standard月額",
       "standardStartsOn": "Standardは{{date}}に{{price}}で開始します。",
-      "yourStandardMonthlyPrice": "Standardの月額料金"
+      "yourStandardMonthlyPrice": "Standardの月額料金",
+      "perMonth": "/月"
     },
     "changelog": {
       "title": "新着情報",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "実行ポリシー",
-      "couldNotLoad": "実行ポリシーを読み込めませんでした"
+      "couldNotLoad": "実行ポリシーを読み込めませんでした",
+      "alwaysAsk": "常に確認",
+      "alwaysAskDescription": "実行前に各コマンドを確認します。最も安全です。",
+      "neverAsk": "確認しない",
+      "neverAskDescription": "確認なしでコマンドを実行します。速いですが安全性は低くなります。"
     },
     "google": {
       "title": "Googleアカウント",

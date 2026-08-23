@@ -88,7 +88,8 @@
       "renews": "Verlengt",
       "standardMonthToMonth": "Standard per maand",
       "standardStartsOn": "Standard start op {{date}} voor {{price}}.",
-      "yourStandardMonthlyPrice": "je maandelijkse Standard-prijs"
+      "yourStandardMonthlyPrice": "je maandelijkse Standard-prijs",
+      "perMonth": "/maand"
     },
     "changelog": {
       "title": "Wat is er nieuw",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "Uitvoeringsbeleid",
-      "couldNotLoad": "Kon uitvoeringsbeleid niet laden"
+      "couldNotLoad": "Kon uitvoeringsbeleid niet laden",
+      "alwaysAsk": "Altijd vragen",
+      "alwaysAskDescription": "Bevestig elke opdracht vóór uitvoering. Meest veilig.",
+      "neverAsk": "Nooit vragen",
+      "neverAskDescription": "Voer opdrachten uit zonder bevestiging. Sneller maar minder veilig."
     },
     "google": {
       "title": "Google-account",

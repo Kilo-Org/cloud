@@ -88,7 +88,8 @@
       "renews": "Diperbarui",
       "standardMonthToMonth": "Standard bulanan",
       "standardStartsOn": "Standard dimulai pada {{date}} seharga {{price}}.",
-      "yourStandardMonthlyPrice": "harga bulanan Standard Anda"
+      "yourStandardMonthlyPrice": "harga bulanan Standard Anda",
+      "perMonth": "/bulan"
     },
     "changelog": {
       "title": "Yang Baru",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "Kebijakan eksekusi",
-      "couldNotLoad": "Tidak dapat memuat kebijakan eksekusi"
+      "couldNotLoad": "Tidak dapat memuat kebijakan eksekusi",
+      "alwaysAsk": "Selalu tanya",
+      "alwaysAskDescription": "Konfirmasi setiap perintah sebelum dieksekusi. Paling aman.",
+      "neverAsk": "Jangan pernah tanya",
+      "neverAskDescription": "Jalankan perintah tanpa konfirmasi. Lebih cepat tetapi kurang aman."
     },
     "google": {
       "title": "Akun Google",

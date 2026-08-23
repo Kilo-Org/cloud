@@ -88,7 +88,8 @@
       "renews": "续订",
       "standardMonthToMonth": "Standard 按月",
       "standardStartsOn": "Standard 将于 {{date}} 以 {{price}} 开始。",
-      "yourStandardMonthlyPrice": "您的 Standard 月费"
+      "yourStandardMonthlyPrice": "您的 Standard 月费",
+      "perMonth": "/月"
     },
     "changelog": {
       "title": "新功能",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "执行策略",
-      "couldNotLoad": "无法加载执行策略"
+      "couldNotLoad": "无法加载执行策略",
+      "alwaysAsk": "始终询问",
+      "alwaysAskDescription": "执行前确认每条命令。最安全。",
+      "neverAsk": "从不询问",
+      "neverAskDescription": "无需确认即可执行命令。更快但安全性较低。"
     },
     "google": {
       "title": "Google 账号",

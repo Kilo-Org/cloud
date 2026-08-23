@@ -88,7 +88,8 @@
       "renews": "नवीनीकृत होता है",
       "standardMonthToMonth": "Standard माह-दर-माह",
       "standardStartsOn": "Standard {{date}} को {{price}} पर शुरू होता है.",
-      "yourStandardMonthlyPrice": "आपकी Standard मासिक कीमत"
+      "yourStandardMonthlyPrice": "आपकी Standard मासिक कीमत",
+      "perMonth": "/माह"
     },
     "changelog": {
       "title": "नया क्या है",
@@ -134,7 +135,11 @@
     },
     "execPolicy": {
       "title": "निष्पादन नीति",
-      "couldNotLoad": "निष्पादन नीति लोड नहीं हो सकी"
+      "couldNotLoad": "निष्पादन नीति लोड नहीं हो सकी",
+      "alwaysAsk": "हमेशा पूछें",
+      "alwaysAskDescription": "प्रत्येक कमांड को निष्पादन से पहले पुष्टि करें। सबसे सुरक्षित।",
+      "neverAsk": "कभी न पूछें",
+      "neverAskDescription": "बिना पुष्टि के कमांड निष्पादित करें। तेज़ लेकिन कम सुरक्षित।"
     },
     "google": {
       "title": "Google खाता",

@@ -43,7 +43,7 @@ function DetailRow({
 function formatStandardPrice(microdollars: number | null | undefined): string {
   return microdollars == null
     ? i18n.t('kiloclaw.billing.yourStandardMonthlyPrice')
-    : `${formatMoney(fromMicrodollars(microdollars), i18n.language)}/month`;
+    : `${formatMoney(fromMicrodollars(microdollars), i18n.language)}${i18n.t('kiloclaw.billing.perMonth')}`;
 }
 
 /** "Continue month-to-month" CTA shown during a Commit plan's final term. */

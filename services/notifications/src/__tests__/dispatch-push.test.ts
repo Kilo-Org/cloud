@@ -16,7 +16,7 @@ vi.mock('../lib/expo-push', () => ({
 }));
 
 type DbState = {
-  tokens: { user_id: string; token: string; app_version?: string | null }[];
+  tokens: { user_id: string; token: string; app_version?: string | null; locale?: string | null }[];
   staleTokensToDelete?: string[];
   deleteCalls?: number;
   // When set, the `user_notification_preferences` read returns this value.
@@ -33,7 +33,11 @@ function installDbMock(state: DbState) {
         where: async () => {
           const tableName = getTableName(table);
           if (tableName === 'user_push_tokens') {
-            return state.tokens.map(t => ({ token: t.token, app_version: t.app_version ?? null }));
+            return state.tokens.map(t => ({
+              token: t.token,
+              app_version: t.app_version ?? null,
+              locale: t.locale ?? null,
+            }));
           }
           if (tableName === 'user_notification_preferences') {
             if (state.previewsThrows) {
@@ -1307,5 +1311,103 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages[0].title).toBe('Kilo');
     expect(messages[0].body).not.toBe('B');
+  });
+});
+
+describe('NotificationChannelDO per-token locale translation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  it('translates title and body per token locale when i18nKey is present', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-locale', token: 'tok-es', locale: 'es' },
+        { user_id: 'user-locale', token: 'tok-en', locale: 'en' },
+      ],
+      previews: 'full',
+    });
+    const stub = getDO('user-locale');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-locale',
+        idempotencyKey: 'k-locale',
+        push: {
+          title: 'Low balance alert',
+          body: 'Acme Corp balance fell below $10',
+          i18nKey: 'internal.lowBalance',
+          i18nParams: { organizationName: 'Acme Corp', minimumBalanceUsd: '10' },
+          data: { type: 'low_balance', organizationId: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    const esMessage = messages.find(m => m.to === 'tok-es');
+    const enMessage = messages.find(m => m.to === 'tok-en');
+    expect(esMessage?.title).toBe('Alerta de saldo bajo');
+    expect(esMessage?.body).toBe('El saldo de Acme Corp cayó por debajo de $10');
+    expect(enMessage?.title).toBe('Low balance alert');
+    expect(enMessage?.body).toBe('Acme Corp balance fell below $10');
+    expect(esMessage?.title).not.toBe(enMessage?.title);
+  });
+
+  it('treats a null locale as English', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-null-locale', token: 'tok-null', locale: null }],
+      previews: 'full',
+    });
+    const stub = getDO('user-null-locale');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-null-locale',
+        idempotencyKey: 'k-null-locale',
+        push: {
+          title: 'Low balance alert',
+          body: 'Acme Corp balance fell below $10',
+          i18nKey: 'internal.lowBalance',
+          i18nParams: { organizationName: 'Acme Corp', minimumBalanceUsd: '10' },
+          data: { type: 'low_balance', organizationId: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Low balance alert');
+    expect(messages[0].body).toBe('Acme Corp balance fell below $10');
+  });
+
+  it('uses raw title/body when the payload has no i18nKey', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-raw', token: 'tok-raw', locale: 'es' }],
+      previews: 'full',
+    });
+    const stub = getDO('user-raw');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-raw',
+        idempotencyKey: 'k-raw',
+        push: {
+          title: 'My raw title',
+          body: 'My raw body',
+          data: {
+            type: 'chat.message',
+            sandboxId: 'sb1',
+            conversationId: 'conv1',
+            messageId: 'm1',
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('My raw title');
+    expect(messages[0].body).toBe('My raw body');
   });
 });

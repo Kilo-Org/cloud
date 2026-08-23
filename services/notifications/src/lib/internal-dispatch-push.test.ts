@@ -76,6 +76,8 @@ function expectedLowBalanceInput(userId: string): DispatchPushInput {
     push: {
       title: 'Low balance alert',
       body: 'Acme Corp balance fell below $10',
+      i18nKey: 'internal.lowBalance',
+      i18nParams: { organizationName: 'Acme Corp', minimumBalanceUsd: '10' },
       data: { type: 'low_balance', organizationId: 'org-1' },
       sound: 'default',
       priority: 'high',
@@ -259,20 +261,23 @@ describe('dispatchInternalPushCore', () => {
       notificationKind: 'new_finding' as const,
       severity: 'critical',
       expectedTitle: 'New security finding (critical)',
+      expectedI18nKey: 'internal.securityFindingNew',
     },
     {
       notificationKind: 'sla_warning' as const,
       severity: 'high',
       expectedTitle: 'SLA warning',
+      expectedI18nKey: 'internal.securityFindingSlaWarning',
     },
     {
       notificationKind: 'sla_breach' as const,
       severity: 'medium',
       expectedTitle: 'SLA breach',
+      expectedI18nKey: 'internal.securityFindingSlaBreach',
     },
   ])(
     'security_finding $notificationKind copy is exact',
-    async ({ notificationKind, severity, expectedTitle }) => {
+    async ({ notificationKind, severity, expectedTitle, expectedI18nKey }) => {
       const { deps, calls } = fakeDeps();
       const input = securityFinding({ notificationKind, severity, title: 'XSS in admin' });
       const result = await dispatchInternalPushCore(input, deps);
@@ -287,6 +292,12 @@ describe('dispatchInternalPushCore', () => {
         push: {
           title: expectedTitle,
           body: 'XSS in admin in acme/api',
+          i18nKey: expectedI18nKey,
+          i18nParams: {
+            severity,
+            findingTitle: 'XSS in admin',
+            repoFullName: 'acme/api',
+          },
           data: {
             type: 'security_finding',
             findingId: 'finding-1',
@@ -414,6 +425,7 @@ describe('dispatchInternalPushCore', () => {
       push: {
         title: 'Kilo',
         body: 'A security finding needs attention',
+        i18nKey: 'internal.securityLifecycle',
         data: {
           type: 'security_lifecycle',
           event: 'remediation_pr_opened',

@@ -48,7 +48,8 @@ export async function sendConversationMessagePush(
   try {
     const bodyPreview = contentBlocksToText(input.content).slice(0, 200);
     const sandboxLabel = await fetchSandboxLabel(env.HYPERDRIVE.connectionString, input.sandboxId);
-    const conversationTitle = input.title ?? 'Untitled';
+    const hasConversationTitle = input.title != null && input.title.trim().length > 0;
+    const conversationTitle = hasConversationTitle ? input.title : 'Untitled';
     const payload = {
       conversationId: input.conversationId,
       sandboxId: input.sandboxId,
@@ -57,6 +58,13 @@ export async function sendConversationMessagePush(
       title: `${sandboxLabel} · ${conversationTitle}`,
       bodyPreview,
       messageId: input.messageId,
+      // A missing conversation title is a system template ("Untitled"); send
+      // the i18n key so the DO translates it per token. A user-authored title
+      // is sent raw with no i18n key.
+      ...(!hasConversationTitle && {
+        i18nKey: 'chat.untitled',
+        i18nParams: { sandboxLabel, bodyPreview },
+      }),
     } satisfies SendPushForConversationInput;
 
     const pushResult = await env.NOTIFICATIONS.sendPushForConversation(payload);

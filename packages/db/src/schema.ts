@@ -9272,6 +9272,8 @@ export const user_push_tokens = pgTable(
     // App version at token registration. Null for tokens registered by clients
     // that predate channel creation; the push DO gates Android channelId on it.
     app_version: text(),
+    // Locale tag (e.g. "es") captured at token registration. Null means English.
+    locale: text('locale'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

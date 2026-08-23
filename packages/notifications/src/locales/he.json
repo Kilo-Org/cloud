@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "לסשן הסוכן שלך יש עדכון",
+      "chatMessage": "יש לך הודעה חדשה",
+      "instanceLifecycle": "למופע שלך יש עדכון",
+      "scheduledAction": "לפעולה מתוזמנת יש עדכון",
+      "lowBalance": "היתרה שלך דורשת תשומת לב",
+      "securityFinding": "ממצא אבטחה דורש תשומת לב"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "המשימה הושלמה"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "נכשל: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "הופסק: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ללא כותרת",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "התראת יתרה נמוכה",
+      "body": "היתרה של {{organizationName}} ירדה מתחת ל-${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "ממצא אבטחה חדש ({{severity}})",
+      "body": "{{findingTitle}} ב-{{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "אזהרת SLA",
+      "body": "{{findingTitle}} ב-{{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "הפרת SLA",
+      "body": "{{findingTitle}} ב-{{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ממצא אבטחה דורש תשומת לב"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} מוכן",
+      "body": "הקש כדי להתחיל לשוחח."
+    },
+    "startFailed": {
+      "title": "לא ניתן היה להפעיל את {{instanceName}}",
+      "body": "ההפעלה נכשלה."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} יופעל מחדש בקרוב",
+      "body": "הפעלה מחדש מתוזמנת ל-{{when}}."
+    },
+    "restartCancelled": {
+      "title": "ההפעלה מחדש של {{instanceName}} בוטלה",
+      "body": "ההפעלה מחדש שתוזמנה קודם בוטלה."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ישודרג בקרוב",
+      "bodyWithTag": "שדרוג ל-{{targetImageTag}} ב-{{when}}.",
+      "bodyWithoutTag": "שדרוג מתוזמן ב-{{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "השדרוג של {{instanceName}} בוטל",
+      "body": "השדרוג שתוזמן קודם בוטל."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "סשן ה-Kilo שלך מוכן לשליטה מהטלפון"
+  }
+}

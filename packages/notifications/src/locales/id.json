@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sesi agen Anda memiliki pembaruan",
+      "chatMessage": "Anda memiliki pesan baru",
+      "instanceLifecycle": "Instance Anda memiliki pembaruan",
+      "scheduledAction": "Tindakan terjadwal memiliki pembaruan",
+      "lowBalance": "Saldo Anda perlu diperhatikan",
+      "securityFinding": "Temuan keamanan perlu diperhatikan"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tugas selesai"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Gagal: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Terputus: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Tanpa judul",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Peringatan saldo rendah",
+      "body": "Saldo {{organizationName}} turun di bawah ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Temuan keamanan baru ({{severity}})",
+      "body": "{{findingTitle}} di {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Peringatan SLA",
+      "body": "{{findingTitle}} di {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Pelanggaran SLA",
+      "body": "{{findingTitle}} di {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Temuan keamanan perlu diperhatikan"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} siap",
+      "body": "Ketuk untuk mulai mengobrol."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} gagal dimulai",
+      "body": "Gagal dimulai."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} akan segera dimulai ulang",
+      "body": "Dijadwalkan untuk dimulai ulang pada {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Mulai ulang {{instanceName}} dibatalkan",
+      "body": "Mulai ulang yang dijadwalkan sebelumnya telah dibatalkan."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} akan segera ditingkatkan",
+      "bodyWithTag": "Tingkatkan ke {{targetImageTag}} pada {{when}}.",
+      "bodyWithoutTag": "Peningkatan dijadwalkan pada {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Peningkatan {{instanceName}} dibatalkan",
+      "body": "Peningkatan yang dijadwalkan sebelumnya telah dibatalkan."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Sesi Kilo Anda siap dikendalikan dari ponsel"
+  }
+}

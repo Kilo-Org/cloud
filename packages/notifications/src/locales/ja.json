@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "エージェントセッションに更新があります",
+      "chatMessage": "新しいメッセージがあります",
+      "instanceLifecycle": "インスタンスに更新があります",
+      "scheduledAction": "スケジュールされたアクションに更新があります",
+      "lowBalance": "残高の確認が必要です",
+      "securityFinding": "セキュリティの検出結果の確認が必要です"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "タスクが完了しました"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "失敗: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "中断: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · 無題",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "残高低下アラート",
+      "body": "{{organizationName}} の残高が ${{minimumBalanceUsd}} を下回りました"
+    },
+    "securityFindingNew": {
+      "title": "新しいセキュリティ検出結果 ({{severity}})",
+      "body": "{{repoFullName}} の {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA 警告",
+      "body": "{{repoFullName}} の {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA 違反",
+      "body": "{{repoFullName}} の {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "セキュリティの検出結果の確認が必要です"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} の準備ができました",
+      "body": "タップしてチャットを開始します。"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} を開始できませんでした",
+      "body": "開始に失敗しました。"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} はまもなく再起動します",
+      "body": "{{when}} に再起動を予定しています。"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} の再起動がキャンセルされました",
+      "body": "以前に予定されていた再起動はキャンセルされました。"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} はまもなくアップグレードされます",
+      "bodyWithTag": "{{when}} に {{targetImageTag}} へアップグレードします。",
+      "bodyWithoutTag": "{{when}} にアップグレードを予定しています。"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} のアップグレードがキャンセルされました",
+      "body": "以前に予定されていたアップグレードはキャンセルされました。"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo セッションを電話から操作する準備ができました"
+  }
+}

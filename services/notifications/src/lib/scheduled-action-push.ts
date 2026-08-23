@@ -7,6 +7,7 @@
 
 import {
   sendScheduledActionNoticeInputSchema,
+  translatePush,
   type PushData,
   type ScheduledActionEvent,
   type SendScheduledActionNoticeParams,
@@ -24,6 +25,8 @@ export type {
 export const ParamsSchema = sendScheduledActionNoticeInputSchema;
 
 const BODY_MAX_LENGTH = 100;
+
+export type PushTokenWithLocale = { token: string; locale: string | null };
 
 function truncate(text: string, max = BODY_MAX_LENGTH): string {
   if (text.length <= max) return text;
@@ -52,47 +55,100 @@ function formatScheduledAt(iso: string): string {
   }
 }
 
-function buildTitle(event: ScheduledActionEvent, instanceName: string | null): string {
+function buildTitle(
+  locale: string | null,
+  event: ScheduledActionEvent,
+  instanceName: string | null
+): string {
+  // KiloClaw is a product name; it is never translated.
   const name = instanceName ?? 'KiloClaw';
   switch (event) {
     case 'scheduled_restart_notice':
-      return `${name} will restart soon`;
+      return translatePush(
+        locale,
+        'scheduledAction.restartNotice.title',
+        { instanceName: name },
+        '{{instanceName}} will restart soon'
+      );
     case 'scheduled_restart_cancelled':
-      return `${name} restart cancelled`;
+      return translatePush(
+        locale,
+        'scheduledAction.restartCancelled.title',
+        { instanceName: name },
+        '{{instanceName}} restart cancelled'
+      );
     case 'scheduled_version_change_notice':
-      return `${name} will upgrade soon`;
+      return translatePush(
+        locale,
+        'scheduledAction.versionChangeNotice.title',
+        { instanceName: name },
+        '{{instanceName}} will upgrade soon'
+      );
     case 'scheduled_version_change_cancelled':
-      return `${name} upgrade cancelled`;
+      return translatePush(
+        locale,
+        'scheduledAction.versionChangeCancelled.title',
+        { instanceName: name },
+        '{{instanceName}} upgrade cancelled'
+      );
   }
 }
 
-function buildBody(params: SendScheduledActionNoticeParams): string {
+function buildBody(locale: string | null, params: SendScheduledActionNoticeParams): string {
   const when = formatScheduledAt(params.scheduledAt);
   switch (params.event) {
     case 'scheduled_restart_notice':
-      return truncate(`Scheduled to restart at ${when}.`);
+      return truncate(
+        translatePush(
+          locale,
+          'scheduledAction.restartNotice.body',
+          { when },
+          'Scheduled to restart at {{when}}.'
+        )
+      );
     case 'scheduled_restart_cancelled':
-      return truncate(`The previously scheduled restart has been cancelled.`);
+      return truncate(
+        translatePush(
+          locale,
+          'scheduledAction.restartCancelled.body',
+          undefined,
+          'The previously scheduled restart has been cancelled.'
+        )
+      );
     case 'scheduled_version_change_notice':
       return truncate(
         params.targetImageTag
-          ? `Upgrade to ${params.targetImageTag} at ${when}.`
-          : `Scheduled upgrade at ${when}.`
+          ? translatePush(
+              locale,
+              'scheduledAction.versionChangeNotice.bodyWithTag',
+              { targetImageTag: params.targetImageTag, when },
+              'Upgrade to {{targetImageTag}} at {{when}}.'
+            )
+          : translatePush(
+              locale,
+              'scheduledAction.versionChangeNotice.bodyWithoutTag',
+              { when },
+              'Scheduled upgrade at {{when}}.'
+            )
       );
     case 'scheduled_version_change_cancelled':
-      return truncate(`The previously scheduled upgrade has been cancelled.`);
+      return truncate(
+        translatePush(
+          locale,
+          'scheduledAction.versionChangeCancelled.body',
+          undefined,
+          'The previously scheduled upgrade has been cancelled.'
+        )
+      );
   }
 }
 
 /** Pure helper that builds the Expo push messages for a scheduled-action event. */
 export function buildScheduledActionMessages(
-  tokens: readonly string[],
+  tokens: readonly PushTokenWithLocale[],
   params: SendScheduledActionNoticeParams
 ): ExpoPushMessage[] {
-  const title = buildTitle(params.event, params.instanceName);
-  const body = buildBody(params);
-
-  return tokens.map(token => {
+  return tokens.map(({ token, locale }) => {
     const data = {
       type: 'scheduled-action',
       event: params.event,
@@ -101,8 +157,8 @@ export function buildScheduledActionMessages(
 
     return {
       to: token,
-      title,
-      body,
+      title: buildTitle(locale, params.event, params.instanceName),
+      body: buildBody(locale, params),
       data,
       sound: 'default',
       priority: 'high',
@@ -118,7 +174,7 @@ export type ScheduledActionDispatchDeps = {
    * `null` = successful read that returned no row → default-on.
    */
   readPreference: (userId: string) => Promise<boolean | null>;
-  getTokens: (userId: string) => Promise<string[]>;
+  getTokens: (userId: string) => Promise<PushTokenWithLocale[]>;
   deleteStaleTokens: (tokens: string[]) => Promise<void>;
   sendPush: (messages: ExpoPushMessage[]) => Promise<SendResult>;
   enqueueReceipts: (pairs: TicketTokenPair[]) => Promise<void>;

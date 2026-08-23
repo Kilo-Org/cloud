@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Twoja sesja agenta ma aktualizację",
+      "chatMessage": "Masz nową wiadomość",
+      "instanceLifecycle": "Twoja instancja ma aktualizację",
+      "scheduledAction": "Zaplanowana akcja ma aktualizację",
+      "lowBalance": "Twoje saldo wymaga uwagi",
+      "securityFinding": "Wynik bezpieczeństwa wymaga uwagi"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Zadanie ukończone"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Niepowodzenie: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Przerwano: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Bez tytułu",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alert niskiego salda",
+      "body": "Saldo {{organizationName}} spadło poniżej ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nowy wynik bezpieczeństwa ({{severity}})",
+      "body": "{{findingTitle}} w {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Ostrzeżenie SLA",
+      "body": "{{findingTitle}} w {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Naruszenie SLA",
+      "body": "{{findingTitle}} w {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Wynik bezpieczeństwa wymaga uwagi"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} jest gotowa",
+      "body": "Dotknij, aby rozpocząć czat."
+    },
+    "startFailed": {
+      "title": "Nie udało się uruchomić {{instanceName}}",
+      "body": "Uruchomienie nie powiodło się."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} wkrótce uruchomi się ponownie",
+      "body": "Ponowne uruchomienie zaplanowano na {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Ponowne uruchomienie {{instanceName}} anulowane",
+      "body": "Wcześniej zaplanowane ponowne uruchomienie zostało anulowane."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} wkrótce zostanie zaktualizowana",
+      "bodyWithTag": "Aktualizacja do {{targetImageTag}} o {{when}}.",
+      "bodyWithoutTag": "Zaplanowana aktualizacja o {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Aktualizacja {{instanceName}} anulowana",
+      "body": "Wcześniej zaplanowana aktualizacja została anulowana."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Twoja sesja Kilo jest gotowa do sterowania z telefonu"
+  }
+}

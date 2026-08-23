@@ -10,7 +10,12 @@ export function truncatePushSnippet(text: string, maxLength = PUSH_SNIPPET_MAX_L
   return singleLineText.slice(0, maxLength - ELLIPSIS.length) + ELLIPSIS;
 }
 
-export function buildCloudAgentPushBody(
+/**
+ * The English detail interpolated into the translated body templates
+ * (`Failed: {{detail}}` / `Interrupted: {{detail}}`). Snippets and error text
+ * are user/error-authored and pass through untranslated.
+ */
+export function buildCloudAgentPushDetail(
   status: CloudAgentSessionPushStatus,
   snippet?: string,
   error?: string
@@ -22,11 +27,26 @@ export function buildCloudAgentPushBody(
   }
 
   if (status === 'failed') {
-    const detail =
-      truncatedSnippet ?? (error ? truncatePushSnippet(error) : undefined) ?? 'Task failed';
+    return truncatedSnippet ?? (error ? truncatePushSnippet(error) : undefined) ?? 'Task failed';
+  }
+
+  return truncatedSnippet ?? 'Task interrupted';
+}
+
+export function buildCloudAgentPushBody(
+  status: CloudAgentSessionPushStatus,
+  snippet?: string,
+  error?: string
+): string {
+  const detail = buildCloudAgentPushDetail(status, snippet, error);
+
+  if (status === 'completed') {
+    return detail;
+  }
+
+  if (status === 'failed') {
     return `Failed: ${detail}`;
   }
 
-  const detail = truncatedSnippet ?? 'Task interrupted';
   return `Interrupted: ${detail}`;
 }

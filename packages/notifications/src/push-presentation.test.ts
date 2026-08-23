@@ -94,4 +94,28 @@ describe('genericPushContentForPushData', () => {
       body: 'A security finding needs attention',
     });
   });
+
+  it('translates the generic copy for the es locale', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'chat.message',
+      sandboxId: 'sb1',
+      conversationId: 'conv1',
+      messageId: 'm1',
+    });
+    expect(genericPushContentForPushData(parsed, 'es')).toEqual({
+      title: 'Kilo',
+      body: 'Tienes un mensaje nuevo',
+    });
+  });
+
+  it('falls back to English for an unknown locale', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'low_balance',
+      organizationId: 'org1',
+    });
+    expect(genericPushContentForPushData(parsed, 'xx')).toEqual({
+      title: 'Kilo',
+      body: 'Your balance needs attention',
+    });
+  });
 });

@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sua sessão de agente tem uma atualização",
+      "chatMessage": "Você tem uma nova mensagem",
+      "instanceLifecycle": "Sua instância tem uma atualização",
+      "scheduledAction": "Uma ação agendada tem uma atualização",
+      "lowBalance": "Seu saldo precisa de atenção",
+      "securityFinding": "Um achado de segurança precisa de atenção"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tarefa concluída"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Falhou: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Interrompido: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Sem título",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alerta de saldo baixo",
+      "body": "O saldo de {{organizationName}} caiu abaixo de ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Novo achado de segurança ({{severity}})",
+      "body": "{{findingTitle}} em {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Aviso de SLA",
+      "body": "{{findingTitle}} em {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Violação de SLA",
+      "body": "{{findingTitle}} em {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Um achado de segurança precisa de atenção"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} está pronta",
+      "body": "Toque para começar a conversar."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} falhou ao iniciar",
+      "body": "Falha ao iniciar."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} será reiniciada em breve",
+      "body": "Reinício agendado para {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Reinício de {{instanceName}} cancelado",
+      "body": "O reinício agendado anteriormente foi cancelado."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} será atualizada em breve",
+      "bodyWithTag": "Atualização para {{targetImageTag}} em {{when}}.",
+      "bodyWithoutTag": "Atualização agendada em {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Atualização de {{instanceName}} cancelada",
+      "body": "A atualização agendada anteriormente foi cancelada."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Sua sessão do Kilo está pronta para controlar pelo seu telefone"
+  }
+}

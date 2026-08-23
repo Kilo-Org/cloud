@@ -25,6 +25,9 @@ export const sendPushForConversationInputSchema = z.object({
   title: z.string().max(200),
   bodyPreview: z.string().max(200),
   messageId: z.string().min(1),
+  // Old producers omit these; remove the optionals when every producer sends keys.
+  i18nKey: z.string().min(1).optional(),
+  i18nParams: z.record(z.string(), z.string()).optional(),
 });
 export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
 
@@ -149,6 +152,9 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   suppressIfViewingSession: z.boolean().optional(),
   // Absent category is treated as 'status' at the enforcement read site.
   category: cloudAgentSessionCategorySchema.optional(),
+  // Old producers omit these; remove the optionals when every producer sends keys.
+  i18nKey: z.string().min(1).optional(),
+  i18nParams: z.record(z.string(), z.string()).optional(),
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
   typeof sendCloudAgentSessionNotificationInputSchema
@@ -235,6 +241,9 @@ export const dispatchPushInputSchema = z.object({
     data: pushDataSchema,
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),
+    // Old producers omit these; remove the optionals when every producer sends keys.
+    i18nKey: z.string().min(1).optional(),
+    i18nParams: z.record(z.string(), z.string()).optional(),
   }),
   // Optional per-call rate limit (sliding window). When set, the DO checks
   // the sliding window after idempotency/presence and before the Expo send;

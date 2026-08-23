@@ -1149,6 +1149,52 @@ describe('user router - register push token', () => {
     expect(rows[0]?.app_version).toBe('1.0.4');
   });
 
+  it('stores a null locale when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-locale-omitted]',
+      platform: 'ios',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.locale).toBeNull();
+  });
+
+  it('stores the locale when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-locale-es]',
+      platform: 'ios',
+      locale: 'es',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.locale).toBe('es');
+  });
+
+  it('clears the locale to null on re-registration without locale', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-locale-reregister]';
+
+    await caller.user.registerPushToken({ token, platform: 'ios', locale: 'es' });
+    await caller.user.registerPushToken({ token, platform: 'ios' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.locale).toBeNull();
+  });
+
   it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {
     const caller = await createCallerForUser(tokenUser.id);
 

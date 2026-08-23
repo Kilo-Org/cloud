@@ -51,6 +51,19 @@ function securityFindingTitle(
   }
 }
 
+function securityFindingI18nKey(
+  notificationKind: 'new_finding' | 'sla_warning' | 'sla_breach'
+): string {
+  switch (notificationKind) {
+    case 'new_finding':
+      return 'internal.securityFindingNew';
+    case 'sla_warning':
+      return 'internal.securityFindingSlaWarning';
+    case 'sla_breach':
+      return 'internal.securityFindingSlaBreach';
+  }
+}
+
 function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
   switch (input.kind) {
     case 'low_balance':
@@ -62,6 +75,11 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title: 'Low balance alert',
           body: `${input.organizationName} balance fell below $${input.minimumBalanceUsd}`,
+          i18nKey: 'internal.lowBalance',
+          i18nParams: {
+            organizationName: input.organizationName,
+            minimumBalanceUsd: String(input.minimumBalanceUsd),
+          },
           data: {
             type: 'low_balance',
             organizationId: input.organizationId,
@@ -86,6 +104,12 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title,
           body: `${input.title} in ${input.repoFullName}`,
+          i18nKey: securityFindingI18nKey(input.notificationKind),
+          i18nParams: {
+            severity: input.severity,
+            findingTitle: input.title,
+            repoFullName: input.repoFullName,
+          },
           data: {
             type: 'security_finding',
             findingId: input.findingId,
@@ -107,6 +131,7 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title: 'Kilo',
           body: 'A security finding needs attention',
+          i18nKey: 'internal.securityLifecycle',
           data: {
             type: 'security_lifecycle',
             event: input.event,

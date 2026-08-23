@@ -89,6 +89,10 @@ export function buildAgentSessionNotificationDispatchInput(
     push: {
       title: content.title,
       body: content.body,
+      // Session title and agent-authored message are user-authored; both pass
+      // through the catalog templates as params.
+      i18nKey: 'agentSession.notification',
+      i18nParams: { sessionTitle: content.title, message: content.body },
       data: { type: 'cloud_agent_session', cliSessionId: params.cliSessionId },
       sound: 'default',
       priority: 'high',

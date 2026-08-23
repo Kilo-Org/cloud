@@ -111,6 +111,8 @@ describe('buildAgentSessionNotificationDispatchInput', () => {
       push: {
         title: 'Refactor auth module',
         body: 'Build finished',
+        i18nKey: 'agentSession.notification',
+        i18nParams: { sessionTitle: 'Refactor auth module', message: 'Build finished' },
         data: { type: 'cloud_agent_session', cliSessionId: 'ses_abc' },
         sound: 'default',
         priority: 'high',

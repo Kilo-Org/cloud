@@ -31,15 +31,18 @@ type Captured = {
 
 function openMenu(args: {
   onRename?: () => void;
+  onExit?: () => void;
   onDelete?: () => void;
   bottomInset?: number;
 }): Captured & {
   onCopySessionId: ReturnType<typeof vi.fn>;
   onRename: ReturnType<typeof vi.fn> | undefined;
+  onExit: ReturnType<typeof vi.fn> | undefined;
   onDelete: ReturnType<typeof vi.fn> | undefined;
 } {
   const onCopySessionId = vi.fn(() => undefined);
   const onRename = args.onRename ? vi.fn(() => undefined) : undefined;
+  const onExit = args.onExit ? vi.fn(() => undefined) : undefined;
   const onDelete = args.onDelete ? vi.fn(() => undefined) : undefined;
   const captured: { current: Captured | null } = { current: null };
 
@@ -52,6 +55,7 @@ function openMenu(args: {
     },
     onCopySessionId,
     ...(onRename ? { onRename } : {}),
+    ...(onExit ? { onExit } : {}),
     ...(onDelete ? { onDelete } : {}),
     bottomInset: args.bottomInset ?? 12,
   });
@@ -63,6 +67,7 @@ function openMenu(args: {
     ...captured.current,
     onCopySessionId,
     onRename,
+    onExit,
     onDelete,
   };
 }
@@ -142,5 +147,58 @@ describe('showSessionActionMenu', () => {
     onSelect(1);
     expect(onRename).toHaveBeenCalledTimes(1);
     expect(onCopySessionId).not.toHaveBeenCalled();
+  });
+
+  it('includes copy, rename, exit, cancel with destructive exit when delete is absent', () => {
+    const { sheetOptions } = openMenu({
+      onRename: () => undefined,
+      onExit: () => undefined,
+    });
+
+    expect(sheetOptions.options).toEqual(['Copy session ID', 'Rename', 'Exit session', 'Cancel']);
+    expect(sheetOptions.cancelButtonIndex).toBe(3);
+    expect(sheetOptions.destructiveButtonIndex).toBe(2);
+  });
+
+  it('omits exit session when onExit is absent', () => {
+    const { sheetOptions } = openMenu({
+      onRename: () => undefined,
+      onDelete: () => undefined,
+    });
+
+    expect(sheetOptions.options).toEqual(['Copy session ID', 'Rename', 'Delete session', 'Cancel']);
+    expect(sheetOptions.options).not.toContain('Exit session');
+  });
+
+  it('orders copy, rename, exit, delete, cancel with destructive delete when both exist', () => {
+    const { sheetOptions } = openMenu({
+      onRename: () => undefined,
+      onExit: () => undefined,
+      onDelete: () => undefined,
+    });
+
+    expect(sheetOptions.options).toEqual([
+      'Copy session ID',
+      'Rename',
+      'Exit session',
+      'Delete session',
+      'Cancel',
+    ]);
+    expect(sheetOptions.cancelButtonIndex).toBe(4);
+    expect(sheetOptions.destructiveButtonIndex).toBe(3);
+  });
+
+  it('dispatches exit at its index without copy, rename, or delete', () => {
+    const { onSelect, onExit, onCopySessionId, onRename, onDelete } = openMenu({
+      onRename: () => undefined,
+      onExit: () => undefined,
+      onDelete: () => undefined,
+    });
+
+    onSelect(2);
+    expect(onExit).toHaveBeenCalledTimes(1);
+    expect(onCopySessionId).not.toHaveBeenCalled();
+    expect(onRename).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
   });
 });

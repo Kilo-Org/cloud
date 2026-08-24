@@ -8,7 +8,6 @@ import { toast } from 'sonner-native';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
-import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
@@ -16,6 +15,7 @@ import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
 import {
   getLanguagePreference,
+  getResolvedLanguage,
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -55,7 +55,7 @@ export function LanguagePickerSheet({
   }
 
   const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
-  const isRtl = i18n.dir() === 'rtl';
+  const isRtl = isRtlLanguage(getResolvedLanguage());
 
   const handleDone = async () => {
     if (busy) {

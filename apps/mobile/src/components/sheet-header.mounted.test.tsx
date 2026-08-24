@@ -4,16 +4,22 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SheetHeader } from './sheet-header';
-import { i18n } from '@/i18n';
+import '@/i18n';
+
+const resolvedLanguage = vi.hoisted(() => ({ value: 'en' }));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  I18nManager: { allowRTL: vi.fn(), isRTL: false, forceRTL: vi.fn() },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827' }),
+}));
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => resolvedLanguage.value,
 }));
 
 async function mount(
@@ -46,8 +52,8 @@ function pressablesByLabel(
 }
 
 describe('SheetHeader share action', () => {
-  afterEach(async () => {
-    await i18n.changeLanguage('en');
+  afterEach(() => {
+    resolvedLanguage.value = 'en';
   });
 
   it('renders a Share pressable in the left slot when onShare is provided', async () => {
@@ -95,19 +101,19 @@ describe('SheetHeader share action', () => {
   });
 
   it('mirrors Cancel and Done in RTL', async () => {
-    await i18n.changeLanguage('ar');
+    resolvedLanguage.value = 'ar';
     const renderer = await mount({
       title: 'report.pdf',
       onDone: () => undefined,
       onCancel: () => undefined,
     });
 
-    const cancels = pressablesByLabel(renderer.root, 'إلغاء');
+    const cancels = pressablesByLabel(renderer.root, 'Cancel');
     expect(cancels).toHaveLength(1);
     expect(cancels[0]?.props.className).toContain('right-0');
     expect(cancels[0]?.props.className).not.toContain('left-0');
 
-    const dones = pressablesByLabel(renderer.root, 'تم');
+    const dones = pressablesByLabel(renderer.root, 'Done');
     expect(dones).toHaveLength(1);
     expect(dones[0]?.props.className).toContain('left-0');
     expect(dones[0]?.props.className).not.toContain('right-0');

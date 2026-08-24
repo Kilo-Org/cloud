@@ -1,16 +1,7 @@
-import { Portal } from '@rn-primitives/portal';
 import { reloadAppAsync } from 'expo';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  BackHandler,
-  I18nManager,
-  Pressable,
-  ScrollView,
-  View,
-} from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { ActivityIndicator, I18nManager, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -57,32 +48,6 @@ export function LanguagePickerSheet({
       setRestarting(false);
       setReloadFailed(false);
     }
-  }, [visible]);
-
-  // profile-screen passes onClose as a new inline arrow on every render, so a
-  // dep on it re-registers the BackHandler listener on every parent render and
-  // can leave the event unconsumed on a real device. Register once while the
-  // picker is open and read the latest values from refs.
-  const onCloseRef = useRef(onClose);
-  const busyRef = useRef(busy);
-  const reloadFailedRef = useRef(reloadFailed);
-  onCloseRef.current = onClose;
-  busyRef.current = busy;
-  reloadFailedRef.current = reloadFailed;
-
-  useEffect(() => {
-    if (!visible) {
-      return undefined;
-    }
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!busyRef.current && !reloadFailedRef.current) {
-        onCloseRef.current();
-      }
-      return true;
-    });
-    return () => {
-      subscription.remove();
-    };
   }, [visible]);
 
   if (!visible) {
@@ -237,12 +202,17 @@ export function LanguagePickerSheet({
   };
 
   return (
-    <Portal name="language-picker">
-      <Animated.View
-        entering={FadeIn.duration(150)}
-        exiting={FadeOut.duration(150)}
-        className="absolute inset-0 justify-end bg-black/40"
-      >
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        if (!busy && !reloadFailed) {
+          onClose();
+        }
+      }}
+    >
+      <View className="flex-1 justify-end bg-black/40">
         <Pressable
           className="flex-1"
           accessibilityLabel={t('common.cancel')}
@@ -252,16 +222,14 @@ export function LanguagePickerSheet({
             }
           }}
         />
-        <Animated.View
-          entering={SlideInDown.duration(220)}
-          exiting={SlideOutDown.duration(180)}
+        <View
           accessibilityViewIsModal
           className="max-h-[80%] rounded-t-3xl bg-card"
           style={{ paddingBottom: insets.bottom }}
         >
           {renderSheetContent()}
-        </Animated.View>
-      </Animated.View>
-    </Portal>
+        </View>
+      </View>
+    </Modal>
   );
 }

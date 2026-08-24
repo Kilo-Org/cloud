@@ -19,20 +19,9 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
-const backHandler = vi.hoisted(() => {
-  let handler: (() => boolean) | undefined = undefined;
-  return {
-    addEventListener: vi.fn((_event: string, next: () => boolean) => {
-      handler = next;
-      return { remove: vi.fn() };
-    }),
-    __getHandler: () => handler,
-  };
-});
-
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  BackHandler: backHandler,
+  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -156,7 +145,6 @@ describe('LanguagePickerSheet apply', () => {
     writeLanguageReturnTarget.mockReset();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
-    backHandler.addEventListener.mockClear();
     vi.mocked(toast.error).mockClear();
   });
 
@@ -238,12 +226,13 @@ describe('LanguagePickerSheet apply', () => {
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet(onClose);
 
-    const handler = backHandler.__getHandler();
-    expect(handler).toBeDefined();
-    if (!handler) {
-      throw new Error('BackHandler handler not registered');
+    const modal = findByType(renderer.root, 'Modal')[0];
+    if (!modal) {
+      throw new Error('Modal not found');
     }
-    expect(handler()).toBe(true);
+    act(() => {
+      (modal.props.onRequestClose as () => void)();
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
@@ -252,10 +241,6 @@ describe('LanguagePickerSheet apply', () => {
   it('keeps the back handler registered across an onClose identity change', async () => {
     const onCloseFirst = vi.fn<() => void>();
     const renderer = await mountSheet(onCloseFirst);
-
-    const firstHandler = backHandler.__getHandler();
-    expect(firstHandler).toBeDefined();
-    expect(backHandler.addEventListener).toHaveBeenCalledTimes(1);
 
     const onCloseSecond = vi.fn<() => void>();
     await act(async () => {
@@ -269,14 +254,13 @@ describe('LanguagePickerSheet apply', () => {
       await Promise.resolve();
     });
 
-    // The listener is registered once: no remove/re-add churn on re-render.
-    expect(backHandler.addEventListener).toHaveBeenCalledTimes(1);
-    const handler = backHandler.__getHandler();
-    expect(handler).toBe(firstHandler);
-    if (!handler) {
-      throw new Error('BackHandler handler not registered');
+    const modal = findByType(renderer.root, 'Modal')[0];
+    if (!modal) {
+      throw new Error('Modal not found');
     }
-    expect(handler()).toBe(true);
+    act(() => {
+      (modal.props.onRequestClose as () => void)();
+    });
     expect(onCloseFirst).not.toHaveBeenCalled();
     expect(onCloseSecond).toHaveBeenCalledTimes(1);
 
@@ -305,12 +289,13 @@ describe('LanguagePickerSheet apply', () => {
     });
     expect(onClose).not.toHaveBeenCalled();
 
-    const handler = backHandler.__getHandler();
-    expect(handler).toBeDefined();
-    if (!handler) {
-      throw new Error('BackHandler handler not registered');
+    const modal = findByType(renderer.root, 'Modal')[0];
+    if (!modal) {
+      throw new Error('Modal not found');
     }
-    expect(handler()).toBe(true);
+    act(() => {
+      (modal.props.onRequestClose as () => void)();
+    });
     expect(onClose).not.toHaveBeenCalled();
 
     renderer.unmount();

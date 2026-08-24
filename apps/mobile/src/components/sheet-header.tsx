@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { I18nManager, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function SheetHeader({
@@ -26,10 +27,13 @@ export function SheetHeader({
   const colors = useThemeColors();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   // NativeWind may not honor the logical `start-*`/`end-*` utilities in this
-  // project, so derive the physical side from the native direction: Cancel and
-  // Share stay on the leading edge, Done on the trailing edge.
-  const leadingClass = I18nManager.isRTL ? 'right-0' : 'left-0';
-  const trailingClass = I18nManager.isRTL ? 'left-0' : 'right-0';
+  // project, so derive the physical side from the active language's direction:
+  // Cancel and Share stay on the leading edge, Done on the trailing edge.
+  // I18nManager.isRTL is a module-load-time constant in RN 0.86 and can be
+  // stale after forceRTL + reload, so read i18n.dir() instead.
+  const isRtl = i18n.dir() === 'rtl';
+  const leadingClass = isRtl ? 'right-0' : 'left-0';
+  const trailingClass = isRtl ? 'left-0' : 'right-0';
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a

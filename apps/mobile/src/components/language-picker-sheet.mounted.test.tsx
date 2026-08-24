@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
+/* eslint-disable max-lines -- the apply and back-handler suites share one mock harness in this file */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { toast } from 'sonner-native';
@@ -244,6 +245,40 @@ describe('LanguagePickerSheet apply', () => {
     }
     expect(handler()).toBe(true);
     expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps the back handler registered across an onClose identity change', async () => {
+    const onCloseFirst = vi.fn<() => void>();
+    const renderer = await mountSheet(onCloseFirst);
+
+    const firstHandler = backHandler.__getHandler();
+    expect(firstHandler).toBeDefined();
+    expect(backHandler.addEventListener).toHaveBeenCalledTimes(1);
+
+    const onCloseSecond = vi.fn<() => void>();
+    await act(async () => {
+      renderer.update(
+        createElement(LanguagePickerSheet, {
+          visible: true,
+          onClose: onCloseSecond,
+          returnTarget: 'login',
+        })
+      );
+      await Promise.resolve();
+    });
+
+    // The listener is registered once: no remove/re-add churn on re-render.
+    expect(backHandler.addEventListener).toHaveBeenCalledTimes(1);
+    const handler = backHandler.__getHandler();
+    expect(handler).toBe(firstHandler);
+    if (!handler) {
+      throw new Error('BackHandler handler not registered');
+    }
+    expect(handler()).toBe(true);
+    expect(onCloseFirst).not.toHaveBeenCalled();
+    expect(onCloseSecond).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

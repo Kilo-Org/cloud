@@ -1,13 +1,12 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SheetHeader } from './sheet-header';
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -47,6 +46,10 @@ function pressablesByLabel(
 }
 
 describe('SheetHeader share action', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it('renders a Share pressable in the left slot when onShare is provided', async () => {
     const renderer = await mount({
       title: 'report.pdf',
@@ -87,6 +90,27 @@ describe('SheetHeader share action', () => {
 
     expect(pressablesByLabel(renderer.root, 'Share report.pdf')).toHaveLength(0);
     expect(pressablesByLabel(renderer.root, 'Done')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('mirrors Cancel and Done in RTL', async () => {
+    await i18n.changeLanguage('ar');
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    const cancels = pressablesByLabel(renderer.root, 'إلغاء');
+    expect(cancels).toHaveLength(1);
+    expect(cancels[0]?.props.className).toContain('right-0');
+    expect(cancels[0]?.props.className).not.toContain('left-0');
+
+    const dones = pressablesByLabel(renderer.root, 'تم');
+    expect(dones).toHaveLength(1);
+    expect(dones[0]?.props.className).toContain('left-0');
+    expect(dones[0]?.props.className).not.toContain('right-0');
 
     renderer.unmount();
   });

@@ -1,6 +1,6 @@
 import { Portal } from '@rn-primitives/portal';
 import { reloadAppAsync } from 'expo';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -17,6 +17,7 @@ import { toast } from 'sonner-native';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
@@ -58,26 +59,38 @@ export function LanguagePickerSheet({
     }
   }, [visible]);
 
+  // profile-screen passes onClose as a new inline arrow on every render, so a
+  // dep on it re-registers the BackHandler listener on every parent render and
+  // can leave the event unconsumed on a real device. Register once while the
+  // picker is open and read the latest values from refs.
+  const onCloseRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  const reloadFailedRef = useRef(reloadFailed);
+  onCloseRef.current = onClose;
+  busyRef.current = busy;
+  reloadFailedRef.current = reloadFailed;
+
   useEffect(() => {
     if (!visible) {
       return undefined;
     }
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!busy && !reloadFailed) {
-        onClose();
+      if (!busyRef.current && !reloadFailedRef.current) {
+        onCloseRef.current();
       }
       return true;
     });
     return () => {
       subscription.remove();
     };
-  }, [visible, busy, reloadFailed, onClose]);
+  }, [visible]);
 
   if (!visible) {
     return null;
   }
 
   const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
+  const isRtl = i18n.dir() === 'rtl';
 
   const handleDone = async () => {
     if (busy) {
@@ -197,7 +210,7 @@ export function LanguagePickerSheet({
               setSelected('device');
             }}
           >
-            <View className={`flex-1 ${I18nManager.isRTL ? 'pl-3' : 'pr-3'}`}>
+            <View className={`flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`}>
               <Text className="text-sm font-medium">{t('common.device')}</Text>
               <Text variant="muted" className="mt-0.5 text-xs">
                 {deviceEndonym}
@@ -213,7 +226,7 @@ export function LanguagePickerSheet({
                 setSelected(tag);
               }}
             >
-              <View className={`flex-1 ${I18nManager.isRTL ? 'pl-3' : 'pr-3'}`}>
+              <View className={`flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`}>
                 <Text className="text-sm font-medium">{LANGUAGE_ENDONYMS[tag]}</Text>
               </View>
             </ChoiceRow>

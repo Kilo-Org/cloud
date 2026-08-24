@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "تعذّر النسخ إلى الحافظة",
     "required": "مطلوب",
     "error": "خطأ: {{error}}",
-    "notNow": "ليس الآن"
+    "notNow": "ليس الآن",
+    "continue": "متابعة"
   },
   "language": {
     "title": "اللغة",
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
     "couldNotRestart": "تعذّرت إعادة التشغيل",
     "languageSaved": "تم حفظ لغتك.",
-    "retry": "إعادة المحاولة"
+    "retry": "إعادة المحاولة",
+    "catalogLoadFailed": "تعذّر تحميل اللغة. يرجى المحاولة مرة أخرى."
   },
   "login": {
     "welcome": "مرحبًا بك في Kilo",

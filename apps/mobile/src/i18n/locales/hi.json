@@ -21,14 +21,16 @@
     "required": "आवश्यक",
     "error": "त्रुटि: {{error}}",
     "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका",
-    "notNow": "अभी नहीं"
+    "notNow": "अभी नहीं",
+    "continue": "जारी रखें"
   },
   "language": {
     "title": "भाषा",
     "restarting": "भाषा लागू करने के लिए पुनः आरंभ हो रहा है",
     "couldNotRestart": "पुनः आरंभ नहीं हो सका",
     "languageSaved": "आपकी भाषा सहेज ली गई है।",
-    "retry": "फिर से प्रयास करें"
+    "retry": "फिर से प्रयास करें",
+    "catalogLoadFailed": "भाषा लोड नहीं हो सकी। कृपया फिर से प्रयास करें।"
   },
   "login": {
     "welcome": "Kilo में आपका स्वागत है",

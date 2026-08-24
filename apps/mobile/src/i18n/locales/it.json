@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Impossibile copiare negli appunti",
     "required": "obbligatorio",
     "error": "errore: {{error}}",
-    "notNow": "Non ora"
+    "notNow": "Non ora",
+    "continue": "Continua"
   },
   "language": {
     "title": "Lingua",
     "restarting": "Riavvio per applicare la lingua",
     "couldNotRestart": "Impossibile riavviare",
     "languageSaved": "La tua lingua è stata salvata.",
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "catalogLoadFailed": "Impossibile caricare la lingua. Riprova."
   },
   "login": {
     "welcome": "Benvenuto su Kilo",

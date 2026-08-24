@@ -38,6 +38,7 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
@@ -211,6 +212,9 @@ function RootLayoutNav() {
   // True once the active catalog is loaded (or English after a catalog
   // failure), so the splash never hides on an unlocalized tree.
   const [languageReady, setLanguageReady] = useState(false);
+  // True when the cold-start RTL reload failed after syncRtl forced the native
+  // direction; the app then shows a Retry/Continue screen instead of painting LTR.
+  const [languageReloadFailed, setLanguageReloadFailed] = useState(false);
   const {
     userId,
     email,
@@ -331,11 +335,15 @@ function RootLayoutNav() {
 
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
+      let reloadFailed = false;
       if (syncRtl(resolved)) {
         try {
           await reloadAppAsync();
         } catch {
-          // Reload failed: fall through so the splash still hides.
+          // Reload failed: keep going so the language still loads, then show
+          // the Retry/Continue screen instead of first-painting in the wrong
+          // direction.
+          reloadFailed = true;
         }
       }
       // Reopen the screen the user was on before an RTL reload. Read once,
@@ -358,6 +366,9 @@ function RootLayoutNav() {
       }
       void renameAndroidNotificationChannels();
       if (!cancelled) {
+        if (reloadFailed) {
+          setLanguageReloadFailed(true);
+        }
         setLanguageReady(true);
       }
     };
@@ -559,12 +570,18 @@ function RootLayoutNav() {
       needsConsent,
       onConsentRoute,
       onConsentReviewRoute,
+      languageReloadFailed,
     });
 
     // Replaces the old inline if-chain (resolveBootstrapTag in
     // src/lib/bootstrap-decision.ts). Remove this switch when the decision
     // module owns all bootstrap routing.
     switch (decision.tag) {
+      case 'settle-language-error': {
+        markStartupComplete('language-error');
+        setStartupFinished(true);
+        return;
+      }
       case 'wait-loading':
       case 'wait-user-consent': {
         return;
@@ -638,6 +655,7 @@ function RootLayoutNav() {
     needsConsent,
     onConsentRoute,
     onConsentReviewRoute,
+    languageReloadFailed,
   ]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
@@ -721,6 +739,7 @@ function RootLayoutNav() {
       needsConsent,
       onConsentRoute,
       onConsentReviewRoute,
+      languageReloadFailed,
     });
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
@@ -787,6 +806,25 @@ function RootLayoutNav() {
         secondaryAccessibilityLabel={t('bootstrap.signOut')}
         onSecondaryPress={() => {
           void signOut();
+        }}
+      />
+    );
+  }
+
+  if (languageReloadFailed) {
+    return (
+      <LanguageReloadErrorScreen
+        onRetry={() => {
+          void (async () => {
+            try {
+              await reloadAppAsync();
+            } catch {
+              // Reload failed: the screen stays so the user can retry or continue.
+            }
+          })();
+        }}
+        onContinue={() => {
+          setLanguageReloadFailed(false);
         }}
       />
     );

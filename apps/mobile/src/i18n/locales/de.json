@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Konnte nicht in die Zwischenablage kopiert werden",
     "required": "erforderlich",
     "error": "Fehler: {{error}}",
-    "notNow": "Nicht jetzt"
+    "notNow": "Nicht jetzt",
+    "continue": "Weiter"
   },
   "language": {
     "title": "Sprache",
     "restarting": "Neustart zum Anwenden der Sprache",
     "couldNotRestart": "Neustart nicht möglich",
     "languageSaved": "Ihre Sprache ist gespeichert.",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "catalogLoadFailed": "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut."
   },
   "login": {
     "welcome": "Willkommen bei Kilo",

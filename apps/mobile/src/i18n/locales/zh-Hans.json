@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "无法复制到剪贴板",
     "required": "必填",
     "error": "错误：{{error}}",
-    "notNow": "暂不"
+    "notNow": "暂不",
+    "continue": "继续"
   },
   "language": {
     "title": "语言",
     "restarting": "正在重新启动以应用语言",
     "couldNotRestart": "无法重新启动",
     "languageSaved": "你的语言已保存。",
-    "retry": "重试"
+    "retry": "重试",
+    "catalogLoadFailed": "无法加载语言。请重试。"
   },
   "login": {
     "welcome": "欢迎使用 Kilo",

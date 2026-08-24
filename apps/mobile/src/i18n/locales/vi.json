@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Không thể sao chép vào bảng nhớ tạm",
     "required": "bắt buộc",
     "error": "lỗi: {{error}}",
-    "notNow": "Để sau"
+    "notNow": "Để sau",
+    "continue": "Tiếp tục"
   },
   "language": {
     "title": "Ngôn ngữ",
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
     "couldNotRestart": "Không thể khởi động lại",
     "languageSaved": "Ngôn ngữ của bạn đã được lưu.",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "catalogLoadFailed": "Không thể tải ngôn ngữ. Vui lòng thử lại."
   },
   "login": {
     "welcome": "Chào mừng đến với Kilo",

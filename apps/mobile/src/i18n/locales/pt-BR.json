@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Não foi possível copiar para a área de transferência",
     "required": "obrigatório",
     "error": "erro: {{error}}",
-    "notNow": "Agora não"
+    "notNow": "Agora não",
+    "continue": "Continuar"
   },
   "language": {
     "title": "Idioma",
     "restarting": "Reiniciando para aplicar o idioma",
     "couldNotRestart": "Não foi possível reiniciar",
     "languageSaved": "Seu idioma foi salvo.",
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "catalogLoadFailed": "Não foi possível carregar o idioma. Tente novamente."
   },
   "login": {
     "welcome": "Boas-vindas ao Kilo",

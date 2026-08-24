@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "無法複製到剪貼簿",
     "required": "必填",
     "error": "錯誤：{{error}}",
-    "notNow": "稍後再說"
+    "notNow": "稍後再說",
+    "continue": "繼續"
   },
   "language": {
     "title": "語言",
     "restarting": "正在重新啟動以套用語言",
     "couldNotRestart": "無法重新啟動",
     "languageSaved": "你的語言已儲存。",
-    "retry": "重試"
+    "retry": "重試",
+    "catalogLoadFailed": "無法載入語言。請再試一次。"
   },
   "login": {
     "welcome": "歡迎使用 Kilo",

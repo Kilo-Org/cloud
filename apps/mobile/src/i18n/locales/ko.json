@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "클립보드에 복사할 수 없습니다",
     "required": "필수",
     "error": "오류: {{error}}",
-    "notNow": "나중에"
+    "notNow": "나중에",
+    "continue": "계속"
   },
   "language": {
     "title": "언어",
     "restarting": "언어를 적용하기 위해 다시 시작하는 중",
     "couldNotRestart": "다시 시작하지 못했습니다",
     "languageSaved": "언어가 저장되었습니다.",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "catalogLoadFailed": "언어를 불러올 수 없습니다. 다시 시도해 주세요."
   },
   "login": {
     "welcome": "Kilo에 오신 것을 환영합니다",

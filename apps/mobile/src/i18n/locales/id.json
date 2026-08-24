@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Tidak dapat menyalin ke papan klip",
     "required": "wajib diisi",
     "error": "kesalahan: {{error}}",
-    "notNow": "Nanti saja"
+    "notNow": "Nanti saja",
+    "continue": "Lanjutkan"
   },
   "language": {
     "title": "Bahasa",
     "restarting": "Memulai ulang untuk menerapkan bahasa",
     "couldNotRestart": "Tidak dapat memulai ulang",
     "languageSaved": "Bahasa Anda telah disimpan.",
-    "retry": "Coba lagi"
+    "retry": "Coba lagi",
+    "catalogLoadFailed": "Tidak dapat memuat bahasa. Silakan coba lagi."
   },
   "login": {
     "welcome": "Selamat datang di Kilo",

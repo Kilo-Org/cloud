@@ -88,11 +88,19 @@ function findChoiceRow(
   throw new Error(`ChoiceRow for ${endonym} not found`);
 }
 
-async function mountSheet(onClose: () => void): Promise<TestRenderer.ReactTestRenderer> {
+async function mountSheet(
+  onClose: () => void,
+  beforeReload?: () => Promise<void>
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(
-      createElement(LanguagePickerSheet, { visible: true, onClose, returnTarget: 'login' })
+      createElement(LanguagePickerSheet, {
+        visible: true,
+        onClose,
+        returnTarget: 'login',
+        beforeReload,
+      })
     );
     await Promise.resolve();
   });
@@ -199,7 +207,7 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('en');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith('Retry');
+    expect(toast.error).toHaveBeenCalledWith('Could not load the language. Please try again.');
 
     changeLanguageSpy.mockRestore();
     renderer.unmount();
@@ -241,6 +249,62 @@ describe('LanguagePickerSheet apply', () => {
       await Promise.resolve();
     });
     expect(reloadAppAsync).toHaveBeenCalledTimes(2);
+
+    renderer.unmount();
+  });
+
+  it('still reloads into RTL when the return-target write fails', async () => {
+    writeLanguageReturnTarget.mockRejectedValue(new Error('write failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
+    });
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(writeLanguageReturnTarget).toHaveBeenCalledWith('login');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('does not block the RTL reload when the draft flush fails', async () => {
+    const beforeReload = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('flush failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose, beforeReload);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
+    });
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(beforeReload).toHaveBeenCalledTimes(1);
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

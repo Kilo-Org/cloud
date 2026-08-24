@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Не удалось скопировать в буфер обмена",
     "required": "обязательно",
     "error": "ошибка: {{error}}",
-    "notNow": "Не сейчас"
+    "notNow": "Не сейчас",
+    "continue": "Продолжить"
   },
   "language": {
     "title": "Язык",
     "restarting": "Перезапуск для применения языка",
     "couldNotRestart": "Не удалось перезапустить",
     "languageSaved": "Ваш язык сохранён.",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "catalogLoadFailed": "Не удалось загрузить язык. Попробуйте еще раз."
   },
   "login": {
     "welcome": "Добро пожаловать в Kilo",

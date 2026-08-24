@@ -28,6 +28,7 @@ import { errorMessage } from '@/components/login-screen-state';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -226,10 +227,7 @@ export function LoginScreen() {
       >
         <Pressable
           onPress={() => {
-            void (async () => {
-              await persistLoginDrafts();
-              setLanguagePickerOpen(true);
-            })();
+            setLanguagePickerOpen(true);
           }}
           disabled={globeDisabled}
           hitSlop={8}
@@ -257,6 +255,14 @@ export function LoginScreen() {
               recovering only on relaunch — so these branches render without
               animation; status swaps are instant. */}
           <View className="w-full max-w-sm gap-3">
+            {status === 'idle' && draft === null && (
+              <>
+                {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </>
+            )}
+
             {status === 'idle' && draft !== null && (
               <IdleAuth
                 start={start}
@@ -364,6 +370,7 @@ export function LoginScreen() {
           setLanguagePickerOpen(false);
         }}
         returnTarget="login"
+        beforeReload={persistLoginDrafts}
       />
     </KeyboardAvoidingView>
   );

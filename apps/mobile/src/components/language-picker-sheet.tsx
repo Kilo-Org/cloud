@@ -2,7 +2,7 @@ import { Portal } from '@rn-primitives/portal';
 import { reloadAppAsync } from 'expo';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, I18nManager, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -26,11 +26,13 @@ export function LanguagePickerSheet({
   onClose,
   onApplied,
   returnTarget,
+  beforeReload,
 }: Readonly<{
   visible: boolean;
   onClose: () => void;
   onApplied?: () => void;
   returnTarget: LanguageReturnTarget;
+  beforeReload?: () => Promise<void>;
 }>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -64,7 +66,7 @@ export function LanguagePickerSheet({
       setRestarting(true);
     }
     setBusy(true);
-    const outcome = await applyLanguagePreference(selected, resolved, returnTarget);
+    const outcome = await applyLanguagePreference(selected, resolved, returnTarget, beforeReload);
     switch (outcome.kind) {
       case 'applied-ltr': {
         onApplied?.();
@@ -88,7 +90,7 @@ export function LanguagePickerSheet({
         break;
       }
       case 'catalog-failed': {
-        toast.error(t('common.retry'));
+        toast.error(t('language.catalogLoadFailed'));
         setBusy(false);
         break;
       }
@@ -174,7 +176,7 @@ export function LanguagePickerSheet({
               setSelected('device');
             }}
           >
-            <View className="flex-1 pr-3">
+            <View className={`flex-1 ${I18nManager.isRTL ? 'pl-3' : 'pr-3'}`}>
               <Text className="text-sm font-medium">{t('common.device')}</Text>
               <Text variant="muted" className="mt-0.5 text-xs">
                 {deviceEndonym}
@@ -190,7 +192,7 @@ export function LanguagePickerSheet({
                 setSelected(tag);
               }}
             >
-              <View className="flex-1 pr-3">
+              <View className={`flex-1 ${I18nManager.isRTL ? 'pl-3' : 'pr-3'}`}>
                 <Text className="text-sm font-medium">{LANGUAGE_ENDONYMS[tag]}</Text>
               </View>
             </ChoiceRow>

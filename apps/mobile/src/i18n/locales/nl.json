@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Kon niet naar klembord kopiëren",
     "required": "verplicht",
     "error": "fout: {{error}}",
-    "notNow": "Niet nu"
+    "notNow": "Niet nu",
+    "continue": "Doorgaan"
   },
   "language": {
     "title": "Taal",
     "restarting": "Opnieuw opstarten om de taal toe te passen",
     "couldNotRestart": "Opnieuw opstarten niet mogelijk",
     "languageSaved": "Je taal is opgeslagen.",
-    "retry": "Opnieuw proberen"
+    "retry": "Opnieuw proberen",
+    "catalogLoadFailed": "De taal kon niet worden geladen. Probeer het opnieuw."
   },
   "login": {
     "welcome": "Welkom bij Kilo",

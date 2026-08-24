@@ -4,6 +4,7 @@
     "done": "Done",
     "retry": "Retry",
     "tryAgain": "Try again",
+    "continue": "Continue",
     "notNow": "Not now",
     "language": "Language",
     "device": "Device",
@@ -28,6 +29,7 @@
     "restarting": "Restarting to apply language",
     "couldNotRestart": "Could not restart",
     "languageSaved": "Your language is saved.",
+    "catalogLoadFailed": "Could not load the language. Please try again.",
     "retry": "Retry"
   },
   "login": {

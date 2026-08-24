@@ -17,6 +17,7 @@ const ready = {
   needsConsent: false,
   onConsentRoute: false,
   onConsentReviewRoute: false,
+  languageReloadFailed: false,
 } as const;
 
 describe('resolveBootstrapDecision tag', () => {
@@ -97,6 +98,24 @@ describe('resolveBootstrapDecision tag', () => {
   it('settles the app on the success tail', () => {
     expect(resolveBootstrapDecision(ready).tag).toBe('settle-app');
   });
+
+  it('settles the language error first, before loading, when the RTL reload failed', () => {
+    expect(
+      resolveBootstrapDecision({ ...ready, languageReloadFailed: true, isLoading: true }).tag
+    ).toBe('settle-language-error');
+  });
+
+  it('settles the language error for a signed-out cold start', () => {
+    expect(
+      resolveBootstrapDecision({ ...ready, hasToken: false, languageReloadFailed: true }).tag
+    ).toBe('settle-language-error');
+  });
+
+  it('settles the language error for a signed-in cold start', () => {
+    expect(resolveBootstrapDecision({ ...ready, languageReloadFailed: true }).tag).toBe(
+      'settle-language-error'
+    );
+  });
 });
 
 describe('resolveBootstrapDecision derivations', () => {
@@ -130,6 +149,23 @@ describe('resolveBootstrapDecision derivations', () => {
     );
   });
 
+  it('derives hasLanguageReloadError only from languageReloadFailed', () => {
+    expect(resolveBootstrapDecision(ready).hasLanguageReloadError).toBe(false);
+    expect(
+      resolveBootstrapDecision({ ...ready, languageReloadFailed: true }).hasLanguageReloadError
+    ).toBe(true);
+    expect(
+      resolveBootstrapDecision({ ...ready, hasToken: false, languageReloadFailed: true })
+        .hasLanguageReloadError
+    ).toBe(true);
+  });
+
+  it('includes the language reload error in hasBootstrapError', () => {
+    expect(
+      resolveBootstrapDecision({ ...ready, languageReloadFailed: true }).hasBootstrapError
+    ).toBe(true);
+  });
+
   it('derives hidden from loading, redirect, or consent loading, unless a bootstrap error shows', () => {
     expect(resolveBootstrapDecision(ready).hidden).toBe(false);
     expect(resolveBootstrapDecision({ ...ready, isLoading: true }).hidden).toBe(true);
@@ -137,5 +173,9 @@ describe('resolveBootstrapDecision derivations', () => {
     expect(resolveBootstrapDecision({ ...ready, consentChecked: false }).hidden).toBe(true);
     expect(resolveBootstrapDecision({ ...ready, userIdError: true }).hidden).toBe(false);
     expect(resolveBootstrapDecision({ ...ready, consentCheckError: true }).hidden).toBe(false);
+    expect(resolveBootstrapDecision({ ...ready, languageReloadFailed: true }).hidden).toBe(false);
+    expect(
+      resolveBootstrapDecision({ ...ready, languageReloadFailed: true, isLoading: true }).hidden
+    ).toBe(false);
   });
 });

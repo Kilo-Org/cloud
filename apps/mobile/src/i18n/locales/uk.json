@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Не вдалося скопіювати в буфер обміну",
     "required": "обов'язково",
     "error": "помилка: {{error}}",
-    "notNow": "Не зараз"
+    "notNow": "Не зараз",
+    "continue": "Продовжити"
   },
   "language": {
     "title": "Мова",
     "restarting": "Перезапуск для застосування мови",
     "couldNotRestart": "Не вдалося перезапустити",
     "languageSaved": "Вашу мову збережено.",
-    "retry": "Повторити"
+    "retry": "Повторити",
+    "catalogLoadFailed": "Не вдалося завантажити мову. Спробуйте ще раз."
   },
   "login": {
     "welcome": "Ласкаво просимо до Kilo",

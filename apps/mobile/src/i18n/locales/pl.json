@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Nie udało się skopiować do schowka",
     "required": "wymagane",
     "error": "błąd: {{error}}",
-    "notNow": "Nie teraz"
+    "notNow": "Nie teraz",
+    "continue": "Kontynuuj"
   },
   "language": {
     "title": "Język",
     "restarting": "Ponowne uruchamianie w celu zastosowania języka",
     "couldNotRestart": "Nie udało się ponownie uruchomić",
     "languageSaved": "Twój język został zapisany.",
-    "retry": "Spróbuj ponownie"
+    "retry": "Spróbuj ponownie",
+    "catalogLoadFailed": "Nie udało się wczytać języka. Spróbuj ponownie."
   },
   "login": {
     "welcome": "Witamy w Kilo",

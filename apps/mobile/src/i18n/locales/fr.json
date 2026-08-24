@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Impossible de copier dans le presse-papiers",
     "required": "obligatoire",
     "error": "erreur : {{error}}",
-    "notNow": "Pas maintenant"
+    "notNow": "Pas maintenant",
+    "continue": "Continuer"
   },
   "language": {
     "title": "Langue",
     "restarting": "Redémarrage pour appliquer la langue",
     "couldNotRestart": "Impossible de redémarrer",
     "languageSaved": "Votre langue est enregistrée.",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "catalogLoadFailed": "Impossible de charger la langue. Veuillez réessayer."
   },
   "login": {
     "welcome": "Bienvenue sur Kilo",

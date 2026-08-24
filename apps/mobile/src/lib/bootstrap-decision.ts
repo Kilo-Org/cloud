@@ -6,6 +6,7 @@
  */
 
 type BootstrapDecisionTag =
+  | 'settle-language-error'
   | 'wait-loading'
   | 'redirect-force-update'
   | 'settle-force-update'
@@ -33,18 +34,23 @@ export type BootstrapDecisionInput = {
   needsConsent: boolean;
   onConsentRoute: boolean;
   onConsentReviewRoute: boolean;
+  languageReloadFailed: boolean;
 };
 
 export type BootstrapDecision = {
   tag: BootstrapDecisionTag;
   hasUserBootstrapError: boolean;
   hasConsentBootstrapError: boolean;
+  hasLanguageReloadError: boolean;
   hasBootstrapError: boolean;
   hidden: boolean;
 };
 
 // Order mirrors the auth effect's if-chain exactly: earlier branches win.
 function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTag {
+  if (input.languageReloadFailed) {
+    return 'settle-language-error';
+  }
   if (input.isLoading) {
     return 'wait-loading';
   }
@@ -78,7 +84,9 @@ function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTa
 export function resolveBootstrapDecision(input: BootstrapDecisionInput): BootstrapDecision {
   const hasUserBootstrapError = input.hasToken && input.userIdError;
   const hasConsentBootstrapError = input.hasToken && input.consentCheckError;
-  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
+  const hasLanguageReloadError = input.languageReloadFailed;
+  const hasBootstrapError =
+    hasUserBootstrapError || hasConsentBootstrapError || hasLanguageReloadError;
   const consentLoading =
     input.hasToken &&
     !input.consentChecked &&
@@ -95,6 +103,7 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
     (needsForceUpdate ||
       (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
   const hidden =
+    !hasLanguageReloadError &&
     !hasUserBootstrapError &&
     !hasConsentBootstrapError &&
     (input.isLoading || needsRedirect || consentLoading);
@@ -103,6 +112,7 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
     tag: resolveBootstrapTag(input),
     hasUserBootstrapError,
     hasConsentBootstrapError,
+    hasLanguageReloadError,
     hasBootstrapError,
     hidden,
   };

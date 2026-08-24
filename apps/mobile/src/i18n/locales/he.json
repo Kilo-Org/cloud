@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "לא ניתן היה להעתיק ללוח",
     "required": "חובה",
     "error": "שגיאה: {{error}}",
-    "notNow": "לא עכשיו"
+    "notNow": "לא עכשיו",
+    "continue": "המשך"
   },
   "language": {
     "title": "שפה",
     "restarting": "מפעיל מחדש כדי להחיל את השפה",
     "couldNotRestart": "לא ניתן היה להפעיל מחדש",
     "languageSaved": "השפה שלך נשמרה.",
-    "retry": "נסה שוב"
+    "retry": "נסה שוב",
+    "catalogLoadFailed": "לא ניתן היה לטעון את השפה. אנא נסה שוב."
   },
   "login": {
     "welcome": "ברוך הבא ל-Kilo",

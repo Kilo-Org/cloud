@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "クリップボードにコピーできませんでした",
     "required": "必須",
     "error": "エラー: {{error}}",
-    "notNow": "後で"
+    "notNow": "後で",
+    "continue": "続行"
   },
   "language": {
     "title": "言語",
     "restarting": "言語を適用するために再起動しています",
     "couldNotRestart": "再起動できませんでした",
     "languageSaved": "言語を保存しました。",
-    "retry": "再試行"
+    "retry": "再試行",
+    "catalogLoadFailed": "言語を読み込めませんでした。もう一度お試しください。"
   },
   "login": {
     "welcome": "Kiloへようこそ",

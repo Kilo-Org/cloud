@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
 import '@/i18n';
+import { restoreLoginDrafts } from '@/lib/login-draft';
 import { LoginScreen } from './login-screen';
 import { errorMessage } from './login-screen-state';
 
@@ -53,6 +54,7 @@ vi.mock('@/components/language-picker-sheet', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Globe: 'Globe', ExternalLink: 'ExternalLink' }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { warning: vi.fn() } }));
@@ -94,6 +96,13 @@ function findGlobe(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTest
     throw new Error('language globe not found');
   }
   return globe;
+}
+
+function findByType(
+  root: TestRenderer.ReactTestInstance,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
 async function mountLoginScreen(): Promise<TestRenderer.ReactTestRenderer> {
@@ -282,6 +291,47 @@ describe('login-screen language globe', () => {
 
     expect(globe.props.disabled).toBe(true);
     expect(globe.props.accessibilityState).toEqual({ disabled: true });
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen idle skeleton', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+  });
+
+  it('shows a form skeleton until the draft restore finishes', async () => {
+    const state: {
+      resolve: ((value: { email: string; ssoRecovery: null }) => void) | undefined;
+    } = { resolve: undefined };
+    vi.mocked(restoreLoginDrafts).mockReturnValue(
+      new Promise(resolve => {
+        state.resolve = resolve;
+      })
+    );
+
+    const renderer = await mountLoginScreen();
+
+    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
+    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(0);
+
+    await act(async () => {
+      state.resolve?.({ email: '', ssoRecovery: null });
+      await Promise.resolve();
+    });
+
+    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
+    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
 
     renderer.unmount();
   });

@@ -23,10 +23,12 @@ export type ApplyLanguageOutcome =
  * native direction, and reload the app. Never throws: every failure maps to
  * an outcome the picker can render.
  */
+// eslint-disable-next-line eslint/max-params -- beforeReload is the optional draft flush the picker passes through
 export async function applyLanguagePreference(
   preference: LanguagePreference,
   resolved: SupportedLanguage,
-  returnTarget: LanguageReturnTarget
+  returnTarget: LanguageReturnTarget,
+  beforeReload?: () => Promise<void>
 ): Promise<ApplyLanguageOutcome> {
   const persisted = await setLanguagePreferenceAsync(preference);
   if (!persisted) {
@@ -35,9 +37,17 @@ export async function applyLanguagePreference(
 
   if (isRtlLanguage(resolved)) {
     try {
+      // The draft flush is a convenience; a failure must not block the language change.
+      await beforeReload?.();
+    } catch {
+      // Ignore: the reload below still applies RTL.
+    }
+    try {
+      // The return target is a convenience; the reload still applies RTL and the
+      // user lands on the default screen when this write fails.
       await writeLanguageReturnTarget(returnTarget);
     } catch {
-      return { kind: 'persist-failed' };
+      // Ignore: continue to the RTL reload.
     }
     syncRtl(resolved);
     try {

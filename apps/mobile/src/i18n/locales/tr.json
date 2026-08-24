@@ -21,14 +21,16 @@
     "couldNotCopyToClipboard": "Panoya kopyalanamadı",
     "required": "zorunlu",
     "error": "hata: {{error}}",
-    "notNow": "Şimdi değil"
+    "notNow": "Şimdi değil",
+    "continue": "Devam et"
   },
   "language": {
     "title": "Dil",
     "restarting": "Dili uygulamak için yeniden başlatılıyor",
     "couldNotRestart": "Yeniden başlatılamadı",
     "languageSaved": "Diliniz kaydedildi.",
-    "retry": "Tekrar dene"
+    "retry": "Tekrar dene",
+    "catalogLoadFailed": "Dil yüklenemedi. Lütfen tekrar deneyin."
   },
   "login": {
     "welcome": "Kilo’ya hoş geldiniz",

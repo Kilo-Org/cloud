@@ -46,6 +46,10 @@
         "binding": "SYNC_QUEUE",
         "queue": "security-sync-jobs",
       },
+      {
+        "binding": "DISMISS_QUEUE",
+        "queue": "security-dismiss-jobs",
+      },
     ],
     "consumers": [
       {
@@ -54,6 +58,13 @@
         "max_retries": 3,
         "max_concurrency": 10,
         "dead_letter_queue": "security-sync-jobs-dlq",
+      },
+      {
+        "queue": "security-dismiss-jobs",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "max_concurrency": 20,
+        "dead_letter_queue": "security-dismiss-jobs-dlq",
       },
     ],
   },
@@ -98,6 +109,10 @@
             "binding": "SYNC_QUEUE",
             "queue": "security-sync-jobs-dev",
           },
+          {
+            "binding": "DISMISS_QUEUE",
+            "queue": "security-dismiss-jobs-dev",
+          },
         ],
         "consumers": [
           {
@@ -106,6 +121,13 @@
             "max_retries": 3,
             "max_concurrency": 10,
             "dead_letter_queue": "security-sync-jobs-dlq-dev",
+          },
+          {
+            "queue": "security-dismiss-jobs-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "max_concurrency": 20,
+            "dead_letter_queue": "security-dismiss-jobs-dlq-dev",
           },
         ],
       },

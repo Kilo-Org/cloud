@@ -1171,6 +1171,11 @@ export class SessionIngestDO extends DurableObject<Env> {
    * Cancel the alarm, wipe SQLite, then delete the captured R2-backed item blobs.
    * Shared by `clear()` and `resetCloneStage()`; `clear()` additionally marks the
    * DO deleted.
+   *
+   * The R2 delete is best-effort: the SQLite wipe has already committed when it
+   * runs, so a transient R2 failure must not throw. A throw would leave `clear()`
+   * wiped but unmarked, and would turn a typed `rejected` clone result into an
+   * uncaught exception at the RPC boundary.
    */
   private async wipeStorage(): Promise<void> {
     // Capture the R2 keys first (synchronous SQLite). The SQLite wipe below must
@@ -1190,7 +1195,14 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     // Delete the captured R2 objects last, after the SQLite wipe is complete.
     if (r2Keys.length > 0) {
-      await this.env.SESSION_INGEST_R2.delete(r2Keys);
+      try {
+        await this.env.SESSION_INGEST_R2.delete(r2Keys);
+      } catch (error) {
+        console.error('Failed to delete wiped session ingest R2 bodies', {
+          count: r2Keys.length,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 

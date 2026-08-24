@@ -61,7 +61,9 @@ const StepKeySchema = z.enum([
   UserDeletionStepKey.Substack,
   UserDeletionStepKey.Anonymize,
   UserDeletionStepKey.PylonReply,
+  UserDeletionStepKey.PylonFinalize,
   UserDeletionStepKey.PylonContact,
+  UserDeletionStepKey.CsaSupportDb,
 ]);
 
 const EntrySchema = z
@@ -300,6 +302,7 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
     return enqueueUserDeletionTargets({
       actor: { kiloUserId: ctx.user.id, email: ctx.user.google_user_email },
       targets: input.entries,
+      catalogVersion: 2,
     });
   }),
 

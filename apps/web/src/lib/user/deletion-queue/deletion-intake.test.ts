@@ -142,4 +142,38 @@ describe('deletion intake', () => {
     expect(parsePylonTicket('#12345')).toBe('#12345');
     expect(parsePylonTicket('')).toBeNull();
   });
+
+  it('refuses CSA blocked relay emails and allows staff domains', () => {
+    const result = previewDeletionTargets([
+      { email: 'hi@app.kilocode.ai' },
+      { email: 'user@service.usepylon.com' },
+      { email: 'user@mail.service.usepylon.com' },
+      { email: 'cx@kilo.ai' },
+      { email: 'staff@kilocode.ai' },
+    ]);
+    expect(result.rejected).toEqual([
+      {
+        ok: false,
+        email: 'hi@app.kilocode.ai',
+        pylonTicket: null,
+        code: DeletionRefusalCode.RelayOrInternalEmail,
+      },
+      {
+        ok: false,
+        email: 'user@service.usepylon.com',
+        pylonTicket: null,
+        code: DeletionRefusalCode.RelayOrInternalEmail,
+      },
+      {
+        ok: false,
+        email: 'user@mail.service.usepylon.com',
+        pylonTicket: null,
+        code: DeletionRefusalCode.RelayOrInternalEmail,
+      },
+    ]);
+    expect(result.accepted).toEqual([
+      { ok: true, email: 'cx@kilo.ai', pylonTicket: null },
+      { ok: true, email: 'staff@kilocode.ai', pylonTicket: null },
+    ]);
+  });
 });

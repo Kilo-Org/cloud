@@ -512,6 +512,8 @@ describe('MessageSettlementOutbox', () => {
         status: 'failed',
         category: 'status',
         body: 'Failed: Assistant request timed out',
+        i18nKey: 'cloudAgentSession.failed',
+        i18nParams: { detail: 'Assistant request timed out' },
         suppressIfViewingSession: true,
       },
     ]);

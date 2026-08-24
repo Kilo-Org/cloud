@@ -9,6 +9,7 @@ const kvStore = new Map<string, string>();
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
+  clearScope: vi.fn(async (_scope: string): Promise<void> => undefined),
 }));
 
 vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
@@ -22,6 +23,7 @@ import {
   __peekSessionAttentionForTests,
   __resetSessionAttentionForTests,
   ackSessionAttention,
+  clearSessionAttentionForSignOut,
   getRevisionSnapshot,
   isAttentionAcked,
   reconcileSessionAttention,
@@ -52,6 +54,13 @@ beforeEach(() => {
   kvMock.getItem.mockImplementation(async (scope, k) => kvStore.get(storageKey(scope, k)) ?? null);
   kvMock.setItem.mockImplementation(async (scope, k, v) => {
     kvStore.set(storageKey(scope, k), v);
+  });
+  kvMock.clearScope.mockImplementation(async scope => {
+    for (const key of kvStore.keys()) {
+      if (key.startsWith(`${scope}\u0000`)) {
+        kvStore.delete(key);
+      }
+    }
   });
 });
 
@@ -677,5 +686,57 @@ describe('revision snapshot and listener notification', () => {
     ackSessionAttention('s2');
     expect(getRevisionSnapshot()).toBeGreaterThan(0);
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('sign-out cleanup', () => {
+  it('drops the previous account acks so a reused session id is not suppressed', async () => {
+    ackSessionAttention('session-shared');
+    reconcileSessionAttention('session-shared', 'question', '2026-08-24T10:00:00Z');
+    await __flushSessionAttentionWritesForTests();
+    expect(isAttentionAcked('session-shared', '2026-08-24T10:00:00Z')).toBe(true);
+
+    await clearSessionAttentionForSignOut();
+
+    // The next account hydrates from the same device: the blob is gone, so the
+    // prior ack cannot suppress the badge for the same session id.
+    await __hydrateSessionAttentionForTests();
+    expect(__peekSessionAttentionForTests('session-shared')).toBeUndefined();
+    expect(isAttentionAcked('session-shared', '2026-08-24T10:00:00Z')).toBe(false);
+    expect(
+      shouldShowNeedsInput({ status: 'question', raiseId: '2026-08-24T10:00:00Z', isAcked: false })
+    ).toBe(true);
+  });
+
+  it('deletes the persisted blob and notifies subscribers', async () => {
+    ackSessionAttention('session-a');
+    await __flushSessionAttentionWritesForTests();
+    expect(kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY))).toBeDefined();
+
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribe(listener);
+    await clearSessionAttentionForSignOut();
+    unsubscribe();
+
+    expect(kvMock.clearScope).toHaveBeenCalledWith(SESSION_ATTENTION_KEY);
+    expect(kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY))).toBeUndefined();
+    expect(listener).toHaveBeenCalled();
+  });
+
+  it('is not defeated by a bump queued right before sign-out', async () => {
+    ackSessionAttention('session-a');
+    // No flush: the write is still queued when the clear is chained behind it.
+    await clearSessionAttentionForSignOut();
+
+    expect(kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY))).toBeUndefined();
+  });
+
+  it('never throws when the encrypted KV delete fails', async () => {
+    ackSessionAttention('session-a');
+    await __flushSessionAttentionWritesForTests();
+    kvMock.clearScope.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(clearSessionAttentionForSignOut()).resolves.toBeUndefined();
+    expect(__peekSessionAttentionForTests('session-a')).toBeUndefined();
   });
 });

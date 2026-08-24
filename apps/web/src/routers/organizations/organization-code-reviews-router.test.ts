@@ -486,12 +486,13 @@ describe('organization review agent router: patchReviewConfig', () => {
   async function seedOrgSelection(
     organization: { id: string },
     owner: { id: string },
-    selectedRepositoryIds: Array<number | string>
+    selectedRepositoryIds: Array<number | string>,
+    platform: 'github' | 'gitlab' = 'github'
   ): Promise<void> {
     await db.insert(agent_configs).values({
       owned_by_organization_id: organization.id,
       agent_type: 'code_review',
-      platform: 'github',
+      platform,
       config: {
         review_style: 'balanced',
         focus_areas: [],
@@ -551,6 +552,51 @@ describe('organization review agent router: patchReviewConfig', () => {
 
     const stored = await getAgentConfig(organization.id, 'code_review', 'github');
     expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [505] }));
+  });
+
+  // The full save validates selection ids against the platform's id type; the
+  // PATCH must too, or a GitHub/GitLab selection of string ids persists and the
+  // automated trigger can never match a repository.
+  it.each([
+    ['github' as const, 'GitHub repository IDs must be numbers'],
+    ['gitlab' as const, 'GitLab repository IDs must be numbers'],
+  ])('rejects a %s full-array patch of string repository ids', async (platform, message) => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101, 202], platform);
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform,
+        selectedRepositoryIds: ['{repo-uuid}'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', platform);
+    expect(stored?.config).toEqual(
+      expect.objectContaining({ selected_repository_ids: [101, 202] })
+    );
+  });
+
+  it.each([
+    ['github' as const, 'GitHub repository IDs must be numbers'],
+    ['gitlab' as const, 'GitLab repository IDs must be numbers'],
+  ])('rejects a %s delta patch of string repository ids', async (platform, message) => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgSelection(organization, owner, [101], platform);
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.reviewAgent.patchReviewConfig({
+        organizationId: organization.id,
+        platform,
+        selectedRepositoryDelta: { add: ['{repo-uuid}'], remove: [] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', platform);
+    expect(stored?.config).toEqual(expect.objectContaining({ selected_repository_ids: [101] }));
   });
 
   it('rejects an org patch carrying both selectedRepositoryIds and selectedRepositoryDelta', async () => {

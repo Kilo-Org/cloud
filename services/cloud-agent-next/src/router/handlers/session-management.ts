@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { AgentSandboxUnavailableError } from '../../agent-sandbox/protocol.js';
 import { createAgentSandbox } from '../../agent-sandbox/factory.js';
 import { logger, withLogTags } from '../../logger.js';
-import { generateSandboxId } from '../../sandbox-id.js';
+import { generateSandboxId, isGeneratedSharedSandboxId } from '../../sandbox-id.js';
 import type { SessionId, InterruptResult, TRPCContext } from '../../types.js';
 import type { SandboxId } from '../../types.js';
 import {
@@ -23,12 +23,17 @@ import {
   GetMessageResultOutput,
   GetLatestAssistantMessageInput,
   GetLatestAssistantMessageOutput,
+  GetComputeBillingStatusOutput,
 } from '../schemas.js';
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { getPgDb } from '../../db/pg.js';
+import { cloud_billing_sku, container_usage_interval } from '@kilocode/db/schema';
+import { and, desc, eq, like } from 'drizzle-orm';
+import { SANDBOX_USAGE_SKUS } from '../../container-usage-context.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -47,6 +52,17 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
     case 'git':
       return { gitUrl: repository.url, platform: repository.platform };
   }
+}
+
+function toIso(value: string): string {
+  return new Date(value).toISOString();
+}
+
+function microdollarsForSeconds(seconds: number, rateCentsPerSecond: string): number {
+  const [whole, fraction = ''] = rateCentsPerSecond.split('.');
+  const scale = 10n ** BigInt(fraction.length);
+  const cents = BigInt(`${whole}${fraction}` || '0');
+  return Number((BigInt(seconds) * cents * 10_000n) / scale);
 }
 
 async function deleteSessionResources(
@@ -372,6 +388,144 @@ export function createSessionManagementHandlers() {
             latestEventId,
           };
         });
+      }),
+
+    getComputeBillingStatus: protectedProcedure
+      .input(GetSessionInput)
+      .output(GetComputeBillingStatusOutput)
+      .query(async ({ input, ctx }) => {
+        const sessionId = input.cloudAgentSessionId as SessionId;
+        await requireCurrentSessionAccess({
+          env: ctx.env,
+          kiloUserId: ctx.userId,
+          cloudAgentSessionId: sessionId,
+        });
+        const stub = ctx.env.CLOUD_AGENT_SESSION.get(
+          ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`)
+        );
+        const metadata = await withDORetry<
+          DurableObjectStub<CloudAgentSession>,
+          CloudAgentSessionState | null
+        >(
+          () => stub,
+          value => value.getMetadata(),
+          'getMetadata'
+        );
+        if (!metadata) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+
+        const sandbox = createAgentSandbox(ctx.env, metadata);
+        // This is a no-wake status RPC. Older/rejecting runtime deployments are
+        // unavailable rather than a reason to create, wake, or admit compute.
+        const runtime = await sandbox.getBillingRuntimeStatus().catch(() => undefined);
+        const payer = metadata.identity.orgId
+          ? { type: 'org' as const, id: metadata.identity.orgId }
+          : { type: 'user' as const, id: metadata.identity.userId };
+        // The metered runtime has the canonical resolved ID (including a
+        // persisted failover ID). When it is not available, only trust stored
+        // metadata; never regenerate an ID for a read-only billing status.
+        const sandboxId = runtime?.sandboxId ?? metadata.workspace?.sandboxId;
+        const db = getPgDb(ctx.env);
+        const catalogSkuId = runtime ? SANDBOX_USAGE_SKUS[runtime.sandboxClassName] : undefined;
+        const [catalog] = catalogSkuId
+          ? await db
+              .select({ rate: cloud_billing_sku.rate_cents_per_unit, unit: cloud_billing_sku.unit })
+              .from(cloud_billing_sku)
+              .where(eq(cloud_billing_sku.id, catalogSkuId))
+              .limit(1)
+          : [];
+        const latest = sandboxId
+          ? await db
+              .select({
+                id: container_usage_interval.id,
+                billingMode: container_usage_interval.billing_mode,
+                rate: container_usage_interval.rate_cents_per_unit,
+                skuId: container_usage_interval.cloud_billing_sku_id,
+                startedAt: container_usage_interval.started_at,
+                lastSeenAt: container_usage_interval.last_seen_at,
+                stoppedAt: container_usage_interval.stopped_at,
+                confirmedSeconds: container_usage_interval.confirmed_seconds,
+                settledBillableSeconds: container_usage_interval.settled_billable_seconds,
+                status: container_usage_interval.status,
+                skuRate: cloud_billing_sku.rate_cents_per_unit,
+              })
+              .from(container_usage_interval)
+              .leftJoin(
+                cloud_billing_sku,
+                eq(cloud_billing_sku.id, container_usage_interval.cloud_billing_sku_id)
+              )
+              .where(
+                and(
+                  eq(container_usage_interval.instance_id, sandboxId),
+                  eq(container_usage_interval.subject_type, payer.type),
+                  eq(container_usage_interval.subject_id, payer.id),
+                  like(container_usage_interval.service, 'cloud-agent-next-%')
+                )
+              )
+              .orderBy(desc(container_usage_interval.started_at))
+              .limit(1)
+          : [];
+        const interval = latest[0];
+        // A closed row is historical evidence, not the current running
+        // interval. Paid intervals retain their admitted snapshot; shadow
+        // intervals use today's catalog rate for the current runtime class.
+        const hasCurrentInterval = interval?.status === 'open';
+        const catalogRate = catalog?.unit === 'second' ? catalog.rate : null;
+        // Paid interval rates are admitted snapshots for second-based container usage.
+        const rate = hasCurrentInterval
+          ? interval.billingMode === 'paid'
+            ? interval.rate
+            : catalogRate
+          : catalogRate;
+        const attribution =
+          sandboxId && isGeneratedSharedSandboxId(sandboxId)
+            ? ('payer_shared' as const)
+            : ('session' as const);
+        const phase = !runtime
+          ? ('unavailable' as const)
+          : runtime.context || hasCurrentInterval
+            ? runtime.blocked
+              ? ('stopping' as const)
+              : runtime.running
+                ? ('active' as const)
+                : ('settling' as const)
+            : ('idle' as const);
+        const confirmedSeconds = hasCurrentInterval ? (interval?.confirmedSeconds ?? 0) : 0;
+        // This display-only elapsed estimate never drives settlement; the meter is authoritative.
+        const observedSeconds =
+          hasCurrentInterval && interval
+            ? Math.max(
+                confirmedSeconds,
+                Math.floor(
+                  ((interval.stoppedAt ? new Date(interval.stoppedAt).getTime() : Date.now()) -
+                    new Date(interval.startedAt).getTime()) /
+                    1_000
+                )
+              )
+            : 0;
+        return {
+          payer,
+          attribution,
+          phase,
+          estimatedHourlyRateMicrodollars: rate ? microdollarsForSeconds(3600, rate) : null,
+          estimatedIntervalAmountMicrodollars:
+            phase === 'active' || phase === 'stopping'
+              ? rate
+                ? microdollarsForSeconds(observedSeconds, rate)
+                : null
+              : null,
+          billingMode: hasCurrentInterval ? (interval?.billingMode ?? null) : null,
+          interval:
+            hasCurrentInterval && interval
+              ? {
+                  id: interval.id,
+                  startedAt: toIso(interval.startedAt),
+                  lastSeenAt: toIso(interval.lastSeenAt),
+                  stoppedAt: interval.stoppedAt ? toIso(interval.stoppedAt) : null,
+                  confirmedSeconds,
+                  settledBillableSeconds: interval.settledBillableSeconds,
+                }
+              : null,
+        };
       }),
 
     getSessionHealth: protectedProcedure

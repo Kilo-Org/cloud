@@ -132,13 +132,14 @@ export const recordStartFailureCodeSchema = z.enum([
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
 
+/** Customer-safe billing admission failure carried across Worker and client boundaries. */
 const recordStartFailureSchema = z.discriminatedUnion('code', [
   z
     .object({
       code: z.literal('insufficient_credits'),
       message: z.string().min(1),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
     })
     .strict(),
   z
@@ -160,8 +161,8 @@ export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z
     .object({
       verdict: z.literal('warn'),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
       // Retained while already-deployed producers complete their protocol rollout.
       remaining: z.number().int().optional(),
     })
@@ -169,8 +170,8 @@ export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z
     .object({
       verdict: z.literal('stop'),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
       remaining: z.number().int().optional(),
     })
     .strict(),

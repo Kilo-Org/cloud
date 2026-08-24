@@ -5,6 +5,28 @@ import { buildTrpcErrorResponse, createClientError, projectTrpcErrorData } from 
 
 describe('createClientError', () => {
   it.each([
+    ['PAYMENT_REQUIRED', 402, 'INSUFFICIENT_CREDITS'],
+    ['CONFLICT', 409, 'COMPUTE_STOPPING'],
+    ['SERVICE_UNAVAILABLE', 503, 'BILLING_UNAVAILABLE'],
+  ])('projects validated %s billing failure at HTTP %i', (code, httpStatus, billingCode) => {
+    const billingFailure = {
+      code: billingCode,
+      payer: { type: 'user', id: 'user-1' },
+      retryable: code !== 'PAYMENT_REQUIRED',
+    };
+    expect(
+      projectTrpcErrorData({ code, httpStatus }, 'Safe message', { billingFailure })
+    ).toMatchObject({ billingFailure });
+  });
+
+  it('omits malformed billing failures', () => {
+    expect(
+      projectTrpcErrorData({ code: 'PAYMENT_REQUIRED', httpStatus: 402 }, 'Safe', {
+        billingFailure: { code: 'INSUFFICIENT_CREDITS' },
+      })
+    ).not.toHaveProperty('billingFailure');
+  });
+  it.each([
     'PARSE_ERROR',
     'BAD_REQUEST',
     'UNAUTHORIZED',

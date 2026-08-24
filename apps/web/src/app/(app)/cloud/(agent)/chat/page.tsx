@@ -8,11 +8,11 @@ type PageProps = {
 };
 
 export default async function PersonalCloudChatPage({ searchParams }: PageProps) {
-  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/cloud/chat');
+  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/cloud/chat');
   const { sessionId } = await searchParams;
 
   if (!sessionId || isNewSession(sessionId)) {
-    return <CloudChatPageWrapperNext />;
+    return <CloudChatPageWrapperNext currentUserId={user.id} />;
   }
 
   return <LegacySessionViewer sessionId={sessionId} />;

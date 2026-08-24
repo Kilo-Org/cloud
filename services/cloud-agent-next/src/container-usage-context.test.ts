@@ -5,6 +5,7 @@ import {
   assertSandboxBillingAllocation,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  getSandboxBillingRuntimeStatus,
   SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
 } from './container-usage-context.js';
@@ -20,6 +21,28 @@ function metadata(identity: SessionMetadata['identity']): SessionMetadata {
 }
 
 describe('container usage context', () => {
+  it('invokes billing status as a binding method for RPC proxies', async () => {
+    const status = {
+      sandboxClassName: 'SandboxSmall' as const,
+      running: true,
+      blocked: false,
+    };
+    const getBillingRuntimeStatus = new Proxy(
+      vi.fn(async () => status),
+      {
+        get: (target, property, receiver) => {
+          if (property === 'call')
+            throw new Error('RPC method proxies do not support Function.call');
+          return Reflect.get(target, property, receiver);
+        },
+      }
+    );
+
+    await expect(
+      getSandboxBillingRuntimeStatus({ getBillingRuntimeStatus } as unknown as SandboxInstance)
+    ).resolves.toEqual(status);
+  });
+
   it('maps every concrete sandbox class to its immutable SKU', () => {
     expect(SANDBOX_USAGE_SKUS).toEqual({
       Sandbox: 'cloud-agent-standard-2026-07',

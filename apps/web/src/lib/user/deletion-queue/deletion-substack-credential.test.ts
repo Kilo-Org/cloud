@@ -6,6 +6,7 @@ import {
   cookieFromCredential,
   deleteSubstackCredential,
   getSubstackCredentialMeta,
+  getSubstackPublicationUrl,
   replaceSubstackCredential,
   testSubstackCredentialMaterial,
 } from '@/lib/user/deletion-queue/deletion-substack-credential';
@@ -13,11 +14,15 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 
 describe('cookieFromCredential', () => {
   it('builds a sid cookie from JSON sid material', () => {
-    expect(cookieFromCredential('{"sid":"abc123"}')).toBe('substack.sid=abc123');
+    expect(cookieFromCredential('{"sid":"abc123"}')).toBe('connect.sid=abc123');
   });
 
   it('returns a raw cookie string unchanged', () => {
-    expect(cookieFromCredential('substack.sid=raw-cookie')).toBe('substack.sid=raw-cookie');
+    expect(cookieFromCredential('connect.sid=raw-cookie')).toBe('connect.sid=raw-cookie');
+  });
+
+  it('uses connect.sid for a bare session value', () => {
+    expect(cookieFromCredential('bare-session-value')).toBe('connect.sid=bare-session-value');
   });
 
   it('returns null for empty material', () => {
@@ -52,12 +57,12 @@ describe('testSubstackCredentialMaterial', () => {
       )
     );
 
-    const result = await testSubstackCredentialMaterial('{"sid":"abc123"}');
+    const result = await testSubstackCredentialMaterial('connect.sid=abc123');
 
     expect(result).toEqual({ status: 'healthy', handle: 'jane', name: 'Jane Doe' });
     expect(JSON.stringify(result)).not.toContain('secret@example.com');
     expect(fetchSpy).toHaveBeenCalledWith(`${publication}/api/v1/user/profile/self`, {
-      headers: { Cookie: 'substack.sid=abc123', Accept: 'application/json' },
+      headers: { Cookie: 'connect.sid=abc123', Accept: 'application/json' },
       signal: expect.any(AbortSignal),
     });
   });
@@ -65,7 +70,7 @@ describe('testSubstackCredentialMaterial', () => {
   it('returns expired on 401', async () => {
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 401 }));
 
-    await expect(testSubstackCredentialMaterial('substack.sid=expired')).resolves.toEqual({
+    await expect(testSubstackCredentialMaterial('connect.sid=expired')).resolves.toEqual({
       status: 'expired',
     });
   });
@@ -90,14 +95,37 @@ describe('testSubstackCredentialMaterial', () => {
       1,
       `${publication}/api/v1/user/profile/self`,
       expect.objectContaining({
-        headers: { Cookie: 'substack.sid=sid-only', Accept: 'application/json' },
+        headers: { Cookie: 'connect.sid=sid-only', Accept: 'application/json' },
       })
     );
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
       'https://substack.com/api/v1/user/profile/self',
       expect.objectContaining({
-        headers: { Cookie: 'substack.sid=sid-only', Accept: 'application/json' },
+        headers: { Cookie: 'connect.sid=sid-only', Accept: 'application/json' },
+      })
+    );
+  });
+
+  it('uses the blog.kilo.ai publication when no override is configured', async () => {
+    delete process.env.SUBSTACK_PUBLICATION_URL;
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ handle: 'default-publication', name: 'Default Publication' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(testSubstackCredentialMaterial('connect.sid=abc123')).resolves.toEqual({
+      status: 'healthy',
+      handle: 'default-publication',
+      name: 'Default Publication',
+    });
+    expect(getSubstackPublicationUrl()).toBe('https://blog.kilo.ai');
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://blog.kilo.ai/api/v1/user/profile/self',
+      expect.objectContaining({
+        headers: { Cookie: 'connect.sid=abc123', Accept: 'application/json' },
       })
     );
   });

@@ -925,8 +925,18 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
         // Effective selected repository ids: a delta input computes the next
         // array above; a full-array input flows through the merge helper.
-        const effectiveSelectedRepositoryIds: Array<number | string> =
+        // A patch that supplies a selection (full array or delta) is validated
+        // against the platform's id type, exactly like the full save — without
+        // it a GitHub/GitLab PATCH could persist string ids the trigger can
+        // never match. A patch that touches no selection skips the check so an
+        // unrelated edit cannot fail on an already-stored value.
+        const patchesSelection =
+          input.selectedRepositoryIds !== undefined || input.selectedRepositoryDelta !== undefined;
+        const mergedSelectedRepositoryIds: Array<number | string> =
           selectedRepositoryIdsFromDelta ?? merged.selectedRepositoryIds ?? [];
+        const effectiveSelectedRepositoryIds: Array<number | string> = patchesSelection
+          ? requireRepositoryIdsForPlatform(platform, mergedSelectedRepositoryIds)
+          : mergedSelectedRepositoryIds;
 
         // Council entitlement gate: ONLY when the patch actually carries a
         // `council` key. An omitted council must not re-trigger the gate —
@@ -1001,10 +1011,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         // delta (or full-array) input that would leave an invalid selection —
         // unknown UUIDs, an empty result after removal, duplicates, or an
         // unavailable cache — is rejected here rather than persisted.
-        if (
-          isBitbucket &&
-          (input.selectedRepositoryIds !== undefined || input.selectedRepositoryDelta !== undefined)
-        ) {
+        if (isBitbucket && patchesSelection) {
           const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
           requireBitbucketRepositorySelection(
             {
@@ -1054,8 +1061,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         let webhookSyncResult = null;
         if (
           isGitLab &&
-          (input.selectedRepositoryIds !== undefined ||
-            input.selectedRepositoryDelta !== undefined) &&
+          patchesSelection &&
           (input.autoConfigureWebhooks ?? true) &&
           repositorySelectionMode === 'selected'
         ) {

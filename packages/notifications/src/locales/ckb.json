@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "دانیشتنی ئەجێنتەکەت نوێکراوەتەوە",
+      "chatMessage": "نامەیەکی نوێت هەیە",
+      "instanceLifecycle": "دۆخەکەت نوێکراوەتەوە",
+      "scheduledAction": "کردارێکی دیاریکراو نوێکراوەتەوە",
+      "lowBalance": "تەوازنەکەت پێویستی بە سەرنجە",
+      "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ئەرکەکە تەواو بوو"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "سەرکەوتوو نەبوو: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "گۆڕدرا: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · بێ ناونیشان",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ئاگادارکردنەوەی تەوازنی نزم",
+      "body": "تەوازنی {{organizationName}} لە ${{minimumBalanceUsd}} خوارتر کەوت"
+    },
+    "securityFindingNew": {
+      "title": "دۆزینەوەی ئاسایشی نوێ ({{severity}})",
+      "body": "{{findingTitle}} لە {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "ئاگادارکردنەوەی SLA",
+      "body": "{{findingTitle}} لە {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "پێشێلکردنی SLA",
+      "body": "{{findingTitle}} لە {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ئامادەیە",
+      "body": "دابکە بۆ دەستپێکردنی گفتوگۆ."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} سەرکەوتوو نەبوو لە دەستپێکردن",
+      "body": "دەستپێکردن سەرکەوتوو نەبوو."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} بەم زووانە دووبارە دەستپێدەکات",
+      "body": "دیاریکراوە کە لە {{when}} دووبارە دەستپێبکات."
+    },
+    "restartCancelled": {
+      "title": "دووبارە دەستپێکردنی {{instanceName}} پووچەڵکرایەوە",
+      "body": "دووبارە دەستپێکردنی دیاریکراوی پێشوو پووچەڵکرایەوە."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} بەم زووانە نوێدەکرێت",
+      "bodyWithTag": "نوێکردنەوە بۆ {{targetImageTag}} لە {{when}}.",
+      "bodyWithoutTag": "نوێکردنەوەی دیاریکراو لە {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "نوێکردنەوەی {{instanceName}} پووچەڵکرایەوە",
+      "body": "نوێکردنەوەی دیاریکراوی پێشوو پووچەڵکرایەوە."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "دانیشتنی Kiloـی تۆ ئامادەیە بۆ کۆنترۆڵکردن لە مۆبایلەکەتەوە"
+  }
+}

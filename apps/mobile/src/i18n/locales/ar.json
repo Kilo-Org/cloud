@@ -30,11 +30,13 @@
     "couldNotRestart": "تعذّرت إعادة التشغيل",
     "languageSaved": "تم حفظ لغتك.",
     "retry": "إعادة المحاولة",
-    "catalogLoadFailed": "تعذّر تحميل اللغة. يرجى المحاولة مرة أخرى."
+    "catalogLoadFailed": "تعذّر تحميل اللغة. يرجى المحاولة مرة أخرى.",
+    "search": "البحث في اللغات",
+    "noMatches": "لا توجد لغات مطابقة",
+    "deviceLanguage": "لغة الجهاز"
   },
   "login": {
     "welcome": "مرحبًا بك في Kilo",
-    "language": "اللغة",
     "retrySignIn": "إعادة محاولة تسجيل الدخول",
     "logo": "شعار Kilo",
     "continuingSignIn": "جارٍ متابعة تسجيل الدخول.",
@@ -77,7 +79,6 @@
     "or": "أو"
   },
   "profile": {
-    "language": "اللغة",
     "title": "الملف الشخصي",
     "agents": "الوكلاء",
     "codeReviewer": "مراجع الكود",
@@ -141,7 +142,8 @@
     "notificationsSubtitle": "تفضيلات الإشعارات الفورية",
     "appearanceSystem": "النظام",
     "appearanceLight": "فاتح",
-    "appearanceDark": "داكن"
+    "appearanceDark": "داكن",
+    "account": "الحساب"
   },
   "notifications": {
     "title": "الإشعارات",
@@ -1346,17 +1348,6 @@
       "sessionDeleted": "تم حذف الجلسة",
       "needsInput": "يتطلب إدخالًا",
       "fromPlatform": "من {{platform}}",
-      "minuteOne": "دقيقة",
-      "minuteOther": "دقائق",
-      "hourOne": "ساعة",
-      "hourOther": "ساعات",
-      "dayOne": "يوم",
-      "dayOther": "أيام",
-      "monthOne": "شهر",
-      "monthOther": "أشهر",
-      "yearOne": "سنة",
-      "yearOther": "سنوات",
-      "ago": "منذ",
       "centOne": "سنت",
       "centOther": "سنتات",
       "dollarOne": "دولار",
@@ -1365,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
       "couldNotOpenTitle": "تعذّر فتح GitHub"
-    }
+    },
+    "sessionExited": "انتهت الجلسة",
+    "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
+    "remoteSpawnNonRetryable": "فشل المثيل في بدء الجلسة — تحقق من الجهاز أو حدّث CLI.",
+    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر."
   },
   "agentChat": {
     "session": {
@@ -1979,7 +1974,9 @@
     "allow": "السماح",
     "onlineMessage": "لا يمكن لهذا الجهاز النسخ دون اتصال. يُرسل تسجيلك إلى {{provider}} لتحويله إلى نص. لا يخزّن Kilo الصوت.",
     "onlineTitle": "تتم معالجة الكلام عبر الإنترنت",
-    "staysOff": "يبقى الكلام متوقفًا حتى تسمح بالنسخ الصوتي عبر الإنترنت."
+    "staysOff": "يبقى الكلام متوقفًا حتى تسمح بالنسخ الصوتي عبر الإنترنت.",
+    "start": "بدء الإدخال الصوتي",
+    "stop": "إيقاف الإدخال الصوتي"
   },
   "share": {
     "title": "مشاركة إلى Kilo",
@@ -2052,7 +2049,12 @@
     "opensManagementOnWeb": "يفتح إدارة Kilo Pass على الويب.",
     "opensAppStoreManagement": "يفتح إدارة اشتراك App Store.",
     "opensPlans": "يفتح خطط Kilo Pass.",
-    "tryAgainFromProfile": "حاول مرة أخرى من الملف الشخصي."
+    "tryAgainFromProfile": "حاول مرة أخرى من الملف الشخصي.",
+    "unavailableDescription": "Kilo Pass غير متاح كعملية شراء داخل التطبيق على Android. يمكنك إدارته على الويب.",
+    "webManagementDescription": "تتم إدارة Kilo Pass هذا على الويب.",
+    "legalDisclosure": "Kilo Pass اشتراك شهري متجدد تلقائيًا. يتم خصم الدفعة من Apple ID الخاص بك عند تأكيد الشراء. تتجدد الاشتراكات تلقائيًا كل شهر بالسعر المعروض ما لم يتم الإلغاء قبل 24 ساعة على الأقل من نهاية الفترة الحالية. يمكنك الإدارة أو الإلغاء في أي وقت من إعدادات حسابك في App Store.",
+    "legalPrivacyPolicy": "سياسة الخصوصية",
+    "legalTermsOfUse": "شروط الاستخدام (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2339,13 +2341,11 @@
     "headLine": "{{counts}} · الرأس {{sha}}",
     "hunkRows": {
       "contextUnavailable": "السياق غير متاح عند هذا المرجع",
-      "expand": "توسيع",
       "expandAll": "توسيع الكل",
       "expandAllLines": "توسيع جميع الأسطر {{count}}",
       "expandContext": "توسيع السياق",
       "expandLines": "توسيع {{count}} أسطر ({{start}}–{{end}})",
       "expandLinesOfContext": "توسيع {{count}} أسطر من السياق",
-      "expandMore": "توسيع المزيد",
       "expandMoreContext": "توسيع المزيد من السياق",
       "expandMoreLines": "توسيع {{count}} أسطر إضافية ({{start}}–{{end}})",
       "failedToLoadContext": "فشل تحميل السياق — اضغط لإعادة المحاولة",
@@ -2507,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "تم تحديد {{label}}، اضغط لتغيير التحديد",
       "tapToComment": "{{label}}، اضغط للتعليق"
-    }
+    },
+    "linkPasteClipboardEmpty": "الحافظة فارغة",
+    "linkPasteNotAPullRequest": "ليس رابط طلب سحب على GitHub"
   },
   "organization": {
     "boundary": {
@@ -2653,5 +2655,26 @@
     "rateKilo": "قيّم Kilo",
     "sorryMessage": "يرجى إخبارنا بما يحتاج إلى تحسين. المهندس المسؤول عن التطبيق يقرأ كل تقرير!",
     "sorryTitle": "نأسف لسماع ذلك!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "يوجد حساب بهذا البريد الإلكتروني مسجل بطريقة تسجيل دخول مختلفة. جرّب طريقة أخرى أو استخدم \"خيارات تسجيل دخول إضافية\".",
+    "differentOauth": "يوجد حساب بهذا البريد الإلكتروني مسجل بطريقة تسجيل دخول مختلفة. جرّب طريقة أخرى أو استخدم \"خيارات تسجيل دخول إضافية\".",
+    "ssoError": "تتطلب مؤسستك استخدام SSO. استخدم \"خيارات تسجيل دخول إضافية\".",
+    "blocked": "تم حظر هذا الحساب. يرجى التواصل مع الدعم.",
+    "signupRateLimited": "محاولات كثيرة جدًا. يرجى المحاولة لاحقًا.",
+    "invalidCode": "هذا الرمز غير صحيح. يرجى المحاولة مرة أخرى.",
+    "codeInProgress": "جارٍ معالجة الرمز الخاص بك. انتظر لحظة وحاول مرة أخرى.",
+    "tooManyAttempts": "محاولات كثيرة جدًا. يرجى طلب رمز جديد.",
+    "invalidToken": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+    "invalidEmail": "تعذّر تسليم البريد إلى هذا العنوان. يرجى استخدام بريد إلكتروني مختلف.",
+    "invalidRequest": "تحقق من عنوان بريدك الإلكتروني وحاول مرة أخرى.",
+    "emailDeliveryFailed": "تسليم البريد الإلكتروني غير متاح مؤقتًا. يرجى المحاولة لاحقًا.",
+    "admissionRequired": "لا يمكن التحقق من جهازك. استخدم \"خيارات تسجيل دخول إضافية\" لتسجيل الدخول على جهاز آخر أو عبر الويب.",
+    "default": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
+    "retryableAdmission": "تعذّر التحقق من هذا الجهاز. تحقق من اتصالك وحاول مرة أخرى."
+  },
+  "models": {
+    "dataCollected": "البيانات التي تم جمعها",
+    "free": "مجاني"
   }
 }

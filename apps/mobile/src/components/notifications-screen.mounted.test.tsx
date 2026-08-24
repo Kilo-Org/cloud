@@ -65,6 +65,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'auth-token' }) }));
 vi.mock('@/lib/hooks/use-app-lifecycle', () => ({ useAppLifecycle: () => ({ isActive: true }) }));
+vi.mock('@/lib/hooks/use-language-preference', () => ({ getResolvedLanguage: () => 'en' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#000',

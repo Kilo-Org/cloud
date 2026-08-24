@@ -1,3 +1,4 @@
+import { relativeTimeFormat } from '@/lib/intl-cache';
 import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -33,7 +34,7 @@ function timeAgo(date: Date, locale?: string): string {
     return i18n.t('common.justNow');
   }
   const resolvedLocale = locale ?? i18n.language;
-  const formatter = new Intl.RelativeTimeFormat(resolvedLocale, { numeric: 'auto' });
+  const formatter = relativeTimeFormat(resolvedLocale, { numeric: 'auto' });
   for (const { unit, seconds: unitSeconds } of RELATIVE_TIME_UNITS) {
     const value = Math.floor(seconds / unitSeconds);
     if (value >= 1) {

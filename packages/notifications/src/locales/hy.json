@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Ձեր գործակալի նիստն ունի թարմացում",
+      "chatMessage": "Դուք ունեք նոր հաղորդագրություն",
+      "instanceLifecycle": "Ձեր օրինակն ունի թարմացում",
+      "scheduledAction": "Պլանավորված գործողությունն ունի թարմացում",
+      "lowBalance": "Ձեր մնացորդը ուշադրության կարիք ունի",
+      "securityFinding": "Անվտանգության հայտնաբերումը ուշադրության կարիք ունի"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Առաջադրանքն ավարտված է"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Ձախողվեց: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Ընդհատվեց: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Անվերնագիր",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Մնացորդի ցածր մակարդակի ծանուցում",
+      "body": "{{organizationName}}-ի մնացորդն իջել է ${{minimumBalanceUsd}}-ից ցածր"
+    },
+    "securityFindingNew": {
+      "title": "Նոր անվտանգության հայտնաբերում ({{severity}})",
+      "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA նախազգուշացում",
+      "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA խախտում",
+      "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Անվտանգության հայտնաբերումը ուշադրության կարիք ունի"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}}-ը պատրաստ է",
+      "body": "Հպեք՝ զրույց սկսելու համար:"
+    },
+    "startFailed": {
+      "title": "{{instanceName}}-ը չհաջողվեց գործարկել",
+      "body": "Գործարկումը ձախողվեց:"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}}-ը շուտով կվերագործարկվի",
+      "body": "Նախատեսված է վերագործարկվել {{when}}-ին:"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}}-ի վերագործարկումը չեղարկված է",
+      "body": "Նախկինում նախատեսված վերագործարկումը չեղարկված է:"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}}-ը շուտով կթարմացվի",
+      "bodyWithTag": "Թարմացնել {{targetImageTag}}-ին {{when}}-ին:",
+      "bodyWithoutTag": "Նախատեսված թարմացում {{when}}-ին:"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}}-ի թարմացումը չեղարկված է",
+      "body": "Նախկինում նախատեսված թարմացումը չեղարկված է:"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Ձեր Kilo նիստը պատրաստ է կառավարվելու ձեր հեռախոսից"
+  }
+}

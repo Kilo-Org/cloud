@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Агент сессияңызда жаңарту бар",
+      "chatMessage": "Сізде жаңа хабарлама бар",
+      "instanceLifecycle": "Данаңызда жаңарту бар",
+      "scheduledAction": "Жоспарланған әрекетте жаңарту бар",
+      "lowBalance": "Балансыңыз назар қажет етеді",
+      "securityFinding": "Қауіпсіздік табылғаны назар қажет етеді"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Тапсырма аяқталды"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Сәтсіз: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Үзілді: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Атаусыз",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Төмен баланс ескертуі",
+      "body": "{{organizationName}} балансы ${{minimumBalanceUsd}} төмен түсті"
+    },
+    "securityFindingNew": {
+      "title": "Жаңа қауіпсіздік табылғаны ({{severity}})",
+      "body": "{{findingTitle}} {{repoFullName}} ішінде"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ескертуі",
+      "body": "{{findingTitle}} {{repoFullName}} ішінде"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA бұзылуы",
+      "body": "{{findingTitle}} {{repoFullName}} ішінде"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Қауіпсіздік табылғаны назар қажет етеді"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} дайын",
+      "body": "Сөйлесуді бастау үшін түртіңіз."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} іске қосу сәтсіз аяқталды",
+      "body": "Іске қосу сәтсіз аяқталды."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} жақында қайта іске қосылады",
+      "body": "{{when}} уақытында қайта іске қосу жоспарланған."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} қайта іске қосу жойылды",
+      "body": "Алдыңғы жоспарланған қайта іске қосу жойылды."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} жақында жаңартылады",
+      "bodyWithTag": "{{when}} уақытында {{targetImageTag}} нұсқасына жаңарту.",
+      "bodyWithoutTag": "{{when}} уақытында жоспарланған жаңарту."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} жаңарту жойылды",
+      "body": "Алдыңғы жоспарланған жаңарту жойылды."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo сессияңыз телефоннан басқаруға дайын"
+  }
+}

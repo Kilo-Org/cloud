@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { SUPPORTED_LANGUAGES } from './src/i18n/languages';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
@@ -95,6 +96,11 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // iOS reads this list, not the JS catalog. Without it the system treats
+      // the app as English-only, so OS-drawn text we cannot translate — the
+      // native Sign in with Apple button above all — stays English on a
+      // localized device.
+      CFBundleLocalizations: [...SUPPORTED_LANGUAGES],
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
       // Apple's raw key for AdAttributionKit postback copies is the top-level
       // string `AttributionCopyEndpoint` (Xcode displays it as "AdAttributionKit -

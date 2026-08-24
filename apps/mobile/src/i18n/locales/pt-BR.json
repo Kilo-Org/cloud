@@ -30,11 +30,13 @@
     "couldNotRestart": "Não foi possível reiniciar",
     "languageSaved": "Seu idioma foi salvo.",
     "retry": "Tentar novamente",
-    "catalogLoadFailed": "Não foi possível carregar o idioma. Tente novamente."
+    "catalogLoadFailed": "Não foi possível carregar o idioma. Tente novamente.",
+    "search": "Pesquisar idiomas",
+    "noMatches": "Nenhum idioma corresponde",
+    "deviceLanguage": "Idioma do dispositivo"
   },
   "login": {
     "welcome": "Boas-vindas ao Kilo",
-    "language": "Idioma",
     "retrySignIn": "Tentar entrar novamente",
     "logo": "Logotipo do Kilo",
     "continuingSignIn": "Continuando seu login.",
@@ -77,7 +79,6 @@
     "or": "ou"
   },
   "profile": {
-    "language": "Idioma",
     "title": "Perfil",
     "agents": "Agentes",
     "codeReviewer": "Code Reviewer",
@@ -1333,17 +1334,6 @@
       "sessionDeleted": "Sessão excluída",
       "needsInput": "requer entrada",
       "fromPlatform": "de {{platform}}",
-      "minuteOne": "minuto",
-      "minuteOther": "minutos",
-      "hourOne": "hora",
-      "hourOther": "horas",
-      "dayOne": "dia",
-      "dayOther": "dias",
-      "monthOne": "mês",
-      "monthOther": "meses",
-      "yearOne": "ano",
-      "yearOther": "anos",
-      "ago": "atrás",
       "centOne": "centavo",
       "centOther": "centavos",
       "dollarOne": "dólar",
@@ -1352,7 +1342,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "Não foi possível iniciar a configuração do GitHub App. Tente novamente.",
       "couldNotOpenTitle": "Não foi possível abrir o GitHub"
-    }
+    },
+    "sessionExited": "Sessão encerrada",
+    "remoteSpawnRetryable": "Não foi possível acessar a instância — ela pode ter se desconectado.",
+    "remoteSpawnNonRetryable": "A instância não conseguiu iniciar a sessão — verifique a máquina ou atualize a CLI.",
+    "remoteSpawnInstanceDisconnected": "A instância selecionada se desconectou. Inicie uma sessão no Cloud Agent ou escolha outra instância."
   },
   "agentChat": {
     "session": {
@@ -1880,7 +1874,8 @@
     "notificationsSubtitle": "Preferências de push",
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
-    "appearanceDark": "Escuro"
+    "appearanceDark": "Escuro",
+    "account": "Conta"
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -1979,7 +1974,9 @@
     "allow": "Permitir",
     "onlineMessage": "Este dispositivo não pode transcrever offline. Sua gravação é enviada para {{provider}} para transformá-la em texto. O Kilo não armazena o áudio.",
     "onlineTitle": "A fala é processada online",
-    "staysOff": "A fala permanece desativada até você permitir a transcrição online."
+    "staysOff": "A fala permanece desativada até você permitir a transcrição online.",
+    "start": "Iniciar entrada de voz",
+    "stop": "Parar entrada de voz"
   },
   "share": {
     "title": "Compartilhar no Kilo",
@@ -2052,7 +2049,12 @@
     "opensManagementOnWeb": "Abre o gerenciamento do Kilo Pass na web.",
     "opensAppStoreManagement": "Abre o gerenciamento de assinatura da App Store.",
     "opensPlans": "Abre os planos do Kilo Pass.",
-    "tryAgainFromProfile": "Tente novamente no Perfil."
+    "tryAgainFromProfile": "Tente novamente no Perfil.",
+    "unavailableDescription": "O Kilo Pass não está disponível como compra no app no Android. Gerencie-o na web.",
+    "webManagementDescription": "Este Kilo Pass é gerenciado na web.",
+    "legalDisclosure": "O Kilo Pass é uma assinatura mensal com renovação automática. O pagamento é cobrado na sua Apple ID na confirmação da compra. As assinaturas são renovadas automaticamente todos os meses pelo preço exibido, a menos que sejam canceladas pelo menos 24 horas antes do fim do período atual. Gerencie ou cancele a qualquer momento nas configurações da sua conta na App Store.",
+    "legalPrivacyPolicy": "Política de Privacidade",
+    "legalTermsOfUse": "Termos de Uso (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2339,13 +2341,11 @@
     "headLine": "{{counts}} · head {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Contexto indisponível nesta ref",
-      "expand": "Expandir",
       "expandAll": "Expandir tudo",
       "expandAllLines": "Expandir todas as {{count}} linhas",
       "expandContext": "Expandir contexto",
       "expandLines": "Expandir {{count}} linhas ({{start}}–{{end}})",
       "expandLinesOfContext": "Expandir {{count}} linhas de contexto",
-      "expandMore": "Expandir mais",
       "expandMoreContext": "Expandir mais contexto",
       "expandMoreLines": "Expandir mais {{count}} linhas ({{start}}–{{end}})",
       "failedToLoadContext": "Falha ao carregar o contexto — toque para tentar novamente",
@@ -2507,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "{{label}} selecionado, toque para alterar a seleção",
       "tapToComment": "{{label}}, toque para comentar"
-    }
+    },
+    "linkPasteClipboardEmpty": "A área de transferência está vazia",
+    "linkPasteNotAPullRequest": "Não é um link de pull request do GitHub"
   },
   "organization": {
     "boundary": {
@@ -2653,5 +2655,26 @@
     "rateKilo": "Avaliar o Kilo",
     "sorryMessage": "Conte para nós o que precisa melhorar. O engenheiro responsável pelo app lê cada relatório!",
     "sorryTitle": "Lamentamos saber disso!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Já existe uma conta com este e-mail usando um método de entrada diferente. Tente outro método ou use 'Mais opções de entrada'.",
+    "differentOauth": "Já existe uma conta com este e-mail usando um método de entrada diferente. Tente outro método ou use 'Mais opções de entrada'.",
+    "ssoError": "Sua organização exige SSO. Use 'Mais opções de entrada'.",
+    "blocked": "Esta conta foi bloqueada. Entre em contato com o suporte.",
+    "signupRateLimited": "Muitas tentativas. Tente novamente mais tarde.",
+    "invalidCode": "Esse código está incorreto. Tente novamente.",
+    "codeInProgress": "Seu código está sendo processado. Aguarde um momento e tente novamente.",
+    "tooManyAttempts": "Muitas tentativas. Solicite um novo código.",
+    "invalidToken": "Falha na entrada. Tente novamente.",
+    "invalidEmail": "Não foi possível entregar o e-mail a este endereço. Use um e-mail diferente.",
+    "invalidRequest": "Verifique seu endereço de e-mail e tente novamente.",
+    "emailDeliveryFailed": "A entrega de e-mail está temporariamente indisponível. Tente novamente mais tarde.",
+    "admissionRequired": "Seu dispositivo não pode ser verificado. Use 'Mais opções de entrada' para entrar em outro dispositivo ou pela web.",
+    "default": "Algo deu errado. Tente novamente.",
+    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifique sua conexão e tente novamente."
+  },
+  "models": {
+    "dataCollected": "Dados coletados",
+    "free": "Grátis"
   }
 }

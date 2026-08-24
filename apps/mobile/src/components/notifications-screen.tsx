@@ -48,6 +48,7 @@ import {
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getDevicePushToken,
@@ -334,7 +335,7 @@ export function NotificationsScreen() {
         if (deviceToken) {
           queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
             ...(old ?? []),
-            { token: deviceToken, platform: getPlatform() },
+            { token: deviceToken, platform: getPlatform(), locale: getResolvedLanguage() },
           ]);
         }
         return { previous, generation };
@@ -468,6 +469,9 @@ export function NotificationsScreen() {
             token,
             platform: getPlatform(),
             appVersion: Application.nativeApplicationVersion ?? undefined,
+            // Without this the row is written with a null locale, so every push
+            // to a device enrolled from this screen arrives in English.
+            locale: getResolvedLanguage(),
           });
         } catch {
           // registerToken's onError already surfaced the toast; swallow here so

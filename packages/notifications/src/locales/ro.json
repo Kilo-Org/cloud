@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sesiunea ta de agent are o actualizare",
+      "chatMessage": "Ai un mesaj nou",
+      "instanceLifecycle": "Instanța ta are o actualizare",
+      "scheduledAction": "O acțiune programată are o actualizare",
+      "lowBalance": "Soldul tău necesită atenție",
+      "securityFinding": "O constatare de securitate necesită atenție"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Sarcină finalizată"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Eșuat: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Întrerupt: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Fără titlu",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alertă de sold scăzut",
+      "body": "Soldul {{organizationName}} a scăzut sub ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Constatare de securitate nouă ({{severity}})",
+      "body": "{{findingTitle}} în {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Avertisment SLA",
+      "body": "{{findingTitle}} în {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Încălcare SLA",
+      "body": "{{findingTitle}} în {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "O constatare de securitate necesită atenție"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} este gata",
+      "body": "Atinge pentru a începe chat-ul."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} nu a reușit să pornească",
+      "body": "Pornirea a eșuat."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} va reporni în curând",
+      "body": "Programat pentru repornire la {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Repornirea {{instanceName}} anulată",
+      "body": "Repornirea programată anterior a fost anulată."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} va fi actualizat în curând",
+      "bodyWithTag": "Actualizare la {{targetImageTag}} la {{when}}.",
+      "bodyWithoutTag": "Actualizare programată la {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Actualizarea {{instanceName}} anulată",
+      "body": "Actualizarea programată anterior a fost anulată."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Sesiunea ta Kilo este gata să fie controlată de pe telefon"
+  }
+}

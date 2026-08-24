@@ -16,7 +16,21 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
+  Globe: 'Globe',
   Smartphone: 'Smartphone',
+}));
+vi.mock('@/components/language-picker-sheet', () => ({
+  LanguagePickerSheet: 'LanguagePickerSheet',
+}));
+vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
+  attemptPushRegistrationReconciliation: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+  useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -58,23 +72,20 @@ async function mountPreferences(): Promise<TestRenderer.ReactTestRenderer> {
   return renderer;
 }
 
-describe('PreferencesScreen language controls', () => {
-  it('renders no language control', async () => {
+describe('PreferencesScreen account rows', () => {
+  it('renders the Language and Device sessions rows moved off the profile screen', async () => {
     const renderer = await mountPreferences();
 
     const rows = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
     );
-    const languageRows = rows.filter(row => row.props.title === 'Language');
-    expect(languageRows).toHaveLength(0);
+    const language = rows.filter(row => row.props.title === 'Language');
+    const deviceSessions = rows.filter(row => row.props.title === 'Device sessions');
 
-    const languageTexts = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        node.props.children === 'Language'
-    );
-    expect(languageTexts).toHaveLength(0);
+    expect(language).toHaveLength(1);
+    expect(language[0]?.props.icon).toBe('Globe');
+    expect(language[0]?.props.subtitle).toBe('Device · English');
+    expect(deviceSessions).toHaveLength(1);
 
     renderer.unmount();
   });

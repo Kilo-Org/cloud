@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Din agentsession har en uppdatering",
+      "chatMessage": "Du har ett nytt meddelande",
+      "instanceLifecycle": "Din instans har en uppdatering",
+      "scheduledAction": "En schemalagd åtgärd har en uppdatering",
+      "lowBalance": "Ditt saldo kräver uppmärksamhet",
+      "securityFinding": "En säkerhetsupptäckt kräver uppmärksamhet"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Uppgiften slutförd"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Misslyckades: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Avbruten: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Utan titel",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Lågbalansvarning",
+      "body": "{{organizationName}} saldo föll under ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Ny säkerhetsupptäckt ({{severity}})",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-varning",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-brott",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "En säkerhetsupptäckt kräver uppmärksamhet"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} är redo",
+      "body": "Tryck för att börja chatta."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} misslyckades att starta",
+      "body": "Start misslyckades."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} startas om snart",
+      "body": "Schemalagd omstart klockan {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} omstart avbruten",
+      "body": "Den tidigare schemalagda omstarten har avbrutits."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} uppgraderas snart",
+      "bodyWithTag": "Uppgradera till {{targetImageTag}} klockan {{when}}.",
+      "bodyWithoutTag": "Schemalagd uppgradering klockan {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} uppgradering avbruten",
+      "body": "Den tidigare schemalagda uppgraderingen har avbrutits."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Din Kilo-session är redo att styras från din telefon"
+  }
+}

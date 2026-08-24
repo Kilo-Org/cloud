@@ -16,19 +16,13 @@ import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
+import { getKiloPassLegalLinks, kiloPassLegalDisclosure } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import {
-  KILO_PASS_MANAGE_CTA_LABEL,
-  KILO_PASS_TITLE,
-  KILO_PASS_UNAVAILABLE_DESCRIPTION,
-  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
-  type PurchasePresentationKind,
-} from '@kilocode/app-shared/commerce';
+import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-shared/commerce';
 import { KiloPassNativeIapOwner, useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
 import { RestorePurchasesButton } from './restore-purchases-button';
 
@@ -115,8 +109,8 @@ function KiloPassUnavailableScreen({
   const { t } = useTranslation();
   const isWebManagement = presentation.kind === 'web_management';
   const description = isWebManagement
-    ? KILO_PASS_WEB_MANAGEMENT_DESCRIPTION
-    : KILO_PASS_UNAVAILABLE_DESCRIPTION;
+    ? t('kiloPass.webManagementDescription')
+    : t('kiloPass.unavailableDescription');
 
   return (
     <View className="flex-1 bg-background">
@@ -135,7 +129,7 @@ function KiloPassUnavailableScreen({
             <Text className="mt-1 text-sm text-muted-foreground">{description}</Text>
             {isWebManagement && presentation.webUrl ? (
               <Button
-                accessibilityLabel={KILO_PASS_MANAGE_CTA_LABEL}
+                accessibilityLabel={t('kiloPass.manage')}
                 className="mt-4 self-start"
                 onPress={() => {
                   if (!presentation.webUrl) {
@@ -147,7 +141,7 @@ function KiloPassUnavailableScreen({
                 }}
                 variant="outline"
               >
-                {KILO_PASS_MANAGE_CTA_LABEL}
+                {t('kiloPass.manage')}
               </Button>
             ) : null}
           </View>
@@ -397,7 +391,7 @@ function KiloPassNativeIapContent() {
           />
 
           <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
-            {KILO_PASS_LEGAL_DISCLOSURE}
+            {kiloPassLegalDisclosure()}
             {t('kiloPass.legalConnectorTerms')}
             <Text
               accessibilityRole="link"

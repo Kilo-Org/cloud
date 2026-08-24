@@ -30,11 +30,13 @@
     "couldNotRestart": "Opnieuw opstarten niet mogelijk",
     "languageSaved": "Je taal is opgeslagen.",
     "retry": "Opnieuw proberen",
-    "catalogLoadFailed": "De taal kon niet worden geladen. Probeer het opnieuw."
+    "catalogLoadFailed": "De taal kon niet worden geladen. Probeer het opnieuw.",
+    "search": "Talen zoeken",
+    "noMatches": "Geen talen gevonden",
+    "deviceLanguage": "Taal van apparaat"
   },
   "login": {
     "welcome": "Welkom bij Kilo",
-    "language": "Taal",
     "retrySignIn": "Opnieuw aanmelden",
     "logo": "Kilo-logo",
     "continuingSignIn": "Je aanmelding wordt voortgezet.",
@@ -77,7 +79,6 @@
     "or": "of"
   },
   "profile": {
-    "language": "Taal",
     "title": "Profiel",
     "agents": "Agents",
     "codeReviewer": "Code Reviewer",
@@ -141,7 +142,8 @@
     "notificationsSubtitle": "Pushvoorkeuren",
     "appearanceSystem": "Systeem",
     "appearanceLight": "Licht",
-    "appearanceDark": "Donker"
+    "appearanceDark": "Donker",
+    "account": "Account"
   },
   "notifications": {
     "channel": {
@@ -1346,17 +1348,6 @@
       "sessionDeleted": "Sessie verwijderd",
       "needsInput": "heeft invoer nodig",
       "fromPlatform": "van {{platform}}",
-      "minuteOne": "minuut",
-      "minuteOther": "minuten",
-      "hourOne": "uur",
-      "hourOther": "uren",
-      "dayOne": "dag",
-      "dayOther": "dagen",
-      "monthOne": "maand",
-      "monthOther": "maanden",
-      "yearOne": "jaar",
-      "yearOther": "jaren",
-      "ago": "geleden",
       "centOne": "cent",
       "centOther": "centen",
       "dollarOne": "dollar",
@@ -1365,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
       "couldNotOpenTitle": "Kon GitHub niet openen"
-    }
+    },
+    "sessionExited": "Sessie beëindigd",
+    "remoteSpawnRetryable": "De instantie is niet bereikbaar — deze is mogelijk verbroken.",
+    "remoteSpawnNonRetryable": "De instantie kon de sessie niet starten — controleer de machine of werk de CLI bij.",
+    "remoteSpawnInstanceDisconnected": "De geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie."
   },
   "agentChat": {
     "session": {
@@ -1979,7 +1974,9 @@
     "allow": "Toestaan",
     "onlineMessage": "Dit apparaat kan niet offline transcriberen. Je opname wordt naar {{provider}} gestuurd om er tekst van te maken. Kilo slaat de audio niet op.",
     "onlineTitle": "Spraak wordt online verwerkt",
-    "staysOff": "Spraak blijft uit totdat je online transcriptie toestaat."
+    "staysOff": "Spraak blijft uit totdat je online transcriptie toestaat.",
+    "start": "Start spraakinvoer",
+    "stop": "Stop spraakinvoer"
   },
   "share": {
     "title": "Delen naar Kilo",
@@ -2052,7 +2049,12 @@
     "opensManagementOnWeb": "Opent Kilo Pass-beheer op het web.",
     "opensAppStoreManagement": "Opent abonnementsbeheer in de App Store.",
     "opensPlans": "Opent Kilo Pass-abonnementen.",
-    "tryAgainFromProfile": "Probeer het opnieuw via Profiel."
+    "tryAgainFromProfile": "Probeer het opnieuw via Profiel.",
+    "unavailableDescription": "Kilo Pass is niet beschikbaar als aankoop in de app op Android. Beheer het op het web.",
+    "webManagementDescription": "Deze Kilo Pass wordt op het web beheerd.",
+    "legalDisclosure": "Kilo Pass is een maandelijks abonnement dat automatisch wordt verlengd. De betaling wordt bij bevestiging van de aankoop in rekening gebracht op je Apple ID. Abonnementen worden elke maand automatisch verlengd voor de weergegeven prijs, tenzij je ten minste 24 uur voor het einde van de huidige periode opzegt. Beheer of annuleer op elk moment in de accountinstellingen van de App Store.",
+    "legalPrivacyPolicy": "Privacybeleid",
+    "legalTermsOfUse": "Gebruiksvoorwaarden (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2339,13 +2341,11 @@
     "headLine": "{{counts}} · head {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Context niet beschikbaar bij deze ref",
-      "expand": "Uitvouwen",
       "expandAll": "Alles uitvouwen",
       "expandAllLines": "Alle {{count}} regels uitvouwen",
       "expandContext": "Context uitvouwen",
       "expandLines": "{{count}} regels uitvouwen ({{start}}–{{end}})",
       "expandLinesOfContext": "{{count}} contextregels uitvouwen",
-      "expandMore": "Meer uitvouwen",
       "expandMoreContext": "Meer context uitvouwen",
       "expandMoreLines": "Nog {{count}} regels uitvouwen ({{start}}–{{end}})",
       "failedToLoadContext": "Kon context niet laden — tik om opnieuw te proberen",
@@ -2507,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "{{label}} geselecteerd, tik om de selectie te wijzigen",
       "tapToComment": "{{label}}, tik om te reageren"
-    }
+    },
+    "linkPasteClipboardEmpty": "Klembord is leeg",
+    "linkPasteNotAPullRequest": "Geen GitHub pull-requestlink"
   },
   "organization": {
     "boundary": {
@@ -2653,5 +2655,26 @@
     "rateKilo": "Kilo beoordelen",
     "sorryMessage": "Laat ons weten wat er beter kan. De engineer die over de app gaat, leest elk rapport!",
     "sorryTitle": "Wat jammer om te horen!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik 'Meer aanmeldopties'.",
+    "differentOauth": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik 'Meer aanmeldopties'.",
+    "ssoError": "Je organisatie vereist SSO. Gebruik 'Meer aanmeldopties'.",
+    "blocked": "Dit account is geblokkeerd. Neem contact op met de ondersteuning.",
+    "signupRateLimited": "Te veel pogingen. Probeer het later opnieuw.",
+    "invalidCode": "Die code is onjuist. Probeer het opnieuw.",
+    "codeInProgress": "Je code wordt verwerkt. Wacht even en probeer het opnieuw.",
+    "tooManyAttempts": "Te veel pogingen. Vraag een nieuwe code aan.",
+    "invalidToken": "Aanmelden is mislukt. Probeer het opnieuw.",
+    "invalidEmail": "Kan geen e-mail bezorgen aan dit adres. Gebruik een ander e-mailadres.",
+    "invalidRequest": "Controleer je e-mailadres en probeer het opnieuw.",
+    "emailDeliveryFailed": "E-mailbezorging is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
+    "admissionRequired": "Je apparaat kan niet worden geverifieerd. Gebruik 'Meer aanmeldopties' om aan te melden op een ander apparaat of via het web.",
+    "default": "Er is iets misgegaan. Probeer het opnieuw.",
+    "retryableAdmission": "We konden dit apparaat niet verifiëren. Controleer je verbinding en probeer het opnieuw."
+  },
+  "models": {
+    "dataCollected": "Verzamelde gegevens",
+    "free": "Gratis"
   }
 }

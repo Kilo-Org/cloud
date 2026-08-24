@@ -30,11 +30,13 @@
     "couldNotRestart": "再起動できませんでした",
     "languageSaved": "言語を保存しました。",
     "retry": "再試行",
-    "catalogLoadFailed": "言語を読み込めませんでした。もう一度お試しください。"
+    "catalogLoadFailed": "言語を読み込めませんでした。もう一度お試しください。",
+    "search": "言語を検索",
+    "noMatches": "一致する言語がありません",
+    "deviceLanguage": "端末の言語"
   },
   "login": {
     "welcome": "Kiloへようこそ",
-    "language": "言語",
     "retrySignIn": "サインインを再試行",
     "logo": "Kiloロゴ",
     "continuingSignIn": "サインインを続行しています。",
@@ -77,7 +79,6 @@
     "or": "または"
   },
   "profile": {
-    "language": "言語",
     "title": "プロフィール",
     "agents": "エージェント",
     "codeReviewer": "コードレビュアー",
@@ -141,7 +142,8 @@
     "notificationsSubtitle": "プッシュ設定",
     "appearanceSystem": "システム",
     "appearanceLight": "ライト",
-    "appearanceDark": "ダーク"
+    "appearanceDark": "ダーク",
+    "account": "アカウント"
   },
   "notifications": {
     "title": "通知",
@@ -1346,17 +1348,6 @@
       "sessionDeleted": "セッションを削除しました",
       "needsInput": "入力が必要",
       "fromPlatform": "{{platform}}から",
-      "minuteOne": "分",
-      "minuteOther": "分",
-      "hourOne": "時間",
-      "hourOther": "時間",
-      "dayOne": "日",
-      "dayOther": "日",
-      "monthOne": "ヶ月",
-      "monthOther": "ヶ月",
-      "yearOne": "年",
-      "yearOther": "年",
-      "ago": "前",
       "centOne": "セント",
       "centOther": "セント",
       "dollarOne": "ドル",
@@ -1365,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Appのセットアップを開始できませんでした。もう一度お試しください。",
       "couldNotOpenTitle": "GitHubを開けませんでした"
-    }
+    },
+    "sessionExited": "セッションが終了しました",
+    "remoteSpawnRetryable": "インスタンスに到達できませんでした。接続が切断された可能性があります。",
+    "remoteSpawnNonRetryable": "インスタンスがセッションの開始に失敗しました。マシンを確認するか、CLI を更新してください。",
+    "remoteSpawnInstanceDisconnected": "選択したインスタンスが切断されました。Cloud Agent でセッションを開始するか、別のインスタンスを選択してください。"
   },
   "agentChat": {
     "session": {
@@ -1979,7 +1974,9 @@
     "allow": "許可",
     "onlineMessage": "このデバイスはオフラインで文字起こしできません。録音はテキストに変換するために{{provider}}に送信されます。Kiloは音声を保存しません。",
     "onlineTitle": "音声はオンラインで処理されます",
-    "staysOff": "オンライン文字起こしを許可するまで、音声はオフのままです。"
+    "staysOff": "オンライン文字起こしを許可するまで、音声はオフのままです。",
+    "start": "音声入力を開始",
+    "stop": "音声入力を停止"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2052,7 +2049,12 @@
     "opensManagementOnWeb": "ウェブでKilo Passの管理を開きます。",
     "opensAppStoreManagement": "App Storeのサブスクリプション管理を開きます。",
     "opensPlans": "Kilo Passのプランを開きます。",
-    "tryAgainFromProfile": "プロフィールからもう一度お試しください。"
+    "tryAgainFromProfile": "プロフィールからもう一度お試しください。",
+    "unavailableDescription": "Kilo Pass は Android のアプリ内課金では利用できません。Web で管理してください。",
+    "webManagementDescription": "この Kilo Pass は Web で管理されています。",
+    "legalDisclosure": "Kilo Pass は自動更新の月額サブスクリプションです。購入の確認時に、お支払いは Apple ID に請求されます。サブスクリプションは、現在の期間終了の 24 時間前までに解約しない限り、表示された価格で毎月自動更新されます。App Store のアカウント設定でいつでも管理または解約できます。",
+    "legalPrivacyPolicy": "プライバシーポリシー",
+    "legalTermsOfUse": "利用規約 (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2339,13 +2341,11 @@
     "headLine": "{{counts}} · head {{sha}}",
     "hunkRows": {
       "contextUnavailable": "このrefではコンテキストを利用できません",
-      "expand": "展開",
       "expandAll": "すべて展開",
       "expandAllLines": "{{count}}行すべて展開",
       "expandContext": "コンテキストを展開",
       "expandLines": "{{count}}行を展開（{{start}}–{{end}}）",
       "expandLinesOfContext": "{{count}}行のコンテキストを展開",
-      "expandMore": "さらに展開",
       "expandMoreContext": "さらにコンテキストを展開",
       "expandMoreLines": "さらに{{count}}行を展開（{{start}}–{{end}}）",
       "failedToLoadContext": "コンテキストを読み込めませんでした — タップして再試行",
@@ -2507,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",
       "tapToComment": "{{label}}をタップしてコメント"
-    }
+    },
+    "linkPasteClipboardEmpty": "クリップボードが空です",
+    "linkPasteNotAPullRequest": "GitHub のプルリクエストリンクではありません"
   },
   "organization": {
     "boundary": {
@@ -2653,5 +2655,26 @@
     "rateKilo": "Kiloを評価",
     "sorryMessage": "どこを改善すべきかお知らせください。アプリ担当のエンジニアがすべての報告を読んでいます！",
     "sorryTitle": "それは残念です。"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "このメールアドレスのアカウントは、別のサインイン方法ですでに存在します。別の方法を試すか、[その他のサインイン オプション] を使用してください。",
+    "differentOauth": "このメールアドレスのアカウントは、別のサインイン方法ですでに存在します。別の方法を試すか、[その他のサインイン オプション] を使用してください。",
+    "ssoError": "組織では SSO が必要です。[その他のサインイン オプション] を使用してください。",
+    "blocked": "このアカウントはブロックされています。サポートにお問い合わせください。",
+    "signupRateLimited": "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
+    "invalidCode": "そのコードは正しくありません。もう一度お試しください。",
+    "codeInProgress": "コードを処理中です。しばらく待ってからもう一度お試しください。",
+    "tooManyAttempts": "試行回数が多すぎます。新しいコードをリクエストしてください。",
+    "invalidToken": "サインインに失敗しました。もう一度お試しください。",
+    "invalidEmail": "このアドレスにメールを配信できません。別のメールアドレスを使用してください。",
+    "invalidRequest": "メールアドレスを確認して、もう一度お試しください。",
+    "emailDeliveryFailed": "メールの配信が一時的に利用できません。しばらくしてからもう一度お試しください。",
+    "admissionRequired": "この端末を確認できません。[その他のサインイン オプション] を使用して、別の端末または Web からサインインしてください。",
+    "default": "問題が発生しました。もう一度お試しください。",
+    "retryableAdmission": "この端末を確認できませんでした。接続を確認して、もう一度お試しください。"
+  },
+  "models": {
+    "dataCollected": "収集されるデータ",
+    "free": "無料"
   }
 }

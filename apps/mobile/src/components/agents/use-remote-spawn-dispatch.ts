@@ -15,8 +15,8 @@ import {
 } from '@/lib/hooks/use-remote-instance-spawn';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import {
-  REMOTE_SPAWN_NON_RETRYABLE_TOAST,
-  REMOTE_SPAWN_RETRYABLE_TOAST,
+  remoteSpawnNonRetryableToast,
+  remoteSpawnRetryableToast,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
 import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
@@ -247,13 +247,13 @@ export function useRemoteSpawnDispatch({
       if (outcome.status === 'nonRetryable') {
         // A typed non-retryable rejection ends the intent.
         rotateKey();
-        toast.error(REMOTE_SPAWN_NON_RETRYABLE_TOAST);
+        toast.error(remoteSpawnNonRetryableToast());
         return;
       }
       // outcome.status === 'retryable': refetch the instance list and
       // re-evaluate whether the previously-selected instance is still
       // present.
-      toast.error(REMOTE_SPAWN_RETRYABLE_TOAST);
+      toast.error(remoteSpawnRetryableToast());
       let refetchedInstances: InstancePickerInstance[] = instanceList;
       try {
         const result = await refetchInstances();

@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agent sessiyanızda yenilənmə var",
+      "chatMessage": "Yeni mesajınız var",
+      "instanceLifecycle": "İnstansiyanızda yenilənmə var",
+      "scheduledAction": "Planlaşdırılmış əməliyyatda yenilənmə var",
+      "lowBalance": "Balansınız diqqət tələb edir",
+      "securityFinding": "Təhlükəsizlik tapıntısı diqqət tələb edir"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tapşırıq tamamlandı"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Uğursuz oldu: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Kəsildi: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Adsız",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Aşağı balans xəbərdarlığı",
+      "body": "{{organizationName}} balansı ${{minimumBalanceUsd}}-dan aşağı düşdü"
+    },
+    "securityFindingNew": {
+      "title": "Yeni təhlükəsizlik tapıntısı ({{severity}})",
+      "body": "{{repoFullName}} içində {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA xəbərdarlığı",
+      "body": "{{repoFullName}} içində {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA pozuntusu",
+      "body": "{{repoFullName}} içində {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Təhlükəsizlik tapıntısı diqqət tələb edir"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} hazırdır",
+      "body": "Söhbətə başlamaq üçün toxunun."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} başlaya bilmədi",
+      "body": "Başlama uğursuz oldu."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} tezliklə yenidən başladılacaq",
+      "body": "{{when}} tarixində yenidən başladılması planlaşdırılıb."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} yenidən başladılması ləğv edildi",
+      "body": "Əvvəlcədən planlaşdırılmış yenidən başlatma ləğv edilib."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} tezliklə təkmilləşdiriləcək",
+      "bodyWithTag": "{{when}} tarixində {{targetImageTag}} versiyasına təkmilləşdirmə.",
+      "bodyWithoutTag": "{{when}} tarixində planlaşdırılmış təkmilləşdirmə."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} təkmilləşdirməsi ləğv edildi",
+      "body": "Əvvəlcədən planlaşdırılmış təkmilləşdirmə ləğv edilib."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo sessiyanız telefondan idarə etməyə hazırdır"
+  }
+}

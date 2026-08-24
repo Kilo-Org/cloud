@@ -30,11 +30,13 @@
     "couldNotRestart": "无法重新启动",
     "languageSaved": "你的语言已保存。",
     "retry": "重试",
-    "catalogLoadFailed": "无法加载语言。请重试。"
+    "catalogLoadFailed": "无法加载语言。请重试。",
+    "search": "搜索语言",
+    "noMatches": "没有匹配的语言",
+    "deviceLanguage": "设备语言"
   },
   "login": {
     "welcome": "欢迎使用 Kilo",
-    "language": "语言",
     "retrySignIn": "重试登录",
     "logo": "Kilo 标志",
     "continuingSignIn": "正在继续您的登录。",
@@ -77,7 +79,6 @@
     "or": "或"
   },
   "profile": {
-    "language": "语言",
     "title": "个人资料",
     "agents": "代理",
     "codeReviewer": "代码审查器",
@@ -141,7 +142,8 @@
     "notificationsSubtitle": "推送偏好设置",
     "appearanceSystem": "跟随系统",
     "appearanceLight": "浅色",
-    "appearanceDark": "深色"
+    "appearanceDark": "深色",
+    "account": "账户"
   },
   "notifications": {
     "title": "通知",
@@ -1346,17 +1348,6 @@
       "sessionDeleted": "会话已删除",
       "needsInput": "需要输入",
       "fromPlatform": "来自 {{platform}}",
-      "minuteOne": "分钟",
-      "minuteOther": "分钟",
-      "hourOne": "小时",
-      "hourOther": "小时",
-      "dayOne": "天",
-      "dayOther": "天",
-      "monthOne": "个月",
-      "monthOther": "个月",
-      "yearOne": "年",
-      "yearOther": "年",
-      "ago": "前",
       "centOne": "美分",
       "centOther": "美分",
       "dollarOne": "美元",
@@ -1365,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "我们无法启动 GitHub App 设置。请重试。",
       "couldNotOpenTitle": "无法打开 GitHub"
-    }
+    },
+    "sessionExited": "会话已退出",
+    "remoteSpawnRetryable": "无法连接到实例——它可能已断开。",
+    "remoteSpawnNonRetryable": "实例未能启动会话——请检查机器或更新 CLI。",
+    "remoteSpawnInstanceDisconnected": "所选实例已断开。请在 Cloud Agent 上启动会话，或选择其他实例。"
   },
   "agentChat": {
     "session": {
@@ -1979,7 +1974,9 @@
     "allow": "允许",
     "onlineMessage": "此设备无法离线转录。您的录音会发送到 {{provider}} 以转换为文字。Kilo 不会存储该音频。",
     "onlineTitle": "语音将在线处理",
-    "staysOff": "在您允许在线转录之前，语音将保持关闭。"
+    "staysOff": "在您允许在线转录之前，语音将保持关闭。",
+    "start": "开始语音输入",
+    "stop": "停止语音输入"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2052,7 +2049,12 @@
     "opensManagementOnWeb": "在网页上打开 Kilo Pass 管理。",
     "opensAppStoreManagement": "打开 App Store 订阅管理。",
     "opensPlans": "打开 Kilo Pass 套餐。",
-    "tryAgainFromProfile": "从个人资料页重试。"
+    "tryAgainFromProfile": "从个人资料页重试。",
+    "unavailableDescription": "Kilo Pass 在 Android 上不能作为应用内购买使用。请在网页上管理。",
+    "webManagementDescription": "此 Kilo Pass 在网页上管理。",
+    "legalDisclosure": "Kilo Pass 是可自动续订的月度订阅。付款在购买确认时从您的 Apple ID 扣费。订阅每月按所示价格自动续订，除非在当前周期结束前至少 24 小时取消。可随时在您的 App Store 账户设置中管理或取消。",
+    "legalPrivacyPolicy": "隐私政策",
+    "legalTermsOfUse": "使用条款（EULA）"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2339,13 +2341,11 @@
     "headLine": "{{counts}} · 头部 {{sha}}",
     "hunkRows": {
       "contextUnavailable": "此引用处上下文不可用",
-      "expand": "展开",
       "expandAll": "全部展开",
       "expandAllLines": "展开全部 {{count}} 行",
       "expandContext": "展开上下文",
       "expandLines": "展开 {{count}} 行（{{start}}–{{end}}）",
       "expandLinesOfContext": "展开 {{count}} 行上下文",
-      "expandMore": "展开更多",
       "expandMoreContext": "展开更多上下文",
       "expandMoreLines": "展开更多 {{count}} 行（{{start}}–{{end}}）",
       "failedToLoadContext": "无法加载上下文 — 点击重试",
@@ -2507,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按以更改所选内容",
       "tapToComment": "{{label}}，点按以发表评论"
-    }
+    },
+    "linkPasteClipboardEmpty": "剪贴板为空",
+    "linkPasteNotAPullRequest": "不是 GitHub 拉取请求链接"
   },
   "organization": {
     "boundary": {
@@ -2653,5 +2655,26 @@
     "rateKilo": "给 Kilo 评分",
     "sorryMessage": "请告诉我们哪些地方需要改进。负责该应用的工程师会阅读每一份报告！",
     "sorryTitle": "很抱歉听到您这么说！"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"更多登录选项\"。",
+    "differentOauth": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"更多登录选项\"。",
+    "ssoError": "您的组织要求使用 SSO。请使用\"更多登录选项\"。",
+    "blocked": "此账户已被封禁。请联系支持。",
+    "signupRateLimited": "尝试次数过多。请稍后再试。",
+    "invalidCode": "该代码不正确。请重试。",
+    "codeInProgress": "您的代码正在处理中。请稍候片刻再重试。",
+    "tooManyAttempts": "尝试次数过多。请申请新的代码。",
+    "invalidToken": "登录失败。请重试。",
+    "invalidEmail": "无法向此地址发送邮件。请使用其他邮箱。",
+    "invalidRequest": "请检查您的邮箱地址并重试。",
+    "emailDeliveryFailed": "邮件投递暂时不可用。请稍后再试。",
+    "admissionRequired": "无法验证您的设备。请使用\"更多登录选项\"在其他设备上或通过网页登录。",
+    "default": "出了点问题。请重试。",
+    "retryableAdmission": "我们无法验证此设备。请检查您的连接并重试。"
+  },
+  "models": {
+    "dataCollected": "收集的数据",
+    "free": "免费"
   }
 }

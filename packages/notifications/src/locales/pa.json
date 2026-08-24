@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ਤੁਹਾਡੇ ਏਜੰਟ ਸੈਸ਼ਨ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ",
+      "chatMessage": "ਤੁਹਾਡੇ ਕੋਲ ਇੱਕ ਨਵਾਂ ਸੁਨੇਹਾ ਹੈ",
+      "instanceLifecycle": "ਤੁਹਾਡੀ ਇੰਸਟੈਂਸ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ",
+      "scheduledAction": "ਇੱਕ ਤਹਿ ਕੀਤੀ ਕਾਰਵਾਈ ਵਿੱਚ ਇੱਕ ਅੱਪਡੇਟ ਹੈ",
+      "lowBalance": "ਤੁਹਾਡੇ ਬੈਲੰਸ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+      "securityFinding": "ਇੱਕ ਸੁਰੱਖਿਆ ਲੱਭਤ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ਕੰਮ ਪੂਰਾ ਹੋ ਗਿਆ"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "ਅਸਫਲ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ਰੁਕਾਵਟ: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ਬਿਨਾਂ ਸਿਰਲੇਖ",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ਘੱਟ ਬੈਲੰਸ ਚੇਤਾਵਨੀ",
+      "body": "{{organizationName}} ਬੈਲੰਸ ${{minimumBalanceUsd}} ਤੋਂ ਹੇਠਾਂ ਆ ਗਿਆ"
+    },
+    "securityFindingNew": {
+      "title": "ਨਵੀਂ ਸੁਰੱਖਿਆ ਲੱਭਤ ({{severity}})",
+      "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ਚੇਤਾਵਨੀ",
+      "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ਉਲੰਘਣਾ",
+      "body": "{{repoFullName}} ਵਿੱਚ {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ਇੱਕ ਸੁਰੱਖਿਆ ਲੱਭਤ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ਤਿਆਰ ਹੈ",
+      "body": "ਗੱਲਬਾਤ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ਸ਼ੁਰੂ ਕਰਨ ਵਿੱਚ ਅਸਫਲ ਰਿਹਾ",
+      "body": "ਸ਼ੁਰੂ ਕਰਨਾ ਅਸਫਲ।"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ਜਲਦੀ ਹੀ ਮੁੜ ਚਾਲੂ ਹੋਵੇਗਾ",
+      "body": "{{when}} ਨੂੰ ਮੁੜ ਚਾਲੂ ਕਰਨ ਲਈ ਤਹਿ ਕੀਤਾ ਗਿਆ।"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} ਮੁੜ ਚਾਲੂ ਰੱਦ ਹੋ ਗਿਆ",
+      "body": "ਪਹਿਲਾਂ ਤਹਿ ਕੀਤਾ ਮੁੜ ਚਾਲੂ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ਜਲਦੀ ਹੀ ਅੱਪਗਰੇਡ ਹੋਵੇਗਾ",
+      "bodyWithTag": "{{when}} ਨੂੰ {{targetImageTag}} ਵਿੱਚ ਅੱਪਗਰੇਡ ਕਰੋ।",
+      "bodyWithoutTag": "{{when}} ਨੂੰ ਤਹਿ ਕੀਤਾ ਅੱਪਗਰੇਡ।"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} ਅੱਪਗਰੇਡ ਰੱਦ ਹੋ ਗਿਆ",
+      "body": "ਪਹਿਲਾਂ ਤਹਿ ਕੀਤਾ ਅੱਪਗਰੇਡ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "ਤੁਹਾਡਾ Kilo ਸੈਸ਼ਨ ਤੁਹਾਡੇ ਫ਼ੋਨ ਤੋਂ ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ ਹੈ"
+  }
+}

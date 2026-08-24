@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Zure agente-saioak eguneratze bat du",
+      "chatMessage": "Mezu berri bat duzu",
+      "instanceLifecycle": "Zure instantziak eguneratze bat du",
+      "scheduledAction": "Programatutako ekintza batek eguneratze bat du",
+      "lowBalance": "Zure saldoak arreta behar du",
+      "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Ataza amaituta"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Huts egin du: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Etena: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Izengabea",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Saldo baxuko alerta",
+      "body": "{{organizationName}} saldoa ${{minimumBalanceUsd}} azpitik jaitsi da"
+    },
+    "securityFindingNew": {
+      "title": "Aurkitutako segurtasun-arazo berria ({{severity}})",
+      "body": "{{findingTitle}} {{repoFullName}}-n"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA abisua",
+      "body": "{{findingTitle}} {{repoFullName}}-n"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA haustura",
+      "body": "{{findingTitle}} {{repoFullName}}-n"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Aurkitutako segurtasun-arazo batek arreta behar du"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} prest dago",
+      "body": "Sakatu txateatzen hasteko."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ezin izan da hasi",
+      "body": "Hasteak huts egin du."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} laster berrabiaraziko da",
+      "body": "{{when}}etan berrabiaraztea programatuta."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} berrabiaraztea bertan behera utzita",
+      "body": "Aurretik programatutako berrabiaraztea bertan behera utzi da."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} laster eguneratuko da",
+      "bodyWithTag": "Eguneratu {{targetImageTag}}-ra {{when}}etan.",
+      "bodyWithoutTag": "Eguneratzea programatuta {{when}}etan."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} eguneratzea bertan behera utzita",
+      "body": "Aurretik programatutako eguneratzea bertan behera utzi da."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Zure Kilo saioa prest dago zure telefonotik kontrolatzeko"
+  }
+}

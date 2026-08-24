@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ඔබගේ ඒජන්ත සැසියට යාවත්කාලීනයක් ඇත",
+      "chatMessage": "ඔබට නව පණිවිඩයක් ඇත",
+      "instanceLifecycle": "ඔබගේ අවස්ථාවට යාවත්කාලීනයක් ඇත",
+      "scheduledAction": "සැලසුම්ගත ක්‍රියාවකට යාවත්කාලීනයක් ඇත",
+      "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
+      "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "කාර්යය සම්පූර්ණයි"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "අසාර්ථකයි: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "බාධා විය: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · නම් රහිත",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "අඩු ශේෂ අනතුරු ඇඟවීම",
+      "body": "{{organizationName}} ශේෂය ${{minimumBalanceUsd}} ට පහළට වැටුණි"
+    },
+    "securityFindingNew": {
+      "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})",
+      "body": "{{findingTitle}} {{repoFullName}} තුළ"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA අනතුරු ඇඟවීම",
+      "body": "{{findingTitle}} {{repoFullName}} තුළ"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA උල්ලංඝනය",
+      "body": "{{findingTitle}} {{repoFullName}} තුළ"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} සූදානම්",
+      "body": "කතාබස් ආරම්භ කිරීමට තට්ටු කරන්න."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ආරම්භ වීම අසාර්ථකයි",
+      "body": "ආරම්භය අසාර්ථකයි."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ඉක්මනින් නැවත ආරම්භ වේ",
+      "body": "{{when}} හිදී නැවත ආරම්භ කිරීමට සැලසුම් කර ඇත."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} නැවත ආරම්භය අවලංගු විය",
+      "body": "කලින් සැලසුම් කළ නැවත ආරම්භය අවලංගු කර ඇත."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ඉක්මනින් උත්ශ්‍රේණි වේ",
+      "bodyWithTag": "{{when}} හිදී {{targetImageTag}} වෙත උත්ශ්‍රේණි කරන්න.",
+      "bodyWithoutTag": "{{when}} හිදී සැලසුම් කළ උත්ශ්‍රේණිය."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} උත්ශ්‍රේණිය අවලංගු විය",
+      "body": "කලින් සැලසුම් කළ උත්ශ්‍රේණිය අවලංගු කර ඇත."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "ඔබගේ Kilo සැසිය ඔබගේ දුරකථනයෙන් පාලනය කිරීමට සූදානම්"
+  }
+}

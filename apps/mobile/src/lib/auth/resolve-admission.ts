@@ -5,7 +5,7 @@ import {
   type AdmissionPayload,
   getAdmission,
 } from '@/lib/auth/admission';
-import { RETRYABLE_ADMISSION_ERROR } from '@/lib/auth/auth-error-messages';
+import { retryableAdmissionError } from '@/lib/auth/auth-error-messages';
 
 export async function resolveAdmission(): Promise<
   { admission: AdmissionPayload } | { admission: undefined }
@@ -20,7 +20,7 @@ export async function resolveAdmission(): Promise<
     // Normalize every challenge/provider failure to the retryable message.
     // Network errors, JSON parse failures, and !response.ok all abort sign-in;
     // every path must show the retryable toast and throw a consistent sentinel.
-    toast.error(RETRYABLE_ADMISSION_ERROR);
+    toast.error(retryableAdmissionError());
     throw new Error(ADMISSION_CHALLENGE_FAILED);
   }
 }

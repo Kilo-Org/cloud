@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   BYOK_MODEL_LABEL,
-  FREE_MODEL_DATA_LABEL,
-  FREE_MODEL_FREE_LABEL,
+  freeModelDataLabel,
+  freeModelFreeLabel,
   getFreeModelDataAccessibilityLabel,
   hasUserByokAvailable,
   isFreeModelOption,
@@ -12,8 +12,8 @@ import {
 describe('free model data disclosure', () => {
   it('uses the disclosure label expected in model pickers', () => {
     expect(BYOK_MODEL_LABEL).toBe('BYOK');
-    expect(FREE_MODEL_DATA_LABEL).toBe('Data collected');
-    expect(FREE_MODEL_FREE_LABEL).toBe('Free');
+    expect(freeModelDataLabel()).toBe('Data collected');
+    expect(freeModelFreeLabel()).toBe('Free');
   });
 
   it('detects explicit and known free model options', () => {

@@ -1,7 +1,15 @@
 import { reloadAppAsync } from 'expo';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, I18nManager, Modal, Pressable, ScrollView, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  I18nManager,
+  Modal,
+  Pressable,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -9,7 +17,8 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
-import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { languageRows } from '@/i18n/language-rows';
+import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
@@ -19,6 +28,9 @@ import {
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+const ROW_LTR = { writingDirection: 'ltr' } as const;
+const ROW_RTL = { writingDirection: 'rtl' } as const;
 
 export function LanguagePickerSheet({
   visible,
@@ -40,6 +52,7 @@ export function LanguagePickerSheet({
   const [busy, setBusy] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [reloadFailed, setReloadFailed] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -47,6 +60,7 @@ export function LanguagePickerSheet({
       setBusy(false);
       setRestarting(false);
       setReloadFailed(false);
+      setQuery('');
     }
   }, [visible]);
 
@@ -56,6 +70,7 @@ export function LanguagePickerSheet({
 
   const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
   const isRtl = isRtlLanguage(getResolvedLanguage());
+  const rows = languageRows(query, selected === 'device' ? undefined : selected);
 
   const handleDone = async () => {
     if (busy) {
@@ -166,36 +181,77 @@ export function LanguagePickerSheet({
         disabled={busy}
         scrollable={false}
       >
-        <ScrollView className="max-h-[60vh]">
-          <ChoiceRow
-            selected={selected === 'device'}
-            disabled={busy}
-            onPress={() => {
-              setSelected('device');
-            }}
-          >
-            <View className={`flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`}>
-              <Text className="text-sm font-medium">{t('common.device')}</Text>
-              <Text variant="muted" className="mt-0.5 text-xs">
-                {deviceEndonym}
-              </Text>
-            </View>
-          </ChoiceRow>
-          {SUPPORTED_LANGUAGES.map(tag => (
+        <View className="border-b border-border px-5 pb-3">
+          <TextInput
+            accessibilityLabel={t('language.search')}
+            // leading-[normal] so no lineHeight reaches the style: iOS otherwise
+            // draws the placeholder below the typed text and clips it.
+            className="rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground"
+            placeholder={t('language.search')}
+            placeholderTextColor={colors.mutedForeground}
+            // Uncontrolled: iOS drops keystrokes when state drives `value`. The
+            // sheet unmounts when hidden, so a reopen starts the field empty.
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+        </View>
+        <FlatList
+          data={rows}
+          keyExtractor={row => row.tag}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          className="max-h-[55vh]"
+          contentContainerClassName="px-5 pb-4"
+          ListHeaderComponent={
+            query.length === 0 ? (
+              <ChoiceRow
+                selected={selected === 'device'}
+                disabled={busy}
+                onPress={() => {
+                  setSelected('device');
+                }}
+              >
+                <View className={`flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`}>
+                  <Text className="text-sm font-medium">{t('language.deviceLanguage')}</Text>
+                  <Text variant="muted" className="mt-0.5 text-xs">
+                    {deviceEndonym}
+                  </Text>
+                </View>
+              </ChoiceRow>
+            ) : null
+          }
+          ListEmptyComponent={
+            <Text variant="muted" className="py-8 text-center text-sm">
+              {t('language.noMatches')}
+            </Text>
+          }
+          renderItem={({ item }) => (
             <ChoiceRow
-              key={tag}
-              selected={selected === tag}
+              selected={selected === item.tag}
               disabled={busy}
               onPress={() => {
-                setSelected(tag);
+                setSelected(item.tag);
               }}
             >
               <View className={`flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`}>
-                <Text className="text-sm font-medium">{LANGUAGE_ENDONYMS[tag]}</Text>
+                {/* The row reads in its own script and its own direction. */}
+                <Text
+                  className="text-sm font-medium"
+                  style={isRtlLanguage(item.tag) ? ROW_RTL : ROW_LTR}
+                >
+                  {item.endonym}
+                </Text>
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  {item.englishName}
+                </Text>
               </View>
             </ChoiceRow>
-          ))}
-        </ScrollView>
+          )}
+        />
       </PickerSheet>
     );
   };

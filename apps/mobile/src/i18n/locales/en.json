@@ -30,11 +30,13 @@
     "couldNotRestart": "Could not restart",
     "languageSaved": "Your language is saved.",
     "catalogLoadFailed": "Could not load the language. Please try again.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "search": "Search languages",
+    "noMatches": "No languages match",
+    "deviceLanguage": "Device language"
   },
   "login": {
     "welcome": "Welcome to Kilo",
-    "language": "Language",
     "retrySignIn": "Retry sign in",
     "logo": "Kilo logo",
     "continuingSignIn": "Continuing your sign-in.",
@@ -77,7 +79,6 @@
     "or": "or"
   },
   "profile": {
-    "language": "Language",
     "title": "Profile",
     "agents": "Agents",
     "codeReviewer": "Code Reviewer",
@@ -141,7 +142,8 @@
     "notificationsSubtitle": "Push preferences",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
-    "appearanceDark": "Dark"
+    "appearanceDark": "Dark",
+    "account": "Account"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -202,8 +204,6 @@
       "failedToLoadContext": "Failed to load context — tap to retry",
       "loadingContext": "Loading context…",
       "loadingLines": "Loading {{loaded}} of {{total}} lines…",
-      "expand": "Expand",
-      "expandMore": "Expand more",
       "expandContext": "Expand context",
       "expandMoreContext": "Expand more context",
       "expandLines": "Expand {{count}} lines ({{start}}–{{end}})",
@@ -513,7 +513,9 @@
     "diff": {
       "selectedTapToChange": "Selected {{label}}, tap to change selection",
       "tapToComment": "{{label}}, tap to comment"
-    }
+    },
+    "linkPasteClipboardEmpty": "Clipboard is empty",
+    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
   },
   "notifications": {
     "title": "Notifications",
@@ -1718,17 +1720,6 @@
       "sessionDeleted": "Session deleted",
       "needsInput": "needs input",
       "fromPlatform": "from {{platform}}",
-      "minuteOne": "minute",
-      "minuteOther": "minutes",
-      "hourOne": "hour",
-      "hourOther": "hours",
-      "dayOne": "day",
-      "dayOther": "days",
-      "monthOne": "month",
-      "monthOther": "months",
-      "yearOne": "year",
-      "yearOther": "years",
-      "ago": "ago",
       "centOne": "cent",
       "centOther": "cents",
       "dollarOne": "dollar",
@@ -1737,7 +1728,11 @@
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
       "couldNotOpenMessage": "We could not start the GitHub App setup. Please try again."
-    }
+    },
+    "sessionExited": "Session exited",
+    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
+    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
+    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
   },
   "agentChat": {
     "session": {
@@ -2351,7 +2346,9 @@
     "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
-    "allow": "Allow"
+    "allow": "Allow",
+    "start": "Start voice input",
+    "stop": "Stop voice input"
   },
   "share": {
     "title": "Share to Kilo",
@@ -2424,7 +2421,12 @@
     "opensManagementOnWeb": "Opens Kilo Pass management on web.",
     "opensAppStoreManagement": "Opens App Store subscription management.",
     "opensPlans": "Opens Kilo Pass plans.",
-    "tryAgainFromProfile": "Try again from Profile."
+    "tryAgainFromProfile": "Try again from Profile.",
+    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
+    "webManagementDescription": "This Kilo Pass is managed on the web.",
+    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
+    "legalPrivacyPolicy": "Privacy Policy",
+    "legalTermsOfUse": "Terms of Use (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2653,5 +2655,26 @@
       "retryHint": "Retries loading Kilo Pass status.",
       "setupHint": "Opens Kilo Pass setup on web."
     }
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
+    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
+    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
+    "blocked": "This account has been blocked. Please contact support.",
+    "signupRateLimited": "Too many attempts. Please try again later.",
+    "invalidCode": "That code is incorrect. Please try again.",
+    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
+    "tooManyAttempts": "Too many attempts. Please request a new code.",
+    "invalidToken": "Sign-in failed. Please try again.",
+    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
+    "invalidRequest": "Check your email address and try again.",
+    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
+    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
+    "default": "Something went wrong. Please try again.",
+    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+  },
+  "models": {
+    "dataCollected": "Data collected",
+    "free": "Free"
   }
 }

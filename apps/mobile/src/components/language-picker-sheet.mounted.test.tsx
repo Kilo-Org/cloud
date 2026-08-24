@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 /* eslint-disable max-lines -- the apply and back-handler suites share one mock harness in this file */
-import { createElement } from 'react';
+import { createElement, Fragment, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { toast } from 'sonner-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,11 +19,37 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
+// FlatList renders through a callback, so a host-string mock would drop every
+// row. This mock calls the render props so the row assertions still see rows.
+const flatListMock = vi.hoisted(
+  () =>
+    ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListHeaderComponent,
+      ListEmptyComponent,
+    }: {
+      data: readonly { tag: string }[];
+      renderItem: (info: { item: unknown; index: number }) => ReactNode;
+      keyExtractor: (item: { tag: string }) => string;
+      ListHeaderComponent?: ReactNode;
+      ListEmptyComponent?: ReactNode;
+    }) => {
+      const rows = data.map((item, index) =>
+        createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
+      );
+      const empty = data.length === 0 ? ListEmptyComponent : null;
+      return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
+    }
+);
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  FlatList: flatListMock,
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  TextInput: 'TextInput',
   View: 'View',
   I18nManager: i18nManager,
 }));

@@ -1,8 +1,5 @@
 import {
-  KILO_PASS_MANAGE_CTA_LABEL,
   KILO_PASS_TITLE,
-  KILO_PASS_UNAVAILABLE_DESCRIPTION,
-  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
   type PurchasePresentationKind,
   type PurchaseStatusClass,
 } from '@kilocode/app-shared/commerce';
@@ -145,7 +142,7 @@ export function getKiloPassSubscriptionCardContentState(params: {
       state: {
         action: 'open-native',
         actionLabel: null,
-        description: KILO_PASS_UNAVAILABLE_DESCRIPTION,
+        description: i18n.t('kiloPass.unavailableDescription'),
         title: KILO_PASS_TITLE,
       },
     };
@@ -156,8 +153,8 @@ export function getKiloPassSubscriptionCardContentState(params: {
       kind: 'card',
       state: {
         action: 'open-web',
-        actionLabel: KILO_PASS_MANAGE_CTA_LABEL,
-        description: KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
+        actionLabel: i18n.t('kiloPass.manage'),
+        description: i18n.t('kiloPass.webManagementDescription'),
         title: KILO_PASS_TITLE,
       },
     };

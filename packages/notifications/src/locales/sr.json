@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Vaša agentska sesija ima ažuriranje",
+      "chatMessage": "Imate novu poruku",
+      "instanceLifecycle": "Vaša instanca ima ažuriranje",
+      "scheduledAction": "Zakazana radnja ima ažuriranje",
+      "lowBalance": "Vaš saldo zahteva pažnju",
+      "securityFinding": "Bezbednosni nalaz zahteva pažnju"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Zadatak završen"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Neuspešno: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Prekinuto: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Bez naslova",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Upozorenje o niskom saldu",
+      "body": "Saldo {{organizationName}}-a pao je ispod ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Novi bezbednosni nalaz ({{severity}})",
+      "body": "{{findingTitle}} u {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA upozorenje",
+      "body": "{{findingTitle}} u {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA kršenje",
+      "body": "{{findingTitle}} u {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Bezbednosni nalaz zahteva pažnju"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} je spreman",
+      "body": "Dodirnite da započnete ćaskanje."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} nije uspeo da se pokrene",
+      "body": "Pokretanje nije uspelo."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} će se uskoro ponovo pokrenuti",
+      "body": "Zakazano ponovno pokretanje u {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Ponovno pokretanje {{instanceName}}-a otkazano",
+      "body": "Prethodno zakazano ponovno pokretanje je otkazano."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} će se uskoro nadograditi",
+      "bodyWithTag": "Nadogradnja na {{targetImageTag}} u {{when}}.",
+      "bodyWithoutTag": "Zakazana nadogradnja u {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Nadogradnja {{instanceName}}-a otkazana",
+      "body": "Prethodno zakazana nadogradnja je otkazana."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Vaša Kilo sesija je spremna za upravljanje sa vašeg telefona"
+  }
+}

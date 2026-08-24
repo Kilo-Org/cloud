@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Vaše relace agenta má aktualizaci",
+      "chatMessage": "Máte novou zprávu",
+      "instanceLifecycle": "Vaše instance má aktualizaci",
+      "scheduledAction": "Naplánovaná akce má aktualizaci",
+      "lowBalance": "Váš zůstatek vyžaduje pozornost",
+      "securityFinding": "Nález zabezpečení vyžaduje pozornost"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Úkol dokončen"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Selhání: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Přerušeno: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Bez názvu",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Upozornění na nízký zůstatek",
+      "body": "Zůstatek organizace {{organizationName}} klesl pod ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nový nález zabezpečení ({{severity}})",
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Varování o SLA",
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Porušení SLA",
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Nález zabezpečení vyžaduje pozornost"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} je připraven",
+      "body": "Klepnutím začnete chatovat."
+    },
+    "startFailed": {
+      "title": "Spuštění {{instanceName}} se nezdařilo",
+      "body": "Spuštění se nezdařilo."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} se brzy restartuje",
+      "body": "Naplánován restart v {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Restart {{instanceName}} zrušen",
+      "body": "Dříve naplánovaný restart byl zrušen."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} se brzy aktualizuje",
+      "bodyWithTag": "Aktualizace na {{targetImageTag}} v {{when}}.",
+      "bodyWithoutTag": "Naplánovaná aktualizace v {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Aktualizace {{instanceName}} zrušena",
+      "body": "Dříve naplánovaná aktualizace byla zrušena."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Vaše relace Kilo je připravena k ovládání z telefonu"
+  }
+}

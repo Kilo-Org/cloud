@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Din agentsession har en opdatering",
+      "chatMessage": "Du har en ny besked",
+      "instanceLifecycle": "Din instans har en opdatering",
+      "scheduledAction": "En planlagt handling har en opdatering",
+      "lowBalance": "Din saldo kræver opmærksomhed",
+      "securityFinding": "Et sikkerhedsfund kræver opmærksomhed"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Opgave fuldført"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Mislykkedes: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Afbrudt: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Uden titel",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Lav saldo-alert",
+      "body": "{{organizationName}}s saldo faldt under ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nyt sikkerhedsfund ({{severity}})",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-advarsel",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-overtrædelse",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Et sikkerhedsfund kræver opmærksomhed"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} er klar",
+      "body": "Tryk for at starte chatten."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} kunne ikke startes",
+      "body": "Start mislykkedes."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} genstarter snart",
+      "body": "Planlagt til genstart kl. {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} genstart annulleret",
+      "body": "Den tidligere planlagte genstart er blevet annulleret."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} opgraderes snart",
+      "bodyWithTag": "Opgrader til {{targetImageTag}} kl. {{when}}.",
+      "bodyWithoutTag": "Planlagt opgradering kl. {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} opgradering annulleret",
+      "body": "Den tidligere planlagte opgradering er blevet annulleret."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Din Kilo-session er klar til at blive styret fra din telefon"
+  }
+}

@@ -1,8 +1,11 @@
-export const KILO_PASS_LEGAL_DISCLOSURE =
-  'Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.';
+import { i18n } from '@/i18n';
+
+export function kiloPassLegalDisclosure(): string {
+  return i18n.t('kiloPass.legalDisclosure');
+}
 
 type KiloPassLegalLink = {
-  label: 'Privacy Policy' | 'Terms of Use (EULA)';
+  label: string;
   url: string;
 };
 
@@ -13,11 +16,11 @@ export function getKiloPassLegalLinks(
 
   return [
     {
-      label: 'Privacy Policy',
+      label: i18n.t('kiloPass.legalPrivacyPolicy'),
       url: `${baseUrl}/privacy-app`,
     },
     {
-      label: 'Terms of Use (EULA)',
+      label: i18n.t('kiloPass.legalTermsOfUse'),
       url: `${baseUrl}/terms-app`,
     },
   ];

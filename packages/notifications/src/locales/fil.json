@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "May update ang iyong agent session",
+      "chatMessage": "May bago kang mensahe",
+      "instanceLifecycle": "May update ang iyong instance",
+      "scheduledAction": "May update ang isang naka-schedule na aksyon",
+      "lowBalance": "Kailangan ng atensyon ang iyong balance",
+      "securityFinding": "Kailangan ng atensyon ang isang security finding"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Natapos ang task"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Nabigo: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Na-interrupt: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Walang pamagat",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Low balance alert",
+      "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balance ng {{organizationName}}"
+    },
+    "securityFindingNew": {
+      "title": "Bagong security finding ({{severity}})",
+      "body": "{{findingTitle}} sa {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Babala sa SLA",
+      "body": "{{findingTitle}} sa {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Paglabag sa SLA",
+      "body": "{{findingTitle}} sa {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Kailangan ng atensyon ang isang security finding"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "Handa na ang {{instanceName}}",
+      "body": "I-tap para magsimulang mag-chat."
+    },
+    "startFailed": {
+      "title": "Nabigong magsimula ang {{instanceName}}",
+      "body": "Nabigo ang pagsisimula."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "Mamaya magre-restart ang {{instanceName}}",
+      "body": "Naka-schedule na mag-restart sa {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Na-cancel ang restart ng {{instanceName}}",
+      "body": "Na-cancel ang naunang naka-schedule na restart."
+    },
+    "versionChangeNotice": {
+      "title": "Mamaya mag-upgrade ang {{instanceName}}",
+      "bodyWithTag": "Mag-upgrade sa {{targetImageTag}} sa {{when}}.",
+      "bodyWithoutTag": "Naka-schedule na upgrade sa {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Na-cancel ang upgrade ng {{instanceName}}",
+      "body": "Na-cancel ang naunang naka-schedule na upgrade."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Handa nang kontrolin mula sa iyong telepono ang iyong Kilo session"
+  }
+}

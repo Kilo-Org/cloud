@@ -10,7 +10,7 @@ import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
-import { DEFAULT_ERROR_MESSAGE, mapError } from '@/lib/auth/auth-error-messages';
+import { defaultErrorMessage, mapError } from '@/lib/auth/auth-error-messages';
 import { hasStringCode, postAuth } from '@/lib/auth/auth-fetch';
 import {
   buildChallengeEntry,
@@ -104,7 +104,7 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (!credential.identityToken) {
-        toast.error(DEFAULT_ERROR_MESSAGE);
+        toast.error(defaultErrorMessage());
         return;
       }
 
@@ -132,7 +132,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -152,7 +152,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (hasStringCode(error) && error.code === 'ERR_REQUEST_CANCELED') {
         return;
       }
-      toast.error(DEFAULT_ERROR_MESSAGE);
+      toast.error(defaultErrorMessage());
     } finally {
       finishAction('apple');
     }
@@ -176,7 +176,7 @@ export function useNativeAuth(): NativeAuthResult {
       const idToken = response.data.idToken;
 
       if (!serverAuthCode && !idToken) {
-        toast.error(DEFAULT_ERROR_MESSAGE);
+        toast.error(defaultErrorMessage());
         return;
       }
 
@@ -199,7 +199,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -216,7 +216,7 @@ export function useNativeAuth(): NativeAuthResult {
         toast.error(mapError(result.errorCode));
       }
     } catch {
-      toast.error(DEFAULT_ERROR_MESSAGE);
+      toast.error(defaultErrorMessage());
     } finally {
       finishAction('google');
     }
@@ -245,7 +245,7 @@ export function useNativeAuth(): NativeAuthResult {
         }
         const parsed = parseEmailCodeResponse(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return false;
         }
         // Hold the challenge for the current email so verifyEmailCode can
@@ -297,7 +297,7 @@ export function useNativeAuth(): NativeAuthResult {
         }
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return false;
         }
         await signIn(
@@ -312,7 +312,7 @@ export function useNativeAuth(): NativeAuthResult {
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
         console.error('[native-auth] verifyEmailCode signIn failed:', error);
-        toast.error(DEFAULT_ERROR_MESSAGE);
+        toast.error(defaultErrorMessage());
         return false;
       } finally {
         finishAction('otp-verify');

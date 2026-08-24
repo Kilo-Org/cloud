@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Umboðslotan þín hefur uppfærslu",
+      "chatMessage": "Þú hefur ný skilaboð",
+      "instanceLifecycle": "Dæmið þitt hefur uppfærslu",
+      "scheduledAction": "Skipulögð aðgerð hefur uppfærslu",
+      "lowBalance": "Staðan þín þarfnast athygli",
+      "securityFinding": "Öryggisfundur þarfnast athygli"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Verkefni lokið"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Mistókst: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Rofin: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Án titils",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Viðvörun um lága stöðu",
+      "body": "Staða {{organizationName}} fór niður fyrir ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nýr öryggisfundur ({{severity}})",
+      "body": "{{findingTitle}} í {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-viðvörun",
+      "body": "{{findingTitle}} í {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-brot",
+      "body": "{{findingTitle}} í {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Öryggisfundur þarfnast athygli"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} er tilbúið",
+      "body": "Bankaðu til að byrja að spjalla."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} mistókst að ræsa",
+      "body": "Ræsing mistókst."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} mun endurræsa bráðlega",
+      "body": "Áætluð endurræsing klukkan {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Endurræsing {{instanceName}} aflýst",
+      "body": "Fyrri endurræsingin sem var áætluð hefur verið aflýst."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} mun uppfærast bráðlega",
+      "bodyWithTag": "Uppfæra í {{targetImageTag}} klukkan {{when}}.",
+      "bodyWithoutTag": "Áætluð uppfærsla klukkan {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Uppfærsla {{instanceName}} aflýst",
+      "body": "Fyrri uppfærslan sem var áætluð hefur verið aflýst."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo-lotan þín er tilbúin til stjórnunar úr símanum þínum"
+  }
+}

@@ -99,27 +99,46 @@ describe('attemptPushRegistrationReconciliation', () => {
     expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
   });
 
-  it('returns already-registered and performs no write when the token is present and the locale was already sent', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
+  it('returns already-registered and performs no write when the server row holds the active locale', async () => {
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
       kind: 'token',
       token: 'push-1',
     });
-    trpcMock.getMyPushTokens.query.mockResolvedValue([{ token: 'push-1', platform: 'ios' }]);
+    // A null locale is English, and English is the active language.
+    trpcMock.getMyPushTokens.query.mockResolvedValue([
+      { token: 'push-1', platform: 'ios', locale: null },
+    ]);
     trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
 
-    // The first attempt sends the locale because none has been sent yet.
-    const first = await attemptPushRegistrationReconciliation('u1');
-    expect(first.kind).toBe('registered');
+    const outcome = await attemptPushRegistrationReconciliation('u1');
 
-    // Advance past the 60s spacing window so the second attempt reaches the
-    // already-registered check instead of spacing-skipped.
-    vi.setSystemTime(new Date('2026-08-23T12:02:00Z'));
-    const second = await attemptPushRegistrationReconciliation('u1');
-    expect(second).toEqual({ kind: 'already-registered' });
-    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledTimes(1);
-    expect(queryClientMock.invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ kind: 'already-registered' });
+    expect(trpcMock.registerPushToken.mutate).not.toHaveBeenCalled();
+    expect(queryClientMock.invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('re-registers when the server row for this account holds a stale locale', async () => {
+    // The same device keeps one Expo token across a sign-out and sign-in, so a
+    // client-side "locale already sent" cache would answer already-registered
+    // for a row written by, or for, a different account.
+    notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
+      kind: 'token',
+      token: 'push-1',
+    });
+    trpcMock.getMyPushTokens.query.mockResolvedValue([
+      { token: 'push-1', platform: 'ios', locale: 'de' },
+    ]);
+    trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
+
+    const outcome = await attemptPushRegistrationReconciliation('u2');
+
+    expect(outcome.kind).toBe('registered');
+    expect(trpcMock.registerPushToken.mutate).toHaveBeenCalledWith({
+      token: 'push-1',
+      platform: 'ios',
+      appVersion: '1.0.4',
+      locale: 'en',
+    });
   });
 
   it('registers the Expo token on a fresh sign-in and invalidates the query', async () => {
@@ -378,11 +397,13 @@ describe('attemptPushRegistrationReconciliation', () => {
       kind: 'token',
       token: 'push-1',
     });
-    trpcMock.getMyPushTokens.query.mockResolvedValue([{ token: 'push-1', platform: 'ios' }]);
+    trpcMock.getMyPushTokens.query.mockResolvedValue([
+      { token: 'push-1', platform: 'ios', locale: null },
+    ]);
     trpcMock.registerPushToken.mutate.mockResolvedValue({ success: true });
 
     const first = await attemptPushRegistrationReconciliation('u1');
-    expect(first.kind).toBe('registered');
+    expect(first.kind).toBe('already-registered');
 
     languageMock.getResolvedLanguage.mockReturnValue('es');
     const second = await attemptPushRegistrationReconciliation('u1');

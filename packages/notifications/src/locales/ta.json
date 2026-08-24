@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "உங்கள் முகவர் அமர்வில் ஒரு புதுப்பிப்பு உள்ளது",
+      "chatMessage": "உங்களுக்கு புதிய செய்தி உள்ளது",
+      "instanceLifecycle": "உங்கள் நிகழ்வில் ஒரு புதுப்பிப்பு உள்ளது",
+      "scheduledAction": "திட்டமிடப்பட்ட செயலில் ஒரு புதுப்பிப்பு உள்ளது",
+      "lowBalance": "உங்கள் இருப்புக்கு கவனம் தேவை",
+      "securityFinding": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "பணி முடிந்தது"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "தோல்வி: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "குறுக்கீடு: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · பெயரிடப்படாதது",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "குறைந்த இருப்பு எச்சரிக்கை",
+      "body": "{{organizationName}} இருப்பு ${{minimumBalanceUsd}} க்கு கீழே விழுந்தது"
+    },
+    "securityFindingNew": {
+      "title": "புதிய பாதுகாப்பு கண்டுபிடிப்பு ({{severity}})",
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA எச்சரிக்கை",
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA மீறல்",
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} தயாராக உள்ளது",
+      "body": "அரட்டையடிக்கத் தொடங்க தட்டவும்."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} தொடங்க முடியவில்லை",
+      "body": "தொடக்கம் தோல்வியடைந்தது."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} விரைவில் மறுதொடக்கம் செய்யப்படும்",
+      "body": "{{when}} அன்று மறுதொடக்கம் செய்ய திட்டமிடப்பட்டுள்ளது."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} மறுதொடக்கம் ரத்து செய்யப்பட்டது",
+      "body": "முன்னர் திட்டமிடப்பட்ட மறுதொடக்கம் ரத்து செய்யப்பட்டது."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} விரைவில் மேம்படுத்தப்படும்",
+      "bodyWithTag": "{{when}} அன்று {{targetImageTag}} க்கு மேம்படுத்து.",
+      "bodyWithoutTag": "{{when}} அன்று திட்டமிடப்பட்ட மேம்படுத்தல்."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} மேம்படுத்தல் ரத்து செய்யப்பட்டது",
+      "body": "முன்னர் திட்டமிடப்பட்ட மேம்படுத்தல் ரத்து செய்யப்பட்டது."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "உங்கள் Kilo அமர்வு உங்கள் தொலைபேசியிலிருந்து கட்டுப்படுத்த தயாராக உள்ளது"
+  }
+}

@@ -19,8 +19,8 @@ import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
   decidePrLinkPaste,
-  PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY,
-  PR_LINK_TOAST_INVALID_COPY,
+  prLinkToastClipboardEmptyCopy,
+  prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
 import { getRecentPrs, type RecentPr, removeRecentPr } from '@/lib/pr-review/recent-prs';
@@ -74,7 +74,7 @@ export function PrReviewEntryScreen() {
     const raw = inputValueRef.current;
     const parsed = parseGitHubPrUrl(raw.trim());
     if (!parsed) {
-      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
+      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     // Navigate straight to the PR route. Recents are written only after an
@@ -87,13 +87,13 @@ export function PrReviewEntryScreen() {
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      announcingToast.error(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY);
+      announcingToast.error(prLinkToastClipboardEmptyCopy());
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.
     applyFieldText(decision.text);
     if (decision.kind === 'non-url-text') {
-      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
+      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     handleSubmit();

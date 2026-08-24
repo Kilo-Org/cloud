@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Igba-ijiroro aṣoju rẹ ni imudojuiwọn",
+      "chatMessage": "O ni ifiranṣẹ tuntun",
+      "instanceLifecycle": "Apeere rẹ ni imudojuiwọn",
+      "scheduledAction": "Iṣe ti a ṣeto ni imudojuiwọn",
+      "lowBalance": "Iwọntunwọnsi rẹ nilo akiyesi",
+      "securityFinding": "Wiwa aabo nilo akiyesi"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Iṣẹ-ṣiṣe ti pari"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Kuna: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Ti da duro: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Laisi akọle",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Ifitonileti iwọntunwọnsi kekere",
+      "body": "Iwọntunwọnsi {{organizationName}} ṣubu ni isalẹ ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Wiwa aabo tuntun ({{severity}})",
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Ikilọ SLA",
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Irufin SLA",
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Wiwa aabo nilo akiyesi"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ti ṣetan",
+      "body": "Tẹ lati bẹrẹ ijiroro."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} kuna lati bẹrẹ",
+      "body": "Bẹrẹ kuna."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} yoo tun bẹrẹ laipe",
+      "body": "Ti ṣeto lati tun bẹrẹ ni {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} tun bẹrẹ ti fagile",
+      "body": "Tun bẹrẹ ti a ṣeto tẹlẹ ti fagile."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} yoo ṣe igbesoke laipe",
+      "bodyWithTag": "Igbesoke si {{targetImageTag}} ni {{when}}.",
+      "bodyWithoutTag": "Igbesoke ti a ṣeto ni {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} igbesoke ti fagile",
+      "body": "Igbesoke ti a ṣeto tẹlẹ ti fagile."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Igba-ijiroro Kilo rẹ ti ṣetan lati ṣakoso lati foonu rẹ"
+  }
+}

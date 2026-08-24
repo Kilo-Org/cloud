@@ -20,7 +20,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
-import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
+import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -254,7 +254,7 @@ export function NewSessionConfigureForm({
 
       {showInstanceDisconnectedNote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
-          {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
+          {remoteSpawnInstanceDisconnectedNote()}
         </Text>
       ) : null}
 

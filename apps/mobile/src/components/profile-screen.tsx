@@ -2,20 +2,17 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Building2,
   GitMerge,
   GitPullRequest,
-  Globe,
   KeyRound,
   Lock,
   LogOut,
   MessageSquare,
   ShieldCheck,
   SlidersHorizontal,
-  Smartphone,
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
@@ -23,7 +20,6 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
-import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -34,14 +30,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { i18n } from '@/i18n';
-import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
-import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -113,14 +106,6 @@ export function ProfileScreen() {
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
 
   const { t } = useTranslation();
-  const { preference: languagePreference } = useLanguagePreference();
-  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
-  const resolvedLanguage = getResolvedLanguage();
-  const languageEndonym = LANGUAGE_ENDONYMS[resolvedLanguage];
-  const languageSubtitle =
-    languagePreference === 'device'
-      ? `${t('common.device')} · ${languageEndonym}`
-      : languageEndonym;
 
   const {
     phase: deletePhase,
@@ -310,27 +295,9 @@ export function ProfileScreen() {
             title={t('profile.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
             className="rounded-lg bg-secondary px-3"
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Globe}
-            title={t('common.language')}
-            subtitle={languageSubtitle}
-            className="rounded-lg bg-secondary px-3"
-            onPress={() => {
-              setLanguagePickerOpen(true);
-            }}
-          />
-          <ConfigureRow
-            icon={Smartphone}
-            title={t('profile.deviceSessions')}
-            subtitle={t('profile.deviceSessionsSubtitle')}
-            className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
-              router.push('/(app)/device-sessions' as Href);
+              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
             }}
           />
         </View>
@@ -392,18 +359,6 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
-      <LanguagePickerSheet
-        visible={languagePickerOpen}
-        onClose={() => {
-          setLanguagePickerOpen(false);
-        }}
-        onApplied={() => {
-          if (userId) {
-            void attemptPushRegistrationReconciliation(userId);
-          }
-        }}
-        returnTarget="profile"
-      />
     </View>
   );
 }

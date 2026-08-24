@@ -11,8 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   BYOK_MODEL_LABEL,
-  FREE_MODEL_DATA_LABEL,
-  FREE_MODEL_FREE_LABEL,
+  freeModelDataLabel,
+  freeModelFreeLabel,
   getFreeModelDataAccessibilityLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
@@ -243,8 +243,8 @@ export function ModelPickerOptionRow({
     option.name,
     option.displayId,
     byok ? BYOK_MODEL_LABEL : undefined,
-    free && !byok ? FREE_MODEL_FREE_LABEL : undefined,
-    collectsData ? FREE_MODEL_DATA_LABEL : undefined,
+    free && !byok ? freeModelFreeLabel() : undefined,
+    collectsData ? freeModelDataLabel() : undefined,
     costLabel ?? undefined,
     option.unavailable ? t('agentChat.modelSelector.unavailableState') : undefined,
     selected ? t('agentChat.modelSelector.selectedState') : undefined,
@@ -295,7 +295,7 @@ export function ModelPickerOptionRow({
                 {free && !byok ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
                     <Text className="text-[11px] font-medium text-good-foreground">
-                      {FREE_MODEL_FREE_LABEL}
+                      {freeModelFreeLabel()}
                     </Text>
                   </View>
                 ) : null}
@@ -308,7 +308,7 @@ export function ModelPickerOptionRow({
                 ) : null}
                 {collectsData ? (
                   <BookOpenCheck
-                    accessibilityLabel={FREE_MODEL_DATA_LABEL}
+                    accessibilityLabel={freeModelDataLabel()}
                     size={13}
                     color={colors.warn}
                   />

@@ -16,7 +16,7 @@ import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
+import { getKiloPassLegalLinks, kiloPassLegalDisclosure } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -394,7 +394,7 @@ function KiloPassNativeIapContent() {
           />
 
           <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
-            {KILO_PASS_LEGAL_DISCLOSURE}
+            {kiloPassLegalDisclosure()}
             {t('kiloPass.legalConnectorTerms')}
             <Text
               accessibilityRole="link"

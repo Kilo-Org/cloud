@@ -1178,6 +1178,10 @@ export const userRouter = createTRPCRouter({
       .select({
         token: user_push_tokens.token,
         platform: user_push_tokens.platform,
+        // The client compares this against the app's active language: the
+        // server row, not a client-side cache, decides whether a re-register
+        // is needed. Null means English.
+        locale: user_push_tokens.locale,
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));

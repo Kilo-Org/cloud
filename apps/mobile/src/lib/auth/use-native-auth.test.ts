@@ -105,7 +105,7 @@ vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
 
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const { AUTH_ERROR_MESSAGES, DEFAULT_ERROR_MESSAGE, mapError, RETRYABLE_ADMISSION_ERROR } =
+const { AUTH_ERROR_KEYS, defaultErrorMessage, mapError, retryableAdmissionError } =
   await import('@/lib/auth/auth-error-messages');
 
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
@@ -212,7 +212,7 @@ describe('use-native-auth error mapping', () => {
     ['INVALID_EMAIL', 'Unable to deliver email to this address. Please use a different email.'],
     ['EMAIL_DELIVERY_FAILED', 'Email delivery is temporarily unavailable. Please try again later.'],
   ] as const)('maps %s to a user-facing message', (code, message) => {
-    // Exercise production mapError against the production AUTH_ERROR_MESSAGES map.
+    // Exercise production mapError against the production AUTH_ERROR_KEYS map.
     const result = mapError(code);
     expect(result).toBe(message);
 
@@ -221,22 +221,22 @@ describe('use-native-auth error mapping', () => {
   });
 
   it('returns the default error message for an undefined code', () => {
-    expect(mapError(undefined)).toBe(DEFAULT_ERROR_MESSAGE);
+    expect(mapError(undefined)).toBe(defaultErrorMessage());
   });
 
   it('returns the default error message for an unknown code', () => {
-    expect(mapError('NONEXISTENT_CODE')).toBe(DEFAULT_ERROR_MESSAGE);
+    expect(mapError('NONEXISTENT_CODE')).toBe(defaultErrorMessage());
   });
 
   it('has a retryable admission error constant', () => {
-    expect(RETRYABLE_ADMISSION_ERROR).toBe(
+    expect(retryableAdmissionError()).toBe(
       'We could not verify this device. Check your connection and try again.'
     );
-    expect(RETRYABLE_ADMISSION_ERROR).toMatch(/try again/i);
+    expect(retryableAdmissionError()).toMatch(/try again/i);
   });
 
   it('ADMISSION_REQUIRED message includes the More sign-in options CTA', () => {
-    const message = AUTH_ERROR_MESSAGES.ADMISSION_REQUIRED;
+    const message = mapError('ADMISSION_REQUIRED');
     expect(message).toContain('More sign-in options');
     // Non-retryable: must not suggest trying again.
     expect(message).not.toMatch(/try again|retry/i);
@@ -278,14 +278,14 @@ describe('resolveAdmission', () => {
     mockGetAdmission.mockRejectedValue(new Error('Network error'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 
   it('shows retryable toast and throws on JSON parse failure', async () => {
     mockGetAdmission.mockRejectedValue(new SyntaxError('Unexpected token'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 });
 

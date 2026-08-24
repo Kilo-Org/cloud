@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Sinu agendi seansil on uuendus",
+      "chatMessage": "Teil on uus sõnum",
+      "instanceLifecycle": "Sinu eksemplaril on uuendus",
+      "scheduledAction": "Planeeritud toimingul on uuendus",
+      "lowBalance": "Sinu saldo vajab tähelepanu",
+      "securityFinding": "Turbetuvastus vajab tähelepanu"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Ülesanne lõpetatud"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Ebaõnnestus: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Katkestatud: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Ilma pealkirjata",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Madala saldo hoiatus",
+      "body": "{{organizationName}} saldo langes alla ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Uus turbetuvastus ({{severity}})",
+      "body": "{{findingTitle}} saidis {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA hoiatus",
+      "body": "{{findingTitle}} saidis {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA rikkumine",
+      "body": "{{findingTitle}} saidis {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Turbetuvastus vajab tähelepanu"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} on valmis",
+      "body": "Vestluse alustamiseks puudutage."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} käivitamine ebaõnnestus",
+      "body": "Käivitamine ebaõnnestus."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} taaskäivitatakse peagi",
+      "body": "Taaskäivitamine on planeeritud kella {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} taaskäivitamine tühistatud",
+      "body": "Varem planeeritud taaskäivitamine on tühistatud."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} uuendatakse peagi",
+      "bodyWithTag": "Uuendus versioonile {{targetImageTag}} kella {{when}}.",
+      "bodyWithoutTag": "Planeeritud uuendus kella {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} uuendus tühistatud",
+      "body": "Varem planeeritud uuendus on tühistatud."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Sinu Kilo seanss on telefonist juhtimiseks valmis"
+  }
+}

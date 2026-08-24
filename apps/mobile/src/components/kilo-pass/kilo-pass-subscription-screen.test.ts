@@ -109,7 +109,7 @@ vi.mock('@/lib/kilo-pass/legal-links', () => ({
     { url: 'https://example.com/privacy', label: 'Privacy Policy' },
     { url: 'https://example.com/terms', label: 'Terms of Use' },
   ],
-  KILO_PASS_LEGAL_DISCLOSURE: '',
+  kiloPassLegalDisclosure: () => '',
 }));
 
 vi.mock('@/lib/kilo-pass/navigation', () => ({

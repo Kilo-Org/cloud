@@ -114,7 +114,7 @@ jobs:
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
 
-      - name: Check i18n leftovers
+      - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
 
   format-check:

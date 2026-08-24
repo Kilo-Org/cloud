@@ -9,5 +9,11 @@
   "rules": {
     "no-literal-copy/no-literal-copy": "error"
   },
-  "ignorePatterns": ["dist/*", "node_modules/**"]
+  "ignorePatterns": [
+    "dist/*",
+    "node_modules/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**"
+  ]
 }

@@ -1,5 +1,7 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type CreateSessionOutcome } from '@/lib/hooks/use-remote-instance-spawn';
 
@@ -11,8 +13,9 @@ import { type CreateSessionOutcome } from '@/lib/hooks/use-remote-instance-spawn
  * literal) and the recovery path is the same — refetch the instance
  * list and re-evaluate.
  */
-export const REMOTE_SPAWN_RETRYABLE_TOAST =
-  'Couldn’t reach the instance — it may have disconnected.';
+export function remoteSpawnRetryableToast(): string {
+  return i18n.t('agents.remoteSpawnRetryable');
+}
 
 /**
  * The fixed string copy surfaced in the toast when the spawn hook returns
@@ -21,8 +24,9 @@ export const REMOTE_SPAWN_RETRYABLE_TOAST =
  * refused the spawn for a structural reason (malformed envelope,
  * `CLI_UPGRADE_REQUIRED`, etc.).
  */
-export const REMOTE_SPAWN_NON_RETRYABLE_TOAST =
-  'The instance failed to start the session — check the machine or update the CLI.';
+export function remoteSpawnNonRetryableToast(): string {
+  return i18n.t('agents.remoteSpawnNonRetryable');
+}
 
 /**
  * Inline note shown under the "Run on" selector when a retryable spawn
@@ -31,8 +35,9 @@ export const REMOTE_SPAWN_NON_RETRYABLE_TOAST =
  * "Cloud Agent" (the `null` value), so the note explains why the
  * selection changed.
  */
-export const REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE =
-  'The selected instance disconnected. Start a session on Cloud Agent or pick another instance.';
+export function remoteSpawnInstanceDisconnectedNote(): string {
+  return i18n.t('agents.remoteSpawnInstanceDisconnected');
+}
 
 export type RemoteSubmitOutcomeAction =
   | {
@@ -122,7 +127,7 @@ export function resolveRemoteSubmitOutcome({
     return { kind: 'navigate', sessionID: outcome.sessionID };
   }
   if (outcome.status === 'nonRetryable') {
-    return { kind: 'nonRetryable', toast: REMOTE_SPAWN_NON_RETRYABLE_TOAST };
+    return { kind: 'nonRetryable', toast: remoteSpawnNonRetryableToast() };
   }
   // outcome.status === 'retryable'
   const stillPresent =
@@ -131,7 +136,7 @@ export function resolveRemoteSubmitOutcome({
   const shouldReset = !stillPresent;
   return {
     kind: 'retryable',
-    toast: REMOTE_SPAWN_RETRYABLE_TOAST,
+    toast: remoteSpawnRetryableToast(),
     shouldRefetchInstances: true,
     shouldResetSelectionToCloudAgent: shouldReset,
     showInstanceDisconnectedNote: shouldReset,

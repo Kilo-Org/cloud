@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ເຊດຊັນຕົວແທນຂອງທ່ານມີການອັບເດດ",
+      "chatMessage": "ທ່ານມີຂໍ້ຄວາມໃໝ່",
+      "instanceLifecycle": "instance ຂອງທ່ານມີການອັບເດດ",
+      "scheduledAction": "ການດຳເນີນການທີ່ກຳນົດໄວ້ມີການອັບເດດ",
+      "lowBalance": "ຍອດຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
+      "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ວຽກສຳເລັດແລ້ວ"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "ລົ້ມເຫລວ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ຖືກຂັດຈັງຫວະ: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ບໍ່ມີຊື່",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ການແຈ້ງເຕືອນຍອດຕໍ່າ",
+      "body": "ຍອດ {{organizationName}} ຕົກຕໍ່າກວ່າ ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})",
+      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "ຄຳເຕືອນ SLA",
+      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "ການລະເມີດ SLA",
+      "body": "{{findingTitle}} ໃນ {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ພ້ອມແລ້ວ",
+      "body": "ແຕະເພື່ອເລີ່ມສົນທະນາ."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ເລີ່ມລົ້ມເຫລວ",
+      "body": "ການເລີ່ມລົ້ມເຫລວ."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ຈະຣີສະຕາດໄວໆນີ້",
+      "body": "ກຳນົດໃຫ້ຣີສະຕາດໃນເວລາ {{when}}."
+    },
+    "restartCancelled": {
+      "title": "ການຣີສະຕາດ {{instanceName}} ຖືກຍົກເລີກ",
+      "body": "ການຣີສະຕາດທີ່ກຳນົດໄວ້ກ່ອນໜ້າຖືກຍົກເລີກແລ້ວ."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ຈະອັບເກຣດໄວໆນີ້",
+      "bodyWithTag": "ອັບເກຣດເປັນ {{targetImageTag}} ໃນເວລາ {{when}}.",
+      "bodyWithoutTag": "ກຳນົດອັບເກຣດໃນເວລາ {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "ການອັບເກຣດ {{instanceName}} ຖືກຍົກເລີກ",
+      "body": "ການອັບເກຣດທີ່ກຳນົດໄວ້ກ່ອນໜ້າຖືກຍົກເລີກແລ້ວ."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "ເຊດຊັນ Kilo ຂອງທ່ານພ້ອມຄວບຄຸມຈາກໂທລະສັບຂອງທ່ານ"
+  }
+}

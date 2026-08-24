@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Your agent session has an update",
+      "chatMessage": "You have a new message",
+      "instanceLifecycle": "Your instance has an update",
+      "scheduledAction": "A scheduled action has an update",
+      "lowBalance": "Your balance needs attention",
+      "securityFinding": "A security finding needs attention"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Task completed"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Failed: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Interrupted: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Untitled",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Low balance alert",
+      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "New security finding ({{severity}})",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA warning",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA breach",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "A security finding needs attention"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} is ready",
+      "body": "Tap to start chatting."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} failed to start",
+      "body": "Start failed."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} will restart soon",
+      "body": "Scheduled to restart at {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} restart cancelled",
+      "body": "The previously scheduled restart has been cancelled."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} will upgrade soon",
+      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
+      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} upgrade cancelled",
+      "body": "The previously scheduled upgrade has been cancelled."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Your Kilo session is ready to control from your phone"
+  }
+}

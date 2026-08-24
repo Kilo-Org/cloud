@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "നിങ്ങളുടെ ഏജന്റ് സെഷനിൽ ഒരു അപ്ഡേറ്റ് ഉണ്ട്",
+      "chatMessage": "നിങ്ങൾക്ക് ഒരു പുതിയ സന്ദേശം ഉണ്ട്",
+      "instanceLifecycle": "നിങ്ങളുടെ ഇൻസ്റ്റൻസിൽ ഒരു അപ്ഡേറ്റ് ഉണ്ട്",
+      "scheduledAction": "ഒരു ഷെഡ്യൂൾ ചെയ്ത പ്രവർത്തനത്തിൽ ഒരു അപ്ഡേറ്റ് ഉണ്ട്",
+      "lowBalance": "നിങ്ങളുടെ ബാലൻസിന് ശ്രദ്ധ ആവശ്യമാണ്",
+      "securityFinding": "ഒരു സുരക്ഷാ കണ്ടെത്തലിന് ശ്രദ്ധ ആവശ്യമാണ്"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ടാസ്ക് പൂർത്തിയായി"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "പരാജയപ്പെട്ടു: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "തടസ്സപ്പെട്ടു: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ശീർഷകമില്ലാത്തത്",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "കുറഞ്ഞ ബാലൻസ് അലേർട്ട്",
+      "body": "{{organizationName}} ബാലൻസ് ${{minimumBalanceUsd}}-ന് താഴെയായി"
+    },
+    "securityFindingNew": {
+      "title": "പുതിയ സുരക്ഷാ കണ്ടെത്തൽ ({{severity}})",
+      "body": "{{repoFullName}}-ലെ {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA മുന്നറിയിപ്പ്",
+      "body": "{{repoFullName}}-ലെ {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ലംഘനം",
+      "body": "{{repoFullName}}-ലെ {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ഒരു സുരക്ഷാ കണ്ടെത്തലിന് ശ്രദ്ധ ആവശ്യമാണ്"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} തയ്യാറാണ്",
+      "body": "ചാറ്റ് ചെയ്യാൻ തുടങ്ങാൻ ടാപ്പ് ചെയ്യുക."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ആരംഭിക്കുന്നതിൽ പരാജയപ്പെട്ടു",
+      "body": "ആരംഭിക്കൽ പരാജയപ്പെട്ടു."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ഉടൻ പുനരാരംഭിക്കും",
+      "body": "{{when}}-ന് പുനരാരംഭിക്കാൻ ഷെഡ്യൂൾ ചെയ്തു."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} പുനരാരംഭിക്കൽ റദ്ദാക്കി",
+      "body": "മുമ്പ് ഷെഡ്യൂൾ ചെയ്ത പുനരാരംഭിക്കൽ റദ്ദാക്കി."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ഉടൻ അപ്ഗ്രേഡ് ചെയ്യും",
+      "bodyWithTag": "{{when}}-ന് {{targetImageTag}} ലേക്ക് അപ്ഗ്രേഡ്.",
+      "bodyWithoutTag": "{{when}}-ന് ഷെഡ്യൂൾ ചെയ്ത അപ്ഗ്രേഡ്."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} അപ്ഗ്രേഡ് റദ്ദാക്കി",
+      "body": "മുമ്പ് ഷെഡ്യൂൾ ചെയ്ത അപ്ഗ്രേഡ് റദ്ദാക്കി."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "നിങ്ങളുടെ Kilo സെഷൻ നിങ്ങളുടെ ഫോണിൽ നിന്ന് നിയന്ത്രിക്കാൻ തയ്യാറാണ്"
+  }
+}

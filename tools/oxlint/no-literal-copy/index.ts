@@ -10,36 +10,86 @@ import type { ESTree } from '@oxlint/plugins';
  * concatenation in one of these positions is a leftover literal.
  */
 const COPY_PROPS = new Set([
-  'title',
-  'subtitle',
-  'label',
-  'placeholder',
-  'accessibilityLabel',
   'accessibilityHint',
-  'headerTitle',
-  'tabBarLabel',
-  'text',
-  'message',
+  'accessibilityLabel',
+  'actionLabel',
+  'alt',
+  'cancelLabel',
+  'caption',
+  'confirmLabel',
   'description',
   'doneLabel',
+  'emptyDescription',
   'emptyTitle',
+  'errorText',
+  'headerTitle',
+  'heading',
+  'helperText',
+  'hint',
+  'label',
+  'message',
+  'placeholder',
+  'subtitle',
+  'tabBarLabel',
+  'text',
+  'title',
+]);
+
+/**
+ * Object keys that are unmistakably UI copy, e.g. an Alert button's `text` or
+ * a card state's `actionLabel`. Deliberately narrower than `COPY_PROPS`:
+ * `title`, `message`, and `description` also name fields on errors, tRPC
+ * payloads, and analytics events, so flagging them on any object literal buries
+ * the real findings.
+ */
+const OBJECT_COPY_PROPS = new Set([
+  'accessibilityHint',
+  'accessibilityLabel',
+  'actionLabel',
+  'cancelLabel',
+  'confirmLabel',
+  'doneLabel',
+  'emptyDescription',
+  'emptyTitle',
+  'errorText',
+  'headerTitle',
+  'helperText',
+  'placeholder',
+  'tabBarLabel',
 ]);
 
 const URL_PATTERN = /^(https?:\/\/|mailto:|tel:)/i;
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-// testID-like: lowercase, no spaces, word chars separated by . _ -
-const TEST_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
+// A catalog key, e.g. 'kiloPass.manage'. These reach a copy prop through t(),
+// and a lookup table of keys is a normal shape, so a dotted identifier is not
+// copy. A single word is NOT matched on purpose: `title="settings"` and
+// `accessibilityLabel="hello"` are copy, and an earlier testID-shaped pattern
+// waved both through.
+const CATALOG_KEY_PATTERN = /^[a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+$/;
 
 const allowlistPath = fileURLToPath(new URL('./allowlist.json', import.meta.url));
 const allowlist = JSON.parse(readFileSync(allowlistPath, 'utf8')) as {
   files?: string[];
   values?: string[];
+  constants?: string[];
 };
 const allowedFiles = new Set(allowlist.files ?? []);
 const allowedValues = new Set(allowlist.values ?? []);
+// Constants that are a brand name, an acronym, a number, or a URL — not copy.
+// Named one by one on purpose: the list is the review record for every
+// SCREAMING_SNAKE value the app renders without translating it.
+const allowedConstants = new Set(allowlist.constants ?? []);
 
 function hasLetter(value: string): boolean {
   return /[A-Za-z]/.test(value);
+}
+
+/**
+ * True when the text holds a word, not a stray letter. `v{version}` renders
+ * the JSXText "v", which is punctuation for a number, not copy to translate.
+ */
+function hasWord(value: string): boolean {
+  return /[A-Za-z]{2}/.test(value);
 }
 
 function isIgnoredValue(value: string): boolean {
@@ -52,7 +102,7 @@ function isIgnoredValue(value: string): boolean {
   if (HEX_COLOR_PATTERN.test(value)) {
     return true;
   }
-  if (TEST_ID_PATTERN.test(value)) {
+  if (CATALOG_KEY_PATTERN.test(value)) {
     return true;
   }
   return false;
@@ -85,8 +135,27 @@ function literalValue(node: ESTree.Expression): string | null {
   return null;
 }
 
+/**
+ * A SCREAMING_SNAKE constant in a copy position is copy that never went
+ * through the catalog — the shape that let an English Kilo Pass string ship to
+ * every locale from `packages/app-shared`. `t()` returns a call, never an
+ * identifier, so this costs no false positives on translated copy.
+ */
+const SHOUTED_CONSTANT_PATTERN = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/;
+
+function isShoutedConstant(node: ESTree.Expression): boolean {
+  return (
+    node.type === 'Identifier' &&
+    SHOUTED_CONSTANT_PATTERN.test(node.name) &&
+    !allowedConstants.has(node.name)
+  );
+}
+
 /** True when the expression is a literal/template/concat that is copy. */
 function isCopyExpression(node: ESTree.Expression): boolean {
+  if (isShoutedConstant(node)) {
+    return true;
+  }
   if (node.type === 'Literal' && typeof node.value === 'string') {
     return hasLetter(node.value) && !isIgnoredValue(node.value);
   }
@@ -126,7 +195,7 @@ const noLiteralCopyRule = defineRule({
           return;
         }
         const text = node.value;
-        if (!hasLetter(text)) {
+        if (!hasWord(text)) {
           return;
         }
         const trimmed = text.trim();
@@ -137,6 +206,22 @@ const noLiteralCopyRule = defineRule({
           return;
         }
         context.report({ node, messageId: 'literalCopy' });
+      },
+      JSXExpressionContainer(node) {
+        if (isAllowedFile(context.filename)) {
+          return;
+        }
+        // Only a child container; an attribute value is handled below.
+        if (node.parent?.type !== 'JSXElement' && node.parent?.type !== 'JSXFragment') {
+          return;
+        }
+        const expression = node.expression;
+        if (expression.type === 'JSXEmptyExpression') {
+          return;
+        }
+        if (isShoutedConstant(expression)) {
+          context.report({ node, messageId: 'literalCopy' });
+        }
       },
       JSXAttribute(node) {
         if (isAllowedFile(context.filename)) {
@@ -164,6 +249,36 @@ const noLiteralCopyRule = defineRule({
           if (isCopyExpression(expression)) {
             context.report({ node, messageId: 'literalCopy' });
           }
+        }
+      },
+      Property(node) {
+        if (isAllowedFile(context.filename)) {
+          return;
+        }
+        if (node.computed || node.kind !== 'init') {
+          return;
+        }
+        const key = node.key;
+        const name =
+          key.type === 'Identifier'
+            ? key.name
+            : key.type === 'Literal' && typeof key.value === 'string'
+              ? key.value
+              : null;
+        if (name === null || !OBJECT_COPY_PROPS.has(name)) {
+          return;
+        }
+        const value = node.value;
+        if (
+          value.type === 'AssignmentPattern' ||
+          value.type === 'ArrayPattern' ||
+          value.type === 'ObjectPattern' ||
+          value.type === 'RestElement'
+        ) {
+          return;
+        }
+        if (isCopyExpression(value)) {
+          context.report({ node, messageId: 'literalCopy' });
         }
       },
       CallExpression(node) {

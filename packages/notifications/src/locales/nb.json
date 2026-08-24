@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agentøkten din har en oppdatering",
+      "chatMessage": "Du har en ny melding",
+      "instanceLifecycle": "Forekomsten din har en oppdatering",
+      "scheduledAction": "En planlagt handling har en oppdatering",
+      "lowBalance": "Saldoen din krever oppmerksomhet",
+      "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Oppgaven fullført"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Mislyktes: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Avbrutt: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Uten tittel",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Varsel om lav saldo",
+      "body": "Saldoen til {{organizationName}} falt under ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nytt sikkerhetsfunn ({{severity}})",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-advarsel",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-brudd",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Et sikkerhetsfunn krever oppmerksomhet"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} er klar",
+      "body": "Trykk for å begynne å chatte."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} kunne ikke startes",
+      "body": "Start mislyktes."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} vil startes på nytt snart",
+      "body": "Planlagt omstart kl. {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} omstart avbrutt",
+      "body": "Den tidligere planlagte omstarten er avbrutt."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} vil oppgraderes snart",
+      "bodyWithTag": "Oppgrader til {{targetImageTag}} kl. {{when}}.",
+      "bodyWithoutTag": "Planlagt oppgradering kl. {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} oppgradering avbrutt",
+      "body": "Den tidligere planlagte oppgraderingen er avbrutt."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo-økten din er klar til å styres fra telefonen"
+  }
+}

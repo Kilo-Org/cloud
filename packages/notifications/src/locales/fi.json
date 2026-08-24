@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agentti-istunnossasi on päivitys",
+      "chatMessage": "Sinulla on uusi viesti",
+      "instanceLifecycle": "Instanssissasi on päivitys",
+      "scheduledAction": "Ajoitetussa toiminnossa on päivitys",
+      "lowBalance": "Saldosi vaatii huomiota",
+      "securityFinding": "Tietoturvalöydös vaatii huomiota"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tehtävä valmis"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Epäonnistui: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Keskeytetty: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Nimetön",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Matalan saldon hälytys",
+      "body": "{{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Uusi tietoturvalöydös ({{severity}})",
+      "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-varoitus",
+      "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-rikkomus",
+      "body": "{{findingTitle}} kohteessa {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Tietoturvalöydös vaatii huomiota"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} on valmis",
+      "body": "Napauta aloittaaksesi keskustelun."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} käynnistys epäonnistui",
+      "body": "Käynnistys epäonnistui."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} käynnistyy uudelleen pian",
+      "body": "Ajoitettu käynnistymään uudelleen {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} uudelleenkäynnistys peruutettu",
+      "body": "Aiemmin ajoitettu uudelleenkäynnistys on peruutettu."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} päivittyy pian",
+      "bodyWithTag": "Päivitys versioon {{targetImageTag}} {{when}}.",
+      "bodyWithoutTag": "Ajoitettu päivitys {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} päivitys peruutettu",
+      "body": "Aiemmin ajoitettu päivitys on peruutettu."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo-istuntosi on valmis hallittavaksi puhelimestasi"
+  }
+}

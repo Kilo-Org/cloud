@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
 import {
-  REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE,
-  REMOTE_SPAWN_NON_RETRYABLE_TOAST,
-  REMOTE_SPAWN_RETRYABLE_TOAST,
+  remoteSpawnInstanceDisconnectedNote,
+  remoteSpawnNonRetryableToast,
+  remoteSpawnRetryableToast,
   type RemoteSubmitOutcomeAction,
   resolveRemoteSubmitOutcome,
 } from './remote-submit-outcome';
@@ -48,7 +48,7 @@ describe('resolveRemoteSubmitOutcome', () => {
       });
       expect(result.kind).toBe('retryable');
       if (result.kind === 'retryable') {
-        expect(result.toast).toBe(REMOTE_SPAWN_RETRYABLE_TOAST);
+        expect(result.toast).toBe(remoteSpawnRetryableToast());
         expect(result.shouldRefetchInstances).toBe(true);
       }
     });
@@ -122,7 +122,7 @@ describe('resolveRemoteSubmitOutcome', () => {
       });
       expect(result).toEqual({
         kind: 'nonRetryable',
-        toast: REMOTE_SPAWN_NON_RETRYABLE_TOAST,
+        toast: remoteSpawnNonRetryableToast(),
       });
     });
 
@@ -142,7 +142,7 @@ describe('resolveRemoteSubmitOutcome', () => {
 
   describe('toast copy constants', () => {
     it('exports the instance-disconnected note as a constant', () => {
-      expect(REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE).toBe(
+      expect(remoteSpawnInstanceDisconnectedNote()).toBe(
         'The selected instance disconnected. Start a session on Cloud Agent or pick another instance.'
       );
     });

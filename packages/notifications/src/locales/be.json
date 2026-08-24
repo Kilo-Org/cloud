@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Ваш сеанс агента мае абнаўленне",
+      "chatMessage": "У вас новае паведамленне",
+      "instanceLifecycle": "Ваш інстанс мае абнаўленне",
+      "scheduledAction": "Запланаванае дзеянне мае абнаўленне",
+      "lowBalance": "Ваш баланс патрабуе ўвагі",
+      "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Задача завершаная"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Не ўдалося: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Перарвана: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Без назвы",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Апавяшчэнне аб нізкім балансе",
+      "body": "Баланс {{organizationName}} апусціўся ніжэй за ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Новая знаходка ў бяспецы ({{severity}})",
+      "body": "{{findingTitle}} у {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Папярэджанне SLA",
+      "body": "{{findingTitle}} у {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Парушэнне SLA",
+      "body": "{{findingTitle}} у {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Знаходка ў бяспецы патрабуе ўвагі"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} гатовы",
+      "body": "Націсніце, каб пачаць размову."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} не ўдалося запусціць",
+      "body": "Запуск не ўдаўся."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} хутка перазапусціцца",
+      "body": "Запланаваны перазапуск у {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Перазапуск {{instanceName}} адменены",
+      "body": "Раней запланаваны перазапуск адменены."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} хутка абновіцца",
+      "bodyWithTag": "Абнаўленне да {{targetImageTag}} у {{when}}.",
+      "bodyWithoutTag": "Запланаванае абнаўленне ў {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Абнаўленне {{instanceName}} адмененае",
+      "body": "Раней запланаванае абнаўленне адмененае."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Ваш сеанс Kilo гатовы да кіравання з тэлефона"
+  }
+}

@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 
 type PrLinkPasteDecision =
@@ -35,6 +36,10 @@ export function selectPrLinkClearButtonVisible(input: PrLinkClearButtonInput): b
 }
 
 /** Toast copy when paste finds an empty clipboard. */
-export const PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY = 'Clipboard is empty';
+export function prLinkToastClipboardEmptyCopy(): string {
+  return i18n.t('prReview.linkPasteClipboardEmpty');
+}
 /** Toast copy when paste or Open gets a non-PR link. */
-export const PR_LINK_TOAST_INVALID_COPY = 'Not a GitHub pull request link';
+export function prLinkToastInvalidCopy(): string {
+  return i18n.t('prReview.linkPasteNotAPullRequest');
+}

@@ -303,17 +303,30 @@ export function buildIngestConnectionFailureMessage(
   return `Failed to connect to ingest: ${details.wsUrl} (${INGEST_CONNECTION_FAILURE_HINTS[details.reason]}${closeDetails})`;
 }
 
-/** Maximum number of reconnection attempts before giving up.
- *  3 attempts ≈ 7s total (1+2+4), fitting within the DO's 10s grace period. */
-const MAX_RECONNECT_ATTEMPTS = 3;
-/** Base delay for exponential backoff (1 second) */
+/** Base delay for exponential backoff between reconnect handshakes. */
 const RECONNECT_BASE_DELAY_MS = 1_000;
+/** Cap so a long Durable Object blackout does not grow the gap without bound. */
+const RECONNECT_MAX_DELAY_MS = 8_000;
+/** Wall-clock budget for a whole reconnect campaign. Some rejections are
+ *  permanent for this wrapper identity — the DO answers a stale run/connection
+ *  fence with 409 forever — and a WebSocket upgrade failure exposes no status
+ *  code to classify, so the ceiling is time. Generous enough to ride out a long
+ *  blackout (several hung `INGEST_RECONNECT_CONNECT_TIMEOUT_MS` handshakes),
+ *  after which the wrapper reports a disconnect so the Kilo turn is aborted and
+ *  the batch drains instead of retrying into a socket nobody will accept. */
+export const RECONNECT_TOTAL_BUDGET_MS = 5 * 60_000;
 /** Maximum time to wait for the SDK SSE `/event` handshake before aborting.
  *  The wrapper talks to kilo on loopback, so handshakes typically complete in
  *  <5ms; a 5s budget covers kilo startup hiccups without blocking `open()` on
  *  a silently stuck HTTP stream. */
 const SUBSCRIBE_HANDSHAKE_TIMEOUT_MS = 5_000;
-const INGEST_INITIAL_CONNECT_TIMEOUT_MS = 10_000;
+/** Fail-fast budget for the first ingest handshake (bad WORKER_URL / network). */
+export const INGEST_INITIAL_CONNECT_TIMEOUT_MS = 10_000;
+/** Recycle a hung reconnect handshake. Does not abort the Kilo turn — the
+ *  wrapper keeps trying until `close()`. A blocked DO can accept an already-
+ *  started socket tens of seconds late; aborting at 10s produced zombie ingest
+ *  sockets the wrapper had already given up on. */
+export const INGEST_RECONNECT_CONNECT_TIMEOUT_MS = 90_000;
 const MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS = 1_000;
 
 function buildIngestWebSocketUrl(session: NonNullable<WrapperState['currentSession']>): string {
@@ -487,6 +500,7 @@ export function createConnectionManager(
   let closedByUs = false;
   let reconnecting = false;
   let reconnectAttempt = 0;
+  let reconnectStartedAt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let generation = 0;
 
@@ -707,8 +721,14 @@ export function createConnectionManager(
    * @param expectedGeneration If provided, the connection is only accepted when
    *   `generation` still matches. This prevents a stale reconnect from assigning
    *   `ingestWs` and flushing buffered events after `close()` was called.
+   * @param connectTimeoutMs How long to wait for `onopen` before aborting this
+   *   handshake. Initial connect stays short; reconnects use a longer budget so
+   *   a stalled DO can still accept the in-flight socket.
    */
-  async function openIngestWs(expectedGeneration?: number): Promise<void> {
+  async function openIngestWs(
+    expectedGeneration?: number,
+    connectTimeoutMs: number = INGEST_INITIAL_CONNECT_TIMEOUT_MS
+  ): Promise<void> {
     const session = state.currentSession;
     if (!session) {
       throw new Error('Cannot open ingest WS: no session context');
@@ -838,7 +858,7 @@ export function createConnectionManager(
             /* ignore */
           }
         }
-      }, INGEST_INITIAL_CONNECT_TIMEOUT_MS);
+      }, connectTimeoutMs);
     });
   }
 
@@ -1290,6 +1310,7 @@ export function createConnectionManager(
     if (reconnecting) return;
     reconnecting = true;
     reconnectAttempt = 0;
+    reconnectStartedAt = Date.now();
     scheduleReconnect();
   }
 
@@ -1297,6 +1318,7 @@ export function createConnectionManager(
     logToFile(`reconnected successfully on attempt ${reconnectAttempt}`);
     reconnecting = false;
     reconnectAttempt = 0;
+    reconnectStartedAt = 0;
     // Re-store ingest WS in state (event subscription abort controller unchanged)
     const existingAbort = state.sseAbortController;
     if (ingestWs && existingAbort) {
@@ -1325,23 +1347,29 @@ export function createConnectionManager(
   }
 
   function scheduleReconnect(): void {
-    reconnectAttempt++;
-    if (reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
-      logToFile(`reconnection failed after ${MAX_RECONNECT_ATTEMPTS} attempts — giving up`);
+    const elapsed = Date.now() - reconnectStartedAt;
+    if (elapsed >= RECONNECT_TOTAL_BUDGET_MS) {
+      logToFile(
+        `reconnection failed after ${reconnectAttempt} attempts over ${elapsed}ms — giving up`
+      );
       reconnecting = false;
       reconnectAttempt = 0;
       callbacks.onDisconnect('ingest websocket closed (reconnection failed)');
       return;
     }
 
-    const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttempt - 1);
-    logToFile(`reconnect attempt ${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
+    reconnectAttempt++;
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY_MS * 2 ** (reconnectAttempt - 1),
+      RECONNECT_MAX_DELAY_MS
+    );
+    logToFile(`reconnect attempt ${reconnectAttempt} in ${delay}ms`);
     callbacks.onReconnecting?.(reconnectAttempt);
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       const gen = generation;
-      openIngestWs(gen)
+      openIngestWs(gen, INGEST_RECONNECT_CONNECT_TIMEOUT_MS)
         .then(() => {
           if (gen !== generation) {
             discardStaleReconnect();
@@ -1365,6 +1393,7 @@ export function createConnectionManager(
     }
     reconnecting = false;
     reconnectAttempt = 0;
+    reconnectStartedAt = 0;
   }
 
   return {

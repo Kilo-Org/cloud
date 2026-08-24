@@ -158,6 +158,109 @@ describe('executeDirectly failure handling', () => {
     expect(result.wrapperRuntimeState.noOutputDeadlineAt).toBeGreaterThan(result.staleDeadline);
   });
 
+  /**
+   * A held delivery (the previous wrapper batch is still finalizing) never
+   * reaches preparation: the message stays queued and is retried moments later.
+   * Settling a preparation attempt from that outcome would flash a spurious
+   * "Environment preparation failed" card between the two tries.
+   */
+  async function drainWithRuntimeResult(
+    keySuffix: string,
+    result: { success: false; code: string; error: string },
+    emitProgress = false
+  ) {
+    const userId = `user_exec_direct_${keySuffix}`;
+    const sessionId = `agent_exec_direct_${keySuffix}`;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    return runInDurableObject(stub, async (instance, state) => {
+      (instance as any).agentRuntime = {
+        send: async (_plan: unknown, hooks: any) => {
+          if (emitProgress) hooks?.onProgress?.('sandbox_provision', 'Provisioning sandbox…');
+          return result;
+        },
+        requestSnapshot: async () => {},
+        interruptWrapper: async () => ({ commandSent: false }),
+        sendPing: () => {},
+        keepSandboxAlive: async () => {},
+      };
+
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: `org_exec_direct_${keySuffix}`,
+        kiloSessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        prompt: 'initial prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: `token-${keySuffix}`,
+      });
+
+      await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'do some work',
+          messageId: 'msg_018f1e2d3c4bHeldMsgAbCdEfG',
+        })
+      );
+      await instance.alarm();
+
+      const db = drizzle(state.storage, { logger: false });
+      const eventQueries = createEventQueries(db, state.storage.sql);
+      const attemptRows = eventQueries.findByEntityPrefix('preparation/attempt/');
+      return {
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        preparationEvents: attemptRows,
+        attemptStatuses: attemptRows
+          .map(row => parsePreparationAttemptStatus(row.payload))
+          .filter((status): status is string => status !== null),
+      };
+    });
+  }
+
+  it('a held delivery leaves no preparation attempt behind', async () => {
+    const result = await drainWithRuntimeResult('held', {
+      success: false,
+      code: 'WRAPPER_FINALIZING',
+      error: 'Wrapper batch is finalizing',
+    });
+
+    expect(result.preparationEvents).toEqual([]);
+    // Held, not failed: the message is still queued for the next drain.
+    expect(result.pending.map(message => message.messageId)).toEqual([
+      'msg_018f1e2d3c4bHeldMsgAbCdEfG',
+    ]);
+  });
+
+  it('a hold raised after preparation started terminalizes that attempt', async () => {
+    const result = await drainWithRuntimeResult(
+      'held-after-progress',
+      { success: false, code: 'WRAPPER_FINALIZING', error: 'Wrapper batch is finalizing' },
+      true
+    );
+
+    // The attempt exists (progress was observed) and must not be left running,
+    // or clients stay in the preparing state forever.
+    expect(result.attemptStatuses).toEqual(['failed']);
+  });
+
+  function parsePreparationAttemptStatus(payload: unknown): string | null {
+    const parsed = JSON.parse(String(payload)) as { attempt?: { status?: string } };
+    return parsed.attempt?.status ?? null;
+  }
+
+  it('a terminal delivery failure still records a failed preparation attempt', async () => {
+    const result = await drainWithRuntimeResult('terminal', {
+      success: false,
+      code: 'SANDBOX_CAPABILITY_UNAVAILABLE',
+      error: 'Sandbox capability unavailable',
+    });
+
+    expect(result.preparationEvents.length).toBeGreaterThan(0);
+  });
+
   it('queued flush pre-start failure retries cleanly with the original execution and message ids', async () => {
     const userId = 'user_exec_direct_fail';
     const sessionId = 'agent_exec_direct_fail';

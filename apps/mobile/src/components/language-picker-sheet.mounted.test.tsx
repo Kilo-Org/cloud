@@ -19,11 +19,38 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
+// FlatList renders through a callback, so a host-string mock would drop every
+// row. This mock calls the render props so the row assertions still see rows.
+const flatListMock = vi.hoisted(
+  () =>
+    ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListHeaderComponent,
+      ListEmptyComponent,
+    }: {
+      data: readonly { tag: string }[];
+      renderItem: (info: { item: unknown; index: number }) => unknown;
+      keyExtractor: (item: { tag: string }) => string;
+      ListHeaderComponent?: unknown;
+      ListEmptyComponent?: unknown;
+    }) => {
+      const { createElement: create, Fragment } = require('react');
+      const rows = data.map((item, index) =>
+        create(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
+      );
+      const empty = data.length === 0 ? ListEmptyComponent : null;
+      return create('FlatList', null, ListHeaderComponent, ...rows, empty);
+    }
+);
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  FlatList: flatListMock,
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  TextInput: 'TextInput',
   View: 'View',
   I18nManager: i18nManager,
 }));

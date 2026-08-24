@@ -62,7 +62,10 @@ import {
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
 import { syncRtl } from '@/i18n/rtl';
-import { readLanguageReturnTarget } from '@/i18n/return-target';
+import {
+  type LanguageReturnTarget,
+  readLanguageReturnTarget,
+} from '@/i18n/return-target';
 import {
   getResolvedLanguage,
   preloadLanguagePreference,
@@ -352,7 +355,7 @@ function RootLayoutNav() {
       // after the reload path, so the helper's one-shot delete is the only read.
       // On a failed reload the key stays in SecureStore, so Retry's successful
       // reloadAppAsync() still reopens the right screen on the relaunch.
-      let returnTarget: 'login' | 'profile' | null = null;
+      let returnTarget: LanguageReturnTarget | null = null;
       if (!reloadFailed) {
         try {
           returnTarget = await readLanguageReturnTarget();
@@ -364,6 +367,8 @@ function RootLayoutNav() {
         router.replace('/(auth)/login');
       } else if (returnTarget === 'profile') {
         router.replace('/(app)/(tabs)/(3_profile)');
+      } else if (returnTarget === 'preferences') {
+        router.replace('/(app)/(tabs)/(3_profile)/preferences');
       }
       try {
         await i18n.changeLanguage(resolved);

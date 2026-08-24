@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { LANGUAGE_RETURN_TARGET_KEY } from '@/lib/storage-keys';
 
-export type LanguageReturnTarget = 'login' | 'profile';
+export type LanguageReturnTarget = 'login' | 'profile' | 'preferences';
 
 /**
  * One-shot return target written before an RTL reload so the relaunched app
@@ -15,7 +15,7 @@ export async function writeLanguageReturnTarget(target: LanguageReturnTarget): P
 export async function readLanguageReturnTarget(): Promise<LanguageReturnTarget | null> {
   const raw = await SecureStore.getItemAsync(LANGUAGE_RETURN_TARGET_KEY);
   await SecureStore.deleteItemAsync(LANGUAGE_RETURN_TARGET_KEY);
-  if (raw === 'login' || raw === 'profile') {
+  if (raw === 'login' || raw === 'profile' || raw === 'preferences') {
     return raw;
   }
   return null;

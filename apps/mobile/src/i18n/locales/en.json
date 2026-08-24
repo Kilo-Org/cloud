@@ -30,7 +30,10 @@
     "couldNotRestart": "Could not restart",
     "languageSaved": "Your language is saved.",
     "catalogLoadFailed": "Could not load the language. Please try again.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "search": "Search languages",
+    "noMatches": "No languages match",
+    "deviceLanguage": "Device language"
   },
   "login": {
     "welcome": "Welcome to Kilo",
@@ -141,7 +144,8 @@
     "notificationsSubtitle": "Push preferences",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
-    "appearanceDark": "Dark"
+    "appearanceDark": "Dark",
+    "account": "Account"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -2424,7 +2428,9 @@
     "opensManagementOnWeb": "Opens Kilo Pass management on web.",
     "opensAppStoreManagement": "Opens App Store subscription management.",
     "opensPlans": "Opens Kilo Pass plans.",
-    "tryAgainFromProfile": "Try again from Profile."
+    "tryAgainFromProfile": "Try again from Profile.",
+    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
+    "webManagementDescription": "This Kilo Pass is managed on the web."
   },
   "consent": {
     "kilo": "Kilo",

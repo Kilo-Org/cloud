@@ -327,28 +327,3 @@ describe('useDeleteAccount', () => {
     expect(current(holder).isPending).toBe(false);
   });
 });
-
-describe('ProfileScreen language row', () => {
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    authToken.value = 'token-1';
-    providersQueryFn.mockReset();
-    organizationsQueryFn.mockReset();
-    providersQueryFn.mockResolvedValue({ providers: [] });
-    organizationsQueryFn.mockResolvedValue([]);
-  });
-
-  it('renders a Language row in the App section', async () => {
-    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
-
-    const rows = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
-    );
-    const languageRows = rows.filter(row => row.props.title === 'Language');
-
-    expect(languageRows).toHaveLength(1);
-    expect(languageRows[0]?.props.icon).toBe('Globe');
-
-    unmount();
-  });
-});

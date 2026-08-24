@@ -1,6 +1,13 @@
 {
   "$schema": "../node_modules/oxlint/configuration_schema.json",
-  "plugins": ["oxc", "typescript", "unicorn", "react", "import", "promise"],
+  "plugins": [
+    "oxc",
+    "typescript",
+    "unicorn",
+    "react",
+    "import",
+    "promise"
+  ],
   "jsPlugins": [
     {
       "name": "react-native",
@@ -35,7 +42,10 @@
     "restriction": "error",
     "nursery": "error"
   },
-  "ignorePatterns": ["dist/*", "node_modules/**"],
+  "ignorePatterns": [
+    "dist/*",
+    "node_modules/**"
+  ],
   "rules": {
     "no-restricted-imports": [
       "error",
@@ -43,7 +53,9 @@
         "paths": [
           {
             "name": "react-native",
-            "importNames": ["Image"],
+            "importNames": [
+              "Image"
+            ],
             "message": "Import Image from @/components/ui/image instead."
           },
           {
@@ -62,7 +74,10 @@
     "import/no-self-import": "error",
     "import/no-duplicates": "error",
     "import/no-mutable-exports": "error",
-    "import/consistent-type-specifier-style": ["error", "prefer-inline"],
+    "import/consistent-type-specifier-style": [
+      "error",
+      "prefer-inline"
+    ],
     "promise/always-return": "error",
     "promise/catch-or-return": "error",
     "promise/no-nesting": "error",
@@ -191,7 +206,10 @@
     "oxc/no-optional-chaining": "off",
     "@typescript-eslint/strict-boolean-expressions": "off",
     "@typescript-eslint/no-import-type-side-effects": "off",
-    "@typescript-eslint/consistent-type-definitions": ["error", "type"],
+    "@typescript-eslint/consistent-type-definitions": [
+      "error",
+      "type"
+    ],
     "@typescript-eslint/no-namespace": "off",
     "import/no-namespace": "off",
     "oxc/no-rest-spread-properties": "off",
@@ -208,31 +226,42 @@
   },
   "overrides": [
     {
-      "files": ["src/components/ui/image.tsx"],
+      "files": [
+        "src/components/ui/image.tsx"
+      ],
       "rules": {
         "no-restricted-imports": "off"
       }
     },
     {
-      "files": ["src/components/ui/icons.ts"],
+      "files": [
+        "src/components/ui/icons.ts"
+      ],
       "rules": {
         "no-restricted-imports": "off"
       }
     },
     {
-      "files": ["src/components/ui/**/*.tsx"],
+      "files": [
+        "src/components/ui/**/*.tsx"
+      ],
       "rules": {
         "react/jsx-no-constructed-context-values": "off"
       }
     },
     {
-      "files": ["src/app/**/_layout.tsx", "src/app/**/*.tsx"],
+      "files": [
+        "src/app/**/_layout.tsx",
+        "src/app/**/*.tsx"
+      ],
       "rules": {
         "import/no-default-export": "off"
       }
     },
     {
-      "files": ["src/app/_layout.tsx"],
+      "files": [
+        "src/app/_layout.tsx"
+      ],
       "rules": {
         "react/style-prop-object": "off"
       }
@@ -254,6 +283,24 @@
         "anti-slop/no-runtime-typeof": "off",
         "anti-slop/no-unknown-returns": "off",
         "zod-utils/no-inline-zod-schema": "off"
+      }
+    },
+    {
+      "files": [
+        "src/i18n/catalogs.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "unicorn/prefer-module": "off"
+      }
+    },
+    {
+      "files": [
+        "src/i18n/index.ts"
+      ],
+      "rules": {
+        "promise/prefer-await-to-callbacks": "off"
       }
     }
   ]

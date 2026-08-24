@@ -25,7 +25,14 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
   const { sessionId } = await searchParams;
 
   if (!sessionId || isNewSession(sessionId)) {
-    return <CloudChatPageWrapperNext organizationId={organizationId} />;
+    return (
+      <CloudChatPageWrapperNext
+        organizationId={organizationId}
+        organizationName={result.data.organization.name}
+        organizationRole={result.data.user.role}
+        currentUserId={result.data.user.id}
+      />
+    );
   }
 
   return <LegacySessionViewer sessionId={sessionId} organizationId={organizationId} />;

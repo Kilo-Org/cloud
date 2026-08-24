@@ -47,6 +47,7 @@ import {
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
+import { clearSessionAttentionForSignOut } from '@/lib/session-attention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
@@ -328,6 +329,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearKiloClawOwned(),
             clearRecentPrs(),
             clearViewedFiles(),
+            clearSessionAttentionForSignOut(),
           ]);
           // Synchronous preference clears so they don't leak to the next
           // signed-in account. A synchronous throw here still falls through

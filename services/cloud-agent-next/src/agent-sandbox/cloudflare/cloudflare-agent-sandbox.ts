@@ -79,6 +79,7 @@ import {
   ensureSandboxBillingAdmissionInput,
   isSandboxBillingBlocked,
   isSandboxContainerRunning,
+  getSandboxBillingRuntimeStatus,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
@@ -283,6 +284,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   async isBillingBlocked(enforcementRequested = false): Promise<boolean> {
     const sandboxId = await this.resolveSandboxId();
     return this.sandboxBillingBlocked(this.resolveSandbox(sandboxId), enforcementRequested);
+  }
+
+  async getBillingRuntimeStatus() {
+    const sandboxId = await this.resolveSandboxId();
+    const status = await getSandboxBillingRuntimeStatus(this.resolveSandbox(sandboxId));
+    return status ? { ...status, sandboxId } : undefined;
   }
 
   private async getSandbox(options?: {

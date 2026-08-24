@@ -3,11 +3,11 @@
  *
  * Security settled-outcome coverage for the two intents added in P1-A-07c:
  * `start_analysis` (admitted through `runSecurityLedgerSubmit`, settled by the
- * web observation settle) and `apply_auto_remediation` (admitted after the
- * manual remediation attempt commits, keyed `remediation:<attemptId>` with
- * `provider_ref = attemptId`). The ledger helpers are mocked; the observation
- * settle reads the real `operation_ledgers` table, so rows are inserted
- * directly.
+ * web observation settle) and `apply_auto_remediation`, whose row the Worker
+ * admits before the queue hand-off — the web handler must NOT admit it, or a
+ * web admit could land after the Worker's terminal settle and leave the row
+ * unsettled forever. The ledger helpers are mocked; the observation settle
+ * reads the real `operation_ledgers` table, so rows are inserted directly.
  */
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { createSecurityAgentHandlers as createSecurityAgentHandlersType } from './router/shared-handlers';
@@ -321,7 +321,7 @@ describe('analysis web observation settle', () => {
   });
 });
 
-describe('remediation manual submit ledger admission', () => {
+describe('remediation manual submit', () => {
   const ATTEMPT_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   const REMEDIATION_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
@@ -333,17 +333,13 @@ describe('remediation manual submit ledger admission', () => {
       attemptId: ATTEMPT_ID,
       attemptNumber: 1,
     });
-    mockAdmitOperation.mockResolvedValue({
-      admission: 'admitted',
-      row: ledgerRow({
-        intent: 'apply_auto_remediation',
-        operation_key: `remediation:${ATTEMPT_ID}`,
-        resource_key: `security:apply_auto_remediation:user:user-123:${FINDING_ID}`,
-      }),
-    });
   });
 
-  it('admits with operation key remediation:<attemptId> and records provider_ref = attemptId', async () => {
+  // The Worker admits the `apply_auto_remediation` ledger row before the queue
+  // hand-off (see `startManualRemediation`), so the web handler must not admit
+  // it a second time: a web admit racing the Worker's terminal settle would
+  // leave the row admitted forever.
+  it('returns the queued attempt without admitting a ledger row', async () => {
     await expect(
       createPersonalHandlers().startRemediation.handler({
         ctx: context,
@@ -357,46 +353,18 @@ describe('remediation manual submit ledger admission', () => {
       attemptNumber: 1,
     });
 
-    const admitInput = mockAdmitOperation.mock.calls[0]?.[1] as {
-      intent: string;
-      operationKey: string;
-      resourceKey: string;
-    };
-    expect(admitInput).toMatchObject({
-      intent: 'apply_auto_remediation',
-      operationKey: `remediation:${ATTEMPT_ID}`,
-      resourceKey: `security:apply_auto_remediation:user:user-123:${FINDING_ID}`,
-    });
-
-    expect(mockRecordOperationAcceptance.mock.calls[0]?.[1]).toEqual({
-      rowId: 'ledger-row-id',
-      providerRef: ATTEMPT_ID,
-      canonicalResult: {
-        attemptId: ATTEMPT_ID,
-        remediationId: REMEDIATION_ID,
-        attemptNumber: 1,
-      },
-    });
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+    expect(mockRecordOperationAcceptance).not.toHaveBeenCalled();
   });
 
-  it('does not fail the request when the remediation ledger admit fails', async () => {
-    mockAdmitOperation.mockRejectedValue(new Error('database unavailable'));
-    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-
+  it('does not admit a ledger row on retry either', async () => {
     await expect(
-      createPersonalHandlers().startRemediation.handler({
+      createPersonalHandlers().retryRemediation.handler({
         ctx: context,
         input: { findingId: FINDING_ID },
       })
-    ).resolves.toEqual({
-      success: true,
-      queued: true,
-      remediationId: REMEDIATION_ID,
-      attemptId: ATTEMPT_ID,
-      attemptNumber: 1,
-    });
+    ).resolves.toMatchObject({ success: true, attemptId: ATTEMPT_ID });
 
-    expect(error).toHaveBeenCalled();
-    error.mockRestore();
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
   });
 });

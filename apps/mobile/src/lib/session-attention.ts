@@ -91,6 +91,7 @@ const store: AttentionStore = (globalScope[STORE_KEY] ??= {
 type AttentionKv = {
   getItem: (scope: string, k: string) => Promise<string | null>;
   setItem: (scope: string, k: string, v: string) => Promise<void>;
+  clearScope: (scope: string) => Promise<void>;
 };
 
 let kvModulePromise: Promise<AttentionKv | null> | null = null;
@@ -351,6 +352,39 @@ export function reconcileSessionAttention(
     });
     commit();
   }
+}
+
+/**
+ * Sign-out cleanup: drop every ack from memory and from the encrypted KV.
+ *
+ * Entries carry the signed-out account's session ids, so they must not survive
+ * the teardown — the next account hydrating this scope would both read the
+ * previous user's ids and let a stale ack suppress its own badge. The delete
+ * is chained through the same FIFO as the writes so a queued bump cannot
+ * re-persist the blob afterwards, and hydration is re-armed so the next
+ * signed-in account starts from an empty store.
+ *
+ * Best effort: a storage failure is swallowed so it can never abort sign-out.
+ */
+export async function clearSessionAttentionForSignOut(): Promise<void> {
+  store.entries.clear();
+  bumpRevision();
+  lastWrite = chainSave(SESSION_ATTENTION_KEY, async () => {
+    const kv = await loadKv();
+    if (!kv) {
+      return;
+    }
+    try {
+      await kv.clearScope(SESSION_ATTENTION_KEY);
+    } catch {
+      // Swallow: the in-memory store is already empty; a stale blob is
+      // discarded by the next hydration's identity-free reset at worst.
+    }
+  });
+  await lastWrite;
+  // Re-arm hydration so the next account does not read the cleared blob
+  // through the settled promise of this run.
+  hydrationPromise = null;
 }
 
 export function isAttentionAcked(sessionId: string, raiseId: string | null): boolean {

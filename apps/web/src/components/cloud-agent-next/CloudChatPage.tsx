@@ -29,6 +29,9 @@ import { PermissionCard, PermissionContextProvider } from './PermissionCard';
 import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { CloudAgentTerminalPane } from './CloudAgentTerminalDock';
+import { CloudAgentBillingError } from './CloudAgentBillingError';
+import { billingPayerPresentation } from './billing-payer-presentation';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import {
   CHAT_TAB_ID,
@@ -177,7 +180,12 @@ DynamicMessages.displayName = 'DynamicMessages';
 // ---------------------------------------------------------------------------
 const emptyQuestionRequestIds = new Map<string, string>();
 
-type CloudChatPageProps = { organizationId?: string };
+type CloudChatPageProps = {
+  currentUserId?: string;
+  organizationId?: string;
+  organizationName?: string;
+  organizationRole?: OrganizationRole;
+};
 
 type TerminalStatusSummary = { status: TerminalStatus; statusText: string };
 
@@ -213,7 +221,12 @@ function TerminalPaneSlot({
   );
 }
 
-export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
+export default function CloudChatPage({
+  currentUserId,
+  organizationId,
+  organizationName,
+  organizationRole,
+}: CloudChatPageProps) {
   const manager = useManager();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -250,6 +263,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
+  const billingFailure = useAtomValue(manager.atoms.billingFailure);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const sessionId = useAtomValue(manager.atoms.sessionId);
   const activity = useAtomValue(manager.atoms.activity);
@@ -799,9 +813,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       gitUrl={fetchedSessionData?.gitUrl}
       model={sessionConfig?.model}
       modelDisplayName={modelDisplayName}
-      totalCost={totalCost}
+      tokenUsage={totalCost}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
+      sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
     />
   );
 
@@ -828,7 +843,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
               title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
             >
               {totalCost > 0 && (
-                <span className="text-muted-foreground text-sm">${totalCost.toFixed(4)}</span>
+                <span className="text-muted-foreground text-sm">
+                  Token Usage{' '}
+                  <span className="font-mono tabular-nums">${totalCost.toFixed(4)}</span>
+                </span>
               )}
             </SetPageTitle>
             {showChatInterface ? (
@@ -895,9 +913,11 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 isStreaming={isStreaming}
                               />
                             )}
-                            {visibleStatusIndicator && (
-                              <SessionStatusIndicator indicator={visibleStatusIndicator} />
-                            )}
+                            {!billingFailure &&
+                              visibleStatusIndicator &&
+                              visibleStatusIndicator.type !== 'error' && (
+                                <SessionStatusIndicator indicator={visibleStatusIndicator} />
+                              )}
 
                             <div ref={messagesEndRef} />
                           </div>
@@ -956,6 +976,24 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                               </div>
                             )}
                             <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                              {billingFailure && (
+                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
+                                  <CloudAgentBillingError
+                                    failure={billingFailure}
+                                    presentation={billingPayerPresentation(billingFailure, {
+                                      currentUserId,
+                                      organization:
+                                        organizationId && organizationName && organizationRole
+                                          ? {
+                                              id: organizationId,
+                                              name: organizationName,
+                                              role: organizationRole,
+                                            }
+                                          : undefined,
+                                    })}
+                                  />
+                                </div>
+                              )}
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
@@ -994,6 +1032,11 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                   },
                                 }}
                               />
+                              {!billingFailure && statusIndicator?.type === 'error' && (
+                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2" role="alert">
+                                  <SessionStatusIndicator indicator={statusIndicator} />
+                                </div>
+                              )}
                               {(sessionConfig?.repository ||
                                 (contextUsage !== undefined && contextWindow !== undefined)) && (
                                 <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">

@@ -44,12 +44,20 @@ const ADMISSION_CODE_TO_TRPC: Record<NonTransientExecutionCode, TRPCCodeName> = 
   NOT_FOUND: 'NOT_FOUND',
   BAD_REQUEST: 'BAD_REQUEST',
   PAYMENT_REQUIRED: 'PAYMENT_REQUIRED',
+  COMPUTE_STOPPING: 'CONFLICT',
+  BILLING_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   PENDING_QUEUE_FULL: 'TOO_MANY_REQUESTS',
   INTERNAL: 'INTERNAL_SERVER_ERROR',
 };
 
 function isAdmissionFailureRetryable(code: AdmissionFailureCode): boolean {
-  return isRetryableCode(code) || code === 'PENDING_QUEUE_FULL' || code === 'INTERNAL';
+  return (
+    isRetryableCode(code) ||
+    code === 'PENDING_QUEUE_FULL' ||
+    code === 'INTERNAL' ||
+    code === 'COMPUTE_STOPPING' ||
+    code === 'BILLING_UNAVAILABLE'
+  );
 }
 
 export function throwAdmissionError(
@@ -66,6 +74,7 @@ export function throwAdmissionError(
       error: result.code,
       message: result.error,
       retryable: explicitlyRetryable,
+      ...(result.billingFailure ? { billingFailure: result.billingFailure } : {}),
     },
   });
 }

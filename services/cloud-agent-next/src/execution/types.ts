@@ -230,6 +230,15 @@ export type RetryableResultCode =
 
 export type PermanentDeliveryResultCode = 'SANDBOX_CAPABILITY_UNAVAILABLE';
 
+// Keep aligned with the customer-safe schemas in trpc-error.ts and cloud-agent-sdk.
+export type CustomerBillingFailure = {
+  code: 'INSUFFICIENT_CREDITS' | 'COMPUTE_STOPPING' | 'BILLING_UNAVAILABLE';
+  payer: { type: 'user' | 'org'; id: string };
+  retryable: boolean;
+  remainingMicrodollars?: number;
+  minimumRequiredMicrodollars?: number;
+};
+
 export type AdmissionFailure = {
   success: false;
   code:
@@ -237,9 +246,12 @@ export type AdmissionFailure = {
     | 'BAD_REQUEST'
     | 'INTERNAL'
     | 'PAYMENT_REQUIRED'
+    | 'COMPUTE_STOPPING'
+    | 'BILLING_UNAVAILABLE'
     | 'PENDING_QUEUE_FULL'
     | RetryableResultCode;
   error: string;
+  billingFailure?: CustomerBillingFailure;
   failureBoundary?: 'registration' | 'admission';
 };
 

@@ -679,11 +679,11 @@ function SubstackCredentialDialog({
               value={material}
               onChange={event => setMaterial(event.target.value)}
               className="min-h-28 font-mono"
-              placeholder="substack.sid=…"
+              placeholder="connect.sid=…"
             />
             <p className="text-muted-foreground text-xs">
-              Paste the <span className="font-mono">substack.sid</span> cookie from a logged-in
-              Substack session.
+              Paste the full <span className="font-mono">connect.sid=…</span> cookie string from a
+              logged-in Substack session.
             </p>
           </div>
         </div>

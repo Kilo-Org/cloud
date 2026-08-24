@@ -1,6 +1,8 @@
 export type DeletionAttentionHint = {
   title: string;
   action: string;
+  href?: string;
+  hrefLabel?: string;
 };
 
 const HTTP_STATUS_RE = /^http_(\d+)$/;
@@ -47,6 +49,31 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   missing_target_email: {
     title: 'Request is missing the target email',
     action: 'Cancel this request and enqueue it again with the target email.',
+  },
+  delete_ready_missing: {
+    title: 'Pylon ticket is missing the delete-ready tag',
+    action: 'Add the delete-ready tag in Pylon, then Retry preflight.',
+  },
+  relay_or_internal_email: {
+    title: 'Target is a relay or internal email',
+    action:
+      'Enter the real customer email. Do not delete @app.kilocode.ai or Pylon relay addresses.',
+  },
+  duplicate_of_active_request: {
+    title: 'Another active request already targets this email',
+    action: 'Open the existing request. Cancel one of them before retrying this ticket.',
+  },
+  app_relay_reply_to_missing: {
+    title: 'App-relay ticket has no external reply-to',
+    action: 'Add the customer reply-to on the first Pylon message, or paste the customer email.',
+  },
+  app_relay_reply_to_ambiguous: {
+    title: 'App-relay ticket has multiple external reply-to emails',
+    action: 'Paste the customer email explicitly, then Retry or re-enqueue.',
+  },
+  resolves_at_preflight: {
+    title: 'Customer email will be resolved at preflight',
+    action: 'The worker will read the Pylon ticket after you submit. No action needed now.',
   },
   kilo_pass_active: {
     title: 'Kilo Pass subscription is still active',
@@ -134,10 +161,28 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     action:
       'Open PostHog, delete or merge the matching people, then Retry or Mark done with evidence.',
   },
+  posthog_manual_required: {
+    title: 'PostHog deletion needs a manual search',
+    action:
+      'Open PostHog, search for the target email, delete the person, then Retry or Mark done with evidence.',
+  },
+  posthog_acceptance_incomplete: {
+    title: 'PostHog did not accept the full deletion',
+    action:
+      'Open PostHog and confirm the person, events, and recordings deletion. Then Retry or Mark done with evidence.',
+  },
   posthog_verify_timeout: {
     title: 'PostHog deletion did not confirm in time',
     action:
       'Check the PostHog deletion task. If it finished, Mark done with evidence. Otherwise Retry.',
+  },
+  substack_publication_invalid: {
+    title: 'Substack publication URL is invalid',
+    action: 'Set SUBSTACK_PUBLICATION_URL to blog.kilo.ai or a substack.com host, then Retry.',
+  },
+  substack_redirect_blocked: {
+    title: 'Substack redirected instead of deleting',
+    action: 'Replace the Substack session credential, then Retry.',
   },
   substack_lookup_incomplete: {
     title: 'Substack subscriber lookup returned an incomplete payload',
@@ -153,6 +198,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Multiple Pylon contacts match this target',
     action:
       'Open Pylon, delete or merge the matching contacts, then Retry or Mark done with evidence.',
+  },
+  pylon_contact_shared_identity: {
+    title: 'Pylon contact is shared with another Kilo user',
+    action:
+      'Do not delete this Pylon contact from this request. Split the shared contact, then Retry or Mark done with evidence.',
   },
   pylon_ticket_invalid: {
     title: 'Pylon ticket on this request is invalid',
@@ -274,6 +324,23 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Usage prompt cleanup progress is invalid',
     action: 'Inspect the task progress and repair it before retrying the cleanup.',
   },
+  csa_unauthorized: {
+    title: 'CSA rejected the support-DB scrub',
+    action: 'Confirm SUPPORT_API_SECRET matches CSA KILO_SUPPORT_API_SECRET, then Retry.',
+  },
+  csa_blocked_email: {
+    title: 'CSA refused this email as a relay or internal target',
+    action:
+      'This should have been blocked at intake. Confirm the target email, then cancel or Retry.',
+  },
+  csa_response_unparsed: {
+    title: 'CSA scrub response could not be parsed',
+    action: 'Retry. If it keeps failing, check CSA logs for this request id.',
+  },
+  csa_base_url_missing: {
+    title: 'CSA base URL is not configured',
+    action: 'Set CSA_APP_BASE_URL, then Retry.',
+  },
 };
 
 export function deletionAttentionHint(
@@ -297,4 +364,26 @@ export function deletionAttentionHint(
 
 function humanizeCode(code: string): string {
   return code.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
+}
+
+export function deletionManualSearchHref(params: {
+  stepKey: string;
+  email?: string | null;
+}): { href: string; label: string } | null {
+  const email = params.email?.trim().toLowerCase();
+  if (params.stepKey === 'posthog') {
+    const search = email ? `?search=${encodeURIComponent(email)}` : '';
+    return {
+      href: `https://us.posthog.com/persons${search}`,
+      label: 'Open PostHog persons',
+    };
+  }
+  if (params.stepKey === 'substack') {
+    const search = email ? `?s=${encodeURIComponent(email)}` : '';
+    return {
+      href: `https://kilocode.substack.com/publish/subscribers${search}`,
+      label: 'Open Substack subscribers',
+    };
+  }
+  return null;
 }

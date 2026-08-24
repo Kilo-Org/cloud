@@ -20,32 +20,32 @@ describe('deletion completion gates', () => {
     await cleanupDbForTest();
   });
 
-  it('advances an email-only request to completed when teardowns and anonymize are not_applicable', async () => {
+  it('moves a v2 request to finalizing after teardown and anonymize succeed', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.InProgress);
-    await setStepsStatus(requestId, [...teardownStepKeys(), UserDeletionStepKey.Anonymize], {
+    await setStepsStatus(requestId, [...teardownStepKeys(2), UserDeletionStepKey.Anonymize], {
       status: UserDeletionStepStatus.NotApplicable,
     });
 
     await advanceDeletionGates(requestId);
 
     const request = await loadRequest(requestId);
-    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Finalizing);
     expect(request?.anonymized_at).toBeNull();
   });
 
-  it('completes a finalizing request after the last catalog task is persisted', async () => {
+  it('completes a finalizing v2 request after every catalog task is persisted', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
     await setStepsStatus(
       requestId,
-      catalogForVersion(1)
+      catalogForVersion(2)
         .map(entry => entry.stepKey)
-        .filter(key => key !== UserDeletionStepKey.Anonymize),
+        .filter(key => key !== UserDeletionStepKey.CsaSupportDb),
       { status: UserDeletionStepStatus.NotApplicable }
     );
     const claimToken = crypto.randomUUID();
-    await setStepsStatus(requestId, [UserDeletionStepKey.Anonymize], {
+    await setStepsStatus(requestId, [UserDeletionStepKey.CsaSupportDb], {
       status: UserDeletionStepStatus.Running,
       claim_token: claimToken,
       claimed_until: new Date(Date.now() + 60_000).toISOString(),
@@ -53,7 +53,7 @@ describe('deletion completion gates', () => {
 
     const persisted = await persistHandlerOutcome({
       requestId,
-      stepKey: UserDeletionStepKey.Anonymize,
+      stepKey: UserDeletionStepKey.CsaSupportDb,
       claimToken,
       outcome: { kind: 'not_applicable' },
     });
@@ -68,7 +68,7 @@ describe('deletion completion gates', () => {
     await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
     await setStepsStatus(
       requestId,
-      catalogForVersion(1).map(entry => entry.stepKey),
+      catalogForVersion(2).map(entry => entry.stepKey),
       { status: UserDeletionStepStatus.Succeeded }
     );
 
@@ -78,17 +78,17 @@ describe('deletion completion gates', () => {
     expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
   });
 
-  it('recovers an email-only anonymize not_applicable persist via the sweep', async () => {
+  it('recovers an in-progress v2 request to finalizing via the sweep', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.InProgress);
-    await setStepsStatus(requestId, [...teardownStepKeys(), UserDeletionStepKey.Anonymize], {
+    await setStepsStatus(requestId, [...teardownStepKeys(2), UserDeletionStepKey.Anonymize], {
       status: UserDeletionStepStatus.NotApplicable,
     });
 
     await sweepUnclaimableDeletionGates(Date.now() + 40_000);
 
     const request = await loadRequest(requestId);
-    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Finalizing);
   });
 });
 

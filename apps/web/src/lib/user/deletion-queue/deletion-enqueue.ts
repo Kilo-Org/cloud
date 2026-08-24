@@ -21,17 +21,19 @@ import { USER_DELETION_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletio
 import { writeDeletionAudit } from '@/lib/user/deletion-queue/deletion-audit';
 import {
   deletionAdvisoryLockKey,
+  deletionRequestAuditHmac,
+  deletionTicketAdvisoryLockKey,
   hmacDeletionEmail,
 } from '@/lib/user/deletion-queue/deletion-hmac';
 import {
   classifyProtectedIdentity,
   DeletionRefusalCode,
+  isBlockedDeletionTargetEmail,
   normalizeDeletionEmail,
   parsePylonTicket,
   type DeletionRefusalCode as RefusalCode,
 } from '@/lib/user/deletion-queue/deletion-intake';
 import { ACTIVE_REQUEST_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
-import { lookupPylonRequesterEmail } from '@/lib/user/deletion-queue/handlers/pylon-client';
 
 export type EnqueueActor = {
   kiloUserId: string | null;
@@ -60,13 +62,16 @@ export type CloudSubjectClassification = {
 export async function enqueueUserDeletionTargets(params: {
   actor: EnqueueActor;
   targets: EnqueueTarget[];
+  catalogVersion?: number;
 }): Promise<EnqueueResult[]> {
+  const catalogVersion = resolvedCatalogVersion(params.catalogVersion);
   const results: EnqueueResult[] = [];
   for (const target of params.targets) {
     results.push(
       await enqueueOneTarget({
         actor: params.actor,
         target,
+        catalogVersion,
       })
     );
   }
@@ -76,27 +81,27 @@ export async function enqueueUserDeletionTargets(params: {
 async function enqueueOneTarget(params: {
   actor: EnqueueActor;
   target: EnqueueTarget;
+  catalogVersion: number;
 }): Promise<EnqueueResult> {
   const ticket = parsePylonTicket(params.target.pylonTicket);
-  let pastedEmail = params.target.email?.trim() ?? '';
-  if (!pastedEmail.includes('@') && ticket && ticket !== DeletionRefusalCode.MalformedTicket) {
-    let resolved: string | null;
-    try {
-      resolved = await lookupPylonRequesterEmail(ticket);
-    } catch {
-      return { status: 'invalid', code: DeletionRefusalCode.TicketUnresolved };
-    }
-    if (!resolved) {
-      return { status: 'invalid', code: DeletionRefusalCode.TicketUnresolved };
-    }
-    pastedEmail = resolved;
+  if (ticket === DeletionRefusalCode.MalformedTicket) {
+    return { status: 'invalid', code: DeletionRefusalCode.MalformedTicket };
   }
-  const email = normalizeDeletionEmail(pastedEmail);
+
+  const pastedEmail = params.target.email?.trim() ?? '';
+  const email = pastedEmail ? normalizeDeletionEmail(pastedEmail) : '';
+  if (!email && ticket) {
+    return enqueueTicketOnlyTarget({
+      actor: params.actor,
+      ticket,
+      catalogVersion: params.catalogVersion,
+    });
+  }
   if (!email.includes('@') || email.length > 320) {
     return { status: 'invalid', code: DeletionRefusalCode.MalformedEmail };
   }
-  if (ticket === DeletionRefusalCode.MalformedTicket) {
-    return { status: 'invalid', code: DeletionRefusalCode.MalformedTicket };
+  if (isBlockedDeletionTargetEmail(email)) {
+    return { status: 'refused', code: DeletionRefusalCode.RelayOrInternalEmail };
   }
 
   try {
@@ -124,10 +129,6 @@ async function enqueueOneTarget(params: {
       }
 
       const currentUser = currentUsers[0] ?? null;
-      if (!currentUser) {
-        await writeRefusalAudit(tx, params, writeHmac, DeletionRefusalCode.NoCloudUser);
-        return { status: 'refused' as const, code: DeletionRefusalCode.NoCloudUser };
-      }
       if (params.target.trustedUserId) {
         if (!currentUser || currentUser.id !== params.target.trustedUserId) {
           return { status: 'invalid' as const, code: DeletionRefusalCode.UserHintMismatch };
@@ -165,8 +166,9 @@ async function enqueueOneTarget(params: {
         .values({
           user_id: subject.userId,
           status: UserDeletionRequestStatus.Pending,
-          catalog_version: USER_DELETION_CATALOG_VERSION,
+          catalog_version: params.catalogVersion,
           requested_by_kilo_user_id: params.actor.kiloUserId,
+          requested_by_email: requestedByEmail(params.actor),
           target_email: currentUser ? currentUser.google_user_email : pastedEmail,
           target_email_hmac: writeHmac,
           pylon_ticket_ref: ticket,
@@ -179,28 +181,19 @@ async function enqueueOneTarget(params: {
         throw new Error('Failed to insert user deletion request');
       }
 
-      await tx.insert(user_deletion_steps).values(
-        catalogForVersion(USER_DELETION_CATALOG_VERSION).map(entry => ({
-          request_id: request.id,
-          step_key: entry.stepKey,
-        }))
-      );
-
+      await insertCatalogSteps(tx, request.id, params.catalogVersion);
       await writeDeletionAudit(tx, {
         requestId: request.id,
         eventType: UserDeletionAuditEventType.RequestCreated,
         actorKiloUserId: params.actor.kiloUserId,
         targetEmailHmac: writeHmac,
         subjectKey: 'request',
-        details: { catalog_version: USER_DELETION_CATALOG_VERSION },
+        details: { catalog_version: params.catalogVersion },
       });
 
       return { status: 'enqueued' as const, requestId: request.id };
     });
   } catch (error) {
-    // Covers the race where a conflicting request commits after the in-tx
-    // HMAC/user_id checks and before insert — typically the user_id unique
-    // index across two different email advisory locks.
     if (isUniqueActiveTargetError(error)) {
       const existing = await db.transaction(async tx => {
         const byEmail = await findActiveRequest(tx, email);
@@ -219,6 +212,91 @@ async function enqueueOneTarget(params: {
     }
     throw error;
   }
+}
+
+async function enqueueTicketOnlyTarget(params: {
+  actor: EnqueueActor;
+  ticket: string;
+  catalogVersion: number;
+}): Promise<EnqueueResult> {
+  try {
+    return await db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(${deletionTicketAdvisoryLockKey(params.ticket).toString()}::int8)`
+      );
+
+      const byTicket = await findActiveRequestByPylonTicket(tx, params.ticket);
+      if (byTicket) {
+        return { status: 'already_active' as const, requestId: byTicket.id };
+      }
+
+      const [request] = await tx
+        .insert(user_deletion_requests)
+        .values({
+          user_id: null,
+          status: UserDeletionRequestStatus.Pending,
+          catalog_version: params.catalogVersion,
+          requested_by_kilo_user_id: params.actor.kiloUserId,
+          requested_by_email: requestedByEmail(params.actor),
+          target_email: null,
+          target_email_hmac: null,
+          pylon_ticket_ref: params.ticket,
+          cloud_subject_resolution: UserDeletionCloudSubjectResolution.Unresolved,
+          cloud_subject_proof_ref: null,
+        })
+        .returning({ id: user_deletion_requests.id });
+
+      if (!request) {
+        throw new Error('Failed to insert user deletion request');
+      }
+
+      await insertCatalogSteps(tx, request.id, params.catalogVersion);
+      await writeDeletionAudit(tx, {
+        requestId: request.id,
+        eventType: UserDeletionAuditEventType.RequestCreated,
+        actorKiloUserId: params.actor.kiloUserId,
+        targetEmailHmac: deletionRequestAuditHmac({ pylonTicketRef: params.ticket }),
+        subjectKey: 'request',
+        details: { catalog_version: params.catalogVersion },
+      });
+
+      return { status: 'enqueued' as const, requestId: request.id };
+    });
+  } catch (error) {
+    if (isUniqueActiveTargetError(error)) {
+      const existing = await db.transaction(async tx =>
+        findActiveRequestByPylonTicket(tx, params.ticket)
+      );
+      if (existing) {
+        return { status: 'already_active', requestId: existing.id };
+      }
+    }
+    throw error;
+  }
+}
+
+function requestedByEmail(actor: EnqueueActor): string | null {
+  const email = actor.email?.trim() ?? '';
+  return email || null;
+}
+
+function resolvedCatalogVersion(version: number | undefined): number {
+  const resolved = version ?? USER_DELETION_CATALOG_VERSION;
+  catalogForVersion(resolved);
+  return resolved;
+}
+
+async function insertCatalogSteps(
+  tx: DrizzleTransaction,
+  requestId: string,
+  catalogVersion: number
+): Promise<void> {
+  await tx.insert(user_deletion_steps).values(
+    catalogForVersion(catalogVersion).map(entry => ({
+      request_id: requestId,
+      step_key: entry.stepKey,
+    }))
+  );
 }
 
 export async function cancelPendingDeletionRequest(params: {
@@ -248,7 +326,10 @@ export async function cancelPendingDeletionRequest(params: {
       requestId: request.id,
       eventType: UserDeletionAuditEventType.Cancelled,
       actorKiloUserId: params.actorKiloUserId,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: deletionRequestAuditHmac({
+        targetEmailHmac: request.target_email_hmac,
+        pylonTicketRef: request.pylon_ticket_ref,
+      }),
       subjectKey: 'request',
     });
 
@@ -270,6 +351,7 @@ export async function scrubControlPlanePii(
     .set({
       status: terminalStatus,
       target_email: null,
+      requested_by_email: null,
       pylon_ticket_ref: null,
       user_id: null,
       completed_at: terminalStatus === UserDeletionRequestStatus.Completed ? now : null,
@@ -368,7 +450,7 @@ async function loadCurrentUsersByEmail(tx: DrizzleTransaction, email: string): P
   return users.filter(user => !isSoftDeletedBlockedReason(user.blocked_reason));
 }
 
-async function classifyCloudSubject(
+export async function classifyCloudSubject(
   tx: DrizzleTransaction,
   params: {
     email: string;

@@ -512,7 +512,9 @@ export const UserDeletionStepKey = {
   Substack: 'substack',
   Anonymize: 'anonymize',
   PylonReply: 'pylon_reply',
+  PylonFinalize: 'pylon_finalize',
   PylonContact: 'pylon_contact',
+  CsaSupportDb: 'csa_support_db',
 } as const;
 
 export type UserDeletionStepKey = (typeof UserDeletionStepKey)[keyof typeof UserDeletionStepKey];
@@ -522,6 +524,7 @@ export const UserDeletionCloudSubjectResolution = {
   AuthoritativeAbsence: 'authoritative_absence',
   PriorQueueCleanup: 'prior_queue_cleanup',
   LegacyIdentityUnresolved: 'legacy_identity_unresolved',
+  Unresolved: 'unresolved',
 } as const;
 
 export type UserDeletionCloudSubjectResolution =
@@ -553,6 +556,7 @@ export const UserDeletionProviderScope = {
   Posthog: 'posthog',
   Substack: 'substack',
   Pylon: 'pylon',
+  Csa: 'csa',
 } as const;
 
 export type UserDeletionProviderScope =
@@ -579,6 +583,7 @@ export type UserDeletionTaskProgress = {
   reply_state?: UserDeletionPylonReplyState;
   reply_message_id?: string;
   close_confirmed?: boolean;
+  verify_attempt_count?: number;
 };
 
 export type UserDeletionManualEvidence = {

@@ -5,7 +5,7 @@ import { i18n } from '@/i18n';
  * that reaches the user must read in the user's language, and the copy lives
  * in one place with every other string.
  */
-export const AUTH_ERROR_KEYS = {
+const AUTH_ERROR_KEYS = {
   'EMAIL-ALREADY-USED': 'authErrors.emailAlreadyUsed',
   'DIFFERENT-OAUTH': 'authErrors.differentOauth',
   SSO_ERROR: 'authErrors.ssoError',

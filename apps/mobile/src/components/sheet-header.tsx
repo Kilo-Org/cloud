@@ -3,8 +3,6 @@ import { Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { isRtlLanguage } from '@/i18n/rtl';
-import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function SheetHeader({
@@ -27,15 +25,13 @@ export function SheetHeader({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
-  // NativeWind may not honor the logical `start-*`/`end-*` utilities in this
-  // project, so derive the physical side from the active language's direction
-  // via the app's RTL_LANGUAGES set: Cancel and Share stay on the leading edge,
-  // Done on the trailing edge. i18n.dir() depends on Intl.Locale.getTextInfo,
-  // which is unreliable in Hermes, and I18nManager.isRTL is a stale
-  // module-load-time constant.
-  const isRtl = isRtlLanguage(getResolvedLanguage());
-  const leadingClass = isRtl ? 'right-0' : 'left-0';
-  const trailingClass = isRtl ? 'left-0' : 'right-0';
+  // Logical `start-*`/`end-*` utilities mirror with the native layout
+  // direction (I18nManager), which forceRTL sets before the reload: Cancel and
+  // Share stay on the leading edge, Done on the trailing edge. Do not derive
+  // the side from i18n.dir() (Intl.Locale.getTextInfo is unreliable in Hermes)
+  // or I18nManager.isRTL (a stale module-load-time constant in RN 0.86).
+  const leadingClass = 'start-0';
+  const trailingClass = 'end-0';
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a

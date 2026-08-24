@@ -1,12 +1,10 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { SheetHeader } from './sheet-header';
 import '@/i18n';
-
-const resolvedLanguage = vi.hoisted(() => ({ value: 'en' }));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -17,9 +15,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827' }),
-}));
-vi.mock('@/lib/hooks/use-language-preference', () => ({
-  getResolvedLanguage: () => resolvedLanguage.value,
 }));
 
 async function mount(
@@ -52,10 +47,6 @@ function pressablesByLabel(
 }
 
 describe('SheetHeader share action', () => {
-  afterEach(() => {
-    resolvedLanguage.value = 'en';
-  });
-
   it('renders a Share pressable in the left slot when onShare is provided', async () => {
     const renderer = await mount({
       title: 'report.pdf',
@@ -100,8 +91,7 @@ describe('SheetHeader share action', () => {
     renderer.unmount();
   });
 
-  it('mirrors Cancel and Done in RTL', async () => {
-    resolvedLanguage.value = 'ar';
+  it('places Cancel at the start edge and Done at the end edge', async () => {
     const renderer = await mount({
       title: 'report.pdf',
       onDone: () => undefined,
@@ -110,13 +100,13 @@ describe('SheetHeader share action', () => {
 
     const cancels = pressablesByLabel(renderer.root, 'Cancel');
     expect(cancels).toHaveLength(1);
-    expect(cancels[0]?.props.className).toContain('right-0');
-    expect(cancels[0]?.props.className).not.toContain('left-0');
+    expect(cancels[0]?.props.className).toContain('start-0');
+    expect(cancels[0]?.props.className).not.toContain('end-0');
 
     const dones = pressablesByLabel(renderer.root, 'Done');
     expect(dones).toHaveLength(1);
-    expect(dones[0]?.props.className).toContain('left-0');
-    expect(dones[0]?.props.className).not.toContain('right-0');
+    expect(dones[0]?.props.className).toContain('end-0');
+    expect(dones[0]?.props.className).not.toContain('start-0');
 
     renderer.unmount();
   });

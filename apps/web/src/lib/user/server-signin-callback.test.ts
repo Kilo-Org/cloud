@@ -110,7 +110,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
-    expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith('settled-user');
+    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
   it('passes autoLink=true for an email (magic link) sign-in', async () => {

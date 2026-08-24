@@ -948,7 +948,7 @@ export const authOptions: NextAuthOptions = {
           return redirectUrlForCode(`BLOCKED`);
         }
 
-        if (!isAccountLinking) {
+        if (!isAccountLinking && autoLinkToExistingUser) {
           await ensureVerifiedDomainOrganizationMembership(result.user.id);
         }
 

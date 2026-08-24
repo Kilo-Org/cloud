@@ -3,9 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import {
   canViewVerifiedDomainsCard,
+  closeVerificationPortal,
   confirmVerifiedDomainRemoval,
   openVerificationPortal,
   reserveVerificationPortal,
+  showVerificationPortal,
   VerifiedDomainsCard,
   VerifiedDomainsCardView,
 } from './VerifiedDomainsCard';
@@ -153,6 +155,86 @@ describe('VerifiedDomainsCard', () => {
     expect(reserveVerificationPortal(openExternal)).toBe(portal);
     expect(openExternal).toHaveBeenCalledWith('', '_blank');
     expect(portal.opener).toBeNull();
+  });
+
+  test('does not wedge verification when popup reservation throws', () => {
+    const openExternal = jest.fn<Window | null, Parameters<typeof window.open>>(() => {
+      throw new Error('Popup access denied');
+    });
+
+    expect(reserveVerificationPortal(openExternal)).toBeNull();
+  });
+
+  test('closes a reserved tab when detaching its opener fails', () => {
+    const close = jest.fn();
+    const portal = {
+      closed: false,
+      close,
+      set opener(_value: Window | null) {
+        throw new Error('Popup access denied');
+      },
+    } as unknown as Window;
+
+    expect(reserveVerificationPortal(() => portal)).toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  test('falls back to a new tab when the reserved provider tab was closed', () => {
+    const portal = { closed: true } as Window;
+    const openExternal = jest.fn<Window | null, Parameters<typeof window.open>>(() => null);
+
+    showVerificationPortal(portal, 'https://setup.workos.com/domain/verify', openExternal);
+
+    expect(openExternal).toHaveBeenCalledWith(
+      'https://setup.workos.com/domain/verify',
+      '_blank',
+      'noopener,noreferrer'
+    );
+  });
+
+  test('falls back and closes the reserved tab when navigation fails', () => {
+    const close = jest.fn();
+    const location = {
+      set href(_value: string) {
+        throw new Error('closed');
+      },
+    };
+    const portal = { closed: false, close, location } as unknown as Window;
+    const openExternal = jest.fn<Window | null, Parameters<typeof window.open>>(() => null);
+
+    showVerificationPortal(portal, 'https://setup.workos.com/domain/verify', openExternal);
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(openExternal).toHaveBeenCalledTimes(1);
+  });
+
+  test('closes an open reserved provider tab during cleanup', () => {
+    const close = jest.fn();
+    const portal = { closed: false, close } as unknown as Window;
+
+    closeVerificationPortal(portal);
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not let popup inspection or closure break cleanup', () => {
+    const portal = {
+      get closed() {
+        throw new Error('Popup access denied');
+      },
+    } as unknown as Window;
+
+    expect(() => closeVerificationPortal(portal)).not.toThrow();
+  });
+
+  test('does not let a blocked fallback break mutation success handling', () => {
+    const openExternal = jest.fn<Window | null, Parameters<typeof window.open>>(() => {
+      throw new Error('Popup access denied');
+    });
+
+    expect(() =>
+      showVerificationPortal(null, 'https://setup.workos.com/domain/verify', openExternal)
+    ).not.toThrow();
   });
 
   test('removal confirmation explains future joins and preserves current members', async () => {

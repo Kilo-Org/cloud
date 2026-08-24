@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, type FormEvent } from 'react';
+import React, { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import {
@@ -55,13 +55,47 @@ export function openVerificationPortal(
   verificationLink: string,
   openExternal: OpenExternal = window.open
 ): void {
-  openExternal(verificationLink, '_blank', 'noopener,noreferrer');
+  try {
+    openExternal(verificationLink, '_blank', 'noopener,noreferrer');
+  } catch {
+    // The pending claim remains available for a later retry.
+  }
 }
 
 export function reserveVerificationPortal(openExternal: OpenExternal = window.open): Window | null {
-  const portal = openExternal('', '_blank');
-  if (portal) portal.opener = null;
-  return portal;
+  let portal: Window | null = null;
+  try {
+    portal = openExternal('', '_blank');
+    if (portal) portal.opener = null;
+    return portal;
+  } catch {
+    closeVerificationPortal(portal);
+    return null;
+  }
+}
+
+export function showVerificationPortal(
+  portal: Window | null,
+  verificationLink: string,
+  openExternal: OpenExternal = window.open
+): void {
+  try {
+    if (portal && !portal.closed) {
+      portal.location.href = verificationLink;
+      return;
+    }
+  } catch {
+    closeVerificationPortal(portal);
+  }
+  openVerificationPortal(verificationLink, openExternal);
+}
+
+export function closeVerificationPortal(portal: Window | null): void {
+  try {
+    if (portal && !portal.closed) portal.close();
+  } catch {
+    // A stale or cross-origin WindowProxy may reject inspection or closure.
+  }
 }
 
 export async function confirmVerifiedDomainRemoval(
@@ -247,8 +281,19 @@ function VerifiedDomainsCardContent({ organizationId }: { organizationId: string
   const [domain, setDomain] = useState('');
   const verificationPortal = useRef<Window | null>(null);
   const verificationRequestPending = useRef(false);
+  const mounted = useRef(true);
   const listOptions = trpc.organizations.verifiedDomains.list.queryOptions({ organizationId });
   const claimsQuery = useQuery(listOptions);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      closeVerificationPortal(verificationPortal.current);
+      verificationPortal.current = null;
+      verificationRequestPending.current = false;
+    };
+  }, []);
 
   const invalidateClaims = () =>
     queryClient.invalidateQueries({
@@ -258,22 +303,25 @@ function VerifiedDomainsCardContent({ organizationId }: { organizationId: string
   const createClaim = useMutation(
     trpc.organizations.verifiedDomains.create.mutationOptions({
       onSuccess: async data => {
-        if (verificationPortal.current) {
-          verificationPortal.current.location.href = data.verificationLink;
-        } else {
-          openVerificationPortal(data.verificationLink);
+        try {
+          if (mounted.current) {
+            showVerificationPortal(verificationPortal.current, data.verificationLink);
+          }
+        } finally {
+          verificationPortal.current = null;
+          verificationRequestPending.current = false;
         }
-        verificationPortal.current = null;
-        verificationRequestPending.current = false;
+        if (!mounted.current) return;
         toast.success('Domain verification ready.', {
           description: 'If WorkOS did not open, use Open verification on the pending domain.',
         });
         await invalidateClaims();
       },
       onError: error => {
-        verificationPortal.current?.close();
+        closeVerificationPortal(verificationPortal.current);
         verificationPortal.current = null;
         verificationRequestPending.current = false;
+        if (!mounted.current) return;
         toast.error(error.message || 'Failed to start domain verification');
       },
     })

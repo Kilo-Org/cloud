@@ -76,6 +76,17 @@ function createFakeDb(options: FakeDbOptions = {}) {
   return { db, sets };
 }
 
+function runtimeStateSqlText(entry: Record<string, unknown>): string {
+  const value = entry.runtime_state;
+  if (value == null || typeof value !== 'object') return '';
+  const chunks = (value as { queryChunks?: Array<{ value?: unknown }> }).queryChunks;
+  if (!Array.isArray(chunks)) return '';
+  return chunks
+    .flatMap(chunk => (Array.isArray(chunk.value) ? chunk.value : []))
+    .filter(part => typeof part === 'string')
+    .join('');
+}
+
 function createGitTokenService() {
   return { getToken: vi.fn(async () => 'github-token') };
 }
@@ -563,10 +574,46 @@ describe('Worker GitHub auth-invalid sync', () => {
     ).resolves.toMatchObject({
       exhaustedBudget: true,
       remainingRepoCount: 2,
-      errors: 1,
+      errors: 0,
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not keep an incomplete GitHub failure as an error after a successful retry', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      runtimeState: {
+        sync_run: {
+          runId: 'run-budget-retry',
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(() => new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-retry',
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+      errors: 0,
+    });
+
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(true);
   });
 
   it('skips completed repositories and finalizes freshness on the last chunk', async () => {

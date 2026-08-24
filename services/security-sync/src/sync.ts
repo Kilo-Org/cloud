@@ -1764,6 +1764,7 @@ export async function syncOwner(params: {
   let firstError: Error | null = null;
   let successfulRepos = 0;
   let processedThisPass = 0;
+  let incompleteFailures = 0;
   let exhaustedBudget = false;
   const notificationPolicy = params.notificationMaterializationEnabled
     ? config.notificationPolicy
@@ -1811,7 +1812,7 @@ export async function syncOwner(params: {
         break;
       }
     } catch (error) {
-      totalResult.errors++;
+      incompleteFailures++;
       await recordSecurityAgentRepositorySyncFailure(database, {
         owner: toSecurityAgentCommandOwner(owner),
         repoFullName: selectedRepoFullName,
@@ -1842,6 +1843,8 @@ export async function syncOwner(params: {
     });
     return { ...totalResult, exhaustedBudget: true, remainingRepoCount };
   }
+
+  totalResult.errors += incompleteFailures;
 
   if (successfulRepos === 0 && firstError && !previousProgress) {
     throw firstError;

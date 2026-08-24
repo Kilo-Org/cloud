@@ -19,6 +19,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { disableUserAccessForDeletion } from '@/lib/user/deletion-queue/deletion-access';
 import { catalogEntryFor, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
+import { deletionRequestAuditHmac } from '@/lib/user/deletion-queue/deletion-hmac';
 import {
   USER_DELETION_ANONYMIZE_MIN_STATEMENT_TIMEOUT_MS,
   USER_DELETION_ANONYMIZE_TIMEOUT_BUFFER_MS,
@@ -39,6 +40,13 @@ import type {
   PersistTaskOutcomeResult,
 } from '@/lib/user/deletion-queue/deletion-types';
 import { SUCCESSFUL_TASK_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
+
+function requestAuditHmac(request: UserDeletionRequest): string {
+  return deletionRequestAuditHmac({
+    targetEmailHmac: request.target_email_hmac,
+    pylonTicketRef: request.pylon_ticket_ref,
+  });
+}
 
 export function ordinaryRetryDelayMs(
   windowAttemptAfterIncrement: number,
@@ -120,7 +128,7 @@ async function persistAnonymizeSuccessTx(params: {
       .select()
       .from(user_deletion_steps)
       .where(eq(user_deletion_steps.request_id, params.requestId));
-    for (const key of teardownStepKeys()) {
+    for (const key of teardownStepKeys(locked.request.catalog_version)) {
       const teardown = steps.find(candidate => candidate.step_key === key);
       if (!teardown || !(SUCCESSFUL_TASK_STATUSES as readonly string[]).includes(teardown.status)) {
         const outcome: DeletionHandlerOutcome = {
@@ -183,7 +191,7 @@ async function persistAnonymizeSuccessTx(params: {
     await writeDeletionAudit(tx, {
       requestId: params.requestId,
       eventType: UserDeletionAuditEventType.Anonymized,
-      targetEmailHmac: locked.request.target_email_hmac,
+      targetEmailHmac: requestAuditHmac(locked.request),
       subjectKey: 'request',
     });
     await persistTaskDispositionTx(tx, {
@@ -306,7 +314,7 @@ async function persistTaskDispositionTx(
           stepId: step.id,
           requestId: request.id,
           stepKey,
-          hmac: request.target_email_hmac,
+          hmac: requestAuditHmac(request),
           errorCode: outcome.errorCode,
           windowAttempt: nextWindow,
           lifetimeAttempt: nextLifetime,
@@ -351,7 +359,7 @@ async function persistTaskDispositionTx(
           stepId: step.id,
           requestId: request.id,
           stepKey,
-          hmac: request.target_email_hmac,
+          hmac: requestAuditHmac(request),
           errorCode: 'rate_limited_24h',
           windowAttempt: step.window_attempt_count,
           lifetimeAttempt: step.lifetime_attempt_count,
@@ -392,7 +400,7 @@ async function persistTaskDispositionTx(
         stepId: step.id,
         requestId: request.id,
         stepKey,
-        hmac: request.target_email_hmac,
+        hmac: requestAuditHmac(request),
         errorCode: outcome.errorCode,
         resourceHmac: outcome.resourceHmac,
         windowAttempt: step.window_attempt_count,
@@ -413,7 +421,7 @@ async function persistTaskDispositionTx(
       await writeDeletionAudit(tx, {
         requestId: request.id,
         eventType: UserDeletionAuditEventType.TaskDisposition,
-        targetEmailHmac: request.target_email_hmac,
+        targetEmailHmac: requestAuditHmac(request),
         subjectKey: `${stepKey}:manual_action_required`,
         details: {
           step_key: stepKey,
@@ -449,7 +457,7 @@ async function persistTaskDispositionTx(
       await writeDeletionAudit(tx, {
         requestId: request.id,
         eventType: UserDeletionAuditEventType.TaskDisposition,
-        targetEmailHmac: request.target_email_hmac,
+        targetEmailHmac: requestAuditHmac(request),
         subjectKey: `${stepKey}:${outcome.kind}`,
         details: { step_key: stepKey, disposition: outcome.kind },
       });
@@ -529,7 +537,7 @@ export async function retryAttentionTask(params: {
       requestId: params.requestId,
       eventType: UserDeletionAuditEventType.ManualRetry,
       actorKiloUserId: params.actorKiloUserId,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: requestAuditHmac(request),
       subjectKey: `${params.stepKey}:${crypto.randomUUID()}`,
       details: { step_key: params.stepKey, code: 'manual_retry' },
     });
@@ -575,7 +583,7 @@ export async function retryBlockedPreflight(params: {
       requestId: params.requestId,
       eventType: UserDeletionAuditEventType.ManualRetry,
       actorKiloUserId: params.actorKiloUserId,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: requestAuditHmac(request),
       subjectKey: `preflight:${crypto.randomUUID()}`,
       details: { code: 'preflight_retry' },
     });
@@ -613,7 +621,7 @@ export async function persistPreflightOutcomeTx(
       requestId: request.id,
       eventType: UserDeletionAuditEventType.PreflightDisposition,
       actorKiloUserId: request.requested_by_kilo_user_id,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: requestAuditHmac(request),
       subjectKey: `preflight:${outcome.errorCode}:${crypto.randomUUID()}`,
       details: { disposition: 'needs_attention', code: outcome.errorCode },
     });
@@ -644,7 +652,7 @@ export async function persistPreflightOutcomeTx(
       ? UserDeletionAuditEventType.AccessDisabled
       : UserDeletionAuditEventType.AccessAbsent,
     actorKiloUserId: request.requested_by_kilo_user_id,
-    targetEmailHmac: request.target_email_hmac,
+    targetEmailHmac: requestAuditHmac(request),
     subjectKey: 'request',
     details: { code: adoptedUserId ? 'access_disabled' : 'access_absent' },
   });
@@ -751,7 +759,7 @@ export async function markTaskManuallyVerified(params: {
       requestId: params.requestId,
       eventType: UserDeletionAuditEventType.ManualAction,
       actorKiloUserId: params.actorKiloUserId,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: requestAuditHmac(request),
       subjectKey: `${params.stepKey}:manually_verified`,
       details: { step_key: params.stepKey, disposition: 'manually_verified' },
     });

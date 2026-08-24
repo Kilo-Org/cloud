@@ -20,15 +20,18 @@ export type UserDeletionCatalogEntry = {
   allowsManualVerification: boolean;
 };
 
-const TEARDOWN_KEYS = [
+const V1_TEARDOWN_KEYS = [
   UserDeletionStepKey.KiloclawDestroy,
   UserDeletionStepKey.Customerio,
   UserDeletionStepKey.CliV1Blobs,
   UserDeletionStepKey.CliV2Sessions,
   UserDeletionStepKey.UsagePromptPrefixes,
-  // Temporarily handled by Customer Support Automation (CSA)
-  // UserDeletionStepKey.Posthog,
-  // UserDeletionStepKey.Substack,
+] as const;
+
+const V2_TEARDOWN_KEYS = [
+  ...V1_TEARDOWN_KEYS,
+  UserDeletionStepKey.Posthog,
+  UserDeletionStepKey.Substack,
 ] as const;
 
 export const USER_DELETION_CATALOG_V1 = [
@@ -67,50 +70,106 @@ export const USER_DELETION_CATALOG_V1 = [
     dependsOn: [],
     allowsManualVerification: false,
   },
-  // Temporarily handled by Customer Support Automation (CSA)
-  // {
-  //   stepKey: UserDeletionStepKey.Posthog,
-  //   phase: UserDeletionPhase.Teardown,
-  //   maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-  //   dependsOn: [],
-  //   allowsManualVerification: true,
-  // },
-  // {
-  //   stepKey: UserDeletionStepKey.Substack,
-  //   phase: UserDeletionPhase.Teardown,
-  //   maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-  //   dependsOn: [],
-  //   allowsManualVerification: true,
-  // },
   {
     stepKey: UserDeletionStepKey.Anonymize,
     phase: UserDeletionPhase.Anonymize,
     maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-    dependsOn: TEARDOWN_KEYS,
+    dependsOn: V1_TEARDOWN_KEYS,
     allowsManualVerification: false,
   },
-  // Temporarily handled by Customer Support Automation (CSA)
-  // {
-  //   stepKey: UserDeletionStepKey.PylonReply,
-  //   phase: UserDeletionPhase.Finalize,
-  //   maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-  //   dependsOn: [...TEARDOWN_KEYS, UserDeletionStepKey.Anonymize],
-  //   allowsManualVerification: true,
-  // },
-  // {
-  //   stepKey: UserDeletionStepKey.PylonContact,
-  //   phase: UserDeletionPhase.Finalize,
-  //   maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-  //   dependsOn: [UserDeletionStepKey.PylonReply],
-  //   allowsManualVerification: true,
-  // },
+] as const satisfies readonly UserDeletionCatalogEntry[];
+
+export const USER_DELETION_CATALOG_V2 = [
+  {
+    stepKey: UserDeletionStepKey.KiloclawDestroy,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.Customerio,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.CliV1Blobs,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.CliV2Sessions,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.UsagePromptPrefixes,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: false,
+  },
+  {
+    stepKey: UserDeletionStepKey.Posthog,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.Substack,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.Anonymize,
+    phase: UserDeletionPhase.Anonymize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: V2_TEARDOWN_KEYS,
+    allowsManualVerification: false,
+  },
+  {
+    stepKey: UserDeletionStepKey.PylonReply,
+    phase: UserDeletionPhase.Finalize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [...V2_TEARDOWN_KEYS, UserDeletionStepKey.Anonymize],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.PylonFinalize,
+    phase: UserDeletionPhase.Finalize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [UserDeletionStepKey.PylonReply],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.PylonContact,
+    phase: UserDeletionPhase.Finalize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [UserDeletionStepKey.PylonFinalize],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.CsaSupportDb,
+    phase: UserDeletionPhase.Finalize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [UserDeletionStepKey.PylonContact],
+    allowsManualVerification: true,
+  },
 ] as const satisfies readonly UserDeletionCatalogEntry[];
 
 export function catalogForVersion(version: number): readonly UserDeletionCatalogEntry[] {
-  if (version !== USER_DELETION_CATALOG_VERSION) {
-    throw new Error(`Unsupported user deletion catalog version ${version}`);
-  }
-  return USER_DELETION_CATALOG_V1;
+  if (version === 1) return USER_DELETION_CATALOG_V1;
+  if (version === 2) return USER_DELETION_CATALOG_V2;
+  throw new Error(`Unsupported user deletion catalog version ${version}`);
 }
 
 export function catalogEntryFor(
@@ -124,10 +183,16 @@ export function catalogEntryFor(
   return entry;
 }
 
-export function teardownStepKeys(): readonly UserDeletionStepKey[] {
-  return TEARDOWN_KEYS;
+export function teardownStepKeys(
+  version: number = USER_DELETION_CATALOG_VERSION
+): readonly UserDeletionStepKey[] {
+  return catalogForVersion(version)
+    .filter(entry => entry.phase === UserDeletionPhase.Teardown)
+    .map(entry => entry.stepKey);
 }
 
-export function preReplyStepKeys(): readonly UserDeletionStepKey[] {
-  return [...TEARDOWN_KEYS, UserDeletionStepKey.Anonymize];
+export function preReplyStepKeys(
+  version: number = USER_DELETION_CATALOG_VERSION
+): readonly UserDeletionStepKey[] {
+  return [...teardownStepKeys(version), UserDeletionStepKey.Anonymize];
 }

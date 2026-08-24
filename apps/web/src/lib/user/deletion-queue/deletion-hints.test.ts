@@ -14,6 +14,8 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('posthog_ambiguous')?.action).toMatch(/Mark done/);
     expect(deletionAttentionHint('already_active')?.title).toMatch(/already in the queue/);
     expect(deletionAttentionHint('usage_prefix_progress_invalid')?.action).not.toMatch(/Mark done/);
+    expect(deletionAttentionHint('delete_ready_missing')?.action).toMatch(/delete-ready/);
+    expect(deletionAttentionHint('csa_unauthorized')?.title).toMatch(/CSA/);
   });
 
   it('falls back for other HTTP statuses', () => {

@@ -18,9 +18,20 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
+const backHandler = vi.hoisted(() => {
+  let handler: (() => boolean) | undefined = undefined;
+  return {
+    addEventListener: vi.fn((_event: string, next: () => boolean) => {
+      handler = next;
+      return { remove: vi.fn() };
+    }),
+    __getHandler: () => handler,
+  };
+});
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  BackHandler: backHandler,
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -144,6 +155,7 @@ describe('LanguagePickerSheet apply', () => {
     writeLanguageReturnTarget.mockReset();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
+    backHandler.addEventListener.mockClear();
     vi.mocked(toast.error).mockClear();
   });
 
@@ -217,6 +229,54 @@ describe('LanguagePickerSheet apply', () => {
       await Promise.resolve();
     });
     expect(reloadAppAsync).toHaveBeenCalledTimes(2);
+
+    renderer.unmount();
+  });
+
+  it('lets Android back cancel the sheet when idle', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    const handler = backHandler.__getHandler();
+    expect(handler).toBeDefined();
+    if (!handler) {
+      throw new Error('BackHandler handler not registered');
+    }
+    expect(handler()).toBe(true);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps Retry as the only action when the reload fails', async () => {
+    reloadAppAsync.mockRejectedValue(new Error('reload failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.onCancel).toBeUndefined();
+
+    const backdrop = findByType(renderer.root, 'Pressable').find(
+      node => node.props.accessibilityLabel === 'Cancel'
+    );
+    if (!backdrop) {
+      throw new Error('backdrop Pressable not found');
+    }
+    act(() => {
+      (backdrop.props.onPress as () => void)();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    const handler = backHandler.__getHandler();
+    expect(handler).toBeDefined();
+    if (!handler) {
+      throw new Error('BackHandler handler not registered');
+    }
+    expect(handler()).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

@@ -2,7 +2,14 @@ import { Portal } from '@rn-primitives/portal';
 import { reloadAppAsync } from 'expo';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, I18nManager, Pressable, ScrollView, View } from 'react-native';
+import {
+  ActivityIndicator,
+  BackHandler,
+  I18nManager,
+  Pressable,
+  ScrollView,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -50,6 +57,21 @@ export function LanguagePickerSheet({
       setReloadFailed(false);
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return undefined;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!busy && !reloadFailed) {
+        onClose();
+      }
+      return true;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [visible, busy, reloadFailed, onClose]);
 
   if (!visible) {
     return null;
@@ -121,7 +143,6 @@ export function LanguagePickerSheet({
           onDone={() => {
             void retryReload();
           }}
-          onCancel={onClose}
           doneLabel={t('common.retry')}
           disabled={busy}
           scrollable={false}
@@ -213,7 +234,7 @@ export function LanguagePickerSheet({
           className="flex-1"
           accessibilityLabel={t('common.cancel')}
           onPress={() => {
-            if (!busy) {
+            if (!busy && !reloadFailed) {
               onClose();
             }
           }}

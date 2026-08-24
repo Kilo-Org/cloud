@@ -212,7 +212,7 @@ export function VerifiedDomainsCardView({
           <label htmlFor="verified-domain" className="text-sm font-medium">
             Company email domain
           </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
             <Input
               id="verified-domain"
               name="domain"

@@ -338,12 +338,16 @@ export async function refreshVerifiedDomainClaim(
   if (!organization) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
   }
-  const providerDomain = await ensureProviderDomain(provider, claim, organization);
   let refreshed: OrganizationDomain;
-  try {
-    refreshed = await provider.organizationDomains.verify(providerDomain.id);
-  } catch (error) {
-    throw providerError(error);
+  if (claim.workos_domain_id) {
+    try {
+      refreshed = await provider.organizationDomains.get(claim.workos_domain_id);
+    } catch (error) {
+      if (providerStatus(error) !== 404) throw providerError(error);
+      refreshed = await ensureProviderDomain(provider, claim, organization);
+    }
+  } else {
+    refreshed = await ensureProviderDomain(provider, claim, organization);
   }
   return serializeClaim(await synchronizeProviderState(claim.id, refreshed, actor));
 }

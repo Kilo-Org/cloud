@@ -292,13 +292,13 @@ describe('organization verified domains router', () => {
     expect(await claimAuditActions()).toEqual(['organization.domain_claim.create']);
   });
 
-  test('synchronizes verification and confirmed verification loss with audit transitions', async () => {
+  test('polls and synchronizes verification state with audit transitions', async () => {
     const caller = await createCallerForUser(owner.id);
     const created = await caller.organizations.verifiedDomains.create({
       organizationId: organization.id,
       domain: 'lifecycle.example.com',
     });
-    mockWorkOSInstance.organizationDomains.verify.mockResolvedValueOnce(
+    mockWorkOSInstance.organizationDomains.get.mockResolvedValueOnce(
       providerDomain('lifecycle.example.com', OrganizationDomainState.Verified)
     );
     const verified = await caller.organizations.verifiedDomains.refresh({
@@ -308,7 +308,7 @@ describe('organization verified domains router', () => {
     expect(verified.status).toBe('verified');
     expect(verified.verifiedAt).not.toBeNull();
 
-    mockWorkOSInstance.organizationDomains.verify.mockResolvedValueOnce(
+    mockWorkOSInstance.organizationDomains.get.mockResolvedValueOnce(
       providerDomain('lifecycle.example.com', OrganizationDomainState.Failed)
     );
     const pending = await caller.organizations.verifiedDomains.refresh({
@@ -321,6 +321,8 @@ describe('organization verified domains router', () => {
       'organization.domain_claim.verify',
       'organization.domain_claim.lose_verification',
     ]);
+    expect(mockWorkOSInstance.organizationDomains.get).toHaveBeenCalledTimes(2);
+    expect(mockWorkOSInstance.organizationDomains.verify).not.toHaveBeenCalled();
   });
 
   test('does not demote a verified claim when the provider refresh fails transiently', async () => {
@@ -332,7 +334,7 @@ describe('organization verified domains router', () => {
       organizationId: organization.id,
       domain: 'stable.example.com',
     });
-    mockWorkOSInstance.organizationDomains.verify.mockRejectedValueOnce(new Error('timeout'));
+    mockWorkOSInstance.organizationDomains.get.mockRejectedValueOnce(new Error('timeout'));
 
     await expect(
       caller.organizations.verifiedDomains.refresh({
@@ -464,7 +466,7 @@ describe('organization verified domains router', () => {
       claimId: created.claim.id,
     });
     await providerRemovalStarted;
-    mockWorkOSInstance.organizationDomains.verify.mockResolvedValueOnce(
+    mockWorkOSInstance.organizationDomains.get.mockResolvedValueOnce(
       providerDomain('remove-refresh-race.example.com', OrganizationDomainState.Verified)
     );
     const refresh = caller.organizations.verifiedDomains.refresh({

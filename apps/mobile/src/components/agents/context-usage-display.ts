@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { formatCurrency } from '@/lib/format';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionTotalCost } from './session-list-helpers';
@@ -35,9 +36,9 @@ export function formatExactTokens(tokens: number): string {
 
 export function formatCost(cost: number): string {
   if (!Number.isFinite(cost) || cost <= 0) {
-    return '$0.0000';
+    return formatCurrency(0, i18n.language, 4);
   }
-  return `$${cost.toFixed(4)}`;
+  return formatCurrency(cost, i18n.language, 4);
 }
 
 export function getContextTone(percentage: number | undefined): ContextTone {

@@ -13,6 +13,23 @@ export function formatMoney(amount: number, locale: string): string {
   }).format(amount);
 }
 
+/**
+ * Currency with an explicit fraction-digit count. Session cost surfaces need
+ * four decimals below half a cent and two above; the shared `formatMoney`
+ * always pins two.
+ */
+export function formatCurrency(amount: number, locale: string, fractionDigits: number): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(amount);
+}
+
+/** Amounts below this render as a zero currency value at four fraction digits (50 µ$). */
+export const CURRENCY_ZERO_THRESHOLD = 50 / 1_000_000;
+
 export function formatMoneyFromCents(amount: number, locale: string, currency = 'USD'): string {
   return new Intl.NumberFormat(locale, {
     style: 'currency',

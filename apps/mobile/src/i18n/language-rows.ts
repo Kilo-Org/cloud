@@ -28,7 +28,9 @@ const ALL_ROWS: readonly LanguageRow[] = SUPPORTED_LANGUAGES.map(tag => ({
   tag,
   endonym: LANGUAGE_ENDONYMS[tag],
   englishName: LANGUAGE_ENGLISH_NAMES[tag],
-})).toSorted((a, b) => a.endonym.localeCompare(b.endonym));
+}))
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; map already copies so nothing shared is mutated
+  .sort((a, b) => a.endonym.localeCompare(b.endonym));
 
 /**
  * The picker's rows: the active language first so it is visible without a

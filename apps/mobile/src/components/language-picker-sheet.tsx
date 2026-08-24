@@ -189,7 +189,8 @@ export function LanguagePickerSheet({
             className="rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
-            value={query}
+            // Uncontrolled: iOS drops keystrokes when state drives `value`. The
+            // sheet unmounts when hidden, so a reopen starts the field empty.
             onChangeText={setQuery}
             autoCapitalize="none"
             autoCorrect={false}

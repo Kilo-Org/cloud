@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { ChevronRight } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-native';
@@ -194,7 +194,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
           <Text className="text-base">
             {registerError ? t('common.tryAgain') : t('notifications.enable')}
           </Text>
-          <ChevronRight size={16} color={colors.primaryForeground} />
+          <DirectionalChevronRight size={16} color={colors.primaryForeground} />
         </Button>
         <Button variant="ghost" size="lg" onPress={() => void handleSkip()}>
           <Text className="text-base">{t('kiloclaw.onboarding.notifications.skipForNow')}</Text>

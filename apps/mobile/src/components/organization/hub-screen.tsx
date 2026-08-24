@@ -1,7 +1,8 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, ChevronRight, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
+import { Bell, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -247,7 +248,7 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       {state.action === 'retry' ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
       ) : null}
-      {opensWeb ? <ChevronRight size={14} color={colors.mutedForeground} /> : null}
+      {opensWeb ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
     </View>
   );
 

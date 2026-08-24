@@ -14,6 +14,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerState.back, canGoBack: routerState.canGoBack }),
 }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',

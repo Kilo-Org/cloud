@@ -1,13 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
-import {
-  ChevronRight,
-  LineChart,
-  MessageSquare,
-  Shield,
-  Smartphone,
-  User,
-} from '@/components/ui/icons';
+import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
@@ -253,7 +247,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           className="mt-6 flex-row items-center gap-1 active:opacity-70"
         >
           <Text className="text-sm font-semibold text-primary">{t('consent.seeFullDetails')}</Text>
-          <ChevronRight size={16} color={colors.primary} />
+          <DirectionalChevronRight size={16} color={colors.primary} />
         </Pressable>
 
         <Text className="mt-6 text-xs text-muted-foreground">

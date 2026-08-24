@@ -1,6 +1,7 @@
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
-import { ArrowRight, FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -85,7 +86,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
             <ShieldCheck size={16} color={colors.good} />
             <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
           </View>
-          <ArrowRight size={14} color={colors.mutedForeground} />
+          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
         </Pressable>
       </SectionCard>
     );
@@ -303,7 +304,7 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
           <Text variant="mono" className="text-xs text-muted-foreground">
             {repoTrailingLabel(repo, slaEnabled)}
           </Text>
-          <ArrowRight size={14} color={colors.mutedForeground} />
+          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
         </Pressable>
       ))}
     </SectionCard>

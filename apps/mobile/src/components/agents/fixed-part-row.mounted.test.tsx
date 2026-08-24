@@ -9,6 +9,7 @@ import { FixedPartRow } from './fixed-part-row';
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   View: 'View',
 }));

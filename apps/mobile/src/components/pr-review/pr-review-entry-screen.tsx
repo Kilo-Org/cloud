@@ -1,6 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ChevronRight, Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/icons';
+import { Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-native';
@@ -178,7 +179,7 @@ export function PrReviewEntryScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <ChevronRight size={16} color={colors.mutedForeground} />
+                <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
               <View className="flex-row items-center justify-between gap-2 px-3 pb-3">
                 {rowState.failed ? (

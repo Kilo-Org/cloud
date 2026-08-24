@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { ChevronDown, ChevronLeft } from '@/components/ui/icons';
+import { ChevronDown } from '@/components/ui/icons';
+import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import { Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,7 +115,7 @@ export function ScreenHeader({
               {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />
               ) : (
-                <ChevronLeft size={24} color={colors.foreground} />
+                <DirectionalChevronLeft size={24} color={colors.foreground} />
               )}
             </Pressable>
           )}

@@ -1,4 +1,5 @@
-import { ChevronRight, type LucideIcon, XCircle } from '@/components/ui/icons';
+import { type LucideIcon, XCircle } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -82,7 +83,7 @@ export function FixedPartRow({
           ) : null}
         </View>
 
-        {onPress ? <ChevronRight size={14} color={colors.mutedForeground} /> : null}
+        {onPress ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
       </Pressable>
     </View>
   );

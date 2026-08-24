@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
 
 import { AgentBadge } from '@/components/ui/agent-badge';
@@ -178,7 +178,7 @@ export function SessionRow({
           </Text>
         ) : null}
       </View>
-      <ChevronRight size={14} color={colors.mutedSoft} />
+      <DirectionalChevronRight size={14} color={colors.mutedSoft} />
     </View>
   );
   if (onPress) {

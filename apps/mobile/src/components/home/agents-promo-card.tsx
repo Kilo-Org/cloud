@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Bot, ChevronRight } from '@/components/ui/icons';
+import { Bot } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -54,7 +55,7 @@ export function AgentsPromoCard({ organizationId }: Readonly<AgentsPromoCardProp
         <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
           {t('home.tryIt')}
         </Text>
-        <ChevronRight size={16} color={colors.mutedForeground} />
+        <DirectionalChevronRight size={16} color={colors.mutedForeground} />
       </View>
     </Pressable>
   );

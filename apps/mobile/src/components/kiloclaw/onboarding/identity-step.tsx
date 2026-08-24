@@ -2,7 +2,8 @@
 import * as Sentry from '@sentry/react-native';
 import { useMutation } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { ChevronDown, ChevronRight, ChevronUp, MapPin } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp, MapPin } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
@@ -472,7 +473,7 @@ export function IdentityStep({
         ) : (
           <>
             <Text className="text-base">{t('kiloclaw.onboarding.identity.continue')}</Text>
-            <ChevronRight size={16} color={colors.primaryForeground} />
+            <DirectionalChevronRight size={16} color={colors.primaryForeground} />
           </>
         )}
       </Button>

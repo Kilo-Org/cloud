@@ -19,7 +19,8 @@ import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { type PrInboxView, selectPrInboxView } from '@/components/pr-review/pr-review-inbox-view';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
+import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -151,7 +152,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           ) : null}
         </View>
       </View>
-      <ChevronRight size={16} color={colors.mutedForeground} />
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }

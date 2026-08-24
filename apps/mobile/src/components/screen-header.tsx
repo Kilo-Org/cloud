@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { Platform, Pressable, View } from 'react-native';
+import { I18nManager, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -110,7 +110,7 @@ export function ScreenHeader({
               accessibilityLabel={
                 resolvedBackIcon === 'close' ? t('screenHeader.close') : t('screenHeader.goBack')
               }
-              className="-ml-4 h-11 w-11 shrink-0 items-center justify-center active:opacity-70"
+              className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
             >
               {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />
@@ -124,7 +124,9 @@ export function ScreenHeader({
             {titleNode}
           </View>
         </View>
-        {headerRight ? <View className="ml-3 shrink-0">{headerRight}</View> : null}
+        {headerRight ? (
+          <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} shrink-0`}>{headerRight}</View>
+        ) : null}
       </View>
     </View>
   );

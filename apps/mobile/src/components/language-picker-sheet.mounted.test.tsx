@@ -111,6 +111,28 @@ async function mountSheet(
   return renderer;
 }
 
+async function applySelection(
+  onClose: () => void,
+  endonym: string,
+  beforeReload?: () => Promise<void>
+): Promise<TestRenderer.ReactTestRenderer> {
+  const renderer = await mountSheet(onClose, beforeReload);
+  act(() => {
+    (findChoiceRow(renderer.root, endonym).props.onPress as () => void)();
+  });
+  const sheet = findByType(renderer.root, 'PickerSheet')[0];
+  if (!sheet) {
+    throw new Error('PickerSheet not found');
+  }
+  await act(async () => {
+    (sheet.props.onDone as () => void)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return renderer;
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('LanguagePickerSheet apply', () => {
@@ -131,20 +153,7 @@ describe('LanguagePickerSheet apply', () => {
 
   it('applies an LTR language in place without reloading the app', async () => {
     const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
-
-    act(() => {
-      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
-    });
-
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-    });
+    const renderer = await applySelection(onClose, 'Español');
 
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
     expect(i18n.language).toBe('es');
@@ -158,20 +167,7 @@ describe('LanguagePickerSheet apply', () => {
   it('keeps the current language and direction when the persist write fails', async () => {
     setLanguagePreferenceAsync.mockResolvedValue(false);
     const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
-
-    act(() => {
-      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
-    });
-
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-    });
+    const renderer = await applySelection(onClose, 'العربية');
 
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(i18n.language).toBe('en');
@@ -188,22 +184,9 @@ describe('LanguagePickerSheet apply', () => {
       .spyOn(i18n, 'changeLanguage')
       .mockRejectedValueOnce(new Error('missing catalog'));
     const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
+    const renderer = await applySelection(onClose, 'Español');
 
-    act(() => {
-      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
-    });
-
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-    });
-
-    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
     expect(i18n.language).toBe('en');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
@@ -216,22 +199,7 @@ describe('LanguagePickerSheet apply', () => {
   it('shows Could not restart and Retry works when the RTL reload fails', async () => {
     reloadAppAsync.mockRejectedValue(new Error('reload failed'));
     const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
-
-    act(() => {
-      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
-    });
-
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    const renderer = await applySelection(onClose, 'العربية');
 
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(reloadAppAsync).toHaveBeenCalledTimes(1);
@@ -256,22 +224,7 @@ describe('LanguagePickerSheet apply', () => {
   it('still reloads into RTL when the return-target write fails', async () => {
     writeLanguageReturnTarget.mockRejectedValue(new Error('write failed'));
     const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
-
-    act(() => {
-      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
-    });
-
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    const renderer = await applySelection(onClose, 'العربية');
 
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(writeLanguageReturnTarget).toHaveBeenCalledWith('login');
@@ -284,26 +237,53 @@ describe('LanguagePickerSheet apply', () => {
   it('does not block the RTL reload when the draft flush fails', async () => {
     const beforeReload = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('flush failed'));
     const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose, beforeReload);
-
-    act(() => {
-      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
-    });
-
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    const renderer = await applySelection(onClose, 'العربية', beforeReload);
 
     expect(beforeReload).toHaveBeenCalledTimes(1);
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('applies a same-direction RTL language in place without reloading', async () => {
+    i18nManager.isRTL = true;
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(i18n.language).toBe('ar');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('reloads into LTR when the direction changes from RTL', async () => {
+    i18nManager.isRTL = true;
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'Español');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(i18nManager.forceRTL).toHaveBeenCalledWith(false);
+    expect(onClose).not.toHaveBeenCalled();
+    // The restarting screen stays up while the reload is pending.
+    expect(findByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('rolls the copy back when the persist write fails after the catalog loads', async () => {
+    setLanguagePreferenceAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'Español');
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(i18n.language).toBe('en');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
 
     renderer.unmount();

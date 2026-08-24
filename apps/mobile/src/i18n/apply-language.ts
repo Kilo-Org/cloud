@@ -1,4 +1,5 @@
 import { reloadAppAsync } from 'expo';
+import { I18nManager } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { type SupportedLanguage } from '@/i18n/languages';
@@ -18,10 +19,11 @@ export type ApplyLanguageOutcome =
   | { kind: 'catalog-failed' };
 
 /**
- * Persist a language preference and apply it. LTR languages switch the i18n
- * instance in place; RTL languages write a one-shot return target, force the
- * native direction, and reload the app. Never throws: every failure maps to
- * an outcome the picker can render.
+ * Persist a language preference and apply it. When the native direction must
+ * change, write the preference first, force the direction, and reload. When
+ * the direction stays the same, switch the i18n instance in place and persist
+ * only after the catalog loads, rolling the copy back if the persist fails.
+ * Never throws: every failure maps to an outcome the picker can render.
  */
 // eslint-disable-next-line eslint/max-params -- beforeReload is the optional draft flush the picker passes through
 export async function applyLanguagePreference(
@@ -30,24 +32,27 @@ export async function applyLanguagePreference(
   returnTarget: LanguageReturnTarget,
   beforeReload?: () => Promise<void>
 ): Promise<ApplyLanguageOutcome> {
-  const persisted = await setLanguagePreferenceAsync(preference);
-  if (!persisted) {
-    return { kind: 'persist-failed' };
-  }
+  const needsDirectionChange = I18nManager.isRTL !== isRtlLanguage(resolved);
 
-  if (isRtlLanguage(resolved)) {
+  if (needsDirectionChange) {
+    const persisted = await setLanguagePreferenceAsync(preference);
+    if (!persisted) {
+      return { kind: 'persist-failed' };
+    }
+
     try {
       // The draft flush is a convenience; a failure must not block the language change.
       await beforeReload?.();
     } catch {
-      // Ignore: the reload below still applies RTL.
+      // Ignore: the reload below still applies the direction change.
     }
     try {
-      // The return target is a convenience; the reload still applies RTL and the
-      // user lands on the default screen when this write fails.
+      // The return target is a convenience; the reload still applies the
+      // direction change and the user lands on the default screen when this
+      // write fails.
       await writeLanguageReturnTarget(returnTarget);
     } catch {
-      // Ignore: continue to the RTL reload.
+      // Ignore: continue to the reload.
     }
     syncRtl(resolved);
     try {
@@ -58,11 +63,23 @@ export async function applyLanguagePreference(
     return { kind: 'restarting-rtl' };
   }
 
+  const previousLanguage = i18n.language;
   try {
     await i18n.changeLanguage(resolved);
   } catch {
     return { kind: 'catalog-failed' };
   }
+
+  const persisted = await setLanguagePreferenceAsync(preference);
+  if (!persisted) {
+    try {
+      await i18n.changeLanguage(previousLanguage);
+    } catch {
+      // Ignore: the rollback is best-effort; the persist failure already surfaced.
+    }
+    return { kind: 'persist-failed' };
+  }
+
   void renameAndroidNotificationChannels();
   return { kind: 'applied-ltr' };
 }

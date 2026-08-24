@@ -62,7 +62,7 @@ export function LanguagePickerSheet({
       return;
     }
     const resolved = selected === 'device' ? resolveDeviceLanguage() : selected;
-    if (isRtlLanguage(resolved)) {
+    if (I18nManager.isRTL !== isRtlLanguage(resolved)) {
       setRestarting(true);
     }
     setBusy(true);

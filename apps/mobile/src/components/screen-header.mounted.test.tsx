@@ -9,12 +9,13 @@ const routerState = vi.hoisted(() => ({
   back: vi.fn(),
   canGoBack: vi.fn(() => true),
 }));
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerState.back, canGoBack: routerState.canGoBack }),
 }));
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: i18nManager,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
@@ -25,6 +26,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
   ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
@@ -108,6 +110,7 @@ describe('ScreenHeader mounted', () => {
     routerState.back.mockClear();
     routerState.canGoBack.mockClear();
     routerState.canGoBack.mockReturnValue(true);
+    i18nManager.isRTL = false;
   });
 
   it('gives the back control a 44-point target and no hit slop', () => {
@@ -122,6 +125,28 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.className).toContain('active:opacity-70');
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
+  });
+
+  it('swaps the back and headerRight margins to the logical edges in RTL', () => {
+    i18nManager.isRTL = true;
+    const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
+
+    const back = findBackPressable(renderer.root);
+    expect(back.props.className).toContain('-mr-4');
+    expect(back.props.className).not.toContain('-ml-4');
+
+    const headerRight = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.className === 'string' &&
+        (node.props.className.includes('ml-3') || node.props.className.includes('mr-3'))
+    )[0];
+    if (!headerRight) {
+      throw new Error('headerRight view not found');
+    }
+    expect(headerRight.props.className).toContain('mr-3');
+    expect(headerRight.props.className).not.toContain('ml-3');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {

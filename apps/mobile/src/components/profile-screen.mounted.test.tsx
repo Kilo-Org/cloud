@@ -93,6 +93,9 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
   getResolvedLanguage: () => 'en',
   useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
 }));
+vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
+  attemptPushRegistrationReconciliation: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));

@@ -105,6 +105,10 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
   useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
 }));
 
+vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
+  attemptPushRegistrationReconciliation: vi.fn(),
+}));
+
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',
   getProfileAgentScope: getProfileAgentScopeMock,

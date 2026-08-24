@@ -20,7 +20,6 @@ import {
 } from '@/lib/user/deletion-queue/handlers/common';
 import {
   pylonConfig,
-  pylonData,
   pylonJson,
   pylonRequest,
 } from '@/lib/user/deletion-queue/handlers/pylon-client';
@@ -46,15 +45,20 @@ function collectContactEmails(contact: Record<string, unknown>): string[] {
   return [...emails];
 }
 
+function contactEntries(payload: unknown): unknown[] | null {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return null;
+  if (!('data' in payload) || payload.data == null) return [];
+  const data = payload.data;
+  if (Array.isArray(data)) return data;
+  if (isRecord(data) && Array.isArray(data.contacts)) return data.contacts;
+  return null;
+}
+
 function parseContacts(
   payload: unknown
 ): { contacts: PylonContact[]; cursor: string | null } | null {
-  const data = pylonData(payload);
-  const list = Array.isArray(data)
-    ? data
-    : isRecord(data) && Array.isArray(data.contacts)
-      ? data.contacts
-      : null;
+  const list = contactEntries(payload);
   if (!list) return null;
 
   const contacts: PylonContact[] = [];

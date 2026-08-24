@@ -156,7 +156,8 @@ function FlowProbe({ props = { searchParams: {} } }: { props?: SignInFlowProps }
       id: 'submit-email',
       onClick: () => flow.handleEmailSubmit({ preventDefault: () => undefined } as React.FormEvent),
     }),
-    createElement('button', { id: 'clear-invite', onClick: flow.handleClearInvite })
+    createElement('button', { id: 'clear-invite', onClick: flow.handleClearInvite }),
+    createElement('button', { id: 'retry-turnstile', onClick: flow.handleRetryTurnstile })
   );
 }
 
@@ -555,5 +556,52 @@ describe('useSignInFlow discovery cancellation', () => {
 
     expect(mounted.container.querySelector('#tier')?.textContent).toBe('new');
     expect(mounted.container.querySelector('#email-input')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not resurrect Turnstile when Back immediately follows retry', async () => {
+    mounted = mountFlow();
+
+    act(() => button(mounted!.container, 'old-email').click());
+    act(() => button(mounted!.container, 'submit-email').click());
+    act(() => button(mounted!.container, 'active-turnstile-error').click());
+    act(() => button(mounted!.container, 'retry-turnstile').click());
+    act(() => button(mounted!.container, 'back').click());
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 150));
+    });
+
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
+  });
+
+  it('does not schedule a Turnstile state update when retry is followed by unmount', () => {
+    const setTimeoutSpy = jest.spyOn(globalThis, 'setTimeout');
+    mounted = mountFlow();
+
+    act(() => button(mounted!.container, 'old-email').click());
+    act(() => button(mounted!.container, 'submit-email').click());
+    act(() => button(mounted!.container, 'active-turnstile-error').click());
+    act(() => button(mounted!.container, 'retry-turnstile').click());
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('true');
+    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 100);
+
+    mounted.cleanup();
+    mounted = undefined;
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('immediately replaces the active Turnstile widget on retry', () => {
+    mounted = mountFlow();
+
+    act(() => button(mounted!.container, 'old-email').click());
+    act(() => button(mounted!.container, 'submit-email').click());
+    const originalAttempt = mounted.container.querySelector('#attempt')?.textContent;
+    act(() => button(mounted!.container, 'active-turnstile-error').click());
+    act(() => button(mounted!.container, 'retry-turnstile').click());
+
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#attempt')?.textContent).not.toBe(originalAttempt);
+    expect(mounted.container.querySelector('#turnstile-error')?.textContent).toBe('false');
   });
 });

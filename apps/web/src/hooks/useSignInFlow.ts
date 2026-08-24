@@ -355,7 +355,14 @@ export function useSignInFlow({
     // Explicit sign-up is provider-first, and invite URLs own their SSO CTA.
     // DIFFERENT-OAUTH recovery still pre-fills and displays the normal email
     // form through showEmailInput; it must not silently resume discovery.
-    if (params.email && !storybookInitialState && !initialError && !isSignUp && tier !== 'invite') {
+    if (
+      params.email &&
+      !storybookInitialState &&
+      !initialError &&
+      !isSignUp &&
+      !isInviteCleared &&
+      tier !== 'invite'
+    ) {
       const prefilledEmail = params.email;
       if (emailSchema.safeParse({ email: prefilledEmail }).success) {
         createTurnstileWidgetAttempt();
@@ -368,6 +375,7 @@ export function useSignInFlow({
     storybookInitialState,
     initialError,
     isSignUp,
+    isInviteCleared,
     tier,
     createTurnstileWidgetAttempt,
   ]);
@@ -726,10 +734,9 @@ export function useSignInFlow({
     isTurnstileSubmissionPendingRef.current = false;
     createTurnstileWidgetAttempt();
     setTurnstileError(false);
-    setShowTurnstile(false);
-    setTimeout(() => {
-      setShowTurnstile(true);
-    }, 100);
+    // The keyed widget remounts when its immutable attempt ID changes; no
+    // delayed state write is needed, so reset/back/unmount cannot resurrect it.
+    setShowTurnstile(true);
   }, [createTurnstileWidgetAttempt]);
 
   const handleProviderSelect = useCallback(

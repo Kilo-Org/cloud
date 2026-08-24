@@ -1856,10 +1856,9 @@ export async function findUserIdByAuthProvider(
  * Returns all providers the user has linked, categorized by type.
  * Used for provider selection UI when user has multiple sign-in options.
  *
- * First resolves an exact linked-provider email. When no provider has that
- * email, it falls back to the account's existing normalized primary-email
- * lookup semantics. This keeps discovery aligned with magic-link sign-in
- * without using submitted email as authentication.
+ * Resolves both exact linked-provider email and normalized primary-email
+ * candidates. This keeps discovery aligned with magic-link sign-in without
+ * letting either lookup source silently take precedence over the other.
  *
  * @param email - Any email linked to the user's account or normalized primary email.
  *
@@ -1881,51 +1880,47 @@ export type UserProviderLookupResult =
 export async function getAllUserProviders(email: string): Promise<UserProviderLookupResult> {
   const lowerEmail = email.toLowerCase().trim();
 
-  // Preserve the exact linked-provider lookup as the primary path. A submitted
-  // email only determines discovery options; provider callbacks and magic-link
-  // verification remain the authentication authority.
+  // A submitted email only determines discovery options; provider callbacks
+  // and magic-link verification remain the authentication authority.
   const linkedProviders = await db
     .selectDistinct({ kilo_user_id: user_auth_provider.kilo_user_id })
     .from(user_auth_provider)
     .where(eq(sql`lower(${user_auth_provider.email})`, lowerEmail))
     .limit(2);
-  const linkedUserIds = new Set(linkedProviders.map(provider => provider.kilo_user_id));
-  if (linkedUserIds.size > 1) {
+  // Keep the legacy null-column fallback used by findUserByNormalizedEmail,
+  // but always resolve it alongside the exact linked-provider source. Looking
+  // at two candidates from each source is enough to identify ambiguity.
+  const normalizedUsers = await db.query.kilocode_users.findMany({
+    where: or(
+      eq(kilocode_users.normalized_email, normalizeEmail(email)),
+      and(
+        isNull(kilocode_users.normalized_email),
+        sql`lower(${kilocode_users.google_user_email}) = lower(${email.trim()})`
+      )
+    ),
+    limit: 2,
+  });
+  const candidateUserIds = new Set([
+    ...linkedProviders.map(provider => provider.kilo_user_id),
+    ...normalizedUsers.map(user => user.id),
+  ]);
+  if (candidateUserIds.size > 1) {
     return { kind: 'ambiguous' };
   }
-
-  const user =
-    linkedUserIds.size === 1
-      ? await findUserById(linkedProviders[0].kilo_user_id)
-      : await db.query.kilocode_users.findMany({
-          // Keep the legacy null-column fallback used by findUserByNormalizedEmail,
-          // but inspect enough rows to reject a normalized identity collision.
-          where: or(
-            eq(kilocode_users.normalized_email, normalizeEmail(email)),
-            and(
-              isNull(kilocode_users.normalized_email),
-              sql`lower(${kilocode_users.google_user_email}) = lower(${email.trim()})`
-            )
-          ),
-          limit: 2,
-        });
-
-  if (Array.isArray(user)) {
-    if (user.length > 1) {
-      return { kind: 'ambiguous' };
-    }
-    if (user.length === 0) {
-      return { kind: 'not_found' };
-    }
-
-    return getUserProviderInfo(user[0]);
-  }
-
-  if (!user) {
+  const candidateUserId = candidateUserIds.values().next().value;
+  if (!candidateUserId) {
     return { kind: 'not_found' };
   }
 
-  return getUserProviderInfo(user);
+  const user = normalizedUsers.find(normalizedUser => normalizedUser.id === candidateUserId);
+  if (user) {
+    return getUserProviderInfo(user);
+  }
+
+  const linkedUser = await findUserById(candidateUserId);
+  if (!linkedUser) return { kind: 'not_found' };
+
+  return getUserProviderInfo(linkedUser);
 }
 
 async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult> {

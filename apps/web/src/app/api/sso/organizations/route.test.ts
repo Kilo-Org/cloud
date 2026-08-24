@@ -173,7 +173,7 @@ describe('POST /api/sso/organizations', () => {
     expect((await POST(request({ email: 'user@example.com' }))).status).toBe(503);
   });
 
-  it('fails closed before new-account eligibility for an ambiguous exact provider email', async () => {
+  it('fails closed before new-account eligibility when exact and normalized email sources conflict', async () => {
     mockGetAllUserProviders.mockResolvedValue({ kind: 'ambiguous' });
 
     const response = await POST(request({ email: 'shared@example.com' }));

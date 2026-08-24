@@ -71,7 +71,8 @@
     "codeSent": "Code verzonden",
     "signInCodeField": "Aanmeldcode",
     "accountCreated": "Account aangemaakt. Welkom bij Kilo.",
-    "pleaseEnterEmail": "Voer je e-mailadres in."
+    "pleaseEnterEmail": "Voer je e-mailadres in.",
+    "or": "of"
   },
   "profile": {
     "language": "Taal",

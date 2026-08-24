@@ -71,7 +71,8 @@
     "codeSent": "코드 전송됨",
     "signInCodeField": "로그인 코드",
     "accountCreated": "계정이 생성되었습니다. Kilo에 오신 것을 환영합니다.",
-    "pleaseEnterEmail": "이메일 주소를 입력하세요."
+    "pleaseEnterEmail": "이메일 주소를 입력하세요.",
+    "or": "또는"
   },
   "profile": {
     "language": "언어",

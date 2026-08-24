@@ -71,7 +71,8 @@
     "codeSent": "コードを送信しました",
     "signInCodeField": "サインインコード",
     "accountCreated": "アカウントが作成されました。Kiloへようこそ。",
-    "pleaseEnterEmail": "メールアドレスを入力してください。"
+    "pleaseEnterEmail": "メールアドレスを入力してください。",
+    "or": "または"
   },
   "profile": {
     "language": "言語",

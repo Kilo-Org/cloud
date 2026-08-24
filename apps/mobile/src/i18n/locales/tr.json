@@ -71,7 +71,8 @@
     "codeSent": "Kod gönderildi",
     "signInCodeField": "Oturum açma kodu",
     "accountCreated": "Hesap oluşturuldu. Kilo'ya hoş geldiniz.",
-    "pleaseEnterEmail": "Lütfen e-posta adresinizi girin."
+    "pleaseEnterEmail": "Lütfen e-posta adresinizi girin.",
+    "or": "veya"
   },
   "profile": {
     "language": "Dil",

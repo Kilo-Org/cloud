@@ -71,7 +71,8 @@
     "codeSent": "कोड भेजा गया",
     "signInCodeField": "साइन-इन कोड",
     "accountCreated": "खाता बन गया। Kilo में आपका स्वागत है।",
-    "pleaseEnterEmail": "कृपया अपना ईमेल पता दर्ज करें।"
+    "pleaseEnterEmail": "कृपया अपना ईमेल पता दर्ज करें।",
+    "or": "या"
   },
   "profile": {
     "language": "भाषा",

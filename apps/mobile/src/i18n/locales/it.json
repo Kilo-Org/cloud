@@ -71,7 +71,8 @@
     "codeSent": "Codice inviato",
     "signInCodeField": "Codice di accesso",
     "accountCreated": "Account creato. Benvenuto su Kilo.",
-    "pleaseEnterEmail": "Inserisci il tuo indirizzo email."
+    "pleaseEnterEmail": "Inserisci il tuo indirizzo email.",
+    "or": "o"
   },
   "profile": {
     "language": "Lingua",

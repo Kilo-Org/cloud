@@ -71,7 +71,8 @@
     "codeSent": "تم إرسال الرمز",
     "signInCodeField": "رمز تسجيل الدخول",
     "accountCreated": "تم إنشاء الحساب. مرحبًا بك في Kilo.",
-    "pleaseEnterEmail": "يرجى إدخال عنوان بريدك الإلكتروني."
+    "pleaseEnterEmail": "يرجى إدخال عنوان بريدك الإلكتروني.",
+    "or": "أو"
   },
   "profile": {
     "language": "اللغة",

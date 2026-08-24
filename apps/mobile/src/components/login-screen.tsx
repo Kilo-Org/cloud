@@ -200,10 +200,10 @@ export function LoginScreen() {
   // verified 704px + 63px = 767px on pixel9). Pad only when the keyboard is up so
   // the resting layout is untouched.
   const androidKeyboardPad = androidKeyboardHeight > 0 ? androidKeyboardHeight + insets.bottom : 0;
-  // The Globe stays enabled on idle and during SSO recovery; it is disabled
-  // while a device-auth flow, the email OTP form, or a busy auth action owns
-  // the screen.
-  const globeDisabled = status !== 'idle' || authFormBusy;
+  // The Globe stays enabled on idle, denied, expired, and error (those render
+  // an interactive IdleAuth form); it is disabled while a device-auth flow
+  // (pending/approved) or a busy auth action owns the screen.
+  const globeDisabled = status === 'pending' || authFormBusy;
   const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
 
   return (
@@ -226,8 +226,10 @@ export function LoginScreen() {
       >
         <Pressable
           onPress={() => {
-            void persistLoginDrafts();
-            setLanguagePickerOpen(true);
+            void (async () => {
+              await persistLoginDrafts();
+              setLanguagePickerOpen(true);
+            })();
           }}
           disabled={globeDisabled}
           hitSlop={8}

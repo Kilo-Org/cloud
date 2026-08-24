@@ -71,7 +71,8 @@
     "codeSent": "הקוד נשלח",
     "signInCodeField": "קוד כניסה",
     "accountCreated": "החשבון נוצר. ברוך הבא ל-Kilo.",
-    "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך."
+    "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך.",
+    "or": "או"
   },
   "profile": {
     "language": "שפה",

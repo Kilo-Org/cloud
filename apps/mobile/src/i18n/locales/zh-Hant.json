@@ -71,7 +71,8 @@
     "codeSent": "代碼已傳送",
     "signInCodeField": "登入代碼",
     "accountCreated": "帳戶已建立。歡迎使用 Kilo。",
-    "pleaseEnterEmail": "請輸入您的電子郵件地址。"
+    "pleaseEnterEmail": "請輸入您的電子郵件地址。",
+    "or": "或"
   },
   "profile": {
     "language": "語言",

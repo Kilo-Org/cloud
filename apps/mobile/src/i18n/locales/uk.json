@@ -71,7 +71,8 @@
     "codeSent": "Код надіслано",
     "signInCodeField": "Код входу",
     "accountCreated": "Обліковий запис створено. Ласкаво просимо до Kilo.",
-    "pleaseEnterEmail": "Введіть адресу електронної пошти."
+    "pleaseEnterEmail": "Введіть адресу електронної пошти.",
+    "or": "або"
   },
   "profile": {
     "language": "Мова",

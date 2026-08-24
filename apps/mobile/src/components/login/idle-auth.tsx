@@ -89,6 +89,16 @@ export function IdleAuth({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot restore on mount
   }, []);
 
+  // Seed the module-level email draft so a restored email survives a second
+  // RTL reload (the first reload restores it into the field, but only a
+  // change event re-seeds the draft).
+  useEffect(() => {
+    if (initialEmail) {
+      setLoginEmailDraft(initialEmail);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot seed on mount
+  }, []);
+
   // Keep the module-level draft in sync so an RTL reload can persist it.
   useEffect(() => {
     setSsoRecoveryDraft(ssoRecovery);
@@ -238,7 +248,7 @@ export function IdleAuth({
         <View className="flex-row items-center gap-3">
           <View className="h-px flex-1 bg-border" />
           <Text variant="muted" className="text-xs">
-            or
+            {t('login.or')}
           </Text>
           <View className="h-px flex-1 bg-border" />
         </View>

@@ -71,7 +71,8 @@
     "codeSent": "Kode terkirim",
     "signInCodeField": "Kode masuk",
     "accountCreated": "Akun dibuat. Selamat datang di Kilo.",
-    "pleaseEnterEmail": "Silakan masukkan alamat email Anda."
+    "pleaseEnterEmail": "Silakan masukkan alamat email Anda.",
+    "or": "atau"
   },
   "profile": {
     "language": "Bahasa",

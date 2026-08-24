@@ -1,6 +1,7 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+import { toast } from 'sonner-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -48,6 +49,9 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
   getLanguagePreference: () => 'device',
   getResolvedLanguage: () => 'en',
   setLanguagePreferenceAsync,
+}));
+vi.mock('@/i18n/resolve-language', () => ({
+  resolveDeviceLanguage: () => 'en',
 }));
 vi.mock('@/i18n/return-target', () => ({
   writeLanguageReturnTarget,
@@ -110,6 +114,7 @@ describe('LanguagePickerSheet apply', () => {
     writeLanguageReturnTarget.mockReset();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
+    vi.mocked(toast.error).mockClear();
   });
 
   afterEach(async () => {
@@ -166,6 +171,76 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('keeps the current language and shows Retry when the catalog load fails', async () => {
+    const changeLanguageSpy = vi
+      .spyOn(i18n, 'changeLanguage')
+      .mockRejectedValueOnce(new Error('missing catalog'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(i18n.language).toBe('en');
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Retry');
+
+    changeLanguageSpy.mockRestore();
+    renderer.unmount();
+  });
+
+  it('shows Could not restart and Retry works when the RTL reload fails', async () => {
+    reloadAppAsync.mockRejectedValue(new Error('reload failed'));
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
+    });
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.title).toBe('Could not restart');
+    expect(failedSheet.props.disabled).toBe(false);
+
+    await act(async () => {
+      (failedSheet.props.onDone as () => void)();
+      await Promise.resolve();
+    });
+    expect(reloadAppAsync).toHaveBeenCalledTimes(2);
 
     renderer.unmount();
   });

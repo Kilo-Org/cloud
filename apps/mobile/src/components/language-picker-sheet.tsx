@@ -12,11 +12,11 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
 import {
   getLanguagePreference,
-  getResolvedLanguage,
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -24,10 +24,12 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function LanguagePickerSheet({
   visible,
   onClose,
+  onApplied,
   returnTarget,
 }: Readonly<{
   visible: boolean;
   onClose: () => void;
+  onApplied?: () => void;
   returnTarget: LanguageReturnTarget;
 }>) {
   const { t } = useTranslation();
@@ -51,13 +53,13 @@ export function LanguagePickerSheet({
     return null;
   }
 
-  const deviceEndonym = LANGUAGE_ENDONYMS[getResolvedLanguage()];
+  const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
 
   const handleDone = async () => {
     if (busy) {
       return;
     }
-    const resolved = selected === 'device' ? getResolvedLanguage() : selected;
+    const resolved = selected === 'device' ? resolveDeviceLanguage() : selected;
     if (isRtlLanguage(resolved)) {
       setRestarting(true);
     }
@@ -65,6 +67,7 @@ export function LanguagePickerSheet({
     const outcome = await applyLanguagePreference(selected, resolved, returnTarget);
     switch (outcome.kind) {
       case 'applied-ltr': {
+        onApplied?.();
         onClose();
         break;
       }
@@ -73,6 +76,7 @@ export function LanguagePickerSheet({
         break;
       }
       case 'reload-failed': {
+        setBusy(false);
         setRestarting(false);
         setReloadFailed(true);
         break;

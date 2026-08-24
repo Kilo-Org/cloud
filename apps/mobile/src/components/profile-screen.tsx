@@ -37,6 +37,7 @@ import { i18n } from '@/i18n';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
+import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -395,6 +396,11 @@ export function ProfileScreen() {
         visible={languagePickerOpen}
         onClose={() => {
           setLanguagePickerOpen(false);
+        }}
+        onApplied={() => {
+          if (userId) {
+            void attemptPushRegistrationReconciliation(userId);
+          }
         }}
         returnTarget="profile"
       />

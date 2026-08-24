@@ -71,7 +71,8 @@
     "codeSent": "Đã gửi mã",
     "signInCodeField": "Mã đăng nhập",
     "accountCreated": "Đã tạo tài khoản. Chào mừng đến với Kilo.",
-    "pleaseEnterEmail": "Vui lòng nhập địa chỉ email của bạn."
+    "pleaseEnterEmail": "Vui lòng nhập địa chỉ email của bạn.",
+    "or": "hoặc"
   },
   "profile": {
     "language": "Ngôn ngữ",

@@ -6,9 +6,16 @@ import type * as manualDismissClientModule from '../services/manual-dismiss-clie
 import type * as manualAnalysisClientModule from '../services/manual-analysis-client';
 import type * as manualRemediationClientModule from '../services/manual-remediation-client';
 import { randomUUID } from 'crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { operation_ledgers, type OperationLedgerRow } from '@kilocode/db/schema';
+import {
+  operation_ledgers,
+  organizations,
+  security_audit_log,
+  type OperationLedgerRow,
+} from '@kilocode/db/schema';
+import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import type { SecurityFindingWithRemediation } from '../db/security-remediation';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -30,6 +37,7 @@ const mockSubmitRemediationCancellation = jest.fn() as jest.MockedFunction<
   typeof manualRemediationClientModule.submitRemediationCancellation
 >;
 const mockGetSecurityFindingById = jest.fn<() => Promise<unknown>>();
+const mockListSecurityFindings = jest.fn<() => Promise<unknown>>();
 const mockCanStartAnalysis = jest.fn<(owner: unknown) => Promise<unknown>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
@@ -68,6 +76,7 @@ const mockMarkReconcilePending = jest.fn<(...args: unknown[]) => Promise<unknown
 const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -124,7 +133,7 @@ jest.mock('../db/security-config', () => ({
   setSecurityAgentEnabled: mockSetSecurityAgentEnabled,
 }));
 jest.mock('../db/security-findings', () => ({
-  listSecurityFindings: jest.fn(),
+  listSecurityFindings: mockListSecurityFindings,
   getSecurityFindingById: mockGetSecurityFindingById,
   getSecurityFindingsSummary: jest.fn(),
   getLastSyncTime: jest.fn(),
@@ -138,6 +147,7 @@ jest.mock('../db/security-remediation', () => ({
 }));
 jest.mock('../db/security-commands', () => ({
   getSecurityAgentCommandStatus: mockGetSecurityAgentCommandStatus,
+  getSecurityAgentCommandStatuses: mockGetSecurityAgentCommandStatuses,
   listActiveSecurityAgentCommands: jest.fn(),
 }));
 jest.mock('../db/dashboard-stats', () => ({ getDashboardStats: jest.fn() }));
@@ -383,6 +393,44 @@ describe('getConfig', () => {
       isEnabled: false,
     });
   });
+
+  it('pins the high-confidence automation defaults for legacy configs', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      storedConfig: {},
+      config: {
+        sla_critical_days: 15,
+        sla_high_days: 30,
+        sla_medium_days: 45,
+        sla_low_days: 90,
+        sla_enabled: true,
+        auto_sync_enabled: true,
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+        model_slug: 'analysis-model',
+        analysis_mode: 'auto',
+        auto_dismiss_enabled: false,
+        auto_analysis_enabled: false,
+        auto_analysis_include_existing: false,
+        auto_remediation_enabled: false,
+        auto_remediation_include_existing: false,
+        auto_remediation_enabled_at: null,
+        remediation_model_slug: 'remediation-model',
+        sla_notifications_enabled: false,
+        sla_notification_min_severity: 'high',
+        sla_notification_warning_days: 3,
+        new_finding_notifications_enabled: false,
+        new_finding_notification_min_severity: 'high',
+      },
+    });
+
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      autoDismissConfidenceThreshold: 'high',
+      autoAnalysisMinSeverity: 'high',
+      autoRemediationMinSeverity: 'high',
+      autoRemediationRequireApproval: true,
+    });
+  });
 });
 
 describe('setEnabled', () => {
@@ -499,6 +547,63 @@ describe('saveConfig', () => {
       })
     ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
+
+  it('maps autoRemediationRequireApproval to the snake_case config field', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 2 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 1, autoRemediationRequireApproval: false },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ auto_remediation_require_approval: false }),
+      })
+    );
+  });
+
+  it('enqueues the include-existing remediation backlog when approval is turned off', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 2 });
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      storedConfig: {},
+      config: {
+        auto_remediation_enabled: true,
+        auto_remediation_include_existing: true,
+        auto_remediation_require_approval: true,
+      },
+    });
+
+    // First save: auto-remediation and include-existing are already on, with
+    // approval required. No bulk command is enqueued while approval is on.
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: {
+        expectedRevision: 1,
+        autoRemediationEnabled: true,
+        autoRemediationIncludeExisting: true,
+        autoRemediationRequireApproval: true,
+      },
+    });
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enqueueRemediation: undefined })
+    );
+
+    // Second save: approval turns off. The include-existing backlog is enqueued.
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 2, autoRemediationRequireApproval: false },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        enqueueRemediation: {
+          owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        },
+      })
+    );
+  });
 });
 
 describe('autoDismissEligible', () => {
@@ -601,6 +706,136 @@ describe('getAnalysis', () => {
   });
 });
 
+describe('getAnalysis remediation timeline', () => {
+  const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const orgId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  const finding = {
+    id: findingId,
+    status: 'open',
+    ignored_reason: null,
+    ignored_by: null,
+    fixed_at: null,
+    updated_at: '2026-06-17T11:45:00.000Z',
+    analysis_status: 'completed',
+    analysis_started_at: '2026-06-17T11:40:00.000Z',
+    analysis_completed_at: '2026-06-17T11:44:59.000Z',
+    analysis_error: null,
+    analysis: { analyzedAt: '2026-06-17T11:44:59.000Z' },
+    session_id: 'session-123',
+    cli_session_id: 'cli-session-123',
+  };
+  const decoratedFinding = {
+    ...finding,
+    remediationSummary: null,
+    remediationCapability: {
+      canStart: false,
+      startReason: 'finding_not_open',
+      canRetry: false,
+      retryReason: 'finding_not_open',
+      canCancel: false,
+      cancelAttemptId: null,
+    },
+  };
+
+  async function insertAuditRow(
+    action: SecurityAuditLogAction,
+    occurredAt: string | null,
+    createdAt: string
+  ) {
+    await db.insert(security_audit_log).values({
+      owned_by_organization_id: orgId,
+      owned_by_user_id: null,
+      action,
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      finding_id: findingId,
+      occurred_at: occurredAt,
+      created_at: createdAt,
+    });
+  }
+
+  beforeEach(async () => {
+    await db
+      .insert(organizations)
+      .values({ id: orgId, name: 'Timeline Test Org' })
+      .onConflictDoNothing();
+    await db.delete(security_audit_log).where(eq(security_audit_log.finding_id, findingId));
+    mockGetSecurityFindingById.mockResolvedValue(finding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(decoratedFinding);
+  });
+
+  afterAll(async () => {
+    await db.delete(security_audit_log).where(eq(security_audit_log.finding_id, findingId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  it('orders remediation events ascending by occurred_at with created_at fallback and normalizes to UTC ISO', async () => {
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationQueued,
+      '2026-04-29 01:16:12.945+00',
+      '2026-04-29 01:16:12.945+00'
+    );
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationPrOpened,
+      null,
+      '2026-04-29 02:00:00.000+00'
+    );
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationFailed,
+      '2026-04-29 01:30:00.000+00',
+      '2026-04-29 01:30:00.000+00'
+    );
+
+    const result = await createHandlers().getAnalysis.handler({
+      ctx: context,
+      input: { findingId },
+    });
+
+    expect(result.remediationTimeline).toEqual([
+      { action: 'security.remediation.queued', occurredAt: '2026-04-29T01:16:12.945Z' },
+      { action: 'security.remediation.failed', occurredAt: '2026-04-29T01:30:00.000Z' },
+      { action: 'security.remediation.pr_opened', occurredAt: '2026-04-29T02:00:00.000Z' },
+    ]);
+  });
+
+  it('returns only remediation actions, not finding lifecycle actions', async () => {
+    await insertAuditRow(
+      SecurityAuditLogAction.FindingCreated,
+      '2026-04-29 01:00:00.000+00',
+      '2026-04-29 01:00:00.000+00'
+    );
+    await insertAuditRow(
+      SecurityAuditLogAction.RemediationQueued,
+      '2026-04-29 01:10:00.000+00',
+      '2026-04-29 01:10:00.000+00'
+    );
+
+    const result = await createHandlers().getAnalysis.handler({
+      ctx: context,
+      input: { findingId },
+    });
+
+    expect(result.remediationTimeline.map(event => event.action)).toEqual([
+      'security.remediation.queued',
+    ]);
+  });
+
+  it('returns an empty timeline when no remediation audit rows exist, keeping the original shape valid', async () => {
+    const result = await createHandlers().getAnalysis.handler({
+      ctx: context,
+      input: { findingId },
+    });
+
+    expect(result.remediationTimeline).toEqual([]);
+    expect(result).toMatchObject({
+      findingState: { status: 'open' },
+      status: 'completed',
+      remediationAttempts: [],
+    });
+  });
+});
+
 describe('queue-backed handlers', () => {
   it('returns sync command correlation', async () => {
     mockSubmitManualSecuritySync.mockResolvedValue({
@@ -642,6 +877,15 @@ describe('queue-backed handlers', () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
     mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
     mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'start_analysis',
+        resource_key:
+          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    });
 
     await expect(
       createHandlers().startAnalysis.handler({
@@ -662,6 +906,15 @@ describe('queue-backed handlers', () => {
     });
     mockCanStartAnalysis.mockResolvedValue({ allowed: false, currentCount: 3, limit: 3 });
     mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'start_analysis',
+        resource_key:
+          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    });
 
     await expect(
       createHandlers().startAnalysis.handler({
@@ -1486,5 +1739,266 @@ describe('terminal command ledger settle', () => {
 
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe('getCommandStatuses', () => {
+  const batchCommandId = 'aaaabbbb-cccc-4ddd-8eee-ffff00002222';
+
+  function terminalCommand(overrides: Record<string, unknown> = {}) {
+    return {
+      id: batchCommandId,
+      commandType: 'sync',
+      origin: 'dashboard_refresh',
+      findingId: null,
+      repoFullName: 'kilo/repo',
+      status: 'succeeded',
+      resultCode: 'SYNC_COMPLETED',
+      resultMetadata: null,
+      lastErrorRedacted: null,
+      acceptedAt: '2026-06-17T10:00:00.000Z',
+      startedAt: '2026-06-17T10:00:01.000Z',
+      completedAt: '2026-06-17T10:00:09.000Z',
+      updatedAt: '2026-06-17T10:00:09.000Z',
+      ...overrides,
+    };
+  }
+
+  async function insertLedgerRow(overrides: Partial<OperationLedgerRow> = {}) {
+    const [row] = await db
+      .insert(operation_ledgers)
+      .values({
+        operation_key: `settle-key-${randomUUID()}`,
+        domain: 'security',
+        intent: 'manual_sync',
+        kilo_user_id: 'user-123',
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        provider_ref: batchCommandId,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+        ...overrides,
+      })
+      .returning();
+    return row!;
+  }
+
+  beforeEach(async () => {
+    await db.delete(operation_ledgers).where(sql`true`);
+  });
+
+  afterAll(async () => {
+    await db.delete(operation_ledgers).where(sql`true`);
+  });
+
+  it('rejects an empty array, a non-uuid id, and more than 100 ids at the schema boundary', () => {
+    const schema = createHandlers().getCommandStatuses.inputSchema;
+    const ids = Array.from({ length: 101 }, () => '00000000-0000-4000-8000-000000000000');
+
+    expect(schema.safeParse({ commandIds: [] }).success).toBe(false);
+    expect(schema.safeParse({ commandIds: ['not-a-uuid'] }).success).toBe(false);
+    expect(schema.safeParse({ commandIds: ids }).success).toBe(false);
+    expect(schema.safeParse({ commandIds: ids.slice(0, 100) }).success).toBe(true);
+  });
+
+  it('returns only the commands the db layer resolved and never throws for unknown ids', async () => {
+    mockGetSecurityAgentCommandStatuses.mockResolvedValue([terminalCommand()]);
+
+    await expect(
+      createHandlers().getCommandStatuses.handler({
+        ctx: context,
+        input: { commandIds: [batchCommandId, '00000000-0000-4000-8000-000000000000'] },
+      })
+    ).resolves.toEqual([terminalCommand()]);
+
+    expect(mockGetSecurityAgentCommandStatuses).toHaveBeenCalledWith(
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      [batchCommandId, '00000000-0000-4000-8000-000000000000']
+    );
+  });
+
+  it('settles a terminal command exactly once across repeated batch calls', async () => {
+    const row = await insertLedgerRow();
+    mockGetSecurityAgentCommandStatuses.mockResolvedValue([terminalCommand()]);
+    mockSettleOperation.mockImplementationOnce(async () => {
+      await db
+        .update(operation_ledgers)
+        .set({ status: 'completed' })
+        .where(eq(operation_ledgers.id, row.id));
+      return { settled: true };
+    });
+
+    const handlers = createHandlers();
+    await handlers.getCommandStatuses.handler({
+      ctx: context,
+      input: { commandIds: [batchCommandId] },
+    });
+    await handlers.getCommandStatuses.handler({
+      ctx: context,
+      input: { commandIds: [batchCommandId] },
+    });
+
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('findings list DTO narrowing', () => {
+  function makeFullDecoratedFinding(): SecurityFindingWithRemediation {
+    return {
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      owned_by_user_id: null,
+      platform_integration_id: null,
+      repo_full_name: 'kilo/repo',
+      source: 'dependabot',
+      source_id: '42',
+      severity: 'high',
+      ghsa_id: 'GHSA-xxxx-yyyy-zzzz',
+      cve_id: 'CVE-2026-0001',
+      package_name: 'lodash',
+      package_ecosystem: 'npm',
+      vulnerable_version_range: '<4.17.21',
+      patched_version: '4.17.21',
+      manifest_path: 'package.json',
+      title: 'Prototype Pollution in lodash',
+      description: 'A prototype pollution vulnerability',
+      status: 'open',
+      ignored_reason: null,
+      ignored_by: null,
+      fixed_at: null,
+      sla_due_at: '2026-08-21T00:00:00.000Z',
+      dependabot_html_url: 'https://github.com/kilo/repo/security/dependabot/42',
+      cwe_ids: ['CWE-1321'],
+      cvss_score: '7.5',
+      dependency_scope: 'runtime',
+      session_id: null,
+      cli_session_id: null,
+      analysis_status: 'completed',
+      analysis_started_at: '2026-08-20T00:00:00.000Z',
+      analysis_completed_at: '2026-08-20T00:05:00.000Z',
+      analysis_error: null,
+      analysis: {
+        analyzedAt: '2026-08-20T00:05:00.000Z',
+        rawMarkdown: 'heavy analysis markdown',
+        modelUsed: 'analysis-model',
+        triage: {
+          needsSandboxAnalysis: true,
+          needsSandboxReasoning: 'needs sandbox',
+          suggestedAction: 'analyze_codebase',
+          confidence: 'high',
+          triageAt: '2026-08-20T00:04:00.000Z',
+        },
+        sandboxAnalysis: {
+          isExploitable: 'unknown',
+          extractionStatus: 'failed',
+          exploitabilityReasoning: 'sandbox reasoning',
+          usageLocations: ['index.js'],
+          suggestedFix: 'upgrade lodash',
+          suggestedAction: 'monitor',
+          summary: 'sandbox summary',
+          rawMarkdown: 'sandbox markdown',
+          analysisAt: '2026-08-20T00:05:00.000Z',
+          modelUsed: 'sandbox-model',
+        },
+      },
+      raw_data: { number: 42, state: 'open' },
+      first_detected_at: '2026-08-01T00:00:00.000Z',
+      last_synced_at: '2026-08-20T00:00:00.000Z',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-20T00:05:00.000Z',
+      remediationSummary: {
+        id: 'remediation-id',
+        status: 'pr_opened',
+        latestAttemptId: 'attempt-id',
+        prUrl: 'https://github.com/kilo/repo/pull/99',
+        prNumber: 99,
+        prDraft: false,
+        prHeadBranch: 'fix/lodash',
+        prBaseBranch: 'main',
+        failureCode: null,
+        blockedReason: null,
+        outcomeSummary: 'PR opened',
+        completedAt: null,
+        updatedAt: '2026-08-20T00:10:00.000Z',
+        latestAttempt: {
+          id: 'attempt-id',
+          status: 'pr_opened',
+          origin: 'manual',
+          attemptNumber: 1,
+          requestedByUserId: 'user-123',
+          remediationModelSlug: 'remediation-model',
+          branchName: 'fix/lodash',
+          prUrl: 'https://github.com/kilo/repo/pull/99',
+          prNumber: 99,
+          prDraft: false,
+          prHeadBranch: 'fix/lodash',
+          prBaseBranch: 'main',
+          failureCode: null,
+          blockedReason: null,
+          lastErrorRedacted: null,
+          validationEvidence: null,
+          riskNotes: null,
+          draftReason: null,
+          cancellationRequestedAt: null,
+          queuedAt: '2026-08-20T00:06:00.000Z',
+          launchedAt: '2026-08-20T00:07:00.000Z',
+          completedAt: '2026-08-20T00:09:00.000Z',
+          createdAt: '2026-08-20T00:06:00.000Z',
+          updatedAt: '2026-08-20T00:09:00.000Z',
+        },
+      },
+      remediationCapability: {
+        canStart: false,
+        startReason: 'finding_not_open',
+        canRetry: false,
+        retryReason: 'finding_not_open',
+        canCancel: false,
+        cancelAttemptId: null,
+      },
+    } as SecurityFindingWithRemediation;
+  }
+
+  it('returns list rows with raw_data nulled', async () => {
+    const decoratedFinding = makeFullDecoratedFinding();
+    mockListSecurityFindings.mockResolvedValue({ findings: [decoratedFinding], totalCount: 1 });
+    mockDecorateFindingsWithRemediation.mockResolvedValue([decoratedFinding]);
+    mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
+
+    const result = await createHandlers().listFindings.handler({
+      ctx: context,
+      input: { sortBy: 'severity_desc', limit: 10, offset: 0 },
+    });
+
+    const row = result.findings[0]!;
+    expect(row.raw_data).toBeNull();
+
+    // Exact key set: the full decorated row; nothing else added or dropped.
+    const expectedKeys = Object.keys(decoratedFinding).sort();
+    expect(Object.keys(row).sort()).toEqual(expectedKeys);
+
+    // analysis stays fully intact, including the heavy payloads the web
+    // detail dialog reads.
+    expect(row.analysis).toEqual(decoratedFinding.analysis);
+
+    // remediationSummary stays fully intact, including latestAttempt.
+    expect(row.remediationSummary).toEqual(decoratedFinding.remediationSummary);
+    expect(row.remediationSummary?.latestAttempt).toBeDefined();
+  });
+
+  it('keeps the heavy fields on the detail getFinding response', async () => {
+    const decoratedFinding = makeFullDecoratedFinding();
+    mockGetSecurityFindingById.mockResolvedValue(decoratedFinding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(decoratedFinding);
+
+    const result = await createHandlers().getFinding.handler({
+      ctx: context,
+      input: { id: decoratedFinding.id },
+    });
+
+    expect(result).toEqual(decoratedFinding);
+    expect(result.raw_data).toBeDefined();
+    expect(result.analysis).toEqual(decoratedFinding.analysis);
+    expect(result.remediationSummary?.latestAttempt).toBeDefined();
   });
 });

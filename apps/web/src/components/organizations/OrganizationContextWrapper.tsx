@@ -5,7 +5,7 @@ import { OrganizationContextProvider } from './OrganizationContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useSession } from 'next-auth/react';
-import type { OrganizationMember } from '@/lib/organizations/organization-types';
+import type { OrganizationMemberResponse } from '@/lib/organizations/organization-types';
 
 type OrganizationContextWrapperProps = {
   organizationId: string;
@@ -24,7 +24,7 @@ export function OrganizationAdminContextProvider({
 
   // Get current organization role
   const actualRole = organizationData?.members?.find(
-    (member: OrganizationMember) =>
+    (member: OrganizationMemberResponse) =>
       member.email === session?.data?.user?.email && member.status === 'active'
   )?.role;
 

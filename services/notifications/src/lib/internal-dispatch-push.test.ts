@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type {
-  DispatchPushInput,
-  DispatchPushOutcome,
-  InternalDispatchLowBalanceRequest,
-  InternalDispatchSecurityFindingRequest,
+import {
+  pushDataSchema,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+  type InternalDispatchLowBalanceRequest,
+  type InternalDispatchSecurityFindingRequest,
+  type InternalDispatchSecurityLifecycleRequest,
 } from '@kilocode/notifications';
 
 import type { UserNotificationPreferences } from './cloud-agent-session-push';
@@ -46,6 +48,21 @@ function securityFinding(
     severity: 'critical',
     repoFullName: 'acme/api',
     title: 'SQL injection in login',
+    ...overrides,
+  };
+}
+
+function securityLifecycle(
+  overrides: Partial<InternalDispatchSecurityLifecycleRequest> = {}
+): InternalDispatchSecurityLifecycleRequest {
+  return {
+    kind: 'security_lifecycle',
+    event: 'remediation_pr_opened',
+    findingId: 'finding-1',
+    scope: 'org-1',
+    remediationId: 'remediation-1',
+    prUrl: 'https://github.com/acme/api/pull/42',
+    recipientUserIds: ['user-a', 'user-b'],
     ...overrides,
   };
 }
@@ -367,5 +384,122 @@ describe('dispatchInternalPushCore', () => {
     ]);
     expect(calls.dispatchPushInputs).toHaveLength(2);
     expect(calls.dispatchPushInputs.map(i => i.userId)).toEqual(['user-a', 'user-b']);
+  });
+
+  it('security_lifecycle dispatches all recipients with a payload that validates', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(securityLifecycle(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    for (const input of calls.dispatchPushInputs) {
+      expect(input.push.data).toEqual({
+        type: 'security_lifecycle',
+        event: 'remediation_pr_opened',
+        findingId: 'finding-1',
+        scope: 'org-1',
+        remediationId: 'remediation-1',
+        prUrl: 'https://github.com/acme/api/pull/42',
+      });
+      expect(pushDataSchema.safeParse(input.push.data).success).toBe(true);
+    }
+    expect(calls.dispatchPushInputs[0]).toEqual({
+      userId: 'user-a',
+      presenceContext: null,
+      idempotencyKey: 'security-lifecycle:finding-1:remediation_pr_opened:remediation-1',
+      badge: null,
+      push: {
+        title: 'Kilo',
+        body: 'A security finding needs attention',
+        data: {
+          type: 'security_lifecycle',
+          event: 'remediation_pr_opened',
+          findingId: 'finding-1',
+          scope: 'org-1',
+          remediationId: 'remediation-1',
+          prUrl: 'https://github.com/acme/api/pull/42',
+        },
+        sound: 'default',
+        priority: 'high',
+      },
+    } satisfies DispatchPushInput);
+  });
+
+  it('security_lifecycle omits optional fields when absent and still validates', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      securityLifecycle({
+        event: 'analysis_completed',
+        remediationId: undefined,
+        prUrl: undefined,
+        recipientUserIds: ['user-a'],
+      }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+    expect(calls.dispatchPushInputs[0].push.data).toEqual({
+      type: 'security_lifecycle',
+      event: 'analysis_completed',
+      findingId: 'finding-1',
+      scope: 'org-1',
+    });
+    expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0].push.data).success).toBe(true);
+    expect(calls.dispatchPushInputs[0].idempotencyKey).toBe(
+      'security-lifecycle:finding-1:analysis_completed:none'
+    );
+  });
+
+  it('suppresses security_lifecycle when securityFindingsEnabled is false (no DO call)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: { ...ALL_ON, securityFindingsEnabled: false },
+    });
+    const result = await dispatchInternalPushCore(securityLifecycle(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'suppressed_preference' },
+      { userId: 'user-b', outcome: 'suppressed_preference' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('security_lifecycle reads only securityFindingsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        chatMessagesEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        kiloclawActivityEnabled: false,
+        balanceAlertsEnabled: false,
+        securityFindingsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(
+      securityLifecycle({ recipientUserIds: ['user-a'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('dedups duplicate recipient ids in security_lifecycle to one call', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      securityLifecycle({ recipientUserIds: ['user-a', 'user-a', 'user-b'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(2);
   });
 });

@@ -1,15 +1,20 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import {
+  agent_configs,
   credit_transactions,
   device_sessions,
+  kiloclaw_instances,
   kilocode_users,
   magic_link_tokens,
+  organization_memberships,
+  organizations,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
 import { sendSignInCodeEmail } from '@/lib/email';
 import {
@@ -46,6 +51,31 @@ const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmation
 const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
+
+const AVAILABLE_CAPABILITY = { available: true, unavailableReason: null };
+const UNAVAILABLE_BALANCE_ALERTS = {
+  available: false,
+  unavailableReason: 'Join an organization to get balance alerts.',
+};
+const UNAVAILABLE_SECURITY_FINDINGS = {
+  available: false,
+  unavailableReason: 'Enable Kilo Security Agent on a scope to get security findings.',
+};
+const UNAVAILABLE_KILOCLAW_ACTIVITY = {
+  available: false,
+  unavailableReason: 'Start a KiloClaw instance to get KiloClaw activity.',
+};
+
+/** Capabilities for a user with no org, no Security config, and no KiloClaw instance. */
+const NO_GATES_CAPABILITIES = {
+  chatMessages: AVAILABLE_CAPABILITY,
+  agentAttention: AVAILABLE_CAPABILITY,
+  agentUpdates: AVAILABLE_CAPABILITY,
+  sessionStatus: AVAILABLE_CAPABILITY,
+  kiloclawActivity: UNAVAILABLE_KILOCLAW_ACTIVITY,
+  balanceAlerts: UNAVAILABLE_BALANCE_ALERTS,
+  securityFindings: UNAVAILABLE_SECURITY_FINDINGS,
+};
 
 let testUser: User;
 let surveyTestUser: User;
@@ -613,6 +643,7 @@ describe('user router - notification preferences', () => {
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
+      capabilities: NO_GATES_CAPABILITIES,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
@@ -643,6 +674,7 @@ describe('user router - notification preferences', () => {
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
+      capabilities: NO_GATES_CAPABILITIES,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
   });
@@ -704,6 +736,7 @@ describe('user router - notification preferences', () => {
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
+      capabilities: NO_GATES_CAPABILITIES,
     });
 
     const firstPrefs = await firstCaller.user.getNotificationPreferences();
@@ -717,6 +750,7 @@ describe('user router - notification preferences', () => {
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
+      capabilities: NO_GATES_CAPABILITIES,
     });
 
     // Setting second user's preference must not affect first user's row.
@@ -917,6 +951,133 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(false);
     expect(row?.kiloclaw_activity_enabled).toBe(false);
     expect(row?.security_findings_enabled).toBe(false);
+  });
+});
+
+describe('user router - notification capabilities', () => {
+  let capUser: User;
+
+  beforeAll(async () => {
+    capUser = await insertTestUser({
+      google_user_email: 'notif-caps@example.com',
+      google_user_name: 'Notif Caps',
+    });
+  });
+
+  afterEach(async () => {
+    // Remove every gate fixture so each test starts from the no-gates baseline.
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, capUser.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, capUser.id));
+    await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, capUser.id));
+    await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, capUser.id));
+    await db
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, capUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, capUser.id));
+  });
+
+  it('reports balanceAlerts unavailable with a reason when the user has no organization', async () => {
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.balanceAlerts).toEqual(UNAVAILABLE_BALANCE_ALERTS);
+    expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+    // The four always-on categories stay available for a signed-in user.
+    expect(result.capabilities.chatMessages).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.agentAttention).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.agentUpdates).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.sessionStatus).toEqual(AVAILABLE_CAPABILITY);
+  });
+
+  it('reports securityFindings unavailable when Security is disabled everywhere', async () => {
+    // The user has an org (so balanceAlerts is available) but no Security config.
+    await createTestOrganization('cap-org', capUser.id, 0);
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.balanceAlerts).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+  });
+
+  it('reports securityFindings available when the personal scope has Security enabled', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: capUser.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: capUser.id,
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.securityFindings).toEqual(AVAILABLE_CAPABILITY);
+  });
+
+  it('reports securityFindings unavailable when the personal scope has Security disabled', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: capUser.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: false,
+      created_by: capUser.id,
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+  });
+
+  it('reports kiloclawActivity unavailable when the only instance is destroyed', async () => {
+    await db.insert(kiloclaw_instances).values({
+      user_id: capUser.id,
+      sandbox_id: 'cap-sandbox-destroyed',
+      destroyed_at: '2026-01-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
+  });
+
+  it('reports every capability available when all gates are satisfied', async () => {
+    const org = await createTestOrganization('cap-org', capUser.id, 0);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: org.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: capUser.id,
+    });
+    await db.insert(kiloclaw_instances).values({
+      user_id: capUser.id,
+      sandbox_id: 'cap-sandbox',
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities).toEqual({
+      chatMessages: AVAILABLE_CAPABILITY,
+      agentAttention: AVAILABLE_CAPABILITY,
+      agentUpdates: AVAILABLE_CAPABILITY,
+      sessionStatus: AVAILABLE_CAPABILITY,
+      kiloclawActivity: AVAILABLE_CAPABILITY,
+      balanceAlerts: AVAILABLE_CAPABILITY,
+      securityFindings: AVAILABLE_CAPABILITY,
+    });
   });
 });
 

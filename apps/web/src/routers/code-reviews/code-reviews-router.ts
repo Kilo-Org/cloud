@@ -47,7 +47,6 @@ import {
   CancelCodeReviewInputSchema,
   RetriggerCodeReviewInputSchema,
   type Owner,
-  type ListCodeReviewsResponse,
 } from '@/lib/code-reviews/core';
 import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
 import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
@@ -72,6 +71,7 @@ import {
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 
 /**
  * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
@@ -248,8 +248,30 @@ export const codeReviewRouter = createTRPCRouter({
           }),
         ]);
 
-        const response: ListCodeReviewsResponse = {
-          reviews,
+        // Role-gated DTO: raw ledger/transaction identifiers are admin+ only.
+        // Per-field decision:
+        // - session_id: internal cloud agent session id -> null for non-admin.
+        // - cli_session_id: internal CLI session id used to look up the billing
+        //   ledger (getSessionUsageFromBilling) -> null for non-admin.
+        // - dispatch_reservation_id: internal dispatch reservation id -> null
+        //   for non-admin.
+        // - check_run_id: internal GitHub Check Run ID -> null for non-admin.
+        // total_cost_musd (display cost) is retained: the mobile review detail
+        // screen renders it (review-detail-screen.tsx).
+        const callerRole = await ensureOrganizationAccess(ctx, fullInput.organizationId);
+        const canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
+        const visibleReviews = canSeeRawIds
+          ? reviews
+          : reviews.map(review => ({
+              ...review,
+              session_id: null,
+              cli_session_id: null,
+              dispatch_reservation_id: null,
+              check_run_id: null,
+            }));
+
+        const response = {
+          reviews: visibleReviews,
           total,
           hasMore: offset + reviews.length < total,
         };
@@ -295,7 +317,7 @@ export const codeReviewRouter = createTRPCRouter({
           }),
         ]);
 
-        const response: ListCodeReviewsResponse = {
+        const response = {
           reviews,
           total,
           hasMore: offset + reviews.length < total,
@@ -325,9 +347,11 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       // Authorization check based on owner type
+      let canSeeRawIds = true;
       if (review.owned_by_organization_id) {
         // Organization review: verify user is org member
-        await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
+        const callerRole = await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
+        canSeeRawIds = callerRole === 'owner' || callerRole === 'admin';
       } else if (review.owned_by_user_id) {
         // Personal review: verify user owns it
         if (review.owned_by_user_id !== ctx.user.id) {
@@ -403,9 +427,34 @@ export const codeReviewRouter = createTRPCRouter({
         }
       }
 
+      // Role-gated DTO: raw ledger/transaction identifiers are admin+ only,
+      // matching listForOrganization. Non-owner/non-admin org members get nulls.
+      const visibleReview = canSeeRawIds
+        ? review
+        : {
+            ...review,
+            session_id: null,
+            cli_session_id: null,
+            dispatch_reservation_id: null,
+            check_run_id: null,
+          };
+      const visibleAttempts = canSeeRawIds
+        ? attempts
+        : attempts.map(attempt => ({
+            ...attempt,
+            session_id: null,
+            cli_session_id: null,
+            execution_id: null,
+          }));
+
       return successResult({
-        review: { ...review, council_result, model: selectedModel ?? review.model },
-        attempts,
+        review: {
+          ...visibleReview,
+          rawIdsRedacted: !canSeeRawIds,
+          council_result,
+          model: selectedModel ?? review.model,
+        },
+        attempts: visibleAttempts,
         tokenUsage,
       });
     } catch (error) {
@@ -486,6 +535,12 @@ export const codeReviewRouter = createTRPCRouter({
               }
             );
             await cancelCodeReview(input.reviewId);
+            await settleCodeReviewLedgerRow({
+              reviewId: input.reviewId,
+              status: 'cancelled',
+              terminalReason: review.terminal_reason,
+              triggerSource: review.trigger_source,
+            });
             try {
               await cancelPRGateCheck(review, credentialActor);
             } catch (gateError) {
@@ -502,6 +557,12 @@ export const codeReviewRouter = createTRPCRouter({
           if (review.status === 'queued' && !review.session_id) {
             console.error('Worker cancel failed, updating DB directly:', workerError);
             await cancelCodeReview(input.reviewId);
+            await settleCodeReviewLedgerRow({
+              reviewId: input.reviewId,
+              status: 'cancelled',
+              terminalReason: review.terminal_reason,
+              triggerSource: review.trigger_source,
+            });
             try {
               await cancelPRGateCheck(review, credentialActor);
             } catch (gateError) {
@@ -516,6 +577,12 @@ export const codeReviewRouter = createTRPCRouter({
 
       // For pending reviews (not yet dispatched to worker), update DB and finalize gate
       await cancelCodeReview(input.reviewId);
+      await settleCodeReviewLedgerRow({
+        reviewId: input.reviewId,
+        status: 'cancelled',
+        terminalReason: review.terminal_reason,
+        triggerSource: review.trigger_source,
+      });
       try {
         await cancelPRGateCheck(review, credentialActor);
       } catch (gateError) {

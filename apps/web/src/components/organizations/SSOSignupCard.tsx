@@ -8,12 +8,12 @@ import { toast } from 'sonner';
 import { usePostHog } from 'posthog-js/react';
 import type {
   OrganizationRole,
-  OrganizationWithMembers,
+  OrganizationWithMembersResponse,
 } from '@/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type SSOSignupCardProps = {
-  organization: OrganizationWithMembers;
+  organization: OrganizationWithMembersResponse;
   role: OrganizationRole;
 };
 

@@ -1,6 +1,6 @@
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
@@ -66,6 +66,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [autoRemediationEnabled, setAutoRemediationEnabled] = useState(false);
   const [autoRemediationMinSeverity, setAutoRemediationMinSeverity] = useState<MinSeverity>('all');
   const [autoRemediationIncludeExisting, setAutoRemediationIncludeExisting] = useState(false);
+  const [autoRemediationRequireApproval, setAutoRemediationRequireApproval] = useState(true);
   const [autoDismissEnabled, setAutoDismissEnabled] = useState(false);
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<ConfidenceThreshold>('high');
@@ -87,6 +88,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     setAutoRemediationEnabled(config.data.autoRemediationEnabled);
     setAutoRemediationMinSeverity(config.data.autoRemediationMinSeverity);
     setAutoRemediationIncludeExisting(config.data.autoRemediationIncludeExisting);
+    setAutoRemediationRequireApproval(config.data.autoRemediationRequireApproval);
     setAutoDismissEnabled(config.data.autoDismissEnabled);
     setAutoDismissConfidenceThreshold(config.data.autoDismissConfidenceThreshold);
   }, [config.data]);
@@ -117,6 +119,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     autoRemediationEnabled,
     autoRemediationMinSeverity,
     autoRemediationIncludeExisting,
+    autoRemediationRequireApproval,
     autoDismissEnabled,
     autoDismissConfidenceThreshold,
   };
@@ -132,6 +135,28 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
         `${result.existingFindingsQueuedCount} existing finding${result.existingFindingsQueuedCount === 1 ? '' : 's'} queued for analysis.`
       );
     }
+  };
+
+  // Enabling auto-remediation is destructive: it opens PRs without a human in
+  // the loop, so confirm before committing (apps/mobile/AGENTS.md rule).
+  const handleAutoRemediationToggle = (next: boolean) => {
+    if (!next) {
+      setAutoRemediationEnabled(false);
+      return;
+    }
+    Alert.alert(
+      'Enable auto-remediation?',
+      'Security Agent will open remediation PRs automatically for eligible exploitable findings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Enable',
+          onPress: () => {
+            setAutoRemediationEnabled(true);
+          },
+        },
+      ]
+    );
   };
 
   const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
@@ -211,7 +236,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             subtitle="Automatically open PRs for eligible exploitable findings."
             value={autoRemediationEnabled}
             disabled={!canManage}
-            onValueChange={setAutoRemediationEnabled}
+            onValueChange={handleAutoRemediationToggle}
           />
           {autoRemediationEnabled && (
             <>
@@ -228,6 +253,13 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
                 value={autoRemediationIncludeExisting}
                 disabled={!canManage}
                 onValueChange={setAutoRemediationIncludeExisting}
+              />
+              <ToggleRow
+                title="Require approval before auto-remediation"
+                subtitle="Auto-remediation waits for your approval before opening PRs."
+                value={autoRemediationRequireApproval}
+                disabled={!canManage}
+                onValueChange={setAutoRemediationRequireApproval}
               />
             </>
           )}

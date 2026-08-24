@@ -250,6 +250,7 @@ function toPolicyConfig(config: SecurityAgentConfig): SecurityRemediationConfig 
     auto_remediation_enabled: config.auto_remediation_enabled,
     auto_remediation_min_severity: config.auto_remediation_min_severity,
     auto_remediation_include_existing: config.auto_remediation_include_existing,
+    auto_remediation_require_approval: config.auto_remediation_require_approval,
     auto_remediation_enabled_at: config.auto_remediation_enabled_at,
   };
 }

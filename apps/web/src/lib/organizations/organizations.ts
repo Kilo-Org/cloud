@@ -70,8 +70,15 @@ export async function getUserOrganizationsWithSeats(
 ): Promise<UserOrganizationWithSeats[]> {
   const results = await db
     .select({
-      organization: organizations,
-      membership: organization_memberships,
+      organizationId: organizations.id,
+      organizationName: organizations.name,
+      role: organization_memberships.role,
+      totalMicrodollarsAcquired: organizations.total_microdollars_acquired,
+      microdollarsUsed: organizations.microdollars_used,
+      requireSeats: organizations.require_seats,
+      plan: organizations.plan,
+      createdAt: organizations.created_at,
+      seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
           SELECT 1 FROM ${organization_memberships} om
@@ -98,18 +105,17 @@ export async function getUserOrganizationsWithSeats(
     );
 
   return results.map(result => ({
-    organizationName: result.organization.name,
-    organizationId: result.organization.id,
-    role: result.membership.role,
+    organizationName: result.organizationName,
+    organizationId: result.organizationId,
+    role: result.role,
     memberCount: result.total_member_count,
-    balance:
-      result.organization.total_microdollars_acquired - result.organization.microdollars_used,
-    requireSeats: result.organization.require_seats,
-    plan: result.organization.plan,
-    created_at: result.organization.created_at,
+    balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
+    requireSeats: result.requireSeats,
+    plan: result.plan,
+    created_at: result.createdAt,
     seatCount: {
       used: result.total_member_count,
-      total: result.organization.seat_count,
+      total: result.seatCountTotal,
     },
   }));
 }

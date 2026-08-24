@@ -28,6 +28,7 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'low_balance':
       return 'balance';
     case 'security_finding':
+    case 'security_lifecycle':
       return 'security';
     default: {
       // Exhaustiveness: new PushData variants must be handled above.
@@ -55,6 +56,7 @@ export function genericPushContentForPushData(data: PushData): { title: string; 
     case 'low_balance':
       return { title: 'Kilo', body: 'Your balance needs attention' };
     case 'security_finding':
+    case 'security_lifecycle':
       return { title: 'Kilo', body: 'A security finding needs attention' };
     default: {
       // Exhaustiveness: new PushData variants must be handled above.

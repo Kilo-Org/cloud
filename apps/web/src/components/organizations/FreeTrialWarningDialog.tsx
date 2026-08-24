@@ -12,13 +12,13 @@ import { Button } from '@/components/Button';
 import { Lock } from 'lucide-react';
 import type {
   OrgTrialStatus,
-  OrganizationWithMembers,
+  OrganizationWithMembersResponse,
 } from '@/lib/organizations/organization-types';
 
 type FreeTrialWarningDialogProps = {
   trialStatus: OrgTrialStatus;
   daysExpired: number;
-  organization: OrganizationWithMembers;
+  organization: OrganizationWithMembersResponse;
   onClose?: () => void;
   onUpgradeClick: () => void;
   container?: HTMLElement | null;

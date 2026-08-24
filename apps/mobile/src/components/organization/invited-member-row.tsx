@@ -57,7 +57,8 @@ export function InvitedMemberRow({
   }
 
   function openActions() {
-    const options = invitedMemberActionOptions(invite.emailStatus);
+    const hasInviteUrl = 'inviteUrl' in invite;
+    const options = invitedMemberActionOptions(invite.emailStatus, hasInviteUrl);
     showActionSheetWithOptions(
       {
         options,
@@ -68,7 +69,9 @@ export function InvitedMemberRow({
       index => {
         const label = index !== undefined ? options[index] : undefined;
         if (label === 'Share invite link') {
-          void Share.share({ message: invite.inviteUrl });
+          if ('inviteUrl' in invite) {
+            void Share.share({ message: invite.inviteUrl });
+          }
         } else if (label === 'Resend invite') {
           resendInvite.mutate({ inviteId: invite.inviteId });
         } else if (label === 'Revoke invitation') {

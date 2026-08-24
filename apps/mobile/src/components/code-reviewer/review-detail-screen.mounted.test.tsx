@@ -133,6 +133,7 @@ function makeReview(over: Record<string, unknown> = {}) {
     completed_at: null,
     total_cost_musd: null,
     check_run_id: 123,
+    rawIdsRedacted: false,
     manual_config: { agentConfig: { gate_threshold: 'critical' } },
     council_result: null,
     ...over,
@@ -235,6 +236,21 @@ describe('ReviewDetailScreen empty council', () => {
     const texts = renderScreen();
 
     expect(texts).toContain('No findings');
+  });
+});
+
+describe('ReviewDetailScreen redacted check run', () => {
+  it('renders "Hidden" (not "None") when the check run is redacted', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ check_run_id: null, rawIdsRedacted: true }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain('Hidden');
+    expect(texts).not.toContain('None');
   });
 });
 

@@ -18,6 +18,8 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type ActiveOrgMember,
   type InvitedOrgMember,
+  isActiveOrgMember,
+  isInvitedOrgMember,
   isMoneyRole,
   useOrgBoundary,
   useOrgWithMembers,
@@ -70,12 +72,9 @@ export function OrganizationMembersScreen() {
   const { userId: currentUserId } = useCurrentUserId();
   const paddingBottom = useTabBarBottomPadding();
 
-  const activeMembers = sortActiveMembers(
-    orgWithMembers.data?.members.filter(m => m.status === 'active') ?? []
-  );
-  const invitedMembers = sortInvitedMembers(
-    orgWithMembers.data?.members.filter(m => m.status === 'invited') ?? []
-  );
+  const members = orgWithMembers.data?.members ?? [];
+  const activeMembers = sortActiveMembers(members.filter(m => isActiveOrgMember(m)));
+  const invitedMembers = sortInvitedMembers(members.filter(m => isInvitedOrgMember(m)));
 
   const items = useMemo(
     () => buildMembersListItems({ activeMembers, invitedMembers }),

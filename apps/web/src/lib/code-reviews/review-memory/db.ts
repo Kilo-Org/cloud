@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
-import { and, asc, count, desc, eq, gte, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -222,6 +223,40 @@ export async function upsertScopeProposal(input: {
   return inserted;
 }
 
+export type ReviewMemoryProposalPage = {
+  proposals: CodeReviewMemoryProposal[];
+  nextCursor: string | null;
+};
+
+const PROPOSAL_CURSOR_SEPARATOR = '|';
+const PROPOSAL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Keyset pagination cursor for `listProposalsPage`. The list orders by
+// `updated_at` desc with `id` desc as the deterministic tie-breaker, so the
+// cursor encodes the last row's `(updated_at, id)`. `updated_at` is a
+// PostgreSQL timestamptz returned as text with microsecond precision (e.g.
+// "2026-04-29 01:16:12.945123+00"). The cursor is opaque and only compared
+// against the database column, never parsed by a client, so it carries the
+// raw value verbatim — normalizing through `new Date(...).toISOString()` would
+// truncate microseconds and silently skip rows that share a millisecond.
+function encodeProposalCursor(row: CodeReviewMemoryProposal): string {
+  return `${row.updated_at}${PROPOSAL_CURSOR_SEPARATOR}${row.id}`;
+}
+
+function decodeProposalCursor(cursor: string): { updatedAt: string; id: string } | null {
+  const separatorIndex = cursor.indexOf(PROPOSAL_CURSOR_SEPARATOR);
+  if (separatorIndex <= 0) return null;
+  const updatedAt = cursor.slice(0, separatorIndex);
+  const id = cursor.slice(separatorIndex + 1);
+  if (!PROPOSAL_ID_PATTERN.test(id)) return null;
+  if (Number.isNaN(new Date(updatedAt).getTime())) return null;
+  return { updatedAt, id };
+}
+
+// Compatibility: the array-shaped `listProposals` is the deployed contract
+// (`origin/main` returns `CodeReviewMemoryProposal[]`); the web panel and
+// stale client bundles call it. Keep it, and serve the paginated shape
+// through the additive `listProposalsPage`.
 export async function listProposals(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
@@ -230,7 +265,21 @@ export async function listProposals(input: {
   limit?: number;
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal[]> {
+  const page = await listProposalsPage(input);
+  return page.proposals;
+}
+
+export async function listProposalsPage(input: {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  repoFullName?: string;
+  statuses?: ReviewMemoryProposalStatus[];
+  limit?: number;
+  cursor?: string;
+  database?: ReviewMemoryDatabase;
+}): Promise<ReviewMemoryProposalPage> {
   const database = input.database ?? db;
+  const limit = Math.min(input.limit ?? 50, 100);
   const conditions: SQL[] = [
     ...proposalOwnerConditions(input.owner),
     eq(code_review_memory_proposals.platform, input.platform),
@@ -241,13 +290,38 @@ export async function listProposals(input: {
   if (input.statuses && input.statuses.length > 0) {
     conditions.push(inArray(code_review_memory_proposals.status, input.statuses));
   }
+  if (input.cursor) {
+    const cursor = decodeProposalCursor(input.cursor);
+    if (!cursor) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Invalid Review Memory proposal cursor.',
+      });
+    }
+    const sameTimestamp = and(
+      eq(code_review_memory_proposals.updated_at, cursor.updatedAt),
+      lt(code_review_memory_proposals.id, cursor.id)
+    );
+    const cursorPredicate = or(
+      lt(code_review_memory_proposals.updated_at, cursor.updatedAt),
+      sameTimestamp
+    );
+    if (cursorPredicate) conditions.push(cursorPredicate);
+  }
 
-  return await database
+  const rows = await database
     .select()
     .from(code_review_memory_proposals)
     .where(and(...conditions))
-    .orderBy(desc(code_review_memory_proposals.updated_at))
-    .limit(Math.min(input.limit ?? 50, 100));
+    .orderBy(desc(code_review_memory_proposals.updated_at), desc(code_review_memory_proposals.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const proposals = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor =
+    hasMore && proposals.length > 0 ? encodeProposalCursor(proposals[proposals.length - 1]) : null;
+
+  return { proposals, nextCursor };
 }
 
 export async function getProposal(input: {

@@ -13,6 +13,8 @@
  */
 import { z } from 'zod';
 
+import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
+
 import { ORGANIZATION_ROLES } from '../organizations/roles';
 
 // ----- shared enums -------------------------------------------------------
@@ -76,7 +78,23 @@ export const PR_INTENTS = [
   'create_review_comment',
   'reply_comment',
 ] as const;
-export const SECURITY_INTENTS = ['manual_sync', 'dismiss_finding'] as const;
+export const SECURITY_INTENTS = [
+  'manual_sync',
+  'dismiss_finding',
+  'start_analysis',
+  'apply_auto_remediation',
+] as const;
+
+/**
+ * Ledger intent per security command type. The ledger intent names predate the
+ * command tuple: the `sync` command type uses the `manual_sync` intent.
+ */
+export const SECURITY_INTENT_FOR_COMMAND_TYPE = {
+  sync: 'manual_sync',
+  dismiss_finding: 'dismiss_finding',
+  start_analysis: 'start_analysis',
+  apply_auto_remediation: 'apply_auto_remediation',
+} as const satisfies Record<SecurityCommandType, (typeof SECURITY_INTENTS)[number]>;
 export const PR_RECONCILE_RESULTS = [
   'confirmed_completed',
   'confirmed_absent',
@@ -118,6 +136,7 @@ export const LOGIN_EVENT = 'login';
 export const SESSION_CREATE_SETTLED_EVENT = 'session_create_settled';
 export const PR_OPERATION_SETTLED_EVENT = 'pr_operation_settled';
 export const SECURITY_COMMAND_SETTLED_EVENT = 'security_command_settled';
+export const CODE_REVIEW_SETTLED_EVENT = 'code_review_settled';
 export const PURCHASE_SETTLED_EVENT = 'purchase_settled';
 
 /**
@@ -143,6 +162,7 @@ export const TERMINAL_PHASE_EVENTS = [
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  CODE_REVIEW_SETTLED_EVENT,
   PURCHASE_SETTLED_EVENT,
 ] as const;
 
@@ -276,6 +296,14 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       intent: z.enum(SECURITY_INTENTS),
       repo_count: metric.optional(),
       error_count: metric.optional(),
+      duration_ms: metric,
+    })
+    .strict(),
+  [CODE_REVIEW_SETTLED_EVENT]: z
+    .object({
+      ...terminalBase,
+      surface: z.literal('code_review'),
+      intent: z.enum(['manual', 'webhook']),
       duration_ms: metric,
     })
     .strict(),

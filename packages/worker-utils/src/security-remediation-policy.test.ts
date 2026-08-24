@@ -12,6 +12,7 @@ const baseConfig: SecurityRemediationConfig = {
   auto_remediation_enabled: true,
   auto_remediation_min_severity: 'high',
   auto_remediation_include_existing: true,
+  auto_remediation_require_approval: false,
   auto_remediation_enabled_at: '2026-01-01T00:00:00.000Z',
 };
 
@@ -460,5 +461,57 @@ describe('decideSecurityRemediationEligibility', () => {
       blockState: emptyBlockState,
     });
     expect(beforeEnablement).toMatchObject({ eligible: false, reason: 'before_enablement' });
+  });
+
+  it('admits auto_policy remediation when approval is not required', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: baseFinding,
+      config: { ...baseConfig, auto_remediation_require_approval: false },
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'auto_policy',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({ eligible: true, reason: 'eligible' });
+  });
+
+  it('rejects auto_policy remediation with approval_required when approval is required', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: baseFinding,
+      config: { ...baseConfig, auto_remediation_require_approval: true },
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'auto_policy',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({ eligible: false, reason: 'approval_required' });
+  });
+
+  it('rejects bulk_existing remediation with approval_required when approval is required', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: baseFinding,
+      config: { ...baseConfig, auto_remediation_require_approval: true },
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'bulk_existing',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({ eligible: false, reason: 'approval_required' });
+  });
+
+  it('never rejects manual remediation for the approval flag', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: baseFinding,
+      config: { ...baseConfig, auto_remediation_require_approval: true },
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'manual',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({ eligible: true, reason: 'eligible' });
   });
 });

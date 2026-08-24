@@ -17,14 +17,17 @@ const config = vi.hoisted(() => ({
   data: null as unknown,
   isLoading: false,
   isError: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
 const capability = vi.hoisted(() => ({
   canManage: true,
-  isLoading: false,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
   isError: false,
-  isFetching: false,
   refetch: vi.fn(),
+}));
+const committedConnectivity = vi.hoisted(() => ({
+  status: 'online' as 'online' | 'offline' | 'unknown',
 }));
 const repositories = vi.hoisted(() => ({
   data: null as unknown[] | null,
@@ -42,6 +45,10 @@ const trackInteraction = vi.hoisted(() => ({
 
 const configureRows = vi.hoisted(() => ({
   rows: [] as { title: string; subtitle?: string; onPress?: () => void }[],
+}));
+
+const platformErrorScreens = vi.hoisted(() => ({
+  screens: [] as { variant?: string; message?: string; onRetry?: () => void }[],
 }));
 
 vi.mock('react-native', () => ({
@@ -68,13 +75,21 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSetSecurityAgentEnabled: () => setEnabled,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => committedConnectivity.status,
+}));
 vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
 }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
 }));
-vi.mock('@/components/platform-error-screen', () => ({ PlatformErrorScreen: () => null }));
+vi.mock('@/components/platform-error-screen', () => ({
+  PlatformErrorScreen: (props: { variant?: string; message?: string; onRetry?: () => void }) => {
+    platformErrorScreens.screens.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/configure-row', () => ({
   ConfigureRow: (props: { title: string; subtitle?: string; onPress?: () => void }) => {
@@ -130,6 +145,15 @@ function findSwitch(root: I): I {
   return n;
 }
 
+function hasSwitch(root: I): boolean {
+  return (
+    root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Switch').length > 0
+  );
+}
+
+const denialCopy =
+  'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
+
 function renderedTexts(root: I): string[] {
   return root
     .findAll(
@@ -141,20 +165,24 @@ function renderedTexts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+function resetMocks() {
+  config.data = null;
+  config.isLoading = false;
+  config.isError = false;
+  config.fetchStatus = 'idle';
+  capability.canManage = true;
+  capability.status = 'allowed';
+  capability.isError = false;
+  committedConnectivity.status = 'online';
+  repositories.data = [];
+  repositories.isLoading = false;
+  repositories.isError = false;
+  configureRows.rows = [];
+  platformErrorScreens.screens = [];
+}
+
 describe('SettingsOverviewScreen disabled switch', () => {
-  beforeEach(() => {
-    config.data = null;
-    config.isLoading = false;
-    config.isError = false;
-    capability.canManage = true;
-    repositories.data = [];
-    repositories.isLoading = false;
-    repositories.isError = false;
-    setEnabled.isPending = false;
-    setEnabled.mutate.mockClear();
-    trackInteraction.mutate.mockClear();
-    configureRows.rows = [];
-  });
+  beforeEach(resetMocks);
 
   it('disables the switch while disabled with no effective repo selection', () => {
     config.data = disabledConfig();
@@ -182,19 +210,7 @@ describe('SettingsOverviewScreen disabled switch', () => {
 });
 
 describe('SettingsOverviewScreen disabled copy and CTA', () => {
-  beforeEach(() => {
-    config.data = null;
-    config.isLoading = false;
-    config.isError = false;
-    capability.canManage = true;
-    repositories.data = [];
-    repositories.isLoading = false;
-    repositories.isError = false;
-    setEnabled.isPending = false;
-    setEnabled.mutate.mockClear();
-    trackInteraction.mutate.mockClear();
-    configureRows.rows = [];
-  });
+  beforeEach(resetMocks);
 
   it('shows the empty-selection copy while disabled with no effective repo', () => {
     config.data = disabledConfig();
@@ -227,6 +243,7 @@ describe('SettingsOverviewScreen disabled copy and CTA', () => {
 
   it('does not offer the CTA to a non-manager', () => {
     capability.canManage = false;
+    capability.status = 'denied';
     config.data = disabledConfig();
     repositories.data = [{ id: 1 }];
     renderScreen();
@@ -236,19 +253,7 @@ describe('SettingsOverviewScreen disabled copy and CTA', () => {
 });
 
 describe('SettingsOverviewScreen repository query loading and error', () => {
-  beforeEach(() => {
-    config.data = null;
-    config.isLoading = false;
-    config.isError = false;
-    capability.canManage = true;
-    repositories.data = [];
-    repositories.isLoading = false;
-    repositories.isError = false;
-    setEnabled.isPending = false;
-    setEnabled.mutate.mockClear();
-    trackInteraction.mutate.mockClear();
-    configureRows.rows = [];
-  });
+  beforeEach(resetMocks);
 
   it('does not read a loading repo query as empty in all mode', () => {
     config.data = disabledConfig({ repositorySelectionMode: 'all' });
@@ -278,5 +283,76 @@ describe('SettingsOverviewScreen repository query loading and error', () => {
     renderScreen();
 
     expect(configureRows.rows.map(r => r.title)).toContain('Select repositories');
+  });
+});
+
+describe('SettingsOverviewScreen capability and connectivity states', () => {
+  beforeEach(resetMocks);
+
+  it('renders the skeleton while the capability is loading', () => {
+    config.data = disabledConfig();
+    capability.status = 'loading';
+    const root = renderScreen();
+
+    expect(platformErrorScreens.screens).toEqual([]);
+    expect(hasSwitch(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).not.toContain(denialCopy);
+  });
+
+  it('shows the permissions error with retry and no denial copy when capability errors', () => {
+    config.data = disabledConfig();
+    capability.status = 'error';
+    const root = renderScreen();
+
+    expect(platformErrorScreens.screens[0]?.message).toBe('Could not load permissions');
+    expect(platformErrorScreens.screens[0]?.onRetry).toBeTypeOf('function');
+    expect(renderedTexts(root.root)).not.toContain(denialCopy);
+  });
+
+  it('keeps the resolved branch when a background refetch fails with a settled role', () => {
+    config.data = disabledConfig();
+    capability.isError = true;
+    const root = renderScreen();
+
+    expect(platformErrorScreens.screens).toEqual([]);
+    expect(hasSwitch(root.root)).toBe(true);
+  });
+
+  it('shows denial copy and hides the switch when denied', () => {
+    config.data = disabledConfig();
+    capability.status = 'denied';
+    capability.canManage = false;
+    const root = renderScreen();
+
+    expect(hasSwitch(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).toContain(denialCopy);
+  });
+
+  it('shows the switch when allowed', () => {
+    config.data = disabledConfig();
+    const root = renderScreen();
+
+    expect(hasSwitch(root.root)).toBe(true);
+  });
+
+  it('shows the offline variant when paused with committed offline', () => {
+    config.data = null;
+    config.fetchStatus = 'paused';
+    committedConnectivity.status = 'offline';
+    const root = renderScreen();
+
+    expect(platformErrorScreens.screens[0]?.variant).toBe('offline');
+    expect(platformErrorScreens.screens[0]?.message).toBe('Could not load Security Agent settings');
+    expect(hasSwitch(root.root)).toBe(false);
+  });
+
+  it('renders the skeleton when paused but connectivity is unknown', () => {
+    config.data = null;
+    config.fetchStatus = 'paused';
+    committedConnectivity.status = 'unknown';
+    const root = renderScreen();
+
+    expect(platformErrorScreens.screens).toEqual([]);
+    expect(hasSwitch(root.root)).toBe(false);
   });
 });

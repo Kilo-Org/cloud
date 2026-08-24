@@ -1,8 +1,12 @@
-import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
@@ -32,13 +36,14 @@ export function useSessionMutations() {
 
   const snapshotAndUpdate = async (
     update: (data: SessionsListData) => SessionsListData
-  ): Promise<{ previous: SessionsListSnapshot }> => {
+  ): Promise<{ previous: SessionsListSnapshot; generation: number }> => {
     await queryClient.cancelQueries({ queryKey: listKey });
+    const generation = nextMutationGeneration(hashKey(listKey));
     const previous = queryClient.getQueriesData<SessionsListData>({ queryKey: listKey });
     queryClient.setQueriesData<SessionsListData>({ queryKey: listKey }, old =>
       old ? update(old) : old
     );
-    return { previous };
+    return { previous, generation };
   };
 
   /**
@@ -61,31 +66,42 @@ export function useSessionMutations() {
     }
   };
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const deleteSessionMutation = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions({
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      onMutate: ({ session_id }) =>
-        snapshotAndUpdate(data => removeStoredSession(data, session_id)),
+      onMutate: async ({ session_id }) => {
+        const { previous, generation } = await snapshotAndUpdate(data =>
+          removeStoredSession(data, session_id)
+        );
+        return { previous, generation };
+      },
       onError: (error, _input, context) => {
-        rollback(context?.previous);
+        if (context && isLatestMutationGeneration(hashKey(listKey), context.generation)) {
+          rollback(context.previous);
+        }
         onError(error);
       },
       onSettled: invalidateSessions,
     })
   );
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const renameSessionMutation = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions({
       onMutate: async ({ session_id, title }) => {
-        const { previous } = await snapshotAndUpdate(data =>
+        const { previous, generation } = await snapshotAndUpdate(data =>
           mapStoredSessions(data, session_id, session => ({ ...session, title }))
         );
         const previousActive = await snapshotAndUpdateActive(session_id, title);
-        return { previous, previousActive };
+        return { previous, previousActive, generation };
       },
       onError: (error, _input, context) => {
-        rollback(context?.previous);
-        rollback(context?.previousActive);
+        if (context && isLatestMutationGeneration(hashKey(listKey), context.generation)) {
+          rollback(context.previous);
+          rollback(context.previousActive);
+        }
         onError(error);
       },
       onSettled: invalidateSessions,

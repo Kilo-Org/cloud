@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from '@/components/ui/icons';
@@ -26,10 +27,12 @@ import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
-import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useNavigation, useRouter } from 'expo-router';
 
 export function AgentSessionListScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -102,17 +105,21 @@ export function AgentSessionListScreen() {
   // from the list hook), so an OS foreground transition must be driven here —
   // through the same wrapped `refetch` as navigation focus — to keep every
   // stored refetch serialized by the shared operation coordinator (backfill
-  // and departure never overlap a refetch).
+  // and departure never overlap a refetch). A frozen (unfocused) Agents tab
+  // must NOT refetch on foreground: only the focused tab refreshes the stored
+  // list and invalidates the active-sessions tray. Focus is read live via
+  // `navigation.isFocused()` because a frozen tree does not re-render.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') {
+      if (nextState === 'active' && navigation.isFocused()) {
         void refetchRef.current();
+        void queryClient.invalidateQueries({ queryKey: [['activeSessions']] });
       }
     });
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [queryClient, navigation]);
 
   const showSearchBusy = selectShowSearchBusy({
     awaitingCommit,

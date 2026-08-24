@@ -1896,6 +1896,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
         if (!queued.queued) return { success: false, ...queued };
 
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
+
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
           userId: ctx.user.id,

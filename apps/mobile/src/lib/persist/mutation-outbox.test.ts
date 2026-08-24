@@ -147,6 +147,23 @@ describe('round trip and absent load', () => {
   });
 });
 
+describe('process kill and relaunch', () => {
+  it('recovers a written safe-retry row after a simulated relaunch and keeps its stored operationKey', async () => {
+    // Crash mid-flight: the row was persisted before the POST.
+    await writeOutboxRow('u1', safeRetryRow({ operationKey: 'op-key-1', fingerprint: 'fp-1' }));
+
+    // Relaunch: the launch load lists the rows again from the encrypted KV.
+    const rows = await listOutboxRows('u1');
+
+    expect(rows).toHaveLength(1);
+    expect(rows?.[0]).toMatchObject({
+      taxonomy: 'safe-retry',
+      operationKey: 'op-key-1',
+      fingerprint: 'fp-1',
+    });
+  });
+});
+
 describe('remove and list', () => {
   it('removes a stored row', async () => {
     await writeOutboxRow('u1', safeRetryRow({ fingerprint: 'fp' }));

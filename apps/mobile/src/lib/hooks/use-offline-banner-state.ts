@@ -1,16 +1,13 @@
 import { addEventListener } from '@react-native-community/netinfo';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import {
+  type BannerState,
   type ConnectivitySource,
   createOfflineBannerStore,
   type OfflineBannerStore,
   type OfflineBannerTimer,
 } from '@/lib/offline-banner-state';
-
-const NOOP_SUBSCRIBE = (): (() => void) => () => {
-  // No store on the first render; the effect creates one and destroys it on unmount.
-};
 
 const netInfoSource: ConnectivitySource = {
   subscribe: listener => addEventListener(listener),
@@ -27,15 +24,20 @@ const defaultTimer: OfflineBannerTimer = {
   },
 };
 
+// One store per app, created lazily on first use and never destroyed, so
+// every caller of the two hooks below shares a single NetInfo subscription
+// (the app must not grow a second connectivity system).
+let store: OfflineBannerStore | null = null;
+
+function getStore(): OfflineBannerStore {
+  store ??= createOfflineBannerStore({ source: netInfoSource, timer: defaultTimer });
+  return store;
+}
+
 export function useOfflineBannerState(): boolean {
-  const [store, setStore] = useState<OfflineBannerStore | null>(null);
-  useEffect(() => {
-    const created = createOfflineBannerStore({ source: netInfoSource, timer: defaultTimer });
-    setStore(created);
-    return () => {
-      created.destroy();
-    };
-  }, []);
-  const getSnapshot = useCallback(() => store?.isOffline() ?? false, [store]);
-  return useSyncExternalStore(store?.subscribe ?? NOOP_SUBSCRIBE, getSnapshot);
+  return useSyncExternalStore(getStore().subscribe, getStore().isOffline);
+}
+
+export function useCommittedConnectivityStatus(): BannerState {
+  return useSyncExternalStore(getStore().subscribe, getStore().state);
 }

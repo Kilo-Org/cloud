@@ -14,8 +14,14 @@ function resolve(input: {
   activeSessionType: 'remote' | 'cloud-agent' | 'read-only' | null;
   agentStatusType: StatusType;
   userWebConnected: boolean;
+  reconnectExhausted?: boolean;
 }): SessionConnectionState {
-  return resolveSessionConnectionState(input);
+  return resolveSessionConnectionState({
+    activeSessionType: input.activeSessionType,
+    agentStatusType: input.agentStatusType,
+    userWebConnected: input.userWebConnected,
+    reconnectExhausted: input.reconnectExhausted ?? false,
+  });
 }
 
 describe('resolveSessionConnectionState - remote', () => {
@@ -87,6 +93,101 @@ describe('resolveSessionConnectionState - no transport', () => {
         expect(
           resolve({ activeSessionType: null, agentStatusType: status, userWebConnected })
         ).toBe('none');
+      }
+    }
+  });
+});
+
+describe('resolveSessionConnectionState - exhausted', () => {
+  it('reports exhausted for a remote session when the user-web leg is down and reconnects are exhausted', () => {
+    expect(
+      resolve({
+        activeSessionType: 'remote',
+        agentStatusType: 'idle',
+        userWebConnected: false,
+        reconnectExhausted: true,
+      })
+    ).toBe('exhausted');
+  });
+
+  it('reports exhausted for a remote disconnected agent status while reconnects are exhausted', () => {
+    expect(
+      resolve({
+        activeSessionType: 'remote',
+        agentStatusType: 'disconnected',
+        userWebConnected: true,
+        reconnectExhausted: true,
+      })
+    ).toBe('exhausted');
+  });
+
+  it('reports down (not exhausted) for a remote session while the user-web leg is down and reconnects remain', () => {
+    expect(
+      resolve({
+        activeSessionType: 'remote',
+        agentStatusType: 'idle',
+        userWebConnected: false,
+        reconnectExhausted: false,
+      })
+    ).toBe('down');
+  });
+
+  it('reports up for a connected remote session even while reconnects are exhausted', () => {
+    for (const status of STATUSES.filter(item => item !== 'disconnected')) {
+      expect(
+        resolve({
+          activeSessionType: 'remote',
+          agentStatusType: status,
+          userWebConnected: true,
+          reconnectExhausted: true,
+        })
+      ).toBe('up');
+    }
+  });
+});
+
+describe('resolveSessionConnectionState - exhausted precedence', () => {
+  it('never overrides none for read-only sessions while reconnects are exhausted', () => {
+    for (const status of STATUSES) {
+      for (const userWebConnected of CONNECTION_VALUES) {
+        expect(
+          resolve({
+            activeSessionType: 'read-only',
+            agentStatusType: status,
+            userWebConnected,
+            reconnectExhausted: true,
+          })
+        ).toBe('none');
+      }
+    }
+  });
+
+  it('never overrides none for unresolved session types while reconnects are exhausted', () => {
+    for (const status of STATUSES) {
+      for (const userWebConnected of CONNECTION_VALUES) {
+        expect(
+          resolve({
+            activeSessionType: null,
+            agentStatusType: status,
+            userWebConnected,
+            reconnectExhausted: true,
+          })
+        ).toBe('none');
+      }
+    }
+  });
+
+  it('never applies to cloud-agent sessions', () => {
+    for (const status of STATUSES) {
+      for (const userWebConnected of CONNECTION_VALUES) {
+        expect(
+          resolve({
+            activeSessionType: 'cloud-agent',
+            agentStatusType: status,
+            userWebConnected,
+            reconnectExhausted: true,
+          })
+        ).toBe(status === 'disconnected' ? 'down' : 'up');
       }
     }
   });

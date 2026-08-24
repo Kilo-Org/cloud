@@ -18,6 +18,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
 
@@ -60,6 +61,7 @@ export default function SessionDetailScreen() {
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const trpc = useTRPC();
   const router = useRouter();
+  useRouteForegroundRefresh([[['cliSessionsV2']], [['modelPreferences']]]);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
       { session_id: sessionId ?? '' },

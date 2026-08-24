@@ -60,6 +60,7 @@ type UserWebConnectionConfig = {
   onError?: (message: string) => void;
   onReconnect?: () => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
+  maxReconnectAttempts?: number;
 };
 
 type SendCommandToConnectionInput = {
@@ -91,6 +92,10 @@ type UserWebConnection = {
    * never invoked and the unsubscribe is a no-op.
    */
   onConnectionChange: (listener: (connected: boolean) => void) => () => void;
+  // The boolean readiness API (old form) stays the readiness source for existing consumers; the exhaustion signal is additive and owns only recovery UI. Removal condition: none — the boolean API is permanent.
+  isReconnectExhausted: () => boolean;
+  onReconnectExhaustionChange: (listener: (exhausted: boolean) => void) => () => void;
+  retryConnection: () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
   sendCommand: (
     sessionId: string,
@@ -191,6 +196,19 @@ function createUserWebConnection(
     if (connected === value) return;
     connected = value;
     for (const listener of connectionChangeListeners) listener(value);
+  }
+
+  // Wrapper-owned reconnect-exhaustion snapshot, mirroring `connected`. The base
+  // connection fires the two-edge callback; the wrapper keeps a synchronous
+  // snapshot so `isReconnectExhausted()` reads it without crossing the base
+  // boundary and listeners fire only on value changes.
+  let exhausted = false;
+  const exhaustionChangeListeners = new Set<(exhausted: boolean) => void>();
+
+  function setExhausted(value: boolean): void {
+    if (exhausted === value) return;
+    exhausted = value;
+    for (const listener of exhaustionChangeListeners) listener(value);
   }
 
   function hasLifetime(): boolean {
@@ -431,6 +449,8 @@ function createUserWebConnection(
     hasEverOpened = false;
     baseConnection = createBaseConnection({
       lifecycleHooks: createLifecycleHooks(),
+      maxReconnectAttempts: config.maxReconnectAttempts,
+      onReconnectExhaustionChange: setExhausted,
       buildUrl,
       parseMessage: (data: unknown) => {
         if (typeof data !== 'string') return null;
@@ -541,6 +561,7 @@ function createUserWebConnection(
     // callback, so the wrapper must drive the disconnected transition itself
     // before the next `startConnection()` reopens from a false baseline.
     setConnected(false);
+    setExhausted(false);
   }
 
   function connect(): void {
@@ -646,6 +667,7 @@ function createUserWebConnection(
       reconnectListeners.clear();
       sessionListeners.clear();
       connectionChangeListeners.clear();
+      exhaustionChangeListeners.clear();
     },
     isConnected: () => connected,
     onConnectionChange(listener) {
@@ -654,6 +676,17 @@ function createUserWebConnection(
       return () => {
         connectionChangeListeners.delete(listener);
       };
+    },
+    isReconnectExhausted: () => exhausted,
+    onReconnectExhaustionChange(listener) {
+      if (destroyed) return () => {};
+      exhaustionChangeListeners.add(listener);
+      return () => {
+        exhaustionChangeListeners.delete(listener);
+      };
+    },
+    retryConnection() {
+      baseConnection?.retryReconnect();
     },
     subscribeToCliSession(sessionId) {
       if (destroyed) return () => {};

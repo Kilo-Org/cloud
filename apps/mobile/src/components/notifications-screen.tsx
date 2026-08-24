@@ -4,7 +4,7 @@
  * has seven keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
  * Extracting subcomponents would re-encode the same hooks. The screen stays a
  * single rendered surface. */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import {
@@ -43,6 +43,10 @@ import {
   rollbackAgentPushOptimistic,
 } from '@/lib/hooks/agent-push-preference';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -318,10 +322,13 @@ export function NotificationsScreen() {
     void queryClient.invalidateQueries({ queryKey: preferencesQueryKey });
   }, [queryClient, pushTokensQueryKey, preferencesQueryKey]);
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const registerToken = useMutation(
     trpc.user.registerPushToken.mutationOptions({
       onMutate: async () => {
         await queryClient.cancelQueries({ queryKey: pushTokensQueryKey });
+        const generation = nextMutationGeneration(hashKey(pushTokensQueryKey));
         const previous = queryClient.getQueryData(pushTokensQueryKey);
         if (deviceToken) {
           queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
@@ -329,15 +336,21 @@ export function NotificationsScreen() {
             { token: deviceToken, platform: getPlatform() },
           ]);
         }
-        return { previous };
+        return { previous, generation };
       },
       onError: (error, _vars, context) => {
-        if (context?.previous) {
+        if (
+          context?.previous &&
+          isLatestMutationGeneration(hashKey(pushTokensQueryKey), context.generation)
+        ) {
           queryClient.setQueryData(pushTokensQueryKey, context.previous);
         }
         toast.error(error.message);
       },
       onSettled: invalidateAll,
+      // One fixed cache entry, so a single static scope id serializes the
+      // network call (rule 2).
+      scope: { id: 'push-tokens' },
     })
   );
 
@@ -345,12 +358,11 @@ export function NotificationsScreen() {
   // category. We pass ONE key per call so the server-side partial update
   // only touches the column the user is flipping; the optimistic helper
   // scopes its in-memory flip to that same key.
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const setPreference = useMutation(
     trpc.user.setNotificationPreferences.mutationOptions({
-      // react-query's onMutate signature requires either an async function or
-      // a plain return of a Promise; we need async semantics so the optimistic
-      // write commits before the mutation body runs.
-      // eslint-disable-next-line require-await, typescript-eslint/return-await
+      // async so the optimistic write commits before the mutation body runs.
       onMutate: async variables => {
         const category = categoryFromVariables(variables);
         if (category == null) {
@@ -360,19 +372,27 @@ export function NotificationsScreen() {
         if (next === undefined) {
           return undefined;
         }
-        return applyAgentPushOptimistic({
+        // The helper stamps its own generation after its `cancelQueries`
+        // await, so the stamp cannot drift from the cache write it guards.
+        const context = await applyAgentPushOptimistic({
           queryClient,
           queryKey: preferencesQueryKey,
           next,
           category,
         });
+        return context;
       },
       onError: (error, variables, context) => {
-        rollbackAgentPushOptimistic({
-          queryClient,
-          queryKey: preferencesQueryKey,
-          context,
-        });
+        if (
+          context &&
+          isLatestMutationGeneration(hashKey(preferencesQueryKey), context.generation)
+        ) {
+          rollbackAgentPushOptimistic({
+            queryClient,
+            queryKey: preferencesQueryKey,
+            context,
+          });
+        }
         toast.error(error.message);
         if (variables.notificationPreviews !== undefined) {
           setPreviewErrorCode(readTrpcErrorField(error, 'code'));
@@ -395,6 +415,9 @@ export function NotificationsScreen() {
         }
         void queryClient.invalidateQueries({ queryKey: preferencesQueryKey });
       },
+      // One fixed cache entry, so a single static scope id serializes the
+      // network call (rule 2).
+      scope: { id: 'notification-preferences' },
     })
   );
 

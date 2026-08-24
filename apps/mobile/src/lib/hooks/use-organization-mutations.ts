@@ -1,6 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import {
   type OrgListEntry,
   type OrgRole,
@@ -65,6 +69,8 @@ export function useOrganizationMutations(
   // Every optimistic mutation here only touches the withMembers cache, so the
   // key is fixed rather than threaded through like use-kiloclaw-mutations.ts
   // (which juggles many caches across a personal/org split).
+  // onError policy: roll back the onMutate snapshot (latest generation only);
+  // toast error.message, or the caller renders the error inline when silent.
   function optimistic<TInput>(
     updater: (old: OrgWithMembers, input: TInput) => OrgWithMembers,
     { silent }: { silent?: boolean } = {}
@@ -72,18 +78,22 @@ export function useOrganizationMutations(
     return {
       onMutate: async (input: TInput) => {
         await queryClient.cancelQueries({ queryKey: withMembersKey });
+        const generation = nextMutationGeneration(hashKey(withMembersKey));
         const previous = queryClient.getQueryData<OrgWithMembers>(withMembersKey);
         queryClient.setQueryData<OrgWithMembers>(withMembersKey, old =>
           old ? updater(old, input) : old
         );
-        return { previous };
+        return { previous, generation };
       },
       onError: (
         error: { message: string },
         _input: TInput,
-        context?: { previous?: OrgWithMembers }
+        context?: { previous?: OrgWithMembers; generation: number }
       ) => {
-        if (context?.previous) {
+        if (
+          context?.previous &&
+          isLatestMutationGeneration(hashKey(withMembersKey), context.generation)
+        ) {
           queryClient.setQueryData(withMembersKey, context.previous);
         }
         if (!silent) {
@@ -95,6 +105,8 @@ export function useOrganizationMutations(
   }
 
   return {
+    // onError policy: roll back the onMutate snapshot (latest generation only);
+    // the caller renders the error inline (no toast).
     rename: useMutation({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { name: string }) =>
@@ -104,6 +116,7 @@ export function useOrganizationMutations(
           queryClient.cancelQueries({ queryKey: withMembersKey }),
           queryClient.cancelQueries({ queryKey: listKey }),
         ]);
+        const generation = nextMutationGeneration(hashKey(withMembersKey));
         const previousWithMembers = queryClient.getQueryData<OrgWithMembers>(withMembersKey);
         const previousList = queryClient.getQueryData<OrgListEntry[]>(listKey);
         queryClient.setQueryData<OrgWithMembers>(withMembersKey, old =>
@@ -118,23 +131,36 @@ export function useOrganizationMutations(
               )
             : old
         );
-        return { previousWithMembers, previousList };
+        return { previousWithMembers, previousList, generation };
       },
       // No onMutationError toast here: RenameModal (the only caller) shows
       // the error inline while it stays open (see Pattern P2).
       onError: (
         _error: { message: string },
         _input,
-        context?: { previousWithMembers?: OrgWithMembers; previousList?: OrgListEntry[] }
+        context?: {
+          previousWithMembers?: OrgWithMembers;
+          previousList?: OrgListEntry[];
+          generation: number;
+        }
       ) => {
-        if (context?.previousWithMembers) {
+        if (
+          context?.previousWithMembers &&
+          isLatestMutationGeneration(hashKey(withMembersKey), context.generation)
+        ) {
           queryClient.setQueryData(withMembersKey, context.previousWithMembers);
         }
-        if (context?.previousList) {
+        if (
+          context?.previousList &&
+          isLatestMutationGeneration(hashKey(withMembersKey), context.generation)
+        ) {
           queryClient.setQueryData(listKey, context.previousList);
         }
       },
       onSettled: invalidateAll,
+      // Serialize rename against the other optimistic org writes so the
+      // network calls land in order; the generation guard orders rollbacks.
+      scope: { id: `organization:${organizationId}` },
     }),
 
     // No onMutationError toast here: invite-member-sheet (the only caller)
@@ -169,6 +195,7 @@ export function useOrganizationMutations(
           ),
         { silent: silenceUpdateMemberToast }
       ),
+      scope: { id: `organization:${organizationId}` },
     }),
 
     removeMember: useMutation({
@@ -178,6 +205,7 @@ export function useOrganizationMutations(
       ...optimistic<{ memberId: string }>((old, input) =>
         filterMembers(old, member => !(member.status === 'active' && member.id === input.memberId))
       ),
+      scope: { id: `organization:${organizationId}` },
     }),
 
     deleteInvite: useMutation({
@@ -190,10 +218,13 @@ export function useOrganizationMutations(
           member => !(member.status === 'invited' && member.inviteId === input.inviteId)
         )
       ),
+      scope: { id: `organization:${organizationId}` },
     }),
 
     // No onMutationError toast here: low-balance-alert-sheet (the only
     // caller) shows the error inline while it stays open (see Pattern P2).
+    // onError policy: roll back the onMutate snapshot (latest generation only);
+    // the caller renders the error inline (no toast).
     updateMinimumBalanceAlert: useMutation({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: {
@@ -230,6 +261,7 @@ export function useOrganizationMutations(
         },
         { silent: true }
       ),
+      scope: { id: `organization:${organizationId}` },
     }),
   };
 }

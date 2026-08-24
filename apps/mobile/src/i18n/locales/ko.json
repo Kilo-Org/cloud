@@ -20,7 +20,8 @@
     "copiedToClipboard": "클립보드에 복사됨",
     "couldNotCopyToClipboard": "클립보드에 복사할 수 없습니다",
     "required": "필수",
-    "error": "오류: {{error}}"
+    "error": "오류: {{error}}",
+    "notNow": "나중에"
   },
   "language": {
     "title": "언어",
@@ -68,7 +69,9 @@
     "accessDenied": "액세스가 거부되었습니다.",
     "somethingWentWrong": "문제가 발생했습니다. 다시 시도하세요.",
     "codeSent": "코드 전송됨",
-    "signInCodeField": "로그인 코드"
+    "signInCodeField": "로그인 코드",
+    "accountCreated": "계정이 생성되었습니다. Kilo에 오신 것을 환영합니다.",
+    "pleaseEnterEmail": "이메일 주소를 입력하세요."
   },
   "profile": {
     "language": "언어",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent가 진행 중인 수정 시도를 중지합니다.",
       "cancelRemediation": "수정 취소",
       "cancelTitle": "이 수정을 취소하시겠습니까?",
+      "cancellationRequested": "취소 요청됨",
+      "cancelled": "수정이 취소되었습니다",
       "couldNotLoad": "수정 상태를 불러올 수 없습니다",
       "keepRunning": "계속 실행",
       "model": "모델",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "변경 필요 없음",
         "prOpened": "PR 열림",
         "queued": "수정 요청됨"
-      }
+      },
+      "queued": "수정이 대기열에 추가되었습니다",
+      "retryQueued": "수정 재시도가 대기열에 추가되었습니다",
+      "unavailable": "이 발견 항목에는 수정을 사용할 수 없습니다."
     },
     "repositories": {
       "allRepositories": "모든 저장소",
@@ -1266,7 +1274,11 @@
       "title": "설정"
     },
     "settingsSave": {
-      "saveChanges": "변경 사항 저장"
+      "discard": "삭제",
+      "keepEditing": "계속 수정",
+      "saveChanges": "변경 사항 저장",
+      "unsavedMessage": "이 화면을 떠나기 전에 변경 사항을 저장할까요?",
+      "unsavedTitle": "저장되지 않은 변경 사항"
     },
     "setup": {
       "couldNotOpenGithub": "GitHub를 열 수 없습니다. 다시 시도하세요."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "{{label}} 수정 마감일(일)",
       "title": "SLA 정책"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent가 활성화되었지만 초기 동기화를 대기열에 추가할 수 없습니다. 다시 동기화하세요.",
+    "queuedActionUntracked": "대기 중인 작업을 더 이상 추적할 수 없습니다. 최신 상태를 보려면 새로고침하세요."
   },
   "agents": {
     "activeNow": "지금 활성 중",
@@ -1325,7 +1339,12 @@
       "copyId": "세션 ID 복사",
       "idCopied": "세션 ID 복사됨",
       "couldNotCopyId": "세션 ID를 복사할 수 없습니다",
-      "untitled": "제목 없는 세션"
+      "untitled": "제목 없는 세션",
+      "sessionDeleted": "세션이 삭제되었습니다."
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "GitHub 앱 설정을 시작할 수 없습니다. 다시 시도하세요.",
+      "couldNotOpenTitle": "GitHub를 열 수 없습니다"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}}은(는) 더 이상 사용할 수 없습니다. 아래에서 리포지토리를 선택하세요.",
       "prefillModelUnavailable": "{{model}}은(는) 더 이상 사용할 수 없습니다. 기본 모델을 사용합니다.",
       "couldNotReadPendingSessions": "보류 중인 세션을 읽을 수 없습니다. 다시 시도하세요.",
-      "failedToCreate": "세션을 만들지 못했습니다"
+      "failedToCreate": "세션을 만들지 못했습니다",
+      "couldNotRefreshRepositories": "리포지토리를 새로 고칠 수 없습니다. 다시 시도하세요.",
+      "discard": "삭제",
+      "discardDraftMessage": "프롬프트가 사라집니다.",
+      "discardDraftTitle": "초안을 삭제할까요?",
+      "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
+      "keepEditing": "계속 수정"
     },
     "partRenderer": {
       "updatedFile": "{{count}}개 파일 업데이트됨",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "사진 보관함",
       "files": "파일",
       "cameraAccessDisabled": "카메라 액세스 비활성화됨",
-      "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 액세스를 허용하세요."
+      "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 액세스를 허용하세요.",
+      "couldNotOpenPhotoPicker": "사진 선택기를 열 수 없습니다. Kilo를 다시 시작하고 다시 시도하세요.",
+      "maxFilesAllowed": "최대 {{count}}개의 파일을 첨부할 수 있습니다.",
+      "onlyAddingFiles": "{{accepted}}개의 파일만 추가합니다 ({{total}}개 중, 최대 {{max}}개)"
     },
     "composer": {
       "addAttachment": "첨부 파일 추가",
@@ -1923,7 +1951,11 @@
     "needsInput": "입력 필요"
   },
   "voiceInput": {
-    "listening": "듣는 중..."
+    "listening": "듣는 중...",
+    "allow": "허용",
+    "onlineMessage": "이 기기는 오프라인으로 전사할 수 없습니다. 녹음이 {{provider}}로 전송되어 텍스트로 변환됩니다. Kilo는 오디오를 저장하지 않습니다.",
+    "onlineTitle": "음성이 온라인에서 처리됩니다",
+    "staysOff": "온라인 전사를 허용할 때까지 음성 입력은 꺼져 있습니다."
   },
   "share": {
     "title": "Kilo로 공유",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "이 세션은 연결되지 않은 Kilo CLI에서 실행 중이므로 지금 메시지를 받을 수 없습니다. 해당 컴퓨터에서 CLI를 다시 연결하거나 다른 세션을 선택하세요.",
     "cliCantReceiveFilesTitle": "이 세션은 파일을 받을 수 없습니다",
     "cliCantReceiveFilesMessage": "이 세션을 실행하는 Kilo CLI가 파일을 받을 수 없습니다. 해당 컴퓨터에서 CLI를 업데이트하거나 새 세션으로 공유하세요.",
-    "contentlessMessage": "공유할 내용 없음 — 텍스트나 파일이 포함되지 않았습니다."
+    "contentlessMessage": "공유할 내용 없음 — 텍스트나 파일이 포함되지 않았습니다.",
+    "couldNotReadContent": "공유된 콘텐츠를 읽을 수 없습니다"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "기기 내에서만, 또는 이 기기가 오프라인으로 전사할 수 없을 때 Apple 또는 Google.",
     "what": "무엇",
     "why": "이유",
-    "who": "누구"
+    "who": "누구",
+    "continue": "계속",
+    "installAttributionPromptMessage": "Kilo는 Apple의 추적 권한을 어떤 채널을 통해 여기에 도달했는지 확인하는 데만 사용합니다. 프롬프트와 대화는 절대 사용되지 않습니다.",
+    "installAttributionPromptTitle": "설치 기여 분석을 허용할까요?"
   },
   "prReview": {
     "accessDenied": "액세스 거부됨",
@@ -2561,5 +2597,18 @@
       "retryHint": "Kilo Pass 상태 로드를 다시 시도합니다.",
       "setupHint": "웹에서 Kilo Pass 설정을 엽니다."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "스토어를 열 수 없습니다.",
+    "emailUs": "이메일 보내기",
+    "gladMessage": "스토어 리뷰가 큰 도움이 됩니다. Kilo를 사용해 주셔서 감사합니다!",
+    "gladTitle": "좋은 소식이네요!",
+    "iLikeIt": "마음에 들어요",
+    "needsWork": "개선이 필요해요",
+    "noEmailApp": "사용 가능한 이메일 앱이 없습니다. {{email}}로 문의하세요.",
+    "promptTitle": "Kilo 앱은 어떠신가요?",
+    "rateKilo": "Kilo 평가하기",
+    "sorryMessage": "무엇을 개선해야 하는지 알려주세요. 앱 담당 엔지니어가 모든 보고를 읽습니다!",
+    "sorryTitle": "안타깝네요!"
   }
 }

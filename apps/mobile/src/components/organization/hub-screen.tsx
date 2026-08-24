@@ -1,4 +1,4 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, ChevronRight, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
@@ -21,9 +21,11 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
 import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
+import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -61,7 +63,9 @@ export function OrganizationHubScreen() {
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   const lowBalanceSubtitle =
     minimumBalance != null
-      ? t('organization.hub.lowBalanceBelow', { amount: formatDollars(minimumBalance) })
+      ? t('organization.hub.lowBalanceBelow', {
+          amount: formatMoney(minimumBalance, i18n.language),
+        })
       : t('organization.hub.lowBalanceOff');
 
   return (
@@ -94,7 +98,7 @@ export function OrganizationHubScreen() {
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
-              value={formatDollars(fromMicrodollars(org.balance))}
+              value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
             />
           )}
           {showMoney && org.balance === 0 && (

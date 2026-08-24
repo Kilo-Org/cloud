@@ -7,16 +7,11 @@ import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
 
-type PrReviewTab = {
-  id: PrReviewTabId;
-  labelKey: string;
-};
-
-const TABS: readonly PrReviewTab[] = [
+const TABS = [
   { id: 'overview', labelKey: 'prReview.tabs.overview' },
   { id: 'files', labelKey: 'prReview.tabs.files' },
   { id: 'discussion', labelKey: 'prReview.tabs.discussion' },
-];
+] as const satisfies readonly { id: PrReviewTabId; labelKey: string }[];
 
 type PrReviewTabSelectorProps = {
   activeTab: PrReviewTabId;

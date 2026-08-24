@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { parseLanguagePreference } from '@/lib/hooks/use-language-preference';
+import { resolveLanguageTag } from './resolve-language';
+
 const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
   getItemAsync: vi.fn(),
   setItemAsync: vi.fn(),
@@ -17,9 +20,6 @@ const localizationMock = vi.hoisted(() => ({
   getLocales: vi.fn<() => { languageTag: string }[]>(() => [{ languageTag: 'en-US' }]),
 }));
 vi.mock('expo-localization', () => ({ getLocales: localizationMock.getLocales }));
-
-import { parseLanguagePreference } from '@/lib/hooks/use-language-preference';
-import { resolveLanguageTag } from './resolve-language';
 
 describe('resolveLanguageTag', () => {
   it('resolves an empty locale list to en', () => {

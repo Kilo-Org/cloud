@@ -20,7 +20,8 @@
     "copiedToClipboard": "Panoya kopyalandı",
     "couldNotCopyToClipboard": "Panoya kopyalanamadı",
     "required": "zorunlu",
-    "error": "hata: {{error}}"
+    "error": "hata: {{error}}",
+    "notNow": "Şimdi değil"
   },
   "language": {
     "title": "Dil",
@@ -68,7 +69,9 @@
     "accessDenied": "Erişim reddedildi.",
     "somethingWentWrong": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
     "codeSent": "Kod gönderildi",
-    "signInCodeField": "Oturum açma kodu"
+    "signInCodeField": "Oturum açma kodu",
+    "accountCreated": "Hesap oluşturuldu. Kilo'ya hoş geldiniz.",
+    "pleaseEnterEmail": "Lütfen e-posta adresinizi girin."
   },
   "profile": {
     "language": "Dil",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent, sürmekte olan iyileştirme denemesini durdurur.",
       "cancelRemediation": "İyileştirmeyi iptal et",
       "cancelTitle": "Bu iyileştirme iptal edilsin mi?",
+      "cancellationRequested": "İptal istendi",
+      "cancelled": "İyileştirme iptal edildi",
       "couldNotLoad": "İyileştirme durumu yüklenemedi",
       "keepRunning": "Çalışmaya devam et",
       "model": "Model",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "Değişiklik gerekmiyor",
         "prOpened": "PR açıldı",
         "queued": "İyileştirme istendi"
-      }
+      },
+      "queued": "İyileştirme kuyruğa alındı",
+      "retryQueued": "İyileştirme tekrarı kuyruğa alındı",
+      "unavailable": "Bu bulgu için iyileştirme kullanılamıyor."
     },
     "repositories": {
       "allRepositories": "Tüm depolar",
@@ -1266,7 +1274,11 @@
       "title": "Ayarlar"
     },
     "settingsSave": {
-      "saveChanges": "Değişiklikleri kaydet"
+      "discard": "Vazgeç",
+      "keepEditing": "Düzenlemeye devam et",
+      "saveChanges": "Değişiklikleri kaydet",
+      "unsavedMessage": "Bu ekrandan ayrılmadan önce değişikliklerinizi kaydedin?",
+      "unsavedTitle": "Kaydedilmemiş değişiklikler"
     },
     "setup": {
       "couldNotOpenGithub": "GitHub açılamadı. Lütfen tekrar deneyin."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "{{label}} iyileştirme son tarihi (gün)",
       "title": "SLA ilkesi"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent etkinleştirildi ancak ilk eşitleme kuyruğa alınamadı. Tekrar eşitleyin.",
+    "queuedActionUntracked": "Kuyruğa alınmış bir eylem artık izlenemiyor. En son durumu görmek için yenileyin."
   },
   "agents": {
     "activeNow": "Şu anda etkin",
@@ -1325,7 +1339,12 @@
       "copyId": "Oturum kimliğini kopyala",
       "idCopied": "Oturum kimliği kopyalandı",
       "couldNotCopyId": "Oturum kimliği kopyalanamadı",
-      "untitled": "Başlıksız oturum"
+      "untitled": "Başlıksız oturum",
+      "sessionDeleted": "Oturum silindi"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "GitHub Uygulaması kurulumu başlatılamadı. Lütfen tekrar deneyin.",
+      "couldNotOpenTitle": "GitHub açılamadı"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} artık kullanılamıyor. Aşağıdan bir depo seçin.",
       "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modeliniz kullanılıyor.",
       "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar deneyin.",
-      "failedToCreate": "Oturum oluşturulamadı"
+      "failedToCreate": "Oturum oluşturulamadı",
+      "couldNotRefreshRepositories": "Depolar yenilenemedi. Lütfen tekrar deneyin.",
+      "discard": "Vazgeç",
+      "discardDraftMessage": "İsteminiz kaybolacak.",
+      "discardDraftTitle": "Taslak silinsin mi?",
+      "discardFailed": "Taslak silinemedi. Lütfen tekrar deneyin.",
+      "keepEditing": "Düzenlemeye devam et"
     },
     "partRenderer": {
       "updatedFile": "{{count}} dosya güncellendi",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "Fotoğraf Arşivi",
       "files": "Dosyalar",
       "cameraAccessDisabled": "Kamera Erişimi Devre Dışı",
-      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin."
+      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin.",
+      "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar deneyin.",
+      "maxFilesAllowed": "En fazla {{count}} dosyaya izin verilir",
+      "onlyAddingFiles": "Yalnızca {{total}} dosyanın {{accepted}} kadarı ekleniyor (en fazla {{max}})"
     },
     "composer": {
       "addAttachment": "Ek ekle",
@@ -1923,7 +1951,11 @@
     "needsInput": "GİRİŞ GEREKLİ"
   },
   "voiceInput": {
-    "listening": "Dinleniyor..."
+    "listening": "Dinleniyor...",
+    "allow": "İzin ver",
+    "onlineMessage": "Bu cihaz çevrimdışı yazıya dökemiyor. Kaydınız, metne dönüştürülmesi için {{provider}} hizmetine gönderilir. Kilo sesi saklamaz.",
+    "onlineTitle": "Konuşma çevrimiçi işleniyor",
+    "staysOff": "Çevrimiçi transkripsiyona izin verene kadar konuşma kapalı kalır."
   },
   "share": {
     "title": "Kilo'ya paylaş",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "Bu oturum bağlı olmayan bir Kilo CLI üzerinde çalışıyor, bu yüzden şu anda mesaj alamıyor. O makinedeki CLI'yi yeniden bağlayın veya başka bir oturum seçin.",
     "cliCantReceiveFilesTitle": "Bu oturum dosya alamıyor",
     "cliCantReceiveFilesMessage": "Bu oturumu çalıştıran Kilo CLI dosya alamıyor. O makinedeki CLI'yi güncelleyin veya bunun yerine yeni bir oturuma paylaşın.",
-    "contentlessMessage": "Paylaşılacak bir şey yok — metin veya dosya eklenmedi."
+    "contentlessMessage": "Paylaşılacak bir şey yok — metin veya dosya eklenmedi.",
+    "couldNotReadContent": "Paylaşılan içerik okunamadı"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "Yalnızca cihazda veya bu cihaz çevrimdışı yazıya dökemediğinde Apple veya Google.",
     "what": "Ne",
     "why": "Neden",
-    "who": "Kim"
+    "who": "Kim",
+    "continue": "Devam et",
+    "installAttributionPromptMessage": "Kilo, Apple'ın izleme iznini yalnızca sizi buraya getiren kanalı öğrenmek için kullanır. İstemleriniz ve konuşmalarınız asla kullanılmaz.",
+    "installAttributionPromptTitle": "Yükleme ilişkilendirmesine izin verilsin mi?"
   },
   "prReview": {
     "accessDenied": "Erişim reddedildi",
@@ -2561,5 +2597,18 @@
       "retryHint": "Kilo Pass durumunu yüklemeyi tekrar dener.",
       "setupHint": "Web'de Kilo Pass kurulumunu açar."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "Mağaza açılamadı.",
+    "emailUs": "Bize e-posta gönder",
+    "gladMessage": "Bir mağaza yorumu bize çok yardımcı olur. Kilo'yu kullandığınız için teşekkürler!",
+    "gladTitle": "Bunu duyduğumuza sevindik!",
+    "iLikeIt": "Beğendim",
+    "needsWork": "Geliştirilmeli",
+    "noEmailApp": "Kullanılabilir e-posta uygulaması yok. Bize {{email}} adresinden ulaşabilirsiniz.",
+    "promptTitle": "Kilo uygulamasını nasıl buluyorsunuz?",
+    "rateKilo": "Kilo'yu değerlendir",
+    "sorryMessage": "Lütfen neyin daha iyi olması gerektiğini bize bildirin. Uygulamadan sorumlu mühendis her raporu tek tek okur!",
+    "sorryTitle": "Bunu duyduğumuza üzüldük!"
   }
 }

@@ -3,6 +3,7 @@ import { type RefObject, useRef } from 'react';
 import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 
 /**
@@ -50,24 +51,28 @@ export function useNewSessionDiscardGuard({
       return;
     }
     const action = data.action;
-    Alert.alert('Discard draft?', 'Your prompt will be lost.', [
-      { text: 'Keep editing', style: 'cancel' },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await onDiscardRef.current();
-              navigation.dispatch(action);
-            } catch {
-              // The clear failed: stay on the screen so the draft is kept
-              // and the user can retry or keep editing.
-              toast.error('Could not discard the draft. Please try again.');
-            }
-          })();
+    Alert.alert(
+      i18n.t('agentChat.newSession.discardDraftTitle'),
+      i18n.t('agentChat.newSession.discardDraftMessage'),
+      [
+        { text: i18n.t('agentChat.newSession.keepEditing'), style: 'cancel' },
+        {
+          text: i18n.t('agentChat.newSession.discard'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await onDiscardRef.current();
+                navigation.dispatch(action);
+              } catch {
+                // The clear failed: stay on the screen so the draft is kept
+                // and the user can retry or keep editing.
+                toast.error(i18n.t('agentChat.newSession.discardFailed'));
+              }
+            })();
+          },
         },
-      },
-    ]);
+      ]
+    );
   });
 }

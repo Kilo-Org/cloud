@@ -11,6 +11,7 @@ import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
+const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
 const i18nManager = vi.hoisted(() => ({
   allowRTL: vi.fn(),
   isRTL: false,
@@ -51,6 +52,9 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 vi.mock('@/i18n/return-target', () => ({
   writeLanguageReturnTarget,
 }));
+vi.mock('@/lib/notifications', () => ({
+  renameAndroidNotificationChannels,
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -69,7 +73,9 @@ function findChoiceRow(
   for (const row of rows) {
     const label = row.findAll(
       node =>
-        typeof node.type === 'string' && node.type === 'Text' && node.props.children === endonym
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === endonym
     );
     if (label.length > 0) {
       return row;

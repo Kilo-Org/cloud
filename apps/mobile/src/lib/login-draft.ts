@@ -1,8 +1,14 @@
 import * as SecureStore from 'expo-secure-store';
+import { z } from 'zod';
 
 import { LOGIN_EMAIL_DRAFT_KEY, LOGIN_SSO_RECOVERY_DRAFT_KEY } from '@/lib/storage-keys';
 
 export type SsoRecoveryDraft = { email: string; ssoOrganizationId: string | undefined };
+
+const ssoRecoveryDraftSchema = z.object({
+  email: z.string(),
+  ssoOrganizationId: z.string().optional(),
+});
 
 let emailDraft = '';
 let ssoRecoveryDraft: SsoRecoveryDraft | null = null;
@@ -44,9 +50,12 @@ export async function restoreLoginDrafts(): Promise<{
   let ssoRecovery: SsoRecoveryDraft | null = null;
   if (ssoRaw) {
     try {
-      const parsed = JSON.parse(ssoRaw) as SsoRecoveryDraft;
-      if (typeof parsed.email === 'string') {
-        ssoRecovery = parsed;
+      const parsed = ssoRecoveryDraftSchema.safeParse(JSON.parse(ssoRaw));
+      if (parsed.success) {
+        ssoRecovery = {
+          email: parsed.data.email,
+          ssoOrganizationId: parsed.data.ssoOrganizationId,
+        };
       }
     } catch {
       // Corrupt draft: ignore it.

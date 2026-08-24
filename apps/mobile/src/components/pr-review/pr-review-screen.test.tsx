@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Submit-review, share, and inset reachability tests share the direct-invocation screen harness. */
 // P1-F-46b: the "Submit review" affordance must be reachable from the
 // Overview tab (header right) and the Files tab (floating action bar,
 // see `pr-diff-floating-actions.test.tsx`). The Discussion tab is
@@ -16,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewScreen } from './pr-review-screen';
+import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -27,7 +29,6 @@ vi.mock('react-i18next', async importOriginal => {
     },
   };
 });
-import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 
 const routerPush = vi.fn();
 const routerBack = vi.fn();

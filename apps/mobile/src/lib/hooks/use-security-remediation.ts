@@ -12,6 +12,7 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
+import { i18n } from '@/i18n';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
@@ -81,10 +82,10 @@ export function useStartSecurityRemediation(scope: string) {
       if (!result.queued) {
         toast.error(
           getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
+            i18n.t('securityAgent.remediation.unavailable')
         );
       } else {
-        toast.success('Remediation queued');
+        toast.success(i18n.t('securityAgent.remediation.queued'));
       }
       await invalidateRemediationQueries(
         { trpc, queryClient },
@@ -113,10 +114,10 @@ export function useRetrySecurityRemediation(scope: string) {
       if (!result.queued) {
         toast.error(
           getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
+            i18n.t('securityAgent.remediation.unavailable')
         );
       } else {
-        toast.success('Remediation retry queued');
+        toast.success(i18n.t('securityAgent.remediation.retryQueued'));
       }
       await invalidateRemediationQueries(
         { trpc, queryClient },
@@ -189,8 +190,8 @@ export function useCancelSecurityRemediation(scope: string) {
       // was only asked to stop — it may still finish and produce a PR.
       toast.success(
         result.status === 'cancellation_requested'
-          ? 'Cancellation requested'
-          : 'Remediation cancelled'
+          ? i18n.t('securityAgent.remediation.cancellationRequested')
+          : i18n.t('securityAgent.remediation.cancelled')
       );
     },
     onSettled: async (_result, _error, vars) => {

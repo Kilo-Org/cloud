@@ -87,7 +87,7 @@ vi.mock('@/lib/login-draft', () => ({
 
 function findGlobe(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   const pressables = root.findAll(
-    node => typeof node.type === 'string' && node.type === 'Pressable'
+    node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
   );
   const globe = pressables.find(pressable => pressable.props.accessibilityLabel === 'Language');
   if (!globe) {
@@ -266,7 +266,7 @@ describe('login-screen language globe', () => {
     expect(globe.props.accessibilityState).toEqual({ disabled: false });
 
     const icons = renderer.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'Globe'
+      node => typeof node.type === 'string' && (node.type as string) === 'Globe'
     );
     expect(icons).toHaveLength(1);
 

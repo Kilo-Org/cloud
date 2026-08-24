@@ -4,8 +4,10 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SheetHeader } from './sheet-header';
+import '@/i18n';
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -72,7 +74,7 @@ describe('SheetHeader share action', () => {
     const shares = pressablesByLabel(renderer.root, 'Share report.pdf');
     expect(shares).toHaveLength(1);
     expect(shares[0]?.props.disabled).toBe(true);
-    expect(shares[0]?.props.accessibilityState).toEqual({ disabled: false, busy: true });
+    expect(shares[0]?.props.accessibilityState).toEqual({ disabled: true, busy: true });
 
     renderer.unmount();
   });

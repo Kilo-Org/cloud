@@ -20,7 +20,8 @@
     "copiedToClipboard": "تم النسخ إلى الحافظة",
     "couldNotCopyToClipboard": "تعذّر النسخ إلى الحافظة",
     "required": "مطلوب",
-    "error": "خطأ: {{error}}"
+    "error": "خطأ: {{error}}",
+    "notNow": "ليس الآن"
   },
   "language": {
     "title": "اللغة",
@@ -68,7 +69,9 @@
     "accessDenied": "تم رفض الوصول.",
     "somethingWentWrong": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     "codeSent": "تم إرسال الرمز",
-    "signInCodeField": "رمز تسجيل الدخول"
+    "signInCodeField": "رمز تسجيل الدخول",
+    "accountCreated": "تم إنشاء الحساب. مرحبًا بك في Kilo.",
+    "pleaseEnterEmail": "يرجى إدخال عنوان بريدك الإلكتروني."
   },
   "profile": {
     "language": "اللغة",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "سيوقف وكيل الأمان محاولة المعالجة الجارية.",
       "cancelRemediation": "إلغاء المعالجة",
       "cancelTitle": "إلغاء هذه المعالجة؟",
+      "cancellationRequested": "تم طلب الإلغاء",
+      "cancelled": "تم إلغاء المعالجة",
       "couldNotLoad": "تعذّر تحميل حالة المعالجة",
       "keepRunning": "مواصلة التشغيل",
       "model": "النموذج",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "لا حاجة إلى تغييرات",
         "prOpened": "تم فتح طلب السحب",
         "queued": "تم طلب المعالجة"
-      }
+      },
+      "queued": "تم طلب المعالجة",
+      "retryQueued": "تمت جدولة إعادة محاولة المعالجة",
+      "unavailable": "المعالجة غير متاحة لهذه النتيجة."
     },
     "repositories": {
       "allRepositories": "جميع المستودعات",
@@ -1266,7 +1274,11 @@
       "title": "الإعدادات"
     },
     "settingsSave": {
-      "saveChanges": "حفظ التغييرات"
+      "discard": "تجاهل",
+      "keepEditing": "متابعة التعديل",
+      "saveChanges": "حفظ التغييرات",
+      "unsavedMessage": "هل تريد حفظ تغييراتك قبل مغادرة هذه الشاشة؟",
+      "unsavedTitle": "تغييرات غير محفوظة"
     },
     "setup": {
       "couldNotOpenGithub": "تعذّر فتح GitHub. يرجى المحاولة مرة أخرى."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "الموعد النهائي لمعالجة {{label}} بالأيام",
       "title": "سياسة SLA"
     },
-    "title": "وكيل الأمان"
+    "title": "وكيل الأمان",
+    "initialSyncAdmissionFailed": "تم تفعيل وكيل الأمان، لكن تعذّرت جدولة المزامنة الأولية. قم بالمزامنة مرة أخرى.",
+    "queuedActionUntracked": "تعذّر تتبع إجراء في قائمة الانتظار. حدّث لرؤية أحدث حالة."
   },
   "agents": {
     "activeNow": "نشط الآن",
@@ -1325,7 +1339,12 @@
       "copyId": "نسخ معرّف الجلسة",
       "idCopied": "تم نسخ معرّف الجلسة",
       "couldNotCopyId": "تعذّر نسخ معرّف الجلسة",
-      "untitled": "جلسة بدون عنوان"
+      "untitled": "جلسة بدون عنوان",
+      "sessionDeleted": "تم حذف الجلسة"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
+      "couldNotOpenTitle": "تعذّر فتح GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "لم يعد {{repo}} متاحًا. اختر مستودعًا أدناه.",
       "prefillModelUnavailable": "لم يعد {{model}} متاحًا. سيتم استخدام نموذجك الافتراضي.",
       "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
-      "failedToCreate": "تعذّر إنشاء الجلسة"
+      "failedToCreate": "تعذّر إنشاء الجلسة",
+      "couldNotRefreshRepositories": "تعذّر تحديث المستودعات. يرجى المحاولة مرة أخرى.",
+      "discard": "تجاهل",
+      "discardDraftMessage": "ستفقد مطالبتك.",
+      "discardDraftTitle": "تجاهل المسودة؟",
+      "discardFailed": "تعذّر تجاهل المسودة. يرجى المحاولة مرة أخرى.",
+      "keepEditing": "متابعة التعديل"
     },
     "partRenderer": {
       "updatedFile": "تم تحديث {{count}} ملف",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "مكتبة الصور",
       "files": "الملفات",
       "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
-      "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
+      "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة.",
+      "couldNotOpenPhotoPicker": "تعذّر فتح منتقي الصور. أعد تشغيل Kilo وحاول مرة أخرى.",
+      "maxFilesAllowed": "الحد الأقصى {{count}} ملفات مسموح بها",
+      "onlyAddingFiles": "ستتم إضافة {{accepted}} من {{total}} ملفات فقط (الحد الأقصى {{max}})"
     },
     "composer": {
       "addAttachment": "إضافة مرفق",
@@ -1923,7 +1951,11 @@
     "needsInput": "يتطلب إدخالًا"
   },
   "voiceInput": {
-    "listening": "جارٍ الاستماع..."
+    "listening": "جارٍ الاستماع...",
+    "allow": "السماح",
+    "onlineMessage": "لا يمكن لهذا الجهاز النسخ دون اتصال. يُرسل تسجيلك إلى {{provider}} لتحويله إلى نص. لا يخزّن Kilo الصوت.",
+    "onlineTitle": "تتم معالجة الكلام عبر الإنترنت",
+    "staysOff": "يبقى الكلام متوقفًا حتى تسمح بالنسخ الصوتي عبر الإنترنت."
   },
   "share": {
     "title": "مشاركة إلى Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "تعمل هذه الجلسة على Kilo CLI غير متصل، لذا لا يمكنها استقبال الرسائل الآن. أعد توصيل CLI على ذلك الجهاز، أو اختر جلسة أخرى.",
     "cliCantReceiveFilesTitle": "لا يمكن لهذه الجلسة استقبال الملفات",
     "cliCantReceiveFilesMessage": "لا يمكن لـ Kilo CLI الذي يشغّل هذه الجلسة استقبال الملفات. حدّث CLI على ذلك الجهاز، أو شارك إلى جلسة جديدة بدلًا من ذلك.",
-    "contentlessMessage": "لا يوجد شيء للمشاركة — لم يتم تضمين نص أو ملفات."
+    "contentlessMessage": "لا يوجد شيء للمشاركة — لم يتم تضمين نص أو ملفات.",
+    "couldNotReadContent": "تعذّرت قراءة المحتوى المشترك"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "على الجهاز فقط، أو Apple أو Google عندما يتعذر على هذا الجهاز النسخ دون اتصال.",
     "what": "ماذا",
     "why": "لماذا",
-    "who": "من"
+    "who": "من",
+    "continue": "متابعة",
+    "installAttributionPromptMessage": "يستخدم Kilo إذن التتبع من Apple فقط لمعرفة القناة التي جلبتك إلى هنا. لا تُستخدم مطالباتك ومحادثاتك أبدًا.",
+    "installAttributionPromptTitle": "السماح بإسناد التثبيت؟"
   },
   "prReview": {
     "accessDenied": "تم رفض الوصول",
@@ -2561,5 +2597,18 @@
       "retryHint": "يعيد محاولة تحميل حالة Kilo Pass.",
       "setupHint": "يفتح إعداد Kilo Pass على الويب."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "تعذّر فتح المتجر.",
+    "emailUs": "راسلنا عبر البريد الإلكتروني",
+    "gladMessage": "سيساعدنا تقييم المتجر كثيرًا. شكرًا لاستخدامك Kilo!",
+    "gladTitle": "يسعدنا سماع ذلك!",
+    "iLikeIt": "أعجبني",
+    "needsWork": "يحتاج إلى تحسين",
+    "noEmailApp": "لا يتوفر تطبيق بريد إلكتروني. يمكنك التواصل معنا عبر {{email}}",
+    "promptTitle": "ما رأيك في تطبيق Kilo؟",
+    "rateKilo": "قيّم Kilo",
+    "sorryMessage": "يرجى إخبارنا بما يحتاج إلى تحسين. المهندس المسؤول عن التطبيق يقرأ كل تقرير!",
+    "sorryTitle": "نأسف لسماع ذلك!"
   }
 }

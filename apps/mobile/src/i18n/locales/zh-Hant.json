@@ -20,7 +20,8 @@
     "copiedToClipboard": "已複製到剪貼簿",
     "couldNotCopyToClipboard": "無法複製到剪貼簿",
     "required": "必填",
-    "error": "錯誤：{{error}}"
+    "error": "錯誤：{{error}}",
+    "notNow": "稍後再說"
   },
   "language": {
     "title": "語言",
@@ -68,7 +69,9 @@
     "accessDenied": "存取遭拒。",
     "somethingWentWrong": "發生錯誤。請再試一次。",
     "codeSent": "代碼已傳送",
-    "signInCodeField": "登入代碼"
+    "signInCodeField": "登入代碼",
+    "accountCreated": "帳戶已建立。歡迎使用 Kilo。",
+    "pleaseEnterEmail": "請輸入您的電子郵件地址。"
   },
   "profile": {
     "language": "語言",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "安全性代理將停止進行中的修復嘗試。",
       "cancelRemediation": "取消修復",
       "cancelTitle": "取消此修復？",
+      "cancellationRequested": "已要求取消",
+      "cancelled": "修復已取消",
       "couldNotLoad": "無法載入修復狀態",
       "keepRunning": "繼續執行",
       "model": "模型",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "無需變更",
         "prOpened": "PR 已開啟",
         "queued": "已要求修復"
-      }
+      },
+      "queued": "修復已排入佇列",
+      "retryQueued": "修復重試已排入佇列",
+      "unavailable": "此發現無法進行修復。"
     },
     "repositories": {
       "allRepositories": "所有存放庫",
@@ -1266,7 +1274,11 @@
       "title": "設定"
     },
     "settingsSave": {
-      "saveChanges": "儲存變更"
+      "discard": "捨棄",
+      "keepEditing": "繼續編輯",
+      "saveChanges": "儲存變更",
+      "unsavedMessage": "離開此畫面之前要儲存您的變更嗎？",
+      "unsavedTitle": "未儲存的變更"
     },
     "setup": {
       "couldNotOpenGithub": "無法開啟 GitHub。請重試。"
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "{{label}} 修復截止時間（天）",
       "title": "SLA 政策"
     },
-    "title": "安全性代理"
+    "title": "安全性代理",
+    "initialSyncAdmissionFailed": "安全性代理已啟用，但無法將初始同步排入佇列。請再次同步。",
+    "queuedActionUntracked": "已排入佇列的動作無法再追蹤。請重新整理以查看最新狀態。"
   },
   "agents": {
     "activeNow": "目前使用中",
@@ -1325,7 +1339,12 @@
       "copyId": "複製工作階段 ID",
       "idCopied": "工作階段 ID 已複製",
       "couldNotCopyId": "無法複製工作階段 ID",
-      "untitled": "無標題工作階段"
+      "untitled": "無標題工作階段",
+      "sessionDeleted": "工作階段已刪除"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "無法啟動 GitHub App 設定。請再試一次。",
+      "couldNotOpenTitle": "無法開啟 GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} 已不再可用。請在下方選取存放庫。",
       "prefillModelUnavailable": "{{model}} 已不再可用。將使用您的預設模型。",
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
-      "failedToCreate": "無法建立工作階段"
+      "failedToCreate": "無法建立工作階段",
+      "couldNotRefreshRepositories": "無法重新整理存放庫。請再試一次。",
+      "discard": "捨棄",
+      "discardDraftMessage": "您的提示將遺失。",
+      "discardDraftTitle": "捨棄草稿？",
+      "discardFailed": "無法捨棄草稿。請再試一次。",
+      "keepEditing": "繼續編輯"
     },
     "partRenderer": {
       "updatedFile": "已更新 {{count}} 個檔案",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "照片圖庫",
       "files": "檔案",
       "cameraAccessDisabled": "相機存取已停用",
-      "cameraAccessMessage": "請在「設定」中允許相機存取以拍攝照片。"
+      "cameraAccessMessage": "請在「設定」中允許相機存取以拍攝照片。",
+      "couldNotOpenPhotoPicker": "無法開啟照片選擇器。請重新啟動 Kilo 並再試一次。",
+      "maxFilesAllowed": "最多允許 {{count}} 個檔案",
+      "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
     },
     "composer": {
       "addAttachment": "新增附件",
@@ -1923,7 +1951,11 @@
     "needsInput": "需要輸入"
   },
   "voiceInput": {
-    "listening": "正在聆聽..."
+    "listening": "正在聆聽...",
+    "allow": "允許",
+    "onlineMessage": "此裝置無法離線轉錄。您的錄音會傳送至 {{provider}} 以轉換為文字。Kilo 不會儲存音訊。",
+    "onlineTitle": "語音會在線上處理",
+    "staysOff": "在您允許線上轉錄之前，語音會保持關閉。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "此工作階段在未連接的 Kilo CLI 上執行，因此目前無法接收訊息。請在該電腦上重新連接 CLI，或選擇其他工作階段。",
     "cliCantReceiveFilesTitle": "此工作階段無法接收檔案",
     "cliCantReceiveFilesMessage": "執行此工作階段的 Kilo CLI 無法接收檔案。請更新該電腦上的 CLI，或改為分享到新工作階段。",
-    "contentlessMessage": "沒有可分享的內容 — 未包含任何文字或檔案。"
+    "contentlessMessage": "沒有可分享的內容 — 未包含任何文字或檔案。",
+    "couldNotReadContent": "無法讀取分享的內容"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "僅在裝置上，或當此裝置無法離線轉錄時由 Apple 或 Google 處理。",
     "what": "內容",
     "why": "原因",
-    "who": "對象"
+    "who": "對象",
+    "continue": "繼續",
+    "installAttributionPromptMessage": "Kilo 僅使用 Apple 的追蹤權限來了解是哪個管道將您帶到這裡。您的提示與對話絕不會被使用。",
+    "installAttributionPromptTitle": "允許安裝歸因？"
   },
   "prReview": {
     "accessDenied": "存取遭拒",
@@ -2561,5 +2597,18 @@
       "retryHint": "重試載入 Kilo Pass 狀態。",
       "setupHint": "在網頁上開啟 Kilo Pass 設定。"
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "無法開啟商店。",
+    "emailUs": "以電子郵件聯絡我們",
+    "gladMessage": "商店評論對我們幫助很大。感謝您使用 Kilo！",
+    "gladTitle": "很高興聽到您這麼說！",
+    "iLikeIt": "我喜歡",
+    "needsWork": "需要改進",
+    "noEmailApp": "沒有可用的電子郵件應用程式。您可以透過 {{email}} 聯絡我們。",
+    "promptTitle": "您覺得 Kilo 應用程式如何？",
+    "rateKilo": "為 Kilo 評分",
+    "sorryMessage": "請告訴我們哪裡需要改進。負責此應用程式的工程師會閱讀每一份報告！",
+    "sorryTitle": "很遺憾聽到您這麼說！"
   }
 }

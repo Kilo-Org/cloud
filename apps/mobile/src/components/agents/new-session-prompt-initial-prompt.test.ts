@@ -4,6 +4,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
 const onChangeTextMock = vi.fn();
 const pasteClipboardImageMock = vi.hoisted(() => vi.fn());
 /** Captures the options the composer hands the clipboard hint. */

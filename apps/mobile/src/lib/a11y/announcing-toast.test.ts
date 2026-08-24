@@ -52,6 +52,7 @@ describe('announcingToast', () => {
   });
 
   it('success shows the toast AND announces the message', () => {
+    // oxlint-disable-next-line no-literal-copy/no-literal-copy
     const result = announcingToast.success('Session renamed');
 
     expect(sonnerMock.success).toHaveBeenCalledTimes(1);
@@ -62,6 +63,7 @@ describe('announcingToast', () => {
   });
 
   it('error shows the toast AND announces the message', () => {
+    // oxlint-disable-next-line no-literal-copy/no-literal-copy
     const result = announcingToast.error('Network request failed');
 
     expect(sonnerMock.error).toHaveBeenCalledTimes(1);
@@ -74,6 +76,7 @@ describe('announcingToast', () => {
   });
 
   it('warning shows the toast AND announces the message', () => {
+    // oxlint-disable-next-line no-literal-copy/no-literal-copy
     const result = announcingToast.warning('Webhook sync partially failed');
 
     expect(sonnerMock.warning).toHaveBeenCalledTimes(1);
@@ -87,11 +90,13 @@ describe('announcingToast', () => {
 
   it('forwards sonner-native options without swallowing them', () => {
     const options = { description: 'tap to retry' };
+    // oxlint-disable-next-line no-literal-copy/no-literal-copy
     announcingToast.error('Save failed', options);
 
     expect(sonnerMock.error).toHaveBeenCalledWith('Save failed', options);
   });
   it('trims whitespace from the announced message so the screen reader hears the trimmed form', () => {
+    // oxlint-disable-next-line no-literal-copy/no-literal-copy
     announcingToast.error('  Too many requests  ');
 
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Too many requests');

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
 import { ExternalLink, Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';

@@ -1,4 +1,4 @@
-import i18next from 'i18next';
+import { createInstance } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import ar from './locales/ar.json';
@@ -23,7 +23,7 @@ import zhHans from './locales/zh-Hans.json';
 import zhHant from './locales/zh-Hant.json';
 
 /** The single static resource map: every supported language's bundled catalog. */
-export const resources = {
+const resources = {
   en: { translation: en },
   es: { translation: es },
   'pt-BR': { translation: ptBR },
@@ -46,7 +46,7 @@ export const resources = {
   id: { translation: id },
 } as const;
 
-export const i18n = i18next.createInstance();
+export const i18n = createInstance();
 
 void i18n.use(initReactI18next).init({
   resources,
@@ -57,5 +57,3 @@ void i18n.use(initReactI18next).init({
   initAsync: false,
   returnNull: false,
 });
-
-export default i18n;

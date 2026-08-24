@@ -20,7 +20,8 @@
     "copiedToClipboard": "Disalin ke papan klip",
     "couldNotCopyToClipboard": "Tidak dapat menyalin ke papan klip",
     "required": "wajib diisi",
-    "error": "kesalahan: {{error}}"
+    "error": "kesalahan: {{error}}",
+    "notNow": "Nanti saja"
   },
   "language": {
     "title": "Bahasa",
@@ -68,7 +69,9 @@
     "accessDenied": "Akses ditolak.",
     "somethingWentWrong": "Terjadi kesalahan. Coba lagi.",
     "codeSent": "Kode terkirim",
-    "signInCodeField": "Kode masuk"
+    "signInCodeField": "Kode masuk",
+    "accountCreated": "Akun dibuat. Selamat datang di Kilo.",
+    "pleaseEnterEmail": "Silakan masukkan alamat email Anda."
   },
   "profile": {
     "language": "Bahasa",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent akan menghentikan percobaan remediasi yang sedang berlangsung.",
       "cancelRemediation": "Batalkan remediasi",
       "cancelTitle": "Batalkan remediasi ini?",
+      "cancellationRequested": "Pembatalan diminta",
+      "cancelled": "Remediasi dibatalkan",
       "couldNotLoad": "Tidak dapat memuat status remediasi",
       "keepRunning": "Biarkan berjalan",
       "model": "Model",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "Tidak ada perubahan diperlukan",
         "prOpened": "PR dibuka",
         "queued": "Remediasi diminta"
-      }
+      },
+      "queued": "Remediasi diantrekan",
+      "retryQueued": "Coba lagi remediasi diantrekan",
+      "unavailable": "Remediasi tidak tersedia untuk temuan ini."
     },
     "repositories": {
       "allRepositories": "Semua repositori",
@@ -1266,7 +1274,11 @@
       "title": "Pengaturan"
     },
     "settingsSave": {
-      "saveChanges": "Simpan perubahan"
+      "discard": "Buang",
+      "keepEditing": "Tetap mengedit",
+      "saveChanges": "Simpan perubahan",
+      "unsavedMessage": "Simpan perubahan Anda sebelum meninggalkan layar ini?",
+      "unsavedTitle": "Perubahan belum disimpan"
     },
     "setup": {
       "couldNotOpenGithub": "Tidak dapat membuka GitHub. Silakan coba lagi."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "Tenggat remediasi {{label}} dalam hari",
       "title": "Kebijakan SLA"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent telah diaktifkan, tetapi sinkronisasi awal tidak dapat diantrekan. Sinkronkan lagi.",
+    "queuedActionUntracked": "Tindakan yang diantrekan tidak dapat dilacak lagi. Muat ulang untuk melihat status terbaru."
   },
   "agents": {
     "activeNow": "Aktif sekarang",
@@ -1325,7 +1339,12 @@
       "copyId": "Salin ID sesi",
       "idCopied": "ID sesi disalin",
       "couldNotCopyId": "Tidak dapat menyalin ID sesi",
-      "untitled": "Sesi tanpa judul"
+      "untitled": "Sesi tanpa judul",
+      "sessionDeleted": "Sesi dihapus"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
+      "couldNotOpenTitle": "Tidak dapat membuka GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} tidak lagi tersedia. Pilih repositori di bawah.",
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Menggunakan model default Anda.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi tertunda. Coba lagi.",
-      "failedToCreate": "Gagal membuat sesi"
+      "failedToCreate": "Gagal membuat sesi",
+      "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Silakan coba lagi.",
+      "discard": "Buang",
+      "discardDraftMessage": "Prompt Anda akan hilang.",
+      "discardDraftTitle": "Buang draf?",
+      "discardFailed": "Tidak dapat membuang draf. Silakan coba lagi.",
+      "keepEditing": "Tetap mengedit"
     },
     "partRenderer": {
       "updatedFile": "Memperbarui {{count}} file",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "Perpustakaan Foto",
       "files": "File",
       "cameraAccessDisabled": "Akses Kamera Dinonaktifkan",
-      "cameraAccessMessage": "Izinkan akses kamera di Pengaturan untuk mengambil foto."
+      "cameraAccessMessage": "Izinkan akses kamera di Pengaturan untuk mengambil foto.",
+      "couldNotOpenPhotoPicker": "Tidak dapat membuka pemilih foto. Mulai ulang Kilo dan coba lagi.",
+      "maxFilesAllowed": "Maksimal {{count}} file yang diizinkan",
+      "onlyAddingFiles": "Hanya menambahkan {{accepted}} dari {{total}} file (maks {{max}})"
     },
     "composer": {
       "addAttachment": "Tambah lampiran",
@@ -1923,7 +1951,11 @@
     "needsInput": "PERLU MASUKAN"
   },
   "voiceInput": {
-    "listening": "Mendengarkan..."
+    "listening": "Mendengarkan...",
+    "allow": "Izinkan",
+    "onlineMessage": "Perangkat ini tidak dapat mentranskripsi secara offline. Rekaman Anda dikirim ke {{provider}} untuk diubah menjadi teks. Kilo tidak menyimpan audio.",
+    "onlineTitle": "Ucapan diproses secara online",
+    "staysOff": "Ucapan tetap nonaktif hingga Anda mengizinkan transkripsi online."
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "Sesi ini berjalan di Kilo CLI yang tidak terhubung, jadi tidak dapat menerima pesan saat ini. Sambungkan kembali CLI di mesin tersebut, atau pilih sesi lain.",
     "cliCantReceiveFilesTitle": "Sesi ini tidak dapat menerima file",
     "cliCantReceiveFilesMessage": "Kilo CLI yang menjalankan sesi ini tidak dapat menerima file. Perbarui CLI di mesin tersebut, atau bagikan ke sesi baru.",
-    "contentlessMessage": "Tidak ada yang dibagikan — tidak ada teks atau file yang disertakan."
+    "contentlessMessage": "Tidak ada yang dibagikan — tidak ada teks atau file yang disertakan.",
+    "couldNotReadContent": "Tidak dapat membaca konten yang dibagikan"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "Hanya di perangkat, atau Apple atau Google saat perangkat ini tidak dapat mentranskripsi secara offline.",
     "what": "Apa",
     "why": "Mengapa",
-    "who": "Siapa"
+    "who": "Siapa",
+    "continue": "Lanjutkan",
+    "installAttributionPromptMessage": "Kilo menggunakan izin pelacakan Apple hanya untuk mengetahui kanal mana yang membawa Anda ke sini. Prompt dan percakapan Anda tidak pernah digunakan.",
+    "installAttributionPromptTitle": "Izinkan atribusi pemasangan?"
   },
   "prReview": {
     "accessDenied": "Akses ditolak",
@@ -2561,5 +2597,18 @@
       "retryHint": "Mencoba ulang memuat status Kilo Pass.",
       "setupHint": "Membuka penyiapan Kilo Pass di web."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "Tidak dapat membuka toko.",
+    "emailUs": "Email kami",
+    "gladMessage": "Ulasan toko akan sangat membantu kami. Terima kasih telah menggunakan Kilo!",
+    "gladTitle": "Kami senang mendengarnya!",
+    "iLikeIt": "Saya menyukainya",
+    "needsWork": "Perlu perbaikan",
+    "noEmailApp": "Tidak ada aplikasi email tersedia. Anda dapat menghubungi kami di {{email}}",
+    "promptTitle": "Bagaimana pendapat Anda tentang aplikasi Kilo?",
+    "rateKilo": "Beri Nilai Kilo",
+    "sorryMessage": "Beri tahu kami apa yang perlu diperbaiki. Insinyur yang menangani aplikasi membaca setiap laporan!",
+    "sorryTitle": "Kami menyesal mendengarnya!"
   }
 }

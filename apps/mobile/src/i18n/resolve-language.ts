@@ -1,6 +1,6 @@
 import { getLocales } from 'expo-localization';
 
-import { isSupportedLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
 
 function normalizeLocale(tag: string): string {
   return tag.toLowerCase().replaceAll('_', '-');
@@ -34,27 +34,26 @@ export function resolveLanguageTag(
 ): SupportedLanguage {
   for (const locale of locales) {
     const raw = locale.languageTag;
-    if (!raw || raw.length === 0) {
-      continue;
-    }
-    const tag = normalizeLocale(raw);
+    if (raw && raw.length > 0) {
+      const tag = normalizeLocale(raw);
 
-    const script = chineseScriptFor(tag);
-    if (script) {
-      return script;
-    }
+      const script = chineseScriptFor(tag);
+      if (script) {
+        return script;
+      }
 
-    const exact = SUPPORTED_LANGUAGES.find(supported => normalizeLocale(supported) === tag);
-    if (exact) {
-      return exact;
-    }
+      const exact = SUPPORTED_LANGUAGES.find(supported => normalizeLocale(supported) === tag);
+      if (exact) {
+        return exact;
+      }
 
-    const [language] = tag.split('-');
-    const sameLanguage = SUPPORTED_LANGUAGES.find(
-      supported => normalizeLocale(supported).split('-')[0] === language
-    );
-    if (sameLanguage) {
-      return sameLanguage;
+      const [language] = tag.split('-');
+      const sameLanguage = SUPPORTED_LANGUAGES.find(
+        supported => normalizeLocale(supported).split('-')[0] === language
+      );
+      if (sameLanguage) {
+        return sameLanguage;
+      }
     }
   }
   return 'en';
@@ -63,9 +62,4 @@ export function resolveLanguageTag(
 /** Resolve the supported language from the device's preferred locale list. */
 export function resolveDeviceLanguage(): SupportedLanguage {
   return resolveLanguageTag(getLocales());
-}
-
-/** True when a raw stored value is a supported language tag. */
-export function isSupportedLanguageTag(raw: string): raw is SupportedLanguage {
-  return isSupportedLanguage(raw);
 }

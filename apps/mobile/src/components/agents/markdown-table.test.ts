@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Table semantics and modal tests share the direct-invocation tree-walk harness. */
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 
@@ -6,6 +7,20 @@ import { moveA11yFocus } from '@/lib/a11y/announce';
 import { MarkdownTable, TableRow } from './markdown-table';
 
 import { type MarkdownPalette } from './markdown-palette';
+
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 // Stub native modules that markdown-table.tsx imports at module scope. Without
 // a stub, the reanimated / gesture-handler / worklets entry points reach this

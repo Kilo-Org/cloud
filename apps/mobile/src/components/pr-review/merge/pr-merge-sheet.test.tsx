@@ -7,6 +7,13 @@ import * as Haptics from 'expo-haptics';
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrMergeSheet } from './pr-merge-sheet';
+import {
+  __resetMergePartialSuccessStoreForTests,
+  consumeMergePartialSuccess,
+} from '@/lib/pr-review/merge/merge-result-banner-store';
+import { type PrOverviewRepoSettings } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
+import { clearDraft } from '@/lib/persist/drafts';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -18,13 +25,6 @@ vi.mock('react-i18next', async importOriginal => {
     },
   };
 });
-import {
-  __resetMergePartialSuccessStoreForTests,
-  consumeMergePartialSuccess,
-} from '@/lib/pr-review/merge/merge-result-banner-store';
-import { type PrOverviewRepoSettings } from '@/lib/pr-review/merge/merge-blocked-reasons';
-import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
-import { clearDraft } from '@/lib/persist/drafts';
 
 const mergeMutationMocks = vi.hoisted(() => ({
   mutateAsync: vi.fn<() => Promise<unknown>>(),

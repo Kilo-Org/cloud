@@ -3,11 +3,12 @@ import { reloadAppAsync } from 'expo';
 import { i18n } from '@/i18n';
 import { type SupportedLanguage } from '@/i18n/languages';
 import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
-import { writeLanguageReturnTarget, type LanguageReturnTarget } from '@/i18n/return-target';
+import { type LanguageReturnTarget, writeLanguageReturnTarget } from '@/i18n/return-target';
 import {
-  setLanguagePreferenceAsync,
   type LanguagePreference,
+  setLanguagePreferenceAsync,
 } from '@/lib/hooks/use-language-preference';
+import { renameAndroidNotificationChannels } from '@/lib/notifications';
 
 export type ApplyLanguageOutcome =
   | { kind: 'applied-ltr' }
@@ -52,5 +53,6 @@ export async function applyLanguagePreference(
   } catch {
     return { kind: 'catalog-failed' };
   }
+  void renameAndroidNotificationChannels();
   return { kind: 'applied-ltr' };
 }

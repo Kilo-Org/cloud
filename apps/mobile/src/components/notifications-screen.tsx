@@ -491,7 +491,7 @@ export function NotificationsScreen() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
     ]);
-  }, []);
+  }, [t]);
 
   const isMasterBusy = isTogglingPermission || isRegisteringToken;
   const masterLeading = deriveMasterGateLeadingPresentation({

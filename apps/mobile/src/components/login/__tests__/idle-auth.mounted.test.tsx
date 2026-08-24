@@ -7,6 +7,7 @@ import { openBrowserAsync } from 'expo-web-browser';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
 import { IdleAuth } from '../idle-auth';
+import '@/i18n';
 
 type StartFn = (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -28,7 +29,13 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     verifyEmailCode: vi.fn(),
     ssoRecovery: ssoRecovery.value,
     clearSsoRecovery: vi.fn(),
+    handleSsoError: vi.fn(),
   }),
+}));
+
+vi.mock('@/lib/login-draft', () => ({
+  setLoginEmailDraft: vi.fn(),
+  setSsoRecoveryDraft: vi.fn(),
 }));
 
 vi.mock('expo-apple-authentication', () => ({

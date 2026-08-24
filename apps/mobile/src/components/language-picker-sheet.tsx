@@ -64,25 +64,34 @@ export function LanguagePickerSheet({
     setBusy(true);
     const outcome = await applyLanguagePreference(selected, resolved, returnTarget);
     switch (outcome.kind) {
-      case 'applied-ltr':
+      case 'applied-ltr': {
         onClose();
         break;
-      case 'restarting-rtl':
+      }
+      case 'restarting-rtl': {
         // reloadAppAsync succeeded; the native reload wipes this state.
         break;
-      case 'reload-failed':
+      }
+      case 'reload-failed': {
         setRestarting(false);
         setReloadFailed(true);
         break;
-      case 'persist-failed':
+      }
+      case 'persist-failed': {
         // setAsync already toasts the failure; keep the current language.
         setBusy(false);
         setRestarting(false);
         break;
-      case 'catalog-failed':
+      }
+      case 'catalog-failed': {
         toast.error(t('common.retry'));
         setBusy(false);
         break;
+      }
+      default: {
+        // Unknown outcome: leave the sheet open.
+        break;
+      }
     }
   };
 
@@ -96,6 +105,95 @@ export function LanguagePickerSheet({
     } catch {
       setBusy(false);
     }
+  };
+
+  const renderSheetContent = () => {
+    if (reloadFailed) {
+      return (
+        <PickerSheet
+          title={t('language.couldNotRestart')}
+          onDone={() => {
+            void retryReload();
+          }}
+          onCancel={onClose}
+          doneLabel={t('common.retry')}
+          disabled={busy}
+          scrollable={false}
+        >
+          <View className="items-center gap-3 px-6 py-8">
+            <Text variant="muted" className="text-center">
+              {t('language.languageSaved')}
+            </Text>
+          </View>
+        </PickerSheet>
+      );
+    }
+    if (restarting) {
+      return (
+        <PickerSheet
+          title={t('language.title')}
+          onDone={() => {
+            // Restarting: the native reload replaces this sheet.
+          }}
+          onCancel={() => {
+            // Restarting: the native reload replaces this sheet.
+          }}
+          doneLabel={t('common.done')}
+          disabled
+          scrollable={false}
+        >
+          <View className="items-center gap-3 px-6 py-8">
+            <ActivityIndicator color={colors.mutedForeground} />
+            <Text variant="muted" className="text-center">
+              {t('language.restarting')}
+            </Text>
+          </View>
+        </PickerSheet>
+      );
+    }
+    return (
+      <PickerSheet
+        title={t('language.title')}
+        onDone={() => {
+          void handleDone();
+        }}
+        onCancel={onClose}
+        doneLabel={t('common.done')}
+        disabled={busy}
+        scrollable={false}
+      >
+        <ScrollView className="max-h-[60vh]">
+          <ChoiceRow
+            selected={selected === 'device'}
+            disabled={busy}
+            onPress={() => {
+              setSelected('device');
+            }}
+          >
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-medium">{t('common.device')}</Text>
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {deviceEndonym}
+              </Text>
+            </View>
+          </ChoiceRow>
+          {SUPPORTED_LANGUAGES.map(tag => (
+            <ChoiceRow
+              key={tag}
+              selected={selected === tag}
+              disabled={busy}
+              onPress={() => {
+                setSelected(tag);
+              }}
+            >
+              <View className="flex-1 pr-3">
+                <Text className="text-sm font-medium">{LANGUAGE_ENDONYMS[tag]}</Text>
+              </View>
+            </ChoiceRow>
+          ))}
+        </ScrollView>
+      </PickerSheet>
+    );
   };
 
   return (
@@ -121,82 +219,7 @@ export function LanguagePickerSheet({
           className="max-h-[80%] rounded-t-3xl bg-card"
           style={{ paddingBottom: insets.bottom }}
         >
-          {reloadFailed ? (
-            <PickerSheet
-              title={t('language.couldNotRestart')}
-              onDone={() => {
-                void retryReload();
-              }}
-              onCancel={onClose}
-              doneLabel={t('common.retry')}
-              disabled={busy}
-              scrollable={false}
-            >
-              <View className="items-center gap-3 px-6 py-8">
-                <Text variant="muted" className="text-center">
-                  {t('language.languageSaved')}
-                </Text>
-              </View>
-            </PickerSheet>
-          ) : restarting ? (
-            <PickerSheet
-              title={t('language.title')}
-              onDone={() => {}}
-              onCancel={() => {}}
-              doneLabel={t('common.done')}
-              disabled
-              scrollable={false}
-            >
-              <View className="items-center gap-3 px-6 py-8">
-                <ActivityIndicator color={colors.mutedForeground} />
-                <Text variant="muted" className="text-center">
-                  {t('language.restarting')}
-                </Text>
-              </View>
-            </PickerSheet>
-          ) : (
-            <PickerSheet
-              title={t('language.title')}
-              onDone={() => {
-                void handleDone();
-              }}
-              onCancel={onClose}
-              doneLabel={t('common.done')}
-              disabled={busy}
-              scrollable={false}
-            >
-              <ScrollView className="max-h-[60vh]">
-                <ChoiceRow
-                  selected={selected === 'device'}
-                  disabled={busy}
-                  onPress={() => {
-                    setSelected('device');
-                  }}
-                >
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">{t('common.device')}</Text>
-                    <Text variant="muted" className="mt-0.5 text-xs">
-                      {deviceEndonym}
-                    </Text>
-                  </View>
-                </ChoiceRow>
-                {SUPPORTED_LANGUAGES.map(tag => (
-                  <ChoiceRow
-                    key={tag}
-                    selected={selected === tag}
-                    disabled={busy}
-                    onPress={() => {
-                      setSelected(tag);
-                    }}
-                  >
-                    <View className="flex-1 pr-3">
-                      <Text className="text-sm font-medium">{LANGUAGE_ENDONYMS[tag]}</Text>
-                    </View>
-                  </ChoiceRow>
-                ))}
-              </ScrollView>
-            </PickerSheet>
-          )}
+          {renderSheetContent()}
         </Animated.View>
       </Animated.View>
     </Portal>

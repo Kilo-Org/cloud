@@ -20,7 +20,8 @@
     "copiedToClipboard": "Skopiowano do schowka",
     "couldNotCopyToClipboard": "Nie udało się skopiować do schowka",
     "required": "wymagane",
-    "error": "błąd: {{error}}"
+    "error": "błąd: {{error}}",
+    "notNow": "Nie teraz"
   },
   "language": {
     "title": "Język",
@@ -68,7 +69,9 @@
     "accessDenied": "Odmówiono dostępu.",
     "somethingWentWrong": "Coś poszło nie tak. Spróbuj ponownie.",
     "codeSent": "Kod wysłany",
-    "signInCodeField": "Kod logowania"
+    "signInCodeField": "Kod logowania",
+    "accountCreated": "Konto utworzone. Witamy w Kilo.",
+    "pleaseEnterEmail": "Wpisz swój adres e-mail."
   },
   "profile": {
     "language": "Język",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent zatrzyma trwającą próbę naprawy.",
       "cancelRemediation": "Anuluj naprawę",
       "cancelTitle": "Anulować tę naprawę?",
+      "cancellationRequested": "Zażądano anulowania",
+      "cancelled": "Naprawa anulowana",
       "couldNotLoad": "Nie można załadować statusu naprawy",
       "keepRunning": "Kontynuuj",
       "model": "Model",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "Brak potrzebnych zmian",
         "prOpened": "Otwarto PR",
         "queued": "Zażądano naprawy"
-      }
+      },
+      "queued": "Naprawa w kolejce",
+      "retryQueued": "Ponowna naprawa w kolejce",
+      "unavailable": "Naprawa jest niedostępna dla tego znaleziska."
     },
     "repositories": {
       "allRepositories": "Wszystkie repozytoria",
@@ -1266,7 +1274,11 @@
       "title": "Ustawienia"
     },
     "settingsSave": {
-      "saveChanges": "Zapisz zmiany"
+      "discard": "Odrzuć",
+      "keepEditing": "Kontynuuj edycję",
+      "saveChanges": "Zapisz zmiany",
+      "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
+      "unsavedTitle": "Niezapisane zmiany"
     },
     "setup": {
       "couldNotOpenGithub": "Nie udało się otworzyć GitHub. Spróbuj ponownie."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "Termin naprawy dla {{label}} w dniach",
       "title": "Polityka SLA"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent został włączony, ale nie udało się dodać początkowej synchronizacji do kolejki. Synchronizuj ponownie.",
+    "queuedActionUntracked": "Nie można już śledzić akcji w kolejce. Odśwież, aby zobaczyć najnowszy stan."
   },
   "agents": {
     "activeNow": "Aktywne teraz",
@@ -1325,7 +1339,12 @@
       "copyId": "Kopiuj identyfikator sesji",
       "idCopied": "Skopiowano identyfikator sesji",
       "couldNotCopyId": "Nie udało się skopiować identyfikatora sesji",
-      "untitled": "Sesja bez tytułu"
+      "untitled": "Sesja bez tytułu",
+      "sessionDeleted": "Sesja usunięta"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
+      "couldNotOpenTitle": "Nie udało się otworzyć GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} nie jest już dostępne. Wybierz repozytorium poniżej.",
       "prefillModelUnavailable": "{{model}} nie jest już dostępny. Używany jest Twój domyślny model.",
       "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
-      "failedToCreate": "Nie udało się utworzyć sesji"
+      "failedToCreate": "Nie udało się utworzyć sesji",
+      "couldNotRefreshRepositories": "Nie udało się odświeżyć repozytoriów. Spróbuj ponownie.",
+      "discard": "Odrzuć",
+      "discardDraftMessage": "Twoje polecenie zostanie utracone.",
+      "discardDraftTitle": "Odrzucić szkic?",
+      "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
+      "keepEditing": "Kontynuuj edycję"
     },
     "partRenderer": {
       "updatedFile": "Zaktualizowano {{count}} plik",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "Biblioteka zdjęć",
       "files": "Pliki",
       "cameraAccessDisabled": "Dostęp do aparatu wyłączony",
-      "cameraAccessMessage": "Zezwól na dostęp do aparatu w Ustawieniach, aby zrobić zdjęcie."
+      "cameraAccessMessage": "Zezwól na dostęp do aparatu w Ustawieniach, aby zrobić zdjęcie.",
+      "couldNotOpenPhotoPicker": "Nie udało się otworzyć wyboru zdjęć. Uruchom ponownie Kilo i spróbuj ponownie.",
+      "maxFilesAllowed": "Maksymalnie {{count}} plików",
+      "onlyAddingFiles": "Dodawanie tylko {{accepted}} z {{total}} plików (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Dodaj załącznik",
@@ -1923,7 +1951,11 @@
     "needsInput": "WYMAGA DANYCH WEJŚCIOWYCH"
   },
   "voiceInput": {
-    "listening": "Słuchanie..."
+    "listening": "Słuchanie...",
+    "allow": "Zezwól",
+    "onlineMessage": "To urządzenie nie może transkrybować offline. Twoje nagranie jest wysyłane do {{provider}}, aby zamienić je na tekst. Kilo nie przechowuje dźwięku.",
+    "onlineTitle": "Mowa jest przetwarzana online",
+    "staysOff": "Mowa pozostaje wyłączona, dopóki nie zezwolisz na transkrypcję online."
   },
   "share": {
     "title": "Udostępnij do Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "Ta sesja działa na Kilo CLI, które nie jest połączone, więc nie może teraz odbierać wiadomości. Połącz ponownie CLI na tym komputerze lub wybierz inną sesję.",
     "cliCantReceiveFilesTitle": "Ta sesja nie może odbierać plików",
     "cliCantReceiveFilesMessage": "Kilo CLI obsługujące tę sesję nie może odbierać plików. Zaktualizuj CLI na tym komputerze lub udostępnij do nowej sesji.",
-    "contentlessMessage": "Nie ma nic do udostępnienia — nie dołączono tekstu ani plików."
+    "contentlessMessage": "Nie ma nic do udostępnienia — nie dołączono tekstu ani plików.",
+    "couldNotReadContent": "Nie udało się odczytać udostępnionej treści"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "Tylko na urządzeniu albo Apple lub Google, gdy to urządzenie nie może transkrybować offline.",
     "what": "Co",
     "why": "Dlaczego",
-    "who": "Kto"
+    "who": "Kto",
+    "continue": "Kontynuuj",
+    "installAttributionPromptMessage": "Kilo używa uprawnienia śledzenia Apple tylko po to, aby dowiedzieć się, który kanał Cię tu przyprowadził. Twoje polecenia i rozmowy nigdy nie są używane.",
+    "installAttributionPromptTitle": "Zezwolić na atrybucję instalacji?"
   },
   "prReview": {
     "accessDenied": "Odmowa dostępu",
@@ -2561,5 +2597,18 @@
       "retryHint": "Ponawia ładowanie statusu Kilo Pass.",
       "setupHint": "Otwiera konfigurację Kilo Pass w sieci."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "Nie udało się otworzyć sklepu.",
+    "emailUs": "Napisz do nas",
+    "gladMessage": "Recenzja w sklepie bardzo by nam pomogła. Dziękujemy za korzystanie z Kilo!",
+    "gladTitle": "Miło nam to słyszeć!",
+    "iLikeIt": "Podoba mi się",
+    "needsWork": "Wymaga poprawy",
+    "noEmailApp": "Brak dostępnej aplikacji e-mail. Możesz się z nami skontaktować pod adresem {{email}}",
+    "promptTitle": "Jak podoba Ci się aplikacja Kilo?",
+    "rateKilo": "Oceń Kilo",
+    "sorryMessage": "Daj nam znać, co należy poprawić. Inżynier odpowiedzialny za aplikację czyta każde zgłoszenie!",
+    "sorryTitle": "Przykro nam to słyszeć!"
   }
 }

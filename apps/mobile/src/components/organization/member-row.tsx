@@ -1,5 +1,4 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { formatDollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
@@ -154,7 +154,7 @@ export function MemberRow({
         {member.dailyUsageLimitUsd != null && (
           <Text className="text-xs text-muted-foreground">
             {t('organization.members.limitPerDay', {
-              amount: formatDollars(member.dailyUsageLimitUsd),
+              amount: formatMoney(member.dailyUsageLimitUsd, i18n.language),
             })}
           </Text>
         )}

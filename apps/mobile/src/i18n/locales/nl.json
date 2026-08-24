@@ -20,7 +20,8 @@
     "copiedToClipboard": "Gekopieerd naar klembord",
     "couldNotCopyToClipboard": "Kon niet naar klembord kopiëren",
     "required": "verplicht",
-    "error": "fout: {{error}}"
+    "error": "fout: {{error}}",
+    "notNow": "Niet nu"
   },
   "language": {
     "title": "Taal",
@@ -68,7 +69,9 @@
     "accessDenied": "Toegang is geweigerd.",
     "somethingWentWrong": "Er is iets misgegaan. Probeer het opnieuw.",
     "codeSent": "Code verzonden",
-    "signInCodeField": "Aanmeldcode"
+    "signInCodeField": "Aanmeldcode",
+    "accountCreated": "Account aangemaakt. Welkom bij Kilo.",
+    "pleaseEnterEmail": "Voer je e-mailadres in."
   },
   "profile": {
     "language": "Taal",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent stopt de lopende herstelpoging.",
       "cancelRemediation": "Herstel annuleren",
       "cancelTitle": "Dit herstel annuleren?",
+      "cancellationRequested": "Annulering aangevraagd",
+      "cancelled": "Herstel geannuleerd",
       "couldNotLoad": "Herstelstatus kon niet worden geladen",
       "keepRunning": "Blijven draaien",
       "model": "Model",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "Geen wijzigingen nodig",
         "prOpened": "PR geopend",
         "queued": "Herstel aangevraagd"
-      }
+      },
+      "queued": "Herstel in de wachtrij gezet",
+      "retryQueued": "Nieuwe herstelpoging in de wachtrij gezet",
+      "unavailable": "Herstel is niet beschikbaar voor deze bevinding."
     },
     "repositories": {
       "allRepositories": "Alle repositories",
@@ -1266,7 +1274,11 @@
       "title": "Instellingen"
     },
     "settingsSave": {
-      "saveChanges": "Wijzigingen opslaan"
+      "discard": "Weggooien",
+      "keepEditing": "Blijven bewerken",
+      "saveChanges": "Wijzigingen opslaan",
+      "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
+      "unsavedTitle": "Niet-opgeslagen wijzigingen"
     },
     "setup": {
       "couldNotOpenGithub": "GitHub kon niet worden geopend. Probeer het opnieuw."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "{{label}} hersteldeadline in dagen",
       "title": "SLA-beleid"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent is ingeschakeld, maar de eerste synchronisatie kon niet in de wachtrij worden gezet. Synchroniseer opnieuw.",
+    "queuedActionUntracked": "Een actie in de wachtrij kon niet meer worden gevolgd. Vernieuw om de nieuwste status te zien."
   },
   "agents": {
     "activeNow": "Nu actief",
@@ -1325,7 +1339,12 @@
       "copyId": "Sessie-ID kopiëren",
       "idCopied": "Sessie-ID gekopieerd",
       "couldNotCopyId": "Kon sessie-ID niet kopiëren",
-      "untitled": "Naamloze sessie"
+      "untitled": "Naamloze sessie",
+      "sessionDeleted": "Sessie verwijderd"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
+      "couldNotOpenTitle": "Kon GitHub niet openen"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} is niet meer beschikbaar. Kies hieronder een repository.",
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "Kon openstaande sessies niet lezen. Probeer opnieuw.",
-      "failedToCreate": "Sessie maken mislukt"
+      "failedToCreate": "Sessie maken mislukt",
+      "couldNotRefreshRepositories": "Kon repositories niet vernieuwen. Probeer het opnieuw.",
+      "discard": "Weggooien",
+      "discardDraftMessage": "Je prompt gaat verloren.",
+      "discardDraftTitle": "Concept weggooien?",
+      "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
+      "keepEditing": "Blijven bewerken"
     },
     "partRenderer": {
       "updatedFile": "{{count}} bestand bijgewerkt",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "Fotobibliotheek",
       "files": "Bestanden",
       "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
-      "cameraAccessMessage": "Sta cameratoegang toe in Instellingen om een foto te maken."
+      "cameraAccessMessage": "Sta cameratoegang toe in Instellingen om een foto te maken.",
+      "couldNotOpenPhotoPicker": "Kon de fotokiezer niet openen. Start Kilo opnieuw op en probeer het opnieuw.",
+      "maxFilesAllowed": "Maximaal {{count}} bestanden toegestaan",
+      "onlyAddingFiles": "Alleen {{accepted}} van {{total}} bestanden worden toegevoegd (max. {{max}})"
     },
     "composer": {
       "addAttachment": "Bijlage toevoegen",
@@ -1923,7 +1951,11 @@
     "needsInput": "INVOER VEREIST"
   },
   "voiceInput": {
-    "listening": "Luisteren..."
+    "listening": "Luisteren...",
+    "allow": "Toestaan",
+    "onlineMessage": "Dit apparaat kan niet offline transcriberen. Je opname wordt naar {{provider}} gestuurd om er tekst van te maken. Kilo slaat de audio niet op.",
+    "onlineTitle": "Spraak wordt online verwerkt",
+    "staysOff": "Spraak blijft uit totdat je online transcriptie toestaat."
   },
   "share": {
     "title": "Delen naar Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "Deze sessie draait op een Kilo CLI die niet is verbonden, dus hij kan nu geen berichten ontvangen. Verbind de CLI op die machine opnieuw, of kies een andere sessie.",
     "cliCantReceiveFilesTitle": "Deze sessie kan geen bestanden ontvangen",
     "cliCantReceiveFilesMessage": "De Kilo CLI die deze sessie uitvoert kan geen bestanden ontvangen. Werk de CLI op die machine bij, of deel in plaats daarvan naar een nieuwe sessie.",
-    "contentlessMessage": "Niets om te delen — er is geen tekst of bestand toegevoegd."
+    "contentlessMessage": "Niets om te delen — er is geen tekst of bestand toegevoegd.",
+    "couldNotReadContent": "Kon de gedeelde inhoud niet lezen"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "Alleen op het apparaat, of Apple of Google wanneer dit apparaat niet offline kan transcriberen.",
     "what": "Wat",
     "why": "Waarom",
-    "who": "Wie"
+    "who": "Wie",
+    "continue": "Doorgaan",
+    "installAttributionPromptMessage": "Kilo gebruikt de trackingtoestemming van Apple alleen om te zien via welk kanaal je hier bent gekomen. Je prompts en gesprekken worden nooit gebruikt.",
+    "installAttributionPromptTitle": "Installatie-attributie toestaan?"
   },
   "prReview": {
     "accessDenied": "Toegang geweigerd",
@@ -2561,5 +2597,18 @@
       "retryHint": "Probeert de Kilo Pass-status opnieuw te laden.",
       "setupHint": "Opent de Kilo Pass-instellingen op het web."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "Kon de store niet openen.",
+    "emailUs": "E-mail ons",
+    "gladMessage": "Een review in de store zou ons enorm helpen. Bedankt dat je Kilo gebruikt!",
+    "gladTitle": "Wat fijn om te horen!",
+    "iLikeIt": "Ik vind het leuk",
+    "needsWork": "Kan beter",
+    "noEmailApp": "Geen e-mailapp beschikbaar. Je kunt ons bereiken op {{email}}",
+    "promptTitle": "Hoe bevalt de Kilo-app je?",
+    "rateKilo": "Kilo beoordelen",
+    "sorryMessage": "Laat ons weten wat er beter kan. De engineer die over de app gaat, leest elk rapport!",
+    "sorryTitle": "Wat jammer om te horen!"
   }
 }

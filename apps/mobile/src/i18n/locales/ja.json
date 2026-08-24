@@ -20,7 +20,8 @@
     "copiedToClipboard": "クリップボードにコピーしました",
     "couldNotCopyToClipboard": "クリップボードにコピーできませんでした",
     "required": "必須",
-    "error": "エラー: {{error}}"
+    "error": "エラー: {{error}}",
+    "notNow": "後で"
   },
   "language": {
     "title": "言語",
@@ -68,7 +69,9 @@
     "accessDenied": "アクセスが拒否されました。",
     "somethingWentWrong": "問題が発生しました。もう一度お試しください。",
     "codeSent": "コードを送信しました",
-    "signInCodeField": "サインインコード"
+    "signInCodeField": "サインインコード",
+    "accountCreated": "アカウントが作成されました。Kiloへようこそ。",
+    "pleaseEnterEmail": "メールアドレスを入力してください。"
   },
   "profile": {
     "language": "言語",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agentは進行中の修復試行を停止します。",
       "cancelRemediation": "修復をキャンセル",
       "cancelTitle": "この修復をキャンセルしますか？",
+      "cancellationRequested": "キャンセルを要求しました",
+      "cancelled": "修復をキャンセルしました",
       "couldNotLoad": "修復ステータスを読み込めませんでした",
       "keepRunning": "実行を続ける",
       "model": "モデル",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "変更は不要です",
         "prOpened": "PRが開かれました",
         "queued": "修復がリクエストされました"
-      }
+      },
+      "queued": "修復をキューに入れました",
+      "retryQueued": "修復の再試行をキューに入れました",
+      "unavailable": "この検出には修復を利用できません。"
     },
     "repositories": {
       "allRepositories": "すべてのリポジトリ",
@@ -1266,7 +1274,11 @@
       "title": "設定"
     },
     "settingsSave": {
-      "saveChanges": "変更を保存"
+      "discard": "破棄",
+      "keepEditing": "編集を続ける",
+      "saveChanges": "変更を保存",
+      "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
+      "unsavedTitle": "未保存の変更"
     },
     "setup": {
       "couldNotOpenGithub": "GitHubを開けませんでした。もう一度お試しください。"
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "{{label}}の修復期限（日数）",
       "title": "SLAポリシー"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agentは有効になりましたが、初回同期をキューに入れられませんでした。もう一度同期してください。",
+    "queuedActionUntracked": "キューに入れたアクションを追跡できなくなりました。更新して最新の状態を確認してください。"
   },
   "agents": {
     "activeNow": "現在アクティブ",
@@ -1325,7 +1339,12 @@
       "copyId": "セッションIDをコピー",
       "idCopied": "セッションIDをコピーしました",
       "couldNotCopyId": "セッションIDをコピーできませんでした",
-      "untitled": "無題のセッション"
+      "untitled": "無題のセッション",
+      "sessionDeleted": "セッションを削除しました"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "GitHub Appのセットアップを開始できませんでした。もう一度お試しください。",
+      "couldNotOpenTitle": "GitHubを開けませんでした"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}}は利用できなくなりました。以下でリポジトリを選択してください。",
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
-      "failedToCreate": "セッションを作成できませんでした"
+      "failedToCreate": "セッションを作成できませんでした",
+      "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
+      "discard": "破棄",
+      "discardDraftMessage": "プロンプトは失われます。",
+      "discardDraftTitle": "下書きを破棄しますか？",
+      "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
+      "keepEditing": "編集を続ける"
     },
     "partRenderer": {
       "updatedFile": "{{count}}件のファイルを更新しました",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "フォトライブラリ",
       "files": "ファイル",
       "cameraAccessDisabled": "カメラアクセスが無効です",
-      "cameraAccessMessage": "写真を撮るには設定でカメラアクセスを許可してください。"
+      "cameraAccessMessage": "写真を撮るには設定でカメラアクセスを許可してください。",
+      "couldNotOpenPhotoPicker": "写真ピッカーを開けませんでした。Kiloを再起動してもう一度お試しください。",
+      "maxFilesAllowed": "最大{{count}}個のファイルまで添付できます",
+      "onlyAddingFiles": "{{total}}個中{{accepted}}個のファイルのみ追加します（最大{{max}}個）"
     },
     "composer": {
       "addAttachment": "添付ファイルを追加",
@@ -1923,7 +1951,11 @@
     "needsInput": "入力が必要"
   },
   "voiceInput": {
-    "listening": "聞き取り中..."
+    "listening": "聞き取り中...",
+    "allow": "許可",
+    "onlineMessage": "このデバイスはオフラインで文字起こしできません。録音はテキストに変換するために{{provider}}に送信されます。Kiloは音声を保存しません。",
+    "onlineTitle": "音声はオンラインで処理されます",
+    "staysOff": "オンライン文字起こしを許可するまで、音声はオフのままです。"
   },
   "share": {
     "title": "Kiloに共有",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "このセッションは接続されていないKilo CLIで実行されているため、現在メッセージを受信できません。そのマシンでCLIを再接続するか、別のセッションを選択してください。",
     "cliCantReceiveFilesTitle": "このセッションはファイルを受信できません",
     "cliCantReceiveFilesMessage": "このセッションを実行しているKilo CLIはファイルを受信できません。そのマシンでCLIを更新するか、新しいセッションに共有してください。",
-    "contentlessMessage": "共有するものがありません。テキストやファイルが含まれていません。"
+    "contentlessMessage": "共有するものがありません。テキストやファイルが含まれていません。",
+    "couldNotReadContent": "共有コンテンツを読み取れませんでした"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "デバイス上のみ。このデバイスがオフラインで文字起こしできない場合はAppleまたはGoogle。",
     "what": "内容",
     "why": "理由",
-    "who": "対象"
+    "who": "対象",
+    "continue": "続行",
+    "installAttributionPromptMessage": "Kiloは、どのチャネルからこのアプリにたどり着いたかを知るためにのみ、Appleのトラッキング権限を使用します。プロンプトや会話が使用されることはありません。",
+    "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {
     "accessDenied": "アクセスが拒否されました",
@@ -2561,5 +2597,18 @@
       "retryHint": "Kilo Passステータスの読み込みを再試行します。",
       "setupHint": "WebでKilo Passセットアップを開きます。"
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "ストアを開けませんでした。",
+    "emailUs": "メールでお問い合わせ",
+    "gladMessage": "ストアでのレビューが大きな助けになります。Kiloをご利用いただきありがとうございます！",
+    "gladTitle": "そう言っていただけて嬉しいです！",
+    "iLikeIt": "気に入っています",
+    "needsWork": "改善が必要",
+    "noEmailApp": "利用できるメールアプリがありません。{{email}}までご連絡ください。",
+    "promptTitle": "Kiloアプリはいかがですか？",
+    "rateKilo": "Kiloを評価",
+    "sorryMessage": "どこを改善すべきかお知らせください。アプリ担当のエンジニアがすべての報告を読んでいます！",
+    "sorryTitle": "それは残念です。"
   }
 }

@@ -10,11 +10,11 @@ import { Text } from '@/components/ui/text';
 import { type ReviewEvent } from '@/lib/pr-review/build-submit-review-input';
 import { cn } from '@/lib/utils';
 
-const EVENT_OPTIONS: readonly { value: ReviewEvent; labelKey: string }[] = [
+const EVENT_OPTIONS = [
   { value: 'COMMENT', labelKey: 'prReview.eventChips.comment' },
   { value: 'REQUEST_CHANGES', labelKey: 'prReview.eventChips.requestChanges' },
   { value: 'APPROVE', labelKey: 'prReview.eventChips.approve' },
-];
+] as const satisfies readonly { value: ReviewEvent; labelKey: string }[];
 
 export function ReviewEventChips(props: {
   value: ReviewEvent;

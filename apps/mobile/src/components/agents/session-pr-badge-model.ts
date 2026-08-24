@@ -24,7 +24,7 @@ const STATE_ARIA_LABEL_KEYS = {
   // Mobile keeps `unknown` on the open presentation (never mapped to closed),
   // so it speaks as an open PR.
   unknown: 'agentChat.prBadge.open',
-} satisfies Readonly<Record<PrBadgeState, string>>;
+} as const satisfies Readonly<Record<PrBadgeState, string>>;
 
 /**
  * Bucket a raw PR state string into a badge state. Unlike the web helper,

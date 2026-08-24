@@ -1,4 +1,3 @@
-import { formatCents } from '@kilocode/app-shared/utils';
 import { Download, FileText } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +13,7 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatMoneyFromCents } from '@/lib/format';
 import {
   type OrgInvoice,
   useOrgBoundary,
@@ -96,7 +96,7 @@ function InvoiceRowContent({
           </Text>
         </View>
         <Text className="text-sm font-medium text-foreground">
-          {formatCents(invoice.amount_due)}
+          {formatMoneyFromCents(invoice.amount_due, i18n.language)}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">

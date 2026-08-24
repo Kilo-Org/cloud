@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
+import { clearDraft } from '@/lib/persist/drafts';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -24,7 +25,6 @@ vi.mock('react-i18next', async importOriginal => {
     },
   };
 });
-import { clearDraft } from '@/lib/persist/drafts';
 
 type AlertButton = { text?: string; style?: string; onPress?: () => void };
 type AlertCall = { title: string; message: string; buttons: AlertButton[] };

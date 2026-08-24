@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 // A pending result belongs to one launch. Dedupe by asset URI so a second call
@@ -21,7 +22,7 @@ export async function consumeAndroidPendingPickerResult(): Promise<ImagePicker.I
   try {
     result = await ImagePicker.getPendingResultAsync();
   } catch {
-    announcingToast.error('Could not open the photo picker. Restart Kilo and try again.');
+    announcingToast.error(i18n.t('agentChat.attachmentPicker.couldNotOpenPhotoPicker'));
     return [];
   }
   if (result === null) {
@@ -29,7 +30,7 @@ export async function consumeAndroidPendingPickerResult(): Promise<ImagePicker.I
   }
   if ('code' in result) {
     // Error result: surface the existing recovery copy once.
-    announcingToast.error('Could not open the photo picker. Restart Kilo and try again.');
+    announcingToast.error(i18n.t('agentChat.attachmentPicker.couldNotOpenPhotoPicker'));
     return [];
   }
   if (result.canceled) {

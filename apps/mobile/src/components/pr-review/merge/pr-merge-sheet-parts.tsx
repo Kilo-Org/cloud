@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Merge-sheet form sub-components share the sheet's keyboard-visibility and footer contracts. */
 // Form sub-components for the S8 merge sheet. Extracted out of
 // `pr-merge-sheet.tsx` to keep that file under the repo's 300-line limit.
 

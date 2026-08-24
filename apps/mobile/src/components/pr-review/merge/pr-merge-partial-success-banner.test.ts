@@ -1,3 +1,4 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -16,12 +17,16 @@ vi.mock('@/components/ui/text', () => ({
 const REASON = 'Reference does not exist';
 
 function render(reason: string): string {
-  let renderer: TestRenderer.ReactTestRenderer | undefined;
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    renderer = TestRenderer.create(createElement(PrMergePartialSuccessBanner, { reason }));
+    ref.current = TestRenderer.create(createElement(PrMergePartialSuccessBanner, { reason }));
   });
-  const serialized = JSON.stringify(renderer!.toJSON());
-  renderer!.unmount();
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('PrMergePartialSuccessBanner renderer was not created');
+  }
+  const serialized = JSON.stringify(renderer.toJSON());
+  renderer.unmount();
   return serialized;
 }
 

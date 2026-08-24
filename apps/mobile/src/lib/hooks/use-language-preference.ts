@@ -37,8 +37,9 @@ export function getLanguagePreference(): LanguagePreference {
 }
 
 /** Apply and persist a preference; returns false when the disk write failed. */
-export function setLanguagePreferenceAsync(preference: LanguagePreference): Promise<boolean> {
-  return store.setAsync(preference);
+export async function setLanguagePreferenceAsync(preference: LanguagePreference): Promise<boolean> {
+  const result = await store.setAsync(preference);
+  return result;
 }
 
 /** Start the disk read at module scope, before React mounts. */
@@ -51,5 +52,3 @@ export function useLanguagePreference() {
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
   return { preference, hasLoaded };
 }
-
-export { store as languagePreferenceStore };

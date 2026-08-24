@@ -339,7 +339,7 @@ describe('ProfileScreen language row', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
 
     const rows = renderer.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'ConfigureRow'
+      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
     );
     const languageRows = rows.filter(row => row.props.title === 'Language');
 

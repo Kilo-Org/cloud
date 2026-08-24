@@ -20,7 +20,8 @@
     "copiedToClipboard": "הועתק ללוח",
     "couldNotCopyToClipboard": "לא ניתן היה להעתיק ללוח",
     "required": "חובה",
-    "error": "שגיאה: {{error}}"
+    "error": "שגיאה: {{error}}",
+    "notNow": "לא עכשיו"
   },
   "language": {
     "title": "שפה",
@@ -68,7 +69,9 @@
     "accessDenied": "הגישה נדחתה.",
     "somethingWentWrong": "משהו השתבש. נסה שוב.",
     "codeSent": "הקוד נשלח",
-    "signInCodeField": "קוד כניסה"
+    "signInCodeField": "קוד כניסה",
+    "accountCreated": "החשבון נוצר. ברוך הבא ל-Kilo.",
+    "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך."
   },
   "profile": {
     "language": "שפה",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "סוכן האבטחה יעצור את ניסיון התיקון המתבצע.",
       "cancelRemediation": "בטל תיקון",
       "cancelTitle": "לבטל תיקון זה?",
+      "cancellationRequested": "התבקשה ביטול",
+      "cancelled": "התיקון בוטל",
       "couldNotLoad": "לא ניתן היה לטעון את מצב התיקון",
       "keepRunning": "השאר רץ",
       "model": "דגם",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "אין צורך בשינויים",
         "prOpened": "PR נפתח",
         "queued": "תיקון התבקש"
-      }
+      },
+      "queued": "התיקון הועמד בתור",
+      "retryQueued": "ניסיון תיקון חוזר הועמד בתור",
+      "unavailable": "התיקון אינו זמין עבור ממצא זה."
     },
     "repositories": {
       "allRepositories": "כל המאגרים",
@@ -1266,7 +1274,11 @@
       "title": "הגדרות"
     },
     "settingsSave": {
-      "saveChanges": "שמור שינויים"
+      "discard": "מחק",
+      "keepEditing": "המשך לערוך",
+      "saveChanges": "שמור שינויים",
+      "unsavedMessage": "לשמור את השינויים שלך לפני היציאה מהמסך?",
+      "unsavedTitle": "שינויים שלא נשמרו"
     },
     "setup": {
       "couldNotOpenGithub": "לא ניתן היה לפתוח את GitHub. נסה שוב."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "מועד תיקון של {{label}} בימים",
       "title": "מדיניות SLA"
     },
-    "title": "סוכן אבטחה"
+    "title": "סוכן אבטחה",
+    "initialSyncAdmissionFailed": "סוכן האבטחה הופעל, אך לא ניתן היה להעמיד את הסינכרון הראשוני בתור. סנכרן שוב.",
+    "queuedActionUntracked": "לא ניתן עוד לעקוב אחר פעולה שהועמדה בתור. רענן כדי לראות את המצב העדכני."
   },
   "agents": {
     "activeNow": "פעיל כעת",
@@ -1325,7 +1339,12 @@
       "copyId": "העתק מזהה הפעלה",
       "idCopied": "מזהה ההפעלה הועתק",
       "couldNotCopyId": "לא ניתן היה להעתיק את מזהה ההפעלה",
-      "untitled": "הפעלה ללא כותרת"
+      "untitled": "הפעלה ללא כותרת",
+      "sessionDeleted": "ההפעלה נמחקה"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
+      "couldNotOpenTitle": "לא ניתן היה לפתוח את GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} אינו זמין עוד. בחר מאגר למטה.",
       "prefillModelUnavailable": "{{model}} אינו זמין עוד. נעשה שימוש בדגם ברירת המחדל שלך.",
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא הפעלות ממתינות. נסה שוב.",
-      "failedToCreate": "לא ניתן היה ליצור הפעלה"
+      "failedToCreate": "לא ניתן היה ליצור הפעלה",
+      "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
+      "discard": "בטל",
+      "discardDraftMessage": "ההנחיה שלך תאבד.",
+      "discardDraftTitle": "לבטל את הטיוטה?",
+      "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
+      "keepEditing": "המשך לערוך"
     },
     "partRenderer": {
       "updatedFile": "עודכן {{count}} קובץ",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "ספריית תמונות",
       "files": "קבצים",
       "cameraAccessDisabled": "גישת מצלמה מושבתת",
-      "cameraAccessMessage": "אפשר גישת מצלמה בהגדרות כדי לצלם תמונה."
+      "cameraAccessMessage": "אפשר גישת מצלמה בהגדרות כדי לצלם תמונה.",
+      "couldNotOpenPhotoPicker": "לא ניתן היה לפתוח את בורר התמונות. הפעל מחדש את Kilo ונסה שוב.",
+      "maxFilesAllowed": "מותר לצרף עד {{count}} קבצים",
+      "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (מקסימום {{max}})"
     },
     "composer": {
       "addAttachment": "הוסף קובץ מצורף",
@@ -1923,7 +1951,11 @@
     "needsInput": "דורש קלט"
   },
   "voiceInput": {
-    "listening": "מאזין..."
+    "listening": "מאזין...",
+    "allow": "אפשר",
+    "onlineMessage": "מכשיר זה אינו יכול לתמלל במצב לא מקוון. ההקלטה שלך נשלחת אל {{provider}} כדי להפוך אותה לטקסט. Kilo אינו שומר את השמע.",
+    "onlineTitle": "הדיבור מעובד באופן מקוון",
+    "staysOff": "הדיבור נשאר כבוי עד שתאפשר תמלול מקוון."
   },
   "share": {
     "title": "שתף ל-Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "ההפעלה הזו רצה על Kilo CLI שאינו מחובר, ולכן אינה יכולה לקבל הודעות כעת. חבר מחדש את ה-CLI במחשב הזה, או בחר הפעלה אחרת.",
     "cliCantReceiveFilesTitle": "ההפעלה הזו אינה יכולה לקבל קבצים",
     "cliCantReceiveFilesMessage": "ה-Kilo CLI שמפעיל את ההפעלה הזו אינו יכול לקבל קבצים. עדכן את ה-CLI במחשב הזה, או שתף להפעלה חדשה במקום זאת.",
-    "contentlessMessage": "אין מה לשתף — לא נכללו טקסט או קבצים."
+    "contentlessMessage": "אין מה לשתף — לא נכללו טקסט או קבצים.",
+    "couldNotReadContent": "לא ניתן היה לקרוא את התוכן המשותף"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "במכשיר בלבד, או Apple או Google כשהמכשיר הזה אינו יכול לתמלל במצב לא מקוון.",
     "what": "מה",
     "why": "למה",
-    "who": "מי"
+    "who": "מי",
+    "continue": "המשך",
+    "installAttributionPromptMessage": "Kilo משתמש בהרשאת המעקב של Apple רק כדי לדעת איזה ערוץ הביא אותך לכאן. ההנחיות והשיחות שלך לעולם אינן בשימוש.",
+    "installAttributionPromptTitle": "לאפשר ייחוס התקנה?"
   },
   "prReview": {
     "accessDenied": "הגישה נדחתה",
@@ -2561,5 +2597,18 @@
       "retryHint": "מנסה שוב לטעון את מצב Kilo Pass.",
       "setupHint": "פותח את הגדרת Kilo Pass באינטרנט."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "לא ניתן היה לפתוח את החנות.",
+    "emailUs": "שלח לנו דוא״ל",
+    "gladMessage": "ביקורת בחנות תעזור לנו מאוד. תודה על השימוש ב-Kilo!",
+    "gladTitle": "אנחנו שמחים לשמוע את זה!",
+    "iLikeIt": "אהבתי את זה",
+    "needsWork": "דורש שיפור",
+    "noEmailApp": "אין אפליקציית דוא״ל זמינה. תוכל לפנות אלינו בכתובת {{email}}",
+    "promptTitle": "מה דעתך על אפליקציית Kilo?",
+    "rateKilo": "דרג את Kilo",
+    "sorryMessage": "ספר לנו מה צריך להשתפר. המהנדס האחראי על האפליקציה קורא כל דוח!",
+    "sorryTitle": "אנחנו מצטערים לשמוע את זה!"
   }
 }

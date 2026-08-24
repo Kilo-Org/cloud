@@ -28,6 +28,10 @@ function conversationTimestamp(conversation: ConversationListItem): number {
   return conversation.lastActivityAt ?? conversation.joinedAt;
 }
 
+function emptyConversationGroup(): ConversationListItem[] {
+  return [];
+}
+
 export function groupConversationsByActivity(
   conversations: ConversationListItem[],
   nowMs: number
@@ -36,12 +40,12 @@ export function groupConversationsByActivity(
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterdayStart = todayStart - DAY_MS;
   const weekStart = todayStart - 6 * DAY_MS;
-  const groups: Record<ConversationListGroupKey, ConversationListItem[]> = {
-    today: [],
-    yesterday: [],
-    thisWeek: [],
-    older: [],
-  };
+  const groups = {
+    today: emptyConversationGroup(),
+    yesterday: emptyConversationGroup(),
+    thisWeek: emptyConversationGroup(),
+    older: emptyConversationGroup(),
+  } satisfies Record<ConversationListGroupKey, ConversationListItem[]>;
 
   for (const conversation of conversations) {
     const timestamp = conversationTimestamp(conversation);

@@ -18,7 +18,9 @@ export function parseEmails(value: string): string[] {
 }
 
 export function thresholdError(value: string): string | null {
-  return parseThreshold(value) == null ? i18n.t('organization.lowBalanceAlert.thresholdError') : null;
+  return parseThreshold(value) == null
+    ? i18n.t('organization.lowBalanceAlert.thresholdError')
+    : null;
 }
 
 export function emailsError(value: string): string | null {

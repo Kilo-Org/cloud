@@ -63,14 +63,16 @@ describe('PreferencesScreen language controls', () => {
     const renderer = await mountPreferences();
 
     const rows = renderer.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'ConfigureRow'
+      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
     );
     const languageRows = rows.filter(row => row.props.title === 'Language');
     expect(languageRows).toHaveLength(0);
 
     const languageTexts = renderer.root.findAll(
       node =>
-        typeof node.type === 'string' && node.type === 'Text' && node.props.children === 'Language'
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'Language'
     );
     expect(languageTexts).toHaveLength(0);
 

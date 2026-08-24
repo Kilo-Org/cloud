@@ -95,11 +95,11 @@ export function ExpandSeparatorRow({
     ? startLine + DEFAULT_EXPAND_WINDOW - 1
     : Math.min(startLine + DEFAULT_EXPAND_WINDOW - 1, endLine);
   const windowSize = Math.min(gapSize, DEFAULT_EXPAND_WINDOW);
-  const expandText = isUnknownEnd
-    ? isPartial
-      ? t('prReview.hunkRows.expandMoreContext')
-      : t('prReview.hunkRows.expandContext')
-    : isPartial
+  let expandText = isPartial
+    ? t('prReview.hunkRows.expandMoreContext')
+    : t('prReview.hunkRows.expandContext');
+  if (!isUnknownEnd) {
+    expandText = isPartial
       ? t('prReview.hunkRows.expandMoreLines', {
           count: windowSize,
           start: startLine,
@@ -110,6 +110,7 @@ export function ExpandSeparatorRow({
           start: startLine,
           end: windowEnd,
         });
+  }
 
   return (
     <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
@@ -224,19 +225,22 @@ export function PaginationRow({
       </View>
     );
   }
-  const loadedLabel = totalFiles
-    ? loadedFiles === 1
-      ? t('prReview.hunkRows.fileLoadedOfTotal', {
-          count: loadedFiles.toLocaleString(),
-          total: totalFiles.toLocaleString(),
-        })
-      : t('prReview.hunkRows.filesLoadedOfTotal', {
-          count: loadedFiles.toLocaleString(),
-          total: totalFiles.toLocaleString(),
-        })
-    : loadedFiles === 1
+  let loadedLabel =
+    loadedFiles === 1
       ? t('prReview.hunkRows.fileLoaded', { count: loadedFiles.toLocaleString() })
       : t('prReview.hunkRows.filesLoaded', { count: loadedFiles.toLocaleString() });
+  if (totalFiles) {
+    loadedLabel =
+      loadedFiles === 1
+        ? t('prReview.hunkRows.fileLoadedOfTotal', {
+            count: loadedFiles.toLocaleString(),
+            total: totalFiles.toLocaleString(),
+          })
+        : t('prReview.hunkRows.filesLoadedOfTotal', {
+            count: loadedFiles.toLocaleString(),
+            total: totalFiles.toLocaleString(),
+          });
+  }
   return (
     <View className="flex-row items-center justify-center gap-2 py-4">
       <Check size={12} color={colors.mutedForeground} />

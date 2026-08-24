@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
 // Must run before the first view mounts: allowRTL(true) makes the native
 // direction known before any layout pass (see src/i18n/rtl.ts).
+// eslint-disable-next-line import/no-duplicates -- the side effect must run here, before the named import below
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
@@ -60,6 +61,7 @@ import {
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
 import { syncRtl } from '@/i18n/rtl';
+import { readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
   preloadLanguagePreference,
@@ -76,6 +78,7 @@ import {
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
+  renameAndroidNotificationChannels,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
@@ -322,7 +325,7 @@ function RootLayoutNav() {
   // English and then swaps.
   useEffect(() => {
     if (!languageHasLoaded) {
-      return;
+      return undefined;
     }
     let cancelled = false;
 
@@ -335,11 +338,25 @@ function RootLayoutNav() {
           // Reload failed: fall through so the splash still hides.
         }
       }
+      // Reopen the screen the user was on before an RTL reload. Read once,
+      // after the reload path, so the helper's one-shot delete is the only read.
+      let returnTarget: 'login' | 'profile' | null = null;
+      try {
+        returnTarget = await readLanguageReturnTarget();
+      } catch {
+        // Failed read: fall through so the splash still hides.
+      }
+      if (returnTarget === 'login') {
+        router.replace('/(auth)/login');
+      } else if (returnTarget === 'profile') {
+        router.replace('/(app)/(tabs)/(3_profile)');
+      }
       try {
         await i18n.changeLanguage(resolved);
       } catch {
         await i18n.changeLanguage('en');
       }
+      void renameAndroidNotificationChannels();
       if (!cancelled) {
         setLanguageReady(true);
       }
@@ -349,7 +366,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [languageHasLoaded]);
+  }, [languageHasLoaded, router]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
@@ -476,7 +493,7 @@ function RootLayoutNav() {
         },
         fingerprint: ['share-intent-provider-error'],
       });
-      toast.error("Couldn't read the shared content");
+      toast.error(i18n.t('share.couldNotReadContent'));
       resetShareIntentRef.current();
     }
   }, [shareIntentError]);
@@ -516,7 +533,7 @@ function RootLayoutNav() {
         Sentry.captureException(error, {
           tags: { 'error.subsystem': 'share-intent', 'error.operation': 'normalize_payload' },
         });
-        toast.error("Couldn't read the shared content");
+        toast.error(i18n.t('share.couldNotReadContent'));
         resetShareIntentRef.current();
       }
     };

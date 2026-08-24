@@ -222,7 +222,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         setInlineErrorKind('retryable');
       }
     }
-  }, [reply.error]);
+  }, [reply.error, t]);
 
   const submit = async () => {
     const body = bodyRef.current.trim();

@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { Alert, Platform } from 'react-native';
 
+import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -114,9 +115,9 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
     // Mint or browser failure is retryable: keep a working retry action so
     // the user can recover without restarting the whole install flow.
     Alert.alert(
-      'Could not open GitHub',
-      'We could not start the GitHub App setup. Please try again.',
-      [{ text: 'Try again', onPress: () => void retryGitHubInstall(organizationId) }]
+      i18n.t('agents.githubInstall.couldNotOpenTitle'),
+      i18n.t('agents.githubInstall.couldNotOpenMessage'),
+      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }]
     );
   }
 }

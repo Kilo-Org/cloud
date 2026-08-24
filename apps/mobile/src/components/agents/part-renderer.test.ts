@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Renderer routing, patch-summary, and mounted diff-line tests share the direct-invocation harness. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/test/render-with-providers.tsx */
 import {
   type PatchPart,
@@ -16,6 +17,20 @@ import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { PatchToolCardBody } from './tool-cards/patch-tool-card';
 import { ToolPartRenderer } from './tool-part-renderer';
+
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 vi.mock('./child-session-section', () => ({}));
 vi.mock('./compaction-separator', () => ({

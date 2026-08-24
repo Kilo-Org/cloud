@@ -13,6 +13,20 @@ import { ChildSessionMessage, ChildSessionSection } from './child-session-sectio
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',

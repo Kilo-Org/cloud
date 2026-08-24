@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
+import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -48,6 +49,7 @@ type NativeAuthResult = {
   verifyEmailCode: (email: string, code: string) => Promise<boolean>;
   ssoRecovery: SsoRecovery | null;
   clearSsoRecovery: () => void;
+  handleSsoError: (email: string, ssoOrganizationId: string | undefined) => void;
 };
 
 export function useNativeAuth(): NativeAuthResult {
@@ -139,7 +141,7 @@ export function useNativeAuth(): NativeAuthResult {
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
         if (parsed.created === true) {
-          announcingToast.success('Account created. Welcome to Kilo.');
+          announcingToast.success(i18n.t('login.accountCreated'));
         }
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(credential.email ?? '', result.ssoOrganizationId);
@@ -206,7 +208,7 @@ export function useNativeAuth(): NativeAuthResult {
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
         if (parsed.created === true) {
-          announcingToast.success('Account created. Welcome to Kilo.');
+          announcingToast.success(i18n.t('login.accountCreated'));
         }
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
@@ -224,7 +226,7 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
-        toast.error('Please enter your email address.');
+        toast.error(i18n.t('login.pleaseEnterEmail'));
         return false;
       }
 
@@ -304,7 +306,7 @@ export function useNativeAuth(): NativeAuthResult {
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
         if (parsed.created === true) {
-          announcingToast.success('Account created. Welcome to Kilo.');
+          announcingToast.success(i18n.t('login.accountCreated'));
         }
         return true;
       } catch (error) {
@@ -328,5 +330,6 @@ export function useNativeAuth(): NativeAuthResult {
     verifyEmailCode,
     ssoRecovery,
     clearSsoRecovery,
+    handleSsoError,
   };
 }

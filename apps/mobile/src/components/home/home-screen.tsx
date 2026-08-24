@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 import { RefreshControl, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -112,7 +113,7 @@ function renderSessionsOrPromo(params: {
   sessionsLoadedEmpty: boolean;
   activeIsError: boolean;
   handleRetrySessions: () => void;
-  t: ReturnType<typeof useTranslation>['t'];
+  t: TFunction;
 }) {
   // Stale stored history always wins over an error (e.g. a live-poll blip
   // on the active-sessions query) — never blank out sessions we already

@@ -1,4 +1,4 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
 import { type ReactNode, useEffect } from 'react';
@@ -13,6 +13,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
@@ -54,7 +56,7 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
           {isPositive ? '+' : '-'}
-          {formatDollars(Math.abs(amount))}
+          {formatMoney(Math.abs(amount), i18n.language)}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">

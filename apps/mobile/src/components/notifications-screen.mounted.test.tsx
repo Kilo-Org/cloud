@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsScreen } from './notifications-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import '@/i18n';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());

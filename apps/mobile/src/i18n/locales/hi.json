@@ -20,7 +20,8 @@
     "copiedToClipboard": "क्लिपबोर्ड पर कॉपी किया गया",
     "required": "आवश्यक",
     "error": "त्रुटि: {{error}}",
-    "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका"
+    "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका",
+    "notNow": "अभी नहीं"
   },
   "language": {
     "title": "भाषा",
@@ -68,7 +69,9 @@
     "accessDenied": "पहुँच अस्वीकृत कर दी गई।",
     "somethingWentWrong": "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
     "codeSent": "कोड भेजा गया",
-    "signInCodeField": "साइन-इन कोड"
+    "signInCodeField": "साइन-इन कोड",
+    "accountCreated": "खाता बन गया। Kilo में आपका स्वागत है।",
+    "pleaseEnterEmail": "कृपया अपना ईमेल पता दर्ज करें।"
   },
   "profile": {
     "language": "भाषा",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent जारी सुधार प्रयास रोक देगा।",
       "cancelRemediation": "सुधार रद्द करें",
       "cancelTitle": "यह सुधार रद्द करें?",
+      "cancellationRequested": "रद्द करने का अनुरोध किया गया",
+      "cancelled": "सुधार रद्द किया गया",
       "couldNotLoad": "सुधार स्थिति लोड नहीं हो सकी",
       "keepRunning": "चालू रखें",
       "model": "मॉडल",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "कोई बदलाव आवश्यक नहीं",
         "prOpened": "PR खोला गया",
         "queued": "सुधार अनुरोधित"
-      }
+      },
+      "queued": "सुधार कतार में लगाया गया",
+      "retryQueued": "सुधार पुनः प्रयास कतार में लगाया गया",
+      "unavailable": "इस निष्कर्ष के लिए सुधार उपलब्ध नहीं है।"
     },
     "repositories": {
       "allRepositories": "सभी रिपॉज़िटरी",
@@ -1266,7 +1274,11 @@
       "title": "सेटिंग"
     },
     "settingsSave": {
-      "saveChanges": "बदलाव सहेजें"
+      "discard": "छोड़ें",
+      "keepEditing": "संपादन जारी रखें",
+      "saveChanges": "बदलाव सहेजें",
+      "unsavedMessage": "इस स्क्रीन से बाहर जाने से पहले अपने बदलाव सहेजें?",
+      "unsavedTitle": "बिना सहेजे बदलाव"
     },
     "setup": {
       "couldNotOpenGithub": "GitHub नहीं खुल सका। कृपया फिर से कोशिश करें।"
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "{{label}} सुधार समय सीमा दिनों में",
       "title": "SLA नीति"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent सक्षम हो गया, लेकिन प्रारंभिक सिंक कतार में नहीं लग सका। फिर से सिंक करें।",
+    "queuedActionUntracked": "कतार में लगी कार्रवाई अब ट्रैक नहीं की जा सकती। नवीनतम स्थिति देखने के लिए रीफ़्रेश करें।"
   },
   "agents": {
     "activeNow": "अभी सक्रिय",
@@ -1325,7 +1339,12 @@
       "idCopied": "सत्र ID कॉपी हो गया",
       "rename": "नाम बदलें",
       "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें",
-      "untitled": "बिना शीर्षक वाला सत्र"
+      "untitled": "बिना शीर्षक वाला सत्र",
+      "sessionDeleted": "सत्र हटाया गया"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "हम GitHub ऐप सेटअप शुरू नहीं कर सके। कृपया फिर से कोशिश करें।",
+      "couldNotOpenTitle": "GitHub नहीं खुल सका"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} अब उपलब्ध नहीं है। नीचे एक रिपॉज़िटरी चुनें।",
       "prefillModelUnavailable": "{{model}} अब उपलब्ध नहीं है। आपका डिफ़ॉल्ट मॉडल उपयोग हो रहा है।",
       "couldNotReadPendingSessions": "लंबित सत्र पढ़े नहीं जा सके। फिर से कोशिश करें।",
-      "failedToCreate": "सत्र बनाने में विफल"
+      "failedToCreate": "सत्र बनाने में विफल",
+      "couldNotRefreshRepositories": "रिपॉज़िटरी रीफ़्रेश नहीं हो सकीं। कृपया फिर से कोशिश करें।",
+      "discard": "छोड़ें",
+      "discardDraftMessage": "आपका प्रॉम्प्ट खो जाएगा।",
+      "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
+      "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
+      "keepEditing": "संपादन जारी रखें"
     },
     "partRenderer": {
       "updatedFile": "{{count}} फ़ाइल अपडेट की गई",
@@ -1694,7 +1719,10 @@
       "photoLibrary": "फ़ोटो लाइब्रेरी",
       "files": "फ़ाइलें",
       "cameraAccessDisabled": "कैमरा पहुँच अक्षम",
-      "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा पहुँच की अनुमति दें।"
+      "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा पहुँच की अनुमति दें।",
+      "couldNotOpenPhotoPicker": "फ़ोटो पिकर नहीं खुल सका। Kilo को पुनः आरंभ करें और फिर से कोशिश करें।",
+      "maxFilesAllowed": "अधिकतम {{count}} फ़ाइलें अनुमत हैं",
+      "onlyAddingFiles": "केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं ({{total}} में से, अधिकतम {{max}})"
     },
     "composer": {
       "addAttachment": "संलग्नक जोड़ें",
@@ -1923,7 +1951,11 @@
     "needsInput": "इनपुट आवश्यक"
   },
   "voiceInput": {
-    "listening": "सुन रहा है..."
+    "listening": "सुन रहा है...",
+    "allow": "अनुमति दें",
+    "onlineMessage": "यह डिवाइस ऑफ़लाइन ट्रांसक्राइब नहीं कर सकता। आपकी रिकॉर्डिंग को टेक्स्ट में बदलने के लिए {{provider}} को भेजी जाती है। Kilo ऑडियो संग्रहीत नहीं करता।",
+    "onlineTitle": "भाषण ऑनलाइन प्रोसेस होता है",
+    "staysOff": "भाषण तब तक बंद रहता है जब तक आप ऑनलाइन ट्रांसक्रिप्शन की अनुमति नहीं देते।"
   },
   "share": {
     "title": "Kilo पर साझा करें",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "यह सत्र एक Kilo CLI पर चलता है जो कनेक्ट नहीं है, इसलिए यह अभी संदेश प्राप्त नहीं कर सकता। उस मशीन पर CLI फिर से कनेक्ट करें, या कोई दूसरा सत्र चुनें।",
     "cliCantReceiveFilesTitle": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता",
     "cliCantReceiveFilesMessage": "इस सत्र को चलाने वाला Kilo CLI फ़ाइलें प्राप्त नहीं कर सकता। उस मशीन पर CLI अपडेट करें, या इसके बजाय नए सत्र पर साझा करें।",
-    "contentlessMessage": "साझा करने के लिए कुछ नहीं — कोई टेक्स्ट या फ़ाइल शामिल नहीं थी।"
+    "contentlessMessage": "साझा करने के लिए कुछ नहीं — कोई टेक्स्ट या फ़ाइल शामिल नहीं थी।",
+    "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "केवल डिवाइस पर, या Apple या Google जब यह डिवाइस ऑफ़लाइन ट्रांसक्राइब नहीं कर सकता।",
     "what": "क्या",
     "why": "क्यों",
-    "who": "कौन"
+    "who": "कौन",
+    "continue": "जारी रखें",
+    "installAttributionPromptMessage": "Kilo, Apple की ट्रैकिंग अनुमति का उपयोग केवल यह जानने के लिए करता है कि आपको कौन सा चैनल यहाँ लाया। आपके प्रॉम्प्ट और बातचीत का कभी उपयोग नहीं किया जाता।",
+    "installAttributionPromptTitle": "इंस्टॉल एट्रिब्यूशन की अनुमति दें?"
   },
   "prReview": {
     "accessDenied": "पहुँच अस्वीकृत",
@@ -2561,5 +2597,18 @@
       "retryHint": "Kilo Pass स्थिति फिर से आज़माता है।",
       "setupHint": "वेब पर Kilo Pass सेटअप खोलता है।"
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "स्टोर नहीं खुल सका।",
+    "emailUs": "हमें ईमेल करें",
+    "gladMessage": "स्टोर समीक्षा से हमें बहुत मदद मिलेगी। Kilo उपयोग करने के लिए धन्यवाद!",
+    "gladTitle": "यह सुनकर हमें खुशी हुई!",
+    "iLikeIt": "मुझे यह पसंद है",
+    "needsWork": "सुधार की ज़रूरत है",
+    "noEmailApp": "कोई ईमेल ऐप उपलब्ध नहीं है। आप हमसे {{email}} पर संपर्क कर सकते हैं।",
+    "promptTitle": "आपको Kilo ऐप कैसा लग रहा है?",
+    "rateKilo": "Kilo को रेट करें",
+    "sorryMessage": "कृपया हमें बताएँ कि क्या बेहतर होना चाहिए। ऐप का प्रभारी इंजीनियर हर एक रिपोर्ट पढ़ता है!",
+    "sorryTitle": "यह सुनकर हमें खेद है!"
   }
 }

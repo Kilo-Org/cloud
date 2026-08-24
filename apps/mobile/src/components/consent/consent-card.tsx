@@ -75,7 +75,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     return () => {
       active = false;
     };
-  }, [mode, userId]);
+  }, [mode, userId, t]);
 
   const handlePrimaryAction = async () => {
     if (mode === 'review') {
@@ -174,7 +174,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         setError(t('consent.couldNotLoadAccount'));
       }
     },
-    [mode, userId]
+    [mode, userId, t]
   );
 
   return (

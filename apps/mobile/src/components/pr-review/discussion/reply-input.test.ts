@@ -16,6 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { ensureTermsAcceptedOutcome, ReplyInput } from './reply-input';
+import { clearDraft } from '@/lib/persist/drafts';
+import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -27,8 +29,6 @@ vi.mock('react-i18next', async importOriginal => {
     },
   };
 });
-import { clearDraft } from '@/lib/persist/drafts';
-import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 
 type AlertButton = { text?: string; onPress?: () => void };
 type AlertCall = { title: string; message: string; buttons: AlertButton[] };

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,

@@ -7,6 +7,20 @@ import { type RepositorySectionView } from '@/components/agents/new-session-repo
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
 // ── React hooks ────────────────────────────────────────────────────
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -257,9 +271,7 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(true);
-    expect(findTextContent(element, t => t.includes('laptop'))).toBe(true);
-    expect(findTextContent(element, t => t.includes('kilo'))).toBe(true);
+    expect(findTextContent(element, t => t === 'Run on: laptop · kilo')).toBe(true);
   });
 
   // ── Case 5: Disconnected note — three contracts ──

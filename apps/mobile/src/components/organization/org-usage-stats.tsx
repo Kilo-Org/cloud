@@ -1,4 +1,4 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -6,6 +6,8 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatMoney } from '@/lib/format';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 function StatTile({ label, value }: Readonly<{ label: string; value: string }>) {
@@ -62,7 +64,7 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
         <View className="flex-row gap-3">
           <StatTile
             label={t('organization.usageStats.cost')}
-            value={formatDollars(fromMicrodollars(data.totalCost))}
+            value={formatMoney(fromMicrodollars(data.totalCost), i18n.language)}
           />
           <StatTile
             label={t('organization.usageStats.requests')}

@@ -20,7 +20,8 @@
     "copiedToClipboard": "Скопировано в буфер обмена",
     "couldNotCopyToClipboard": "Не удалось скопировать в буфер обмена",
     "required": "обязательно",
-    "error": "ошибка: {{error}}"
+    "error": "ошибка: {{error}}",
+    "notNow": "Не сейчас"
   },
   "language": {
     "title": "Язык",
@@ -68,7 +69,9 @@
     "accessDenied": "В доступе отказано.",
     "somethingWentWrong": "Что-то пошло не так. Попробуйте снова.",
     "codeSent": "Код отправлен",
-    "signInCodeField": "Код входа"
+    "signInCodeField": "Код входа",
+    "accountCreated": "Аккаунт создан. Добро пожаловать в Kilo.",
+    "pleaseEnterEmail": "Пожалуйста, введите адрес электронной почты."
   },
   "profile": {
     "language": "Язык",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent остановит текущую попытку исправления.",
       "cancelRemediation": "Отменить исправление",
       "cancelTitle": "Отменить это исправление?",
+      "cancellationRequested": "Запрошена отмена",
+      "cancelled": "Исправление отменено",
       "couldNotLoad": "Не удалось загрузить статус исправления",
       "keepRunning": "Продолжить выполнение",
       "model": "Модель",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "Изменения не требуются",
         "prOpened": "PR открыт",
         "queued": "Исправление запрошено"
-      }
+      },
+      "queued": "Исправление в очереди",
+      "retryQueued": "Повтор исправления в очереди",
+      "unavailable": "Исправление недоступно для этой находки."
     },
     "repositories": {
       "allRepositories": "Все репозитории",
@@ -1266,7 +1274,11 @@
       "title": "Настройки"
     },
     "settingsSave": {
-      "saveChanges": "Сохранить изменения"
+      "discard": "Отменить",
+      "keepEditing": "Продолжить редактирование",
+      "saveChanges": "Сохранить изменения",
+      "unsavedMessage": "Сохранить изменения перед уходом с этого экрана?",
+      "unsavedTitle": "Несохраненные изменения"
     },
     "setup": {
       "couldNotOpenGithub": "Не удалось открыть GitHub. Попробуйте снова."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "Срок исправления {{label}} в днях",
       "title": "Политика SLA"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent включен, но начальную синхронизацию не удалось поставить в очередь. Синхронизируйте снова.",
+    "queuedActionUntracked": "Действие в очереди больше нельзя отслеживать. Обновите, чтобы увидеть актуальное состояние."
   },
   "agents": {
     "activeNow": "Активен сейчас",
@@ -1325,7 +1339,12 @@
       "copyId": "Копировать идентификатор сеанса",
       "idCopied": "Идентификатор сеанса скопирован",
       "couldNotCopyId": "Не удалось скопировать идентификатор сеанса",
-      "untitled": "Сеанс без названия"
+      "untitled": "Сеанс без названия",
+      "sessionDeleted": "Сеанс удален"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "Не удалось начать настройку GitHub App. Попробуйте снова.",
+      "couldNotOpenTitle": "Не удалось открыть GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} больше недоступен. Выберите репозиторий ниже.",
       "prefillModelUnavailable": "{{model}} больше недоступна. Используется ваша модель по умолчанию.",
       "couldNotReadPendingSessions": "Не удалось прочитать ожидающие сеансы. Попробуйте снова.",
-      "failedToCreate": "Не удалось создать сеанс"
+      "failedToCreate": "Не удалось создать сеанс",
+      "couldNotRefreshRepositories": "Не удалось обновить репозитории. Попробуйте снова.",
+      "discard": "Отменить",
+      "discardDraftMessage": "Ваш запрос будет потерян.",
+      "discardDraftTitle": "Отменить черновик?",
+      "discardFailed": "Не удалось отменить черновик. Попробуйте снова.",
+      "keepEditing": "Продолжить редактирование"
     },
     "partRenderer": {
       "updatedFile": "Обновлен {{count}} файл",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "Библиотека фото",
       "files": "Файлы",
       "cameraAccessDisabled": "Доступ к камере отключен",
-      "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото."
+      "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото.",
+      "couldNotOpenPhotoPicker": "Не удалось открыть выбор фото. Перезапустите Kilo и попробуйте снова.",
+      "maxFilesAllowed": "Максимум {{count}} файлов",
+      "onlyAddingFiles": "Добавляем только {{accepted}} из {{total}} файлов (максимум {{max}})"
     },
     "composer": {
       "addAttachment": "Добавить вложение",
@@ -1923,7 +1951,11 @@
     "needsInput": "ТРЕБУЕТСЯ ВВОД"
   },
   "voiceInput": {
-    "listening": "Слушаю..."
+    "listening": "Слушаю...",
+    "allow": "Разрешить",
+    "onlineMessage": "Это устройство не может транскрибировать офлайн. Ваша запись отправляется в {{provider}}, чтобы преобразовать ее в текст. Kilo не хранит аудио.",
+    "onlineTitle": "Речь обрабатывается онлайн",
+    "staysOff": "Речь остается выключенной, пока вы не разрешите онлайн-транскрипцию."
   },
   "share": {
     "title": "Поделиться в Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "Этот сеанс работает на Kilo CLI, который не подключен, поэтому сейчас он не может получать сообщения. Переподключите CLI на том компьютере или выберите другой сеанс.",
     "cliCantReceiveFilesTitle": "Этот сеанс не может принимать файлы",
     "cliCantReceiveFilesMessage": "Kilo CLI, на котором работает этот сеанс, не может принимать файлы. Обновите CLI на том компьютере или поделитесь в новом сеансе.",
-    "contentlessMessage": "Нечем поделиться — не добавлены текст или файлы."
+    "contentlessMessage": "Нечем поделиться — не добавлены текст или файлы.",
+    "couldNotReadContent": "Не удалось прочитать переданное содержимое"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "Только на устройстве, или Apple или Google, когда это устройство не может транскрибировать офлайн.",
     "what": "Что",
     "why": "Почему",
-    "who": "Кто"
+    "who": "Кто",
+    "continue": "Продолжить",
+    "installAttributionPromptMessage": "Kilo использует разрешение Apple на отслеживание только для того, чтобы узнать, какой канал привел вас сюда. Ваши запросы и разговоры никогда не используются.",
+    "installAttributionPromptTitle": "Разрешить атрибуцию установки?"
   },
   "prReview": {
     "accessDenied": "Доступ запрещен",
@@ -2561,5 +2597,18 @@
       "retryHint": "Повторяет загрузку статуса Kilo Pass.",
       "setupHint": "Открывает настройку Kilo Pass в веб-версии."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "Не удалось открыть магазин.",
+    "emailUs": "Написать нам",
+    "gladMessage": "Отзыв в магазине нам очень поможет. Спасибо, что пользуетесь Kilo!",
+    "gladTitle": "Рады это слышать!",
+    "iLikeIt": "Мне нравится",
+    "needsWork": "Нужно доработать",
+    "noEmailApp": "Нет доступного почтового приложения. Напишите нам на {{email}}",
+    "promptTitle": "Как вам приложение Kilo?",
+    "rateKilo": "Оценить Kilo",
+    "sorryMessage": "Пожалуйста, расскажите, что можно улучшить. Инженер, отвечающий за приложение, читает каждый отчет!",
+    "sorryTitle": "Нам жаль это слышать!"
   }
 }

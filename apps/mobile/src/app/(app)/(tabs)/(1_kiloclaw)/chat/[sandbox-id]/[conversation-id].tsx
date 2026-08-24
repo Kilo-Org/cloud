@@ -53,7 +53,7 @@ export default function ChatConversationRoute() {
       toast.error(t('chat.conversation.notFound'));
       router.replace(redirectPath);
     }
-  }, [redirectPath, routeDecision, router]);
+  }, [redirectPath, routeDecision, router, t]);
 
   if (routeDecision === 'pending') {
     return <ConversationHistoryLoadingView />;

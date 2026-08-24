@@ -32,7 +32,7 @@ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const RTL_LANGUAGES = new Set<string>(['ar', 'he']);
 
 /** Each language's name in its own language, for the picker rows. */
-export const LANGUAGE_ENDONYMS: Record<SupportedLanguage, string> = {
+export const LANGUAGE_ENDONYMS = {
   en: 'English',
   es: 'Español',
   'pt-BR': 'Português (Brasil)',
@@ -53,7 +53,7 @@ export const LANGUAGE_ENDONYMS: Record<SupportedLanguage, string> = {
   'zh-Hant': '繁體中文',
   vi: 'Tiếng Việt',
   id: 'Bahasa Indonesia',
-};
+} satisfies Record<SupportedLanguage, string>;
 
 export function isSupportedLanguage(tag: string): tag is SupportedLanguage {
   return (SUPPORTED_LANGUAGES as readonly string[]).includes(tag);

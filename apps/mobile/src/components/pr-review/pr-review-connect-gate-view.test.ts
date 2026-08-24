@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
+import {
+  type PrReviewGateView,
+  selectPrReviewGateView,
+  type SelectPrReviewGateViewInput,
+} from './pr-review-connect-gate-view';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -15,11 +20,6 @@ vi.mock('react-i18next', async importOriginal => {
     },
   };
 });
-import {
-  type PrReviewGateView,
-  selectPrReviewGateView,
-  type SelectPrReviewGateViewInput,
-} from './pr-review-connect-gate-view';
 
 const base: SelectPrReviewGateViewInput = {
   isError: false,

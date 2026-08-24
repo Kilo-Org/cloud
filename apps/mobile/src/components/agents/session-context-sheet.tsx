@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The context sheet composes the usage ring, token totals, and per-model cost rows. */
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -20,7 +20,8 @@
     "copiedToClipboard": "Đã sao chép vào bảng nhớ tạm",
     "couldNotCopyToClipboard": "Không thể sao chép vào bảng nhớ tạm",
     "required": "bắt buộc",
-    "error": "lỗi: {{error}}"
+    "error": "lỗi: {{error}}",
+    "notNow": "Để sau"
   },
   "language": {
     "title": "Ngôn ngữ",
@@ -68,7 +69,9 @@
     "accessDenied": "Quyền truy cập đã bị từ chối.",
     "somethingWentWrong": "Đã xảy ra lỗi. Vui lòng thử lại.",
     "codeSent": "Đã gửi mã",
-    "signInCodeField": "Mã đăng nhập"
+    "signInCodeField": "Mã đăng nhập",
+    "accountCreated": "Đã tạo tài khoản. Chào mừng đến với Kilo.",
+    "pleaseEnterEmail": "Vui lòng nhập địa chỉ email của bạn."
   },
   "profile": {
     "language": "Ngôn ngữ",
@@ -1185,6 +1188,8 @@
       "cancelMessage": "Security Agent sẽ dừng lần thử khắc phục đang diễn ra.",
       "cancelRemediation": "Hủy khắc phục",
       "cancelTitle": "Hủy khắc phục này?",
+      "cancellationRequested": "Đã yêu cầu hủy",
+      "cancelled": "Đã hủy khắc phục",
       "couldNotLoad": "Không thể tải trạng thái khắc phục",
       "keepRunning": "Tiếp tục chạy",
       "model": "Mô hình",
@@ -1204,7 +1209,10 @@
         "noChangesNeeded": "Không cần thay đổi",
         "prOpened": "PR đã mở",
         "queued": "Đã yêu cầu khắc phục"
-      }
+      },
+      "queued": "Đã xếp hàng khắc phục",
+      "retryQueued": "Đã xếp hàng thử lại khắc phục",
+      "unavailable": "Không thể khắc phục cho phát hiện này."
     },
     "repositories": {
       "allRepositories": "Tất cả kho lưu trữ",
@@ -1266,7 +1274,11 @@
       "title": "Cài đặt"
     },
     "settingsSave": {
-      "saveChanges": "Lưu thay đổi"
+      "discard": "Hủy bỏ",
+      "keepEditing": "Tiếp tục chỉnh sửa",
+      "saveChanges": "Lưu thay đổi",
+      "unsavedMessage": "Lưu thay đổi của bạn trước khi rời màn hình này?",
+      "unsavedTitle": "Thay đổi chưa lưu"
     },
     "setup": {
       "couldNotOpenGithub": "Không thể mở GitHub. Vui lòng thử lại."
@@ -1290,7 +1302,9 @@
       "remediationDeadlineA11y": "Hạn chót khắc phục {{label}} theo ngày",
       "title": "Chính sách SLA"
     },
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "initialSyncAdmissionFailed": "Security Agent đã được bật, nhưng không thể xếp hàng đồng bộ ban đầu. Đồng bộ lại.",
+    "queuedActionUntracked": "Không thể theo dõi một hành động đã xếp hàng nữa. Làm mới để xem trạng thái mới nhất."
   },
   "agents": {
     "activeNow": "Đang hoạt động",
@@ -1325,7 +1339,12 @@
       "copyId": "Sao chép ID phiên",
       "idCopied": "Đã sao chép ID phiên",
       "couldNotCopyId": "Không thể sao chép ID phiên",
-      "untitled": "Phiên không có tiêu đề"
+      "untitled": "Phiên không có tiêu đề",
+      "sessionDeleted": "Đã xóa phiên"
+    },
+    "githubInstall": {
+      "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
+      "couldNotOpenTitle": "Không thể mở GitHub"
     }
   },
   "agentChat": {
@@ -1402,7 +1421,13 @@
       "prefillRepoUnavailable": "{{repo}} không còn khả dụng. Hãy chọn một kho lưu trữ bên dưới.",
       "prefillModelUnavailable": "{{model}} không còn khả dụng. Đang sử dụng mô hình mặc định của bạn.",
       "couldNotReadPendingSessions": "Không thể đọc các phiên đang chờ. Thử lại.",
-      "failedToCreate": "Không thể tạo phiên"
+      "failedToCreate": "Không thể tạo phiên",
+      "couldNotRefreshRepositories": "Không thể làm mới các kho lưu trữ. Vui lòng thử lại.",
+      "discard": "Hủy bỏ",
+      "discardDraftMessage": "Lời nhắc của bạn sẽ bị mất.",
+      "discardDraftTitle": "Hủy bản nháp?",
+      "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
+      "keepEditing": "Tiếp tục chỉnh sửa"
     },
     "partRenderer": {
       "updatedFile": "Đã cập nhật {{count}} tệp",
@@ -1728,7 +1753,10 @@
       "photoLibrary": "Thư viện ảnh",
       "files": "Tệp",
       "cameraAccessDisabled": "Quyền truy cập máy ảnh bị tắt",
-      "cameraAccessMessage": "Cho phép quyền truy cập máy ảnh trong Cài đặt để chụp ảnh."
+      "cameraAccessMessage": "Cho phép quyền truy cập máy ảnh trong Cài đặt để chụp ảnh.",
+      "couldNotOpenPhotoPicker": "Không thể mở trình chọn ảnh. Khởi động lại Kilo và thử lại.",
+      "maxFilesAllowed": "Cho phép tối đa {{count}} tệp",
+      "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
     },
     "composer": {
       "addAttachment": "Thêm tệp đính kèm",
@@ -1923,7 +1951,11 @@
     "needsInput": "CẦN NHẬP LIỆU"
   },
   "voiceInput": {
-    "listening": "Đang nghe..."
+    "listening": "Đang nghe...",
+    "allow": "Cho phép",
+    "onlineMessage": "Thiết bị này không thể chuyển giọng nói thành văn bản ngoại tuyến. Bản ghi âm của bạn được gửi đến {{provider}} để chuyển thành văn bản. Kilo không lưu trữ âm thanh.",
+    "onlineTitle": "Giọng nói được xử lý trực tuyến",
+    "staysOff": "Giọng nói vẫn tắt cho đến khi bạn cho phép chuyển giọng nói thành văn bản trực tuyến."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -1943,7 +1975,8 @@
     "cliNotConnectedMessage": "Phiên này chạy trên Kilo CLI chưa được kết nối, nên hiện không thể nhận tin nhắn. Hãy kết nối lại CLI trên máy đó, hoặc chọn phiên khác.",
     "cliCantReceiveFilesTitle": "Phiên này không thể nhận tệp",
     "cliCantReceiveFilesMessage": "Kilo CLI đang chạy phiên này không thể nhận tệp. Hãy cập nhật CLI trên máy đó, hoặc chia sẻ đến một phiên mới.",
-    "contentlessMessage": "Không có gì để chia sẻ — không có văn bản hoặc tệp nào được đính kèm."
+    "contentlessMessage": "Không có gì để chia sẻ — không có văn bản hoặc tệp nào được đính kèm.",
+    "couldNotReadContent": "Không thể đọc nội dung được chia sẻ"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2056,7 +2089,10 @@
     "voiceTranscriptionWho": "Chỉ trên thiết bị, hoặc Apple hoặc Google khi thiết bị này không thể phiên âm ngoại tuyến.",
     "what": "Cái gì",
     "why": "Tại sao",
-    "who": "Ai"
+    "who": "Ai",
+    "continue": "Tiếp tục",
+    "installAttributionPromptMessage": "Kilo chỉ dùng quyền theo dõi của Apple để biết kênh nào đưa bạn đến đây. Lời nhắc và cuộc trò chuyện của bạn không bao giờ bị sử dụng.",
+    "installAttributionPromptTitle": "Cho phép phân bổ lượt cài đặt?"
   },
   "prReview": {
     "accessDenied": "Truy cập bị từ chối",
@@ -2561,5 +2597,18 @@
       "retryHint": "Thử lại việc tải trạng thái Kilo Pass.",
       "setupHint": "Mở thiết lập Kilo Pass trên web."
     }
+  },
+  "feedback": {
+    "couldNotOpenStore": "Không thể mở cửa hàng.",
+    "emailUs": "Gửi email cho chúng tôi",
+    "gladMessage": "Một đánh giá trên cửa hàng sẽ giúp chúng tôi rất nhiều. Cảm ơn bạn đã dùng Kilo!",
+    "gladTitle": "Chúng tôi rất vui khi nghe điều đó!",
+    "iLikeIt": "Tôi thích",
+    "needsWork": "Cần cải thiện",
+    "noEmailApp": "Không có ứng dụng email khả dụng. Bạn có thể liên hệ chúng tôi qua {{email}}",
+    "promptTitle": "Bạn thấy ứng dụng Kilo thế nào?",
+    "rateKilo": "Đánh giá Kilo",
+    "sorryMessage": "Vui lòng cho chúng tôi biết điều cần cải thiện. Kỹ sư phụ trách ứng dụng đọc từng báo cáo một!",
+    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!"
   }
 }

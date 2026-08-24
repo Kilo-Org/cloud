@@ -240,7 +240,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
         setInlineErrorKind('retryable');
       }
     }
-  }, [lastError]);
+  }, [lastError, t]);
 
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {

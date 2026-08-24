@@ -4,6 +4,7 @@
     "done": "Done",
     "retry": "Retry",
     "tryAgain": "Try again",
+    "notNow": "Not now",
     "language": "Language",
     "device": "Device",
     "share": "Share {{title}}",
@@ -68,6 +69,8 @@
     "accessDenied": "Access was denied.",
     "somethingWentWrong": "Something went wrong. Please try again.",
     "codeSent": "Code sent",
+    "accountCreated": "Account created. Welcome to Kilo.",
+    "pleaseEnterEmail": "Please enter your email address.",
     "signInCodeField": "Sign-in code"
   },
   "profile": {
@@ -1492,6 +1495,8 @@
       "disabledPrompt": "Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation."
     },
     "remediation": {
+      "cancellationRequested": "Cancellation requested",
+      "cancelled": "Remediation cancelled",
       "pullRequest": "pull request",
       "couldNotLoad": "Could not load remediation status",
       "noAnalysisTitle": "No analysis yet",
@@ -1510,6 +1515,8 @@
       "startedBy": "Started by",
       "model": "Model",
       "branch": "Branch",
+      "queued": "Remediation queued",
+      "retryQueued": "Remediation retry queued",
       "timeline": {
         "queued": "Remediation requested",
         "prOpened": "PR opened",
@@ -1517,7 +1524,8 @@
         "blocked": "Remediation blocked",
         "noChangesNeeded": "No changes needed",
         "cancelled": "Cancelled"
-      }
+      },
+      "unavailable": "Remediation is unavailable for this finding."
     },
     "analysisSettings": {
       "title": "Models & analysis",
@@ -1598,7 +1606,11 @@
       "couldNotOpenGithub": "Could not open GitHub. Please try again."
     },
     "settingsSave": {
-      "saveChanges": "Save changes"
+      "discard": "Discard",
+      "keepEditing": "Keep Editing",
+      "saveChanges": "Save changes",
+      "unsavedTitle": "Unsaved changes",
+      "unsavedMessage": "Save your changes before leaving this screen?"
     },
     "auditReportButton": {
       "viewA11y": "View audit report"
@@ -1662,6 +1674,8 @@
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
+    "queuedActionUntracked": "A queued action could no longer be tracked. Refresh to see the latest state.",
+    "initialSyncAdmissionFailed": "Security Agent was enabled, but the initial sync could not be queued. Sync again.",
     "title": "Security Agent"
   },
   "agents": {
@@ -1697,7 +1711,12 @@
       "copyId": "Copy session ID",
       "idCopied": "Session ID copied",
       "couldNotCopyId": "Could not copy session ID",
-      "untitled": "Untitled session"
+      "untitled": "Untitled session",
+      "sessionDeleted": "Session deleted"
+    },
+    "githubInstall": {
+      "couldNotOpenTitle": "Could not open GitHub",
+      "couldNotOpenMessage": "We could not start the GitHub App setup. Please try again."
     }
   },
   "agentChat": {
@@ -1774,7 +1793,13 @@
       "prefillRepoUnavailable": "{{repo}} is no longer available. Pick a repository below.",
       "prefillModelUnavailable": "{{model}} is no longer available. Using your default model.",
       "couldNotReadPendingSessions": "Could not read pending sessions. Try again.",
-      "failedToCreate": "Failed to create session"
+      "failedToCreate": "Failed to create session",
+      "couldNotRefreshRepositories": "Could not refresh repositories. Please try again.",
+      "discardDraftTitle": "Discard draft?",
+      "discardDraftMessage": "Your prompt will be lost.",
+      "keepEditing": "Keep editing",
+      "discard": "Discard",
+      "discardFailed": "Could not discard the draft. Please try again."
     },
     "partRenderer": {
       "updatedFile": "Updated {{count}} file",
@@ -2100,7 +2125,10 @@
       "photoLibrary": "Photo Library",
       "files": "Files",
       "cameraAccessDisabled": "Camera Access Disabled",
-      "cameraAccessMessage": "Allow camera access in Settings to take a photo."
+      "cameraAccessMessage": "Allow camera access in Settings to take a photo.",
+      "couldNotOpenPhotoPicker": "Could not open the photo picker. Restart Kilo and try again.",
+      "maxFilesAllowed": "Maximum {{count}} files allowed",
+      "onlyAddingFiles": "Only adding {{accepted}} of {{total}} files (max {{max}})"
     },
     "composer": {
       "addAttachment": "Add attachment",
@@ -2295,7 +2323,11 @@
     "needsInput": "NEEDS INPUT"
   },
   "voiceInput": {
-    "listening": "Listening..."
+    "listening": "Listening...",
+    "staysOff": "Speech stays off until you allow online transcription.",
+    "onlineTitle": "Speech is processed online",
+    "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
+    "allow": "Allow"
   },
   "share": {
     "title": "Share to Kilo",
@@ -2315,7 +2347,8 @@
     "cliNotConnectedMessage": "This session runs on a Kilo CLI that isn't connected, so it can't receive messages right now. Reconnect the CLI on that machine, or pick another session.",
     "cliCantReceiveFilesTitle": "This session can't receive files",
     "cliCantReceiveFilesMessage": "The Kilo CLI running this session can't receive files. Update the CLI on that machine, or share to a new session instead.",
-    "contentlessMessage": "Nothing to share — no text or files were included."
+    "contentlessMessage": "Nothing to share — no text or files were included.",
+    "couldNotReadContent": "Couldn't read the shared content"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2426,9 +2459,25 @@
     "voiceTranscriptionWhat": "Your recording while you dictate.",
     "voiceTranscriptionWhy": "To turn speech into text.",
     "voiceTranscriptionWho": "On-device only, or Apple or Google when this device cannot transcribe offline.",
+    "installAttributionPromptTitle": "Allow install attribution?",
+    "installAttributionPromptMessage": "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
+    "continue": "Continue",
     "what": "What",
     "why": "Why",
     "who": "Who"
+  },
+  "feedback": {
+    "noEmailApp": "No email app available. You can reach us at {{email}}",
+    "couldNotOpenStore": "Could not open the store.",
+    "promptTitle": "How are you liking the Kilo app?",
+    "iLikeIt": "I like it",
+    "gladTitle": "We're glad to hear that!",
+    "gladMessage": "A store review would help us out immensely. Thanks for using Kilo!",
+    "rateKilo": "Rate Kilo",
+    "needsWork": "Needs work",
+    "sorryTitle": "We're sorry to hear that!",
+    "sorryMessage": "Please let us know what needs to be better. The engineer in charge of the app reads every single report!",
+    "emailUs": "Email us"
   },
   "organization": {
     "boundary": {

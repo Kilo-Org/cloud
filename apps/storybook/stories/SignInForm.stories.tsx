@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import { SignInForm } from '@/components/auth/SignInForm';
+import { orderNewAccountProviders } from '@/lib/auth/sign-in-methods';
+import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+
+// Mirrors discovery for an eligible unknown email, including Google-first presentation.
+const eligibleNewAccountProviders = orderNewAccountProviders(ProdNonSSOAuthProviders);
 
 const meta: Meta<typeof SignInForm> = {
   title: 'Auth/SignInForm',
@@ -12,8 +17,8 @@ const meta: Meta<typeof SignInForm> = {
     isSignUp: false,
     error: undefined,
     allowFakeLogin: false,
-    title: undefined,
-    subtitle: undefined,
+    title: 'Welcome.',
+    subtitle: 'Sign in or create an account to get started',
   },
 };
 
@@ -82,10 +87,27 @@ export const DiscoveryLoading: Story = {
 export const LandingNewUserSignUp: Story = {
   args: {
     isSignUp: true,
+    title: 'Create your account',
+    subtitle: 'Sign up to get started',
     storybookInitialState: {
       flowState: 'landing',
       tier: 'new',
       email: '',
+    },
+  },
+};
+
+export const LandingEnterpriseSSO: Story = {
+  args: {
+    ssoMode: true,
+    emailOnly: true,
+    title: 'Enterprise SSO',
+    subtitle: "Enter your work email address to sign in with your organization's Single Sign-On",
+    storybookInitialState: {
+      flowState: 'landing',
+      tier: 'new',
+      email: '',
+      showEmailInput: true,
     },
   },
 };
@@ -207,7 +229,7 @@ export const ProviderSelectNewUser: Story = {
     storybookInitialState: {
       flowState: 'provider-select',
       email: 'newuser@example.com',
-      availableProviders: ['google', 'github', 'gitlab', 'linkedin', 'email'],
+      availableProviders: eligibleNewAccountProviders,
       isNewUser: true,
     },
   },
@@ -229,20 +251,18 @@ export const UnknownEmailAccountCreation: Story = {
     storybookInitialState: {
       flowState: 'provider-select',
       email: 'new.user@example.com',
-      availableProviders: ['google', 'anaconda', 'github', 'email'],
+      availableProviders: eligibleNewAccountProviders,
       isNewUser: true,
     },
   },
 };
 
-export const ProviderSelectNewUserWithPreferredProvider: Story = {
+export const ProviderSelectNewUserGoogleFirst: Story = {
   args: {
     storybookInitialState: {
       flowState: 'provider-select',
-      tier: 'returning', // This simulates having a hint, so preferred provider is first
       email: 'user@example.com',
-      // Providers would be sorted with preferred (e.g., 'github') first
-      availableProviders: ['github', 'google', 'gitlab', 'linkedin', 'email'],
+      availableProviders: eligibleNewAccountProviders,
       isNewUser: true,
     },
   },

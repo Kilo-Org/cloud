@@ -62,18 +62,21 @@ const { SignInForm } = require('./SignInForm') as {
   SignInForm: (props: {
     isSignUp?: boolean;
     ssoMode?: boolean;
+    title?: string;
     searchParams: Record<string, string>;
   }) => ReactElement;
 };
 
 describe('SignInForm Enterprise SSO navigation', () => {
-  it('renders one install action for initial email-first sign-in', () => {
+  it('renders the neutral normal sign-in title with one install action', () => {
     const html = renderToStaticMarkup(
       createElement(SignInForm, {
         searchParams: {},
+        title: 'Welcome.',
       })
     );
 
+    expect(html).toContain('Welcome.');
     expect(html.match(/Install Kilo Code/g)).toHaveLength(1);
     expect(html).toContain('Enterprise SSO');
   });

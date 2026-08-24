@@ -1,4 +1,5 @@
 import { orderNewAccountProviders, resolveSignInMethods } from './sign-in-methods';
+import { ProdNonSSOAuthProviders } from './provider-metadata';
 
 describe('resolveSignInMethods', () => {
   it('filters unsupported and duplicate providers, promoting Google first', () => {
@@ -32,11 +33,10 @@ describe('resolveSignInMethods', () => {
     });
   });
 
-  it('orders server-authorized account-creation choices with Google first', () => {
-    expect(orderNewAccountProviders(['github', 'email', 'google'])).toEqual([
-      'google',
-      'github',
-      'email',
-    ]);
+  it('resolves every production new-account method with Google first', () => {
+    const providers = orderNewAccountProviders(ProdNonSSOAuthProviders);
+
+    expect(providers[0]).toBe('google');
+    expect(new Set(providers)).toEqual(new Set(ProdNonSSOAuthProviders));
   });
 });

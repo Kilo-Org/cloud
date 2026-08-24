@@ -3,7 +3,6 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 import { confirmRemoteSessionExit } from './remote-session-exit-confirmation';
 
-
 /**
  * Classifier literals copied from `exit-remote-session-with-feedback.ts`. They
  * must stay in sync with that file (which pins them to the SDK source). The

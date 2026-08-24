@@ -300,9 +300,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
 
-    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(
-      false
-    );
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(false);
   });
 
   it('renders the disconnected note even when showRunOnSelector is true', async () => {

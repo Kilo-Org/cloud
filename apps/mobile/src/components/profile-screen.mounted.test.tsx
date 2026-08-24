@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import '@/i18n';
-import { ProfileScreen } from './profile-screen';
 import { type DeleteAccountPhase, useDeleteAccount } from './use-delete-account';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────

@@ -302,6 +302,16 @@
       "rules": {
         "promise/prefer-await-to-callbacks": "off"
       }
+    },
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__tests__/**"
+      ],
+      "rules": {
+        "no-literal-copy/no-literal-copy": "off"
+      }
     }
   ]
 }

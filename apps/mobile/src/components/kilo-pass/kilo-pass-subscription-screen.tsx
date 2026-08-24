@@ -22,10 +22,7 @@ import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import {
-  KILO_PASS_TITLE,
-  type PurchasePresentationKind,
-} from '@kilocode/app-shared/commerce';
+import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-shared/commerce';
 import { KiloPassNativeIapOwner, useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
 import { RestorePurchasesButton } from './restore-purchases-button';
 

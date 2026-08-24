@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 /* eslint-disable max-lines -- the apply and back-handler suites share one mock harness in this file */
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { toast } from 'sonner-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,12 +36,11 @@ const flatListMock = vi.hoisted(
       ListHeaderComponent?: unknown;
       ListEmptyComponent?: unknown;
     }) => {
-      const { createElement: create, Fragment } = require('react');
       const rows = data.map((item, index) =>
-        create(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
+        createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
       );
       const empty = data.length === 0 ? ListEmptyComponent : null;
-      return create('FlatList', null, ListHeaderComponent, ...rows, empty);
+      return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
     }
 );
 vi.mock('react-native', () => ({

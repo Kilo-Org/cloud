@@ -1,3 +1,5 @@
+import { numberFormat } from '@/lib/intl-cache';
+
 /**
  * Mobile money/date formatters. Unlike the shared `formatDollars`/`formatCents`
  * helpers (which pin `en-US`), these take an explicit locale so the active
@@ -5,7 +7,7 @@
  */
 
 export function formatMoney(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
@@ -19,7 +21,7 @@ export function formatMoney(amount: number, locale: string): string {
  * always pins two.
  */
 export function formatCurrency(amount: number, locale: string, fractionDigits: number): string {
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: fractionDigits,
@@ -31,7 +33,7 @@ export function formatCurrency(amount: number, locale: string, fractionDigits: n
 export const CURRENCY_ZERO_THRESHOLD = 50 / 1_000_000;
 
 export function formatMoneyFromCents(amount: number, locale: string, currency = 'USD'): string {
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency: currency.toUpperCase(),
   }).format(amount / 100);

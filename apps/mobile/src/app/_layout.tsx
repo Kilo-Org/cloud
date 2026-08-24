@@ -62,10 +62,7 @@ import {
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
 import { syncRtl } from '@/i18n/rtl';
-import {
-  type LanguageReturnTarget,
-  readLanguageReturnTarget,
-} from '@/i18n/return-target';
+import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
   preloadLanguagePreference,

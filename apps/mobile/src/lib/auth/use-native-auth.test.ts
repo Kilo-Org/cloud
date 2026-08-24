@@ -105,7 +105,7 @@ vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
 
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const { AUTH_ERROR_KEYS, defaultErrorMessage, mapError, retryableAdmissionError } =
+const { defaultErrorMessage, mapError, retryableAdmissionError } =
   await import('@/lib/auth/auth-error-messages');
 
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');

@@ -1,4 +1,6 @@
 'use client';
+
+import React from 'react';
 import { BlockedNotification } from '@/components/auth/BlockedNotification';
 
 export function AuthErrorNotification({ error }: { error: string }) {
@@ -6,7 +8,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'DIFFERENT-OAUTH')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Error">
           An account already exists with this email. Did you use a different login method?
         </ErrorNotificationBox>
@@ -15,7 +17,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'ACCOUNT-ALREADY-LINKED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Already Linked">
           This account is already linked to another user. Please use a different account or contact
           support if you believe this is an error.
@@ -25,7 +27,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'PROVIDER-ALREADY-LINKED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Provider Already Linked">
           You already have this type of account linked. Please unlink the existing account first.
         </ErrorNotificationBox>
@@ -34,7 +36,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'LINKING-FAILED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Linking Failed">
           Account linking failed. Please try again or contact support if the problem persists.
         </ErrorNotificationBox>
@@ -43,7 +45,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'SIGNUP-RATE-LIMITED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Signup Blocked">
           Automated account creation was detected and blocked. If this was a mistake, please{' '}
           <a href="https://kilo.ai/support" className="underline hover:text-red-100">
@@ -56,7 +58,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'EMAIL-ALREADY-USED')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Already Exists">
           An account already exists for this email address. Try signing in with the original login
           method, or{' '}
@@ -70,7 +72,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'EMAIL-MUST-BE-LOWERCASE')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Invalid Email">
           Email address must be lowercase for new account signup.
         </ErrorNotificationBox>
@@ -79,7 +81,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
 
   if (error === 'EMAIL-CANNOT-CONTAIN-PLUS')
     return (
-      <div data-error-notification>
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Invalid Email">
           Email address cannot contain a + character for new account signup.
         </ErrorNotificationBox>
@@ -87,7 +89,7 @@ export function AuthErrorNotification({ error }: { error: string }) {
     );
 
   return (
-    <div data-error-notification>
+    <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
       <ErrorNotificationBox title="Error">
         Oops! Something went wrong trying to log in.
       </ErrorNotificationBox>

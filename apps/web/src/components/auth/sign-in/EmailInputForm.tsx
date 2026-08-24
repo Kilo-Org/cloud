@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 
 type EmailInputFormProps = {
   email: string;
@@ -12,6 +13,7 @@ type EmailInputFormProps = {
   placeholder?: string;
   autoFocus?: boolean;
   disabled?: boolean;
+  isLoading?: boolean;
 };
 
 /**
@@ -27,32 +29,51 @@ export function EmailInputForm({
   placeholder = 'you@example.com',
   autoFocus = false,
   disabled = false,
+  isLoading = false,
 }: EmailInputFormProps) {
+  const [hasBlurred, setHasBlurred] = useState(false);
+  const validationError =
+    hasBlurred && email && !emailValidation.isValid ? emailValidation.error : null;
+  const visibleError = validationError ?? error;
+  const errorId = 'sign-in-email-error';
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-md space-y-6">
       <div className="space-y-2">
+        <label
+          htmlFor="sign-in-email"
+          className="text-foreground block text-left text-sm font-medium"
+        >
+          Email address
+        </label>
         <Input
+          id="sign-in-email"
+          name="email"
           type="email"
           placeholder={placeholder}
           value={email}
           onChange={e => onEmailChange(e.target.value)}
-          className={error || (email && !emailValidation.isValid) ? 'border-destructive' : ''}
+          onBlur={() => setHasBlurred(true)}
+          autoComplete="email"
+          aria-invalid={Boolean(visibleError)}
+          aria-describedby={visibleError ? errorId : undefined}
+          className={visibleError ? 'border-destructive' : ''}
           autoFocus={autoFocus}
         />
-        {email && !emailValidation.isValid && emailValidation.error && (
-          <p className="text-sm text-red-400">{emailValidation.error}</p>
+        {visibleError && (
+          <p id={errorId} role="alert" className="text-left text-sm text-red-400">
+            {visibleError}
+          </p>
         )}
-        {error && !email && <p className="text-sm text-red-400">{error}</p>}
       </div>
 
       <Button
         type="submit"
         variant="primary"
         size="lg"
-        className="w-full"
-        disabled={disabled || !email.trim() || !emailValidation.isValid}
+        className="min-h-11 w-full"
+        disabled={disabled || isLoading || !email.trim() || !emailValidation.isValid}
       >
-        Continue
+        {isLoading ? 'Finding sign-in methods...' : 'Continue'}
       </Button>
     </form>
   );

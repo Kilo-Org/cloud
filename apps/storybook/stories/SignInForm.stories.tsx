@@ -34,6 +34,8 @@ export const LandingNewUser: Story = {
   },
 };
 
+export const InitialSignInEmailOnly: Story = LandingNewUser;
+
 export const LandingNewUserEmailInput: Story = {
   args: {
     storybookInitialState: {
@@ -52,6 +54,27 @@ export const LandingNewUserEmailInputWithValue: Story = {
       tier: 'new',
       email: 'newuser@example.com',
       showEmailInput: true,
+    },
+  },
+};
+
+export const InvalidEmail: Story = {
+  args: {
+    storybookInitialState: {
+      flowState: 'landing',
+      tier: 'new',
+      email: 'not-an-email',
+    },
+  },
+};
+
+export const DiscoveryLoading: Story = {
+  args: {
+    storybookInitialState: {
+      flowState: 'landing',
+      tier: 'new',
+      email: 'user@example.com',
+      showTurnstile: true,
     },
   },
 };
@@ -185,6 +208,28 @@ export const ProviderSelectNewUser: Story = {
       flowState: 'provider-select',
       email: 'newuser@example.com',
       availableProviders: ['google', 'github', 'gitlab', 'linkedin', 'email'],
+      isNewUser: true,
+    },
+  },
+};
+
+export const ProviderSelectExistingGoogleFirst: Story = {
+  args: {
+    storybookInitialState: {
+      flowState: 'provider-select',
+      email: 'user@example.com',
+      availableProviders: ['google', 'github', 'email'],
+      isNewUser: false,
+    },
+  },
+};
+
+export const UnknownEmailAccountCreation: Story = {
+  args: {
+    storybookInitialState: {
+      flowState: 'provider-select',
+      email: 'new.user@example.com',
+      availableProviders: ['google', 'anaconda', 'github', 'email'],
       isNewUser: true,
     },
   },
@@ -334,6 +379,19 @@ export const Redirecting: Story = {
   args: {
     storybookInitialState: {
       flowState: 'redirecting',
+    },
+  },
+};
+
+export const RedirectingSingleProvider: Story = Redirecting;
+
+export const NoSupportedMethod: Story = {
+  args: {
+    error: 'No supported sign-in method is available for this account. Use a different email.',
+    storybookInitialState: {
+      flowState: 'landing',
+      tier: 'new',
+      email: 'long.email.address.for.mobile.layout@example.com',
     },
   },
 };

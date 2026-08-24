@@ -262,6 +262,8 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
     case 'MODEL_MISSING':
       return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
     case 'WRAPPER_CLEANUP_EXHAUSTED':
+    case 'COMPUTE_STOPPING':
+    case 'BILLING_UNAVAILABLE':
     case 'SANDBOX_CAPABILITY_UNAVAILABLE':
     case 'WRAPPER_FINALIZING':
     case 'INTERNAL':

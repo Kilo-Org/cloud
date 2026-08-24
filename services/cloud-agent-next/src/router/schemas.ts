@@ -955,6 +955,26 @@ export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
 
+/** Customer-safe, no-wake compute billing status for an existing session. */
+export const GetComputeBillingStatusOutput = z.object({
+  payer: z.object({ type: z.enum(['user', 'org']), id: z.string() }),
+  attribution: z.enum(['payer_shared', 'session']),
+  phase: z.enum(['idle', 'active', 'stopping', 'settling', 'unavailable']),
+  estimatedHourlyRateMicrodollars: z.number().int().nonnegative().nullable(),
+  estimatedIntervalAmountMicrodollars: z.number().int().nonnegative().nullable(),
+  billingMode: z.enum(['shadow', 'paid']).nullable(),
+  interval: z
+    .object({
+      id: z.string(),
+      startedAt: z.string().datetime(),
+      lastSeenAt: z.string().datetime(),
+      stoppedAt: z.string().datetime().nullable(),
+      confirmedSeconds: z.number().int().nonnegative(),
+      settledBillableSeconds: z.number().int().nonnegative(),
+    })
+    .nullable(),
+});
+
 export const SandboxStatusSchema = z
   .enum(['healthy', 'destroyed', 'unreachable', 'unknown'])
   .describe('Sandbox reachability status for the session container');

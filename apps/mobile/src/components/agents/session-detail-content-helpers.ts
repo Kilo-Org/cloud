@@ -1,6 +1,11 @@
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type MessageDeliveryState,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 
-import { firstHumanText } from './part-types';
+import { getTaskToolSessionId } from './child-session-card-state';
+import { firstHumanText, isToolPart } from './part-types';
 
 /**
  * Counts pending messages that are still in flight. A terminal delivery
@@ -38,6 +43,18 @@ export async function retryMessageAndClear(
 }
 
 /**
+ * Runs the Connect repository action: opens the GitHub integration setup and
+ * clears the terminal guidance so Continue becomes available again.
+ */
+export function runConnectRepository(
+  openGitHubIntegration: () => void,
+  clearGuidance: () => void
+): void {
+  openGitHubIntegration();
+  clearGuidance();
+}
+
+/**
  * Resolves the retry prompt for a failed row. A user delivery failure re-sends
  * the row's own first human-authored text part; an assistant failure re-sends
  * the newest preceding user row's. Returns null when there is no human text
@@ -60,4 +77,50 @@ export function resolveRetryPrompt(
     }
   }
   return null;
+}
+
+/**
+ * Collects child session ids that appear in task tool parts but have no
+ * hydrated messages yet. Ids are deduplicated and returned in first-seen
+ * order; a child that already has messages is skipped.
+ */
+export function collectEmptyChildSessionIds(
+  messages: readonly StoredMessage[],
+  getChildMessages: (childSessionId: KiloSessionId) => readonly StoredMessage[]
+): KiloSessionId[] {
+  const seen = new Set<KiloSessionId>();
+  const emptyIds: KiloSessionId[] = [];
+  for (const message of messages) {
+    for (const part of message.parts) {
+      const childSessionId = isToolPart(part) ? getTaskToolSessionId(part) : undefined;
+      if (childSessionId !== undefined && !seen.has(childSessionId)) {
+        seen.add(childSessionId);
+        if (getChildMessages(childSessionId).length === 0) {
+          emptyIds.push(childSessionId);
+        }
+      }
+    }
+  }
+  return emptyIds;
+}
+
+/**
+ * Hydrates each empty child session once, retrying an id exactly once when
+ * its first hydration reports an error status. `hydrate` never rejects on a
+ * fetch failure (it writes an error status), so the retry reads the status
+ * rather than catching a rejection.
+ */
+export async function hydrateEmptyChildSessions(
+  ids: readonly KiloSessionId[],
+  hydrate: (id: KiloSessionId) => Promise<void>,
+  readHydrationStatus: (id: KiloSessionId) => string
+): Promise<void> {
+  await Promise.all(
+    ids.map(async id => {
+      await hydrate(id);
+      if (readHydrationStatus(id) === 'error') {
+        await hydrate(id);
+      }
+    })
+  );
 }

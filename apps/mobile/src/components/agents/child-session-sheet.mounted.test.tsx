@@ -1,7 +1,7 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/selectable-text.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type ChildSessionHydrationState,
@@ -15,17 +15,27 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { ChildSessionSheet } from './child-session-sheet';
 import { ChildSessionModelLabel } from './child-session-model-label';
 
+const reactNativeMock = vi.hoisted(() => ({
+  Platform: { OS: 'ios' as string },
+  useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
+}));
+const safeAreaMock = vi.hoisted(() => ({
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
+}));
+
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   View: 'View',
   Pressable: 'Pressable',
+  Platform: reactNativeMock.Platform,
+  useWindowDimensions: reactNativeMock.useWindowDimensions,
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
   LinearTransition: { duration: () => ({}) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
 // The real `@/components/ui/text` loads `@rn-primitives/slot`, whose node_modules
 // `.mjs` contains JSX that this pipeline cannot transform. Provide a real context
@@ -161,6 +171,28 @@ async function renderSheet(props: ComponentProps<typeof ChildSessionSheet>) {
   return renderer;
 }
 
+function findByTestID(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => node.props.testID === testID);
+}
+
+function modal(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const found = root.findAll(node => (node.type as string) === 'Modal');
+  const node = found[0];
+  if (!node) {
+    throw new Error('Modal not found');
+  }
+  return node;
+}
+
+beforeEach(() => {
+  reactNativeMock.Platform.OS = 'ios';
+  reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
+  safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+});
+
 describe('ChildSessionSheet mounted', () => {
   it('renders the model row when child messages carry model data', async () => {
     const messages = [makeAssistantMessage()];
@@ -203,5 +235,77 @@ describe('ChildSessionSheet mounted', () => {
     expect(renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
     const errors = renderer.root.findAll(node => (node.type as string) === 'QueryError');
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('ChildSessionSheet sheet surface', () => {
+  it('renders the native pageSheet Modal on iOS and preserves onDismiss', async () => {
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      onClose,
+      onDismiss,
+    });
+
+    const modalNode = modal(renderer.root);
+    expect(modalNode.props.animationType).toBe('slide');
+    expect(modalNode.props.presentationStyle).toBe('pageSheet');
+    expect(modalNode.props.transparent).toBeUndefined();
+    expect(modalNode.props.onRequestClose).toBe(onClose);
+    expect(modalNode.props.onDismiss).toBe(onDismiss);
+
+    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+  });
+
+  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34, left: 0, right: 0 });
+
+    const renderer = await renderSheet(
+      buildProps({ getChildMessages: () => [], hydrationState: readyState })
+    );
+
+    const modalNode = modal(renderer.root);
+    expect(modalNode.props.transparent).toBeUndefined();
+
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    // flex-1 fills the window; the padding clears the system status bar.
+    expect(surface[0]?.props.className).toContain('flex-1');
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
+  });
+
+  it('closes when Android Back fires onRequestClose', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const onClose = vi.fn<() => void>();
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      onClose,
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      (modal(renderer.root).props.onRequestClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes when Done is pressed', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      onClose,
+    });
+
+    const header = renderer.root.findAll(node => (node.type as string) === 'SheetHeader')[0];
+    if (!header) {
+      throw new Error('SheetHeader not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (header.props.onDone as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

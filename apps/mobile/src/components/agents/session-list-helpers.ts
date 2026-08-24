@@ -1,5 +1,6 @@
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { platformLabel } from '@/lib/platform-label';
@@ -286,6 +287,15 @@ export function remoteSessionEyebrowLabel(session: {
 }): string {
   const repo = repoNameFromGitUrl(session.gitUrl);
   return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
+}
+
+/**
+ * Whether the Active now row's long-press menu may offer Exit session.
+ * Cloud-agent rows carry the sentinel `connectionId` and have no CLI
+ * connection to receive `exit_cli`; only real CLI rows can be exited.
+ */
+export function canExitSessionFromList(session: { connectionId: string }): boolean {
+  return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
 }
 
 const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;

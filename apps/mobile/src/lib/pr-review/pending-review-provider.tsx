@@ -60,6 +60,8 @@ function keepValidPendingReviewItems(restored: unknown[]): PendingReviewItem[] {
   if (valid.length !== restored.length) {
     Sentry.captureException(new Error('stored pending review dropped invalid items'), {
       level: 'warning',
+      tags: { 'error.subsystem': 'pending-review', 'error.operation': 'hydrate' },
+      fingerprint: ['pending-review-invalid-items'],
       extra: { dropped: restored.length - valid.length, kept: valid.length },
     });
   }

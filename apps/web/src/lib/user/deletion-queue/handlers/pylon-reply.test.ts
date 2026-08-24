@@ -7,7 +7,7 @@ import {
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { USER_DELETION_PYLON_REPLY_TEXT } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_PYLON_REPLY_HTML } from '@/lib/user/deletion-queue/deletion-constants';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handlePylonReply } from '@/lib/user/deletion-queue/handlers/pylon-reply';
@@ -15,7 +15,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const ISSUE_ID = 'iss-case';
 const TARGET_EMAIL = 'user@example.com';
-const REPLY_HTML = `<p>${USER_DELETION_PYLON_REPLY_TEXT}</p>`;
+const REPLY_HTML = USER_DELETION_PYLON_REPLY_HTML;
 const AUTHOR_USER_ID = 'pylon-bot';
 
 describe('handlePylonReply', () => {
@@ -65,12 +65,43 @@ describe('handlePylonReply', () => {
     expect(outcome.kind).toBe('succeeded');
   });
 
-  it('posts the deletion reply, persists its id, and closes the issue', async () => {
+  it('is not applicable when the request has no ticket', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    const outcome = await handlePylonReply({
+      request: { ...request, pylon_ticket_ref: null },
+      step,
+      context,
+    });
+    expect(outcome).toEqual({ kind: 'not_applicable' });
+  });
+
+  it('posts the unwrapped confirmation HTML to the latest public customer message and always sends to_emails', async () => {
     const { request, step, context } = await setupReplyRequest();
     const fetchSpy = mockPylon({
       requesterEmail: TARGET_EMAIL,
       state: 'open',
-      messages: [customerMessage()],
+      messages: [
+        {
+          ...customerMessage(),
+          id: 'msg-older',
+          thread_id: 'thread-old',
+        },
+        {
+          id: 'msg-private',
+          is_private: true,
+          thread_id: 'thread-private',
+          timestamp: '2026-08-18T01:00:00.000Z',
+          message_html: '<p>internal</p>',
+          author: { contact: { email: TARGET_EMAIL } },
+          email_info: { from_email: TARGET_EMAIL },
+        },
+        {
+          ...customerMessage(),
+          id: 'msg-latest',
+          thread_id: 'thread-latest',
+          timestamp: '2026-08-18T02:00:00.000Z',
+        },
+      ],
       replyId: 'msg-posted',
     });
 
@@ -80,15 +111,125 @@ describe('handlePylonReply', () => {
       progress: {
         reply_state: UserDeletionPylonReplyState.Posted,
         reply_message_id: 'msg-posted',
-        close_confirmed: true,
       },
     });
-    expect(postedBodies(fetchSpy)).toHaveLength(1);
-    expect(closedIssue(fetchSpy)).toBe(true);
+    const posted = postedBodies(fetchSpy);
+    expect(posted).toHaveLength(1);
+    expect(JSON.parse(String(posted[0]?.[1]?.body))).toEqual({
+      body_html: USER_DELETION_PYLON_REPLY_HTML,
+      message_id: 'thread-latest',
+      email_info: { to_emails: [TARGET_EMAIL] },
+    });
+    expect(closedIssue(fetchSpy)).toBe(false);
     await expect(loadProgress(request.id)).resolves.toMatchObject({
       reply_state: UserDeletionPylonReplyState.Posted,
       reply_message_id: 'msg-posted',
     });
+  });
+
+  it('sends to_emails even when the issue source is not email', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    const fetchSpy = mockPylon({
+      requesterEmail: TARGET_EMAIL,
+      state: 'open',
+      source: 'chat',
+      messages: [customerMessage()],
+      replyId: 'msg-posted',
+    });
+
+    const outcome = await handlePylonReply({ request, step, context });
+    expect(outcome.kind).toBe('succeeded');
+    expect(JSON.parse(String(postedBodies(fetchSpy)[0]?.[1]?.body))).toMatchObject({
+      email_info: { to_emails: [TARGET_EMAIL] },
+    });
+    expect(closedIssue(fetchSpy)).toBe(false);
+  });
+
+  it('does not close the ticket in this step', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    const fetchSpy = mockPylon({
+      requesterEmail: TARGET_EMAIL,
+      state: 'open',
+      messages: [customerMessage()],
+      replyId: 'msg-posted',
+    });
+
+    const outcome = await handlePylonReply({ request, step, context });
+    expect(outcome.kind).toBe('succeeded');
+    expect(closedIssue(fetchSpy)).toBe(false);
+    expect(outcome).not.toEqual(
+      expect.objectContaining({ progress: expect.objectContaining({ close_confirmed: true }) })
+    );
+  });
+
+  it('fails when the issue has no requester and the latest public message is not the target', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    mockPylon({
+      requesterEmail: null,
+      state: 'open',
+      messages: [
+        {
+          ...customerMessage(),
+          author: { contact: { email: 'other@example.com' } },
+          email_info: { from_email: 'other@example.com' },
+        },
+      ],
+    });
+
+    const outcome = await handlePylonReply({ request, step, context });
+    expect(outcome).toMatchObject({
+      kind: 'needs_attention',
+      errorCode: 'pylon_issue_requester_missing',
+    });
+  });
+
+  it('replies when the issue has no requester but the latest public customer message is the target', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    const fetchSpy = mockPylon({
+      requesterEmail: null,
+      state: 'open',
+      messages: [customerMessage()],
+      replyId: 'msg-posted',
+    });
+
+    const outcome = await handlePylonReply({ request, step, context });
+    expect(outcome.kind).toBe('succeeded');
+    expect(postedBodies(fetchSpy)).toHaveLength(1);
+  });
+
+  it('fails when a different customer requester does not match and the latest public message is not the target', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    mockPylon({
+      requesterEmail: 'other@example.com',
+      state: 'open',
+      messages: [
+        {
+          ...customerMessage(),
+          author: { contact: { email: 'other@example.com' } },
+          email_info: { from_email: 'other@example.com' },
+        },
+      ],
+    });
+
+    const outcome = await handlePylonReply({ request, step, context });
+    expect(outcome).toMatchObject({
+      kind: 'needs_attention',
+      errorCode: 'pylon_issue_identity_mismatch',
+    });
+  });
+
+  it('replies when a staff requester does not match the target but the latest public customer message does', async () => {
+    const { request, step, context } = await setupReplyRequest();
+    const fetchSpy = mockPylon({
+      requesterEmail: 'cx@kilo.ai',
+      state: 'open',
+      messages: [customerMessage()],
+      replyId: 'msg-posted',
+    });
+
+    const outcome = await handlePylonReply({ request, step, context });
+    expect(outcome.kind).toBe('succeeded');
+    expect(postedBodies(fetchSpy)).toHaveLength(1);
   });
 
   it('reuses an existing matching reply instead of posting', async () => {
@@ -398,8 +539,9 @@ function matchingReply(overrides?: {
 }
 
 function mockPylon(params: {
-  requesterEmail: string;
+  requesterEmail: string | null;
   state: string;
+  source?: string;
   messages?: unknown[];
   pages?: Array<{ messages: unknown[]; cursor?: string }>;
   replyId?: string;
@@ -447,8 +589,8 @@ function mockPylon(params: {
       return jsonResponse({
         data: {
           id: ISSUE_ID,
-          requester: { email: params.requesterEmail },
-          source: 'email',
+          requester: params.requesterEmail ? { email: params.requesterEmail } : null,
+          source: params.source ?? 'email',
           state: params.state,
         },
       });

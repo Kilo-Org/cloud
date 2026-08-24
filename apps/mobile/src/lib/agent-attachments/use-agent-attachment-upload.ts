@@ -61,8 +61,15 @@ function deleteCacheOwnedFile(localUri: string): void {
     if (file.exists) {
       file.delete();
     }
-  } catch (error) {
-    Sentry.captureException(error);
+  } catch {
+    Sentry.captureException(new Error('Attachment cache file delete failed'), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'delete-cache-file',
+      },
+      extra: { cacheOwned: true },
+      fingerprint: ['agent-attachments-delete-cache-file'],
+    });
   }
 }
 
@@ -384,11 +391,18 @@ export function useAgentAttachmentUpload(
         return;
       }
       commitAttachments(current => [...current, ...additions]);
+      // Step 2: images upload at selection time. Documents stay deferred to
+      // send (`uploadPending`). The upload is fire-and-forget: the chip flips
+      // to `uploading` synchronously in `startUpload`, and success/error
+      // states already exist in that path.
       for (const addition of additions) {
         liveIdsRef.current.add(addition.id);
+        if (addition.kind === 'image') {
+          void startUpload(addition, pathRef.current);
+        }
       }
     },
-    [attachments.length, commitAttachments]
+    [attachments.length, commitAttachments, startUpload]
   );
 
   const removeAttachment = useCallback(

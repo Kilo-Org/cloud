@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
-import { AlertCircle, RefreshCw, Search, X } from 'lucide-react';
-// Temporarily unused while Add requests / Substack credential are hidden.
-// import { KeyRound, Plus } from 'lucide-react';
+import { AlertCircle, KeyRound, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -58,6 +56,7 @@ import {
 } from './deletion-queue-format';
 
 const COLUMN_COUNT = 7;
+const SHOW_CLOUD_INTAKE = true;
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 type QueueSummary = RouterOutputs['admin']['userDeletionQueue']['summary'];
@@ -132,16 +131,16 @@ export function DeletionQueueContent() {
           >
             <RefreshCw className={listQuery.isFetching ? 'animate-spin' : undefined} /> Refresh
           </Button>
-          {/* Temporarily disabled: Substack task is not in the active catalog.
-          <Button variant="secondary" size="sm" onClick={() => setCredentialOpen(true)}>
-            <KeyRound /> Substack credential
-          </Button>
-          */}
-          {/* Temporarily disabled: start deletion via CSA API or the user profile page.
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus /> Add requests
-          </Button>
-          */}
+          {SHOW_CLOUD_INTAKE ? (
+            <>
+              <Button variant="secondary" size="sm" onClick={() => setCredentialOpen(true)}>
+                <KeyRound /> Substack credential
+              </Button>
+              <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Plus /> Add requests
+              </Button>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -533,8 +532,8 @@ function AddRequestsDialog({
                   <p className="font-medium">Accepted ({preview.accepted.length})</p>
                   <ul className="space-y-1 text-xs">
                     {preview.accepted.map(entry => (
-                      <li key={entry.email} className="font-mono">
-                        {entry.email}
+                      <li key={`${entry.email}:${entry.pylonTicket ?? ''}`} className="font-mono">
+                        {entry.email || entry.pylonTicket}
                         {entry.pylonTicket ? ` · ${entry.pylonTicket}` : ''}
                         {entry.warnings.length > 0 ? (
                           <span className="text-status-warning block font-sans">

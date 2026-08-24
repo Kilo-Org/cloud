@@ -35,8 +35,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { UserDeletionStepKey } from '@kilocode/db/schema-types';
-import { deletionAttentionHint } from '@/lib/user/deletion-queue/deletion-hints';
 import {
+  deletionAttentionHint,
+  deletionManualSearchHref,
+} from '@/lib/user/deletion-queue/deletion-hints';
+import {
+  deletionPreflightProgress,
   deletionStepDescription,
   deletionStepLabel,
   deletionStepProgressLabel,
@@ -45,6 +49,7 @@ import {
   formatTimestamp,
   humanizeToken,
   statusBadgeClass,
+  type DeletionProgressKind,
 } from '../deletion-queue-format';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
@@ -216,7 +221,7 @@ export function DeletionQueueDetailContent({
       <Card>
         <CardHeader>
           <CardTitle>Steps</CardTitle>
-          <CardDescription>Cleanup, then Cloud user, then Pylon.</CardDescription>
+          <CardDescription>Preflight, then cleanup, then Cloud user, then Pylon.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -236,6 +241,12 @@ export function DeletionQueueDetailContent({
                 const stuck =
                   task.status === 'needs_attention' || task.status === 'manual_action_required';
                 const hint = stuck ? deletionAttentionHint(task.lastErrorCode) : null;
+                const search = stuck
+                  ? deletionManualSearchHref({
+                      stepKey: task.stepKey,
+                      email: request.email,
+                    })
+                  : null;
                 return (
                   <TableRow key={task.stepKey}>
                     <TableCell className="text-xs">{deletionStepLabel(task.stepKey)}</TableCell>
@@ -250,6 +261,16 @@ export function DeletionQueueDetailContent({
                         <p className="text-muted-foreground mt-1">
                           {hint.title}. {hint.action}
                         </p>
+                      ) : null}
+                      {search ? (
+                        <a
+                          href={search.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-link hover:text-link-hover mt-1 inline-block underline"
+                        >
+                          {search.label}
+                        </a>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-sm tabular-nums">
@@ -368,6 +389,7 @@ function CompactDeletionDetail({
   onInvalidate: () => Promise<void>;
 }) {
   const request = detail.request;
+  const preflightKind = deletionPreflightProgress(request);
   const ticket = request.pylonTicket ? `#${request.pylonTicket.replace(/^#/, '')}` : null;
   const stuckTask = detail.tasks.find(
     task => task.status === 'needs_attention' || task.status === 'manual_action_required'
@@ -450,24 +472,27 @@ function CompactDeletionDetail({
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             Progress
           </p>
+          <ProgressGroup label="Preflight" hint="Before cleanup starts">
+            <ProgressStepTile
+              label="Preflight"
+              description={
+                preflightKind === 'stuck' && request.preflightAttentionCode
+                  ? request.preflightAttentionCode
+                  : 'Confirm identity, subscriptions, and delete-ready'
+              }
+              kind={preflightKind}
+            />
+          </ProgressGroup>
           {PROGRESS_GROUPS.map((group, groupIndex) => {
             const tasks = group.stepKeys.flatMap(stepKey => {
               const task = detail.tasks.find(item => item.stepKey === stepKey);
               return task ? [task] : [];
             });
             if (tasks.length === 0) return null;
-            const unlocked = isProgressGroupUnlocked(detail.tasks, groupIndex);
+            const unlocked =
+              preflightKind === 'finished' && isProgressGroupUnlocked(detail.tasks, groupIndex);
             return (
-              <div key={group.label} className="flex flex-col gap-2">
-                {groupIndex > 0 ? (
-                  <p className="text-muted-foreground text-center text-[11px] tracking-wide uppercase">
-                    then
-                  </p>
-                ) : null}
-                <div>
-                  <p className="text-foreground text-xs font-medium">{group.label}</p>
-                  <p className="text-muted-foreground text-[11px]">{group.hint}</p>
-                </div>
+              <ProgressGroup key={group.label} label={group.label} hint={group.hint} showThen>
                 <div
                   className={
                     group.stepKeys.length > 1
@@ -476,14 +501,14 @@ function CompactDeletionDetail({
                   }
                 >
                   {tasks.map(task => (
-                    <ProgressStepTile
+                    <CatalogProgressTile
                       key={task.stepKey}
                       task={task}
                       current={unlocked && isOpenTask(task.status)}
                     />
                   ))}
                 </div>
-              </div>
+              </ProgressGroup>
             );
           })}
         </div>
@@ -584,9 +609,19 @@ const PROGRESS_GROUPS = [
     stepKeys: [UserDeletionStepKey.PylonReply],
   },
   {
-    label: 'Pylon delete',
+    label: 'Pylon finalize',
     hint: 'After the reply is posted',
+    stepKeys: [UserDeletionStepKey.PylonFinalize],
+  },
+  {
+    label: 'Pylon delete',
+    hint: 'After the ticket is tagged and closed',
     stepKeys: [UserDeletionStepKey.PylonContact],
+  },
+  {
+    label: 'CSA support DB',
+    hint: 'After the Pylon contact is deleted',
+    stepKeys: [UserDeletionStepKey.CsaSupportDb],
   },
 ] as const;
 
@@ -611,7 +646,34 @@ function isProgressGroupUnlocked(tasks: Task[], groupIndex: number): boolean {
   );
 }
 
-function ProgressStepTile({ task, current }: { task: Task; current: boolean }) {
+function ProgressGroup({
+  label,
+  hint,
+  showThen = false,
+  children,
+}: {
+  label: string;
+  hint: string;
+  showThen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {showThen ? (
+        <p className="text-muted-foreground text-center text-[11px] tracking-wide uppercase">
+          then
+        </p>
+      ) : null}
+      <div>
+        <p className="text-foreground text-xs font-medium">{label}</p>
+        <p className="text-muted-foreground text-[11px]">{hint}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function CatalogProgressTile({ task, current }: { task: Task; current: boolean }) {
   const finished = isFinishedTask(task.status);
   const stuck = isStuckTask(task.status);
   const countLabel = deletionStepProgressLabel(
@@ -628,23 +690,41 @@ function ProgressStepTile({ task, current }: { task: Task; current: boolean }) {
           ? countLabel
           : deletionStepDescription(task.stepKey);
   return (
+    <ProgressStepTile
+      label={deletionStepLabel(task.stepKey)}
+      description={description}
+      kind={finished ? 'finished' : stuck ? 'stuck' : current ? 'current' : 'idle'}
+    />
+  );
+}
+
+function ProgressStepTile({
+  label,
+  description,
+  kind,
+}: {
+  label: string;
+  description: string;
+  kind: DeletionProgressKind;
+}) {
+  return (
     <div
       className={cn(
         'flex items-start gap-2.5 rounded-lg border p-2.5 text-xs',
-        finished
+        kind === 'finished'
           ? 'border-status-success-border bg-status-success-surface'
-          : stuck
+          : kind === 'stuck'
             ? 'border-status-warning-border bg-status-warning-surface'
-            : current
+            : kind === 'current'
               ? 'border-status-info-border bg-status-info-surface'
               : 'border-border bg-card text-muted-foreground'
       )}
     >
       <span className="shrink-0 font-semibold">
-        {finished ? <Check className="size-3.5" /> : current ? '▸' : '·'}
+        {kind === 'finished' ? <Check className="size-3.5" /> : kind === 'current' ? '▸' : '·'}
       </span>
       <div className="min-w-0">
-        <p className="text-foreground font-medium">{deletionStepLabel(task.stepKey)}</p>
+        <p className="text-foreground font-medium">{label}</p>
         <p className="text-muted-foreground mt-0.5">{description}</p>
       </div>
     </div>

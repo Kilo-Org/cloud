@@ -92,6 +92,27 @@ describe('inspectDeletionTargets', () => {
     expect(await deletionRequestCount()).toBe(before);
   });
 
+  it('rejects an already-enqueued ticket-only entry as ticket_already_active', async () => {
+    const actor = await insertTestUser({ is_admin: true });
+    const [enqueued] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: actor.id },
+      targets: [{ pylonTicket: '#iss-ticket-only' }],
+    });
+    expect(enqueued.status).toBe('enqueued');
+
+    const result = await inspectDeletionTargets([{ pylonTicket: 'iss-ticket-only' }]);
+
+    expect(result.accepted).toEqual([]);
+    expect(result.rejected).toEqual([
+      {
+        ok: false,
+        email: '',
+        pylonTicket: 'iss-ticket-only',
+        code: DeletionRefusalCode.TicketAlreadyActive,
+      },
+    ]);
+  });
+
   it('rejects an already-enqueued Pylon ticket as ticket_already_active', async () => {
     const actor = await insertTestUser({ is_admin: true });
     const first = await insertTestUser({ google_user_email: 'inspect-ticket-one@example.com' });
@@ -142,18 +163,9 @@ describe('inspectDeletionTargets', () => {
     expect(await deletionRequestCount()).toBe(before);
   });
 
-  it('resolves a ticket-only entry from the Pylon requester email', async () => {
-    process.env.PYLON_API_KEY = 'test-pylon-key';
-    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({ data: { id: 'iss_1', requester: { email: 'From-Ticket@Example.com' } } }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      )
-    );
-    const user = await insertTestUser({ google_user_email: 'from-ticket@example.com' });
+  it('accepts a ticket-only entry without calling Pylon', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const before = await deletionRequestCount();
 
     const result = await inspectDeletionTargets([{ pylonTicket: '#5678' }]);
 
@@ -161,50 +173,30 @@ describe('inspectDeletionTargets', () => {
     expect(result.accepted).toEqual([
       {
         ok: true,
-        email: 'from-ticket@example.com',
-        pylonTicket: '#5678',
-        warnings: [],
-        userId: user.id,
-      },
-    ]);
-    expect(fetchSpy).toHaveBeenCalled();
-  });
-
-  it('rejects a ticket-only entry when Pylon has no requester email', async () => {
-    process.env.PYLON_API_KEY = 'test-pylon-key';
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ data: { id: 'iss_1', requester: {} } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
-
-    const result = await inspectDeletionTargets([{ pylonTicket: '#5678' }]);
-
-    expect(result.accepted).toEqual([]);
-    expect(result.rejected).toEqual([
-      {
-        ok: false,
         email: '',
         pylonTicket: '#5678',
-        code: DeletionRefusalCode.TicketUnresolved,
+        warnings: ['resolves_at_preflight'],
+        userId: null,
       },
     ]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await deletionRequestCount()).toBe(before);
   });
 
-  it('rejects an unknown email as no_cloud_user', async () => {
+  it('accepts an unknown email with userId null', async () => {
     const fetchSpy = jest.spyOn(globalThis, 'fetch');
     const before = await deletionRequestCount();
 
     const result = await inspectDeletionTargets([{ email: 'inspect-missing@example.com' }]);
 
-    expect(result.accepted).toEqual([]);
-    expect(result.rejected).toEqual([
+    expect(result.rejected).toEqual([]);
+    expect(result.accepted).toEqual([
       {
-        ok: false,
+        ok: true,
         email: 'inspect-missing@example.com',
         pylonTicket: null,
-        code: DeletionRefusalCode.NoCloudUser,
+        warnings: [],
+        userId: null,
       },
     ]);
     expect(fetchSpy).not.toHaveBeenCalled();

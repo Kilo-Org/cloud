@@ -162,7 +162,9 @@ describe('deep-link-launch', () => {
       setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
       await vi.waitFor(() => {
-        expect(Sentry.captureException).toHaveBeenCalled();
+        expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+          tags: { 'error.subsystem': 'deep_link', 'error.operation': 'write_pending_link' },
+        });
       });
     });
   });

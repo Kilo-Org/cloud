@@ -44,10 +44,12 @@ type Scenario =
 
 type Person = {
   id: string;
+  uuid: string;
   email: string;
   distinctIds: string[];
   deleted: boolean;
   verifyPolls: number;
+  deletedAt: string | null;
 };
 
 type Contact = {
@@ -73,6 +75,7 @@ type Issue = {
   email: string;
   state: string;
   createdAt: string;
+  tags: string[];
   messages: IssueMessage[];
 };
 
@@ -183,7 +186,7 @@ function helpText(host: string, port: number): string {
     'Deletion provider mock (PostHog + Pylon + Substack + Customer.io)',
     '',
     `Listening on http://${host}:${port}`,
-    'Point POSTHOG_HOST, PYLON_HOST, SUBSTACK_PUBLICATION_URL, and CUSTOMERIO_TRACK_BASE at this origin.',
+    'Point POSTHOG_HOST, PYLON_HOST, SUBSTACK_PUBLICATION_URL, CUSTOMERIO_TRACK_BASE, and CSA_APP_BASE_URL at this origin.',
     '',
     'Email local-part scenarios:',
     '  ok@local.test                 happy path for all mocked providers',
@@ -224,7 +227,15 @@ function createDeletionProviderMockState(): {
     const id = personIdForEmail(email);
     let person = persons.get(id);
     if (!person) {
-      person = { id, email, distinctIds: [email, id], deleted: false, verifyPolls: 0 };
+      person = {
+        id,
+        uuid: id,
+        email,
+        distinctIds: [email, id],
+        deleted: false,
+        verifyPolls: 0,
+        deletedAt: null,
+      };
       persons.set(id, person);
       ensureSubscriber(email);
     }
@@ -256,6 +267,7 @@ function createDeletionProviderMockState(): {
       email,
       state: 'open',
       createdAt,
+      tags: ['delete-ready'],
       messages: [
         {
           id: `msg-${number}-customer`,
@@ -317,7 +329,7 @@ function createDeletionProviderMockState(): {
       created_at: issue.createdAt,
       latest_message_time: issue.messages.at(-1)?.timestamp ?? issue.createdAt,
       number: issue.number,
-      tags: [],
+      tags: issue.tags,
       requester: { id: contactIdForEmail(issue.email), email: issue.email },
     };
   }
@@ -326,11 +338,126 @@ function createDeletionProviderMockState(): {
     const wanted = new Set(ids);
     const matched: Person[] = [];
     for (const person of persons.values()) {
-      if (wanted.has(person.id) || person.distinctIds.some(id => wanted.has(id))) {
+      if (
+        wanted.has(person.id) ||
+        wanted.has(person.uuid) ||
+        person.distinctIds.some(id => wanted.has(id))
+      ) {
         matched.push(person);
       }
     }
     return matched;
+  }
+
+  function personPayload(person: Person): Record<string, unknown> {
+    return {
+      id: person.id,
+      uuid: person.uuid,
+      distinct_ids: person.distinctIds,
+      properties: { email: person.email },
+    };
+  }
+
+  function lookupEmailFromPersonsUrl(url: URL): string {
+    return (url.searchParams.get('email') ?? url.searchParams.get('distinct_id') ?? '')
+      .trim()
+      .toLowerCase();
+  }
+
+  function handlePersonsLookup(res: ServerResponse, email: string): void {
+    const scenario = scenarioFromEmail(email);
+    if (scenario === 'fail-posthog') {
+      json(res, 500, { detail: 'posthog lookup failed' });
+      return;
+    }
+    if (!email || scenario === 'missing') {
+      json(res, 200, { results: [] });
+      return;
+    }
+    const person = ensurePerson(email);
+    if (person.deleted) {
+      json(res, 200, { results: [] });
+      return;
+    }
+    json(res, 200, { results: [personPayload(person)] });
+  }
+
+  function handlePersonGet(res: ServerResponse, personId: string): void {
+    const person = persons.get(decodeURIComponent(personId));
+    if (!person) {
+      json(res, 404, { detail: 'not found' });
+      return;
+    }
+    if (person.deleted) {
+      if (scenarioFromEmail(person.email) === 'slow-posthog' && person.verifyPolls < 2) {
+        person.verifyPolls += 1;
+        json(res, 200, personPayload(person));
+        return;
+      }
+      json(res, 404, { detail: 'not found' });
+      return;
+    }
+    json(res, 200, personPayload(person));
+  }
+
+  function markPersonsDeleted(matched: Person[]): void {
+    for (const person of matched) {
+      person.deleted = true;
+      person.verifyPolls = 0;
+      person.deletedAt = nowIso();
+    }
+  }
+
+  function handleBulkDelete(
+    res: ServerResponse,
+    ids: string[],
+    options: { acceptance: boolean }
+  ): void {
+    const matched = findPersonsByDistinctIds(ids);
+    const emailHints = ids.filter(id => id.includes('@'));
+    if (
+      matched.some(person => scenarioFromEmail(person.email) === '429-posthog') ||
+      emailHints.some(email => scenarioFromEmail(email) === '429-posthog')
+    ) {
+      rateLimited(res);
+      return;
+    }
+    markPersonsDeleted(matched);
+    if (options.acceptance) {
+      json(res, 202, {
+        id: 'deletion-mock',
+        persons_found: matched.length,
+        persons_deleted: matched.length,
+        events_queued_for_deletion: true,
+        recordings_queued_for_deletion: true,
+        deletion_errors: [],
+      });
+      return;
+    }
+    json(res, 202, { id: 'deletion-mock' });
+  }
+
+  function handleDeletionStatus(res: ServerResponse, personUuid: string): void {
+    const person = persons.get(decodeURIComponent(personUuid));
+    if (
+      !person ||
+      !person.deleted ||
+      (scenarioFromEmail(person.email) === 'slow-posthog' && person.verifyPolls < 2)
+    ) {
+      json(res, 200, { results: [] });
+      return;
+    }
+    const at = person.deletedAt ?? nowIso();
+    json(res, 200, {
+      results: [
+        {
+          person_uuid: person.uuid,
+          status: 'completed',
+          created_at: at,
+          delete_verified_at: at,
+        },
+      ],
+    });
   }
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -346,6 +473,14 @@ function createDeletionProviderMockState(): {
       return;
     }
 
+    const environmentsPersonsMatch = path.match(/^\/api\/environments\/[^/]+\/persons$/);
+    const environmentsPersonMatch = path.match(/^\/api\/environments\/[^/]+\/persons\/([^/]+)$/);
+    const environmentsBulkDeleteMatch = path.match(
+      /^\/api\/environments\/[^/]+\/persons\/bulk_delete$/
+    );
+    const environmentsDeletionStatusMatch = path.match(
+      /^\/api\/environments\/[^/]+\/persons\/deletion_status$/
+    );
     const personsMatch = path.match(/^\/api\/projects\/[^/]+\/persons$/);
     const personMatch = path.match(/^\/api\/projects\/[^/]+\/persons\/([^/]+)$/);
     const bulkDeleteMatch = path.match(/^\/api\/projects\/[^/]+\/persons\/bulk_delete$/);
@@ -356,73 +491,47 @@ function createDeletionProviderMockState(): {
     const substackSubscriberMatch = path.match(/^\/api\/v1\/subscriber\/([^/]+)$/);
     const customerMatch = path.match(/^\/api\/v1\/customers\/([^/]+)$/);
 
+    if (method === 'GET' && environmentsPersonsMatch) {
+      handlePersonsLookup(res, lookupEmailFromPersonsUrl(url));
+      return;
+    }
+
     if (method === 'GET' && personsMatch) {
-      const email = (url.searchParams.get('email') ?? '').trim().toLowerCase();
-      const scenario = scenarioFromEmail(email);
-      if (scenario === 'fail-posthog') {
-        json(res, 500, { detail: 'posthog lookup failed' });
-        return;
-      }
-      if (!email || scenario === 'missing') {
-        json(res, 200, { results: [] });
-        return;
-      }
-      const person = ensurePerson(email);
-      if (person.deleted) {
-        json(res, 200, { results: [] });
-        return;
-      }
-      json(res, 200, {
-        results: [{ id: person.id, distinct_ids: person.distinctIds, properties: { email } }],
-      });
+      handlePersonsLookup(res, lookupEmailFromPersonsUrl(url));
+      return;
+    }
+
+    if (method === 'POST' && environmentsBulkDeleteMatch) {
+      const body = await readBody(req);
+      const ids = isRecord(body) && Array.isArray(body.ids) ? body.ids.map(String) : [];
+      handleBulkDelete(res, ids, { acceptance: true });
       return;
     }
 
     if (method === 'POST' && bulkDeleteMatch) {
       const body = await readBody(req);
       const ids =
-        isRecord(body) && Array.isArray(body.distinct_ids) ? body.distinct_ids.map(String) : [];
-      const matched = findPersonsByDistinctIds(ids);
-      const emailHints = ids.filter(id => id.includes('@'));
-      if (
-        matched.some(person => scenarioFromEmail(person.email) === '429-posthog') ||
-        emailHints.some(email => scenarioFromEmail(email) === '429-posthog')
-      ) {
-        rateLimited(res);
-        return;
-      }
-      for (const person of matched) {
-        person.deleted = true;
-        person.verifyPolls = 0;
-      }
-      json(res, 202, { id: 'deletion-mock' });
+        isRecord(body) && Array.isArray(body.distinct_ids)
+          ? body.distinct_ids.map(String)
+          : isRecord(body) && Array.isArray(body.ids)
+            ? body.ids.map(String)
+            : [];
+      handleBulkDelete(res, ids, { acceptance: false });
+      return;
+    }
+
+    if (method === 'GET' && environmentsDeletionStatusMatch) {
+      handleDeletionStatus(res, url.searchParams.get('person_uuid') ?? '');
+      return;
+    }
+
+    if (method === 'GET' && environmentsPersonMatch) {
+      handlePersonGet(res, environmentsPersonMatch[1] ?? '');
       return;
     }
 
     if (method === 'GET' && personMatch) {
-      const person = persons.get(decodeURIComponent(personMatch[1] ?? ''));
-      if (!person) {
-        json(res, 404, { detail: 'not found' });
-        return;
-      }
-      if (person.deleted) {
-        if (scenarioFromEmail(person.email) === 'slow-posthog' && person.verifyPolls < 2) {
-          person.verifyPolls += 1;
-          json(res, 200, {
-            id: person.id,
-            distinct_ids: person.distinctIds,
-            properties: { email: person.email },
-          });
-          return;
-        }
-        json(res, 404, { detail: 'not found' });
-        return;
-      }
-      json(res, 200, {
-        id: person.id,
-        distinct_ids: person.distinctIds,
-        properties: { email: person.email },
-      });
+      handlePersonGet(res, personMatch[1] ?? '');
       return;
     }
 
@@ -548,6 +657,9 @@ function createDeletionProviderMockState(): {
         if (isRecord(body) && typeof body.state === 'string' && body.state.trim()) {
           issue.state = body.state.trim();
         }
+        if (isRecord(body) && Array.isArray(body.tags)) {
+          issue.tags = body.tags.filter((tag): tag is string => typeof tag === 'string');
+        }
       }
       if (method === 'GET' || method === 'PATCH') {
         json(res, 200, { data: issuePayload(issue) });
@@ -571,12 +683,26 @@ function createDeletionProviderMockState(): {
     }
 
     if (method === 'DELETE' && substackSubscriberMatch) {
-      const subscriberId = decodeURIComponent(substackSubscriberMatch[1] ?? '');
-      if (subscriberId.startsWith('partial-')) {
+      const subscriberKey = decodeURIComponent(substackSubscriberMatch[1] ?? '');
+      const disableEmail = url.searchParams.get('disable_email') === 'true';
+      const local = localPart(subscriberKey.trim().toLowerCase());
+      if (local.startsWith('gone-user')) {
+        json(res, 400, { error: 'User not found' });
+        return;
+      }
+      if (local.startsWith('gone-sub')) {
+        json(res, 400, { error: 'Subscription not found' });
+        return;
+      }
+      if (subscriberKey.startsWith('partial-')) {
         json(res, 409, { error: 'refused to delete non-exact subscriber' });
         return;
       }
-      const subscriber = subscribers.get(subscriberId);
+      const byId = subscribers.get(subscriberKey);
+      const byEmail = [...subscribers.values()].find(
+        subscriber => subscriber.email === subscriberKey.trim().toLowerCase()
+      );
+      const subscriber = byId ?? byEmail ?? null;
       if (subscriber?.decoy) {
         json(res, 409, { error: 'refused to delete non-exact subscriber' });
         return;
@@ -585,7 +711,15 @@ function createDeletionProviderMockState(): {
         json(res, 401, { error: 'unauthorized' });
         return;
       }
-      if (subscriber) subscriber.deleted = true;
+      if (!subscriber) {
+        if (disableEmail) {
+          json(res, 404, { error: 'User not found' });
+          return;
+        }
+        json(res, 200, { ok: true });
+        return;
+      }
+      subscriber.deleted = true;
       json(res, 200, { ok: true });
       return;
     }
@@ -613,6 +747,22 @@ function createDeletionProviderMockState(): {
         return;
       }
       json(res, 200, { ok: true });
+      return;
+    }
+
+    if (method === 'POST' && path === '/api/internal/cloud/users/gdpr-scrub') {
+      const body = await readBody(req);
+      const email =
+        isRecord(body) && typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      if (!email) {
+        json(res, 400, { status: 'error' });
+        return;
+      }
+      if (email.endsWith('@service.usepylon.com') || email.endsWith('@app.kilocode.ai')) {
+        json(res, 400, { status: 'blocked' });
+        return;
+      }
+      json(res, 200, { status: email.includes('missing') ? 'not_found' : 'updated' });
       return;
     }
 

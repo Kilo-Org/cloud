@@ -77,6 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
     const [result] = await enqueueUserDeletionTargets({
       actor: { kiloUserId: admin.id, email: admin.google_user_email },
       targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+      catalogVersion: 2,
     });
 
     if (!result) {

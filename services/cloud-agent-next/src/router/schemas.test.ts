@@ -17,6 +17,7 @@ import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
+const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 const validImages = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.png'],
@@ -315,6 +316,81 @@ describe('legacy live attachment input compatibility', () => {
         images: validImages,
       }).success
     ).toBe(false);
+  });
+});
+
+describe('prepareSession clone-only variant', () => {
+  const baseCloneInput = {
+    mode: 'code',
+    model: 'claude-sonnet-4-5-20250929',
+    githubRepo: 'acme/repo',
+    autoInitiate: true,
+    operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+  };
+
+  it('accepts a clone-only prepare without a prompt', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects a clone-only prepare with a prompt', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        prompt: 'Continue from the cloned session context.',
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone-only prepare with an initialMessageId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        initialMessageId: validMessageId,
+        cloneFromKiloSessionId: validKiloSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a malformed cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: 'agent_invalid',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects an agent_ UUID cloneFromKiloSessionId', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('still requires a prompt for a non-clone prepare', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Continue from the cloned session context.',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(true);
   });
 });
 

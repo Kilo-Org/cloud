@@ -26,7 +26,12 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
           if (cancelled) {
             return;
           }
-          Sentry.captureException(error);
+          Sentry.captureException(error, {
+            tags: {
+              'error.subsystem': 'tracking_permission',
+              'error.operation': 'get_permission',
+            },
+          });
           return;
         }
 
@@ -46,7 +51,12 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
                   try {
                     await requestTrackingPermissionsAsync();
                   } catch (error) {
-                    Sentry.captureException(error);
+                    Sentry.captureException(error, {
+                      tags: {
+                        'error.subsystem': 'tracking_permission',
+                        'error.operation': 'request_permission',
+                      },
+                    });
                   }
                 })();
               },

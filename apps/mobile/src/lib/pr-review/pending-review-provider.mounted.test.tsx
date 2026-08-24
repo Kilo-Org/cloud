@@ -196,7 +196,12 @@ describe('PendingReviewProvider persistence', () => {
     await flushMicrotasks();
 
     expect(latest(renders).items).toEqual([ITEM_A, ITEM_B]);
-    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(sentryMock.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'pending-review', 'error.operation': 'hydrate' },
+      fingerprint: ['pending-review-invalid-items'],
+      extra: { dropped: 3, kept: 2 },
+    });
   });
 
   it('keeps the queue empty when every restored item is malformed', async () => {

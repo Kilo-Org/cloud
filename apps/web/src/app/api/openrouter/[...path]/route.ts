@@ -341,9 +341,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           // Kilo-funded classification with no user to attribute it to.
           if (!user || authFailedResponse) return null;
           const { settings, plan } = await balanceAndSettingsPromise;
-          const deniedFromSettings =
-            plan === 'enterprise' ? (settings?.model_deny_list?.map(normalizeModelId) ?? []) : [];
           const groupPolicy = await organizationGroupPolicyPromise;
+          const deniedFromSettings =
+            !groupPolicy && plan === 'enterprise'
+              ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
+              : [];
           const deniedFromPolicy = groupPolicy
             ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
                 userId: user.id,
@@ -604,10 +606,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   async function resolveAccessCheck(modelId: string) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const groupPolicy = await organizationGroupPolicyPromise;
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId,
       settings,
-      organizationPlan: plan,
+      organizationPlan: groupPolicy ? undefined : plan,
     });
     if (modelRestrictionError) {
       return {
@@ -616,14 +619,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         groupModelAllowed: true,
         groupProvidersAllowed: true,
         modelRestrictionError,
-        plan,
         settings,
       };
     }
     let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
     let groupProvidersAllowed = true;
-    const groupPolicy = await organizationGroupPolicyPromise;
     if (groupPolicy) {
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
       groupModelAllowed = groupDecision.allowed;
@@ -642,7 +643,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
-      plan,
       settings,
     };
   }
@@ -847,7 +847,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
-      plan,
       settings,
     } = await accessCheckResolver.get();
 
@@ -879,11 +878,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return dataCollectionRequiredResponse();
     }
 
-    // Enterprise `provider_allow_list` is enforced via OpenRouter's
-    // `body.provider.only` field, which doesn't reach a direct partner
-    // upstream. Refuse the experimented public id rather than routing
-    // around the org's allow-list.
-    if (effectiveProviderContext.experiment && plan === 'enterprise') {
+    // OpenRouter's `body.provider.only` does not reach a direct experiment
+    // partner, so enforce any effective provider routes locally instead.
+    if (
+      effectiveProviderContext.experiment &&
+      effectiveProviderConfig?.only &&
+      !effectiveProviderConfig.only.includes(effectiveProviderContext.provider.id)
+    ) {
       return modelNotAllowedResponse();
     }
 

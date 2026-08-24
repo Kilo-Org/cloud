@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
 
 import {
   _resetPendingExternalAuthForTests,
@@ -31,6 +32,7 @@ beforeEach(() => {
   vi.mocked(SecureStore.getItemAsync).mockReset();
   vi.mocked(SecureStore.setItemAsync).mockReset();
   vi.mocked(SecureStore.deleteItemAsync).mockReset();
+  vi.mocked(Sentry.captureException).mockReset();
   _resetPendingExternalAuthForTests();
 });
 
@@ -75,6 +77,17 @@ describe('pending-external-auth', () => {
   it('clears the record', async () => {
     await clearPendingExternalAuth();
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('pending-external-auth');
+  });
+
+  it('reports a write failure with safe fixed context and native grouping', async () => {
+    const error = new Error('device-secret');
+    vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(error);
+
+    await writePendingExternalAuth(record);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'write_pending_external_auth' },
+    });
   });
 
   it('serializes a write then a clear in FIFO order', async () => {

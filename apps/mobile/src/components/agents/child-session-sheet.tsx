@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Modal, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type ChildSessionHydrationState,
@@ -24,6 +24,7 @@ import { MessageErrorBoundary } from './message-error-boundary';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
+import { SessionPageSheet } from './session-page-sheet';
 import { SessionStatusIndicator } from './session-status-indicator';
 import { WorkingIndicator } from './working-indicator';
 
@@ -152,22 +153,14 @@ export function ChildSessionSheet({
   }
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-      onDismiss={onDismiss}
-    >
-      <View className="flex-1 bg-background">
-        <SheetHeader title={title} onDone={onClose} />
-        {modelLabel ? (
-          <View className="border-b border-border px-4 py-2">
-            <ChildSessionModelLabel modelLabel={modelLabel} />
-          </View>
-        ) : null}
-        <PartDetailSheetHost messages={messages}>{content}</PartDetailSheetHost>
-      </View>
-    </Modal>
+    <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
+      <SheetHeader title={title} onDone={onClose} />
+      {modelLabel ? (
+        <View className="border-b border-border px-4 py-2">
+          <ChildSessionModelLabel modelLabel={modelLabel} />
+        </View>
+      ) : null}
+      <PartDetailSheetHost messages={messages}>{content}</PartDetailSheetHost>
+    </SessionPageSheet>
   );
 }

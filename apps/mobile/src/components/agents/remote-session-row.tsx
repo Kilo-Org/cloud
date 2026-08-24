@@ -1,11 +1,13 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
+import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -15,8 +17,12 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { useTRPC } from '@/lib/trpc';
+import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
+import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
 import {
   activeSessionMetaTimestamp,
+  canExitSessionFromList,
   composeActiveSessionVisibleMeta,
   formatSessionTotalCost,
   remoteMeta,
@@ -31,6 +37,7 @@ import {
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
+import { useUserWebConnection } from './user-web-connection-provider';
 
 type RemoteSessionRowProps = {
   session: ActiveSession;
@@ -51,6 +58,10 @@ export function RemoteSessionRow({
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const { renameSession } = useSessionMutations();
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+  const connection = useUserWebConnection();
+  const exitingRef = useRef(false);
   const title = session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
@@ -58,6 +69,7 @@ export function RemoteSessionRow({
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status;
+  const canExit = canExitSessionFromList(session);
   const needsInput = shouldShowNeedsInput({
     status: session.status,
     raiseId,
@@ -97,7 +109,33 @@ export function RemoteSessionRow({
       </View>
     ) : undefined;
 
+  const refreshActiveList = async () => {
+    if (await refreshActiveSessionsNow()) {
+      return;
+    }
+    await queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter());
+  };
+
+  const handleExit = () => {
+    void exitRemoteSessionFromList({
+      confirm: showRemoteSessionExitConfirmation,
+      sendExit: async () => {
+        await connection.sendCommand(
+          session.id,
+          'exit_cli',
+          { protocolVersion: 1 },
+          session.connectionId
+        );
+      },
+      refreshActiveList,
+      inFlight: exitingRef,
+    });
+  };
+
   const handleLongPress = () => {
+    if (exitingRef.current) {
+      return;
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     showSessionActionMenu({
       showActionSheetWithOptions,
@@ -114,6 +152,7 @@ export function RemoteSessionRow({
           setRenameVisible(true);
         }
       },
+      onExit: canExit ? handleExit : undefined,
     });
   };
 

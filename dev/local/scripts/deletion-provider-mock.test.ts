@@ -75,7 +75,7 @@ test('GET / returns a plaintext cheat sheet', async () => {
   });
 });
 
-test('PostHog lookup returns id (not uuid) for ok@local.test', async () => {
+test('PostHog lookup returns uuid for ok@local.test', async () => {
   await withMock(async origin => {
     const { status, body } = await requestJson(
       origin,
@@ -86,9 +86,56 @@ test('PostHog lookup returns id (not uuid) for ok@local.test', async () => {
     const person = results[0];
     assert.equal(results.length, 1);
     assert.ok(person);
-    assert.equal(typeof person.id, 'string');
-    assert.equal(person.uuid, undefined);
+    assert.equal(typeof person.uuid, 'string');
     assert.equal((person.properties as { email?: string }).email, 'ok@local.test');
+  });
+});
+
+test('PostHog environments lookup and bulk_delete use trailing slashes and uuid ids', async () => {
+  await withMock(async origin => {
+    const distinct = await requestJson(
+      origin,
+      '/api/environments/proj/persons/?distinct_id=ok%40local.test'
+    );
+    const byEmail = await requestJson(
+      origin,
+      '/api/environments/proj/persons/?email=ok%40local.test'
+    );
+    assert.equal(distinct.status, 200);
+    assert.equal(byEmail.status, 200);
+    const person = (byEmail.body as { results: Array<{ uuid: string }> }).results[0];
+    assert.ok(person?.uuid);
+
+    const deleted = await requestJson(origin, '/api/environments/proj/persons/bulk_delete/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ids: [person.uuid],
+        delete_events: true,
+        delete_recordings: true,
+        keep_person: false,
+      }),
+    });
+    assert.equal(deleted.status, 202);
+    assert.deepEqual(deleted.body, {
+      id: 'deletion-mock',
+      persons_found: 1,
+      persons_deleted: 1,
+      events_queued_for_deletion: true,
+      recordings_queued_for_deletion: true,
+      deletion_errors: [],
+    });
+
+    const gone = await requestJson(origin, `/api/environments/proj/persons/${person.uuid}/`);
+    assert.equal(gone.status, 404);
+    const status = await requestJson(
+      origin,
+      `/api/environments/proj/persons/deletion_status/?person_uuid=${person.uuid}&status=all`
+    );
+    const results = (status.body as { results: Array<{ status: string; person_uuid: string }> })
+      .results;
+    assert.equal(results[0]?.status, 'completed');
+    assert.equal(results[0]?.person_uuid, person.uuid);
   });
 });
 
@@ -104,7 +151,7 @@ test('PostHog fail-posthog lookup is 500 and 429-posthog bulk delete is 429', as
       origin,
       '/api/projects/proj/persons?email=429-posthog%40local.test'
     );
-    const person = (lookedUp.body as { results: Array<{ id: string; distinct_ids: string[] }> })
+    const person = (lookedUp.body as { results: Array<{ uuid: string; distinct_ids: string[] }> })
       .results[0];
     assert.ok(person);
     const deleted = await requestJson(origin, '/api/projects/proj/persons/bulk_delete', {
@@ -212,6 +259,41 @@ test('Substack first page includes exact matches plus decoys without prior primi
       method: 'DELETE',
     });
     assert.equal(unknownDecoy.status, 409);
+  });
+});
+
+test('Substack delete-by-email uses disable_email=true and already-gone bodies', async () => {
+  await withMock(async origin => {
+    const deleted = await requestJson(
+      origin,
+      '/api/v1/subscriber/ok%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(deleted.status, 200);
+
+    const missing = await requestJson(
+      origin,
+      '/api/v1/subscriber/missing%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(missing.status, 404);
+    assert.equal((missing.body as { error?: string }).error, 'User not found');
+
+    const goneUser = await requestJson(
+      origin,
+      '/api/v1/subscriber/gone-user%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(goneUser.status, 400);
+    assert.equal((goneUser.body as { error?: string }).error, 'User not found');
+
+    const goneSub = await requestJson(
+      origin,
+      '/api/v1/subscriber/gone-sub%40local.test?disable_email=true',
+      { method: 'DELETE' }
+    );
+    assert.equal(goneSub.status, 400);
+    assert.equal((goneSub.body as { error?: string }).error, 'Subscription not found');
   });
 });
 

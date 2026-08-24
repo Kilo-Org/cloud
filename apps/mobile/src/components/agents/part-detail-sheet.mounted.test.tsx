@@ -15,9 +15,11 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
@@ -313,6 +315,9 @@ describe('PartDetailSheet mounted', () => {
     expect(radioSelected(renderer.root, 'Scroll')).toBe(false);
     // Only the sheet's own vertical ScrollView: the block wraps without a scroller.
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(1);
+    // The sheet ScrollView fills the fixed-height Android surface so long
+    // content scrolls inside it instead of clipping.
+    expect(propOf(sheetScrollView(renderer.root), 'className')).toBe('flex-1');
 
     await unmount(renderer);
   });

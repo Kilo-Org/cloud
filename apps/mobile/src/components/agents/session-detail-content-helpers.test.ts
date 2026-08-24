@@ -1,12 +1,92 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
+  type KiloSessionId,
+  type MessageDeliveryState,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
+import {
+  collectEmptyChildSessionIds,
   countInFlightMessages,
+  hydrateEmptyChildSessions,
   resolveRetryPrompt,
   retryMessageAndClear,
+  runConnectRepository,
 } from './session-detail-content-helpers';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
+
+const subagentSessionId = 'ses-child' as KiloSessionId;
+const otherSubagentSessionId = 'ses-child-2' as KiloSessionId;
+
+const noChildMessages = (): StoredMessage[] => [];
+
+function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
+  return {
+    id: 'p1',
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'tool',
+    tool,
+    callID: 'call-1',
+    state,
+  };
+}
+
+function makeTaskPart(
+  status: 'pending' | 'running' | 'completed' | 'error',
+  sessionId: KiloSessionId = subagentSessionId,
+  input: Record<string, unknown> = {}
+): ToolPart {
+  if (status === 'pending') {
+    return makeToolPart('task', { status: 'pending', input, raw: '' });
+  }
+  if (status === 'running') {
+    return makeToolPart('task', {
+      status: 'running',
+      input,
+      time: { start: 1 },
+      metadata: { sessionId },
+    });
+  }
+  if (status === 'completed') {
+    return makeToolPart('task', {
+      status: 'completed',
+      input,
+      output: 'done',
+      title: 'Task',
+      metadata: { sessionId },
+      time: { start: 1, end: 2 },
+    });
+  }
+  return makeToolPart('task', {
+    status: 'error',
+    input,
+    error: 'failed',
+    metadata: { sessionId },
+    time: { start: 1, end: 2 },
+  });
+}
+
+function makeAssistantMessage(parts: ToolPart[], id = 'msg-1'): StoredMessage {
+  return {
+    info: {
+      id,
+      sessionID: 'ses-1',
+      role: 'assistant',
+      time: { created: 1 },
+      parentID: 'msg-0',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+    parts,
+  };
+}
 
 describe('countInFlightMessages', () => {
   it('excludes a failed pending row from the in-flight count', () => {
@@ -50,6 +130,21 @@ describe('retryMessageAndClear', () => {
     await retryMessageAndClear(send, clearFailed);
     expect(send).toHaveBeenCalledTimes(1);
     expect(clearFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('runConnectRepository', () => {
+  it('opens the GitHub integration and clears terminal guidance in order', () => {
+    const openGitHubIntegration = vi.fn<() => void>();
+    const clearGuidance = vi.fn<() => void>();
+
+    runConnectRepository(openGitHubIntegration, clearGuidance);
+
+    expect(openGitHubIntegration).toHaveBeenCalledTimes(1);
+    expect(clearGuidance).toHaveBeenCalledTimes(1);
+    expect(openGitHubIntegration.mock.invocationCallOrder[0]).toBeLessThan(
+      clearGuidance.mock.invocationCallOrder[0] ?? 0
+    );
   });
 });
 
@@ -120,5 +215,104 @@ describe('resolveRetryPrompt', () => {
   it('returns null for an assistant row with no preceding user row', () => {
     const assistant = assistantMessage('m5');
     expect(resolveRetryPrompt(assistant, [assistant])).toBeNull();
+  });
+});
+
+describe('collectEmptyChildSessionIds', () => {
+  it('returns [] for no messages', () => {
+    expect(collectEmptyChildSessionIds([], noChildMessages)).toEqual([]);
+  });
+
+  it('returns [] for a non-task tool part', () => {
+    const readPart = makeToolPart('read', {
+      status: 'completed',
+      input: { filePath: 'x' },
+      output: 'y',
+      title: 'read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    const messages = [makeAssistantMessage([readPart])];
+    expect(collectEmptyChildSessionIds(messages, noChildMessages)).toEqual([]);
+  });
+
+  it('returns [] for a pending task with no metadata sessionId', () => {
+    const messages = [makeAssistantMessage([makeTaskPart('pending')])];
+    expect(collectEmptyChildSessionIds(messages, noChildMessages)).toEqual([]);
+  });
+
+  it('returns the id for a completed task with empty child messages', () => {
+    const messages = [makeAssistantMessage([makeTaskPart('completed')])];
+    expect(collectEmptyChildSessionIds(messages, noChildMessages)).toEqual([subagentSessionId]);
+  });
+
+  it('returns [] for a completed task with existing child messages', () => {
+    const messages = [makeAssistantMessage([makeTaskPart('completed')])];
+    const getChildMessages = (id: KiloSessionId): StoredMessage[] =>
+      id === subagentSessionId ? [makeAssistantMessage([], 'child-msg')] : [];
+    expect(collectEmptyChildSessionIds(messages, getChildMessages)).toEqual([]);
+  });
+
+  it('includes running and error task states when empty', () => {
+    const messages = [
+      makeAssistantMessage([makeTaskPart('running', subagentSessionId)], 'msg-run'),
+      makeAssistantMessage([makeTaskPart('error', otherSubagentSessionId)], 'msg-err'),
+    ];
+    expect(collectEmptyChildSessionIds(messages, noChildMessages)).toEqual([
+      subagentSessionId,
+      otherSubagentSessionId,
+    ]);
+  });
+
+  it('returns a duplicate task id once', () => {
+    const messages = [
+      makeAssistantMessage([makeTaskPart('completed', subagentSessionId)], 'msg-1'),
+      makeAssistantMessage([makeTaskPart('completed', subagentSessionId)], 'msg-2'),
+    ];
+    expect(collectEmptyChildSessionIds(messages, noChildMessages)).toEqual([subagentSessionId]);
+  });
+
+  it('returns two different empty child ids in first-seen order', () => {
+    const messages = [
+      makeAssistantMessage([makeTaskPart('completed', subagentSessionId)], 'msg-1'),
+      makeAssistantMessage([makeTaskPart('completed', otherSubagentSessionId)], 'msg-2'),
+    ];
+    expect(collectEmptyChildSessionIds(messages, noChildMessages)).toEqual([
+      subagentSessionId,
+      otherSubagentSessionId,
+    ]);
+  });
+});
+
+describe('hydrateEmptyChildSessions', () => {
+  it('does not retry when ready after the first hydrate', async () => {
+    let status = 'loading';
+    const hydrate = vi.fn(async () => {
+      status = 'ready';
+      await Promise.resolve();
+    });
+    const readHydrationStatus = vi.fn(() => status);
+    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus);
+    expect(hydrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries once when the first hydrate errors and the second readies', async () => {
+    let status = 'loading';
+    const hydrate = vi.fn(async () => {
+      status = status === 'loading' ? 'error' : 'ready';
+      await Promise.resolve();
+    });
+    const readHydrationStatus = vi.fn(() => status);
+    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus);
+    expect(hydrate).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops at two hydrates when the retry also errors', async () => {
+    const hydrate = vi.fn(async () => {
+      await Promise.resolve();
+    });
+    const readHydrationStatus = vi.fn(() => 'error');
+    await hydrateEmptyChildSessions([subagentSessionId], hydrate, readHydrationStatus);
+    expect(hydrate).toHaveBeenCalledTimes(2);
   });
 });

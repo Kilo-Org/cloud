@@ -326,7 +326,8 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   },
   csa_unauthorized: {
     title: 'CSA rejected the support-DB scrub',
-    action: 'Confirm SUPPORT_API_SECRET matches CSA KILO_SUPPORT_API_SECRET, then Retry.',
+    action:
+      'Confirm SUPPORT_API_SECRET matches CSA KILO_SUPPORT_API_SECRET and CSA_VERCEL_PROTECTION_BYPASS matches CSA Vercel automation bypass, then Retry.',
   },
   csa_blocked_email: {
     title: 'CSA refused this email as a relay or internal target',

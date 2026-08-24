@@ -45,6 +45,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `CUSTOMERIO_TRACK_BASE` - Optional Customer.io Track API base override for local user-deletion cleanup; defaults to `https://track.customer.io`. [SERVER]
 - `SUBSTACK_PUBLICATION_URL` - Substack publication origin used by user-deletion subscriber cleanup; defaults to `https://blog.kilo.ai`. Must be `blog.kilo.ai` or a `*.substack.com` host. The Substack admin search URL is hardcoded to `https://kilocode.substack.com/publish/subscribers`, not this publication. [SERVER]
 - `CSA_APP_BASE_URL` - CSA origin used by the Cloud deletion worker to call `POST /api/internal/cloud/users/gdpr-scrub`. Example: the production CSA app URL. [SERVER]
+- `CSA_VERCEL_PROTECTION_BYPASS` - CSA Vercel Deployment Protection automation bypass. Cloud sends it as the `x-vercel-protection-bypass` header on Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`, never as a query parameter. Required when CSA has Vercel Authentication enabled; without it Vercel returns 401 before the CSA route. Distinct from `SUPPORT_API_SECRET`. `[SECRET]`
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`

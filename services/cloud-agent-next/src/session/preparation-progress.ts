@@ -21,25 +21,10 @@ export type PreparationProgressRecorder = {
   /** Translate a legacy (step, message) progress callback into v2 events. */
   onProgress(step: string, message: string): boolean;
   /**
-   * Drive the attempt to a terminal state if it is still running. Early
-   * failures create the attempt before finalizing it so clients receive a
-   * terminal status instead of remaining in the preparing state.
+   * Drive the attempt to a terminal state if it is still running. A no-op
+   * when no preparation happened or the wrapper already finished the attempt.
    */
-  finalize(outcome: PreparationOutcome, options?: PreparationFinalizeOptions): void;
-};
-
-export type PreparationFinalizeOptions = {
-  /**
-   * Whether an attempt no progress was ever observed for may be created just
-   * to carry the terminal status. Defaults to true.
-   *
-   * Pass `false` for an outcome that is not the delivery's last word — a held
-   * delivery is retried moments later, so inventing a failed attempt for it
-   * would surface a preparation failure the retry immediately contradicts. An
-   * attempt that *did* start is still terminalized either way: leaving one
-   * running strands clients in the preparing state.
-   */
-  createIfMissing?: boolean;
+  finalize(outcome: PreparationOutcome): void;
 };
 
 export function createPreparationProgressRecorder(options: {
@@ -109,12 +94,9 @@ export function createPreparationProgressRecorder(options: {
     return readPreparationAttempt(eventQueries, attemptId)?.status === 'running';
   }
 
-  function finalize(outcome: PreparationOutcome, options?: PreparationFinalizeOptions): void {
+  function finalize(outcome: PreparationOutcome): void {
     activeStep = undefined;
-    if (!readPreparationAttempt(eventQueries, attemptId)) {
-      if (options?.createIfMissing === false) return;
-      emit('workspace_setup', 'Preparing environment', { action: 'attempt_started' });
-    }
+    if (!readPreparationAttempt(eventQueries, attemptId)) return;
     for (const event of finalizePreparationAttempt(eventQueries, attemptId, {
       ...outcome,
       timestamp: now(),

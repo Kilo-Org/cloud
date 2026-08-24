@@ -60,7 +60,6 @@ import {
   getPreparationSnapshots,
   reconcileStalePreparationAttempts,
 } from '../session/preparation-history.js';
-import { isHeldDeliveryResult } from '../session/delivery-outcome.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
 import {
   createIngestHandler,
@@ -3568,6 +3567,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             if (!readyResult.success) {
               throw new Error(readyResult.error ?? 'Failed to record session readiness');
             }
+            recorder.finalize({ status: 'completed' });
           },
           onAccepted: delivery => this.recordRuntimeAcceptedMessage(plan, delivery),
         }
@@ -3575,20 +3575,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     } catch (error) {
       recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
       throw error;
-    }
-
-    // A hold is not the delivery's last word: the message stays queued and is
-    // retried moments later. Inventing a failed attempt for a hold that never
-    // reached preparation would flash a spurious "Environment preparation
-    // failed" card between the two tries. A hold raised *after* the wrapper
-    // started preparing (the batch began finalizing mid-dispatch) still has to
-    // terminalize its attempt, or clients stay in the preparing state.
-    if (isHeldDeliveryResult(result)) {
-      recorder.finalize(
-        { status: 'failed', safeError: 'Environment preparation failed' },
-        { createIfMissing: false }
-      );
-      return result;
     }
 
     // The wrapper's own terminal event can be lost (its progress channel may

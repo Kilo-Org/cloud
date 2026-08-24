@@ -132,49 +132,15 @@ describe('createPreparationProgressRecorder', () => {
     expect(attempt.safeError).toBe('Environment preparation failed');
   });
 
-  it('finalize records an early failure when no preparation progress was observed', () => {
+  it('finalize is a no-op when no preparation progress was observed', () => {
     const eventQueries = createMemoryEventQueries();
     const broadcasts: StoredEvent[] = [];
     const recorder = createRecorder(eventQueries, broadcasts);
 
     recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
 
-    expect(readAttempt(eventQueries, 'attempt-1')).toMatchObject({
-      status: 'failed',
-      safeError: 'Environment preparation failed',
-    });
-    expect(broadcastActions(broadcasts)).toEqual(['attempt_started', 'attempt_failed']);
-  });
-
-  it('createIfMissing=false skips an attempt no progress was observed for', () => {
-    const eventQueries = createMemoryEventQueries();
-    const broadcasts: StoredEvent[] = [];
-    const recorder = createRecorder(eventQueries, broadcasts);
-
-    recorder.finalize(
-      { status: 'failed', safeError: 'Environment preparation failed' },
-      { createIfMissing: false }
-    );
-
     expect(broadcasts).toEqual([]);
     expect(eventQueries.findByEntityPrefix('preparation/attempt/')).toEqual([]);
-  });
-
-  it('createIfMissing=false still terminalizes an attempt that started', () => {
-    const eventQueries = createMemoryEventQueries();
-    const broadcasts: StoredEvent[] = [];
-    const recorder = createRecorder(eventQueries, broadcasts);
-
-    recorder.onProgress('sandbox_provision', 'Provisioning sandbox…');
-    recorder.finalize(
-      { status: 'failed', safeError: 'Environment preparation failed' },
-      { createIfMissing: false }
-    );
-
-    expect(readAttempt(eventQueries, 'attempt-1')).toMatchObject({
-      status: 'failed',
-      safeError: 'Environment preparation failed',
-    });
   });
 
   it('ignores progress received after the attempt was finalized', () => {

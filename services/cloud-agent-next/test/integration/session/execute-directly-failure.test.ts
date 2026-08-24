@@ -167,7 +167,7 @@ describe('executeDirectly failure handling', () => {
   async function drainWithRuntimeResult(
     keySuffix: string,
     result: { success: false; code: string; error: string },
-    emitProgress = false
+    options: { emitProgress?: boolean; reportWorkspaceReady?: boolean } = {}
   ) {
     const userId = `user_exec_direct_${keySuffix}`;
     const sessionId = `agent_exec_direct_${keySuffix}`;
@@ -178,7 +178,18 @@ describe('executeDirectly failure handling', () => {
     return runInDurableObject(stub, async (instance, state) => {
       (instance as any).agentRuntime = {
         send: async (_plan: unknown, hooks: any) => {
-          if (emitProgress) hooks?.onProgress?.('sandbox_provision', 'Provisioning sandbox…');
+          if (options.emitProgress) {
+            hooks?.onProgress?.('sandbox_provision', 'Provisioning sandbox…');
+          }
+          if (options.reportWorkspaceReady) {
+            await hooks?.onWorkspaceReady?.({
+              workspacePath: `/workspace/${userId}/sessions/${sessionId}`,
+              sandboxId: 'usr-123456789abc',
+              sessionHome: `/home/${sessionId}`,
+              branchName: `session/${sessionId}`,
+              kiloSessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            });
+          }
           return result;
         },
         requestSnapshot: async () => {},
@@ -238,7 +249,7 @@ describe('executeDirectly failure handling', () => {
     const result = await drainWithRuntimeResult(
       'held-after-progress',
       { success: false, code: 'WRAPPER_FINALIZING', error: 'Wrapper batch is finalizing' },
-      true
+      { emitProgress: true }
     );
 
     // The attempt exists (progress was observed) and must not be left running,
@@ -251,14 +262,28 @@ describe('executeDirectly failure handling', () => {
     return parsed.attempt?.status ?? null;
   }
 
-  it('a terminal delivery failure still records a failed preparation attempt', async () => {
+  it('a terminal delivery failure before preparation leaves no attempt behind', async () => {
     const result = await drainWithRuntimeResult('terminal', {
       success: false,
       code: 'SANDBOX_CAPABILITY_UNAVAILABLE',
       error: 'Sandbox capability unavailable',
     });
 
-    expect(result.preparationEvents.length).toBeGreaterThan(0);
+    expect(result.preparationEvents).toEqual([]);
+  });
+
+  it('a delivery failure after workspace readiness leaves the attempt completed', async () => {
+    const result = await drainWithRuntimeResult(
+      'failure-after-ready',
+      {
+        success: false,
+        code: 'WRAPPER_START_FAILED',
+        error: 'Prompt dispatch failed',
+      },
+      { emitProgress: true, reportWorkspaceReady: true }
+    );
+
+    expect(result.attemptStatuses).toEqual(['completed']);
   });
 
   it('queued flush pre-start failure retries cleanly with the original execution and message ids', async () => {

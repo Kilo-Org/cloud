@@ -15,7 +15,6 @@ import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
-import { isHeldDeliveryResult } from './delivery-outcome.js';
 import {
   WrapperCleanupBlockedError,
   type WrapperCleanupBlock,
@@ -565,7 +564,7 @@ export async function flushNextPendingSessionMessage(params: {
     return toFailureResult(failure, totalCount);
   }
 
-  if (isHeldDeliveryResult(startResult)) {
+  if (!startResult.success && startResult.code === 'WRAPPER_FINALIZING') {
     return { type: 'held', remainingCount: totalCount };
   }
   if (!startResult.success) {

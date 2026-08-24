@@ -5,13 +5,6 @@ import { createRemoteSessionWithFeedback } from '@/components/agents/create-remo
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { type AgentSessionRouterLike } from '@/components/agents/session-router-like';
 
-/**
- * Test-visible pin: the restart test asserts this exact surfaced message. The
- * production path resolves the same copy through the catalog at call time.
- */
-export const RESTART_EXIT_FAILED_MESSAGE =
-  'Started a new session. The previous session is still open.';
-
 type RestartAgentSessionInput = {
   create: () => Promise<KiloSessionId>;
   exit: () => Promise<void>;

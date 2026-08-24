@@ -67,6 +67,9 @@ export function LanguagePickerSheet({
     }
     setBusy(true);
     const outcome = await applyLanguagePreference(selected, resolved, returnTarget, beforeReload);
+    // `ApplyLanguageOutcome` is a closed union and every kind is handled
+    // above, so no `default` branch is reachable.
+    // eslint-disable-next-line default-case
     switch (outcome.kind) {
       case 'applied-ltr': {
         onApplied?.();
@@ -92,10 +95,6 @@ export function LanguagePickerSheet({
       case 'catalog-failed': {
         toast.error(t('language.catalogLoadFailed'));
         setBusy(false);
-        break;
-      }
-      default: {
-        // Unknown outcome: leave the sheet open.
         break;
       }
     }

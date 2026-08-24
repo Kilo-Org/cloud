@@ -15,6 +15,7 @@ import {
 } from '@kilocode/notifications';
 
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from './expo-push';
+import type { PushTokenWithLocale } from './instance-lifecycle-push';
 
 export type {
   ScheduledActionEvent,
@@ -25,8 +26,6 @@ export type {
 export const ParamsSchema = sendScheduledActionNoticeInputSchema;
 
 const BODY_MAX_LENGTH = 100;
-
-export type PushTokenWithLocale = { token: string; locale: string | null };
 
 function truncate(text: string, max = BODY_MAX_LENGTH): string {
   if (text.length <= max) return text;

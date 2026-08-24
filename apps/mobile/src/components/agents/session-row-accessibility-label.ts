@@ -5,49 +5,13 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 /**
  * Speech-friendly relative-time formatter.
  *
- * `timeAgo` (`@/lib/utils`) produces abbreviated strings like `"5m ago"`,
- * `"1h ago"`, `"3d ago"`, `"1mo ago"`, `"2y ago"`, or `"just now"`. When
- * the row renders those through `formatMeta` they are uppercased
- * (`"5M AGO"`), which VoiceOver reads letter-by-letter. This helper
- * expands every unit `timeAgo` emits into a form VoiceOver reads as words,
- * with singular/plural handled, and leaves `"just now"` unchanged.
- *
- * Inputs that don't match a known unit pass through unchanged so a future
- * `timeAgo` unit added without updating this helper doesn't get silently
- * mangled — the worst case is the same letter-by-letter reading the
- * uppercased form already has.
+ * `timeAgo` (`@/lib/utils`) now returns `Intl.RelativeTimeFormat` words
+ * like `"5 minutes ago"`, `"yesterday"`, or `"just now"`, which VoiceOver
+ * already reads as words. This helper is a pass-through wrapper that keeps
+ * the screen-reader call site explicit.
  */
 export function formatSpokenTimeAgo(timestamp: string): string {
-  const raw = timeAgo(parseTimestamp(timestamp));
-  const match = /^(\d+)([a-z]+)\s+ago$/.exec(raw);
-  if (!match) {
-    // "just now" or any future-unrecognized form
-    return raw;
-  }
-  const n = Number(match[1]);
-  const unit = match[2];
-  const singular = {
-    m: 'agents.sessionRow.minuteOne',
-    h: 'agents.sessionRow.hourOne',
-    d: 'agents.sessionRow.dayOne',
-    mo: 'agents.sessionRow.monthOne',
-    y: 'agents.sessionRow.yearOne',
-  } satisfies Record<string, string>;
-  const plural = {
-    m: 'agents.sessionRow.minuteOther',
-    h: 'agents.sessionRow.hourOther',
-    d: 'agents.sessionRow.dayOther',
-    mo: 'agents.sessionRow.monthOther',
-    y: 'agents.sessionRow.yearOther',
-  } satisfies Record<string, string>;
-  const oneKey = unit ? singular[unit as keyof typeof singular] : undefined;
-  const otherKey = unit ? plural[unit as keyof typeof plural] : undefined;
-  if (!oneKey || !otherKey) {
-    // Unrecognized unit — pass through so a future `timeAgo` unit added
-    // without updating this helper doesn't get silently mangled.
-    return raw;
-  }
-  return `${n} ${i18n.t(n === 1 ? oneKey : otherKey)} ${i18n.t('agents.sessionRow.ago')}`;
+  return timeAgo(parseTimestamp(timestamp));
 }
 
 /**

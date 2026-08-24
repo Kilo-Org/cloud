@@ -892,6 +892,78 @@ describe('remediation queued lifecycle emit sites', () => {
     });
   });
 
+  // Regression: the ledger admit must precede the queue hand-off. The queue
+  // consumer can reach a terminal state (blocked, launch failure) in
+  // milliseconds, and the terminal settle joins on `provider_ref = attemptId`,
+  // so an admit that lands after it leaves the row admitted forever.
+  it('admits the remediation ledger row before the queue hand-off', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(eligiblePersonalFinding());
+    vi.mocked(getAnalysisActorById).mockResolvedValue(actor);
+    vi.mocked(getWorkerDb).mockReturnValue(
+      admissionDb({ runtimeConfig: autoPolicyRuntimeConfig() }) as never
+    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+
+    const order: string[] = [];
+    vi.mocked(admitOperation).mockImplementation(async () => {
+      order.push('admit');
+      return { admission: 'admitted', row: { id: 'ledger-row-1' } } as never;
+    });
+    vi.mocked(recordOperationAcceptance).mockImplementation(async () => {
+      order.push('accept');
+      return {} as never;
+    });
+    const sendBatch = vi.fn(async () => {
+      order.push('enqueue');
+    });
+    const orderedEnv = {
+      ...(env as unknown as Record<string, unknown>),
+      REMEDIATION_ATTEMPT_QUEUE: { sendBatch },
+    } as unknown as CloudflareEnv;
+
+    await startManualRemediation({
+      env: orderedEnv,
+      request: {
+        schemaVersion: 1,
+        findingId: FINDING_ID,
+        owner: { userId: 'user-1' },
+        actorUserId: 'user-1',
+      },
+    });
+
+    expect(order).toEqual(['admit', 'accept', 'enqueue']);
+    expect(vi.mocked(admitOperation).mock.calls[0]?.[1]).toMatchObject({
+      intent: 'apply_auto_remediation',
+      operationKey: `remediation:${ATTEMPT_ID}`,
+    });
+    expect(vi.mocked(recordOperationAcceptance).mock.calls[0]?.[1]).toMatchObject({
+      providerRef: ATTEMPT_ID,
+    });
+  });
+
+  it('does not fail the manual start when the ledger admit throws', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(eligiblePersonalFinding());
+    vi.mocked(getAnalysisActorById).mockResolvedValue(actor);
+    vi.mocked(getWorkerDb).mockReturnValue(
+      admissionDb({ runtimeConfig: autoPolicyRuntimeConfig() }) as never
+    );
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.mocked(admitOperation).mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      startManualRemediation({
+        env,
+        request: {
+          schemaVersion: 1,
+          findingId: FINDING_ID,
+          owner: { userId: 'user-1' },
+          actorUserId: 'user-1',
+        },
+      })
+    ).resolves.toMatchObject({ admitted: true, attemptId: ATTEMPT_ID });
+  });
+
   it('emits remediation_queued from applyAutoRemediationCommand', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue(eligiblePersonalFinding());
     vi.mocked(getAnalysisActorById).mockResolvedValue(actor);

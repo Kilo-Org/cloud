@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { logger } from './logger.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
+import type { BillingContext } from '@kilocode/container-usage';
 
 export const SANDBOX_USAGE_SKUS = {
   Sandbox: 'cloud-agent-standard-2026-07',
@@ -55,6 +56,17 @@ export type MeteredSandboxInstance = SandboxInstance & {
   ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult>;
   isBillingBlocked(): Promise<boolean>;
   isContainerRunning(): Promise<boolean>;
+  getBillingRuntimeStatus(): Promise<{
+    sandboxClassName: SandboxClassName;
+    running: boolean;
+    blocked: boolean;
+    context?: BillingContext;
+  }>;
+};
+
+/** Optional while Worker and sandbox runtime deployments roll forward independently. */
+type BillingRuntimeStatusCapability = {
+  getBillingRuntimeStatus?: MeteredSandboxInstance['getBillingRuntimeStatus'];
 };
 
 const sandboxBillingInputEnvelopeSchema = z
@@ -289,6 +301,20 @@ export async function isSandboxContainerRunning(
       .warn('Container running probe failed');
     return undefined;
   }
+}
+
+export async function getSandboxBillingRuntimeStatus(sandbox: SandboxInstance): Promise<
+  | {
+      sandboxClassName: SandboxClassName;
+      running: boolean;
+      blocked: boolean;
+      context?: BillingContext;
+    }
+  | undefined
+> {
+  const capability = sandbox as BillingRuntimeStatusCapability;
+  if (typeof capability.getBillingRuntimeStatus !== 'function') return undefined;
+  return await capability.getBillingRuntimeStatus();
 }
 
 export async function configureSandboxBillingInput(

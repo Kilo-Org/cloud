@@ -676,6 +676,14 @@ function promptAdmissionError(
       return facadeError(429, 'KILO_PROMPT_QUEUE_FULL', result.error);
     case 'PAYMENT_REQUIRED':
       return facadeError(402, 'KILO_PROMPT_PAYMENT_REQUIRED', result.error);
+    case 'COMPUTE_STOPPING':
+      return facadeError(409, 'KILO_BILLING_BLOCKED', 'Cloud Agent is saving and stopping compute');
+    case 'BILLING_UNAVAILABLE':
+      return facadeError(
+        503,
+        'KILO_BILLING_UNAVAILABLE',
+        'Cloud Agent cannot verify compute billing right now'
+      );
     case 'SANDBOX_CONNECT_FAILED':
     case 'WORKSPACE_SETUP_FAILED':
     case 'KILO_SERVER_FAILED':

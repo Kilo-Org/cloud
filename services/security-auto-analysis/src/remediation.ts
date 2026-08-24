@@ -2197,10 +2197,32 @@ export async function startManualRemediation(params: {
     allowManualRetry: params.request.retry,
   });
   if (!result.admitted) return result;
+  // Admit the ledger row BEFORE the queue hand-off. The consumer can reach a
+  // terminal state (blocked, launch failure) within milliseconds, and the
+  // terminal settle joins on `provider_ref = attemptId`, so an admit that
+  // lands after it would leave the row permanently unsettled.
+  const finding = await getSecurityFindingById(db, params.request.findingId);
+  if (finding) {
+    await admitSecurityRemediationLedgerRow({
+      db,
+      finding,
+      attemptId: result.attemptId,
+      remediationId: result.remediationId,
+      attemptNumber: result.attemptNumber,
+    });
+  }
   try {
     await enqueueRemediationAttempt(params.env, result.attemptId);
   } catch (error) {
     await markAttemptQueueAdmissionFailed(db, result.attemptId);
+    if (finding) {
+      await settleAdmittedLedgerRowBestEffort({
+        db,
+        finding,
+        attemptId: result.attemptId,
+        terminalStatus: 'failed',
+      });
+    }
     throw error;
   }
   await dispatchSecurityLifecycleEventForFinding({
@@ -2211,7 +2233,6 @@ export async function startManualRemediation(params: {
     remediationId: result.remediationId,
   });
   if (params.request.retry) {
-    const finding = await getSecurityFindingById(db, params.request.findingId);
     if (finding) {
       try {
         await recordRemediationAudit({

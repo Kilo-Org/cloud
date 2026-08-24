@@ -9,5 +9,7 @@ export default async function PersonalCloudPage() {
     user.id
   );
 
-  return <NewSessionPanel isDevcontainerAvailable={isDevcontainerAvailable} />;
+  return (
+    <NewSessionPanel currentUserId={user.id} isDevcontainerAvailable={isDevcontainerAvailable} />
+  );
 }

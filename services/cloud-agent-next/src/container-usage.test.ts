@@ -74,7 +74,7 @@ const sdk = vi.hoisted(() => {
 
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: sdk.StockSandbox }));
 
-import { MeteredSandbox } from './container-usage.js';
+import { billingHeartbeatSeconds, MeteredSandbox } from './container-usage.js';
 
 class MemoryStorage {
   private readonly values = new Map<string, unknown>();
@@ -98,6 +98,10 @@ class MemoryStorage {
 
   clear(): void {
     this.values.clear();
+  }
+
+  size(): number {
+    return this.values.size;
   }
 }
 
@@ -139,7 +143,8 @@ function createSandbox(
     | 'Sandbox'
     | 'SandboxContainment'
     | 'SandboxSmallContainment'
-    | 'SandboxDIND' = 'SandboxSmallContainment'
+    | 'SandboxDIND' = 'SandboxSmallContainment',
+  heartbeatSeconds?: string
 ) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
@@ -169,6 +174,7 @@ function createSandbox(
     flushShadowTasks: () => Promise.all(shadowTasks),
     sandbox: new TestSandbox(ctx, {
       CONTAINER_USAGE_METER: rpc,
+      CONTAINER_BILLING_HEARTBEAT_SECONDS: heartbeatSeconds,
     } as never) as unknown as TestRuntime,
   };
 }
@@ -182,14 +188,43 @@ const billingInput = {
 };
 
 describe('MeteredSandbox', () => {
+  it('uses a configurable positive heartbeat interval with the production default as fallback', () => {
+    expect(billingHeartbeatSeconds('60')).toBe(60);
+    expect(billingHeartbeatSeconds(undefined)).toBe(300);
+    expect(billingHeartbeatSeconds('')).toBe(300);
+    expect(billingHeartbeatSeconds('0')).toBe(300);
+    expect(billingHeartbeatSeconds('-1')).toBe(300);
+    expect(billingHeartbeatSeconds('not-a-number')).toBe(300);
+  });
+
   beforeEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
+  it('reads billing runtime status without creating a billing generation or waking the container', async () => {
+    const { sandbox, storage, rpc } = createSandbox(createRpc(), false, 'SandboxSmallContainment');
+
+    await expect(sandbox.getBillingRuntimeStatus()).resolves.toEqual({
+      sandboxClassName: 'SandboxSmallContainment',
+      running: false,
+      blocked: false,
+      context: undefined,
+    });
+
+    expect(storage.size()).toBe(0);
+    expect(rpc.recordStart).not.toHaveBeenCalled();
+    expect(rpc.recordHeartbeat).not.toHaveBeenCalled();
+  });
+
   it('accepts any successful meter admission before a selected cold start', async () => {
     const rpc = createRpc();
-    const { sandbox, flushShadowTasks } = createSandbox(rpc);
+    const { sandbox, flushShadowTasks } = createSandbox(
+      rpc,
+      false,
+      'SandboxSmallContainment',
+      '60'
+    );
 
     await expect(
       sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
@@ -202,7 +237,7 @@ describe('MeteredSandbox', () => {
     await sandbox.onStart();
     await flushShadowTasks();
     expect(sandbox.schedules).toEqual([
-      expect.objectContaining({ callback: 'billingHeartbeatTick' }),
+      expect.objectContaining({ when: 60, callback: 'billingHeartbeatTick' }),
     ]);
   });
 

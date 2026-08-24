@@ -1,5 +1,7 @@
-import { QueryClient } from '@tanstack/react-query';
+import { hashKey, QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
+
+import { isLatestMutationGeneration } from '@/lib/hooks/mutation-generations';
 
 import {
   applyAgentPushOptimistic,
@@ -224,4 +226,60 @@ describe('per-category flip flow (each category in turn)', () => {
       expect(qc.getQueryData(key)).toEqual(fullRow());
     });
   }
+});
+
+function releaseGate(gates: readonly (() => void)[], index: number): void {
+  const gate = gates[index];
+  if (!gate) {
+    throw new Error(`expected a pending cancellation at index ${index}`);
+  }
+  gate();
+}
+
+describe('applyAgentPushOptimistic generation stamping', () => {
+  it('gives the latest generation to the write that lands last', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow());
+
+    // Hold each cancellation open so the two onMutate critical sections
+    // interleave, then release them in reverse order.
+    const gates: (() => void)[] = [];
+    const writeOrder: NotificationCategoryKey[] = [];
+    const client = {
+      cancelQueries: async () => {
+        await new Promise<void>(resolve => {
+          gates.push(resolve);
+        });
+      },
+      getQueryData: (queryKey: readonly unknown[]) => qc.getQueryData(queryKey),
+      setQueryData: (queryKey: readonly unknown[], value: NotificationPreferences) => {
+        writeOrder.push(value.agentAttention ? 'sessionStatus' : 'agentAttention');
+        return qc.setQueryData(queryKey, value);
+      },
+    } as unknown as QueryClient;
+
+    const first = applyAgentPushOptimistic({
+      queryClient: client,
+      queryKey: key,
+      next: false,
+      category: 'agentAttention',
+    });
+    const second = applyAgentPushOptimistic({
+      queryClient: client,
+      queryKey: key,
+      next: false,
+      category: 'sessionStatus',
+    });
+    await Promise.resolve();
+
+    releaseGate(gates, 1);
+    await Promise.resolve();
+    releaseGate(gates, 0);
+    const [firstContext, secondContext] = await Promise.all([first, second]);
+
+    expect(writeOrder).toEqual(['sessionStatus', 'agentAttention']);
+    // The last write owns the cache, so only it may roll back.
+    expect(isLatestMutationGeneration(hashKey(key), firstContext.generation)).toBe(true);
+    expect(isLatestMutationGeneration(hashKey(key), secondContext.generation)).toBe(false);
+  });
 });

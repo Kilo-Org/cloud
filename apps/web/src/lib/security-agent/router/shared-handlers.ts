@@ -380,86 +380,6 @@ function securityAnalysisLedgerResourceKey(owner: SecurityReviewOwner, findingId
   return `security:start_analysis:${securityOwnerScopeKey(owner)}:${findingId}`;
 }
 
-/** Security ledger resource identity for a remediation attempt. */
-function securityRemediationLedgerResourceKey(
-  owner: SecurityReviewOwner,
-  findingId: string
-): string {
-  return `security:apply_auto_remediation:${securityOwnerScopeKey(owner)}:${findingId}`;
-}
-
-/**
- * The ledger user id for a security owner. Personal scope uses the owner user.
- * Org scope has no single acting user, so it approximates with the
- * organization's `created_by_kilo_user_id` (the `kilo_user_id` column is NOT
- * NULL). Returns null when the org has no creator, in which case the admit is
- * skipped and the terminal settle later skips on the missing row.
- */
-async function resolveSecurityLedgerUserId(owner: SecurityReviewOwner): Promise<string | null> {
-  if (!('organizationId' in owner) || !owner.organizationId) {
-    return owner.userId ?? null;
-  }
-  const [org] = await db
-    .select({ createdBy: organizations.created_by_kilo_user_id })
-    .from(organizations)
-    .where(eq(organizations.id, owner.organizationId))
-    .limit(1);
-  return org?.createdBy ?? null;
-}
-
-/**
- * Admits a `security`-domain ledger row for an already-created remediation
- * attempt and records the attempt id as the provider reference. The Worker
- * settles the row from the terminal callback. Best-effort: the remediation
- * effect already committed, so a ledger write failure must not fail the
- * request; the terminal settle then skips on the missing row.
- */
-async function admitSecurityRemediationLedgerRow(params: {
-  owner: SecurityReviewOwner;
-  findingId: string;
-  attemptId: string;
-  remediationId: string;
-  attemptNumber: number;
-}): Promise<void> {
-  try {
-    const userId = await resolveSecurityLedgerUserId(params.owner);
-    if (!userId) {
-      console.error('Skipping security remediation ledger admission: no ledger user id', {
-        attemptId: params.attemptId,
-      });
-      return;
-    }
-    const admission = await admitOperation(db, {
-      userId,
-      orgId:
-        'organizationId' in params.owner && params.owner.organizationId
-          ? params.owner.organizationId
-          : null,
-      domain: 'security',
-      intent: 'apply_auto_remediation',
-      operationKey: `remediation:${params.attemptId}`,
-      resourceKey: securityRemediationLedgerResourceKey(params.owner, params.findingId),
-      taxonomy: 'reconcile-first',
-      leaseSeconds: 120,
-    });
-    if (admission.admission !== 'admitted') return;
-    await recordOperationAcceptance(db, {
-      rowId: admission.row.id,
-      providerRef: params.attemptId,
-      canonicalResult: {
-        attemptId: params.attemptId,
-        remediationId: params.remediationId,
-        attemptNumber: params.attemptNumber,
-      },
-    });
-  } catch (error) {
-    console.error('Failed to admit the security remediation ledger row', {
-      attemptId: params.attemptId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
 /**
  * Runs a ledger write whose failure must never produce a success receipt:
  * `work` resolves false when nothing durable was written. Both cases surface
@@ -1924,16 +1844,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
         if (!queued.queued) return { success: false, ...queued };
 
-        // Admit the remediation ledger row after the attempt committed so the
-        // Worker's terminal callback can settle it. Best-effort: the attempt
-        // already exists, so a ledger write failure must not fail the request.
-        await admitSecurityRemediationLedgerRow({
-          owner: securityOwner,
-          findingId: input.findingId,
-          attemptId: queued.attemptId,
-          remediationId: queued.remediationId,
-          attemptNumber: queued.attemptNumber,
-        });
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
@@ -1984,13 +1896,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
         if (!queued.queued) return { success: false, ...queued };
 
-        await admitSecurityRemediationLedgerRow({
-          owner: securityOwner,
-          findingId: input.findingId,
-          attemptId: queued.attemptId,
-          remediationId: queued.remediationId,
-          attemptNumber: queued.attemptNumber,
-        });
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,

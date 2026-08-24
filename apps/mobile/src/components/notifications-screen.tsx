@@ -374,14 +374,15 @@ export function NotificationsScreen() {
         if (next === undefined) {
           return undefined;
         }
-        const generation = nextMutationGeneration(hashKey(preferencesQueryKey));
+        // The helper stamps its own generation after its `cancelQueries`
+        // await, so the stamp cannot drift from the cache write it guards.
         const context = await applyAgentPushOptimistic({
           queryClient,
           queryKey: preferencesQueryKey,
           next,
           category,
         });
-        return { ...context, generation };
+        return context;
       },
       onError: (error, variables, context) => {
         if (

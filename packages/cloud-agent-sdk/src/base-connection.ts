@@ -238,6 +238,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
 
     newWs.onmessage = (messageEvent: MessageEvent) => {
+      // Ignore messages from replaced sockets: a late event from a socket we
+      // already closed must not re-anchor the staleness clock, clear
+      // exhaustion, or report the transport recovered.
+      if (ws !== newWs) {
+        return;
+      }
+
       // Any incoming message cancels an active staleness check
       clearStalenessTimeout();
       lastMessageTime = Date.now();

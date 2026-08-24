@@ -558,13 +558,47 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
-    it('successful message after exhaustion fires false', () => {
+    it('a message on the recovery socket keeps exhaustion cleared', () => {
       const onReconnectExhaustionChange = jest.fn();
       const connection = exhaustWithCap(onReconnectExhaustionChange);
 
-      connectSocket(2);
+      connection.retryReconnect();
+      connectSocket(sockets.length - 1);
 
       expect(onReconnectExhaustionChange).toHaveBeenLastCalledWith(false);
+      expect(onReconnectExhaustionChange).toHaveBeenCalledTimes(2);
+
+      connection.destroy();
+    });
+
+    it('ignores a late message from a replaced socket', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const onReconnectExhaustionChange = jest.fn();
+      const { connection, onEvent, onReconnected } = createTestConnection({
+        maxReconnectAttempts: 2,
+        onReconnectExhaustionChange,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      closeSocket(0);
+      jest.advanceTimersByTime(60_000);
+      closeSocket(1);
+      jest.advanceTimersByTime(60_000);
+      closeSocket(2);
+
+      expect(onReconnectExhaustionChange).toHaveBeenCalledWith(true);
+      const socketsAfterExhaustion = sockets.length;
+      onEvent.mockClear();
+      onReconnected.mockClear();
+
+      // The socket replaced two reconnects ago delivers a late message.
+      sockets[0].onmessage?.({ data: 'late-msg' } as MessageEvent);
+
+      expect(onEvent).not.toHaveBeenCalled();
+      expect(onReconnected).not.toHaveBeenCalled();
+      expect(onReconnectExhaustionChange).toHaveBeenCalledTimes(1);
+      expect(sockets.length).toBe(socketsAfterExhaustion);
 
       connection.destroy();
     });

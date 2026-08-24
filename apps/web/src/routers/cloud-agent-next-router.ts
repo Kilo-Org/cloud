@@ -445,6 +445,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await client.getSession(input.cloudAgentSessionId);
     }),
 
+  getComputeBillingStatus: baseProcedure
+    .input(baseGetSessionNextSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      return await createCloudAgentNextClient(
+        generateCloudAgentToken(ctx.user)
+      ).getComputeBillingStatus(input.cloudAgentSessionId);
+    }),
+
   checkEligibility: baseProcedure.query(async ({ ctx }) => {
     const { balance } = await getBalanceForUser(ctx.user);
     return buildCloudAgentNextEligibility(balance);

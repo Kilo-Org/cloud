@@ -541,21 +541,32 @@ describe('Worker GitHub auth-invalid sync', () => {
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
-    expect(sets).toContainEqual(
-      expect.objectContaining({
-        runtime_state: expect.objectContaining({
-          sync_run: expect.objectContaining({
-            runId: 'run-budget-1',
-            completedRepos: ['acme/widgets'],
-          }),
-        }),
+    const progressWrite = sets.find(entry => entry.runtime_state != null)?.runtime_state;
+    expect(progressWrite).toBeDefined();
+    expect(progressWrite).not.toHaveProperty('sync_run');
+    expect(progressWrite).not.toHaveProperty('last_synced_at');
+  });
+
+  it('counts a fresh-run GitHub failure toward the owner budget and does not mark it complete', async () => {
+    const { db } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('Service unavailable', { status: 500 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-fail',
+        budgetMs: 0,
       })
-    );
-    expect(sets).not.toContainEqual(
-      expect.objectContaining({
-        runtime_state: expect.objectContaining({ last_synced_at: expect.anything() }),
-      })
-    );
+    ).resolves.toMatchObject({
+      exhaustedBudget: true,
+      remainingRepoCount: 2,
+      errors: 1,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
   });
 
   it('skips completed repositories and finalizes freshness on the last chunk', async () => {

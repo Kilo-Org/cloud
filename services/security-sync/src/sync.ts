@@ -258,16 +258,17 @@ function toSyncRunProgress(
 async function writeSyncRunProgress(
   db: WorkerDb,
   owner: SecurityReviewOwner,
-  runtimeState: Record<string, unknown>,
   progress: SyncRunProgress
 ): Promise<void> {
   await db
     .update(agent_configs)
     .set({
-      runtime_state: {
-        ...runtimeState,
-        sync_run: progress,
-      },
+      runtime_state: sql`jsonb_set(
+        COALESCE(${agent_configs.runtime_state}, '{}'::jsonb),
+        '{sync_run}',
+        ${JSON.stringify(progress)}::jsonb,
+        true
+      )`,
     })
     .where(
       and(
@@ -1822,15 +1823,8 @@ export async function syncOwner(params: {
       if (!firstError && error instanceof Error) {
         firstError = error;
       }
-      if (successfulRepos > 0 || previousProgress) {
-        completedRepos.add(selectedRepoFullName);
-        processedThisPass++;
-      }
+      processedThisPass++;
     }
-  }
-
-  if (successfulRepos === 0 && firstError && !previousProgress) {
-    throw firstError;
   }
 
   const remainingRepoCount = repositories.filter(name => !completedRepos.has(name)).length;
@@ -1838,7 +1832,6 @@ export async function syncOwner(params: {
     await writeSyncRunProgress(
       database,
       owner,
-      config.runtimeState,
       toSyncRunProgress(runId, totalResult, [...completedRepos])
     );
     console.info('Security sync owner budget exhausted; continuation required', {
@@ -1848,6 +1841,10 @@ export async function syncOwner(params: {
       durationMs: Date.now() - startTime,
     });
     return { ...totalResult, exhaustedBudget: true, remainingRepoCount };
+  }
+
+  if (successfulRepos === 0 && firstError && !previousProgress) {
+    throw firstError;
   }
 
   // Prune stale configured repositories regardless of trigger so manual and scheduled

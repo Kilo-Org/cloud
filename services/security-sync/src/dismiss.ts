@@ -77,39 +77,75 @@ async function getDismissalAuditActor(
   return buildSecurityFindingAuditHumanActor(actor);
 }
 
+async function timedDismissalStage<T>(
+  stage: string,
+  context: { commandId: string; findingId: string; runId: string },
+  work: () => Promise<T>
+): Promise<T> {
+  const started = Date.now();
+  try {
+    const result = await work();
+    console.info('Security Agent dismissal stage completed', {
+      stage,
+      duration_ms: Date.now() - started,
+      command_id: context.commandId,
+      finding_id: context.findingId,
+      run_id: context.runId,
+    });
+    return result;
+  } catch (error) {
+    console.error('Security Agent dismissal stage failed', {
+      stage,
+      duration_ms: Date.now() - started,
+      command_id: context.commandId,
+      finding_id: context.findingId,
+      run_id: context.runId,
+      error_type: error instanceof Error ? error.name : 'UnknownError',
+    });
+    throw error;
+  }
+}
+
 export async function processSecurityFindingDismissal(params: {
   db: WorkerDb;
   gitTokenService: GitTokenService;
   message: SecurityDismissMessage;
 }): Promise<FindingDismissalResult> {
-  const rows = await params.db
-    .select({
-      id: security_findings.id,
-      source: security_findings.source,
-      source_id: security_findings.source_id,
-      repo_full_name: security_findings.repo_full_name,
-      title: security_findings.title,
-      severity: security_findings.severity,
-      status: security_findings.status,
-      package_name: security_findings.package_name,
-      package_ecosystem: security_findings.package_ecosystem,
-      manifest_path: security_findings.manifest_path,
-      patched_version: security_findings.patched_version,
-      ghsa_id: security_findings.ghsa_id,
-      cve_id: security_findings.cve_id,
-      cwe_ids: security_findings.cwe_ids,
-      cvss_score: security_findings.cvss_score,
-      dependabot_html_url: security_findings.dependabot_html_url,
-      first_detected_at: security_findings.first_detected_at,
-      fixed_at: security_findings.fixed_at,
-      sla_due_at: security_findings.sla_due_at,
-      session_id: security_findings.session_id,
-      owned_by_organization_id: security_findings.owned_by_organization_id,
-      owned_by_user_id: security_findings.owned_by_user_id,
-    })
-    .from(security_findings)
-    .where(eq(security_findings.id, params.message.findingId))
-    .limit(1);
+  const stageContext = {
+    commandId: params.message.commandId,
+    findingId: params.message.findingId,
+    runId: params.message.runId,
+  };
+  const rows = await timedDismissalStage('load_finding', stageContext, () =>
+    params.db
+      .select({
+        id: security_findings.id,
+        source: security_findings.source,
+        source_id: security_findings.source_id,
+        repo_full_name: security_findings.repo_full_name,
+        title: security_findings.title,
+        severity: security_findings.severity,
+        status: security_findings.status,
+        package_name: security_findings.package_name,
+        package_ecosystem: security_findings.package_ecosystem,
+        manifest_path: security_findings.manifest_path,
+        patched_version: security_findings.patched_version,
+        ghsa_id: security_findings.ghsa_id,
+        cve_id: security_findings.cve_id,
+        cwe_ids: security_findings.cwe_ids,
+        cvss_score: security_findings.cvss_score,
+        dependabot_html_url: security_findings.dependabot_html_url,
+        first_detected_at: security_findings.first_detected_at,
+        fixed_at: security_findings.fixed_at,
+        sla_due_at: security_findings.sla_due_at,
+        session_id: security_findings.session_id,
+        owned_by_organization_id: security_findings.owned_by_organization_id,
+        owned_by_user_id: security_findings.owned_by_user_id,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, params.message.findingId))
+      .limit(1)
+  );
   const finding = rows[0];
 
   if (!finding || !findingMatchesOwner(finding, params.message.owner)) {
@@ -153,72 +189,78 @@ export async function processSecurityFindingDismissal(params: {
       };
     }
 
-    const token = await params.gitTokenService.getToken(params.message.installationId);
-    const response = await fetch(
-      `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
-
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'cloudflare-security-sync',
-        },
-        body: JSON.stringify({
-          state: 'dismissed',
-          dismissed_reason: params.message.reason,
-          dismissed_comment: params.message.comment,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `GitHub Dependabot dismissal failed with ${response.status} for finding ${finding.id}`
+    await timedDismissalStage('github_writeback', stageContext, async () => {
+      const token = await params.gitTokenService.getToken(params.message.installationId);
+      const response = await fetch(
+        `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'cloudflare-security-sync',
+          },
+          body: JSON.stringify({
+            state: 'dismissed',
+            dismissed_reason: params.message.reason,
+            dismissed_comment: params.message.comment,
+          }),
+        }
       );
-    }
+
+      if (!response.ok) {
+        throw new Error(
+          `GitHub Dependabot dismissal failed with ${response.status} for finding ${finding.id}`
+        );
+      }
+    });
   }
 
-  const actor = await getDismissalAuditActor(params.db, params.message.actor.id);
+  const actor = await timedDismissalStage('load_actor', stageContext, () =>
+    getDismissalAuditActor(params.db, params.message.actor.id)
+  );
 
-  await params.db.transaction(async tx => {
-    await tx
-      .update(security_findings)
-      .set({
-        status: 'ignored',
-        ignored_reason: params.message.reason,
-        ignored_by: actor.email ?? actor.id,
-        updated_at: sql`now()`,
-      })
-      .where(eq(security_findings.id, finding.id));
+  await timedDismissalStage('persist_dismissal', stageContext, () =>
+    params.db.transaction(async tx => {
+      await tx
+        .update(security_findings)
+        .set({
+          status: 'ignored',
+          ignored_reason: params.message.reason,
+          ignored_by: actor.email ?? actor.id,
+          updated_at: sql`now()`,
+        })
+        .where(eq(security_findings.id, finding.id));
 
-    await insertSecurityFindingAuditEvent(tx, {
-      owner: toAuditOwner(params.message.owner),
-      finding: { ...finding, status: 'ignored' },
-      actor,
-      action: SecurityAuditLogAction.FindingDismissed,
-      occurredAt: new Date(),
-      eventKey: dismissalEventKey({
-        owner: params.message.owner,
-        findingId: finding.id,
-        commandId: params.message.commandId,
-      }),
-      sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
-      beforeState: { status: finding.status },
-      afterState: { status: 'ignored', reason_code: params.message.reason },
-      metadata: {
-        source: finding.source,
-        run_id: params.message.runId,
-        command_id: params.message.commandId,
-        message_id: params.message.messageId,
-        trigger: 'worker_queue',
-        reason_code: params.message.reason,
-        source_writeback_outcome: finding.source === 'dependabot' ? 'dismissed' : 'not_applicable',
-      },
-    });
-  });
+      await insertSecurityFindingAuditEvent(tx, {
+        owner: toAuditOwner(params.message.owner),
+        finding: { ...finding, status: 'ignored' },
+        actor,
+        action: SecurityAuditLogAction.FindingDismissed,
+        occurredAt: new Date(),
+        eventKey: dismissalEventKey({
+          owner: params.message.owner,
+          findingId: finding.id,
+          commandId: params.message.commandId,
+        }),
+        sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
+        beforeState: { status: finding.status },
+        afterState: { status: 'ignored', reason_code: params.message.reason },
+        metadata: {
+          source: finding.source,
+          run_id: params.message.runId,
+          command_id: params.message.commandId,
+          message_id: params.message.messageId,
+          trigger: 'worker_queue',
+          reason_code: params.message.reason,
+          source_writeback_outcome:
+            finding.source === 'dependabot' ? 'dismissed' : 'not_applicable',
+        },
+      });
+    })
+  );
 
   return {
     dismissed: true,

@@ -10,6 +10,7 @@ declare type Message<T> = {
 };
 
 declare type MessageBatch<T> = {
+  queue?: string;
   messages: Array<Message<T>>;
 };
 
@@ -44,6 +45,7 @@ declare type ExecutionContext = {
 declare type CloudflareEnv = {
   INTERNAL_API_SECRET: SecretBinding;
   SYNC_QUEUE: Queue<import('./src/index').SecuritySyncQueueMessage>;
+  DISMISS_QUEUE: Queue<import('./src/index').SecurityDismissMessage>;
   HYPERDRIVE: Hyperdrive;
   GIT_TOKEN_SERVICE: GitTokenService;
   ENVIRONMENT: string;

@@ -12,6 +12,7 @@ import {
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
+import { ProductChoices } from '@/components/home/product-choices';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -91,6 +92,8 @@ export function HomeScreen() {
                   <NewTaskButton organizationId={organizationId} />
                 </View>
               ) : null}
+
+              <ProductChoices organizationId={organizationId} />
             </Animated.View>
           )}
         </Animated.View>

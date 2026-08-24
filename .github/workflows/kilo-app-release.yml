@@ -52,8 +52,64 @@ jobs:
   validate:
     uses: ./.github/workflows/kilo-app-ci.yml
 
+  preflight:
+    needs: [check-changes]
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "::error::EXPO_TOKEN secret is required for the release preflight"
+            exit 1
+          fi
+          echo "EXPO_TOKEN is present"
+
+      - name: Verify EAS production environment
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          ENV_OUTPUT=$(pnpx eas-cli@21.8.0 env:list --environment production --format long)
+          MISSING=""
+          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT; do
+            if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
+              MISSING="$MISSING $NAME"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing EAS production environment variables:$MISSING"
+            exit 1
+          fi
+          echo "All required EAS production environment variables are present"
+
+      - name: Assert production config contract
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: EAS_BUILD_PROFILE=production pnpx eas-cli@21.8.0 env:exec production --non-interactive 'pnpm assert:config'
+
   build-and-submit:
-    needs: [check-changes, validate]
+    needs: [check-changes, validate, preflight]
     if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
@@ -74,11 +130,59 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build and submit
+      - name: Build iOS and Android
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpx eas-cli@latest build --profile production --platform all --auto-submit --non-interactive
+        run: |
+          mkdir -p artifacts
+          pnpx eas-cli@21.8.0 build --profile production --platform all --non-interactive --json --wait > build.json
+          node ../../scripts/inspect-mobile-artifacts.mjs --select build.json > urls.txt
+          echo "IOS_URL=$(sed -n '1p' urls.txt)" >> "$GITHUB_ENV"
+          echo "ANDROID_URL=$(sed -n '2p' urls.txt)" >> "$GITHUB_ENV"
+
+      - name: Download artifacts
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          download() {
+            url="$1"
+            out="$2"
+            label="$3"
+            if curl -fL -H "Authorization: Bearer $EXPO_TOKEN" -o "$out" "$url"; then
+              echo "$label: downloaded with Authorization header"
+            elif curl -fL -o "$out" "$url"; then
+              echo "$label: downloaded without Authorization header (pre-signed URL rejected the header)"
+            else
+              echo "::error::$label download failed"
+              return 1
+            fi
+          }
+          download "$IOS_URL" artifacts/app.ipa "iOS"
+          download "$ANDROID_URL" artifacts/app.aab "Android"
+
+      - name: Setup Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Inspect artifacts
+        working-directory: apps/mobile
+        run: node ../../scripts/inspect-mobile-artifacts.mjs artifacts/app.ipa artifacts/app.aab build.json
+
+      - name: Submit iOS
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: pnpx eas-cli@21.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
+
+      - name: Submit Android
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: pnpx eas-cli@21.8.0 submit --profile production --platform android --non-interactive --path artifacts/app.aab
 
       - name: Tag release
         run: |

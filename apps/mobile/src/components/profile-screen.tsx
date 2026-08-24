@@ -32,6 +32,7 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
+import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -72,6 +73,7 @@ export function ProfileScreen() {
   const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const {
     data,
@@ -81,7 +83,7 @@ export function ProfileScreen() {
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && afterInteractions,
   });
   const {
     data: orgs,
@@ -90,10 +92,10 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && afterInteractions,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching)
+    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
     : undefined;
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
@@ -240,13 +242,16 @@ export function ProfileScreen() {
         {/* No layout animation on this section: siblings above mount/resize
             asynchronously; LinearTransition would animate this container's
             position lag as a visible header overlap. Opacity fades are safe. */}
-        {(isLoading || providersError || (data?.providers.length ?? 0) > 0) && (
+        {(providersError ||
+          (data?.providers.length ?? 0) > 0 ||
+          isLoading ||
+          (!afterInteractions && !data)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               Linked accounts
             </Text>
 
-            {isLoading && (
+            {(isLoading || !afterInteractions) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
                 <Skeleton className="h-12 w-full rounded-lg" />
               </Animated.View>

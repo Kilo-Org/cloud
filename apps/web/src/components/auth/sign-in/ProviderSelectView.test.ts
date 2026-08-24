@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import * as React from 'react';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 
 jest.mock('@/components/auth/sign-in/AuthProviderButtons', () => ({
@@ -218,5 +219,22 @@ describe('ProviderSelectView pending provider selection', () => {
 
     expect(provider.disabled).toBe(true);
     expect(back.disabled).toBe(true);
+  });
+});
+
+describe('ProviderSelectView email copy', () => {
+  it('keeps the action phrase separate and only breaks long email addresses when needed', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProviderSelectView, {
+        email: 'person@example.com',
+        providers: ['google'],
+        onProviderSelect: async () => false,
+        onBack: () => undefined,
+      })
+    );
+
+    expect(html).toContain('Choose how you&#x27;d like to sign in as');
+    expect(html).toContain('class="mt-1 block break-words font-semibold"');
+    expect(html).not.toContain('break-all');
   });
 });

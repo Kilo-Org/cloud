@@ -345,7 +345,7 @@ export function SignInForm({
             </>
           )}
 
-          {/* Secondary actions footer - hidden in emailOnly or SSO mode and only on the new-user landing screen */}
+          {/* Keep Enterprise SSO available for normal sign-in; the install link belongs to one footer only. */}
           {!emailOnly && !ssoMode && flow.tier === 'new' && !isSignUp && (
             <div className="border-border mt-8 flex flex-col items-center gap-3 border-t pt-6">
               <Link
@@ -355,12 +355,14 @@ export function SignInForm({
                 <SquareUserRound className="size-4" />
                 Enterprise SSO
               </Link>
-              <Link
-                href="/get-started"
-                className="mt-4 text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
-              >
-                Install Kilo Code
-              </Link>
+              {!flow.showEmailInput && (
+                <Link
+                  href="/get-started"
+                  className="mt-4 text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  Install Kilo Code
+                </Link>
+              )}
             </div>
           )}
 

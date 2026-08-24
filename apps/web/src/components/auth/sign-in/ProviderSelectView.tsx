@@ -39,8 +39,10 @@ export function ProviderSelectView({
   return (
     <div className="w-full text-center">
       <p className="text-muted-foreground mb-8 text-lg">
-        {purpose === 'sign-up' ? 'Create an account as' : "Choose how you'd like to sign in as"}{' '}
-        <span className="font-semibold break-all">{email}</span>
+        <span className="block">
+          {purpose === 'sign-up' ? 'Create an account as' : "Choose how you'd like to sign in as"}
+        </span>
+        <span className="mt-1 block break-words font-semibold">{email}</span>
       </p>
 
       <div className="mx-auto max-w-md space-y-4">

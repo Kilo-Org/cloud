@@ -67,6 +67,17 @@ const { SignInForm } = require('./SignInForm') as {
 };
 
 describe('SignInForm Enterprise SSO navigation', () => {
+  it('renders one install action for initial email-first sign-in', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: {},
+      })
+    );
+
+    expect(html.match(/Install Kilo Code/g)).toHaveLength(1);
+    expect(html).toContain('Enterprise SSO');
+  });
+
   it('renders SSO Back as normal sign-in while retaining approved context', () => {
     const html = renderToStaticMarkup(
       createElement(SignInForm, {
@@ -103,6 +114,7 @@ describe('SignInForm Enterprise SSO navigation', () => {
 
     expect(html).toContain('Continue with Email');
     expect(html).not.toContain('Security Verification');
+    expect(html).not.toContain('Install Kilo Code');
   });
 
   it('renders an invite SSO CTA instead of automatic discovery', () => {
@@ -114,5 +126,6 @@ describe('SignInForm Enterprise SSO navigation', () => {
 
     expect(html).toContain('Continue to Single Sign-On');
     expect(html).not.toContain('Security Verification');
+    expect(html.match(/Install Kilo Code/g)).toHaveLength(1);
   });
 });

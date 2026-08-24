@@ -37,6 +37,25 @@ describe('handlePylonContact', () => {
     expect(outcome).toEqual({ kind: 'not_applicable' });
   });
 
+  it('is not applicable when search omits data', async () => {
+    const { request, step, context } = await setupContactRequest();
+    mockPylon({ searchBody: { request_id: '2cea4887-e3f3-452d-837b-bb3e590939de' } });
+
+    const outcome = await handlePylonContact({ request, step, context });
+    expect(outcome).toEqual({ kind: 'not_applicable' });
+  });
+
+  it('needs attention when search data is not a contact list', async () => {
+    const { request, step, context } = await setupContactRequest();
+    mockPylon({ searchBody: { data: { unexpected: true } } });
+
+    const outcome = await handlePylonContact({ request, step, context });
+    expect(outcome).toEqual({
+      kind: 'needs_attention',
+      errorCode: 'pylon_contact_lookup_incomplete',
+    });
+  });
+
   it('blocks when an extra email belongs to another Kilo user', async () => {
     await insertTestUser({ google_user_email: EXTRA_EMAIL });
     const { request, step, context } = await setupContactRequest();
@@ -141,15 +160,20 @@ async function setupContactRequest() {
   return { request, step: claimed, context };
 }
 
-function mockPylon(params: { contacts: Array<{ id: string; email?: string; emails?: string[] }> }) {
+function mockPylon(params: {
+  contacts?: Array<{ id: string; email?: string; emails?: string[] }>;
+  searchBody?: unknown;
+}) {
   return jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
     if (url.endsWith('/contacts/search') && method === 'POST') {
-      return jsonResponse({
-        data: params.contacts,
-        pagination: { has_next_page: false },
-      });
+      return jsonResponse(
+        params.searchBody ?? {
+          data: params.contacts ?? [],
+          pagination: { has_next_page: false },
+        }
+      );
     }
     const deleteMatch = url.match(/\/contacts\/([^/?]+)$/);
     if (deleteMatch && method === 'DELETE') {

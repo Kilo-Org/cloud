@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Agent sessiyangizda yangilanish bor",
+      "chatMessage": "Sizda yangi xabar bor",
+      "instanceLifecycle": "Instansiyangizda yangilanish bor",
+      "scheduledAction": "Rejalashtirilgan harakatda yangilanish bor",
+      "lowBalance": "Balansingiz e'tibor talab qiladi",
+      "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Vazifa yakunlandi"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Amalga oshmadi: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Uzildi: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Nomsiz",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Past balans ogohlantirishi",
+      "body": "{{organizationName}} balansi ${{minimumBalanceUsd}} dan pastga tushdi"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Yangi xavfsizlik xulosasi ({{severity}})",
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA ogohlantirishi",
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA buzilishi",
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Xavfsizlik xulosasi e'tibor talab qiladi"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} tayyor",
+      "body": "Suhbatni boshlash uchun bosing."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} ishga tushmadi",
+      "body": "Ishga tushirish amalga oshmadi."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} tez orada qayta ishga tushadi",
+      "body": "{{when}} da qayta ishga tushirish rejalashtirilgan."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "{{instanceName}} qayta ishga tushirish bekor qilindi",
+      "body": "Avval rejalashtirilgan qayta ishga tushirish bekor qilindi."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} tez orada yangilanadi",
+      "bodyWithTag": "{{when}} da {{targetImageTag}} ga yangilash.",
+      "bodyWithoutTag": "{{when}} da rejalashtirilgan yangilash."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "{{instanceName}} yangilash bekor qilindi",
+      "body": "Avval rejalashtirilgan yangilash bekor qilindi."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Kilo sessiyangiz telefoningizdan boshqarishga tayyor"
   }
 }

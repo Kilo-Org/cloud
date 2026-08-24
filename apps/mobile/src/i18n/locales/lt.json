@@ -31,9 +31,9 @@
     "languageSaved": "Jūsų kalba išsaugota.",
     "catalogLoadFailed": "Nepavyko įkelti kalbos. Bandykite dar kartą.",
     "retry": "Bandyti dar kartą",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Ieškoti kalbų",
+    "noMatches": "Kalbų nesutapo",
+    "deviceLanguage": "Įrenginio kalba"
   },
   "login": {
     "welcome": "Sveiki atvykę į Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
-    "account": "Account"
+    "account": "Paskyra"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Pasirinkta {{label}}, bakstelėkite, kad pakeistumėte pasirinkimą",
       "tapToComment": "{{label}}, bakstelėkite, kad pakomentuotumėte"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Iškarpinė tuščia",
+    "linkPasteNotAPullRequest": "Tai ne „GitHub“ pull request nuoroda"
   },
   "notifications": {
     "title": "Pranešimai",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
       "couldNotOpenMessage": "Nepavyko pradėti GitHub App sąrankos. Bandykite dar kartą."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sesija baigta",
+    "remoteSpawnRetryable": "Nepavyko pasiekti egzemplioriaus — jis galėjo atsijungti.",
+    "remoteSpawnNonRetryable": "Egzemplioriui nepavyko pradėti sesijos — patikrinkite įrenginį arba atnaujinkite CLI.",
+    "remoteSpawnInstanceDisconnected": "Pasirinktas egzempliorius atsijungė. Pradėkite sesiją „Cloud Agent“ arba pasirinkite kitą egzempliorių."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Kalba apdorojama internetu",
     "onlineMessage": "Šis įrenginys negali transkribuoti neprisijungęs. Jūsų įrašas siunčiamas {{provider}}, kad jis būtų paverstas tekstu. Kilo nesaugo garso.",
     "allow": "Leisti",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Pradėti balso įvestį",
+    "stop": "Sustabdyti balso įvestį"
   },
   "share": {
     "title": "Dalintis į Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Atidaro App Store prenumeratos valdymą.",
     "opensPlans": "Atidaro Kilo Pass planus.",
     "tryAgainFromProfile": "Bandykite dar kartą iš profilio.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "„Kilo Pass“ negalima įsigyti programoje „Android“ sistemoje. Tvarkykite jį internete.",
+    "webManagementDescription": "Šis „Kilo Pass“ tvarkomas internete.",
+    "legalDisclosure": "„Kilo Pass“ yra automatiškai atnaujinama mėnesinė prenumerata. Mokėjimas nuskaitomas iš jūsų „Apple ID“ patvirtinus pirkimą. Prenumeratos atnaujinamos automatiškai kiekvieną mėnesį nurodyta kaina, nebent atšauksite ne vėliau kaip likus 24 valandoms iki einamojo laikotarpio pabaigos. Tvarkykite arba atšaukite bet kada „App Store“ paskyros nustatymuose.",
+    "legalPrivacyPolicy": "Privatumo politika",
+    "legalTermsOfUse": "Naudojimo sąlygos (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Paskyra su šiuo el. paštu jau yra su kitu prisijungimo būdu. Išbandykite kitą būdą arba naudokite „Daugiau prisijungimo parinkčių“.",
+    "differentOauth": "Paskyra su šiuo el. paštu jau yra su kitu prisijungimo būdu. Išbandykite kitą būdą arba naudokite „Daugiau prisijungimo parinkčių“.",
+    "ssoError": "Jūsų organizacijai reikalinga SSO. Naudokite „Daugiau prisijungimo parinkčių“.",
+    "blocked": "Ši paskyra užblokuota. Susisiekite su pagalba.",
+    "signupRateLimited": "Per daug bandymų. Bandykite dar kartą vėliau.",
+    "invalidCode": "Tas kodas neteisingas. Bandykite dar kartą.",
+    "codeInProgress": "Jūsų kodas apdorojamas. Palaukite akimirką ir bandykite dar kartą.",
+    "tooManyAttempts": "Per daug bandymų. Prašykite naujo kodo.",
+    "invalidToken": "Prisijungti nepavyko. Bandykite dar kartą.",
+    "invalidEmail": "Nepavyko pristatyti el. laiško į šį adresą. Naudokite kitą el. paštą.",
+    "invalidRequest": "Patikrinkite savo el. pašto adresą ir bandykite dar kartą.",
+    "emailDeliveryFailed": "El. laiškų pristatymas laikinai nepasiekiamas. Bandykite dar kartą vėliau.",
+    "admissionRequired": "Jūsų įrenginio negalima patikrinti. Naudokite „Daugiau prisijungimo parinkčių“, kad prisijungtumėte kitame įrenginyje arba internete.",
+    "default": "Kažkas nepavyko. Bandykite dar kartą.",
+    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Patikrinkite ryšį ir bandykite dar kartą."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Surinkti duomenys",
+    "free": "Nemokama"
   }
 }

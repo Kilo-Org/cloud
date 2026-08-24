@@ -31,9 +31,9 @@
     "languageSaved": "Η γλώσσα σας αποθηκεύτηκε.",
     "catalogLoadFailed": "Δεν ήταν δυνατή η φόρτωση της γλώσσας. Δοκιμάστε ξανά.",
     "retry": "Νέα προσπάθεια",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Αναζήτηση γλωσσών",
+    "noMatches": "Καμία γλώσσα δεν ταιριάζει",
+    "deviceLanguage": "Γλώσσα συσκευής"
   },
   "login": {
     "welcome": "Καλώς ήρθατε στο Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Σύστημα",
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
-    "account": "Account"
+    "account": "Λογαριασμός"
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Επιλεγμένο {{label}}, πατήστε για αλλαγή επιλογής",
       "tapToComment": "{{label}}, πατήστε για σχόλιο"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο",
+    "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub"
   },
   "notifications": {
     "title": "Ειδοποιήσεις",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
       "couldNotOpenMessage": "Δεν ήταν δυνατή η έναρξη της ρύθμισης της εφαρμογής GitHub. Δοκιμάστε ξανά."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Η συνεδρία τερματίστηκε",
+    "remoteSpawnRetryable": "Δεν ήταν δυνατή η πρόσβαση στην παρουσία — μπορεί να αποσυνδέθηκε.",
+    "remoteSpawnNonRetryable": "Η παρουσία απέτυχε να ξεκινήσει τη συνεδρία — ελέγξτε τη μηχανή ή ενημερώστε το CLI.",
+    "remoteSpawnInstanceDisconnected": "Η επιλεγμένη παρουσία αποσυνδέθηκε. Ξεκινήστε μια συνεδρία στο Cloud Agent ή επιλέξτε άλλη παρουσία."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Η ομιλία επεξεργάζεται online",
     "onlineMessage": "Αυτή η συσκευή δεν μπορεί να μεταγράψει εκτός σύνδεσης. Η εγγραφή σας αποστέλλεται στο {{provider}} για μετατροπή σε κείμενο. Το Kilo δεν αποθηκεύει τον ήχο.",
     "allow": "Επιτρέπω",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Έναρξη φωνητικής εισόδου",
+    "stop": "Διακοπή φωνητικής εισόδου"
   },
   "share": {
     "title": "Κοινή χρήση στο Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Ανοίγει τη διαχείριση συνδρομών του App Store.",
     "opensPlans": "Ανοίγει τα προγράμματα Kilo Pass.",
     "tryAgainFromProfile": "Δοκιμάστε ξανά από το Προφίλ.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Το Kilo Pass δεν είναι διαθέσιμο ως αγορά εντός εφαρμογής σε Android. Διαχειριστείτε το στον ιστό.",
+    "webManagementDescription": "Αυτό το Kilo Pass διαχειρίζεται στον ιστό.",
+    "legalDisclosure": "Το Kilo Pass είναι μια συνδρομή με αυτόματη ανανέωση σε μηνιαία βάση. Η πληρωμή χρεώνεται στο Apple ID σας κατά την επιβεβαίωση της αγοράς. Οι συνδρομές ανανεώνονται αυτόματα κάθε μήνα στην τιμή που εμφανίζεται, εκτός εάν ακυρωθούν τουλάχιστον 24 ώρες πριν από το τέλος της τρέχουσας περιόδου. Διαχειριστείτε ή ακυρώστε ανά πάσα στιγμή στις ρυθμίσεις του λογαριασμού σας στο App Store.",
+    "legalPrivacyPolicy": "Πολιτική Απορρήτου",
+    "legalTermsOfUse": "Όροι Χρήσης (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Υπάρχει ήδη λογαριασμός με αυτό το email με διαφορετική μέθοδο σύνδεσης. Δοκιμάστε άλλη μέθοδο ή χρησιμοποιήστε τις «Περισσότερες επιλογές σύνδεσης».",
+    "differentOauth": "Υπάρχει ήδη λογαριασμός με αυτό το email με διαφορετική μέθοδο σύνδεσης. Δοκιμάστε άλλη μέθοδο ή χρησιμοποιήστε τις «Περισσότερες επιλογές σύνδεσης».",
+    "ssoError": "Ο οργανισμός σας απαιτεί SSO. Χρησιμοποιήστε τις «Περισσότερες επιλογές σύνδεσης».",
+    "blocked": "Αυτός ο λογαριασμός έχει αποκλειστεί. Επικοινωνήστε με την υποστήριξη.",
+    "signupRateLimited": "Πάρα πολλές προσπάθειες. Προσπαθήστε ξανά αργότερα.",
+    "invalidCode": "Αυτός ο κωδικός είναι λανθασμένος. Προσπαθήστε ξανά.",
+    "codeInProgress": "Ο κωδικός σας επεξεργάζεται. Περιμένετε λίγο και προσπαθήστε ξανά.",
+    "tooManyAttempts": "Πάρα πολλές προσπάθειες. Ζητήστε έναν νέο κωδικό.",
+    "invalidToken": "Η σύνδεση απέτυχε. Προσπαθήστε ξανά.",
+    "invalidEmail": "Δεν είναι δυνατή η παράδοση email σε αυτή τη διεύθυνση. Χρησιμοποιήστε διαφορετικό email.",
+    "invalidRequest": "Ελέγξτε τη διεύθυνση email σας και προσπαθήστε ξανά.",
+    "emailDeliveryFailed": "Η παράδοση email δεν είναι προσωρινά διαθέσιμη. Προσπαθήστε ξανά αργότερα.",
+    "admissionRequired": "Η συσκευή σας δεν μπορεί να επαληθευτεί. Χρησιμοποιήστε τις «Περισσότερες επιλογές σύνδεσης» για να συνδεθείτε από άλλη συσκευή ή μέσω ιστού.",
+    "default": "Κάτι πήγε στραβά. Προσπαθήστε ξανά.",
+    "retryableAdmission": "Δεν μπορέσαμε να επαληθεύσουμε αυτή τη συσκευή. Ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Δεδομένα που συλλέγονται",
+    "free": "Δωρεάν"
   }
 }

@@ -31,9 +31,9 @@
     "languageSaved": "O teu idioma está gardado.",
     "catalogLoadFailed": "Non se puido cargar o idioma. Proba de novo.",
     "retry": "Volver tentar",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Buscar idiomas",
+    "noMatches": "Ningún idioma coincide",
+    "deviceLanguage": "Idioma do dispositivo"
   },
   "login": {
     "welcome": "Benvido a Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
-    "account": "Account"
+    "account": "Conta"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Seleccionado {{label}}, toca para cambiar a selección",
       "tapToComment": "{{label}}, toca para comentar"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "O portapapeis está baleiro",
+    "linkPasteNotAPullRequest": "Non é unha ligazón de solicitude de cambios de GitHub"
   },
   "notifications": {
     "title": "Notificacións",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Non se puido abrir GitHub",
       "couldNotOpenMessage": "Non se puido iniciar a configuración da app de GitHub. Téntao de novo."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "A sesión saíu",
+    "remoteSpawnRetryable": "Non se puido alcanzar a instancia; é posible que se desconectase.",
+    "remoteSpawnNonRetryable": "A instancia non puido iniciar a sesión; comprobe a máquina ou actualice a CLI.",
+    "remoteSpawnInstanceDisconnected": "A instancia seleccionada desconectouse. Inicie unha sesión en Cloud Agent ou elixa outra instancia."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "O audio procésase en liña",
     "onlineMessage": "Este dispositivo non pode transcribir sen conexión. A túa gravación envíase a {{provider}} para convertela en texto. Kilo non almacena o audio.",
     "allow": "Permitir",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Iniciar entrada de voz",
+    "stop": "Deter entrada de voz"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Ábre a xestión de subscricións da App Store.",
     "opensPlans": "Ábre os plans de Kilo Pass.",
     "tryAgainFromProfile": "Téntao de novo desde o Perfil.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass non está dispoñible como compra dentro da aplicación en Android. Xestiona na web.",
+    "webManagementDescription": "Este Kilo Pass xestiónase na web.",
+    "legalDisclosure": "Kilo Pass é unha subscrición mensual auto-renovable. O pago cobrase na túa conta de Apple no momento da compra. As subscricións renóvanse automaticamente cada mes ao prezo indicado a menos que se cancelen polo menos 24 horas antes de que remate o período actual. Xestiona ou cancela en calquera momento na configuración da túa conta da App Store.",
+    "legalPrivacyPolicy": "Política de privacidade",
+    "legalTermsOfUse": "Termos de uso (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Xa existe unha conta con este correo cun método de inicio de sesión diferente. Proba outro método ou usa \"Máis opcións de inicio de sesión\".",
+    "differentOauth": "Xa existe unha conta con este correo cun método de inicio de sesión diferente. Proba outro método ou usa \"Máis opcións de inicio de sesión\".",
+    "ssoError": "A túa organización require SSO. Usa \"Máis opcións de inicio de sesión\".",
+    "blocked": "Esta conta foi bloqueada. Contacta co soporte.",
+    "signupRateLimited": "Demasiados intentos. Tenta de novo máis tarde.",
+    "invalidCode": "Ese código é incorrecto. Tenta de novo.",
+    "codeInProgress": "O teu código está a procesarse. Espera un momento e tenta de novo.",
+    "tooManyAttempts": "Demasiados intentos. Solicita un código novo.",
+    "invalidToken": "Fallou o inicio de sesión. Tenta de novo.",
+    "invalidEmail": "Non se puido entregar o correo a este enderezo. Usa un correo diferente.",
+    "invalidRequest": "Comproba o teu enderezo de correo e tenta de novo.",
+    "emailDeliveryFailed": "A entrega do correo non está dispoñible temporalmente. Tenta de novo máis tarde.",
+    "admissionRequired": "Non se pode verificar o teu dispositivo. Usa \"Máis opcións de inicio de sesión\" para iniciar sesión noutro dispositivo ou a través da web.",
+    "default": "Algo saíu mal. Tenta de novo.",
+    "retryableAdmission": "Non puidemos verificar este dispositivo. Comproba a túa conexión e tenta de novo."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Datos recollidos",
+    "free": "Grátis"
   }
 }

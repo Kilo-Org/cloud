@@ -31,9 +31,9 @@
     "languageSaved": "S'ha desat el teu idioma.",
     "catalogLoadFailed": "No s'ha pogut carregar l'idioma. Torna-ho a provar.",
     "retry": "Torna-ho a provar",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Cerca idiomes",
+    "noMatches": "No hi coincideix cap idioma",
+    "deviceLanguage": "Idioma del dispositiu"
   },
   "login": {
     "welcome": "Benvingut/da a Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Clar",
     "appearanceDark": "Fosc",
-    "account": "Account"
+    "account": "Compte"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} seleccionat, toca per canviar la selecció",
       "tapToComment": "{{label}}, toca per comentar"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "El porta-retalls és buit",
+    "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub"
   },
   "notifications": {
     "title": "Notificacions",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
       "couldNotOpenMessage": "No hem pogut iniciar la configuració de l'aplicació de GitHub. Torna-ho a provar."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "La sessió ha finalitzat",
+    "remoteSpawnRetryable": "No s'ha pogut arribar a la instància: potser s'ha desconnectat.",
+    "remoteSpawnNonRetryable": "La instància no ha pogut iniciar la sessió: comproveu la màquina o actualitzeu la CLI.",
+    "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicieu una sessió a Cloud Agent o trieu una altra instància."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "La parla es processa en línia",
     "onlineMessage": "Aquest dispositiu no pot transcriure sense connexió. El teu enregistrament s'envia a {{provider}} per convertir-lo en text. Kilo no emmagatzema l'àudio.",
     "allow": "Permet",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Inicia l'entrada de veu",
+    "stop": "Atura l'entrada de veu"
   },
   "share": {
     "title": "Comparteix a Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Obre la gestió de la subscripció de l'App Store.",
     "opensPlans": "Obre els plans de Kilo Pass.",
     "tryAgainFromProfile": "Torna-ho a provar des del Perfil.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass no està disponible com a compra dins de l'aplicació a Android. Gestioneu-lo al web.",
+    "webManagementDescription": "Aquest Kilo Pass es gestiona al web.",
+    "legalDisclosure": "Kilo Pass és una subscripció mensual de renovació automàtica. El pagament es carrega al vostre Apple ID en confirmar la compra. Les subscripcions es renoven automàticament cada mes al preu mostrat tret que es cancel·lin com a mínim 24 hores abans del final del període actual. Gestioneu-les o cancel·leu-les en qualsevol moment a la configuració del compte de l'App Store.",
+    "legalPrivacyPolicy": "Política de privadesa",
+    "legalTermsOfUse": "Condicions d'ús (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Ja existeix un compte amb aquest correu electrònic i un mètode d'inici de sessió diferent. Proveu un altre mètode o feu servir \"Més opcions d'inici de sessió\".",
+    "differentOauth": "Ja existeix un compte amb aquest correu electrònic i un mètode d'inici de sessió diferent. Proveu un altre mètode o feu servir \"Més opcions d'inici de sessió\".",
+    "ssoError": "La vostra organització requereix SSO. Feu servir \"Més opcions d'inici de sessió\".",
+    "blocked": "Aquest compte s'ha bloquejat. Contacteu amb el suport.",
+    "signupRateLimited": "Massa intents. Torneu-ho a provar més tard.",
+    "invalidCode": "Aquest codi és incorrecte. Torneu-ho a provar.",
+    "codeInProgress": "S'està processant el vostre codi. Espereu un moment i torneu-ho a provar.",
+    "tooManyAttempts": "Massa intents. Sol·liciteu un codi nou.",
+    "invalidToken": "L'inici de sessió ha fallat. Torneu-ho a provar.",
+    "invalidEmail": "No s'ha pogut enviar el correu electrònic a aquesta adreça. Feu servir un correu electrònic diferent.",
+    "invalidRequest": "Comproveu la vostra adreça de correu electrònic i torneu-ho a provar.",
+    "emailDeliveryFailed": "El lliurament del correu electrònic no està disponible temporalment. Torneu-ho a provar més tard.",
+    "admissionRequired": "No es pot verificar el vostre dispositiu. Feu servir \"Més opcions d'inici de sessió\" per iniciar sessió en un altre dispositiu o mitjançant el web.",
+    "default": "S'ha produït un error. Torneu-ho a provar.",
+    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comproveu la connexió i torneu-ho a provar."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Dades recollides",
+    "free": "Gratuït"
   }
 }

@@ -31,9 +31,9 @@
     "languageSaved": "तुमची भाषा जतन झाली आहे.",
     "catalogLoadFailed": "भाषा लोड करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
     "retry": "पुन्हा प्रयत्न करा",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "भाषा शोधा",
+    "noMatches": "कोणतीही भाषा जुळत नाही",
+    "deviceLanguage": "डिव्हाइसची भाषा"
   },
   "login": {
     "welcome": "Kilo मध्ये स्वागत आहे",
@@ -143,7 +143,7 @@
     "appearanceSystem": "सिस्टम",
     "appearanceLight": "लाइट",
     "appearanceDark": "डार्क",
-    "account": "Account"
+    "account": "खाते"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} निवडले, निवड बदलण्यासाठी टॅप करा",
       "tapToComment": "{{label}}, टिप्पणी करण्यासाठी टॅप करा"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे",
+    "linkPasteNotAPullRequest": "ही GitHub पुल रिक्वेस्ट लिंक नाही"
   },
   "notifications": {
     "title": "सूचना",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub उघडता आले नाही",
       "couldNotOpenMessage": "आम्ही GitHub App सेटअप सुरू करू शकलो नाही. कृपया पुन्हा प्रयत्न करा."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "सत्र संपले",
+    "remoteSpawnRetryable": "उदाहरणापर्यंत पोहोचता आले नाही — ते डिस्कनेक्ट झाले असावे.",
+    "remoteSpawnNonRetryable": "उदाहरण सत्र सुरू करू शकले नाही — मशीन तपासा किंवा CLI अद्यतनित करा.",
+    "remoteSpawnInstanceDisconnected": "निवडलेले उदाहरण डिस्कनेक्ट झाले. Cloud Agent वर सत्र सुरू करा किंवा दुसरे उदाहरण निवडा."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "भाषण ऑनलाइन प्रक्रिया केले जाते",
     "onlineMessage": "ही डिव्हाइस ऑफलाइन ट्रान्सक्राइब करू शकत नाही. ते मजकुरात बदलण्यासाठी तुमचे रेकॉर्डिंग {{provider}} कडे पाठवले जाते. Kilo ऑडिओ साठवत नाही.",
     "allow": "परवानगी द्या",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "व्हॉइस इनपुट सुरू करा",
+    "stop": "व्हॉइस इनपुट थांबवा"
   },
   "share": {
     "title": "Kilo ला शेअर करा",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store सदस्यत्व व्यवस्थापन उघडते.",
     "opensPlans": "Kilo Pass प्लॅन्स उघडते.",
     "tryAgainFromProfile": "प्रोफाइलमधून पुन्हा प्रयत्न करा.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass Android वर अॅपमधील खरेदी म्हणून उपलब्ध नाही. ते वेबवर व्यवस्थापित करा.",
+    "webManagementDescription": "हे Kilo Pass वेबवर व्यवस्थापित केले जाते.",
+    "legalDisclosure": "Kilo Pass ही आपोआप नूतनीकरण होणारी मासिक सदस्यता आहे. खरेदीच्या पुष्टीकरणावर पेमेंट तुमच्या Apple ID वर आकारले जाते. सदस्यता सध्याच्या कालावधीच्या समाप्तीच्या किमान 24 तास आधी रद्द न केल्यास दरमहा दाखवलेल्या किंमतीवर आपोआप नूतनीकरण होते. तुमच्या App Store खाते सेटिंग्जमध्ये कधीही व्यवस्थापित करा किंवा रद्द करा.",
+    "legalPrivacyPolicy": "गोपनीयता धोरण",
+    "legalTermsOfUse": "वापराच्या अटी (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "या ईमेलसह एक खाते आधीपासून अस्तित्वात आहे पण वेगळ्या साइन-इन पद्धतीसह. दुसरी पद्धत वापरा किंवा 'More sign-in options' वापरा.",
+    "differentOauth": "या ईमेलसह एक खाते आधीपासून अस्तित्वात आहे पण वेगळ्या साइन-इन पद्धतीसह. दुसरी पद्धत वापरा किंवा 'More sign-in options' वापरा.",
+    "ssoError": "तुमच्या संस्थेला SSO आवश्यक आहे. 'More sign-in options' वापरा.",
+    "blocked": "हे खाते ब्लॉक केले गेले आहे. कृपया समर्थनाशी संपर्क साधा.",
+    "signupRateLimited": "खूप प्रयत्न झाले. कृपया नंतर पुन्हा प्रयत्न करा.",
+    "invalidCode": "तो कोड चुकीचा आहे. कृपया पुन्हा प्रयत्न करा.",
+    "codeInProgress": "तुमचा कोड प्रक्रिया होत आहे. थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा.",
+    "tooManyAttempts": "खूप प्रयत्न झाले. कृपया नवीन कोड मागवा.",
+    "invalidToken": "साइन-इन अयशस्वी. कृपया पुन्हा प्रयत्न करा.",
+    "invalidEmail": "या पत्त्यावर ईमेल वितरित करण्यात अक्षम. कृपया वेगळा ईमेल वापरा.",
+    "invalidRequest": "तुमचा ईमेल पत्ता तपासा आणि पुन्हा प्रयत्न करा.",
+    "emailDeliveryFailed": "ईमेल वितरण सध्या अनुपलब्ध आहे. कृपया नंतर पुन्हा प्रयत्न करा.",
+    "admissionRequired": "तुमचे डिव्हाइस सत्यापित केले जाऊ शकत नाही. दुसऱ्या डिव्हाइसवर किंवा वेबद्वारे साइन इन करण्यासाठी 'More sign-in options' वापरा.",
+    "default": "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा.",
+    "retryableAdmission": "आम्ही हे डिव्हाइस सत्यापित करू शकलो नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "संकलित डेटा",
+    "free": "मोफत"
   }
 }

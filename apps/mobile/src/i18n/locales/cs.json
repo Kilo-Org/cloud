@@ -31,9 +31,9 @@
     "languageSaved": "Váš jazyk je uložen.",
     "catalogLoadFailed": "Nepodařilo se načíst jazyk. Zkuste to prosím znovu.",
     "retry": "Zkusit znovu",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Hledat jazyky",
+    "noMatches": "Žádné jazyky neodpovídají",
+    "deviceLanguage": "Jazyk zařízení"
   },
   "login": {
     "welcome": "Vítejte v Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Systém",
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
-    "account": "Account"
+    "account": "Účet"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Vybráno {{label}}, klepnutím změníte výběr",
       "tapToComment": "{{label}}, klepnutím okomentujete"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Schránka je prázdná",
+    "linkPasteNotAPullRequest": "Toto není odkaz na pull request v GitHubu"
   },
   "notifications": {
     "title": "Oznámení",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
       "couldNotOpenMessage": "Nemohli jsme spustit nastavení aplikace GitHub. Zkuste to znovu."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Relace ukončena",
+    "remoteSpawnRetryable": "Instanci se nepodařilo dosáhnout — mohla se odpojit.",
+    "remoteSpawnNonRetryable": "Instanci se nepodařilo spustit relaci — zkontrolujte stroj nebo aktualizujte CLI.",
+    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusťte relaci na Cloud Agent nebo vyberte jinou instanci."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Řeč se zpracovává online",
     "onlineMessage": "Toto zařízení nemůže přepisovat offline. Váš záznam je odeslán poskytovateli {{provider}} pro převod na text. Kilo neukládá zvuk.",
     "allow": "Povolit",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Spustit hlasový vstup",
+    "stop": "Zastavit hlasový vstup"
   },
   "share": {
     "title": "Sdílet do Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Otevře správu předplatného v App Store.",
     "opensPlans": "Otevře plány Kilo Pass.",
     "tryAgainFromProfile": "Zkuste to znovu z Profilu.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass není na Androidu dostupný jako nákup v aplikaci. Spravujte jej na webu.",
+    "webManagementDescription": "Tento Kilo Pass je spravován na webu.",
+    "legalDisclosure": "Kilo Pass je měsíční předplatné s automatickou obnovou. Platba je účtována na váš Apple ID při potvrzení nákupu. Předplatné se automaticky obnovuje každý měsíc za uvedenou cenu, pokud jej nezrušíte nejméně 24 hodin před koncem aktuálního období. Předplatné můžete kdykoli spravovat nebo zrušit v nastavení účtu App Store.",
+    "legalPrivacyPolicy": "Zásady ochrany osobních údajů",
+    "legalTermsOfUse": "Podmínky použití (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Účet s tímto e-mailem již existuje s jinou metodou přihlášení. Zkuste jinou metodu nebo použijte „Další možnosti přihlášení“.",
+    "differentOauth": "Účet s tímto e-mailem již existuje s jinou metodou přihlášení. Zkuste jinou metodu nebo použijte „Další možnosti přihlášení“.",
+    "ssoError": "Vaše organizace vyžaduje SSO. Použijte „Další možnosti přihlášení“.",
+    "blocked": "Tento účet byl zablokován. Kontaktujte prosím podporu.",
+    "signupRateLimited": "Příliš mnoho pokusů. Zkuste to prosím později.",
+    "invalidCode": "Tento kód je nesprávný. Zkuste to prosím znovu.",
+    "codeInProgress": "Váš kód se zpracovává. Počkejte chvíli a zkuste to znovu.",
+    "tooManyAttempts": "Příliš mnoho pokusů. Vyžádejte si prosím nový kód.",
+    "invalidToken": "Přihlášení se nezdařilo. Zkuste to prosím znovu.",
+    "invalidEmail": "Na tuto adresu nelze doručit e-mail. Použijte prosím jiný e-mail.",
+    "invalidRequest": "Zkontrolujte svou e-mailovou adresu a zkuste to znovu.",
+    "emailDeliveryFailed": "Doručování e-mailů je dočasně nedostupné. Zkuste to prosím později.",
+    "admissionRequired": "Vaše zařízení nelze ověřit. Pomocí „Další možnosti přihlášení“ se přihlaste na jiném zařízení nebo přes web.",
+    "default": "Došlo k chybě. Zkuste to prosím znovu.",
+    "retryableAdmission": "Zařízení se nám nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Shromažďovaná data",
+    "free": "Zdarma"
   }
 }

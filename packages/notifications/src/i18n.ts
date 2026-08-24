@@ -64,6 +64,7 @@ import pa from './locales/pa.json';
 import pl from './locales/pl.json';
 import ps from './locales/ps.json';
 import pt from './locales/pt.json';
+import pt_BR from './locales/pt-BR.json';
 import ro from './locales/ro.json';
 import ru from './locales/ru.json';
 import si from './locales/si.json';
@@ -152,6 +153,7 @@ const resources = {
   fa: { translation: fa },
   pl: { translation: pl },
   pt: { translation: pt },
+  "pt-BR": { translation: pt_BR },
   pa: { translation: pa },
   ro: { translation: ro },
   ru: { translation: ru },

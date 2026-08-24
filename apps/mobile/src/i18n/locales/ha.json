@@ -31,9 +31,9 @@
     "languageSaved": "An ajiye harshen ka.",
     "catalogLoadFailed": "Ba a iya ɗaukar harshen ba. Don Allah sake gwadawa.",
     "retry": "Sake gwadawa",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Nemo harsuna",
+    "noMatches": "Babu harsunan da suka dace",
+    "deviceLanguage": "Harshen na'urar"
   },
   "login": {
     "welcome": "Barka da zuwa Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Tsarin",
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
-    "account": "Account"
+    "account": "Asusu"
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "An zaɓi {{label}}, danna don canza zaɓi",
       "tapToComment": "{{label}}, danna don tsokaci"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Allon kwafi babu kome",
+    "linkPasteNotAPullRequest": "Ba hanyar GitHub pull request ba"
   },
   "notifications": {
     "title": "Sanarwa",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "An kasa buɗe GitHub",
       "couldNotOpenMessage": "Ba mu iya fara saitin GitHub App ba. Da fatan za a sake gwadawa."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Zaman ya ƙare",
+    "remoteSpawnRetryable": "An kasa isa ga instance — yana iya zama an yanke.",
+    "remoteSpawnNonRetryable": "Instance ta kasa fara zaman — duba na'urar ko sabunta CLI.",
+    "remoteSpawnInstanceDisconnected": "Instance da aka zaɓa ta yanke. Fara zama a Cloud Agent ko zaɓi wata instance."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Ana sarrafa magana akan layi",
     "onlineMessage": "Wannan na'urar ba za ta iya rubuta magana ba tare da haɗi ba. Ana aika rikodin ka zuwa {{provider}} don a mayar da shi rubutu. Kilo ba ya adana sautin.",
     "allow": "Ba da izini",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Fara shigar da murya",
+    "stop": "Dakatar da shigar da murya"
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Yana buɗe sarrafa biyan kuɗi na App Store.",
     "opensPlans": "Yana buɗe tsare-tsaren Kilo Pass.",
     "tryAgainFromProfile": "Sake gwadawa daga Profile.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass ba ya samuwa a matsayin siyayyar in-app akan Android. Sarrafa shi a yanar gizo.",
+    "webManagementDescription": "Wannan Kilo Pass ana sarrafa shi a yanar gizo.",
+    "legalDisclosure": "Kilo Pass biyan kuɗi ne na wata-wata wanda ke sabunta kansa. Ana cajin biyan kuɗi ga Apple ID ɗinka a lokacin tabbatar da siyayya. Biyan kuɗi yana sabuntawa kowace wata a farashin da aka nuna sai dai idan an soke shi aƙalla sa'o'i 24 kafin ƙarshen lokaci na yanzu. Sarrafa ko soke a kowane lokaci a saitunan asusunka na App Store.",
+    "legalPrivacyPolicy": "Manufofin Sirri",
+    "legalTermsOfUse": "Sharuɗɗan Amfani (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Asusu da wannan imel ya riga ya wanzu da wata hanyar shiga daban. Gwada wata hanya ko yi amfani da 'More sign-in options'.",
+    "differentOauth": "Asusu da wannan imel ya riga ya wanzu da wata hanyar shiga daban. Gwada wata hanya ko yi amfani da 'More sign-in options'.",
+    "ssoError": "Ƙungiyarka na buƙatar SSO. Yi amfani da 'More sign-in options'.",
+    "blocked": "An toshe wannan asusu. Tuntuɓi tallafi.",
+    "signupRateLimited": "Ƙoƙari da yawa. Da fatan za a sake gwadawa daga baya.",
+    "invalidCode": "Wannan lambar ba daidai ba ce. Da fatan za a sake gwadawa.",
+    "codeInProgress": "Ana sarrafa lambarka. Jira ɗan lokaci ka sake gwadawa.",
+    "tooManyAttempts": "Ƙoƙari da yawa. Da fatan za a nemi sabuwar lamba.",
+    "invalidToken": "Shiga ya gaza. Da fatan za a sake gwadawa.",
+    "invalidEmail": "An kasa isar da imel ga wannan adireshin. Da fatan za a yi amfani da wani imel.",
+    "invalidRequest": "Duba adireshin imel ɗinka ka sake gwadawa.",
+    "emailDeliveryFailed": "Isar da imel ba ta samuwa na ɗan lokaci. Da fatan za a sake gwadawa daga baya.",
+    "admissionRequired": "Ba a iya tabbatar da na'urarka ba. Yi amfani da 'More sign-in options' don shiga a wata na'ura ko ta yanar gizo.",
+    "default": "Wani abu ya faru da kuskure. Da fatan za a sake gwadawa.",
+    "retryableAdmission": "Ba mu iya tabbatar da wannan na'ura ba. Duba haɗinka ka sake gwadawa."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Bayanan da aka tattara",
+    "free": "Kyauta"
   }
 }

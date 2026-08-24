@@ -31,9 +31,9 @@
     "languageSaved": "Echekwaala asụsụ gị.",
     "catalogLoadFailed": "Enweghị ike ibugo asụsụ ahụ. Biko nwaa ọzọ.",
     "retry": "Nwaa ọzọ",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Chọọ asụsụ",
+    "noMatches": "Ọ dịghị asụsụ dabara adaba",
+    "deviceLanguage": "Asụsụ ngwaọrụ"
   },
   "login": {
     "welcome": "Nnọọ na Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistemụ",
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
-    "account": "Account"
+    "account": "Akaụntụ"
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ dọrọ adịghị",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Ahọpụtara {{label}}, pịa iji gbanwee nhọrọ",
       "tapToComment": "{{label}}, pịa iji kọwaa"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Mbadamba ederede tọgbọrọ chakachara",
+    "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ndọta GitHub"
   },
   "notifications": {
     "title": "Ọkwa",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Enweghị ike imeghe GitHub",
       "couldNotOpenMessage": "Anyị enweghị ike ịmalite nhazi GitHub App. Biko nwaa ọzọ."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Oge nnọkọ kwụsịrị",
+    "remoteSpawnRetryable": "Enweghị ike iru ebe a na-akpọ — o nwere ike ịkpụpụla.",
+    "remoteSpawnNonRetryable": "Ụlọ ọrụ ahụ adịghị ebido oge nnọkọ — lelee igwe ma ọ bụ melite CLI.",
+    "remoteSpawnInstanceDisconnected": "Ebe a họpụtara ịkpụpụla. Malite oge nnọkọ na Cloud Agent ma ọ bụ họrọ ebe ọzọ."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "A na-ahazi okwu n'ịntanetị",
     "onlineMessage": "Ngwaọrụ a enweghị ike idegharị n'ọfụma. A na-eziga ndekọ gị na {{provider}} ka ọ gbanwee ya ka ọ bụrụ ederede. Kilo anaghị echekwa ụda ahụ.",
     "allow": "Kwe",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Malite ntinye olu",
+    "stop": "Kwụsị ntinye olu"
   },
   "share": {
     "title": "Kekọrịta na Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Na-emeghe njikwa ndenye aha App Store.",
     "opensPlans": "Na-emeghe atụmatụ Kilo Pass.",
     "tryAgainFromProfile": "Nwaa ọzọ site na Profaịlụ.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Ọ dịghị ike ịzụta Kilo Pass dị ka ịzụta n'ime ngwa na Android. Jikwaa ya na webụ.",
+    "webManagementDescription": "A Kilo Pass a na-ejikwa na webụ.",
+    "legalDisclosure": "Kilo Pass bụ ndenye aha kwa ọnwa nke na-emegharị onwe ya. A na-ana ụgwọ na Apple ID gị mgbe ị kwadoro ịzụta. Ndenye aha na-emegharị kwa ọnwa na ọnụahịa egosiri belụsọ na ị kagburu ya ọ dịkarịa ala awa 24 tupu njedebe nke oge ugbu a. Jikwaa ma ọ bụ kagbuo ya mgbe ọ bụla na ntọala akaụntụ App Store gị.",
+    "legalPrivacyPolicy": "Amụma Nzuzo",
+    "legalTermsOfUse": "Ụkpụrụ Ojiji (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Akaụntụ nwere email a adịlarị yana ụzọ nbanye dị iche. Nwaa ụzọ ọzọ ma ọ bụ jiri 'Ọzọ nbanye'.",
+    "differentOauth": "Akaụntụ nwere email a adịlarị yana ụzọ nbanye dị iche. Nwaa ụzọ ọzọ ma ọ bụ jiri 'Ọzọ nbanye'.",
+    "ssoError": "Òtù gị chọrọ SSO. Jiri 'Ọzọ nbanye'.",
+    "blocked": "Echibidoro akaụntụ a. Biko kpọtụrụ nkwado.",
+    "signupRateLimited": "Mgbalị dị ọtụtụ. Biko nwaa ọzọ ma emechaa.",
+    "invalidCode": "Koodu ahụ ezighi ezi. Biko nwaa ọzọ.",
+    "codeInProgress": "A na-ahazi koodu gị. Chere nwa oge wee nwaa ọzọ.",
+    "tooManyAttempts": "Mgbalị dị ọtụtụ. Biko rịọ koodu ọhụrụ.",
+    "invalidToken": "Nbanye dara. Biko nwaa ọzọ.",
+    "invalidEmail": "Enweghị ike iziga email na adreesị a. Biko jiri email ọzọ.",
+    "invalidRequest": "Lelee adreesị email gị wee nwaa ọzọ.",
+    "emailDeliveryFailed": "Nnyefe email adịghị adị ugbu a. Biko nwaa ọzọ ma emechaa.",
+    "admissionRequired": "Enweghị ike ịgba mbọ gosipụta ngwaọrụ gị. Jiri 'Ọzọ nbanye' banye na ngwaọrụ ọzọ ma ọ bụ na webụ.",
+    "default": "Ihe mere n'ụzọ na-ezighi ezi. Biko nwaa ọzọ.",
+    "retryableAdmission": "Anyị enweghị ike ịgba mbọ gosipụta ngwaọrụ a. Lelee njikọ gị wee nwaa ọzọ."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Data anakọtara",
+    "free": "N'efu"
   }
 }

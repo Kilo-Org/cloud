@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "ستاسو د اجنټ غونډه تازه شوې ده",
+      "chatMessage": "تاسو یو نوی پیغام لرئ",
+      "instanceLifecycle": "ستاسو نمونه تازه شوې ده",
+      "scheduledAction": "یو ټاکلی عمل تازه شوی دی",
+      "lowBalance": "ستاسو توازن ته پاملرنه اړینه ده",
+      "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "دنده بشپړه شوه"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "ناکام شو: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "مداخله شوه: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · پرته له سرلیک",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "د ټیټ توازن خبرتیا",
+      "body": "د {{organizationName}} توازن له ${{minimumBalanceUsd}} لاندې راښکته شو"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "نوې امنیتي موندنه ({{severity}})",
+      "body": "{{findingTitle}} په {{repoFullName}} کې"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "د SLA خبرداری",
+      "body": "{{findingTitle}} په {{repoFullName}} کې"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "د SLA سرغړونه",
+      "body": "{{findingTitle}} په {{repoFullName}} کې"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "یو امنیتي موندنې ته پاملرنه اړینه ده"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} چمتو دی",
+      "body": "د خبرو پیل لپاره ټایپ کړئ."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} نه شو پیل کېدلای",
+      "body": "پیل ناکام شو."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} به ژر بیا پیل شي",
+      "body": "د {{when}} په وخت کې د بیا پیل ټاکل شوی."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "د {{instanceName}} بیا پیل لغوه شو",
+      "body": "مخکې ټاکل شوی بیا پیل لغوه شوی دی."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} به ژر تازه شي",
+      "bodyWithTag": "د {{when}} په وخت کې {{targetImageTag}} ته تازه کړئ.",
+      "bodyWithoutTag": "د {{when}} په وخت کې ټاکل شوی تازه کول."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "د {{instanceName}} تازه کول لغوه شو",
+      "body": "مخکې ټاکل شوی تازه کول لغوه شوی دی."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "ستاسو Kilo غونډه چمتو ده چې له خپل تلیفون څخه یې کنټرول کړئ"
   }
 }

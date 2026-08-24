@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Mae gan eich sesiwn asiant ddiweddariad",
+      "chatMessage": "Mae gennych neges newydd",
+      "instanceLifecycle": "Mae gan eich achos ddiweddariad",
+      "scheduledAction": "Mae gan weithred wedi'i hamserlennu ddiweddariad",
+      "lowBalance": "Mae angen sylw ar eich balans",
+      "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Cwblhawyd y dasg"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Methodd: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Wedi'i ymyrryd: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Heb deitl",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Rhybudd balans isel",
+      "body": "Syrthiodd balans {{organizationName}} o dan ${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Canfyddiad diogelwch newydd ({{severity}})",
+      "body": "{{findingTitle}} yn {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Rhybudd SLA",
+      "body": "{{findingTitle}} yn {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Torri SLA",
+      "body": "{{findingTitle}} yn {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Mae angen sylw ar ganfyddiad diogelwch"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "Mae {{instanceName}} yn barod",
+      "body": "Tapiwch i ddechrau sgwrsio."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "Methodd {{instanceName}} â chychwyn",
+      "body": "Methodd y cychwyn."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "Bydd {{instanceName}} yn ailgychwyn yn fuan",
+      "body": "Wedi'i drefnu i ailgychwyn am {{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "Canslwyd ailgychwyn {{instanceName}}",
+      "body": "Canslwyd yr ailgychwyn a drefnwyd yn flaenorol."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "Bydd {{instanceName}} yn uwchraddio'n fuan",
+      "bodyWithTag": "Uwchraddio i {{targetImageTag}} am {{when}}.",
+      "bodyWithoutTag": "Uwchraddio wedi'i drefnu am {{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "Canslwyd uwchraddiad {{instanceName}}",
+      "body": "Canslwyd yr uwchraddiad a drefnwyd yn flaenorol."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Mae eich sesiwn Kilo yn barod i'w rheoli o'ch ffôn"
   }
 }

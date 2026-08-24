@@ -31,9 +31,9 @@
     "languageSaved": "Nai-save ang iyong wika.",
     "catalogLoadFailed": "Hindi ma-load ang wika. Pakisubukan muli.",
     "retry": "Subukan muli",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Maghanap ng mga wika",
+    "noMatches": "Walang tugmang wika",
+    "deviceLanguage": "Wika ng device"
   },
   "login": {
     "welcome": "Maligayang pagdating sa Kilo",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Napili ang {{label}}, tap para baguhin ang pagpili",
       "tapToComment": "{{label}}, tap para magkomento"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Walang laman ang clipboard",
+    "linkPasteNotAPullRequest": "Hindi link ng GitHub pull request"
   },
   "notifications": {
     "title": "Mga Notipikasyon",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
       "couldNotOpenMessage": "Hindi namin masimulan ang setup ng GitHub App. Pakisubukang muli."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Lumabas sa session",
+    "remoteSpawnRetryable": "Hindi maabot ang instance — maaaring nadiskonekta ito.",
+    "remoteSpawnNonRetryable": "Nabigong simulan ang session ng instance — suriin ang machine o i-update ang CLI.",
+    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Pinoproseso ang pagsasalita online",
     "onlineMessage": "Hindi ma-transcribe ng device na ito nang offline. Ipinapadala ang iyong recording sa {{provider}} para gawing text. Hindi iniimbak ng Kilo ang audio.",
     "allow": "Payagan",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Simulan ang voice input",
+    "stop": "Itigil ang voice input"
   },
   "share": {
     "title": "I-share sa Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Bubuksan ang pamamahala ng App Store subscription.",
     "opensPlans": "Bubuksan ang mga plan ng Kilo Pass.",
     "tryAgainFromProfile": "Subukang muli mula sa Profile.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Hindi available ang Kilo Pass bilang in-app purchase sa Android. Pamahalaan ito sa web.",
+    "webManagementDescription": "Pinamamahalaan sa web ang Kilo Pass na ito.",
+    "legalDisclosure": "Ang Kilo Pass ay isang auto-renewable na buwanang subscription. Babayaran ang bayad sa iyong Apple ID kapag nakumpirma ang pagbili. Awtomatikong nire-renew ang mga subscription bawat buwan sa ipinapakitang presyo maliban kung kinansela nang hindi bababa sa 24 na oras bago matapos ang kasalukuyang panahon. Pamahalaan o kanselahin anumang oras sa iyong mga setting ng App Store account.",
+    "legalPrivacyPolicy": "Patakaran sa Privacy",
+    "legalTermsOfUse": "Mga Tuntunin ng Paggamit (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "May umiiral nang account na may ganitong email gamit ang ibang paraan ng pag-sign in. Subukan ang ibang paraan o gamitin ang 'More sign-in options'.",
+    "differentOauth": "May umiiral nang account na may ganitong email gamit ang ibang paraan ng pag-sign in. Subukan ang ibang paraan o gamitin ang 'More sign-in options'.",
+    "ssoError": "Nangangailangan ng SSO ang iyong organisasyon. Gamitin ang 'More sign-in options'.",
+    "blocked": "Na-block ang account na ito. Mangyaring makipag-ugnayan sa suporta.",
+    "signupRateLimited": "Masyadong maraming pagsubok. Mangyaring subukan muli mamaya.",
+    "invalidCode": "Mali ang code na iyon. Mangyaring subukan muli.",
+    "codeInProgress": "Pinoproseso ang iyong code. Maghintay ng sandali at subukan muli.",
+    "tooManyAttempts": "Masyadong maraming pagsubok. Mangyaring humiling ng bagong code.",
+    "invalidToken": "Nabigo ang pag-sign in. Mangyaring subukan muli.",
+    "invalidEmail": "Hindi maihatid ang email sa address na ito. Mangyaring gumamit ng ibang email.",
+    "invalidRequest": "Suriin ang iyong email address at subukan muli.",
+    "emailDeliveryFailed": "Pansamantalang hindi available ang paghahatid ng email. Mangyaring subukan muli mamaya.",
+    "admissionRequired": "Hindi ma-verify ang iyong device. Gamitin ang 'More sign-in options' para mag-sign in sa ibang device o sa pamamagitan ng web.",
+    "default": "May nangyaring mali. Mangyaring subukan muli.",
+    "retryableAdmission": "Hindi namin ma-verify ang device na ito. Suriin ang iyong koneksyon at subukan muli."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Kinokolektang data",
+    "free": "Libre"
   }
 }

@@ -31,9 +31,9 @@
     "languageSaved": "Ваша мова захавана.",
     "catalogLoadFailed": "Не атрымалася загрузіць мову. Паспрабуйце яшчэ раз.",
     "retry": "Паўтарыць",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Пошук моў",
+    "noMatches": "Няма супадзенняў моў",
+    "deviceLanguage": "Мова прылады"
   },
   "login": {
     "welcome": "Сардэчна запрашаем у Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Сістэма",
     "appearanceLight": "Светлая",
     "appearanceDark": "Цёмная",
-    "account": "Account"
+    "account": "Уліковы запіс"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Выбрана {{label}}, дакраніцеся, каб змяніць выбар",
       "tapToComment": "{{label}}, дакраніцеся, каб пакінуць каментар"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Буфер абмену пусты",
+    "linkPasteNotAPullRequest": "Гэта не спасылка на pull request GitHub"
   },
   "notifications": {
     "title": "Апавяшчэнні",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
       "couldNotOpenMessage": "Не атрымалася пачаць наладу GitHub App. Паспрабуйце зноў."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Сеанс завершаны",
+    "remoteSpawnRetryable": "Не ўдалося злучыцца з інстансам — магчыма, ён адключыўся.",
+    "remoteSpawnNonRetryable": "Інстанс не змог запусціць сеанс — праверце машыну або абнавіце CLI.",
+    "remoteSpawnInstanceDisconnected": "Выбраны інстанс адключыўся. Запусціце сеанс у Cloud Agent або абярыце іншы інстанс."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Маўленне апрацоўваецца онлайн",
     "onlineMessage": "Гэтая прылада не можа выконваць транскрыпцыю афлайн. Ваш запіс адпраўляецца ў {{provider}} для пераўтварэння ў тэкст. Kilo не захоўвае аўдыё.",
     "allow": "Дазволіць",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Пачаць галасавы ўвод",
+    "stop": "Спыніць галасавы ўвод"
   },
   "share": {
     "title": "Падзяліцца з Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Адкрывае кіраванне падпіскай у App Store.",
     "opensPlans": "Адкрывае планы Kilo Pass.",
     "tryAgainFromProfile": "Паспрабуйце яшчэ раз у Профілі.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass недаступны як пакупка ў праграме на Android. Кіруйце ім у вэбе.",
+    "webManagementDescription": "Гэтым Kilo Pass кіруюць у вэбе.",
+    "legalDisclosure": "Kilo Pass — гэта аўтападоўжвальная штомесячная падпіска. Плацёж спаганяецца з вашага Apple ID пры пацвярджэнні пакупкі. Падпіска аўтаматычна падаўжаецца кожны месяц па паказанай цане, калі яна не адменена не менш чым за 24 гадзіны да заканчэння бягучага перыяду. Кіруйце ёю або адменіце яе ў любы час у наладах уліковага запісу App Store.",
+    "legalPrivacyPolicy": "Палітыка прыватнасці",
+    "legalTermsOfUse": "Умовы выкарыстання (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Уліковы запіс з гэтым адрасам электроннай пошты ўжо існуе з іншым спосабам уваходу. Паспрабуйце іншы спосаб або скарыстайцеся пунктам «Дадатковыя варыянты ўваходу».",
+    "differentOauth": "Уліковы запіс з гэтым адрасам электроннай пошты ўжо існуе з іншым спосабам уваходу. Паспрабуйце іншы спосаб або скарыстайцеся пунктам «Дадатковыя варыянты ўваходу».",
+    "ssoError": "Ваша арганізацыя патрабуе SSO. Скарыстайцеся пунктам «Дадатковыя варыянты ўваходу».",
+    "blocked": "Гэты ўліковы запіс заблакаваны. Звярніцеся ў падтрымку.",
+    "signupRateLimited": "Занадта шмат спроб. Паспрабуйце пазней.",
+    "invalidCode": "Гэты код няслушны. Паспрабуйце яшчэ раз.",
+    "codeInProgress": "Ваш код апрацоўваецца. Пачакайце і паспрабуйце яшчэ раз.",
+    "tooManyAttempts": "Занадта шмат спроб. Запытайце новы код.",
+    "invalidToken": "Уваход не ўдаўся. Паспрабуйце яшчэ раз.",
+    "invalidEmail": "Немагчыма даставіць ліст на гэты адрас. Скарыстайцеся іншым адрасам электроннай пошты.",
+    "invalidRequest": "Праверце адрас электроннай пошты і паспрабуйце яшчэ раз.",
+    "emailDeliveryFailed": "Дастаўка электроннай пошты часова недаступная. Паспрабуйце пазней.",
+    "admissionRequired": "Ваша прылада не можа быць праверана. Скарыстайцеся пунктам «Дадатковыя варыянты ўваходу», каб увайсці на іншай прыладзе або праз вэб.",
+    "default": "Нешта пайшло не так. Паспрабуйце яшчэ раз.",
+    "retryableAdmission": "Не ўдалося правесці праверку гэтай прылады. Праверце злучэнне і паспрабуйце яшчэ раз."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Сабраныя даныя",
+    "free": "Бясплатна"
   }
 }

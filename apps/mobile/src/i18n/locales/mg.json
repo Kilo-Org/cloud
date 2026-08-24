@@ -31,9 +31,9 @@
     "languageSaved": "Voatahiry ny fiteninao.",
     "catalogLoadFailed": "Tsy afaka namaky ny fiteny. Andramana indray azafady.",
     "retry": "Andramana indray",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Karohy ny fiteny",
+    "noMatches": "Tsy misy fiteny mifanaraka",
+    "deviceLanguage": "Fitenin'ny fitaovana"
   },
   "login": {
     "welcome": "Tongasoa eto amin'ny Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Rafitra",
     "appearanceLight": "Mazava",
     "appearanceDark": "Maizina",
-    "account": "Account"
+    "account": "Kaonty"
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Voafidy {{label}}, tsindrio mba hanova ny fisafidianana",
       "tapToComment": "{{label}}, tsindrio mba hanehoana hevitra"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Foana ny tahiry",
+    "linkPasteNotAPullRequest": "Tsy rohy pull request amin'ny GitHub io"
   },
   "notifications": {
     "title": "Fampandrenesana",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
       "couldNotOpenMessage": "Tsy afaka nanomboka ny fanamboarana GitHub App izahay. Andramo indray azafady."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Nifarana ny sessio",
+    "remoteSpawnRetryable": "Tsy tratra ilay fitaovana — mety ho tapaka ny fifandraisana.",
+    "remoteSpawnNonRetryable": "Tsy nahomby ny fanombohan'ny sessio tamin'ilay fitaovana — jereo ny milina na havaozy ny CLI.",
+    "remoteSpawnInstanceDisconnected": "Tapaka ny fitaovana voafidy. Atombohy sessio amin'ny Cloud Agent na fidio fitaovana hafa."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Voahodina an-tserasera ny kabary",
     "onlineMessage": "Tsy afaka mandika offline ity fitaovana ity. Alefa any amin'ny {{provider}} ny rakitsoratrao mba hahazoana lahatsoratra. Tsy voatahirin'i Kilo ny audio.",
     "allow": "Avelao",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Atombohy ny fidirana amin'ny feo",
+    "stop": "Ajanony ny fidirana amin'ny feo"
   },
   "share": {
     "title": "Zarao amin'ny Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Misokatra ny fitantanana abonnement App Store.",
     "opensPlans": "Misokatra ny drafitra Kilo Pass.",
     "tryAgainFromProfile": "Andramo indray avy amin'ny Profile.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Tsy misy Kilo Pass ho famandrihana ao amin'ny rindranasa amin'ny Android. Tantano amin'ny tranonkala.",
+    "webManagementDescription": "Io Kilo Pass io dia tantanina amin'ny tranonkala.",
+    "legalDisclosure": "Kilo Pass dia famandrihana isam-bolana azo havaozina ho azy. Alaina amin'ny Apple ID anao ny fandoavam-bola rehefa hamafisina ny fividianana. Havaozina ho azy ny famandrihana isam-bolana amin'ny vidiny aseho raha tsy foanana 24 ora farafahakeliny alohan'ny fiafaran'ny fe-potoana ankehitriny. Tantano na foano isaky ny te ianao amin'ny fikandrana kaonty App Store anao.",
+    "legalPrivacyPolicy": "Politika momba ny fiainana manokana",
+    "legalTermsOfUse": "Fepetran'ny fampiasana (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Efa misy kaonty amin'ity adiresy e-mail ity nefa amin'ny fomba fidirana hafa. Andramo fomba hafa na ampiasao ny 'More sign-in options'.",
+    "differentOauth": "Efa misy kaonty amin'ity adiresy e-mail ity nefa amin'ny fomba fidirana hafa. Andramo fomba hafa na ampiasao ny 'More sign-in options'.",
+    "ssoError": "Mila SSO ny fandaminanao. Ampiasao ny 'More sign-in options'.",
+    "blocked": "Nisakana ity kaonty ity. Mifandraisa amin'ny fanohanana azafady.",
+    "signupRateLimited": "Be loatra ny fikasana. Andramo indray azafady.",
+    "invalidCode": "Diso io kaody io. Andramo indray azafady.",
+    "codeInProgress": "Ikarohana ny kaody anao. Andraso kely ary andramo indray.",
+    "tooManyAttempts": "Be loatra ny fikasana. Mangataha kaody vaovao azafady.",
+    "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
+    "invalidEmail": "Tsy azo ampitaina ny e-mail amin'ity adiresy ity. Ampiasao e-mail hafa azafady.",
+    "invalidRequest": "Jereo ny adiresy e-mail anao ary andramo indray.",
+    "emailDeliveryFailed": "Tsy misy vonjimaika ny fandefasana e-mail. Andramo indray azafady.",
+    "admissionRequired": "Tsy azo hamaivanina ny fitaovanao. Ampiasao ny 'More sign-in options' hidirana amin'ny fitaovana hafa na amin'ny tranonkala.",
+    "default": "Nisy olana. Andramo indray azafady.",
+    "retryableAdmission": "Tsy afaka nanamarina ity fitaovana ity izahay. Jereo ny fifandraisanao ary andramo indray."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Angona voaangona",
+    "free": "Maimaimpoana"
   }
 }

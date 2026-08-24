@@ -1,27 +1,27 @@
 {
   "generic": {
-    "title": "Kilo",
+    "title": "I-Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Iseshini yakho ye-agent inokubuyekezwa",
+      "chatMessage": "Unomlayezo omusha",
+      "instanceLifecycle": "I-instance yakho inokubuyekezwa",
+      "scheduledAction": "Isenzo esihleliwe sinokubuyekezwa",
+      "lowBalance": "Ibhalansi yakho idinga ukunakwa",
+      "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Umsebenzi uqediwe"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Ihlulekile: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Iphazamisekile: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Akunaso Isihloko",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Isaziso sebalansi ephansi",
+      "body": "Ibhalansi ye-{{organizationName}} yehle ngezansi kwe-${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Okutholakele okusha kokuphepha ({{severity}})",
+      "body": "{{findingTitle}} ku-{{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Isixwayiso se-SLA",
+      "body": "{{findingTitle}} ku-{{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Ukwephulwa kwe-SLA",
+      "body": "{{findingTitle}} ku-{{repoFullName}}"
     },
     "securityLifecycle": {
-      "title": "Kilo",
-      "body": "A security finding needs attention"
+      "title": "I-Kilo",
+      "body": "Okutholakele kokuphepha kudinga ukunakwa"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} isilungile",
+      "body": "Thepha ukuze uqale ukuxoxa."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} yehlulekile ukuqala",
+      "body": "Ukuqala kwehlulekile."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} izoqala kabusha maduze",
+      "body": "Kuhlelelwe ukuqala kabusha ngo-{{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "Ukuqala kabusha kwe-{{instanceName}} kukhanseliwe",
+      "body": "Ukuqala kabusha okwakuhleliwe ngaphambilini kukhanseliwe."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} izothuthukiswa maduze",
+      "bodyWithTag": "Thuthukisa ku-{{targetImageTag}} ngo-{{when}}.",
+      "bodyWithoutTag": "Ukuthuthukiswa okuhleliwe ngo-{{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "Ukuthuthukiswa kwe-{{instanceName}} kukhanseliwe",
+      "body": "Ukuthuthukiswa okwakuhleliwe ngaphambilini kukhanseliwe."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Iseshini yakho ye-Kilo isilungile ukuthi ilawulwe kusuka kufoni yakho"
   }
 }

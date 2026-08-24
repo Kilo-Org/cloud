@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Shumarra agent kee keessa bakka jijjiiramni jira",
+      "chatMessage": "Ergaa haaraa qabda",
+      "instanceLifecycle": "Instance kee keessa bakka jijjiiramni jira",
+      "scheduledAction": "Sochiin karoorfame keessa bakka jijjiiramni jira",
+      "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
+      "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Hojii xumurameera"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Hin milkoofne: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Ni ceeceefame: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Maqaa hin qabdu",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Akeekkachiisa baalansii xiqqaa",
+      "body": "Baalansiin {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Arganni nagaa haaraa ({{severity}})",
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Akeekkachiisa SLA",
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Diinqii SLA",
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Arganni nagaa xiyyeeffannaa barbaada"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} qophaa'ee jira",
+      "body": "Walmaree jalqabuuf cuqaasa."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} jalqabuu hin danda'ine",
+      "body": "Jalqabni hin milkoofne."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} dhihootti deebi'ii jalqaba",
+      "body": "{{when}} deebi'ii jalqabuuf karoorfameera."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "Deebi'ii jalqabni {{instanceName}} dhaabameera",
+      "body": "Deebi'ii jalqabni duraan karoorfame dhaabameera."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} dhihootti fooyyessa",
+      "bodyWithTag": "Gara {{targetImageTag}} fi {{when}} fooyyessi.",
+      "bodyWithoutTag": "{{when}} fooyyessuuf karoorfameera."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "Fooyyessin {{instanceName}} dhaabameera",
+      "body": "Fooyyessin duraan karoorfame dhaabameera."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Shumarra Kilo kee bilbilaa kee irraa bulchuuf qophaa'ee jira"
   }
 }

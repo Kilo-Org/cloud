@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Vaša relácia agenta má aktualizáciu",
+      "chatMessage": "Máte novú správu",
+      "instanceLifecycle": "Vaša inštancia má aktualizáciu",
+      "scheduledAction": "Naplánovaná akcia má aktualizáciu",
+      "lowBalance": "Váš zostatok si vyžaduje pozornosť",
+      "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Úloha dokončená"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Zlyhalo: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Prerušené: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Bez názvu",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Upozornenie na nízky zostatok",
+      "body": "Zostatok {{organizationName}} klesol pod ${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Nový bezpečnostný problém ({{severity}})",
+      "body": "{{findingTitle}} v {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Upozornenie na SLA",
+      "body": "{{findingTitle}} v {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Porušenie SLA",
+      "body": "{{findingTitle}} v {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Nájdený bezpečnostný problém si vyžaduje pozornosť"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} je pripravený",
+      "body": "Klepnutím začnete chatovať."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} sa nepodarilo spustiť",
+      "body": "Spustenie zlyhalo."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} sa čoskoro reštartuje",
+      "body": "Reštart naplánovaný na {{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "Reštart {{instanceName}} bol zrušený",
+      "body": "Predtým naplánovaný reštart bol zrušený."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} sa čoskoro aktualizuje",
+      "bodyWithTag": "Aktualizácia na {{targetImageTag}} v {{when}}.",
+      "bodyWithoutTag": "Naplánovaná aktualizácia v {{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "Aktualizácia {{instanceName}} bola zrušená",
+      "body": "Predtým naplánovaná aktualizácia bola zrušená."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Vaša relácia Kilo je pripravená na ovládanie z telefónu"
   }
 }

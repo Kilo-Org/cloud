@@ -31,9 +31,9 @@
     "languageSaved": "A nyelv beállítása mentve.",
     "catalogLoadFailed": "Nem sikerült betölteni a nyelvet. Kérjük, próbálja újra.",
     "retry": "Újra",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Nyelvek keresése",
+    "noMatches": "Nem található nyelv",
+    "deviceLanguage": "Eszköz nyelve"
   },
   "login": {
     "welcome": "Üdvözöljük a Kilo szolgáltatásban",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Rendszer",
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
-    "account": "Account"
+    "account": "Fiók"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Kijelölve: {{label}}, koppintson a kijelölés módosításához",
       "tapToComment": "{{label}}, koppintson a megjegyzéshez"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "A vágólap üres",
+    "linkPasteNotAPullRequest": "Nem GitHub pull request hivatkozás"
   },
   "notifications": {
     "title": "Értesítések",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "A GitHub megnyitása nem sikerült",
       "couldNotOpenMessage": "Nem sikerült elindítani a GitHub App beállítását. Próbálja újra."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "A munkamenet kilépett",
+    "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
+    "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet — ellenőrizze a gépet vagy frissítse a CLI-t.",
+    "remoteSpawnInstanceDisconnected": "A kiválasztott példány megszakadt. Indítson munkamenetet a Cloud Agenten, vagy válasszon másik példányt."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "A beszéd online feldolgozásra kerül",
     "onlineMessage": "Ez az eszköz nem tud offline átírni. A felvételedet a(z) {{provider}} kapja meg szöveggé alakításhoz. A Kilo nem tárolja a hangot.",
     "allow": "Engedélyezés",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Hangbevitel indítása",
+    "stop": "Hangbevitel leállítása"
   },
   "share": {
     "title": "Megosztás a Kilo-val",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Megnyitja az App Store előfizetés-kezelést.",
     "opensPlans": "Megnyitja a Kilo Pass csomagokat.",
     "tryAgainFromProfile": "Próbáld újra a Profilból.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "A Kilo Pass nem érhető el alkalmazáson belüli vásárlásként Androidon. Kezelje a weben.",
+    "webManagementDescription": "Ez a Kilo Pass a weben van kezelve.",
+    "legalDisclosure": "A Kilo Pass automatikusan megújuló havi előfizetés. A fizetés az Apple ID-hoz kerül felszámításra a vásárlás megerősítésekor. Az előfizetés minden hónapban automatikusan megújul a megjelenített áron, hacsak nem mondja le legalább 24 órával az aktuális időszak vége előtt. Kezelje vagy mondja le bármikor az App Store fiókbeállításaiban.",
+    "legalPrivacyPolicy": "Adatvédelmi irányelvek",
+    "legalTermsOfUse": "Felhasználási feltételek (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Ezzel az e-mail címmel már létezik fiók, más bejelentkezési móddal. Próbáljon másik módszert, vagy használja a „További bejelentkezési lehetőségek” opciót.",
+    "differentOauth": "Ezzel az e-mail címmel már létezik fiók, más bejelentkezési móddal. Próbáljon másik módszert, vagy használja a „További bejelentkezési lehetőségek” opciót.",
+    "ssoError": "A szervezete SSO-t igényel. Használja a „További bejelentkezési lehetőségek” opciót.",
+    "blocked": "Ez a fiók le lett tiltva. Kérjük, vegye fel a kapcsolatot az ügyfélszolgálattal.",
+    "signupRateLimited": "Túl sok próbálkozás. Kérjük, próbálja újra később.",
+    "invalidCode": "A kód helytelen. Kérjük, próbálja újra.",
+    "codeInProgress": "A kód feldolgozás alatt áll. Várjon egy pillanatot, majd próbálja újra.",
+    "tooManyAttempts": "Túl sok próbálkozás. Kérjük, kérjen új kódot.",
+    "invalidToken": "A bejelentkezés sikertelen. Kérjük, próbálja újra.",
+    "invalidEmail": "Nem lehet e-mailt kézbesíteni erre a címre. Kérjük, használjon másik e-mail címet.",
+    "invalidRequest": "Ellenőrizze az e-mail címét, és próbálja újra.",
+    "emailDeliveryFailed": "Az e-mail kézbesítés jelenleg nem érhető el. Kérjük, próbálja újra később.",
+    "admissionRequired": "Az eszköz nem ellenőrizhető. Használja a „További bejelentkezési lehetőségek” opciót a bejelentkezéshez másik eszközön vagy a weben keresztül.",
+    "default": "Valami hiba történt. Kérjük, próbálja újra.",
+    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Ellenőrizze a kapcsolatot, és próbálja újra."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Gyűjtött adatok",
+    "free": "Ingyenes"
   }
 }

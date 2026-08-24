@@ -30,7 +30,10 @@
     "couldNotRestart": "다시 시작하지 못했습니다",
     "languageSaved": "언어가 저장되었습니다.",
     "retry": "다시 시도",
-    "catalogLoadFailed": "언어를 불러올 수 없습니다. 다시 시도해 주세요."
+    "catalogLoadFailed": "언어를 불러올 수 없습니다. 다시 시도해 주세요.",
+    "search": "언어 검색",
+    "noMatches": "일치하는 언어가 없습니다",
+    "deviceLanguage": "기기 언어"
   },
   "login": {
     "welcome": "Kilo에 오신 것을 환영합니다",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "푸시 환경설정",
     "appearanceSystem": "시스템",
     "appearanceLight": "밝음",
-    "appearanceDark": "어두움"
+    "appearanceDark": "어두움",
+    "account": "계정"
   },
   "notifications": {
     "title": "알림",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "GitHub 앱 설정을 시작할 수 없습니다. 다시 시도하세요.",
       "couldNotOpenTitle": "GitHub를 열 수 없습니다"
-    }
+    },
+    "sessionExited": "세션이 종료되었습니다",
+    "remoteSpawnRetryable": "인스턴스에 연결할 수 없습니다. 연결이 끊어졌을 수 있습니다.",
+    "remoteSpawnNonRetryable": "인스턴스가 세션을 시작하지 못했습니다. 머신을 확인하거나 CLI를 업데이트하세요.",
+    "remoteSpawnInstanceDisconnected": "선택한 인스턴스가 연결이 끊어졌습니다. Cloud Agent에서 세션을 시작하거나 다른 인스턴스를 선택하세요."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "허용",
     "onlineMessage": "이 기기는 오프라인으로 전사할 수 없습니다. 녹음이 {{provider}}로 전송되어 텍스트로 변환됩니다. Kilo는 오디오를 저장하지 않습니다.",
     "onlineTitle": "음성이 온라인에서 처리됩니다",
-    "staysOff": "온라인 전사를 허용할 때까지 음성 입력은 꺼져 있습니다."
+    "staysOff": "온라인 전사를 허용할 때까지 음성 입력은 꺼져 있습니다.",
+    "start": "음성 입력 시작",
+    "stop": "음성 입력 중지"
   },
   "share": {
     "title": "Kilo로 공유",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "웹에서 Kilo Pass 관리를 엽니다.",
     "opensAppStoreManagement": "App Store 구독 관리를 엽니다.",
     "opensPlans": "Kilo Pass 요금제를 엽니다.",
-    "tryAgainFromProfile": "프로필에서 다시 시도하세요."
+    "tryAgainFromProfile": "프로필에서 다시 시도하세요.",
+    "unavailableDescription": "Kilo Pass는 Android에서 인앱 구매로 이용할 수 없습니다. 웹에서 관리하세요.",
+    "webManagementDescription": "이 Kilo Pass는 웹에서 관리됩니다.",
+    "legalDisclosure": "Kilo Pass는 자동 갱신되는 월간 구독입니다. 결제는 구매 확인 시 Apple ID로 청구됩니다. 구독은 현재 기간 종료 24시간 전까지 취소하지 않으면 표시된 가격으로 매월 자동 갱신됩니다. App Store 계정 설정에서 언제든지 관리하거나 취소할 수 있습니다.",
+    "legalPrivacyPolicy": "개인정보 처리방침",
+    "legalTermsOfUse": "이용 약관 (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
       "tapToComment": "{{label}}, 탭하여 댓글 달기"
-    }
+    },
+    "linkPasteClipboardEmpty": "클립보드가 비어 있습니다",
+    "linkPasteNotAPullRequest": "GitHub 풀 리퀘스트 링크가 아닙니다"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "Kilo 평가하기",
     "sorryMessage": "무엇을 개선해야 하는지 알려주세요. 앱 담당 엔지니어가 모든 보고를 읽습니다!",
     "sorryTitle": "안타깝네요!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "이 이메일로 된 계정이 다른 로그인 방식으로 이미 존재합니다. 다른 방식을 시도하거나 '더 많은 로그인 옵션'을 사용하세요.",
+    "differentOauth": "이 이메일로 된 계정이 다른 로그인 방식으로 이미 존재합니다. 다른 방식을 시도하거나 '더 많은 로그인 옵션'을 사용하세요.",
+    "ssoError": "귀하의 조직에서는 SSO가 필요합니다. '더 많은 로그인 옵션'을 사용하세요.",
+    "blocked": "이 계정은 차단되었습니다. 지원팀에 문의하세요.",
+    "signupRateLimited": "시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요.",
+    "invalidCode": "코드가 올바르지 않습니다. 다시 시도하세요.",
+    "codeInProgress": "코드를 처리 중입니다. 잠시 기다린 후 다시 시도하세요.",
+    "tooManyAttempts": "시도 횟수가 너무 많습니다. 새 코드를 요청하세요.",
+    "invalidToken": "로그인에 실패했습니다. 다시 시도하세요.",
+    "invalidEmail": "이 주소로 이메일을 보낼 수 없습니다. 다른 이메일을 사용하세요.",
+    "invalidRequest": "이메일 주소를 확인하고 다시 시도하세요.",
+    "emailDeliveryFailed": "이메일 전송이 일시적으로 불가능합니다. 잠시 후 다시 시도하세요.",
+    "admissionRequired": "기기를 확인할 수 없습니다. '더 많은 로그인 옵션'을 사용하여 다른 기기 또는 웹을 통해 로그인하세요.",
+    "default": "문제가 발생했습니다. 다시 시도하세요.",
+    "retryableAdmission": "이 기기를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요."
+  },
+  "models": {
+    "dataCollected": "수집된 데이터",
+    "free": "무료"
   }
 }

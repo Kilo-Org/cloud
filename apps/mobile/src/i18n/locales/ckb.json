@@ -31,9 +31,9 @@
     "languageSaved": "زمانەکەت پاشەکەوت کرا.",
     "catalogLoadFailed": "نەتوانرا زمانەکە بار بکرێت. تکایە دووبارە هەوڵبدەوە.",
     "retry": "هەوڵدانەوە",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "گەڕان لە زمانەکان",
+    "noMatches": "هیچ زمانێک نەگونجاوە",
+    "deviceLanguage": "زمانی ئامێرەکە"
   },
   "login": {
     "welcome": "بەخێربێیت بۆ Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "سیستەم",
     "appearanceLight": "ڕووناک",
     "appearanceDark": "تاریک",
-    "account": "Account"
+    "account": "هەژمار"
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "هەڵبژێردراو {{label}}، بۆ گۆڕینی هەڵبژاردن لێی بدە",
       "tapToComment": "{{label}}، بۆ بۆچوون لێی بدە"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "کلیپبۆردەکە بەتاڵە",
+    "linkPasteNotAPullRequest": "لینکی پرسی ڕاکێشان (pull request)ی GitHub نییە"
   },
   "notifications": {
     "title": "ئاگادارکردنەوەکان",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "نەتوانرا GitHub بکرێتەوە",
       "couldNotOpenMessage": "نەتوانرا دامەزراندنی GitHub App دەستپێبکرێت. تکایە دووبارە هەوڵ بدە."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "دانیشتنەکە بەجێهێشت",
+    "remoteSpawnRetryable": "نەگەیشتینە نموونەکە — لەوانەیە پەیوەندییەکە پچڕابێت.",
+    "remoteSpawnNonRetryable": "نموونەکە نەیتوانی دانیشتنەکە دەستپێبکات — ئامێرەکە بپشکنە یان CLI نوێ بکەرەوە.",
+    "remoteSpawnInstanceDisconnected": "نموونەی هەڵبژێردراو پەیوەندییەکەی پچڕا. لە Cloud Agent دانیشتنێک دەستپێبکە یان نموونەیەکی دیکە هەڵبژێرە."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "قسەکردن بە سەرهێڵ داڕێژراوە",
     "onlineMessage": "ئەم ئامێرە ناتوانێت بە بێ ئینتەرنێت وەربگێڕێت. تۆمارەکەت بۆ {{provider}} دەنێردرێت بۆ گۆڕینی بۆ دەق. Kilo دەنگەکە هەڵناگرێت.",
     "allow": "ڕێگەدان",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "دەستپێکردنی دەنگی تێخستن",
+    "stop": "وەستاندنی دەنگی تێخستن"
   },
   "share": {
     "title": "هاوبەشکردن بۆ Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "بەڕێوەبردنی بەشداربوونی App Store دەکاتەوە.",
     "opensPlans": "پلانەکانی Kilo Pass دەکاتەوە.",
     "tryAgainFromProfile": "لە پڕۆفایلەوە دووبارە هەوڵبدەرەوە.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass وەک کڕین لەناو ئەپ لە Android بەردەست نییە. لە وێبەکەدا بەڕێوەی ببە.",
+    "webManagementDescription": "ئەم Kilo Passیە لە وێبەکەدا بەڕێوە دەبرێت.",
+    "legalDisclosure": "Kilo Pass بەشداربوونێکی مانگانەیە کە خۆکارانە نوێ دەبێتەوە. لە کاتی پشتڕاستکردنەوەی کڕینەکە، پارە لە Apple IDی تۆ دەبەسترێت. بەشداربوونەکان هەر مانگێک بە بەهای نیشاندراو خۆکارانە نوێ دەبنەوە مەگەر لانیکەم ٢٤ کاتژمێر پێش کۆتایی ماوەی ئێستا هەڵنەوەشێنرێنەوە. لە هەر کاتێکدا لە ڕێکخستنەکانی هەژماری App Store بەڕێوەی ببە یان هەڵیبوەشێنەوە.",
+    "legalPrivacyPolicy": "ڕێسای تایبەتمەندی",
+    "legalTermsOfUse": "مەرجەکانی بەکارهێنان (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "هەژمارێک بەم ئیمەیڵە پێشتر هەیە لەگەڵ ڕێگەیەکی جیاوازی چوونەژوورەوە. ڕێگەیەکی دیکە تاقیبکەرەوە یان 'زیاتر هەڵبژاردەی چوونەژوورەوە' بەکاربهێنە.",
+    "differentOauth": "هەژمارێک بەم ئیمەیڵە پێشتر هەیە لەگەڵ ڕێگەیەکی جیاوازی چوونەژوورەوە. ڕێگەیەکی دیکە تاقیبکەرەوە یان 'زیاتر هەڵبژاردەی چوونەژوورەوە' بەکاربهێنە.",
+    "ssoError": "ڕێکخراوەکەت SSO دەوێت. 'زیاتر هەڵبژاردەی چوونەژوورەوە' بەکاربهێنە.",
+    "blocked": "ئەم هەژمارە ڕاگیراوە. تکایە پەیوەندی بە پشتیوانی بکە.",
+    "signupRateLimited": "هەوڵی زۆر کرا. تکایە دواتر دووبارە تاقیبکەرەوە.",
+    "invalidCode": "ئەو کۆدە هەڵەیە. تکایە دووبارە تاقیبکەرەوە.",
+    "codeInProgress": "کۆدەکەت لە پڕۆسێسکردندایە. ساتێک بوەستە و دووبارە تاقیبکەرەوە.",
+    "tooManyAttempts": "هەوڵی زۆر کرا. تکایە کۆدێکی نوێ داوا بکە.",
+    "invalidToken": "چوونەژوورەوە سەرکەوتوو نەبوو. تکایە دووبارە تاقیبکەرەوە.",
+    "invalidEmail": "نەتوانرا ئیمەیڵەکە بگەیەنرێت بەم ناونیشانە. تکایە ئیمەیڵێکی دیکە بەکاربهێنە.",
+    "invalidRequest": "ناونیشانی ئیمەیڵەکەت بپشکنە و دووبارە تاقیبکەرەوە.",
+    "emailDeliveryFailed": "گەیاندنی ئیمەیڵ بەشێوەی کاتی بەردەست نییە. تکایە دواتر دووبارە تاقیبکەرەوە.",
+    "admissionRequired": "ئامێرەکەت ناتوانرێت پشتڕاست بکرێتەوە. 'زیاتر هەڵبژاردەی چوونەژوورەوە' بەکاربهێنە بۆ چوونەژوورەوە لە ئامێرێکی دیکە یان لە ڕێگەی وێبەوە.",
+    "default": "شتێک هەڵە ڕوویدا. تکایە دووبارە تاقیبکەرەوە.",
+    "retryableAdmission": "نەمانتوانی ئەم ئامێرە پشتڕاست بکەینەوە. پەیوەندییەکەت بپشکنە و دووبارە تاقیبکەرەوە."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "داتاکان کۆکرانەوە",
+    "free": "خۆڕایی"
   }
 }

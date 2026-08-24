@@ -30,7 +30,10 @@
     "couldNotRestart": "No se pudo reiniciar",
     "languageSaved": "Tu idioma está guardado.",
     "retry": "Reintentar",
-    "catalogLoadFailed": "No se pudo cargar el idioma. Inténtalo de nuevo."
+    "catalogLoadFailed": "No se pudo cargar el idioma. Inténtalo de nuevo.",
+    "search": "Buscar idiomas",
+    "noMatches": "Ningún idioma coincide",
+    "deviceLanguage": "Idioma del dispositivo"
   },
   "login": {
     "welcome": "Te damos la bienvenida a Kilo",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "Preferencias de push",
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
-    "appearanceDark": "Oscuro"
+    "appearanceDark": "Oscuro",
+    "account": "Cuenta"
   },
   "notifications": {
     "channel": {
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "No pudimos iniciar la configuración de la GitHub App. Inténtalo de nuevo.",
       "couldNotOpenTitle": "No se pudo abrir GitHub"
-    }
+    },
+    "sessionExited": "La sesión finalizó",
+    "remoteSpawnRetryable": "No se pudo conectar con la instancia: es posible que se haya desconectado.",
+    "remoteSpawnNonRetryable": "La instancia no pudo iniciar la sesión: revisa la máquina o actualiza la CLI.",
+    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "Permitir",
     "onlineMessage": "Este dispositivo no puede transcribir sin conexión. Tu grabación se envía a {{provider}} para convertirla en texto. Kilo no almacena el audio.",
     "onlineTitle": "La voz se procesa en línea",
-    "staysOff": "La voz permanece desactivada hasta que permitas la transcripción en línea."
+    "staysOff": "La voz permanece desactivada hasta que permitas la transcripción en línea.",
+    "start": "Iniciar entrada de voz",
+    "stop": "Detener entrada de voz"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "Abre la gestión de Kilo Pass en la web.",
     "opensAppStoreManagement": "Abre la gestión de suscripciones de App Store.",
     "opensPlans": "Abre los planes de Kilo Pass.",
-    "tryAgainFromProfile": "Inténtalo de nuevo desde Perfil."
+    "tryAgainFromProfile": "Inténtalo de nuevo desde Perfil.",
+    "unavailableDescription": "Kilo Pass no está disponible como compra dentro de la aplicación en Android. Gestiona tu suscripción en la web.",
+    "webManagementDescription": "Este Kilo Pass se gestiona en la web.",
+    "legalDisclosure": "Kilo Pass es una suscripción mensual renovable automáticamente. El pago se cobra en tu Apple ID al confirmar la compra. Las suscripciones se renuevan automáticamente cada mes al precio indicado, a menos que se cancelen al menos 24 horas antes del final del período actual. Puedes gestionar o cancelar la suscripción en cualquier momento en los ajustes de tu cuenta de App Store.",
+    "legalPrivacyPolicy": "Política de privacidad",
+    "legalTermsOfUse": "Términos de uso (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "Seleccionado {{label}}, toca para cambiar la selección",
       "tapToComment": "{{label}}, toca para comentar"
-    }
+    },
+    "linkPasteClipboardEmpty": "El portapapeles está vacío",
+    "linkPasteNotAPullRequest": "No es un enlace de pull request de GitHub"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "Valora Kilo",
     "sorryMessage": "Cuéntanos qué se puede mejorar. ¡El ingeniero responsable de la app lee todos los informes!",
     "sorryTitle": "¡Lamentamos oírlo!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Ya existe una cuenta con este correo, pero con otro método de inicio de sesión. Prueba otro método o usa 'More sign-in options'.",
+    "differentOauth": "Ya existe una cuenta con este correo, pero con otro método de inicio de sesión. Prueba otro método o usa 'More sign-in options'.",
+    "ssoError": "Tu organización requiere SSO. Usa 'More sign-in options'.",
+    "blocked": "Esta cuenta ha sido bloqueada. Contacta con el soporte.",
+    "signupRateLimited": "Demasiados intentos. Inténtalo de nuevo más tarde.",
+    "invalidCode": "Ese código es incorrecto. Inténtalo de nuevo.",
+    "codeInProgress": "Tu código se está procesando. Espera un momento e inténtalo de nuevo.",
+    "tooManyAttempts": "Demasiados intentos. Solicita un código nuevo.",
+    "invalidToken": "No se pudo iniciar sesión. Inténtalo de nuevo.",
+    "invalidEmail": "No se pudo enviar el correo a esta dirección. Usa un correo diferente.",
+    "invalidRequest": "Revisa tu dirección de correo e inténtalo de nuevo.",
+    "emailDeliveryFailed": "El envío de correo no está disponible temporalmente. Inténtalo de nuevo más tarde.",
+    "admissionRequired": "No se pudo verificar tu dispositivo. Usa 'More sign-in options' para iniciar sesión en otro dispositivo o a través de la web.",
+    "default": "Algo salió mal. Inténtalo de nuevo.",
+    "retryableAdmission": "No pudimos verificar este dispositivo. Revisa tu conexión e inténtalo de nuevo."
+  },
+  "models": {
+    "dataCollected": "Datos recopilados",
+    "free": "Gratis"
   }
 }

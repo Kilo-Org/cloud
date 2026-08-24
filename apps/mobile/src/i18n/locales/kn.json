@@ -31,9 +31,9 @@
     "languageSaved": "ನಿಮ್ಮ ಭಾಷೆ ಉಳಿಸಲಾಗಿದೆ.",
     "catalogLoadFailed": "ಭಾಷೆ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "ಭಾಷೆಗಳನ್ನು ಹುಡುಕಿ",
+    "noMatches": "ಯಾವುದೇ ಭಾಷೆಗಳು ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ",
+    "deviceLanguage": "ಸಾಧನ ಭಾಷೆ"
   },
   "login": {
     "welcome": "Kilo ಗೆ ಸುಸ್ವಾಗತ",
@@ -143,7 +143,7 @@
     "appearanceSystem": "ಸಿಸ್ಟಮ್",
     "appearanceLight": "ಲೈಟ್",
     "appearanceDark": "ಡಾರ್ಕ್",
-    "account": "Account"
+    "account": "ಖಾತೆ"
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} ಆಯ್ಕೆಮಾಡಲಾಗಿದೆ, ಆಯ್ಕೆ ಬದಲಾಯಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
       "tapToComment": "{{label}}, ಕಾಮೆಂಟ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ",
+    "linkPasteNotAPullRequest": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ"
   },
   "notifications": {
     "title": "ಅಧಿಸೂಚನೆಗಳು",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "couldNotOpenMessage": "GitHub App ಸೆಟಪ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಿದೆ",
+    "remoteSpawnRetryable": "ಇನ್ಸ್ಟೆನ್ಸ್ ಅನ್ನು ತಲುಪಲಾಗಲಿಲ್ಲ — ಅದು ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿರಬಹುದು.",
+    "remoteSpawnNonRetryable": "ಇನ್ಸ್ಟೆನ್ಸ್ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಲು ವಿಫಲವಾಗಿದೆ — ಯಂತ್ರವನ್ನು ಪರಿಶೀಲಿಸಿ ಅಥವಾ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
+    "remoteSpawnInstanceDisconnected": "ಆಯ್ಕೆಮಾಡಿದ ಇನ್ಸ್ಟೆನ್ಸ್ ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ. Cloud Agent ನಲ್ಲಿ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ಮತ್ತೊಂದು ಇನ್ಸ್ಟೆನ್ಸ್ ಆಯ್ಕೆಮಾಡಿ."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "ಮಾತನ್ನು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸಂಸ್ಕರಿಸಲಾಗುತ್ತದೆ",
     "onlineMessage": "ಈ ಸಾಧನವು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದನ್ನು ಪಠ್ಯವಾಗಿ ಪರಿವರ್ತಿಸಲು ನಿಮ್ಮ ರೆಕಾರ್ಡಿಂಗ್ ಅನ್ನು {{provider}} ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ. Kilo ಆಡಿಯೊವನ್ನು ಸಂಗ್ರಹಿಸುವುದಿಲ್ಲ.",
     "allow": "ಅನುಮತಿಸಿ",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "ಧ್ವನಿ ಇನ್ಪುಟ್ ಪ್ರಾರಂಭಿಸಿ",
+    "stop": "ಧ್ವನಿ ಇನ್ಪುಟ್ ನಿಲ್ಲಿಸಿ"
   },
   "share": {
     "title": "Kilo ಗೆ ಹಂಚಿಕೊಳ್ಳಿ",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store ಚಂದಾದಾರಿಕೆ ನಿರ್ವಹಣೆಯನ್ನು ತೆರೆಯುತ್ತದೆ.",
     "opensPlans": "Kilo Pass ಯೋಜನೆಗಳನ್ನು ತೆರೆಯುತ್ತದೆ.",
     "tryAgainFromProfile": "ಪ್ರೊಫೈಲ್‌ನಿಂದ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass Android ನಲ್ಲಿ ಇನ್-ಆಪ್ ಖರೀದಿಯಾಗಿ ಲಭ್ಯವಿಲ್ಲ. ಅದನ್ನು ವೆಬ್ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ.",
+    "webManagementDescription": "ಈ Kilo Pass ವೆಬ್ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
+    "legalDisclosure": "Kilo Pass ಸ್ವಯಂ-ನವೀಕರಿಸುವ ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆಯಾಗಿದೆ. ಖರೀದಿಯ ದೃಢೀಕರಣದ ಸಮಯದಲ್ಲಿ ನಿಮ್ಮ Apple ID ಗೆ ಹಣವನ್ನು ವಿಧಿಸಲಾಗುತ್ತದೆ. ಪ್ರಸ್ತುತ ಅವಧಿಯ ಮುಕ್ತಾಯಕ್ಕೆ ಕನಿಷ್ಠ 24 ಗಂಟೆಗಳ ಮೊದಲು ರದ್ದುಮಾಡದ ಹೊರತು ಚಂದಾದಾರಿಕೆಗಳು ಪ್ರತಿ ತಿಂಗಳು ತೋರಿಸಿದ ಬೆಲೆಯಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಿಸುತ್ತವೆ. ನಿಮ್ಮ App Store ಖಾತೆ ಸೆಟ್ಟಿಂಗ್ಗಳಲ್ಲಿ ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ನಿರ್ವಹಿಸಿ ಅಥವಾ ರದ್ದುಮಾಡಿ.",
+    "legalPrivacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
+    "legalTermsOfUse": "ಬಳಕೆಯ ನಿಯಮಗಳು (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "ಈ ಇಮೇಲ್ನೊಂದಿಗೆ ಖಾತೆಯು ಬೇರೆ ಸೈನ್-ಇನ್ ವಿಧಾನದೊಂದಿಗೆ ಈಗಾಗಲೇ ಅಸ್ತಿತ್ವದಲ್ಲಿದೆ. ಮತ್ತೊಂದು ವಿಧಾನವನ್ನು ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ 'More sign-in options' ಬಳಸಿ.",
+    "differentOauth": "ಈ ಇಮೇಲ್ನೊಂದಿಗೆ ಖಾತೆಯು ಬೇರೆ ಸೈನ್-ಇನ್ ವಿಧಾನದೊಂದಿಗೆ ಈಗಾಗಲೇ ಅಸ್ತಿತ್ವದಲ್ಲಿದೆ. ಮತ್ತೊಂದು ವಿಧಾನವನ್ನು ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ 'More sign-in options' ಬಳಸಿ.",
+    "ssoError": "ನಿಮ್ಮ ಸಂಸ್ಥೆಗೆ SSO ಅಗತ್ಯವಿದೆ. 'More sign-in options' ಬಳಸಿ.",
+    "blocked": "ಈ ಖಾತೆಯನ್ನು ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "signupRateLimited": "ಹಲವು ಪ್ರಯತ್ನಗಳು. ದಯವಿಟ್ಟು ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "invalidCode": "ಆ ಕೋಡ್ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "codeInProgress": "ನಿಮ್ಮ ಕೋಡ್ ಅನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ. ಸ್ವಲ್ಪ ಸಮಯ ಕಾಯ್ದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "tooManyAttempts": "ಹಲವು ಪ್ರಯತ್ನಗಳು. ದಯವಿಟ್ಟು ಹೊಸ ಕೋಡ್ ಅನ್ನು ವಿನಂತಿಸಿ.",
+    "invalidToken": "ಸೈನ್-ಇನ್ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "invalidEmail": "ಈ ವಿಳಾಸಕ್ಕೆ ಇಮೇಲ್ ತಲುಪಿಸಲು ಸಾಧ್ಯವಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೇರೆ ಇಮೇಲ್ ಬಳಸಿ.",
+    "invalidRequest": "ನಿಮ್ಮ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "emailDeliveryFailed": "ಇಮೇಲ್ ವಿತರಣೆ ತಾತ್ಕಾಲಿಕವಾಗಿ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "admissionRequired": "ನಿಮ್ಮ ಸಾಧನವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಮತ್ತೊಂದು ಸಾಧನದಲ್ಲಿ ಅಥವಾ ವೆಬ್ ಮೂಲಕ ಸೈನ್-ಇನ್ ಮಾಡಲು 'More sign-in options' ಬಳಸಿ.",
+    "default": "ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "retryableAdmission": "ನಾವು ಈ ಸಾಧನವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "ಸಂಗ್ರಹಿಸಿದ ಡೇಟಾ",
+    "free": "ಉಚಿತ"
   }
 }

@@ -30,7 +30,10 @@
     "couldNotRestart": "Không thể khởi động lại",
     "languageSaved": "Ngôn ngữ của bạn đã được lưu.",
     "retry": "Thử lại",
-    "catalogLoadFailed": "Không thể tải ngôn ngữ. Vui lòng thử lại."
+    "catalogLoadFailed": "Không thể tải ngôn ngữ. Vui lòng thử lại.",
+    "search": "Tìm ngôn ngữ",
+    "noMatches": "Không có ngôn ngữ phù hợp",
+    "deviceLanguage": "Ngôn ngữ của thiết bị"
   },
   "login": {
     "welcome": "Chào mừng đến với Kilo",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "Tùy chọn đẩy",
     "appearanceSystem": "Hệ thống",
     "appearanceLight": "Sáng",
-    "appearanceDark": "Tối"
+    "appearanceDark": "Tối",
+    "account": "Tài khoản"
   },
   "notifications": {
     "title": "Thông báo",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
       "couldNotOpenTitle": "Không thể mở GitHub"
-    }
+    },
+    "sessionExited": "Phiên đã thoát",
+    "remoteSpawnRetryable": "Không thể kết nối tới phiên bản — có thể nó đã ngắt kết nối.",
+    "remoteSpawnNonRetryable": "Phiên bản không khởi động được phiên — hãy kiểm tra máy hoặc cập nhật CLI.",
+    "remoteSpawnInstanceDisconnected": "Phiên bản đã chọn bị ngắt kết nối. Hãy bắt đầu phiên trên Cloud Agent hoặc chọn phiên bản khác."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "Cho phép",
     "onlineMessage": "Thiết bị này không thể chuyển giọng nói thành văn bản ngoại tuyến. Bản ghi âm của bạn được gửi đến {{provider}} để chuyển thành văn bản. Kilo không lưu trữ âm thanh.",
     "onlineTitle": "Giọng nói được xử lý trực tuyến",
-    "staysOff": "Giọng nói vẫn tắt cho đến khi bạn cho phép chuyển giọng nói thành văn bản trực tuyến."
+    "staysOff": "Giọng nói vẫn tắt cho đến khi bạn cho phép chuyển giọng nói thành văn bản trực tuyến.",
+    "start": "Bắt đầu nhập giọng nói",
+    "stop": "Dừng nhập giọng nói"
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "Mở trang quản lý Kilo Pass trên web.",
     "opensAppStoreManagement": "Mở trang quản lý đăng ký trong App Store.",
     "opensPlans": "Mở các gói Kilo Pass.",
-    "tryAgainFromProfile": "Thử lại từ Hồ sơ."
+    "tryAgainFromProfile": "Thử lại từ Hồ sơ.",
+    "unavailableDescription": "Kilo Pass không có sẵn dưới dạng giao dịch mua trong ứng dụng trên Android. Quản lý trên web.",
+    "webManagementDescription": "Kilo Pass này được quản lý trên web.",
+    "legalDisclosure": "Kilo Pass là gói đăng ký hàng tháng tự gia hạn. Khoản thanh toán được tính vào Apple ID của bạn khi xác nhận mua. Gói đăng ký tự động gia hạn mỗi tháng theo giá đã hiển thị trừ khi bạn hủy ít nhất 24 giờ trước khi kết thúc kỳ hiện tại. Quản lý hoặc hủy bất kỳ lúc nào trong cài đặt tài khoản App Store.",
+    "legalPrivacyPolicy": "Chính sách quyền riêng tư",
+    "legalTermsOfUse": "Điều khoản sử dụng (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "Đã chọn {{label}}, chạm để đổi lựa chọn",
       "tapToComment": "{{label}}, chạm để bình luận"
-    }
+    },
+    "linkPasteClipboardEmpty": "Bộ nhớ tạm trống",
+    "linkPasteNotAPullRequest": "Không phải là liên kết yêu cầu kéo GitHub"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "Đánh giá Kilo",
     "sorryMessage": "Vui lòng cho chúng tôi biết điều cần cải thiện. Kỹ sư phụ trách ứng dụng đọc từng báo cáo một!",
     "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng 'Thêm tùy chọn đăng nhập'.",
+    "differentOauth": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng 'Thêm tùy chọn đăng nhập'.",
+    "ssoError": "Tổ chức của bạn yêu cầu SSO. Dùng 'Thêm tùy chọn đăng nhập'.",
+    "blocked": "Tài khoản này đã bị chặn. Vui lòng liên hệ bộ phận hỗ trợ.",
+    "signupRateLimited": "Quá nhiều lần thử. Vui lòng thử lại sau.",
+    "invalidCode": "Mã đó không đúng. Vui lòng thử lại.",
+    "codeInProgress": "Mã của bạn đang được xử lý. Chờ một chút rồi thử lại.",
+    "tooManyAttempts": "Quá nhiều lần thử. Vui lòng yêu cầu mã mới.",
+    "invalidToken": "Đăng nhập thất bại. Vui lòng thử lại.",
+    "invalidEmail": "Không thể gửi email tới địa chỉ này. Vui lòng dùng email khác.",
+    "invalidRequest": "Kiểm tra địa chỉ email của bạn và thử lại.",
+    "emailDeliveryFailed": "Việc gửi email tạm thời không khả dụng. Vui lòng thử lại sau.",
+    "admissionRequired": "Không thể xác minh thiết bị của bạn. Dùng 'Thêm tùy chọn đăng nhập' để đăng nhập trên thiết bị khác hoặc qua web.",
+    "default": "Đã xảy ra sự cố. Vui lòng thử lại.",
+    "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại."
+  },
+  "models": {
+    "dataCollected": "Dữ liệu đã thu thập",
+    "free": "Miễn phí"
   }
 }

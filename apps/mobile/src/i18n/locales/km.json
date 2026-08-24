@@ -31,9 +31,9 @@
     "languageSaved": "ភាសារបស់អ្នកត្រូវបានរក្សាទុក។",
     "catalogLoadFailed": "មិនអាចផ្ទុកភាសាបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "retry": "ព្យាយាមម្តងទៀត",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "ស្វែងរកភាសា",
+    "noMatches": "គ្មានភាសាដែលត្រូវគ្នា។",
+    "deviceLanguage": "ភាសារបស់ឧបករណ៍"
   },
   "login": {
     "welcome": "សូមស្វាគមន៍មកកាន់ Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "ប្រព័ន្ធ",
     "appearanceLight": "ភ្លឺ",
     "appearanceDark": "ងងឹត",
-    "account": "Account"
+    "account": "គណនី"
   },
   "prReview": {
     "pullRequestUnavailable": "សំណើទាញ (pull request) មិនអាចប្រើបានទេ",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "បានជ្រើសរើស {{label}} ប៉ះដើម្បីប្តូរការជ្រើសរើស",
       "tapToComment": "{{label}} ប៉ះដើម្បីធ្វើអត្ថាធិប្បាយ"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ",
+    "linkPasteNotAPullRequest": "មិនមែនជាតំណ pull request របស់ GitHub ទេ"
   },
   "notifications": {
     "title": "ការជូនដំណឹង",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "មិនអាចបើក GitHub",
       "couldNotOpenMessage": "យើងមិនអាចចាប់ផ្តើមការដំឡើង GitHub App បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "វគ្គត្រូវបានបញ្ចប់",
+    "remoteSpawnRetryable": "មិនអាចទៅដល់ instance បានទេ — វាអាចត្រូវបានផ្ដាច់។",
+    "remoteSpawnNonRetryable": "instance បរាជ័យក្នុងការចាប់ផ្ដើមវគ្គ — ពិនិត្យម៉ាស៊ីន ឬធ្វើបច្ចុប្បន្នភាព CLI។",
+    "remoteSpawnInstanceDisconnected": "instance ដែលបានជ្រើសរើសត្រូវបានផ្ដាច់។ ចាប់ផ្ដើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើស instance ផ្សេងទៀត។"
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "ការនិយាយត្រូវបានដំណើរការតាមអនឡាញ",
     "onlineMessage": "ឧបករណ៍នេះមិនអាចចម្លងដោយគ្មានអនឡាញបានទេ។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ {{provider}} ដើម្បីបំប្លែងវាទៅជាអត្ថបទ។ Kilo មិនរក្សាទុកសំឡេងនោះទេ។",
     "allow": "អនុញ្ញាត",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "ចាប់ផ្ដើមបញ្ចូលសំឡេង",
+    "stop": "បញ្ឈប់ការបញ្ចូលសំឡេង"
   },
   "share": {
     "title": "ចែករំលែកទៅ Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "បើកការគ្រប់គ្រងការជាវ App Store ។",
     "opensPlans": "បើកគម្រោង Kilo Pass ។",
     "tryAgainFromProfile": "ព្យាយាមម្តងទៀតពី Profile ។",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass មិនអាចប្រើបានជាការទិញក្នុងកម្មវិធីនៅលើ Android ទេ។ គ្រប់គ្រងវានៅលើបណ្ដាញ។",
+    "webManagementDescription": "Kilo Pass នេះត្រូវបានគ្រប់គ្រងនៅលើបណ្ដាញ។",
+    "legalDisclosure": "Kilo Pass គឺជាការជាវប្រចាំខែដែលអាចបន្តដោយស្វ័យប្រវត្តិបាន។ ការទូទាត់នឹងត្រូវគិតលើ Apple ID របស់អ្នកនៅពេលបញ្ជាក់ការទិញ។ ការជាវត្រូវបន្តដោយស្វ័យប្រវត្តិរៀងរាល់ខែក្នុងតម្លៃដែលបង្ហាញ លុះត្រាតែលុបចោលយ៉ាងហោចណាស់ 24 ម៉ោងមុនចុងបញ្ចប់នៃរយៈពេលបច្ចុប្បន្ន។ គ្រប់គ្រង ឬលុបចោលនៅពេលណាក៏បាននៅក្នុងការកំណត់គណនី App Store របស់អ្នក។",
+    "legalPrivacyPolicy": "គោលការណ៍ឯកជនភាព",
+    "legalTermsOfUse": "លក្ខខណ្ឌនៃការប្រើប្រាស់ (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "គណនីមួយដែលមានអ៊ីមែលនេះមានស្រាប់ជាមួយនឹងវិធីចូលផ្សេងទៀត។ សាកល្បងវិធីផ្សេង ឬប្រើ 'More sign-in options'។",
+    "differentOauth": "គណនីមួយដែលមានអ៊ីមែលនេះមានស្រាប់ជាមួយនឹងវិធីចូលផ្សេងទៀត។ សាកល្បងវិធីផ្សេង ឬប្រើ 'More sign-in options'។",
+    "ssoError": "អង្គការរបស់អ្នកតម្រូវឱ្យប្រើ SSO។ ប្រើ 'More sign-in options'។",
+    "blocked": "គណនីនេះត្រូវបានរារាំង។ សូមទាក់ទងផ្នែកគាំទ្រ។",
+    "signupRateLimited": "ការព្យាយាមច្រើនពេកហើយ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
+    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវទេ។ សូមព្យាយាមម្ដងទៀត។",
+    "codeInProgress": "លេខកូដរបស់អ្នកកំពុងត្រូវបានដំណើរការ។ រង់ចាំមួយភ្លែត ហើយព្យាយាមម្ដងទៀត។",
+    "tooManyAttempts": "ការព្យាយាមច្រើនពេកហើយ។ សូមស្នើសុំលេខកូដថ្មី។",
+    "invalidToken": "ការចូលបរាជ័យ។ សូមព្យាយាមម្ដងទៀត។",
+    "invalidEmail": "មិនអាចផ្ញើអ៊ីមែលទៅអាសយដ្ឋាននេះបានទេ។ សូមប្រើអ៊ីមែលផ្សេង។",
+    "invalidRequest": "ពិនិត្យអាសយដ្ឋានអ៊ីមែលរបស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
+    "emailDeliveryFailed": "ការផ្ញើអ៊ីមែលមិនអាចប្រើបានជាបណ្ដោះអាសន្នទេ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
+    "admissionRequired": "ឧបករណ៍របស់អ្នកមិនអាចផ្ទៀងផ្ទាត់បានទេ។ ប្រើ 'More sign-in options' ដើម្បីចូលនៅលើឧបករណ៍ផ្សេង ឬតាមរយៈបណ្ដាញ។",
+    "default": "មានអ្វីមួយខុសប្រក្រតី។ សូមព្យាយាមម្ដងទៀត។",
+    "retryableAdmission": "យើងមិនអាចផ្ទៀងផ្ទាត់ឧបករណ៍នេះបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។"
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "ទិន្នន័យដែលប្រមូលបាន",
+    "free": "ឥតគិតថ្លៃ"
   }
 }

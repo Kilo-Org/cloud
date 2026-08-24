@@ -31,9 +31,9 @@
     "languageSaved": "Kua tiakina tō reo.",
     "catalogLoadFailed": "Kāore i taea te uta te reo. Whakamātau anō.",
     "retry": "Whakamātau anō",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Rapua ngā reo",
+    "noMatches": "Kāore he reo e taurite",
+    "deviceLanguage": "Reo o te pūrere"
   },
   "login": {
     "welcome": "Nau mai ki Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Pūnaha",
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
-    "account": "Account"
+    "account": "Pūkete"
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Kua kōwhiria {{label}}, pāwhiria kia huri i te kōwhiringa",
       "tapToComment": "{{label}}, pāwhiria kia kōrero"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Kei te putua tonu te papapātuhi",
+    "linkPasteNotAPullRequest": "Ehara tēnei i te hononga GitHub pull request"
   },
   "notifications": {
     "title": "Ngā Pānui",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Kāore i taea te whakatuwhera GitHub",
       "couldNotOpenMessage": "Kāore i taea e mātou te tīmata te whirihora GitHub App. Tēnā whakamātau anō."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Kua puta te wātū",
+    "remoteSpawnRetryable": "Kāore i taea te tae ki te wātū — kua motu pea tana hononga.",
+    "remoteSpawnNonRetryable": "Kāore i tīmata te wātū i te wātū — tirohia te mīhini, ka whakahōu rānei i te CLI.",
+    "remoteSpawnInstanceDisconnected": "Kua motu te hononga o te wātū kua tīpakona. Tīmatahia he wātū ki runga i te Cloud Agent, tīpakoa rānei tētahi atu wātū."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Kei te tukatuka-ā-ipurangi te kōrero",
     "onlineMessage": "Kāore e taea e tēnei pūrere te tuhi kore-tuihono. Ka tukuna tō rekoata ki {{provider}} hei huri hei kuputuhi. Kāore a Kilo e penapena i te ororongo.",
     "allow": "Tukua",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Tīmatahia te tāuru reo",
+    "stop": "Whakamutua te tāuru reo"
   },
   "share": {
     "title": "Tuari ki Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Ka whakatuwhera i te whakahaere ohaurunga App Store.",
     "opensPlans": "Ka whakatuwhera i ngā mahere Kilo Pass.",
     "tryAgainFromProfile": "Whakamātau anō mai i te Kōtaha.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kāore e waatea a Kilo Pass hei hokonga i roto i te taputapu ki runga i te Android. Whakahaerehia i runga i te paetukutuku.",
+    "webManagementDescription": "Kei te whakahaeretia tēnei Kilo Pass i runga i te paetukutuku.",
+    "legalDisclosure": "He ohinga ā-marama e hoko aunoatia ana a Kilo Pass. Ka utua te utu ki tō Apple ID i te whakaaetanga o te hoko. Ka whakahoutia aunoatia ngā ohinga ia marama ki te utu e whakaaturia ana ki te kore e whakakorengia kia 24 hāora i mua i te mutunga o te wā o nāianei. Whakahaerehia, whakakorea rānei i ngā wā katoa i roto i tō tautuhinga pūkete App Store.",
+    "legalPrivacyPolicy": "Kaupapahere Tūmataiti",
+    "legalTermsOfUse": "Tikanga Whakamahi (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Kei te noho tētahi pūkete ki tēnei īmēra mā tētahi atu tikanga takiuru. Whakamātauria tētahi atu tikanga, whakamahia rānei ngā 'Whiringa takiuru atu anō'.",
+    "differentOauth": "Kei te noho tētahi pūkete ki tēnei īmēra mā tētahi atu tikanga takiuru. Whakamātauria tētahi atu tikanga, whakamahia rānei ngā 'Whiringa takiuru atu anō'.",
+    "ssoError": "E hiahia ana tō umanga ki te SSO. Whakamahia ngā 'Whiringa takiuru atu anō'.",
+    "blocked": "Kua āraitia tēnei pūkete. Tēnā koa whakapā atu ki te tautoko.",
+    "signupRateLimited": "He nui rawa ngā whakamātautanga. Tēnā koa whakamātau anō ā muri.",
+    "invalidCode": "He hē tērā waehere. Tēnā koa whakamātau anō.",
+    "codeInProgress": "Kei te tukatukahia tō waehere. Tatari poto ana, ka whakamātau anō.",
+    "tooManyAttempts": "He nui rawa ngā whakamātautanga. Tēnā koa tonoa he waehere hou.",
+    "invalidToken": "Kāore i angitu te takiuru. Tēnā koa whakamātau anō.",
+    "invalidEmail": "Kāore i taea te tuku īmēra ki tēnei wāhitau. Tēnā koa whakamahia tētahi atu īmēra.",
+    "invalidRequest": "Tirohia tō wāhitau īmēra, ka whakamātau anō.",
+    "emailDeliveryFailed": "Kāore e waatea ināianei te tuku īmēra. Tēnā koa whakamātau anō ā muri.",
+    "admissionRequired": "Kāore e taea te whakamana i tō pūrere. Whakamahia ngā 'Whiringa takiuru atu anō' hei takiuru ki tētahi atu pūrere, mā te paetukutuku rānei.",
+    "default": "Kua hē tētahi mea. Tēnā koa whakamātau anō.",
+    "retryableAdmission": "Kāore i taea e mātou te whakamana i tēnei pūrere. Tirohia tō hononga, ka whakamātau anō."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Kua kohia ngā raraunga",
+    "free": "Koreutu"
   }
 }

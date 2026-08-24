@@ -31,9 +31,9 @@
     "languageSaved": "Språket ditt er lagret.",
     "catalogLoadFailed": "Kunne ikke laste språket. Prøv igjen.",
     "retry": "Prøv igjen",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Søk etter språk",
+    "noMatches": "Ingen språk samsvarer",
+    "deviceLanguage": "Enhetens språk"
   },
   "login": {
     "welcome": "Velkommen til Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "System",
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
-    "account": "Account"
+    "account": "Konto"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Valgte {{label}}, trykk for å endre markeringen",
       "tapToComment": "{{label}}, trykk for å kommentere"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Utklippstavlen er tom",
+    "linkPasteNotAPullRequest": "Ikke en GitHub-pull request-lenke"
   },
   "notifications": {
     "title": "Varsler",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Kunne ikke åpne GitHub",
       "couldNotOpenMessage": "Vi kunne ikke starte GitHub App-oppsettet. Prøv igjen."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Økten ble avsluttet",
+    "remoteSpawnRetryable": "Kunne ikke nå forekomsten — den kan ha mistet tilkoblingen.",
+    "remoteSpawnNonRetryable": "Forekomsten klarte ikke å starte økten — kontroller maskinen eller oppdater CLI-en.",
+    "remoteSpawnInstanceDisconnected": "Den valgte forekomsten mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen forekomst."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enheten kan ikke transkribere offline. Opptaket ditt sendes til {{provider}} for å gjøre det om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Start taleinntasting",
+    "stop": "Stopp taleinntasting"
   },
   "share": {
     "title": "Del til Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Åpner App Store-abonnementsadministrasjon.",
     "opensPlans": "Åpner Kilo Pass-planer.",
     "tryAgainFromProfile": "Prøv igjen fra Profil.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass er ikke tilgjengelig som et kjøp i appen på Android. Administrer det på nettet.",
+    "webManagementDescription": "Denne Kilo Pass-en administreres på nettet.",
+    "legalDisclosure": "Kilo Pass er et automatisk fornybart månedsabonnement. Betaling belastes Apple-ID-en din ved bekreftelse av kjøpet. Abonnementet fornyes automatisk hver måned til prisen som vises, med mindre det kanselleres minst 24 timer før slutten av gjeldende periode. Administrer eller kanseller når som helst i App Store-kontoinnstillingene.",
+    "legalPrivacyPolicy": "Personvernpolicy",
+    "legalTermsOfUse": "Bruksvilkår (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Det finnes allerede en konto med denne e-postadressen med en annen påloggingsmetode. Prøv en annen metode eller bruk «Flere påloggingsalternativer».",
+    "differentOauth": "Det finnes allerede en konto med denne e-postadressen med en annen påloggingsmetode. Prøv en annen metode eller bruk «Flere påloggingsalternativer».",
+    "ssoError": "Organisasjonen din krever SSO. Bruk «Flere påloggingsalternativer».",
+    "blocked": "Denne kontoen er blokkert. Kontakt støtte.",
+    "signupRateLimited": "For mange forsøk. Prøv igjen senere.",
+    "invalidCode": "Den koden er feil. Prøv igjen.",
+    "codeInProgress": "Koden din behandles. Vent et øyeblikk og prøv igjen.",
+    "tooManyAttempts": "For mange forsøk. Be om en ny kode.",
+    "invalidToken": "Påloggingen mislyktes. Prøv igjen.",
+    "invalidEmail": "Kan ikke levere e-post til denne adressen. Bruk en annen e-postadresse.",
+    "invalidRequest": "Kontroller e-postadressen din og prøv igjen.",
+    "emailDeliveryFailed": "E-postlevering er midlertidig utilgjengelig. Prøv igjen senere.",
+    "admissionRequired": "Enheten din kan ikke verifiseres. Bruk «Flere påloggingsalternativer» for å logge på en annen enhet eller via nettet.",
+    "default": "Noe gikk galt. Prøv igjen.",
+    "retryableAdmission": "Vi kunne ikke verifisere denne enheten. Kontroller tilkoblingen og prøv igjen."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Data samlet inn",
+    "free": "Gratis"
   }
 }

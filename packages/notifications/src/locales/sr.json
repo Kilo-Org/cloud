@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Vaša agentska sesija ima ažuriranje",
+      "chatMessage": "Imate novu poruku",
+      "instanceLifecycle": "Vaša instanca ima ažuriranje",
+      "scheduledAction": "Zakazana radnja ima ažuriranje",
+      "lowBalance": "Vaš saldo zahteva pažnju",
+      "securityFinding": "Bezbednosni nalaz zahteva pažnju"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Zadatak završen"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Neuspešno: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Prekinuto: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Bez naslova",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Upozorenje o niskom saldu",
+      "body": "Saldo {{organizationName}}-a pao je ispod ${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Novi bezbednosni nalaz ({{severity}})",
+      "body": "{{findingTitle}} u {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA upozorenje",
+      "body": "{{findingTitle}} u {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA kršenje",
+      "body": "{{findingTitle}} u {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Bezbednosni nalaz zahteva pažnju"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} je spreman",
+      "body": "Dodirnite da započnete ćaskanje."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} nije uspeo da se pokrene",
+      "body": "Pokretanje nije uspelo."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} će se uskoro ponovo pokrenuti",
+      "body": "Zakazano ponovno pokretanje u {{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "Ponovno pokretanje {{instanceName}}-a otkazano",
+      "body": "Prethodno zakazano ponovno pokretanje je otkazano."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} će se uskoro nadograditi",
+      "bodyWithTag": "Nadogradnja na {{targetImageTag}} u {{when}}.",
+      "bodyWithoutTag": "Zakazana nadogradnja u {{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "Nadogradnja {{instanceName}}-a otkazana",
+      "body": "Prethodno zakazana nadogradnja je otkazana."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Vaša Kilo sesija je spremna za upravljanje sa vašeg telefona"
   }
 }

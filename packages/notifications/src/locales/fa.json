@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "جلسه عامل شما به‌روزرسانی دارد",
+      "chatMessage": "پیام جدیدی دارید",
+      "instanceLifecycle": "نمونه شما به‌روزرسانی دارد",
+      "scheduledAction": "یک اقدام زمان‌بندی‌شده به‌روزرسانی دارد",
+      "lowBalance": "موجودی شما نیاز به توجه دارد",
+      "securityFinding": "یک یافته امنیتی نیاز به توجه دارد"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "وظیفه کامل شد"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "ناموفق: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "قطع شد: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · بدون عنوان",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "هشدار موجودی کم",
+      "body": "موجودی {{organizationName}} به زیر ${{minimumBalanceUsd}} رسید"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "یافته امنیتی جدید ({{severity}})",
+      "body": "{{findingTitle}} در {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "هشدار SLA",
+      "body": "{{findingTitle}} در {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "نقض SLA",
+      "body": "{{findingTitle}} در {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "یک یافته امنیتی نیاز به توجه دارد"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} آماده است",
+      "body": "برای شروع گفتگو لمس کنید."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} شروع نشد",
+      "body": "شروع ناموفق بود."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} به‌زودی راه‌اندازی مجدد می‌شود",
+      "body": "زمان‌بندی راه‌اندازی مجدد در {{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "راه‌اندازی مجدد {{instanceName}} لغو شد",
+      "body": "راه‌اندازی مجدد زمان‌بندی‌شده قبلی لغو شده است."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} به‌زودی ارتقا می‌یابد",
+      "bodyWithTag": "ارتقا به {{targetImageTag}} در {{when}}.",
+      "bodyWithoutTag": "ارتقای زمان‌بندی‌شده در {{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "ارتقای {{instanceName}} لغو شد",
+      "body": "ارتقای زمان‌بندی‌شده قبلی لغو شده است."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "جلسه Kilo شما آماده است تا از تلفن خود کنترل کنید"
   }
 }

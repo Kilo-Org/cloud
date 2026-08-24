@@ -31,9 +31,9 @@
     "languageSaved": "നിങ്ങളുടെ ഭാഷ സംരക്ഷിച്ചു.",
     "catalogLoadFailed": "ഭാഷ ലോഡ് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "retry": "വീണ്ടും ശ്രമിക്കുക",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "ഭാഷകൾ തിരയുക",
+    "noMatches": "ഭാഷകൾ ഒന്നും യോജിക്കുന്നില്ല",
+    "deviceLanguage": "ഉപകരണ ഭാഷ"
   },
   "login": {
     "welcome": "Kilo-യിലേക്ക് സ്വാഗതം",
@@ -143,7 +143,7 @@
     "appearanceSystem": "സിസ്റ്റം",
     "appearanceLight": "ലൈറ്റ്",
     "appearanceDark": "ഡാർക്ക്",
-    "account": "Account"
+    "account": "അക്കൗണ്ട്"
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} തിരഞ്ഞെടുത്തു, തിരഞ്ഞെടുപ്പ് മാറ്റാൻ ടാപ്പ് ചെയ്യുക",
       "tapToComment": "{{label}}, അഭിപ്രായമിടാൻ ടാപ്പ് ചെയ്യുക"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "ക്ലിപ്പ്ബോർഡ് ശൂന്യമാണ്",
+    "linkPasteNotAPullRequest": "ഇത് ഒരു GitHub പുൾ റിക്വസ്റ്റ് ലിങ്ക് അല്ല"
   },
   "notifications": {
     "title": "അറിയിപ്പുകൾ",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub തുറക്കാൻ കഴിഞ്ഞില്ല",
       "couldNotOpenMessage": "GitHub App സജ്ജീകരണം ആരംഭിക്കാൻ ഞങ്ങൾക്ക് കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "സെഷൻ പുറത്തുകടന്നു",
+    "remoteSpawnRetryable": "ഇൻസ്റ്റൻസിൽ എത്താൻ കഴിഞ്ഞില്ല — ഇത് വിച്ഛേദിക്കപ്പെട്ടിരിക്കാം.",
+    "remoteSpawnNonRetryable": "സെഷൻ ആരംഭിക്കുന്നതിൽ ഇൻസ്റ്റൻസ് പരാജയപ്പെട്ടു — മെഷീൻ പരിശോധിക്കുക അല്ലെങ്കിൽ CLI അപ്ഡേറ്റ് ചെയ്യുക.",
+    "remoteSpawnInstanceDisconnected": "തിരഞ്ഞെടുത്ത ഇൻസ്റ്റൻസ് വിച്ഛേദിക്കപ്പെട്ടു. Cloud Agent-ൽ ഒരു സെഷൻ ആരംഭിക്കുക അല്ലെങ്കിൽ മറ്റൊരു ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കുക."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "സംസാരം ഓൺലൈനിൽ പ്രോസസ്സ് ചെയ്യുന്നു",
     "onlineMessage": "ഈ ഉപകരണത്തിന് ഓഫ്ലൈനിൽ ട്രാൻസ്ക്രൈബ് ചെയ്യാൻ കഴിയില്ല. നിങ്ങളുടെ റെക്കോർഡിംഗ് ടെക്സ്റ്റാക്കാൻ {{provider}}-ലേക്ക് അയയ്ക്കുന്നു. Kilo ഓഡിയോ സംഭരിക്കുന്നില്ല.",
     "allow": "അനുവദിക്കുക",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "ശബ്ദ ഇൻപുട്ട് ആരംഭിക്കുക",
+    "stop": "ശബ്ദ ഇൻപുട്ട് നിർത്തുക"
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store സബ്സ്ക്രിപ്ഷൻ മാനേജ്മെന്റ് തുറക്കുന്നു.",
     "opensPlans": "Kilo Pass പ്ലാനുകൾ തുറക്കുന്നു.",
     "tryAgainFromProfile": "പ്രൊഫൈലിൽ നിന്ന് വീണ്ടും ശ്രമിക്കുക.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "കിലോ പാസ് Android-ൽ ഒരു ഇൻ-ആപ്പ് വാങ്ങലായി ലഭ്യമല്ല. ഇത് വെബിൽ കൈകാര്യം ചെയ്യുക.",
+    "webManagementDescription": "ഈ കിലോ പാസ് വെബിൽ കൈകാര്യം ചെയ്യപ്പെടുന്നു.",
+    "legalDisclosure": "കിലോ പാസ് ഒരു യാന്ത്രിക-പുതുക്കാവുന്ന പ്രതിമാസ സബ്സ്ക്രിപ്ഷൻ ആണ്. വാങ്ങൽ സ്ഥിരീകരിക്കുമ്പോൾ നിങ്ങളുടെ Apple ID-യിൽ നിന്ന് പേയ്മെന്റ് ഈടാക്കുന്നു. നിലവിലെ കാലയളവ് അവസാനിക്കുന്നതിന് കുറഞ്ഞത് 24 മണിക്കൂർ മുമ്പ് റദ്ദാക്കിയില്ലെങ്കിൽ സബ്സ്ക്രിപ്ഷനുകൾ ഓരോ മാസവും കാണിച്ചിരിക്കുന്ന വിലയിൽ സ്വയമേവ പുതുക്കുന്നു. നിങ്ങളുടെ App Store അക്കൗണ്ട് ക്രമീകരണങ്ങളിൽ എപ്പോൾ വേണമെങ്കിലും കൈകാര്യം ചെയ്യുക അല്ലെങ്കിൽ റദ്ദാക്കുക.",
+    "legalPrivacyPolicy": "സ്വകാര്യതാ നയം",
+    "legalTermsOfUse": "ഉപയോഗ നിബന്ധനകൾ (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "ഈ ഇമെയിൽ ഉള്ള ഒരു അക്കൗണ്ട് മറ്റൊരു സൈൻ-ഇൻ രീതിയിൽ ഇതിനകം നിലവിലുണ്ട്. മറ്റൊരു രീതി പരീക്ഷിക്കുക അല്ലെങ്കിൽ 'More sign-in options' ഉപയോഗിക്കുക.",
+    "differentOauth": "ഈ ഇമെയിൽ ഉള്ള ഒരു അക്കൗണ്ട് മറ്റൊരു സൈൻ-ഇൻ രീതിയിൽ ഇതിനകം നിലവിലുണ്ട്. മറ്റൊരു രീതി പരീക്ഷിക്കുക അല്ലെങ്കിൽ 'More sign-in options' ഉപയോഗിക്കുക.",
+    "ssoError": "നിങ്ങളുടെ ഓർഗനൈസേഷന് SSO ആവശ്യമാണ്. 'More sign-in options' ഉപയോഗിക്കുക.",
+    "blocked": "ഈ അക്കൗണ്ട് ബ്ലോക്ക് ചെയ്യപ്പെട്ടിരിക്കുന്നു. ദയവായി പിന്തുണയുമായി ബന്ധപ്പെടുക.",
+    "signupRateLimited": "വളരെയധികം ശ്രമങ്ങൾ. ദയവായി പിന്നീട് വീണ്ടും ശ്രമിക്കുക.",
+    "invalidCode": "ആ കോഡ് തെറ്റാണ്. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+    "codeInProgress": "നിങ്ങളുടെ കോഡ് പ്രോസസ്സ് ചെയ്യപ്പെടുകയാണ്. കുറച്ച് നേരം കാത്തിരുന്ന് വീണ്ടും ശ്രമിക്കുക.",
+    "tooManyAttempts": "വളരെയധികം ശ്രമങ്ങൾ. ദയവായി ഒരു പുതിയ കോഡ് അഭ്യർത്ഥിക്കുക.",
+    "invalidToken": "സൈൻ-ഇൻ പരാജയപ്പെട്ടു. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+    "invalidEmail": "ഈ വിലാസത്തിലേക്ക് ഇമെയിൽ എത്തിക്കാൻ കഴിഞ്ഞില്ല. ദയവായി മറ്റൊരു ഇമെയിൽ ഉപയോഗിക്കുക.",
+    "invalidRequest": "നിങ്ങളുടെ ഇമെയിൽ വിലാസം പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+    "emailDeliveryFailed": "ഇമെയിൽ ഡെലിവറി താൽക്കാലികമായി ലഭ്യമല്ല. ദയവായി പിന്നീട് വീണ്ടും ശ്രമിക്കുക.",
+    "admissionRequired": "നിങ്ങളുടെ ഉപകരണം പരിശോധിക്കാൻ കഴിയില്ല. മറ്റൊരു ഉപകരണത്തിൽ അല്ലെങ്കിൽ വെബ് വഴി സൈൻ ഇൻ ചെയ്യാൻ 'More sign-in options' ഉപയോഗിക്കുക.",
+    "default": "എന്തോ കുഴപ്പം സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+    "retryableAdmission": "ഈ ഉപകരണം പരിശോധിക്കാൻ ഞങ്ങൾക്ക് കഴിഞ്ഞില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "ശേഖരിച്ച ഡാറ്റ",
+    "free": "സൗജന്യം"
   }
 }

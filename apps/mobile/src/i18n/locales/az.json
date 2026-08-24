@@ -31,9 +31,9 @@
     "languageSaved": "Diliniz saxlanıldı.",
     "catalogLoadFailed": "Dil yüklənə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
     "retry": "Yenidən cəhd edin",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Dilləri axtar",
+    "noMatches": "Uyğun dil tapılmadı",
+    "deviceLanguage": "Cihazın dili"
   },
   "login": {
     "welcome": "Kilo'ya xoş gəldiniz",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "İşıq",
     "appearanceDark": "Qaranlıq",
-    "account": "Account"
+    "account": "Hesab"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} seçildi, seçimi dəyişmək üçün toxunun",
       "tapToComment": "{{label}}, şərh üçün toxunun"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Panoda heç nə yoxdur",
+    "linkPasteNotAPullRequest": "Bu, GitHub pull request linki deyil"
   },
   "notifications": {
     "title": "Bildirişlər",
@@ -724,7 +724,7 @@
       "commitPlan": "Commit",
       "daysLeft": "{{count}} gün qalıb",
       "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Your final Commit term ends on {{date}}. Continue as Standard at {{price}}, or hosting ends.",
+      "finalCommitTermEndsOn": "Son Commit müddətiniz {{date}} tarixində bitir. {{price}} qiymətinə Standart olaraq davam edin, yoxsa hostinq sona çatır.",
       "freeTrial": "Pulsuz Sınaq",
       "hostingEnds": "Hostinq bitir",
       "oneDayLeft": "1 gün qalıb",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub açıla bilmədi",
       "couldNotOpenMessage": "GitHub App quraşdırması başladıla bilmədi. Zəhmət olmasa yenidən cəhd edin."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sessiya başa çatdı",
+    "remoteSpawnRetryable": "İnstansa çatmaq mümkün olmadı — o, əlaqəsi kəsilmiş ola bilər.",
+    "remoteSpawnNonRetryable": "İnstans sessiyanı başlada bilmədi — maşını yoxlayın və ya CLI-ni yeniləyin.",
+    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın əlaqəsi kəsildi. Cloud Agent-də sessiya başladın və ya başqa instans seçin."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Nitq onlayn emal olunur",
     "onlineMessage": "Bu cihaz oflayn transkripsiya edə bilmir. Yazınız mətnə çevrilmək üçün {{provider}}-a göndərilir. Kilo audio faylı saxlamır.",
     "allow": "İcazə ver",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Səs girişini başlat",
+    "stop": "Səs girişini dayandır"
   },
   "share": {
     "title": "Kilo-ya paylaş",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store abunəlik idarəetməsini açır.",
     "opensPlans": "Kilo Pass planlarını açır.",
     "tryAgainFromProfile": "Profildən yenidən cəhd edin.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass Android-də tətbiqdaxili alış kimi mövcud deyil. Onu vebdə idarə edin.",
+    "webManagementDescription": "Bu Kilo Pass vebdə idarə olunur.",
+    "legalDisclosure": "Kilo Pass avtomatik yenilənən aylıq abunədir. Ödəniş alışın təsdiqində Apple ID-nizdən çıxılır. Abunəliklər cari dövrün sonuna ən azı 24 saat qalmış ləğv edilmədiyi halda hər ay göstərilən qiymətlə avtomatik yenilənir. İstənilən vaxt App Store hesabınızın parametrlərində idarə edin və ya ləğv edin.",
+    "legalPrivacyPolicy": "Məxfilik Siyasəti",
+    "legalTermsOfUse": "İstifadə Şərtləri (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Bu e-poçtla hesab artıq başqa giriş üsulu ilə mövcuddur. Başqa üsul cəhd edin və ya 'Daha çox giriş seçimi'ni istifadə edin.",
+    "differentOauth": "Bu e-poçtla hesab artıq başqa giriş üsulu ilə mövcuddur. Başqa üsul cəhd edin və ya 'Daha çox giriş seçimi'ni istifadə edin.",
+    "ssoError": "Təşkilatınız SSO tələb edir. 'Daha çox giriş seçimi'ni istifadə edin.",
+    "blocked": "Bu hesab bloklanıb. Zəhmət olmasa dəstək xidməti ilə əlaqə saxlayın.",
+    "signupRateLimited": "Çox sayda cəhd. Zəhmət olmasa daha sonra yenidən cəhd edin.",
+    "invalidCode": "Bu kod səhvdir. Zəhmət olmasa yenidən cəhd edin.",
+    "codeInProgress": "Kodunuz işlənir. Bir an gözləyin və yenidən cəhd edin.",
+    "tooManyAttempts": "Çox sayda cəhd. Zəhmət olmasa yeni kod tələb edin.",
+    "invalidToken": "Giriş uğursuz oldu. Zəhmət olmasa yenidən cəhd edin.",
+    "invalidEmail": "Bu ünvana e-poçt göndərilə bilmir. Zəhmət olmasa başqa e-poçt istifadə edin.",
+    "invalidRequest": "E-poçt ünvanınızı yoxlayın və yenidən cəhd edin.",
+    "emailDeliveryFailed": "E-poçt çatdırılması müvəqqəti mümkün deyil. Zəhmət olmasa daha sonra yenidən cəhd edin.",
+    "admissionRequired": "Cihazınız təsdiqlənə bilmir. Başqa cihazda və ya veb vasitəsilə daxil olmaq üçün 'Daha çox giriş seçimi'ni istifadə edin.",
+    "default": "Nəsə səhv oldu. Zəhmət olmasa yenidən cəhd edin.",
+    "retryableAdmission": "Bu cihazı təsdiqləyə bilmədik. Əlaqənizi yoxlayın və yenidən cəhd edin."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Toplanan məlumatlar",
+    "free": "Pulsuz"
   }
 }

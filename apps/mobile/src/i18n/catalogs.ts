@@ -5,8 +5,8 @@ import { type SupportedLanguage } from './languages';
 /**
  * One loader per language. Metro keeps every catalog in the bundle, but a
  * catalog is only parsed when its loader runs, so a cold start parses one
- * catalog instead of 86. `require` is deliberate: a static
- * `import` would parse all 86 at startup, which is the cost this
+ * catalog instead of 87. `require` is deliberate: a static
+ * `import` would parse all 87 at startup, which is the cost this
  * module exists to avoid.
  *
  * ponytail: lazy parse, not lazy download. Move the catalogs to hosted assets
@@ -77,6 +77,7 @@ export const CATALOG_LOADERS = {
   fa: () => require('./locales/fa.json') as ResourceKey,
   pl: () => require('./locales/pl.json') as ResourceKey,
   pt: () => require('./locales/pt.json') as ResourceKey,
+  'pt-BR': () => require('./locales/pt-BR.json') as ResourceKey,
   pa: () => require('./locales/pa.json') as ResourceKey,
   ro: () => require('./locales/ro.json') as ResourceKey,
   ru: () => require('./locales/ru.json') as ResourceKey,

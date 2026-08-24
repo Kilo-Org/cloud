@@ -31,9 +31,9 @@
     "languageSaved": "ພາສາຂອງທ່ານຖືກບັນທຶກແລ້ວ.",
     "catalogLoadFailed": "ບໍ່ສາມາດໂຫຼດພາສາໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
     "retry": "ລອງໃໝ່",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "ຄົ້ນຫາພາສາ",
+    "noMatches": "ບໍ່ມີພາສາທີ່ກົງກັນ",
+    "deviceLanguage": "ພາສາຂອງອຸປະກອນ"
   },
   "login": {
     "welcome": "ຍິນດີຕ້ອນຮັບສູ່ Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "ລະບົບ",
     "appearanceLight": "ສະຫວ່າງ",
     "appearanceDark": "ມືດ",
-    "account": "Account"
+    "account": "ບັນຊີ"
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "ເລືອກ {{label}}, ແຕະເພື່ອປ່ຽນການເລືອກ",
       "tapToComment": "{{label}}, ແຕະເພື່ອໃສ່ຄຳເຫັນ"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ",
+    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງ pull request ຂອງ GitHub"
   },
   "notifications": {
     "title": "ການແຈ້ງເຕືອນ",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "ບໍ່ສາມາດເປີດ GitHub",
       "couldNotOpenMessage": "ພວກເຮົາບໍ່ສາມາດເລີ່ມການຕັ້ງຄ່າ GitHub App. ກະລຸນາລອງໃໝ່."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "ເຊດຊັນອອກແລ້ວ",
+    "remoteSpawnRetryable": "ບໍ່ສາມາດເຂົ້າເຖິງ instance ໄດ້ — ມັນອາດຈະຕັດການເຊື່ອມຕໍ່.",
+    "remoteSpawnNonRetryable": "instance ລົ້ມເຫຼວໃນການເລີ່ມເຊດຊັນ — ກວດເຄື່ອງ ຫຼື ອັບເດດ CLI.",
+    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "ສຽງເວົ້າຖືກປະມວນຜົນອອນໄລນ໌",
     "onlineMessage": "ອຸປະກອນນີ້ບໍ່ສາມາດຖອດຄວາມອອບຟາຍໄດ້. ການບັນທຶກຂອງທ່ານຈະຖືກສົ່ງໄປຍັງ {{provider}} ເພື່ອແປງເປັນຂໍ້ຄວາມ. Kilo ຈະບໍ່ເກັບສຽງ.",
     "allow": "ອະນຸຍາດ",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "ເລີ່ມການປ້ອນສຽງ",
+    "stop": "ຢຸດການປ້ອນສຽງ"
   },
   "share": {
     "title": "ແບ່ງປັນໄປ Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "ເປີດການຈັດການການສະໝັກ App Store.",
     "opensPlans": "ເປີດແຜນ Kilo Pass.",
     "tryAgainFromProfile": "ລອງອີກຈາກ Profile.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass ບໍ່ມີໃຫ້ຊື້ພາຍໃນແອັບໃນ Android. ຈັດການມັນຢູ່ເວັບ.",
+    "webManagementDescription": "Kilo Pass ນີ້ຖືກຈັດການຢູ່ເວັບ.",
+    "legalDisclosure": "Kilo Pass ເປັນການສະໝັກສະມາຊິກລາຍເດືອນທີ່ຕໍ່ອັດຕະໂນມັດ. ການຊຳລະຈະຖືກຄິດຄ່າຈາກ Apple ID ຂອງທ່ານເມື່ອຢືນຢັນການຊື້. ການສະໝັກຈະຕໍ່ອັດຕະໂນມັດທຸກເດືອນໃນລາຄາທີ່ສະແດງ ເວັ້ນເສຍແຕ່ຍົກເລີກຢ່າງໜ້ອຍ 24 ຊົ່ວໂມງກ່ອນສິ້ນສຸດໄລຍະປັດຈຸບັນ. ຈັດການ ຫຼື ຍົກເລີກໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າບັນຊີ App Store.",
+    "legalPrivacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ",
+    "legalTermsOfUse": "ຂໍ້ກຳນົດການນຳໃຊ້ (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "ບັນຊີທີ່ໃຊ້ອີເມວນີ້ມີຢູ່ແລ້ວດ້ວຍວິທີເຂົ້າສູ່ລະບົບອື່ນ. ລອງວິທີອື່ນ ຫຼື ໃຊ້ 'More sign-in options'.",
+    "differentOauth": "ບັນຊີທີ່ໃຊ້ອີເມວນີ້ມີຢູ່ແລ້ວດ້ວຍວິທີເຂົ້າສູ່ລະບົບອື່ນ. ລອງວິທີອື່ນ ຫຼື ໃຊ້ 'More sign-in options'.",
+    "ssoError": "ອົງກອນຂອງທ່ານກຳນົດໃຫ້ໃຊ້ SSO. ໃຊ້ 'More sign-in options'.",
+    "blocked": "ບັນຊີນີ້ຖືກບລັອກແລ້ວ. ກະລຸນາຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ.",
+    "signupRateLimited": "ລອງຫຼາຍເກີນໄປ. ກະລຸນາລອງໃໝ່ໃນພາຍຫຼັງ.",
+    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ. ກະລຸນາລອງໃໝ່.",
+    "codeInProgress": "ກຳລັງປະມວນຜົນລະຫັດຂອງທ່ານ. ລໍຖ້າຄ່ອຍໆ ແລ້ວລອງໃໝ່.",
+    "tooManyAttempts": "ລອງຫຼາຍເກີນໄປ. ກະລຸນາຂໍລະຫັດໃໝ່.",
+    "invalidToken": "ການເຂົ້າສູ່ລະບົບລົ້ມເຫຼວ. ກະລຸນາລອງໃໝ່.",
+    "invalidEmail": "ບໍ່ສາມາດສົ່ງອີເມວໄປຫາທີ່ຢູ່ນີ້ໄດ້. ກະລຸນາໃຊ້ອີເມວອື່ນ.",
+    "invalidRequest": "ກວດເບິ່ງທີ່ຢູ່ອີເມວຂອງທ່ານ ແລະ ລອງໃໝ່.",
+    "emailDeliveryFailed": "ການສົ່ງອີເມວບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ. ກະລຸນາລອງໃໝ່ໃນພາຍຫຼັງ.",
+    "admissionRequired": "ບໍ່ສາມາດຢືນຢັນອຸປະກອນຂອງທ່ານໄດ້. ໃຊ້ 'More sign-in options' ເພື່ອເຂົ້າສູ່ລະບົບໃນອຸປະກອນອື່ນ ຫຼື ຜ່ານເວັບ.",
+    "default": "ມີບາງຢ່າງຜິດພາດ. ກະລຸນາລອງໃໝ່.",
+    "retryableAdmission": "ພວກເຮົາບໍ່ສາມາດຢືນຢັນອຸປະກອນນີ້ໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງໃໝ່."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "ຂໍ້ມູນທີ່ເກັບກຳ",
+    "free": "ຟຣີ"
   }
 }

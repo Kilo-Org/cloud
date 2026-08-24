@@ -31,9 +31,9 @@
     "languageSaved": "Вашиот јазик е зачуван.",
     "catalogLoadFailed": "Не можеше да се вчита јазикот. Обидете се повторно.",
     "retry": "Обиди се повторно",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Пребарувај јазици",
+    "noMatches": "Нема соодветни јазици",
+    "deviceLanguage": "Јазик на уредот"
   },
   "login": {
     "welcome": "Добредојдовте на Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Системски",
     "appearanceLight": "Светло",
     "appearanceDark": "Темно",
-    "account": "Account"
+    "account": "Сметка"
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Избрано {{label}}, допрете за да го промените изборот",
       "tapToComment": "{{label}}, допрете за да коментирате"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Таблата со клипборд е празна",
+    "linkPasteNotAPullRequest": "Ова не е линк до GitHub pull request"
   },
   "notifications": {
     "title": "Известувања",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Не можеше да се отвори GitHub",
       "couldNotOpenMessage": "Не можевме да го започнеме поставувањето на GitHub App. Обиди се повторно."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Сесијата е затворена",
+    "remoteSpawnRetryable": "Не можеше да се пристапи до инстанцата — можеби се исклучи.",
+    "remoteSpawnNonRetryable": "Инстанцата не успеа да ја започне сесијата — проверете ја машината или ажурирајте го CLI.",
+    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започнете сесија на Cloud Agent или изберете друга инстанца."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Говорот се обработува онлајн",
     "onlineMessage": "Овој уред не може да транскрибира офлајн. Вашиот запис се испраќа до {{provider}} за да се претвори во текст. Kilo не го складира аудиото.",
     "allow": "Дозволи",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Започни гласовен внес",
+    "stop": "Запре го гласовниот внес"
   },
   "share": {
     "title": "Сподели во Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Отвора управување со претплата во App Store.",
     "opensPlans": "Отвора Kilo Pass планови.",
     "tryAgainFromProfile": "Обидете се повторно од Профил.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass не е достапен како купување во апликацијата на Android. Управувајте со него на веб.",
+    "webManagementDescription": "Овој Kilo Pass се управува на веб.",
+    "legalDisclosure": "Kilo Pass е автоматски обновлива месечна претплата. Плаќањето се наплаќа на вашиот Apple ID при потврдување на купувањето. Претплатите автоматски се обновуваат секој месец по прикажаната цена, освен ако не се откажат најмалку 24 часа пред крајот на тековниот период. Управувајте или откажете во секое време во поставките на вашата App Store сметка.",
+    "legalPrivacyPolicy": "Политика за приватност",
+    "legalTermsOfUse": "Услови за користење (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Сметка со оваа е-пошта веќе постои со различен метод за најава. Обидете се со друг метод или користете „Повеќе опции за најава“.",
+    "differentOauth": "Сметка со оваа е-пошта веќе постои со различен метод за најава. Обидете се со друг метод или користете „Повеќе опции за најава“.",
+    "ssoError": "Вашата организација бара SSO. Користете „Повеќе опции за најава“.",
+    "blocked": "Оваа сметка е блокирана. Ве молиме контактирајте поддршка.",
+    "signupRateLimited": "Премногу обиди. Обидете се повторно подоцна.",
+    "invalidCode": "Тој код е неточен. Обидете се повторно.",
+    "codeInProgress": "Вашиот код се обработува. Почекајте момент и обидете се повторно.",
+    "tooManyAttempts": "Премногу обиди. Ве молиме побарајте нов код.",
+    "invalidToken": "Најавата не успеа. Обидете се повторно.",
+    "invalidEmail": "Не може да се испорача е-пошта на оваа адреса. Ве молиме користете друга е-пошта.",
+    "invalidRequest": "Проверете ја вашата е-пошта адреса и обидете се повторно.",
+    "emailDeliveryFailed": "Испораката на е-пошта е привремено недостапна. Обидете се повторно подоцна.",
+    "admissionRequired": "Вашиот уред не може да се потврди. Користете „Повеќе опции за најава“ за да се најавите на друг уред или преку веб.",
+    "default": "Нешто тргна наопаку. Обидете се повторно.",
+    "retryableAdmission": "Не можевме да го потврдиме овој уред. Проверете ја вашата врска и обидете се повторно."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Собрани податоци",
+    "free": "Бесплатно"
   }
 }

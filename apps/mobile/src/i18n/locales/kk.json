@@ -31,9 +31,9 @@
     "languageSaved": "Тіліңіз сақталды.",
     "catalogLoadFailed": "Тілді жүктеу мүмкін болмады. Қайта көріңіз.",
     "retry": "Қайталау",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Тілдерді іздеу",
+    "noMatches": "Тілдер сәйкес келмеді",
+    "deviceLanguage": "Құрылғы тілі"
   },
   "login": {
     "welcome": "Kilo-ға қош келдіңіз",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Жүйе",
     "appearanceLight": "Жарық",
     "appearanceDark": "Қараңғы",
-    "account": "Account"
+    "account": "Тіркелгі"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} таңдалды, таңдауды өзгерту үшін түртіңіз",
       "tapToComment": "{{label}}, пікір қалдыру үшін түртіңіз"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Айырбастау буфері бос",
+    "linkPasteNotAPullRequest": "GitHub pull request сілтемесі емес"
   },
   "notifications": {
     "title": "Хабарландырулар",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub ашу мүмкін болмады",
       "couldNotOpenMessage": "GitHub App орнатуды бастау мүмкін болмады. Қайталап көріңіз."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Сессия аяқталды",
+    "remoteSpawnRetryable": "Инстансқа жете алмадық — ол ажыраған болуы мүмкін.",
+    "remoteSpawnNonRetryable": "Инстанс сессияны бастай алмады — машинаны тексеріңіз немесе CLI жаңартыңыз.",
+    "remoteSpawnInstanceDisconnected": "Таңдалған инстанс ажырады. Cloud Agent сайтында сессияны бастаңыз немесе басқа инстансты таңдаңыз."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Сөйлеу онлайн өңделеді",
     "onlineMessage": "Бұл құрылғы офлайн транскрипция жасай алмайды. Жазбаңыз мәтінге айналдыру үшін {{provider}}-ға жіберіледі. Kilo аудионы сақтамайды.",
     "allow": "Рұқсат ету",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Дауыстық енгізуді бастау",
+    "stop": "Дауыстық енгізуді тоқтату"
   },
   "share": {
     "title": "Kilo-ға бөлісу",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store жазылым басқаруын ашады.",
     "opensPlans": "Kilo Pass жоспарларын ашады.",
     "tryAgainFromProfile": "Профильден қайталап көріңіз.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass Android-та қолданба ішіндегі сатып алу ретінде қолжетімді емес. Оны веб-сайтта басқарыңыз.",
+    "webManagementDescription": "Бұл Kilo Pass веб-сайтта басқарылады.",
+    "legalDisclosure": "Kilo Pass — автоматты жаңартылатын айлық жазылым. Төлем сатып алуды растау кезінде Apple ID-ге есептеледі. Ағымдағы кезең аяқталмастан кемінде 24 сағат бұрын тоқтатылмаса, жазылымдар көрсетілген баға бойынша әр ай сайын автоматты түрде жаңартылады. Оны App Store тіркелгі баптауларында кез келген уақытта басқарыңыз немесе тоқтатыңыз.",
+    "legalPrivacyPolicy": "Құпиялылық саясаты",
+    "legalTermsOfUse": "Пайдалану шарттары (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Бұл электрондық поштамен басқа кіру әдісі бар тіркелгі қазірдің өзінде бар. Басқа әдісті қолданып көріңіз немесе «Кірудің қосымша нұсқаларын» пайдаланыңыз.",
+    "differentOauth": "Бұл электрондық поштамен басқа кіру әдісі бар тіркелгі қазірдің өзінде бар. Басқа әдісті қолданып көріңіз немесе «Кірудің қосымша нұсқаларын» пайдаланыңыз.",
+    "ssoError": "Ұйымыңыз SSO талап етеді. «Кірудің қосымша нұсқаларын» пайдаланыңыз.",
+    "blocked": "Бұл тіркелгі бұғатталған. Қолдау қызметіне хабарласыңыз.",
+    "signupRateLimited": "Тым көп әрекет жасалды. Кейінірек қайта көріңіз.",
+    "invalidCode": "Бұл код дұрыс емес. Қайта көріңіз.",
+    "codeInProgress": "Кодыңыз өңделуде. Біраз күтіп, қайта көріңіз.",
+    "tooManyAttempts": "Тым көп әрекет жасалды. Жаңа код сұраңыз.",
+    "invalidToken": "Кіру сәтсіз аяқталды. Қайта көріңіз.",
+    "invalidEmail": "Бұл мекенжайға электрондық пошта жеткізілмейді. Басқа электрондық поштаны пайдаланыңыз.",
+    "invalidRequest": "Электрондық пошта мекенжайын тексеріп, қайта көріңіз.",
+    "emailDeliveryFailed": "Электрондық поштаны жеткізу уақытша қолжетімсіз. Кейінірек қайта көріңіз.",
+    "admissionRequired": "Құрылғыңызды тексеру мүмкін емес. Басқа құрылғыда немесе веб арқылы кіру үшін «Кірудің қосымша нұсқаларын» пайдаланыңыз.",
+    "default": "Бірдеңе дұрыс болмады. Қайта көріңіз.",
+    "retryableAdmission": "Біз бұл құрылғыны тексере алмадық. Қосылымды тексеріп, қайта көріңіз."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Жинақталған деректер",
+    "free": "Тегін"
   }
 }

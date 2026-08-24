@@ -31,9 +31,9 @@
     "languageSaved": "Vaš jezik je sačuvan.",
     "catalogLoadFailed": "Jezik se nije mogao učitati. Pokušajte ponovo.",
     "retry": "Pokušaj ponovo",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Pretraži jezike",
+    "noMatches": "Nema odgovarajućih jezika",
+    "deviceLanguage": "Jezik uređaja"
   },
   "login": {
     "welcome": "Dobrodošli u Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
-    "account": "Account"
+    "account": "Nalog"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Odabrano {{label}}, dodirnite za promjenu odabira",
       "tapToComment": "{{label}}, dodirnite za komentar"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Međuspremnik je prazan",
+    "linkPasteNotAPullRequest": "Nije GitHub pull request link"
   },
   "notifications": {
     "title": "Obavijesti",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
       "couldNotOpenMessage": "Nismo mogli započeti postavljanje GitHub aplikacije. Pokušajte ponovo."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sesija je završena",
+    "remoteSpawnRetryable": "Nismo mogli doći do instance — možda se odspojila.",
+    "remoteSpawnNonRetryable": "Instanca nije uspjela pokrenuti sesiju — provjerite mašinu ili ažurirajte CLI.",
+    "remoteSpawnInstanceDisconnected": "Odabrana instanca se odspojila. Pokrenite sesiju na Cloud Agent-u ili odaberite drugu instancu."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Govor se obrađuje online",
     "onlineMessage": "Ovaj uređaj ne može transkribovati offline. Vaš snimak se šalje {{provider}}-u za pretvaranje u tekst. Kilo ne pohranjuje audio.",
     "allow": "Dozvoli",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Pokreni glasovni unos",
+    "stop": "Zaustavi glasovni unos"
   },
   "share": {
     "title": "Podijeli u Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Otvara upravljanje pretplatom u App Store-u.",
     "opensPlans": "Otvara Kilo Pass planove.",
     "tryAgainFromProfile": "Pokušajte ponovo s Profila.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass nije dostupan kao kupovina u aplikaciji na Androidu. Upravljajte njime na webu.",
+    "webManagementDescription": "Ovim Kilo Pass-om upravlja se na webu.",
+    "legalDisclosure": "Kilo Pass je pretplata s automatskim obnavljanjem. Uplata se naplaćuje na vaš Apple ID pri potvrdi kupovine. Pretplate se automatski obnavljaju svakog mjeseca po prikazanoj cijeni, osim ako ih otkažete najmanje 24 sata prije kraja tekućeg razdoblja. Upravljajte ili otkažite u bilo kojem trenutku u postavkama vašeg App Store računa.",
+    "legalPrivacyPolicy": "Politika privatnosti",
+    "legalTermsOfUse": "Uvjeti korištenja (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Račun s ovom adresom e-pošte već postoji s drugom metodom prijave. Pokušajte s drugom metodom ili koristite 'Više opcija za prijavu'.",
+    "differentOauth": "Račun s ovom adresom e-pošte već postoji s drugom metodom prijave. Pokušajte s drugom metodom ili koristite 'Više opcija za prijavu'.",
+    "ssoError": "Vaša organizacija zahtijeva SSO. Koristite 'Više opcija za prijavu'.",
+    "blocked": "Ovaj račun je blokiran. Kontaktirajte podršku.",
+    "signupRateLimited": "Previše pokušaja. Pokušajte ponovo kasnije.",
+    "invalidCode": "Taj kod nije ispravan. Pokušajte ponovo.",
+    "codeInProgress": "Vaš kod se obrađuje. Pričekajte trenutak i pokušajte ponovo.",
+    "tooManyAttempts": "Previše pokušaja. Zatražite novi kod.",
+    "invalidToken": "Prijava nije uspjela. Pokušajte ponovo.",
+    "invalidEmail": "Nije moguće dostaviti e-poštu na ovu adresu. Koristite drugu adresu e-pošte.",
+    "invalidRequest": "Provjerite adresu e-pošte i pokušajte ponovo.",
+    "emailDeliveryFailed": "Dostava e-pošte je privremeno nedostupna. Pokušajte ponovo kasnije.",
+    "admissionRequired": "Vaš uređaj se ne može potvrditi. Koristite 'Više opcija za prijavu' da se prijavite na drugom uređaju ili putem weba.",
+    "default": "Nešto je pošlo po zlu. Pokušajte ponovo.",
+    "retryableAdmission": "Nismo mogli potvrditi ovaj uređaj. Provjerite vezu i pokušajte ponovo."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Prikupljeni podaci",
+    "free": "Besplatno"
   }
 }

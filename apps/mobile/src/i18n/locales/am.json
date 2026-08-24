@@ -31,9 +31,9 @@
     "languageSaved": "ቋንቋዎ ተቀምጧል።",
     "catalogLoadFailed": "ቋንቋውን መጫን አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
     "retry": "ደግሞ ሞክር",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "ቋንቋዎችን ይፈልጉ",
+    "noMatches": "ምንም የሚዛመድ ቋንቋ የለም",
+    "deviceLanguage": "የመሣሪያ ቋንቋ"
   },
   "login": {
     "welcome": "ወደ Kilo እንኳን ደህና መጡ",
@@ -143,7 +143,7 @@
     "appearanceSystem": "ስርዓት",
     "appearanceLight": "ብርሃን",
     "appearanceDark": "ጨለማ",
-    "account": "Account"
+    "account": "መለያ"
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} ተመርጧል፣ ምርጫውን ለመቀየር ይንኩ",
       "tapToComment": "{{label}}፣ አስተያየት ለመስጠት ይንኩ"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው",
+    "linkPasteNotAPullRequest": "የGitHub ፑል እንደጠየቀ አገናኝ አይደለም"
   },
   "notifications": {
     "title": "ማሳወቂያዎች",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
       "couldNotOpenMessage": "የGitHub App ማዋቀርን መጀመር አልቻልንም። እባክዎ እንደገና ይሞክሩ።"
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "ክፍለ ጊዜው ወጥቷል",
+    "remoteSpawnRetryable": "እንደገና መድረስ አልተቻለም — ተቋርጦ ሊሆን ይችላል።",
+    "remoteSpawnNonRetryable": "ክፍለ ጊዜውን መጀመር አልተሳካም — ማሽኑን ያረጋግጡ ወይም CLI ን ያዘምኑ።",
+    "remoteSpawnInstanceDisconnected": "የተመረጠው እንደጠየቀ አካል ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ይጀምሩ ወይም ሌላ እንደጠየቀ ይምረጡ።"
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "ንግግር በመስመር ላይ ይሰራጫል",
     "onlineMessage": "ይህ መሣሪያ ከመስመር ውጭ መገልበጥ አይችልም። ቅጂዎ ወደ ጽሑፍ ለመቀየር ወደ {{provider}} ይላካል። Kilo ድምጹን አያከማችም።",
     "allow": "ይፍቀዱ",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "የድምፅ ግብዓት ይጀምሩ",
+    "stop": "የድምፅ ግብዓት ያቁሙ"
   },
   "share": {
     "title": "ወደ Kilo ያጋሩ",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "የApp Store ምዝገባ አስተዳደርን ይከፍታል።",
     "opensPlans": "የKilo Pass እቅዶችን ይከፍታል።",
     "tryAgainFromProfile": "ከመገለጫ እንደገና ይሞክሩ።",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass በAndroid ላይ በመተግበሪያ ውስጥ እንደ ግዢ አይገኝም። በድር ላይ ያስተዳድሩት።",
+    "webManagementDescription": "ይህ Kilo Pass በድር ላይ የሚተዳደር ነው።",
+    "legalDisclosure": "Kilo Pass በራስ-ሰር የሚታደስ ወርሃዊ ምዝገባ ነው። ክፍያው ግዢውን ሲያረጋግጡ በApple ID ዎ ላይ ይጠየቃል። ምዝገባዎች ከወቅቱ ጊዜ ማብቂያ ቢያንስ 24 ሰዓታት በፊት ካልተሰረዙ በስተቀር በየወሩ በተጠቀሰው ዋጋ በራስ-ሰር ይታደሳሉ። በApp Store መለያ ቅንብሮችዎ ውስጥ በማንኛውም ጊዜ ያስተዳድሩ ወይም ይሰርዙ።",
+    "legalPrivacyPolicy": "የግላዊነት ፖሊሲ",
+    "legalTermsOfUse": "የአጠቃቀም ውሎች (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "በዚህ ኢሜይል ያለው መለያ በተለየ የመግቢያ ዘዴ አስቀድሞ አለ። ሌላ ዘዴ ይሞክሩ ወይም 'More sign-in options' ይጠቀሙ።",
+    "differentOauth": "በዚህ ኢሜይል ያለው መለያ በተለየ የመግቢያ ዘዴ አስቀድሞ አለ። ሌላ ዘዴ ይሞክሩ ወይም 'More sign-in options' ይጠቀሙ።",
+    "ssoError": "ድርጅትዎ SSO ይፈልጋል። 'More sign-in options' ይጠቀሙ።",
+    "blocked": "ይህ መለያ ታግዷል። እባክዎ ድጋፍን ያግኙ።",
+    "signupRateLimited": "በጣም ብዙ ሙከራዎች። እባክዎ በኋላ እንደገና ይሞክሩ።",
+    "invalidCode": "ያ ኮድ ትክክል አይደለም። እባክዎ እንደገና ይሞክሩ።",
+    "codeInProgress": "ኮድዎ እየተሰራ ነው። ትንሽ ይጠብቁ እና እንደገና ይሞክሩ።",
+    "tooManyAttempts": "በጣም ብዙ ሙከራዎች። እባክዎ አዲስ ኮድ ይጠይቁ።",
+    "invalidToken": "መግባት አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
+    "invalidEmail": "ወደዚህ አድራሻ ኢሜይል ማድረስ አልተቻለም። እባክዎ የተለየ ኢሜይል ይጠቀሙ።",
+    "invalidRequest": "የኢሜይል አድራሻዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+    "emailDeliveryFailed": "የኢሜይል ማድረስ ለጊዜው አይገኝም። እባክዎ በኋላ እንደገና ይሞክሩ።",
+    "admissionRequired": "መሣሪያዎን ማረጋገጥ አይቻልም። በሌላ መሣሪያ ወይም በድር ለመግባት 'More sign-in options' ይጠቀሙ።",
+    "default": "የሆነ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
+    "retryableAdmission": "ይህን መሣሪያ ማረጋገጥ አልቻልንም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "የተሰበሰበ መረጃ",
+    "free": "ነፃ"
   }
 }

@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Igba-ijiroro aṣoju rẹ ni imudojuiwọn",
+      "chatMessage": "O ni ifiranṣẹ tuntun",
+      "instanceLifecycle": "Apeere rẹ ni imudojuiwọn",
+      "scheduledAction": "Iṣe ti a ṣeto ni imudojuiwọn",
+      "lowBalance": "Iwọntunwọnsi rẹ nilo akiyesi",
+      "securityFinding": "Wiwa aabo nilo akiyesi"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Iṣẹ-ṣiṣe ti pari"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Kuna: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Ti da duro: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Laisi akọle",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Ifitonileti iwọntunwọnsi kekere",
+      "body": "Iwọntunwọnsi {{organizationName}} ṣubu ni isalẹ ${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Wiwa aabo tuntun ({{severity}})",
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Ikilọ SLA",
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Irufin SLA",
+      "body": "{{findingTitle}} ninu {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Wiwa aabo nilo akiyesi"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} ti ṣetan",
+      "body": "Tẹ lati bẹrẹ ijiroro."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} kuna lati bẹrẹ",
+      "body": "Bẹrẹ kuna."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} yoo tun bẹrẹ laipe",
+      "body": "Ti ṣeto lati tun bẹrẹ ni {{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "{{instanceName}} tun bẹrẹ ti fagile",
+      "body": "Tun bẹrẹ ti a ṣeto tẹlẹ ti fagile."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} yoo ṣe igbesoke laipe",
+      "bodyWithTag": "Igbesoke si {{targetImageTag}} ni {{when}}.",
+      "bodyWithoutTag": "Igbesoke ti a ṣeto ni {{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "{{instanceName}} igbesoke ti fagile",
+      "body": "Igbesoke ti a ṣeto tẹlẹ ti fagile."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Igba-ijiroro Kilo rẹ ti ṣetan lati ṣakoso lati foonu rẹ"
   }
 }

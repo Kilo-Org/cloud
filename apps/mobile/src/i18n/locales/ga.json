@@ -31,9 +31,9 @@
     "languageSaved": "Tá do theanga sábháilte.",
     "catalogLoadFailed": "Níorbh fhéidir an teanga a lódáil. Bain triail as arís le do thoil.",
     "retry": "Arís",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Cuardaigh teangacha",
+    "noMatches": "Ní oireann aon teanga",
+    "deviceLanguage": "Teanga an ghléis"
   },
   "login": {
     "welcome": "Fáilte go Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Córas",
     "appearanceLight": "Geal",
     "appearanceDark": "Dorcha",
-    "account": "Account"
+    "account": "Cuntas"
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe ar fáil",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Roghnaithe {{label}}, tapáil chun an roghnú a athrú",
       "tapToComment": "{{label}}, tapáil chun trácht a dhéanamh"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh",
+    "linkPasteNotAPullRequest": "Ní nasc pull request GitHub é seo"
   },
   "notifications": {
     "title": "Fógraí",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
       "couldNotOpenMessage": "Níorbh fhéidir linn socrú GitHub App a thosú. Bain triail as arís le do thoil."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "D'fhág an seisiún",
+    "remoteSpawnRetryable": "Níorbh fhéidir an t-instance a bhaint amach — seans gur dícheanglaíodh é.",
+    "remoteSpawnNonRetryable": "Theip ar an instance an seisiún a thosú — seiceáil an meaisín nó nuashonraigh an CLI.",
+    "remoteSpawnInstanceDisconnected": "Dícheanglaíodh an instance roghnaithe. Tosaigh seisiún ar Cloud Agent nó roghnaigh instance eile."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Déantar an chaint a phróiseáil ar líne",
     "onlineMessage": "Ní féidir leis an ngléas seo tras-scríobh as líne. Seoltar do thaifeadadh chuig {{provider}} le tiontú ina théacs. Ní stórálann Kilo an fhuaim.",
     "allow": "Ceadaigh",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Tosaigh ionchur gutha",
+    "stop": "Stadaigh ionchur gutha"
   },
   "share": {
     "title": "Roinn le Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Osclaíonn bainistíocht sintiúis App Store.",
     "opensPlans": "Osclaíonn pleananna Kilo Pass.",
     "tryAgainFromProfile": "Bain triail as arís ó Phróifíl.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Níl Kilo Pass ar fáil mar cheannach in-app ar Android. Bainistigh é ar an ngréasán.",
+    "webManagementDescription": "Tá an Kilo Pass seo bainistithe ar an ngréasán.",
+    "legalDisclosure": "Is síntiús míosúil uath-fhionnuaire é Kilo Pass. Gearrtar an táille ar do Apple ID ag deimhniú an cheannaigh. Déanann síntiúis athnuachan go huathoibríoch gach mí ar an bpraghas a thaispeántar mura gcuirtear ceal orthu 24 uair an chloig ar a laghad roimh dheireadh na tréimhse reatha. Bainistigh nó cuir ceal orthu am ar bith i do shocruithe cuntais App Store.",
+    "legalPrivacyPolicy": "Beartas Príobháideachta",
+    "legalTermsOfUse": "Téarmaí Úsáide (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Tá cuntas leis an ríomhphost seo ann cheana le modh sínithe isteach éagsúil. Bain triail as modh eile nó úsáid 'More sign-in options'.",
+    "differentOauth": "Tá cuntas leis an ríomhphost seo ann cheana le modh sínithe isteach éagsúil. Bain triail as modh eile nó úsáid 'More sign-in options'.",
+    "ssoError": "Éilíonn d'eagraíocht SSO. Úsáid 'More sign-in options'.",
+    "blocked": "Tá an cuntas seo blocáilte. Déan teagmháil le tacaíocht le do thoil.",
+    "signupRateLimited": "An iomarca iarrachtaí. Bain triail as arís níos déanaí le do thoil.",
+    "invalidCode": "Tá an cód sin mícheart. Bain triail as arís le do thoil.",
+    "codeInProgress": "Tá do chód á phróiseáil. Fan nóiméad agus bain triail as arís.",
+    "tooManyAttempts": "An iomarca iarrachtaí. Iarr cód nua le do thoil.",
+    "invalidToken": "Theip ar an sínithe isteach. Bain triail as arís le do thoil.",
+    "invalidEmail": "Níorbh fhéidir ríomhphost a sheachadadh chuig an seoladh seo. Úsáid ríomhphost eile le do thoil.",
+    "invalidRequest": "Seiceáil do sheoladh ríomhphoist agus bain triail as arís.",
+    "emailDeliveryFailed": "Níl seachadadh ríomhphoist ar fáil go sealadach. Bain triail as arís níos déanaí le do thoil.",
+    "admissionRequired": "Ní féidir do ghléas a fhíorú. Úsáid 'More sign-in options' chun sínithe isteach ar ghléas eile nó tríd an ngréasán.",
+    "default": "Chuaigh rud éigin mícheart. Bain triail as arís le do thoil.",
+    "retryableAdmission": "Níorbh fhéidir linn an gléas seo a fhíorú. Seiceáil do cheangal agus bain triail as arís."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Sonraí bailithe",
+    "free": "Saor in aisce"
   }
 }

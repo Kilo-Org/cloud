@@ -30,7 +30,10 @@
     "couldNotRestart": "Tidak dapat memulai ulang",
     "languageSaved": "Bahasa Anda telah disimpan.",
     "retry": "Coba lagi",
-    "catalogLoadFailed": "Tidak dapat memuat bahasa. Silakan coba lagi."
+    "catalogLoadFailed": "Tidak dapat memuat bahasa. Silakan coba lagi.",
+    "search": "Cari bahasa",
+    "noMatches": "Tidak ada bahasa yang cocok",
+    "deviceLanguage": "Bahasa perangkat"
   },
   "login": {
     "welcome": "Selamat datang di Kilo",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "Preferensi push",
     "appearanceSystem": "Sistem",
     "appearanceLight": "Terang",
-    "appearanceDark": "Gelap"
+    "appearanceDark": "Gelap",
+    "account": "Akun"
   },
   "notifications": {
     "title": "Notifikasi",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
       "couldNotOpenTitle": "Tidak dapat membuka GitHub"
-    }
+    },
+    "sessionExited": "Sesi berakhir",
+    "remoteSpawnRetryable": "Tidak dapat menjangkau instance — mungkin telah terputus.",
+    "remoteSpawnNonRetryable": "Instance gagal memulai sesi — periksa mesin atau perbarui CLI.",
+    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instance lain."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "Izinkan",
     "onlineMessage": "Perangkat ini tidak dapat mentranskripsi secara offline. Rekaman Anda dikirim ke {{provider}} untuk diubah menjadi teks. Kilo tidak menyimpan audio.",
     "onlineTitle": "Ucapan diproses secara online",
-    "staysOff": "Ucapan tetap nonaktif hingga Anda mengizinkan transkripsi online."
+    "staysOff": "Ucapan tetap nonaktif hingga Anda mengizinkan transkripsi online.",
+    "start": "Mulai masukan suara",
+    "stop": "Hentikan masukan suara"
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "Membuka pengelolaan Kilo Pass di web.",
     "opensAppStoreManagement": "Membuka pengelolaan langganan App Store.",
     "opensPlans": "Membuka paket Kilo Pass.",
-    "tryAgainFromProfile": "Coba lagi dari Profil."
+    "tryAgainFromProfile": "Coba lagi dari Profil.",
+    "unavailableDescription": "Kilo Pass tidak tersedia sebagai pembelian dalam aplikasi di Android. Kelola di web.",
+    "webManagementDescription": "Kilo Pass ini dikelola di web.",
+    "legalDisclosure": "Kilo Pass adalah langganan bulanan yang dapat diperbarui otomatis. Pembayaran dibebankan ke Apple ID Anda saat konfirmasi pembelian. Langganan diperbarui otomatis setiap bulan dengan harga yang ditampilkan kecuali dibatalkan minimal 24 jam sebelum akhir periode berjalan. Kelola atau batalkan kapan saja di pengaturan akun App Store Anda.",
+    "legalPrivacyPolicy": "Kebijakan Privasi",
+    "legalTermsOfUse": "Ketentuan Penggunaan (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "Dipilih {{label}}, ketuk untuk mengubah pilihan",
       "tapToComment": "{{label}}, ketuk untuk berkomentar"
-    }
+    },
+    "linkPasteClipboardEmpty": "Clipboard kosong",
+    "linkPasteNotAPullRequest": "Bukan tautan pull request GitHub"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "Beri Nilai Kilo",
     "sorryMessage": "Beri tahu kami apa yang perlu diperbaiki. Insinyur yang menangani aplikasi membaca setiap laporan!",
     "sorryTitle": "Kami menyesal mendengarnya!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Akun dengan email ini sudah ada dengan metode masuk yang berbeda. Coba metode lain atau gunakan 'Opsi masuk lainnya'.",
+    "differentOauth": "Akun dengan email ini sudah ada dengan metode masuk yang berbeda. Coba metode lain atau gunakan 'Opsi masuk lainnya'.",
+    "ssoError": "Organisasi Anda memerlukan SSO. Gunakan 'Opsi masuk lainnya'.",
+    "blocked": "Akun ini telah diblokir. Silakan hubungi dukungan.",
+    "signupRateLimited": "Terlalu banyak percobaan. Silakan coba lagi nanti.",
+    "invalidCode": "Kode itu salah. Silakan coba lagi.",
+    "codeInProgress": "Kode Anda sedang diproses. Tunggu sebentar dan coba lagi.",
+    "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
+    "invalidToken": "Masuk gagal. Silakan coba lagi.",
+    "invalidEmail": "Tidak dapat mengirim email ke alamat ini. Silakan gunakan email lain.",
+    "invalidRequest": "Periksa alamat email Anda dan coba lagi.",
+    "emailDeliveryFailed": "Pengiriman email untuk sementara tidak tersedia. Silakan coba lagi nanti.",
+    "admissionRequired": "Perangkat Anda tidak dapat diverifikasi. Gunakan 'Opsi masuk lainnya' untuk masuk di perangkat lain atau melalui web.",
+    "default": "Terjadi kesalahan. Silakan coba lagi.",
+    "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksi Anda dan coba lagi."
+  },
+  "models": {
+    "dataCollected": "Data yang dikumpulkan",
+    "free": "Gratis"
   }
 }

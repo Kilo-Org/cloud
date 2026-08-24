@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "Kalfadhigaaga wakiilka ayaa leh cusboonaysiin",
+      "chatMessage": "Waxaad haysaa fariin cusub",
+      "instanceLifecycle": "Instance-kaagu wuxuu leeyahay cusboonaysiin",
+      "scheduledAction": "Fal la qorsheeyay ayaa leh cusboonaysiin",
+      "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
+      "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "Hawsha waa la dhammaystiray"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "Guuldarraystay: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "Waa la hakiyay: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · Aan la magacayn",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "Digniinta dheelitirka hooseeya",
+      "body": "{{organizationName}} dheelitirku wuxuu hoos u dhacay ${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Natiijo ammin cusub ({{severity}})",
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Digniin SLA",
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "Jebinta SLA",
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "Natiijo ammin ayaa u baahan feejignaan"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} waa diyaar",
+      "body": "Taabo si aad u bilowdo sheekaysiga."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} wuu ku guuldarraystay bilowga",
+      "body": "Bilowgu wuu guuldarraystay."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} waxaa dhawaan dib loo bilaabi doonaa",
+      "body": "Waxaa loo qorsheeyay in dib loo bilaabo {{when}}."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "Dib-u-bilowga {{instanceName}} waa la joojiyay",
+      "body": "Dib-u-bilowgii hore loo qorsheeyay waa la joojiyay."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} waxaa dhawaan loo cusboonaysiin doonaa",
+      "bodyWithTag": "Cusboonaysiin {{targetImageTag}} {{when}}.",
+      "bodyWithoutTag": "Cusboonaysiin qorsheysan {{when}}."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "Cusboonaysiinta {{instanceName}} waa la joojiyay",
+      "body": "Cusboonaysiintii hore loo qorsheeyay waa la joojiyay."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "Kalfadhigaaga Kilo waa diyaar in laga xakameeyo taleefankaaga"
   }
 }

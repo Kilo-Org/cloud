@@ -31,9 +31,9 @@
     "languageSaved": "Jūsu valoda ir saglabāta.",
     "catalogLoadFailed": "Neizdevās ielādēt valodu. Lūdzu, mēģiniet vēlreiz.",
     "retry": "Mēģināt vēlreiz",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Meklēt valodas",
+    "noMatches": "Neviena valoda neatbilst",
+    "deviceLanguage": "Ierīces valoda"
   },
   "login": {
     "welcome": "Laipni lūdzam Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistēma",
     "appearanceLight": "Gaišs",
     "appearanceDark": "Tumšs",
-    "account": "Account"
+    "account": "Konts"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Atlasīts {{label}}, pieskarieties, lai mainītu atlasi",
       "tapToComment": "{{label}}, pieskarieties, lai komentētu"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Starpliktuve ir tukša",
+    "linkPasteNotAPullRequest": "Nav GitHub pieprasījuma saite"
   },
   "notifications": {
     "title": "Paziņojumi",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
       "couldNotOpenMessage": "Neizdevās sākt GitHub App iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sesija beidzās",
+    "remoteSpawnRetryable": "Nevarēja sasniegt instanci — tā, iespējams, ir atvienojusies.",
+    "remoteSpawnNonRetryable": "Instancei neizdevās sākt sesiju — pārbaudiet iekārtu vai atjauniniet CLI.",
+    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Runa tiek apstrādāta tiešsaistē",
     "onlineMessage": "Šī ierīce nevar transkribēt bezsaistē. Tavs ieraksts tiek nosūtīts {{provider}}, lai to pārvērstu tekstā. Kilo neglabā audio.",
     "allow": "Atļaut",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Sākt balss ievadi",
+    "stop": "Apturēt balss ievadi"
   },
   "share": {
     "title": "Kopīgot Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Atver App Store abonementu pārvaldību.",
     "opensPlans": "Atver Kilo Pass plānus.",
     "tryAgainFromProfile": "Mēģini vēlreiz no profila.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass nav pieejams kā pirkums lietotnē operētājsistēmā Android. Pārvaldiet to tīmeklī.",
+    "webManagementDescription": "Šis Kilo Pass tiek pārvaldīts tīmeklī.",
+    "legalDisclosure": "Kilo Pass ir automātiski atjaunojams mēneša abonements. Maksājums tiek iekasēts no jūsu Apple ID pirkuma apstiprināšanas brīdī. Abonements katru mēnesi atjaunojas automātiski par norādīto cenu, ja vien tas netiek atcelts vismaz 24 stundas pirms pašreizējā perioda beigām. Pārvaldiet vai atceliet to jebkurā laikā sava App Store konta iestatījumos.",
+    "legalPrivacyPolicy": "Privātuma politika",
+    "legalTermsOfUse": "Lietošanas noteikumi (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Konts ar šo e-pasta adresi jau pastāv ar citu pierakstīšanās metodi. Izmēģiniet citu metodi vai izmantojiet “Citas pierakstīšanās iespējas”.",
+    "differentOauth": "Konts ar šo e-pasta adresi jau pastāv ar citu pierakstīšanās metodi. Izmēģiniet citu metodi vai izmantojiet “Citas pierakstīšanās iespējas”.",
+    "ssoError": "Jūsu organizācija pieprasa SSO. Izmantojiet “Citas pierakstīšanās iespējas”.",
+    "blocked": "Šis konts ir bloķēts. Lūdzu, sazinieties ar atbalsta dienestu.",
+    "signupRateLimited": "Pārāk daudz mēģinājumu. Lūdzu, mēģiniet vēlāk.",
+    "invalidCode": "Šis kods nav pareizs. Lūdzu, mēģiniet vēlreiz.",
+    "codeInProgress": "Jūsu kods tiek apstrādāts. Pagaidiet mirkli un mēģiniet vēlreiz.",
+    "tooManyAttempts": "Pārāk daudz mēģinājumu. Lūdzu, pieprasiet jaunu kodu.",
+    "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģiniet vēlreiz.",
+    "invalidEmail": "Nevar piegādāt e-pastu uz šo adresi. Lūdzu, izmantojiet citu e-pasta adresi.",
+    "invalidRequest": "Pārbaudiet savu e-pasta adresi un mēģiniet vēlreiz.",
+    "emailDeliveryFailed": "E-pasta piegāde īslaicīgi nav pieejama. Lūdzu, mēģiniet vēlāk.",
+    "admissionRequired": "Jūsu ierīci nevar verificēt. Izmantojiet “Citas pierakstīšanās iespējas”, lai pierakstītos citā ierīcē vai tīmeklī.",
+    "default": "Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.",
+    "retryableAdmission": "Nevarējām verificēt šo ierīci. Pārbaudiet savienojumu un mēģiniet vēlreiz."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Apkopotie dati",
+    "free": "Bezmaksas"
   }
 }

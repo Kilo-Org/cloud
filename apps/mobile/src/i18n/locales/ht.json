@@ -31,9 +31,9 @@
     "languageSaved": "Lang ou anrejistre.",
     "catalogLoadFailed": "Pa t ka chaje lang lan. Tanpri eseye ankò.",
     "retry": "Rekòmanse",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Chèche lang yo",
+    "noMatches": "Okenn lang pa matche",
+    "deviceLanguage": "Lang aparèy la"
   },
   "login": {
     "welcome": "Byenvini nan Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistèm",
     "appearanceLight": "Limye",
     "appearanceDark": "Fènwa",
-    "account": "Account"
+    "account": "Kont"
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Chwazi {{label}}, tape pou chanje seleksyon",
       "tapToComment": "{{label}}, tape pou kòmante"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Clipboard la vid",
+    "linkPasteNotAPullRequest": "Se pa yon lyen pull request GitHub"
   },
   "notifications": {
     "title": "Notifikasyon",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
       "couldNotOpenMessage": "Nou pa te kapab kòmanse konfigirasyon GitHub App la. Tanpri eseye ankò."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sesyon soti",
+    "remoteSpawnRetryable": "Pa t kapab rive jwenn enstans lan — li ka te dekonekte.",
+    "remoteSpawnNonRetryable": "Enstans lan echwe pou kòmanse sesyon an — tcheke machin lan oswa mete ajou CLI la.",
+    "remoteSpawnInstanceDisconnected": "Enstans chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Dispozitif lapawòl trete sou entènèt",
     "onlineMessage": "Aparèy sa a pa ka transkri offline. Anrejistreman ou voye bay {{provider}} pou l tounen tèks. Kilo pa estoke odyo a.",
     "allow": "Pèmèt",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Kòmanse antre vwa",
+    "stop": "Sispann antre vwa"
   },
   "share": {
     "title": "Pataje nan Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Louvri jesyon abònman App Store.",
     "opensPlans": "Louvri plan Kilo Pass.",
     "tryAgainFromProfile": "Eseye ankò soti nan Pwofil.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass pa disponib kòm yon acha nan aplikasyon an sou Android. Jere li sou web la.",
+    "webManagementDescription": "Kilo Pass sa a jere sou web la.",
+    "legalDisclosure": "Kilo Pass se yon abònman chak mwa ki renouvle otomatikman. Peman an chaje sou Apple ID ou lè acha a konfime. Abònman yo renouvle otomatikman chak mwa nan pri ki montre a sòf si yo anile omwen 24 èdtan anvan fen peryòd aktyèl la. Jere oswa anile nenpòt lè nan paramèt kont App Store ou.",
+    "legalPrivacyPolicy": "Règleman sou Vi prive",
+    "legalTermsOfUse": "Kondisyon Itilizasyon (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Yon kont ak imèl sa a deja egziste ak yon lòt metòd koneksyon. Eseye yon lòt metòd oswa itilize 'Plis opsyon koneksyon'.",
+    "differentOauth": "Yon kont ak imèl sa a deja egziste ak yon lòt metòd koneksyon. Eseye yon lòt metòd oswa itilize 'Plis opsyon koneksyon'.",
+    "ssoError": "Òganizasyon ou mande SSO. Itilize 'Plis opsyon koneksyon'.",
+    "blocked": "Kont sa a te bloke. Tanpri kontakte sipò.",
+    "signupRateLimited": "Twòp tantativ. Tanpri eseye ankò pita.",
+    "invalidCode": "Kòd sa a pa kòrèk. Tanpri eseye ankò.",
+    "codeInProgress": "Kòd ou an ap trete. Tann yon ti moman epi eseye ankò.",
+    "tooManyAttempts": "Twòp tantativ. Tanpri mande yon nouvo kòd.",
+    "invalidToken": "Koneksyon echwe. Tanpri eseye ankò.",
+    "invalidEmail": "Pa t kapab bay imèl bay adrès sa a. Tanpri itilize yon lòt imèl.",
+    "invalidRequest": "Tcheke adrès imèl ou epi eseye ankò.",
+    "emailDeliveryFailed": "Livrezon imèl pa disponib pou kounye a. Tanpri eseye ankò pita.",
+    "admissionRequired": "Aparèy ou pa ka verifye. Itilize 'Plis opsyon koneksyon' pou konekte sou yon lòt aparèy oswa atravè web la.",
+    "default": "Yon bagay mal pase. Tanpri eseye ankò.",
+    "retryableAdmission": "Nou pa t kapab verifye aparèy sa a. Tcheke koneksyon ou epi eseye ankò."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Done kolekte",
+    "free": "Gratis"
   }
 }

@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "మీ ఏజెంట్ సెషన్కు నవీకరణ ఉంది",
+      "chatMessage": "మీకు కొత్త సందేశం ఉంది",
+      "instanceLifecycle": "మీ ఇన్స్టాన్స్కు నవీకరణ ఉంది",
+      "scheduledAction": "షెడ్యూల్ చేసిన చర్యకు నవీకరణ ఉంది",
+      "lowBalance": "మీ బ్యాలెన్స్కు శ్రద్ధ అవసరం",
+      "securityFinding": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "పని పూర్తయింది"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "విఫలమైంది: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "అంతరాయం కలిగింది: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · శీర్షిక లేదు",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "తక్కువ బ్యాలెన్స్ హెచ్చరిక",
+      "body": "{{organizationName}} బ్యాలెన్స్ ${{minimumBalanceUsd}} కంటే తక్కువకు పడిపోయింది"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "కొత్త భద్రతా ఫైండింగ్ ({{severity}})",
+      "body": "{{repoFullName}}లో {{findingTitle}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA హెచ్చరిక",
+      "body": "{{repoFullName}}లో {{findingTitle}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA ఉల్లంఘన",
+      "body": "{{repoFullName}}లో {{findingTitle}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} సిద్ధంగా ఉంది",
+      "body": "చాటింగ్ ప్రారంభించడానికి నొక్కండి."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} ప్రారంభించడంలో విఫలమైంది",
+      "body": "ప్రారంభించడం విఫలమైంది."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} త్వరలో పునఃప్రారంభించబడుతుంది",
+      "body": "{{when}}న పునఃప్రారంభించడానికి షెడ్యూల్ చేయబడింది."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "{{instanceName}} పునఃప్రారంభం రద్దు చేయబడింది",
+      "body": "ముందుగా షెడ్యూల్ చేసిన పునఃప్రారంభం రద్దు చేయబడింది."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} త్వరలో అప్గ్రేడ్ చేయబడుతుంది",
+      "bodyWithTag": "{{when}}న {{targetImageTag}}కి అప్గ్రేడ్ చేయండి.",
+      "bodyWithoutTag": "{{when}}న షెడ్యూల్ చేసిన అప్గ్రేడ్."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "{{instanceName}} అప్గ్రేడ్ రద్దు చేయబడింది",
+      "body": "ముందుగా షెడ్యూల్ చేసిన అప్గ్రేడ్ రద్దు చేయబడింది."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "మీ Kilo సెషన్ మీ ఫోన్ నుండి నియంత్రించడానికి సిద్ధంగా ఉంది"
   }
 }

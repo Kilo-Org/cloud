@@ -31,9 +31,9 @@
     "languageSaved": "Tungumálið þitt er vistað.",
     "catalogLoadFailed": "Gat ekki hlaðið tungumálinu. Reyndu aftur.",
     "retry": "Reyna aftur",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Leita að tungumálum",
+    "noMatches": "Engin tungumál passa",
+    "deviceLanguage": "Tækjatungumál"
   },
   "login": {
     "welcome": "Velkomin(n) til Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Kerfi",
     "appearanceLight": "Ljóst",
     "appearanceDark": "Dökkt",
-    "account": "Account"
+    "account": "Reikningur"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Valið {{label}}, bankaðu til að breyta vali",
       "tapToComment": "{{label}}, bankaðu til að skrifa athugasemd"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Klippiborð er tómt",
+    "linkPasteNotAPullRequest": "Ekki GitHub pull request hlekkur"
   },
   "notifications": {
     "title": "Tilkynningar",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
       "couldNotOpenMessage": "Okkur tókst ekki að hefja uppsetningu GitHub Apps. Reyndu aftur."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Lota hætt",
+    "remoteSpawnRetryable": "Náði ekki til eintaksins — það gæti hafa tengst af.",
+    "remoteSpawnNonRetryable": "Eintakið náði ekki að ræsa lotuna — athugaðu vélina eða uppfærðu CLI.",
+    "remoteSpawnInstanceDisconnected": "Valið eintak tengdist af. Byrjaðu lotu á Cloud Agent eða veldu annað eintak."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Tal er unnið á netinu",
     "onlineMessage": "Þetta tæki getur ekki umritað án nettengingar. Upptakan þín er send til {{provider}} til að breyta henni í texta. Kilo geymir ekki hljóðið.",
     "allow": "Leyfa",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Byrja raddinnslátt",
+    "stop": "Stöðva raddinnslátt"
   },
   "share": {
     "title": "Deila í Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Opnar App Store-áskriftarstjórnun.",
     "opensPlans": "Opnar Kilo Pass-áætlanir.",
     "tryAgainFromProfile": "Reyndu aftur frá Prófíl.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass er ekki tiltækt sem kaup í forriti á Android. Hafa umsjón með því á vefnum.",
+    "webManagementDescription": "Þetta Kilo Pass er meðhöndlað á vefnum.",
+    "legalDisclosure": "Kilo Pass er sjálfvirkt endurnýjanleg mánaðaráskrift. Greiðsla er innheimt á Apple ID þinn við staðfestingu kaupa. Áskriftir endurnýjast sjálfkrafa mánaðarlega á sýnandi verði nema sagt sé upp að minnsta kosti 24 klukkustundum fyrir lok gildistímabilsins. Hafa umsjón með eða hætta við hvenær sem er í stillingum App Store reikningsins þíns.",
+    "legalPrivacyPolicy": "Persónuverndarstefna",
+    "legalTermsOfUse": "Notendaskilmálar (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Reikningur með þessu netfangi er þegar til með aðra innskráningaraðferð. Reyndu aðra aðferð eða notaðu 'More sign-in options'.",
+    "differentOauth": "Reikningur með þessu netfangi er þegar til með aðra innskráningaraðferð. Reyndu aðra aðferð eða notaðu 'More sign-in options'.",
+    "ssoError": "Stofnunin þín krefst SSO. Notaðu 'More sign-in options'.",
+    "blocked": "Þessi reikningur hefur verið læstur. Vinsamlegast hafðu samband við þjónustuver.",
+    "signupRateLimited": "Of margar tilraunir. Reyndu aftur síðar.",
+    "invalidCode": "Þessi kóði er rangur. Reyndu aftur.",
+    "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
+    "tooManyAttempts": "Of margar tilraunir. Vinsamlegast biðjaðu um nýjan kóða.",
+    "invalidToken": "Innskráning mistókst. Reyndu aftur.",
+    "invalidEmail": "Ekki er hægt að afhenda tölvupóst á þetta netfang. Vinsamlegast notaðu annað netfang.",
+    "invalidRequest": "Athugaðu netfangið þitt og reyndu aftur.",
+    "emailDeliveryFailed": "Afhending tölvupósts er tímabundið ófáanleg. Reyndu aftur síðar.",
+    "admissionRequired": "Ekki er hægt að staðfesta tækið þitt. Notaðu 'More sign-in options' til að skrá þig inn á öðru tæki eða í gegnum vefinn.",
+    "default": "Eitthvað fór úrskeiðis. Reyndu aftur.",
+    "retryableAdmission": "Við gátum ekki staðfest þetta tæki. Athugaðu tenginguna og reyndu aftur."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Upplýsingar safnaðar",
+    "free": "Ókeypis"
   }
 }

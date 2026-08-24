@@ -31,9 +31,9 @@
     "languageSaved": "Таны хэл хадгалагдсан.",
     "catalogLoadFailed": "Хэлийг ачаалах боломжгүй. Дахин оролдоно уу.",
     "retry": "Дахин оролдох",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Хэл хайх",
+    "noMatches": "Хэл таарахгүй байна",
+    "deviceLanguage": "Төхөөрөмжийн хэл"
   },
   "login": {
     "welcome": "Kilo-д тавтай морил",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Систем",
     "appearanceLight": "Гэрэлтэй",
     "appearanceDark": "Харанхуй",
-    "account": "Account"
+    "account": "Бүртгэл"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Сонгосон {{label}}, сонголтыг өөрчлөхийн тулд товшино уу",
       "tapToComment": "{{label}}, сэтгэгдэл бичихийн тулд товшино уу"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Хуулбар самбар хоосон байна",
+    "linkPasteNotAPullRequest": "Энэ нь GitHub pull request холбоос биш"
   },
   "notifications": {
     "title": "Мэдэгдэлүүд",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub-ыг нээх боломжгүй",
       "couldNotOpenMessage": "Бид GitHub App тохиргоог эхлүүлж чадсангүй. Дахин оролдоно уу."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Сесс дууссан",
+    "remoteSpawnRetryable": "Инстанц руу холбогдож чадсангүй — салсан байж магадгүй.",
+    "remoteSpawnNonRetryable": "Инстанц сессийг эхлүүлж чадсангүй — машинаа шалга эсвэл CLI-г шинэчил.",
+    "remoteSpawnInstanceDisconnected": "Сонгосон инстанц салсан. Cloud Agent дээр сесс эхлүүл эсвэл өөр инстанц сонго."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Яриаг онлайнаар боловсруулж байна",
     "onlineMessage": "Энэ төхөөрөмж офлайн хувиргах боломжгүй. Таны бичлэгийг текст болгохын тулд {{provider}} руу илгээнэ. Kilo аудиог хадгалахгүй.",
     "allow": "Зөвшөөрөх",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Дуу оруулалтыг эхлүүл",
+    "stop": "Дуу оруулалтыг зогсоо"
   },
   "share": {
     "title": "Kilo руу хуваалцах",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store захиалгын удирдлагыг нээнэ.",
     "opensPlans": "Kilo Pass төлөвлөгөөг нээнэ.",
     "tryAgainFromProfile": "Профайлаас дахин оролдоно уу.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass нь Android дээр апп доторх худалдан авалтаар авах боломжгүй. Үүнийг вэб дээр удирд.",
+    "webManagementDescription": "Энэ Kilo Pass вэб дээр удирдагддаг.",
+    "legalDisclosure": "Kilo Pass нь автоматаар шинэчлэгддэг сарын захиалга юм. Худалдан авалтыг баталгаажуулснаар төлбөрийг таны Apple ID-ээс авна. Захиалга нь одоогийн хугацаа дуусахаас дор хаяж 24 цагийн өмнө цуцлахгүй бол харуулсан үнээр сар бүр автоматаар шинэчлэгддэг. App Store бүртгэлийн тохиргооноос хүссэн үедээ удирдах эсвэл цуцлах боломжтой.",
+    "legalPrivacyPolicy": "Нууцлалын бодлого",
+    "legalTermsOfUse": "Ашиглах нөхцөл (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Энэ имэйлтэй бүртгэл өөр нэвтрэх аргаар аль хэдийн байдаг. Өөр арга туршиж үз эсвэл 'Нэвтрэх нэмэлт сонголтууд'-ыг ашигла.",
+    "differentOauth": "Энэ имэйлтэй бүртгэл өөр нэвтрэх аргаар аль хэдийн байдаг. Өөр арга туршиж үз эсвэл 'Нэвтрэх нэмэлт сонголтууд'-ыг ашигла.",
+    "ssoError": "Танай байгууллага SSO шаарддаг. 'Нэвтрэх нэмэлт сонголтууд'-ыг ашигла.",
+    "blocked": "Энэ бүртгэлийг хаасан. Дэмжлэгтэй холбогдоно уу.",
+    "signupRateLimited": "Хэт олон оролдлого. Дараа дахин оролдоно уу.",
+    "invalidCode": "Энэ код буруу байна. Дахин оролдоно уу.",
+    "codeInProgress": "Таны кодыг боловсруулж байна. Хэсэг хүлээгээд дахин оролдоно уу.",
+    "tooManyAttempts": "Хэт олон оролдлого. Шинэ код хүсэхэд болно.",
+    "invalidToken": "Нэвтрэлт амжилтгүй боллоо. Дахин оролдоно уу.",
+    "invalidEmail": "Энэ хаяг руу имэйл хүргэх боломжгүй. Өөр имэйл ашиглана уу.",
+    "invalidRequest": "Имэйл хаягаа шалгаад дахин оролдоно уу.",
+    "emailDeliveryFailed": "Имэйл хүргэлт түр хугацаанд боломжгүй байна. Дараа дахин оролдоно уу.",
+    "admissionRequired": "Таны төхөөрөмжийг баталгаажуулж чадахгүй. Өөр төхөөрөмж дээр эсвэл вэбээр нэвтрэхийн тулд 'Нэвтрэх нэмэлт сонголтууд'-ыг ашигла.",
+    "default": "Ямар нэгэн алдаа гарлаа. Дахин оролдоно уу.",
+    "retryableAdmission": "Энэ төхөөрөмжийг баталгаажуулж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Цуглуулсан өгөгдөл",
+    "free": "Үнэгүй"
   }
 }

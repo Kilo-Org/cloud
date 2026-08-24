@@ -31,9 +31,9 @@
     "languageSaved": "Bahasa anda telah disimpan.",
     "catalogLoadFailed": "Tidak dapat memuatkan bahasa. Sila cuba lagi.",
     "retry": "Cuba lagi",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Cari bahasa",
+    "noMatches": "Tiada bahasa sepadan",
+    "deviceLanguage": "Bahasa peranti"
   },
   "login": {
     "welcome": "Selamat datang ke Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "Cerah",
     "appearanceDark": "Gelap",
-    "account": "Account"
+    "account": "Akaun"
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Memilih {{label}}, ketik untuk menukar pilihan",
       "tapToComment": "{{label}}, ketik untuk mengomen"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Papan keratan kosong",
+    "linkPasteNotAPullRequest": "Bukan pautan permintaan tarik GitHub"
   },
   "notifications": {
     "title": "Pemberitahuan",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",
       "couldNotOpenMessage": "Kami tidak dapat memulakan persediaan GitHub App. Sila cuba lagi."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sesi keluar",
+    "remoteSpawnRetryable": "Tidak dapat mencapai instance — ia mungkin telah terputus sambungan.",
+    "remoteSpawnNonRetryable": "Instance gagal memulakan sesi — semak mesin atau kemas kini CLI.",
+    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus sambungan. Mulakan sesi pada Cloud Agent atau pilih instance lain."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Pertuturan diproses dalam talian",
     "onlineMessage": "Peranti ini tidak boleh mentranskripsikan di luar talian. Rakaman anda dihantar ke {{provider}} untuk menukarnya kepada teks. Kilo tidak menyimpan audio tersebut.",
     "allow": "Benarkan",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Mula input suara",
+    "stop": "Henti input suara"
   },
   "share": {
     "title": "Kongsi ke Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Membuka pengurusan langganan App Store.",
     "opensPlans": "Membuka pelan Kilo Pass.",
     "tryAgainFromProfile": "Cuba lagi daripada Profil.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass tidak tersedia sebagai pembelian dalam aplikasi pada Android. Urusnya di web.",
+    "webManagementDescription": "Kilo Pass ini diuruskan di web.",
+    "legalDisclosure": "Kilo Pass ialah langganan bulanan auto-boleh diperbaharui. Bayaran dicaj ke Apple ID anda semasa pengesahan pembelian. Langganan diperbaharui secara automatik setiap bulan pada harga yang dipaparkan melainkan dibatalkan sekurang-kurangnya 24 jam sebelum tamat tempoh semasa. Urus atau batalkan pada bila-bila masa dalam tetapan akaun App Store anda.",
+    "legalPrivacyPolicy": "Dasar Privasi",
+    "legalTermsOfUse": "Terma Penggunaan (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "Akaun dengan emel ini sudah wujud dengan kaedah log masuk yang berbeza. Cuba kaedah lain atau gunakan 'Lagi pilihan log masuk'.",
+    "differentOauth": "Akaun dengan emel ini sudah wujud dengan kaedah log masuk yang berbeza. Cuba kaedah lain atau gunakan 'Lagi pilihan log masuk'.",
+    "ssoError": "Organisasi anda memerlukan SSO. Gunakan 'Lagi pilihan log masuk'.",
+    "blocked": "Akaun ini telah disekat. Sila hubungi sokongan.",
+    "signupRateLimited": "Terlalu banyak percubaan. Sila cuba lagi kemudian.",
+    "invalidCode": "Kod itu tidak betul. Sila cuba lagi.",
+    "codeInProgress": "Kod anda sedang diproses. Tunggu seketika dan cuba lagi.",
+    "tooManyAttempts": "Terlalu banyak percubaan. Sila minta kod baharu.",
+    "invalidToken": "Log masuk gagal. Sila cuba lagi.",
+    "invalidEmail": "Tidak dapat menghantar emel ke alamat ini. Sila gunakan emel lain.",
+    "invalidRequest": "Semak alamat emel anda dan cuba lagi.",
+    "emailDeliveryFailed": "Penghantaran emel tidak tersedia buat sementara waktu. Sila cuba lagi kemudian.",
+    "admissionRequired": "Peranti anda tidak dapat disahkan. Gunakan 'Lagi pilihan log masuk' untuk log masuk pada peranti lain atau melalui web.",
+    "default": "Sesuatu tidak kena. Sila cuba lagi.",
+    "retryableAdmission": "Kami tidak dapat mengesahkan peranti ini. Semak sambungan anda dan cuba lagi."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Data dikumpul",
+    "free": "Percuma"
   }
 }

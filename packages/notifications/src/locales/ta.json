@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "உங்கள் முகவர் அமர்வில் ஒரு புதுப்பிப்பு உள்ளது",
+      "chatMessage": "உங்களுக்கு புதிய செய்தி உள்ளது",
+      "instanceLifecycle": "உங்கள் நிகழ்வில் ஒரு புதுப்பிப்பு உள்ளது",
+      "scheduledAction": "திட்டமிடப்பட்ட செயலில் ஒரு புதுப்பிப்பு உள்ளது",
+      "lowBalance": "உங்கள் இருப்புக்கு கவனம் தேவை",
+      "securityFinding": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "பணி முடிந்தது"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "தோல்வி: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "குறுக்கீடு: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · பெயரிடப்படாதது",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "குறைந்த இருப்பு எச்சரிக்கை",
+      "body": "{{organizationName}} இருப்பு ${{minimumBalanceUsd}} க்கு கீழே விழுந்தது"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "புதிய பாதுகாப்பு கண்டுபிடிப்பு ({{severity}})",
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA எச்சரிக்கை",
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "SLA மீறல்",
+      "body": "{{repoFullName}} இல் {{findingTitle}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} தயாராக உள்ளது",
+      "body": "அரட்டையடிக்கத் தொடங்க தட்டவும்."
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} தொடங்க முடியவில்லை",
+      "body": "தொடக்கம் தோல்வியடைந்தது."
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} விரைவில் மறுதொடக்கம் செய்யப்படும்",
+      "body": "{{when}} அன்று மறுதொடக்கம் செய்ய திட்டமிடப்பட்டுள்ளது."
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "{{instanceName}} மறுதொடக்கம் ரத்து செய்யப்பட்டது",
+      "body": "முன்னர் திட்டமிடப்பட்ட மறுதொடக்கம் ரத்து செய்யப்பட்டது."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} விரைவில் மேம்படுத்தப்படும்",
+      "bodyWithTag": "{{when}} அன்று {{targetImageTag}} க்கு மேம்படுத்து.",
+      "bodyWithoutTag": "{{when}} அன்று திட்டமிடப்பட்ட மேம்படுத்தல்."
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "{{instanceName}} மேம்படுத்தல் ரத்து செய்யப்பட்டது",
+      "body": "முன்னர் திட்டமிடப்பட்ட மேம்படுத்தல் ரத்து செய்யப்பட்டது."
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "உங்கள் Kilo அமர்வு உங்கள் தொலைபேசியிலிருந்து கட்டுப்படுத்த தயாராக உள்ளது"
   }
 }

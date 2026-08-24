@@ -2,26 +2,26 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Your agent session has an update",
-      "chatMessage": "You have a new message",
-      "instanceLifecycle": "Your instance has an update",
-      "scheduledAction": "A scheduled action has an update",
-      "lowBalance": "Your balance needs attention",
-      "securityFinding": "A security finding needs attention"
+      "cloudAgentSession": "เซสชันเอเจนต์ของคุณมีการอัปเดต",
+      "chatMessage": "คุณมีข้อความใหม่",
+      "instanceLifecycle": "อินสแตนซ์ของคุณมีการอัปเดต",
+      "scheduledAction": "การดำเนินการที่กำหนดไว้มีการอัปเดต",
+      "lowBalance": "ยอดคงเหลือของคุณต้องได้รับการดูแล",
+      "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล"
     }
   },
   "cloudAgentSession": {
     "completed": {
       "title": "{{sessionTitle}}",
-      "body": "Task completed"
+      "body": "งานเสร็จสมบูรณ์"
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Failed: {{detail}}"
+      "body": "ล้มเหลว: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
-      "body": "Interrupted: {{detail}}"
+      "body": "ถูกขัดจังหวะ: {{detail}}"
     }
   },
   "agentSession": {
@@ -32,63 +32,63 @@
   },
   "chat": {
     "untitled": {
-      "title": "{{sandboxLabel}} · Untitled",
+      "title": "{{sandboxLabel}} · ไม่มีชื่อ",
       "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Low balance alert",
-      "body": "{{organizationName}} balance fell below ${{minimumBalanceUsd}}"
+      "title": "การแจ้งเตือนยอดคงเหลือต่ำ",
+      "body": "ยอดคงเหลือของ {{organizationName}} ลดลงต่ำกว่า ${{minimumBalanceUsd}}"
     },
     "securityFindingNew": {
-      "title": "New security finding ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})",
+      "body": "{{findingTitle}} ใน {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA warning",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "คำเตือน SLA",
+      "body": "{{findingTitle}} ใน {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA breach",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "title": "ละเมิด SLA",
+      "body": "{{findingTitle}} ใน {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล"
     }
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} is ready",
-      "body": "Tap to start chatting."
+      "title": "{{instanceName}} พร้อมแล้ว",
+      "body": "แตะเพื่อเริ่มแชท"
     },
     "startFailed": {
-      "title": "{{instanceName}} failed to start",
-      "body": "Start failed."
+      "title": "{{instanceName}} เริ่มต้นไม่สำเร็จ",
+      "body": "เริ่มต้นล้มเหลว"
     }
   },
   "scheduledAction": {
     "restartNotice": {
-      "title": "{{instanceName}} will restart soon",
-      "body": "Scheduled to restart at {{when}}."
+      "title": "{{instanceName}} จะรีสตาร์ทเร็ว ๆ นี้",
+      "body": "กำหนดให้รีสตาร์ทที่ {{when}}"
     },
     "restartCancelled": {
-      "title": "{{instanceName}} restart cancelled",
-      "body": "The previously scheduled restart has been cancelled."
+      "title": "ยกเลิกการรีสตาร์ท {{instanceName}} แล้ว",
+      "body": "การรีสตาร์ทที่กำหนดไว้ก่อนหน้านี้ถูกยกเลิกแล้ว"
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} will upgrade soon",
-      "bodyWithTag": "Upgrade to {{targetImageTag}} at {{when}}.",
-      "bodyWithoutTag": "Scheduled upgrade at {{when}}."
+      "title": "{{instanceName}} จะอัปเกรดเร็ว ๆ นี้",
+      "bodyWithTag": "อัปเกรดเป็น {{targetImageTag}} ที่ {{when}}",
+      "bodyWithoutTag": "กำหนดอัปเกรดที่ {{when}}"
     },
     "versionChangeCancelled": {
-      "title": "{{instanceName}} upgrade cancelled",
-      "body": "The previously scheduled upgrade has been cancelled."
+      "title": "ยกเลิกการอัปเกรด {{instanceName}} แล้ว",
+      "body": "การอัปเกรดที่กำหนดไว้ก่อนหน้านี้ถูกยกเลิกแล้ว"
     }
   },
   "sessionReady": {
     "title": "{{sessionTitle}}",
-    "body": "Your Kilo session is ready to control from your phone"
+    "body": "เซสชัน Kilo ของคุณพร้อมให้ควบคุมจากโทรศัพท์ของคุณ"
   }
 }

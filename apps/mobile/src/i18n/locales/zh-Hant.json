@@ -30,7 +30,10 @@
     "couldNotRestart": "無法重新啟動",
     "languageSaved": "你的語言已儲存。",
     "retry": "重試",
-    "catalogLoadFailed": "無法載入語言。請再試一次。"
+    "catalogLoadFailed": "無法載入語言。請再試一次。",
+    "search": "搜尋語言",
+    "noMatches": "沒有符合的語言",
+    "deviceLanguage": "裝置語言"
   },
   "login": {
     "welcome": "歡迎使用 Kilo",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "推播偏好設定",
     "appearanceSystem": "系統",
     "appearanceLight": "淺色",
-    "appearanceDark": "深色"
+    "appearanceDark": "深色",
+    "account": "帳戶"
   },
   "notifications": {
     "title": "通知",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "無法啟動 GitHub App 設定。請再試一次。",
       "couldNotOpenTitle": "無法開啟 GitHub"
-    }
+    },
+    "sessionExited": "工作階段已結束",
+    "remoteSpawnRetryable": "無法連線到該執行個體 — 它可能已斷線。",
+    "remoteSpawnNonRetryable": "該執行個體無法啟動工作階段 — 請檢查機器或更新 CLI。",
+    "remoteSpawnInstanceDisconnected": "選取的執行個體已斷線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。"
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "允許",
     "onlineMessage": "此裝置無法離線轉錄。您的錄音會傳送至 {{provider}} 以轉換為文字。Kilo 不會儲存音訊。",
     "onlineTitle": "語音會在線上處理",
-    "staysOff": "在您允許線上轉錄之前，語音會保持關閉。"
+    "staysOff": "在您允許線上轉錄之前，語音會保持關閉。",
+    "start": "開始語音輸入",
+    "stop": "停止語音輸入"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "在網頁上開啟 Kilo Pass 管理。",
     "opensAppStoreManagement": "開啟 App Store 訂閱管理。",
     "opensPlans": "開啟 Kilo Pass 方案。",
-    "tryAgainFromProfile": "請從個人資料頁再試一次。"
+    "tryAgainFromProfile": "請從個人資料頁再試一次。",
+    "unavailableDescription": "Kilo Pass 無法在 Android 上以應用程式內購買的方式取得。請在網頁上管理。",
+    "webManagementDescription": "此 Kilo Pass 是在網頁上管理的。",
+    "legalDisclosure": "Kilo Pass 是自動續訂的每月訂閱。款項會在購買確認時從您的 Apple ID 扣款。除非在目前週期結束前至少 24 小時取消，否則訂閱會以顯示的價格每月自動續訂。您可以隨時在 App Store 帳戶設定中管理或取消。",
+    "legalPrivacyPolicy": "隱私權政策",
+    "legalTermsOfUse": "使用條款 (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "已選取 {{label}}，點擊即可變更選取",
       "tapToComment": "{{label}}，點擊即可留言"
-    }
+    },
+    "linkPasteClipboardEmpty": "剪貼簿是空的",
+    "linkPasteNotAPullRequest": "不是 GitHub 提取請求的連結"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "為 Kilo 評分",
     "sorryMessage": "請告訴我們哪裡需要改進。負責此應用程式的工程師會閱讀每一份報告！",
     "sorryTitle": "很遺憾聽到您這麼說！"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "使用此電子郵件的帳戶已存在，但登入方式不同。請嘗試其他方式，或使用「更多登入選項」。",
+    "differentOauth": "使用此電子郵件的帳戶已存在，但登入方式不同。請嘗試其他方式，或使用「更多登入選項」。",
+    "ssoError": "您的組織需要 SSO。請使用「更多登入選項」。",
+    "blocked": "此帳戶已被封鎖。請聯絡支援。",
+    "signupRateLimited": "嘗試次數過多。請稍後再試。",
+    "invalidCode": "該驗證碼不正確。請再試一次。",
+    "codeInProgress": "您的驗證碼正在處理中。請稍候片刻再試一次。",
+    "tooManyAttempts": "嘗試次數過多。請要求新的驗證碼。",
+    "invalidToken": "登入失敗。請再試一次。",
+    "invalidEmail": "無法將電子郵件傳送至這個地址。請使用其他電子郵件。",
+    "invalidRequest": "請檢查您的電子郵件地址，然後再試一次。",
+    "emailDeliveryFailed": "電子郵件傳送暫時無法使用。請稍後再試。",
+    "admissionRequired": "無法驗證您的裝置。請使用「更多登入選項」在其他裝置上或透過網頁登入。",
+    "default": "發生錯誤。請再試一次。",
+    "retryableAdmission": "我們無法驗證此裝置。請檢查您的連線，然後再試一次。"
+  },
+  "models": {
+    "dataCollected": "收集的資料",
+    "free": "免費"
   }
 }

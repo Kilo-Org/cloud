@@ -30,7 +30,10 @@
     "couldNotRestart": "Neustart nicht möglich",
     "languageSaved": "Ihre Sprache ist gespeichert.",
     "retry": "Erneut versuchen",
-    "catalogLoadFailed": "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut."
+    "catalogLoadFailed": "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut.",
+    "search": "Sprachen suchen",
+    "noMatches": "Keine Sprachen gefunden",
+    "deviceLanguage": "Gerätesprache"
   },
   "login": {
     "welcome": "Willkommen bei Kilo",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "Push-Einstellungen",
     "appearanceSystem": "System",
     "appearanceLight": "Hell",
-    "appearanceDark": "Dunkel"
+    "appearanceDark": "Dunkel",
+    "account": "Konto"
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "Das Setup der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
       "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden"
-    }
+    },
+    "sessionExited": "Sitzung beendet",
+    "remoteSpawnRetryable": "Die Instanz konnte nicht erreicht werden – sie wurde möglicherweise getrennt.",
+    "remoteSpawnNonRetryable": "Die Instanz konnte die Sitzung nicht starten – überprüfe die Maschine oder aktualisiere die CLI.",
+    "remoteSpawnInstanceDisconnected": "Die ausgewählte Instanz wurde getrennt. Starte eine Sitzung auf Cloud Agent oder wähle eine andere Instanz."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "Erlauben",
     "onlineMessage": "Dieses Gerät kann nicht offline transkribieren. Deine Aufnahme wird an {{provider}} gesendet, um sie in Text umzuwandeln. Kilo speichert die Audiodaten nicht.",
     "onlineTitle": "Sprache wird online verarbeitet",
-    "staysOff": "Sprache bleibt aus, bis du die Online-Transkription erlaubst."
+    "staysOff": "Sprache bleibt aus, bis du die Online-Transkription erlaubst.",
+    "start": "Spracheingabe starten",
+    "stop": "Spracheingabe stoppen"
   },
   "share": {
     "title": "An Kilo teilen",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "Öffnet die Kilo Pass-Verwaltung im Web.",
     "opensAppStoreManagement": "Öffnet die Abonnementverwaltung des App Store.",
     "opensPlans": "Öffnet die Kilo Pass-Pläne.",
-    "tryAgainFromProfile": "Versuche es erneut über das Profil."
+    "tryAgainFromProfile": "Versuche es erneut über das Profil.",
+    "unavailableDescription": "Kilo Pass ist auf Android nicht als In-App-Kauf verfügbar. Verwalte ihn im Web.",
+    "webManagementDescription": "Dieser Kilo Pass wird im Web verwaltet.",
+    "legalDisclosure": "Kilo Pass ist ein automatisch verlängerbares Monatsabonnement. Die Zahlung wird bei Kaufbestätigung deiner Apple-ID belastet. Abonnements verlängern sich automatisch jeden Monat zum angezeigten Preis, sofern sie nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums gekündigt werden. Jederzeit in deinen App-Store-Kontoeinstellungen verwalten oder kündigen.",
+    "legalPrivacyPolicy": "Datenschutzrichtlinie",
+    "legalTermsOfUse": "Nutzungsbedingungen (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "{{label}} ausgewählt, tippen zum Ändern der Auswahl",
       "tapToComment": "{{label}}, tippen zum Kommentieren"
-    }
+    },
+    "linkPasteClipboardEmpty": "Zwischenablage ist leer",
+    "linkPasteNotAPullRequest": "Kein GitHub-Pull-Request-Link"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "Kilo bewerten",
     "sorryMessage": "Bitte sag uns, was besser werden muss. Der für die App zuständige Entwickler liest jeden einzelnen Bericht!",
     "sorryTitle": "Das tut uns leid!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Ein Konto mit dieser E-Mail existiert bereits mit einer anderen Anmeldemethode. Versuche eine andere Methode oder nutze „Weitere Anmeldeoptionen“.",
+    "differentOauth": "Ein Konto mit dieser E-Mail existiert bereits mit einer anderen Anmeldemethode. Versuche eine andere Methode oder nutze „Weitere Anmeldeoptionen“.",
+    "ssoError": "Deine Organisation verlangt SSO. Nutze „Weitere Anmeldeoptionen“.",
+    "blocked": "Dieses Konto wurde blockiert. Bitte kontaktiere den Support.",
+    "signupRateLimited": "Zu viele Versuche. Bitte versuche es später erneut.",
+    "invalidCode": "Dieser Code ist falsch. Bitte versuche es erneut.",
+    "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
+    "tooManyAttempts": "Zu viele Versuche. Bitte fordere einen neuen Code an.",
+    "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "invalidEmail": "Die E-Mail kann nicht an diese Adresse zugestellt werden. Bitte verwende eine andere E-Mail.",
+    "invalidRequest": "Überprüfe deine E-Mail-Adresse und versuche es erneut.",
+    "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
+    "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Nutze „Weitere Anmeldeoptionen“, um dich auf einem anderen Gerät oder über das Web anzumelden.",
+    "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Überprüfe deine Verbindung und versuche es erneut."
+  },
+  "models": {
+    "dataCollected": "Erfasste Daten",
+    "free": "Kostenlos"
   }
 }

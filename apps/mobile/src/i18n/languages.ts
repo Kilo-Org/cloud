@@ -1,5 +1,5 @@
 /**
- * The 86 languages the mobile app supports. The list is the source of truth for
+ * The 87 languages the mobile app supports. The list is the source of truth for
  * the catalog loader, the picker, and the push notification catalog in
  * `packages/notifications`, so a token locale and a channel name always resolve
  * to the same tag.
@@ -69,6 +69,7 @@ export const SUPPORTED_LANGUAGES = [
   'fa',
   'pl',
   'pt',
+  'pt-BR',
   'pa',
   'ro',
   'ru',
@@ -163,7 +164,8 @@ export const LANGUAGE_ENDONYMS = {
   ps: 'پښتو',
   fa: 'فارسی',
   pl: 'Polski',
-  pt: 'Português',
+  pt: 'Português (Portugal)',
+  'pt-BR': 'Português (Brasil)',
   pa: 'ਪੰਜਾਬੀ',
   ro: 'Română',
   ru: 'Русский',
@@ -253,7 +255,8 @@ export const LANGUAGE_ENGLISH_NAMES = {
   ps: 'Pashto',
   fa: 'Persian',
   pl: 'Polish',
-  pt: 'Portuguese',
+  pt: 'Portuguese (Portugal)',
+  'pt-BR': 'Portuguese (Brazil)',
   pa: 'Punjabi',
   ro: 'Romanian',
   ru: 'Russian',

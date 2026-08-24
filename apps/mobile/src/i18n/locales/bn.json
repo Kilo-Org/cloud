@@ -31,9 +31,9 @@
     "languageSaved": "আপনার ভাষা সংরক্ষিত হয়েছে।",
     "catalogLoadFailed": "ভাষা লোড করা যায়নি। আবার চেষ্টা করুন।",
     "retry": "আবার চেষ্টা করুন",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "ভাষা খুঁজুন",
+    "noMatches": "কোনো ভাষা মেলেনি",
+    "deviceLanguage": "ডিভাইসের ভাষা"
   },
   "login": {
     "welcome": "Kilo-তে স্বাগতম",
@@ -143,7 +143,7 @@
     "appearanceSystem": "সিস্টেম",
     "appearanceLight": "লাইট",
     "appearanceDark": "ডার্ক",
-    "account": "Account"
+    "account": "অ্যাকাউন্ট"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "{{label}} নির্বাচিত, নির্বাচন পরিবর্তন করতে আলতো চাপুন",
       "tapToComment": "{{label}}, মন্তব্য করতে আলতো চাপুন"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি",
+    "linkPasteNotAPullRequest": "এটি একটি GitHub pull request লিংক নয়"
   },
   "notifications": {
     "title": "বিজ্ঞপ্তি",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
       "couldNotOpenMessage": "আমরা GitHub অ্যাপ সেটআপ শুরু করতে পারিনি। আবার চেষ্টা করুন।"
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "সেশন বন্ধ হয়েছে",
+    "remoteSpawnRetryable": "ইনস্ট্যান্সে পৌঁছানো যায়নি — এটি সংযোগ বিচ্ছিন্ন হতে পারে।",
+    "remoteSpawnNonRetryable": "ইনস্ট্যান্সটি সেশন শুরু করতে ব্যর্থ হয়েছে — মেশিনটি পরীক্ষা করুন বা CLI আপডেট করুন।",
+    "remoteSpawnInstanceDisconnected": "নির্বাচিত ইনস্ট্যান্সটি সংযোগ বিচ্ছিন্ন হয়েছে। Cloud Agent-এ একটি সেশন শুরু করুন বা অন্য একটি ইনস্ট্যান্স বেছে নিন।"
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "স্পিচ অনলাইনে প্রক্রিয়া করা হয়",
     "onlineMessage": "এই ডিভাইসটি অফলাইনে ট্রান্সক্রাইব করতে পারে না। এটি টেক্সটে রূপান্তর করতে আপনার রেকর্ডিং {{provider}}-এ পাঠানো হয়। Kilo অডিও সংরক্ষণ করে না।",
     "allow": "অনুমতি দিন",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "ভয়েস ইনপুট শুরু করুন",
+    "stop": "ভয়েস ইনপুট বন্ধ করুন"
   },
   "share": {
     "title": "Kilo-তে শেয়ার করুন",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "App Store সাবস্ক্রিপশন ব্যবস্থাপনা খোলে।",
     "opensPlans": "Kilo Pass পরিকল্পনা খোলে।",
     "tryAgainFromProfile": "প্রোফাইল থেকে আবার চেষ্টা করুন।",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass Android-এ অ্যাপ-মধ্যস্থ কেনাকাটা হিসেবে উপলব্ধ নয়। এটি ওয়েবে পরিচালনা করুন।",
+    "webManagementDescription": "এই Kilo Pass ওয়েবে পরিচালিত হয়।",
+    "legalDisclosure": "Kilo Pass একটি স্বয়ংক্রিয়-নবায়নযোগ্য মাসিক সাবস্ক্রিপশন। কেনার নিশ্চিতকরণে আপনার Apple ID থেকে পেমেন্ট নেওয়া হয়। সাবস্ক্রিপশন বর্তমান সময়সীমা শেষ হওয়ার কমপক্ষে 24 ঘণ্টা আগে বাতিল না করা হলে প্রতি মাসে দেখানো দামে স্বয়ংক্রিয়ভাবে নবায়ন হয়। আপনার App Store অ্যাকাউন্ট সেটিংসে যেকোনো সময় পরিচালনা বা বাতিল করুন।",
+    "legalPrivacyPolicy": "গোপনীয়তা নীতি",
+    "legalTermsOfUse": "ব্যবহারের শর্তাবলী (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "এই ইমেইলে একটি অ্যাকাউন্ট ইতিমধ্যে অন্য একটি সাইন-ইন পদ্ধতিতে বিদ্যমান। অন্য একটি পদ্ধতি চেষ্টা করুন বা 'More sign-in options' ব্যবহার করুন।",
+    "differentOauth": "এই ইমেইলে একটি অ্যাকাউন্ট ইতিমধ্যে অন্য একটি সাইন-ইন পদ্ধতিতে বিদ্যমান। অন্য একটি পদ্ধতি চেষ্টা করুন বা 'More sign-in options' ব্যবহার করুন।",
+    "ssoError": "আপনার প্রতিষ্ঠানের SSO প্রয়োজন। 'More sign-in options' ব্যবহার করুন।",
+    "blocked": "এই অ্যাকাউন্টটি ব্লক করা হয়েছে। অনুগ্রহ করে সহায়তার সাথে যোগাযোগ করুন।",
+    "signupRateLimited": "অনেক বেশি চেষ্টা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।",
+    "invalidCode": "কোডটি সঠিক নয়। অনুগ্রহ করে আবার চেষ্টা করুন।",
+    "codeInProgress": "আপনার কোড প্রক্রিয়া করা হচ্ছে। একটু অপেক্ষা করে আবার চেষ্টা করুন।",
+    "tooManyAttempts": "অনেক বেশি চেষ্টা হয়েছে। অনুগ্রহ করে একটি নতুন কোডের অনুরোধ করুন।",
+    "invalidToken": "সাইন-ইন ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
+    "invalidEmail": "এই ঠিকানায় ইমেইল পৌঁছানো সম্ভব নয়। অনুগ্রহ করে একটি ভিন্ন ইমেইল ব্যবহার করুন।",
+    "invalidRequest": "আপনার ইমেইল ঠিকানা পরীক্ষা করে আবার চেষ্টা করুন।",
+    "emailDeliveryFailed": "ইমেইল ডেলিভারি সাময়িকভাবে অনুপলব্ধ। অনুগ্রহ করে পরে আবার চেষ্টা করুন।",
+    "admissionRequired": "আপনার ডিভাইস যাচাই করা যাচ্ছে না। অন্য একটি ডিভাইসে বা ওয়েবে সাইন-ইন করতে 'More sign-in options' ব্যবহার করুন।",
+    "default": "কিছু ভুল হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
+    "retryableAdmission": "আমরা এই ডিভাইসটি যাচাই করতে পারিনি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।"
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "সংগৃহীত ডেটা",
+    "free": "ফ্রি"
   }
 }

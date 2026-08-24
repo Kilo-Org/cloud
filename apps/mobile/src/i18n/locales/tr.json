@@ -30,7 +30,10 @@
     "couldNotRestart": "Yeniden başlatılamadı",
     "languageSaved": "Diliniz kaydedildi.",
     "retry": "Tekrar dene",
-    "catalogLoadFailed": "Dil yüklenemedi. Lütfen tekrar deneyin."
+    "catalogLoadFailed": "Dil yüklenemedi. Lütfen tekrar deneyin.",
+    "search": "Dilleri ara",
+    "noMatches": "Eşleşen dil yok",
+    "deviceLanguage": "Cihaz dili"
   },
   "login": {
     "welcome": "Kilo’ya hoş geldiniz",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "Anlık bildirim tercihleri",
     "appearanceSystem": "Sistem",
     "appearanceLight": "Açık",
-    "appearanceDark": "Koyu"
+    "appearanceDark": "Koyu",
+    "account": "Hesap"
   },
   "notifications": {
     "title": "Bildirimler",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Uygulaması kurulumu başlatılamadı. Lütfen tekrar deneyin.",
       "couldNotOpenTitle": "GitHub açılamadı"
-    }
+    },
+    "sessionExited": "Oturumdan çıkıldı",
+    "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
+    "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı — makineyi kontrol edin veya CLI'yı güncelleyin.",
+    "remoteSpawnInstanceDisconnected": "Seçili örnek bağlantısı kesildi. Cloud Agent'ta bir oturum başlatın veya başka bir örnek seçin."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "İzin ver",
     "onlineMessage": "Bu cihaz çevrimdışı yazıya dökemiyor. Kaydınız, metne dönüştürülmesi için {{provider}} hizmetine gönderilir. Kilo sesi saklamaz.",
     "onlineTitle": "Konuşma çevrimiçi işleniyor",
-    "staysOff": "Çevrimiçi transkripsiyona izin verene kadar konuşma kapalı kalır."
+    "staysOff": "Çevrimiçi transkripsiyona izin verene kadar konuşma kapalı kalır.",
+    "start": "Sesli girişi başlat",
+    "stop": "Sesli girişi durdur"
   },
   "share": {
     "title": "Kilo'ya paylaş",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "Kilo Pass yönetimini web'de açar.",
     "opensAppStoreManagement": "App Store abonelik yönetimini açar.",
     "opensPlans": "Kilo Pass planlarını açar.",
-    "tryAgainFromProfile": "Profilden tekrar deneyin."
+    "tryAgainFromProfile": "Profilden tekrar deneyin.",
+    "unavailableDescription": "Kilo Pass, Android'de uygulama içi satın alma olarak kullanılamaz. Web üzerinden yönetin.",
+    "webManagementDescription": "Bu Kilo Pass web üzerinden yönetiliyor.",
+    "legalDisclosure": "Kilo Pass, otomatik yenilenen aylık bir aboneliktir. Ödeme, satın alma onayında Apple Kimliğinize yansıtılır. Abonelikler, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece her ay gösterilen fiyattan otomatik yenilenir. App Store hesap ayarlarınızdan istediğiniz zaman yönetin veya iptal edin.",
+    "legalPrivacyPolicy": "Gizlilik Politikası",
+    "legalTermsOfUse": "Kullanım Koşulları (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "Seçilen {{label}}, seçimi değiştirmek için dokunun",
       "tapToComment": "{{label}}, yorum yapmak için dokunun"
-    }
+    },
+    "linkPasteClipboardEmpty": "Pano boş",
+    "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "Kilo'yu değerlendir",
     "sorryMessage": "Lütfen neyin daha iyi olması gerektiğini bize bildirin. Uygulamadan sorumlu mühendis her raporu tek tek okur!",
     "sorryTitle": "Bunu duyduğumuza üzüldük!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "Bu e-posta ile farklı bir oturum açma yöntemine sahip bir hesap zaten mevcut. Başka bir yöntem deneyin veya 'Daha fazla oturum açma seçeneği'ni kullanın.",
+    "differentOauth": "Bu e-posta ile farklı bir oturum açma yöntemine sahip bir hesap zaten mevcut. Başka bir yöntem deneyin veya 'Daha fazla oturum açma seçeneği'ni kullanın.",
+    "ssoError": "Kuruluşunuz SSO gerektiriyor. 'Daha fazla oturum açma seçeneği'ni kullanın.",
+    "blocked": "Bu hesap engellenmiştir. Lütfen destek ile iletişime geçin.",
+    "signupRateLimited": "Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin.",
+    "invalidCode": "Bu kod hatalı. Lütfen tekrar deneyin.",
+    "codeInProgress": "Kodunuz işleniyor. Bir an bekleyin ve tekrar deneyin.",
+    "tooManyAttempts": "Çok fazla deneme yapıldı. Lütfen yeni bir kod isteyin.",
+    "invalidToken": "Oturum açma başarısız oldu. Lütfen tekrar deneyin.",
+    "invalidEmail": "Bu adrese e-posta gönderilemiyor. Lütfen farklı bir e-posta kullanın.",
+    "invalidRequest": "E-posta adresinizi kontrol edin ve tekrar deneyin.",
+    "emailDeliveryFailed": "E-posta teslimatı geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+    "admissionRequired": "Cihazınız doğrulanamıyor. Başka bir cihazda veya web üzerinden oturum açmak için 'Daha fazla oturum açma seçeneği'ni kullanın.",
+    "default": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantınızı kontrol edin ve tekrar deneyin."
+  },
+  "models": {
+    "dataCollected": "Toplanan veriler",
+    "free": "Ücretsiz"
   }
 }

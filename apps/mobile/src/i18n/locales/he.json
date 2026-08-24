@@ -30,7 +30,10 @@
     "couldNotRestart": "לא ניתן היה להפעיל מחדש",
     "languageSaved": "השפה שלך נשמרה.",
     "retry": "נסה שוב",
-    "catalogLoadFailed": "לא ניתן היה לטעון את השפה. אנא נסה שוב."
+    "catalogLoadFailed": "לא ניתן היה לטעון את השפה. אנא נסה שוב.",
+    "search": "חיפוש שפות",
+    "noMatches": "אין שפות מתאימות",
+    "deviceLanguage": "שפת המכשיר"
   },
   "login": {
     "welcome": "ברוך הבא ל-Kilo",
@@ -139,7 +142,8 @@
     "notificationsSubtitle": "העדפות דחיפה",
     "appearanceSystem": "מערכת",
     "appearanceLight": "בהיר",
-    "appearanceDark": "כהה"
+    "appearanceDark": "כהה",
+    "account": "חשבון"
   },
   "notifications": {
     "title": "התראות",
@@ -1352,7 +1356,11 @@
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
       "couldNotOpenTitle": "לא ניתן היה לפתוח את GitHub"
-    }
+    },
+    "sessionExited": "היציאה מהסשן הושלמה",
+    "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
+    "remoteSpawnNonRetryable": "המופע לא הצליח להפעיל את הסשן — בדוק את המחשב או עדכן את ה-CLI.",
+    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר."
   },
   "agentChat": {
     "session": {
@@ -1966,7 +1974,9 @@
     "allow": "אפשר",
     "onlineMessage": "מכשיר זה אינו יכול לתמלל במצב לא מקוון. ההקלטה שלך נשלחת אל {{provider}} כדי להפוך אותה לטקסט. Kilo אינו שומר את השמע.",
     "onlineTitle": "הדיבור מעובד באופן מקוון",
-    "staysOff": "הדיבור נשאר כבוי עד שתאפשר תמלול מקוון."
+    "staysOff": "הדיבור נשאר כבוי עד שתאפשר תמלול מקוון.",
+    "start": "התחל קלט קולי",
+    "stop": "עצור קלט קולי"
   },
   "share": {
     "title": "שתף ל-Kilo",
@@ -2039,7 +2049,12 @@
     "opensManagementOnWeb": "פותח את ניהול Kilo Pass באינטרנט.",
     "opensAppStoreManagement": "פותח את ניהול המינויים ב-App Store.",
     "opensPlans": "פותח את תוכניות Kilo Pass.",
-    "tryAgainFromProfile": "נסה שוב מהפרופיל."
+    "tryAgainFromProfile": "נסה שוב מהפרופיל.",
+    "unavailableDescription": "Kilo Pass אינו זמין כרכישה בתוך האפליקציה באנדרואיד. נהל אותו באינטרנט.",
+    "webManagementDescription": "Kilo Pass זה מנוהל באינטרנט.",
+    "legalDisclosure": "Kilo Pass הוא מנוי חודשי שמתחדש אוטומטית. התשלום נגבה מחשבון Apple שלך בעת אישור הרכישה. המנוי מתחדש אוטומטית בכל חודש במחיר המוצג, אלא אם תבטל לפחות 24 שעות לפני סוף התקופה הנוכחית. נהל או בטל בכל עת בהגדרות חשבון App Store שלך.",
+    "legalPrivacyPolicy": "מדיניות פרטיות",
+    "legalTermsOfUse": "תנאי שימוש (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2492,7 +2507,9 @@
     "diff": {
       "selectedTapToChange": "{{label}} נבחר, הקש כדי לשנות את הבחירה",
       "tapToComment": "{{label}}, הקש כדי להגיב"
-    }
+    },
+    "linkPasteClipboardEmpty": "הלוח ריק",
+    "linkPasteNotAPullRequest": "לא קישור לבקשת משיכה ב-GitHub"
   },
   "organization": {
     "boundary": {
@@ -2638,5 +2655,26 @@
     "rateKilo": "דרג את Kilo",
     "sorryMessage": "ספר לנו מה צריך להשתפר. המהנדס האחראי על האפליקציה קורא כל דוח!",
     "sorryTitle": "אנחנו מצטערים לשמוע את זה!"
+  },
+  "authErrors": {
+    "emailAlreadyUsed": "חשבון עם כתובת דוא\"ל זו כבר קיים בשיטת התחברות אחרת. נסה שיטה אחרת או השתמש ב'אפשרויות התחברות נוספות'.",
+    "differentOauth": "חשבון עם כתובת דוא\"ל זו כבר קיים בשיטת התחברות אחרת. נסה שיטה אחרת או השתמש ב'אפשרויות התחברות נוספות'.",
+    "ssoError": "הארגון שלך דורש SSO. השתמש ב'אפשרויות התחברות נוספות'.",
+    "blocked": "חשבון זה נחסם. צור קשר עם התמיכה.",
+    "signupRateLimited": "יותר מדי ניסיונות. נסה שוב מאוחר יותר.",
+    "invalidCode": "הקוד שגוי. נסה שוב.",
+    "codeInProgress": "הקוד שלך מעובד. המתן רגע ונסה שוב.",
+    "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
+    "invalidToken": "ההתחברות נכשלה. נסה שוב.",
+    "invalidEmail": "לא ניתן לשלוח דוא\"ל לכתובת זו. השתמש בכתובת דוא\"ל אחרת.",
+    "invalidRequest": "בדוק את כתובת הדוא\"ל שלך ונסה שוב.",
+    "emailDeliveryFailed": "שליחת הדוא\"ל אינה זמינה זמנית. נסה שוב מאוחר יותר.",
+    "admissionRequired": "לא ניתן לאמת את המכשיר שלך. השתמש ב'אפשרויות התחברות נוספות' כדי להתחבר במכשיר אחר או דרך האינטרנט.",
+    "default": "משהו השתבש. נסה שוב.",
+    "retryableAdmission": "לא ניתן היה לאמת מכשיר זה. בדוק את החיבור ונסה שוב."
+  },
+  "models": {
+    "dataCollected": "נתונים שנאספו",
+    "free": "חינם"
   }
 }

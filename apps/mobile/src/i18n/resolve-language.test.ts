@@ -26,8 +26,10 @@ describe('resolveLanguageTag', () => {
     expect(resolveLanguageTag([])).toBe('en');
   });
 
-  it('falls back from a regional Portuguese tag to pt', () => {
-    expect(resolveLanguageTag([{ languageTag: 'pt-BR' }])).toBe('pt');
+  it('matches pt-BR exactly and falls back from other Portuguese tags to pt', () => {
+    expect(resolveLanguageTag([{ languageTag: 'pt-BR' }])).toBe('pt-BR');
+    expect(resolveLanguageTag([{ languageTag: 'pt-PT' }])).toBe('pt');
+    expect(resolveLanguageTag([{ languageTag: 'pt' }])).toBe('pt');
   });
 
   it('matches es-MX to es via the same-language fallback', () => {

@@ -31,9 +31,9 @@
     "languageSaved": "Jou taal is gestoor.",
     "catalogLoadFailed": "Kon nie die taal laai nie. Probeer asseblief weer.",
     "retry": "Probeer weer",
-    "search": "Search languages",
-    "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "search": "Soek tale",
+    "noMatches": "Geen tale stem ooreen nie",
+    "deviceLanguage": "Toesteltaal"
   },
   "login": {
     "welcome": "Welkom by Kilo",
@@ -143,7 +143,7 @@
     "appearanceSystem": "Stelsel",
     "appearanceLight": "Lig",
     "appearanceDark": "Donker",
-    "account": "Account"
+    "account": "Rekening"
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -514,8 +514,8 @@
       "selectedTapToChange": "Gekies {{label}}, tik om seleksie te verander",
       "tapToComment": "{{label}}, tik om kommentaar te lewer"
     },
-    "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteClipboardEmpty": "Knipbord is leeg",
+    "linkPasteNotAPullRequest": "Nie 'n GitHub-pull-request-skakel nie"
   },
   "notifications": {
     "title": "Kennisgewings",
@@ -1729,10 +1729,10 @@
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
       "couldNotOpenMessage": "Ons kon nie die GitHub App-opstelling begin nie. Probeer asseblief weer."
     },
-    "sessionExited": "Session exited",
-    "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
-    "remoteSpawnNonRetryable": "The instance failed to start the session — check the machine or update the CLI.",
-    "remoteSpawnInstanceDisconnected": "The selected instance disconnected. Start a session on Cloud Agent or pick another instance."
+    "sessionExited": "Sessie beëindig",
+    "remoteSpawnRetryable": "Kon nie die instansie bereik nie — dit het moontlik ontkoppel.",
+    "remoteSpawnNonRetryable": "Die instansie kon nie die sessie begin nie — kontroleer die masjien of werk die CLI op.",
+    "remoteSpawnInstanceDisconnected": "Die gekose instansie het ontkoppel. Begin 'n sessie op Cloud Agent of kies 'n ander instansie."
   },
   "agentChat": {
     "session": {
@@ -2347,8 +2347,8 @@
     "onlineTitle": "Spraak word aanlyn verwerk",
     "onlineMessage": "Hierdie toestel kan nie vanlyn transkribeer nie. Jou opname word na {{provider}} gestuur om dit in teks te verander. Kilo stoor nie die klank nie.",
     "allow": "Laat toe",
-    "start": "Start voice input",
-    "stop": "Stop voice input"
+    "start": "Begin steminvoer",
+    "stop": "Stop steminvoer"
   },
   "share": {
     "title": "Deel na Kilo",
@@ -2422,11 +2422,11 @@
     "opensAppStoreManagement": "Maak App Store-intekeningsbestuur oop.",
     "opensPlans": "Maak Kilo Pass-planne oop.",
     "tryAgainFromProfile": "Probeer weer vanaf Profiel.",
-    "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
-    "webManagementDescription": "This Kilo Pass is managed on the web.",
-    "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "unavailableDescription": "Kilo Pass is nie as 'n in-program-koop op Android beskikbaar nie. Bestuur dit op die web.",
+    "webManagementDescription": "Hierdie Kilo Pass word op die web bestuur.",
+    "legalDisclosure": "Kilo Pass is 'n outomaties-hernubare maandelikse intekening. Betaling word by bevestiging van aankoop van jou Apple ID gehef. Intekeninge hernu elke maand outomaties teen die prys wat vertoon word, tensy dit minstens 24 uur voor die einde van die huidige tydperk gekanselleer word. Bestuur of kanselleer enige tyd in jou App Store-rekeninginstellings.",
+    "legalPrivacyPolicy": "Privaatheidsbeleid",
+    "legalTermsOfUse": "Gebruiksvoorwaardes (EULA)"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2657,24 +2657,24 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "differentOauth": "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-    "ssoError": "Your organization requires SSO. Use 'More sign-in options'.",
-    "blocked": "This account has been blocked. Please contact support.",
-    "signupRateLimited": "Too many attempts. Please try again later.",
-    "invalidCode": "That code is incorrect. Please try again.",
-    "codeInProgress": "Your code is being processed. Wait a moment and try again.",
-    "tooManyAttempts": "Too many attempts. Please request a new code.",
-    "invalidToken": "Sign-in failed. Please try again.",
-    "invalidEmail": "Unable to deliver email to this address. Please use a different email.",
-    "invalidRequest": "Check your email address and try again.",
-    "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
-    "admissionRequired": "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-    "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "emailAlreadyUsed": "'n Rekening met hierdie e-pos bestaan reeds met 'n ander aanmeldmetode. Probeer 'n ander metode of gebruik 'More sign-in options'.",
+    "differentOauth": "'n Rekening met hierdie e-pos bestaan reeds met 'n ander aanmeldmetode. Probeer 'n ander metode of gebruik 'More sign-in options'.",
+    "ssoError": "Jou organisasie vereis SSO. Gebruik 'More sign-in options'.",
+    "blocked": "Hierdie rekening is geblokkeer. Kontak asseblief ondersteuning.",
+    "signupRateLimited": "Te veel pogings. Probeer asseblief later weer.",
+    "invalidCode": "Daardie kode is verkeerd. Probeer asseblief weer.",
+    "codeInProgress": "Jou kode word verwerk. Wag 'n oomblik en probeer weer.",
+    "tooManyAttempts": "Te veel pogings. Vra asseblief 'n nuwe kode aan.",
+    "invalidToken": "Aanmelding het misluk. Probeer asseblief weer.",
+    "invalidEmail": "Nie in staat om e-pos aan hierdie adres te lewer nie. Gebruik asseblief 'n ander e-pos.",
+    "invalidRequest": "Kontroleer jou e-posadres en probeer weer.",
+    "emailDeliveryFailed": "E-poslewering is tydelik onbeskikbaar. Probeer asseblief later weer.",
+    "admissionRequired": "Jou toestel kan nie geverifieer word nie. Gebruik 'More sign-in options' om op 'n ander toestel of via die web aan te meld.",
+    "default": "Iets het verkeerd gegaan. Probeer asseblief weer.",
+    "retryableAdmission": "Ons kon nie hierdie toestel verifieer nie. Kontroleer jou verbinding en probeer weer."
   },
   "models": {
-    "dataCollected": "Data collected",
-    "free": "Free"
+    "dataCollected": "Data ingesamel",
+    "free": "Gratis"
   }
 }

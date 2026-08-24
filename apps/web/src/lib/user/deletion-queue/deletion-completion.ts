@@ -18,6 +18,7 @@ import {
   writeDeletionAudit,
 } from '@/lib/user/deletion-queue/deletion-audit';
 import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue';
+import { deletionRequestAuditHmac } from '@/lib/user/deletion-queue/deletion-hmac';
 import { selectNextTaskForRequest } from '@/lib/user/deletion-queue/deletion-task-selector';
 import { SUCCESSFUL_TASK_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
 
@@ -36,24 +37,25 @@ export async function tryAdvancePreReplyGate(requestId: string): Promise<boolean
     if (!request || request.status !== UserDeletionRequestStatus.InProgress) {
       return false;
     }
-    if (request.catalog_version !== 1) {
-      return false;
-    }
-
     const steps = await tx
       .select()
       .from(user_deletion_steps)
       .where(eq(user_deletion_steps.request_id, requestId))
       .for('update');
 
-    if (!catalogTasksReady(request.catalog_version, steps, preReplyStepKeys())) {
+    if (
+      !catalogTasksReady(request.catalog_version, steps, preReplyStepKeys(request.catalog_version))
+    ) {
       return false;
     }
 
     await writeDeletionAudit(tx, {
       requestId: request.id,
       eventType: UserDeletionAuditEventType.ReadyForCustomerReply,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: deletionRequestAuditHmac({
+        targetEmailHmac: request.target_email_hmac,
+        pylonTicketRef: request.pylon_ticket_ref,
+      }),
       subjectKey: 'request',
     });
     await writeDeletionActivity(tx, {
@@ -81,8 +83,6 @@ export async function tryCompleteRequest(requestId: string): Promise<boolean> {
     if (!request || request.status !== UserDeletionRequestStatus.Finalizing) {
       return false;
     }
-    if (request.catalog_version !== 1) return false;
-
     const steps = await tx
       .select()
       .from(user_deletion_steps)
@@ -97,7 +97,10 @@ export async function tryCompleteRequest(requestId: string): Promise<boolean> {
     await writeDeletionAudit(tx, {
       requestId: request.id,
       eventType: UserDeletionAuditEventType.Completed,
-      targetEmailHmac: request.target_email_hmac,
+      targetEmailHmac: deletionRequestAuditHmac({
+        targetEmailHmac: request.target_email_hmac,
+        pylonTicketRef: request.pylon_ticket_ref,
+      }),
       subjectKey: 'request',
     });
     await writeDeletionActivity(tx, {

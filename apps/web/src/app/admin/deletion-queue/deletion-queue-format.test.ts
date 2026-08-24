@@ -1,4 +1,5 @@
 import {
+  deletionPreflightProgress,
   deletionStepCountLabel,
   deletionStepProgressLabel,
   formatActivityDetail,
@@ -110,6 +111,38 @@ describe('formatActivityDetail', () => {
         details: { processedCount: 80, scannedCount: 49000, errorCode: null },
       })
     ).toBe('Usage prompts · 80 scrubbed · 49000 scanned');
+  });
+});
+
+describe('deletionPreflightProgress', () => {
+  it('is current while pending without an attention code', () => {
+    expect(deletionPreflightProgress({ status: 'pending', preflightAttentionCode: null })).toBe(
+      'current'
+    );
+  });
+
+  it('is stuck while pending with an attention code', () => {
+    expect(
+      deletionPreflightProgress({
+        status: 'pending',
+        preflightAttentionCode: 'delete_ready_missing',
+      })
+    ).toBe('stuck');
+  });
+
+  it('is finished after promotion', () => {
+    expect(deletionPreflightProgress({ status: 'in_progress', preflightAttentionCode: null })).toBe(
+      'finished'
+    );
+    expect(deletionPreflightProgress({ status: 'completed', preflightAttentionCode: null })).toBe(
+      'finished'
+    );
+  });
+
+  it('stays idle when cancelled before promotion', () => {
+    expect(deletionPreflightProgress({ status: 'cancelled', preflightAttentionCode: null })).toBe(
+      'idle'
+    );
   });
 });
 

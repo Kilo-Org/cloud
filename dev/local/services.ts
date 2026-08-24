@@ -415,6 +415,7 @@ export function resolveDeletionMockSessionEnv(args: {
     PYLON_HOST: origin,
     SUBSTACK_PUBLICATION_URL: origin,
     CUSTOMERIO_TRACK_BASE: origin,
+    CSA_APP_BASE_URL: origin,
   };
   if (!env.PYLON_API_KEY?.trim()) sessionEnv.PYLON_API_KEY = DELETION_MOCK_DUMMY;
   if (!env.POSTHOG_PERSONAL_API_KEY?.trim()) {

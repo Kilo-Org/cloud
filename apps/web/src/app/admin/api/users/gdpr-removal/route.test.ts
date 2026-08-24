@@ -91,7 +91,7 @@ describe('/admin/api/users/gdpr-removal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetUserFromAuth.mockResolvedValue({
-      user: { id: ADMIN_ID },
+      user: { id: ADMIN_ID, google_user_email: 'admin@example.com' },
       authFailedResponse: null,
     } as never);
     mockedFindUserById.mockResolvedValue({
@@ -181,8 +181,9 @@ describe('/admin/api/users/gdpr-removal', () => {
 
       expect(response.status).toBe(202);
       expect(mockedEnqueueUserDeletionTargets).toHaveBeenCalledWith({
-        actor: { kiloUserId: ADMIN_ID },
+        actor: { kiloUserId: ADMIN_ID, email: 'admin@example.com' },
         targets: [{ email: USER_EMAIL, trustedUserId: USER_ID }],
+        catalogVersion: 2,
       });
       await expect(response.json()).resolves.toEqual({
         requestId: REQUEST_ID,

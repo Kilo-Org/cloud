@@ -306,6 +306,7 @@ test('injects deletion-mock host overrides only when the service is selected', (
     PYLON_HOST: 'http://127.0.0.1:5210',
     SUBSTACK_PUBLICATION_URL: 'http://127.0.0.1:5210',
     CUSTOMERIO_TRACK_BASE: 'http://127.0.0.1:5210',
+    CSA_APP_BASE_URL: 'http://127.0.0.1:5210',
     PYLON_API_KEY: 'deletion-mock',
     POSTHOG_PERSONAL_API_KEY: 'deletion-mock',
     POSTHOG_ENVIRONMENT_ID: 'deletion-mock',

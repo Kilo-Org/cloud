@@ -76,8 +76,11 @@ describe('adminUserDeletionQueueRouter', () => {
       ],
     });
 
-    expect(result.accepted).toEqual([]);
-    expect(result.rejected.map(entry => entry.code)).toEqual(['no_cloud_user', 'no_cloud_user']);
+    expect(result.rejected).toEqual([]);
+    expect(result.accepted.map(entry => entry.email)).toEqual([
+      'person@example.com',
+      'staff@kilocode.ai',
+    ]);
     expect(fetchSpy).not.toHaveBeenCalled();
     const [{ count: after }] = await db
       .select({ count: sql<number>`count(*)::int` })

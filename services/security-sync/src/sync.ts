@@ -164,7 +164,23 @@ type SecurityReviewOwner =
   | { organizationId: string; userId?: never }
   | { userId: string; organizationId?: never };
 
-type SyncResult = {
+export const SECURITY_SYNC_OWNER_BUDGET_MS = 8 * 60 * 1000;
+
+const SyncRunProgressSchema = z.object({
+  runId: z.string().min(1),
+  completedRepos: z.array(z.string().min(1)),
+  staleRepos: z.array(z.string()),
+  authInvalidRepos: z.array(z.string()),
+  synced: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  authInvalid: z.number().int().nonnegative(),
+  reauthRequired: z.boolean(),
+});
+
+type SyncRunProgress = z.infer<typeof SyncRunProgressSchema>;
+
+export type SyncResult = {
   synced: number;
   errors: number;
   /** Repos where Dependabot alerts are permanently disabled (safe to skip) */
@@ -177,6 +193,8 @@ type SyncResult = {
   staleRepos: string[];
   /** Stable command-ledger result when an acknowledged sync resolves without normal success. */
   commandResultCode?: string;
+  exhaustedBudget: boolean;
+  remainingRepoCount: number;
 };
 
 type FetchAlertsResult =
@@ -195,7 +213,84 @@ function createEmptySyncResult(): SyncResult {
     authInvalidRepos: [],
     reauthRequired: false,
     staleRepos: [],
+    exhaustedBudget: false,
+    remainingRepoCount: 0,
   };
+}
+
+function readSyncRunProgress(
+  runtimeState: Record<string, unknown>,
+  runId: string
+): SyncRunProgress | null {
+  const parsed = SyncRunProgressSchema.safeParse(runtimeState.sync_run);
+  if (!parsed.success || parsed.data.runId !== runId) return null;
+  return parsed.data;
+}
+
+function applySyncRunProgress(result: SyncResult, progress: SyncRunProgress): void {
+  result.synced = progress.synced;
+  result.errors = progress.errors;
+  result.skipped = progress.skipped;
+  result.authInvalid = progress.authInvalid;
+  result.authInvalidRepos = [...progress.authInvalidRepos];
+  result.reauthRequired = progress.reauthRequired;
+  result.staleRepos = [...progress.staleRepos];
+}
+
+function toSyncRunProgress(
+  runId: string,
+  result: SyncResult,
+  completedRepos: string[]
+): SyncRunProgress {
+  return {
+    runId,
+    completedRepos,
+    staleRepos: result.staleRepos,
+    authInvalidRepos: result.authInvalidRepos,
+    synced: result.synced,
+    errors: result.errors,
+    skipped: result.skipped,
+    authInvalid: result.authInvalid,
+    reauthRequired: result.reauthRequired,
+  };
+}
+
+async function writeSyncRunProgress(
+  db: WorkerDb,
+  owner: SecurityReviewOwner,
+  runtimeState: Record<string, unknown>,
+  progress: SyncRunProgress
+): Promise<void> {
+  await db
+    .update(agent_configs)
+    .set({
+      runtime_state: {
+        ...runtimeState,
+        sync_run: progress,
+      },
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner)
+      )
+    );
+}
+
+async function clearSyncRunProgress(db: WorkerDb, owner: SecurityReviewOwner): Promise<void> {
+  await db
+    .update(agent_configs)
+    .set({
+      runtime_state: sql`COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - 'sync_run'`,
+    })
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        ownerFilter(owner)
+      )
+    );
 }
 
 function createAuthInvalidSyncResult(repositories: string[]): SyncResult {
@@ -272,6 +367,7 @@ type EnabledOwnerConfig = {
   /** Number of selected_repository_ids that are no longer accessible via the installation.
    *  Non-zero means the app lost access to a configured repo — freshness must not advance. */
   missingSelectedRepoCount: number;
+  runtimeState: Record<string, unknown>;
 };
 
 export async function getOwnerConfig(
@@ -284,6 +380,7 @@ export async function getOwnerConfig(
       id: agent_configs.id,
       config: agent_configs.config,
       is_enabled: agent_configs.is_enabled,
+      runtime_state: agent_configs.runtime_state,
     })
     .from(agent_configs)
     .where(
@@ -401,6 +498,10 @@ export async function getOwnerConfig(
     autoAnalysisEnabledAt: ownerStates[0]?.autoAnalysisEnabledAt ?? null,
     authInvalidAt: integration.authInvalidAt,
     missingSelectedRepoCount,
+    runtimeState:
+      agentConfig.runtime_state && typeof agentConfig.runtime_state === 'object'
+        ? agentConfig.runtime_state
+        : {},
   };
 }
 
@@ -1610,6 +1711,7 @@ export async function syncOwner(params: {
   actor?: { id: string; email?: string | null; name?: string | null };
   repoFullName?: string;
   notificationMaterializationEnabled?: boolean;
+  budgetMs?: number;
 }): Promise<SyncResult> {
   const { db: database, gitTokenService, owner, runId, actor, repoFullName } = params;
   const trigger = params.trigger ?? 'scheduled';
@@ -1646,9 +1748,22 @@ export async function syncOwner(params: {
     return createAuthInvalidSyncResult(repositories);
   }
 
+  const previousProgress = repoFullName ? null : readSyncRunProgress(config.runtimeState, runId);
+  const completedRepos = new Set(previousProgress?.completedRepos ?? []);
+  const remainingRepositories = repositories.filter(name => !completedRepos.has(name));
   const totalResult = createEmptySyncResult();
+  if (previousProgress) {
+    applySyncRunProgress(totalResult, previousProgress);
+    console.info('Resuming security sync owner run', {
+      runId,
+      completedRepoCount: completedRepos.size,
+      remainingRepoCount: remainingRepositories.length,
+    });
+  }
   let firstError: Error | null = null;
   let successfulRepos = 0;
+  let processedThisPass = 0;
+  let exhaustedBudget = false;
   const notificationPolicy = params.notificationMaterializationEnabled
     ? config.notificationPolicy
     : null;
@@ -1656,7 +1771,16 @@ export async function syncOwner(params: {
     ? await resolveNotificationRecipientUserIds(database, owner)
     : [];
 
-  for (const repoFullName of repositories) {
+  for (const selectedRepoFullName of remainingRepositories) {
+    if (
+      processedThisPass > 0 &&
+      params.budgetMs !== undefined &&
+      Date.now() - startTime >= params.budgetMs
+    ) {
+      exhaustedBudget = true;
+      break;
+    }
+
     try {
       const repoResult = await syncRepo({
         db: database,
@@ -1665,7 +1789,7 @@ export async function syncOwner(params: {
         owner,
         runId,
         platformIntegrationId: config.platformIntegrationId,
-        repoFullName,
+        repoFullName: selectedRepoFullName,
         slaConfig: config.slaConfig,
         notificationPolicy,
         notificationRecipientUserIds,
@@ -1679,6 +1803,8 @@ export async function syncOwner(params: {
       totalResult.reauthRequired = totalResult.reauthRequired || repoResult.reauthRequired;
       totalResult.staleRepos.push(...repoResult.staleRepos);
       successfulRepos++;
+      completedRepos.add(selectedRepoFullName);
+      processedThisPass++;
 
       if (repoResult.reauthRequired) {
         break;
@@ -1687,20 +1813,41 @@ export async function syncOwner(params: {
       totalResult.errors++;
       await recordSecurityAgentRepositorySyncFailure(database, {
         owner: toSecurityAgentCommandOwner(owner),
-        repoFullName,
+        repoFullName: selectedRepoFullName,
         failureCode: 'SYNC_FAILED',
       });
-      console.error(`Failed to sync ${repoFullName}`, {
+      console.error(`Failed to sync ${selectedRepoFullName}`, {
         error: error instanceof Error ? error.message : String(error),
       });
       if (!firstError && error instanceof Error) {
         firstError = error;
       }
+      if (successfulRepos > 0 || previousProgress) {
+        completedRepos.add(selectedRepoFullName);
+        processedThisPass++;
+      }
     }
   }
 
-  if (successfulRepos === 0 && firstError) {
+  if (successfulRepos === 0 && firstError && !previousProgress) {
     throw firstError;
+  }
+
+  const remainingRepoCount = repositories.filter(name => !completedRepos.has(name)).length;
+  if (exhaustedBudget && remainingRepoCount > 0 && !totalResult.reauthRequired) {
+    await writeSyncRunProgress(
+      database,
+      owner,
+      config.runtimeState,
+      toSyncRunProgress(runId, totalResult, [...completedRepos])
+    );
+    console.info('Security sync owner budget exhausted; continuation required', {
+      runId,
+      completedRepoCount: completedRepos.size,
+      remainingRepoCount,
+      durationMs: Date.now() - startTime,
+    });
+    return { ...totalResult, exhaustedBudget: true, remainingRepoCount };
   }
 
   // Prune stale configured repositories regardless of trigger so manual and scheduled
@@ -1763,19 +1910,19 @@ export async function syncOwner(params: {
   // repo-level setting, and blocking here would leave the timestamp stuck.
   // Missing selected repos (installation lost access) also block — the repo
   // was configured but silently dropped from the accessible list.
-  if (
+  const shouldAdvanceFreshness =
     !repoFullName &&
     totalResult.errors === 0 &&
     totalResult.authInvalid === 0 &&
     totalResult.staleRepos.length === 0 &&
-    config.missingSelectedRepoCount === 0
-  ) {
+    config.missingSelectedRepoCount === 0;
+  if (shouldAdvanceFreshness) {
     try {
       await database
         .update(agent_configs)
         .set({
           runtime_state: sql`jsonb_set(
-            COALESCE(${agent_configs.runtime_state}, '{}'::jsonb),
+            COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - 'sync_run',
             '{last_synced_at}',
             to_jsonb(now())
           )`,
@@ -1789,6 +1936,14 @@ export async function syncOwner(params: {
         );
     } catch (error) {
       console.error('Failed to update last_synced_at in runtime_state', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else if (previousProgress) {
+    try {
+      await clearSyncRunProgress(database, owner);
+    } catch (error) {
+      console.error('Failed to clear security sync run progress', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -1819,7 +1974,7 @@ export async function syncOwner(params: {
     console.info('Sync cycle summary', syncSummary);
   }
 
-  return totalResult;
+  return { ...totalResult, remainingRepoCount: 0 };
 }
 
 async function syncRepo(params: {

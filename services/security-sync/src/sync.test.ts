@@ -15,6 +15,7 @@ afterEach(() => {
 type FakeDbOptions = {
   authInvalidAt?: string | null;
   repositories?: string[];
+  runtimeState?: Record<string, unknown>;
 };
 
 function createFakeDb(options: FakeDbOptions = {}) {
@@ -29,7 +30,14 @@ function createFakeDb(options: FakeDbOptions = {}) {
           limit: async () => {
             selectCount++;
             if (selectCount === 1) {
-              return [{ id: 'agent-config', config: {}, is_enabled: true }];
+              return [
+                {
+                  id: 'agent-config',
+                  config: {},
+                  is_enabled: true,
+                  runtime_state: options.runtimeState ?? {},
+                },
+              ];
             }
             if (selectCount === 2) {
               return [
@@ -512,6 +520,79 @@ describe('Worker GitHub auth-invalid sync', () => {
       title: 'Contact [redacted-email] or [redacted-email] about lodash',
     });
     expect(auditRows[0]?.finding_snapshot).not.toHaveProperty('dependabot_html_url');
+  });
+
+  it('stops after the first repository when the owner budget is already exhausted', async () => {
+    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-1',
+        budgetMs: 0,
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: true,
+      remainingRepoCount: 1,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(sets).toContainEqual(
+      expect.objectContaining({
+        runtime_state: expect.objectContaining({
+          sync_run: expect.objectContaining({
+            runId: 'run-budget-1',
+            completedRepos: ['acme/widgets'],
+          }),
+        }),
+      })
+    );
+    expect(sets).not.toContainEqual(
+      expect.objectContaining({
+        runtime_state: expect.objectContaining({ last_synced_at: expect.anything() }),
+      })
+    );
+  });
+
+  it('skips completed repositories and finalizes freshness on the last chunk', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      runtimeState: {
+        sync_run: {
+          runId: 'run-budget-1',
+          completedRepos: ['acme/widgets'],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-1',
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+      authInvalid: 0,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(sets).toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
   });
 });
 

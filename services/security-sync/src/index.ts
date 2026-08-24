@@ -23,7 +23,7 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
-import { syncOwner } from './sync';
+import { SECURITY_SYNC_OWNER_BUDGET_MS, syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
 import { runSecurityNotificationSweep } from './notifications/sweep';
 
@@ -243,7 +243,7 @@ function buildManualSyncQueueMessage(
 function buildDismissQueueMessage(
   command: z.infer<typeof ManualFindingDismissalCommandSchema>,
   ids: KeyedEnqueueIds
-): MessageSendRequest<SecuritySyncQueueMessage> {
+): MessageSendRequest<SecurityDismissMessage> {
   return {
     body: {
       ...command,
@@ -265,15 +265,15 @@ function buildDismissQueueMessage(
  * A queue-send failure marks the command failed before rethrowing, so no
  * command is left waiting for a message that was never sent.
  */
-async function enqueueSecurityCommand(
+async function enqueueSecurityCommand<T>(
   db: WorkerDb,
-  queue: Queue<SecuritySyncQueueMessage>,
+  queue: Queue<T>,
   params: {
     operationKey?: string;
     create: CreateSecurityAgentCommandInput;
     runId: string;
     messageId: string;
-    buildMessage: (ids: KeyedEnqueueIds) => MessageSendRequest<SecuritySyncQueueMessage>;
+    buildMessage: (ids: KeyedEnqueueIds) => MessageSendRequest<T>;
   }
 ): Promise<KeyedEnqueueIds> {
   const { command, created } =
@@ -341,7 +341,7 @@ async function enqueueManualSyncCommand(
 
 async function enqueueDismissFindingCommand(
   db: WorkerDb,
-  queue: Queue<SecuritySyncQueueMessage>,
+  queue: Queue<SecurityDismissMessage>,
   command: z.infer<typeof ManualFindingDismissalCommandSchema>
 ): Promise<KeyedEnqueueIds> {
   const runId = crypto.randomUUID();
@@ -652,7 +652,39 @@ async function processSecuritySyncMessage(
       env.SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED,
       'SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED'
     ),
+    budgetMs: body.repoFullName ? undefined : SECURITY_SYNC_OWNER_BUDGET_MS,
   });
+
+  if (result.exhaustedBudget) {
+    const nextChunkIndex = body.chunkIndex + 1;
+    await env.SYNC_QUEUE.sendBatch([
+      {
+        body: {
+          ...body,
+          chunkIndex: nextChunkIndex,
+          chunkCount: nextChunkIndex + 1,
+          messageId:
+            body.trigger === 'manual'
+              ? `${body.runId}:${body.ownerKey}:manual:${nextChunkIndex}`
+              : `${body.runId}:${body.ownerKey}:${nextChunkIndex}`,
+          dispatchedAt: new Date().toISOString(),
+        },
+        contentType: 'json',
+      },
+    ]);
+    console.info('Security sync continuation enqueued', {
+      command_id: body.commandId,
+      command_type: body.commandId ? 'sync' : undefined,
+      owner_type: body.owner.organizationId ? 'org' : 'user',
+      runId: body.runId,
+      ownerKey: body.ownerKey,
+      chunkIndex: nextChunkIndex,
+      remainingRepoCount: result.remainingRepoCount,
+      attempts: message.attempts,
+    });
+    message.ack();
+    return;
+  }
 
   const terminal = syncCommandTerminalState(result);
   if (body.commandId) {
@@ -772,7 +804,7 @@ export default {
       }
 
       const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
-      const accepted = await enqueueDismissFindingCommand(db, env.SYNC_QUEUE, parsed.data);
+      const accepted = await enqueueDismissFindingCommand(db, env.DISMISS_QUEUE, parsed.data);
       return jsonResponse({ success: true, accepted: true, ...accepted }, 202);
     }
 
@@ -885,9 +917,15 @@ export default {
   },
 
   async queue(batch: MessageBatch<SecuritySyncQueueMessage>, env: CloudflareEnv): Promise<void> {
+    const dismissOnly = (batch.queue ?? '').startsWith('security-dismiss-jobs');
     for (const message of batch.messages) {
       try {
         if (await processSecurityDismissMessage(message, env)) {
+          continue;
+        }
+        if (dismissOnly) {
+          console.error('Invalid security dismiss queue message');
+          message.ack();
           continue;
         }
         await processSecuritySyncMessage(message, env);

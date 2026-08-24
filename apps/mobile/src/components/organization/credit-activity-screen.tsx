@@ -14,7 +14,7 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoney } from '@/lib/format';
+import { formatDate, formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
@@ -22,7 +22,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
-import { cn, firstNonEmpty, formatDate, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function humanizeCategory(category: string): string {
   const spaced = category.replaceAll('_', ' ');
@@ -61,12 +61,12 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {formatDate(parseTimestamp(transaction.created_at))}
+          {formatDate(parseTimestamp(transaction.created_at), i18n.language)}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
             {t('organization.creditActivity.expires', {
-              date: formatDate(parseTimestamp(transaction.expiry_date)),
+              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language),
             })}
           </Text>
         )}

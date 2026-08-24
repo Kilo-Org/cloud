@@ -12,8 +12,10 @@ import { CollapsibleSection } from '@/components/security-agent/collapsible-sect
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
-import { capitalize, formatDate, parseTimestamp } from '@/lib/utils';
+import { capitalize, parseTimestamp } from '@/lib/utils';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
@@ -53,9 +55,9 @@ function AuditReportSkeleton() {
 
 function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
-  const start = formatDate(parseTimestamp(report.period.start));
-  const end = formatDate(parseTimestamp(report.period.displayEnd));
-  const generatedAt = formatDate(parseTimestamp(report.generatedAt));
+  const start = formatDate(parseTimestamp(report.period.start), i18n.language);
+  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language);
+  const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language);
 
   return (
     <View className="gap-1">
@@ -124,7 +126,8 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
           <View key={event.id} className="gap-0.5">
             <Text className="text-sm">{event.label}</Text>
             <Text variant="muted" className="text-xs">
-              {formatDate(parseTimestamp(event.occurredAt))} · {event.actor.displayName}
+              {formatDate(parseTimestamp(event.occurredAt), i18n.language)} ·{' '}
+              {event.actor.displayName}
             </Text>
           </View>
         ))}
@@ -136,8 +139,8 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
 function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
-    const start = formatDate(parseTimestamp(report.period.start));
-    const end = formatDate(parseTimestamp(report.period.displayEnd));
+    const start = formatDate(parseTimestamp(report.period.start), i18n.language);
+    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language);
     return (
       <EmptyState
         icon={FileText}

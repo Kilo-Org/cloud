@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { formatDate } from '@/lib/format';
+import { parseTimestamp } from '@/lib/utils';
 
 /**
  * Minimal structural shape of the `trpc.organizations.kiloPass.summary`
@@ -80,7 +81,7 @@ function formatPeriodEnd(iso: string | null): string | null {
     return null;
   }
   const date = parseTimestamp(iso);
-  return Number.isNaN(date.getTime()) ? null : formatDate(date);
+  return Number.isNaN(date.getTime()) ? null : formatDate(date, i18n.language);
 }
 
 function cancelingSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {

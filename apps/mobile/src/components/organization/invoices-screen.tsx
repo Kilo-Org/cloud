@@ -13,7 +13,7 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoneyFromCents } from '@/lib/format';
+import { formatDate, formatMoneyFromCents } from '@/lib/format';
 import {
   type OrgInvoice,
   useOrgBoundary,
@@ -25,7 +25,7 @@ import {
   selectInvoiceRowState,
   shareOrganizationInvoicePdf,
 } from '@/lib/organization-invoice-download';
-import { cn, firstNonEmpty, formatDate } from '@/lib/utils';
+import { cn, firstNonEmpty } from '@/lib/utils';
 
 const STATUS_META = {
   paid: {
@@ -101,7 +101,7 @@ function InvoiceRowContent({
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {formatDate(new Date(invoice.created * 1000))}
+          {formatDate(new Date(invoice.created * 1000), i18n.language)}
         </Text>
         <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
           <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>

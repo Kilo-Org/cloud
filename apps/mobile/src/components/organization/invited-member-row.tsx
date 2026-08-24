@@ -5,9 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
-import { cn, formatDate, parseTimestamp } from '@/lib/utils';
+import { cn, parseTimestamp } from '@/lib/utils';
 
 import {
   emailStatusLabel,
@@ -30,7 +31,7 @@ function inviteDateLabel(inviteDate: string | null): string | null {
     return null;
   }
   return i18n.t('organization.members.invitedDate', {
-    date: formatDate(parseTimestamp(inviteDate)),
+    date: formatDate(parseTimestamp(inviteDate), i18n.language),
   });
 }
 

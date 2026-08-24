@@ -100,13 +100,14 @@ export function createSecureStorePreference<T>(options: {
      * Persist-then-apply write for callers that must not change memory on a
      * failed disk write (e.g. language apply). Writes disk first; on success
      * updates memory and emits, returning true. On failure shows the existing
-     * toast, leaves memory unchanged, and returns false.
+     * toast, leaves memory unchanged, and returns false. `toastLng` pins the
+     * toast language when the caller already switched the active language.
      */
-    setAsync: async (next: T): Promise<boolean> => {
+    setAsync: async (next: T, toastLng?: string): Promise<boolean> => {
       try {
         await setAccountMetadata(key, serialize(next));
       } catch {
-        toast.error(i18n.t('common.couldNotSaveSetting'));
+        toast.error(i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined));
         return false;
       }
       value = next;

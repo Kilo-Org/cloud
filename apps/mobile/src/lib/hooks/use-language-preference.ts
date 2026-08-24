@@ -37,8 +37,11 @@ export function getLanguagePreference(): LanguagePreference {
 }
 
 /** Apply and persist a preference; returns false when the disk write failed. */
-export async function setLanguagePreferenceAsync(preference: LanguagePreference): Promise<boolean> {
-  const result = await store.setAsync(preference);
+export async function setLanguagePreferenceAsync(
+  preference: LanguagePreference,
+  toastLng?: string
+): Promise<boolean> {
+  const result = await store.setAsync(preference, toastLng);
   return result;
 }
 

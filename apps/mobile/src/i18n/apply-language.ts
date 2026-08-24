@@ -70,7 +70,7 @@ export async function applyLanguagePreference(
     return { kind: 'catalog-failed' };
   }
 
-  const persisted = await setLanguagePreferenceAsync(preference);
+  const persisted = await setLanguagePreferenceAsync(preference, previousLanguage);
   if (!persisted) {
     try {
       await i18n.changeLanguage(previousLanguage);

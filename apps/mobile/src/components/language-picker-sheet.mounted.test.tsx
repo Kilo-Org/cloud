@@ -167,7 +167,7 @@ describe('LanguagePickerSheet apply', () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'Español');
 
-    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
     expect(i18n.language).toBe('es');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
@@ -312,7 +312,7 @@ describe('LanguagePickerSheet apply', () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');
 
-    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar', 'en');
     expect(i18n.language).toBe('ar');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
@@ -341,7 +341,7 @@ describe('LanguagePickerSheet apply', () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'Español');
 
-    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es');
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
     expect(i18n.language).toBe('en');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();

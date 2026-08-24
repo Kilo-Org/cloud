@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getAppStoreKiloPassOwnershipPreflight } from './subscription-card-state';
+
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+}));
 
 const currentAppAccountToken = '550e8400-e29b-41d4-a716-446655440000';
 const otherAppAccountToken = '550e8400-e29b-41d4-a716-446655440001';

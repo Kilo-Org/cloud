@@ -746,7 +746,7 @@ function RootLayoutNav() {
     if (!wasHidden || hidden || hasBootstrapError) {
       return undefined;
     }
-    announceForA11y('Content ready');
+    announceForA11y(i18n.t('bootstrap.contentReady'));
     const frame = requestAnimationFrame(() => {
       moveA11yFocus(wrapperRef);
     });
@@ -760,11 +760,11 @@ function RootLayoutNav() {
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
         description={t('bootstrap.couldNotLoadAccountDescription')}
-        primaryLabel="Retry"
-        primaryAccessibilityLabel="Retry loading account"
+        primaryLabel={t('common.retry')}
+        primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
         onPrimaryPress={refetchUserId}
-        secondaryLabel="Sign out"
-        secondaryAccessibilityLabel="Sign out"
+        secondaryLabel={t('bootstrap.signOut')}
+        secondaryAccessibilityLabel={t('bootstrap.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -777,14 +777,14 @@ function RootLayoutNav() {
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}
         description={t('bootstrap.couldNotLoadPrivacyDescription')}
-        primaryLabel="Retry"
-        primaryAccessibilityLabel="Retry loading privacy choices"
+        primaryLabel={t('common.retry')}
+        primaryAccessibilityLabel={t('bootstrap.retryLoadingPrivacy')}
         onPrimaryPress={() => {
           setConsentCheckError(null);
           setConsentCheckRetryKey(key => key + 1);
         }}
-        secondaryLabel="Sign out"
-        secondaryAccessibilityLabel="Sign out"
+        secondaryLabel={t('bootstrap.signOut')}
+        secondaryAccessibilityLabel={t('bootstrap.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}

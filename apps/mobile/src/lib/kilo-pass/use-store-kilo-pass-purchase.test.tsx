@@ -150,6 +150,10 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+}));
+
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
     H: unknown;

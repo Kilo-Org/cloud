@@ -18,10 +18,6 @@ import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
-import {
-  formatKiloPassTierDescription,
-  KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION,
-} from '@/lib/kilo-pass/subscription-page-copy';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
@@ -132,7 +128,7 @@ function KiloPassUnavailableScreen({
           showsVerticalScrollIndicator={false}
         >
           <Text className="px-1 text-sm leading-5 text-muted-foreground">
-            {KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION}
+            {t('kiloPass.subscriptionHeaderDescription')}
           </Text>
           <View className="rounded-xl border border-border bg-card p-5">
             <Text className="font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
@@ -292,7 +288,7 @@ function KiloPassNativeIapContent() {
           showsVerticalScrollIndicator={false}
         >
           <Text className="px-1 text-sm leading-5 text-muted-foreground">
-            {KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION}
+            {t('kiloPass.subscriptionHeaderDescription')}
           </Text>
 
           {feedback && (
@@ -377,7 +373,7 @@ function KiloPassNativeIapContent() {
                   <View className="flex-1 gap-1.5">
                     <Text className="font-semibold text-foreground">{formatTier(product)}</Text>
                     <Text className="text-xs text-muted-foreground">
-                      {formatKiloPassTierDescription(product.webMonthlyPriceUsd)}
+                      {t('kiloPass.tierDescription', { price: product.webMonthlyPriceUsd })}
                     </Text>
                   </View>
                   <Text className="text-base font-semibold text-foreground tabular-nums">

@@ -6,7 +6,10 @@ import {
   type PurchasePresentationKind,
   type PurchaseStatusClass,
 } from '@kilocode/app-shared/commerce';
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
+import { parseTimestamp } from '@/lib/utils';
 
 type KiloPassSubscriptionCardSubscription = {
   cancelAtPeriodEnd: boolean;
@@ -40,7 +43,7 @@ type KiloPassSubscriptionCardContentState =
       state: KiloPassSubscriptionCardState;
     }
   | {
-      actionLabel: 'Retry';
+      actionLabel: string;
       description: string;
       kind: 'error';
       title: string;
@@ -62,11 +65,11 @@ export function getKiloPassSubscriptionCardAccessibility(
     .join('. ');
   let accessibilityHint: string | undefined = undefined;
   if (cardState.action === 'open-web') {
-    accessibilityHint = 'Opens Kilo Pass management on web.';
+    accessibilityHint = i18n.t('kiloPass.opensManagementOnWeb');
   } else if (cardState.action === 'open-store-management') {
-    accessibilityHint = 'Opens App Store subscription management.';
+    accessibilityHint = i18n.t('kiloPass.opensAppStoreManagement');
   } else if (cardState.action === 'open-native') {
-    accessibilityHint = 'Opens Kilo Pass plans.';
+    accessibilityHint = i18n.t('kiloPass.opensPlans');
   }
 
   return { accessibilityHint, accessibilityLabel };
@@ -124,10 +127,10 @@ export function getKiloPassSubscriptionCardContentState(params: {
 
   if (params.presentationIsError || params.stateIsError) {
     return {
-      actionLabel: 'Retry',
-      description: 'Try again from Profile.',
+      actionLabel: i18n.t('common.retry'),
+      description: i18n.t('kiloPass.tryAgainFromProfile'),
       kind: 'error',
-      title: 'Kilo Pass unavailable',
+      title: i18n.t('kiloPass.unavailable'),
     };
   }
 
@@ -168,8 +171,8 @@ export function getKiloPassSubscriptionCardContentState(params: {
       kind: 'card',
       state: {
         action: 'open-native',
-        actionLabel: 'Subscribe',
-        description: 'Monthly credits with bonus progress',
+        actionLabel: i18n.t('kiloPass.subscribe'),
+        description: i18n.t('kiloPass.subscribeDescription'),
         title: KILO_PASS_TITLE,
       },
     };
@@ -187,35 +190,37 @@ function isLiveStatusClass(statusClass: PurchaseStatusClass): boolean {
 
 function formatSubscriptionEndDate(iso: string | null): string {
   if (!iso) {
-    return 'period end';
+    return i18n.t('kiloPass.periodEnd');
   }
 
   const date = parseTimestamp(iso);
   if (Number.isNaN(date.getTime())) {
-    return 'period end';
+    return i18n.t('kiloPass.periodEnd');
   }
 
-  return formatDate(date);
+  return formatDate(date, getResolvedLanguage());
 }
 
 function getStatusClassTitle(statusClass: PurchaseStatusClass, cancelAtPeriodEnd: boolean): string {
   if (cancelAtPeriodEnd) {
-    return 'Kilo Pass canceling';
+    return i18n.t('kiloPass.statusCanceling');
   }
   if (statusClass === 'pending') {
-    return 'Kilo Pass pending';
+    return i18n.t('kiloPass.statusPending');
   }
   if (statusClass === 'retryable') {
-    return 'Kilo Pass past due';
+    return i18n.t('kiloPass.statusPastDue');
   }
-  return 'Kilo Pass active';
+  return i18n.t('kiloPass.statusActive');
 }
 
 function getActiveSubscriptionCardState(
   subscription: KiloPassSubscriptionCardSubscription,
   statusClass: PurchaseStatusClass
 ): KiloPassSubscriptionCardState {
-  const credits = `$${subscription.currentPeriodBaseCreditsUsd.toFixed(0)} monthly credits`;
+  const credits = i18n.t('kiloPass.monthlyCredits', {
+    credits: subscription.currentPeriodBaseCreditsUsd.toFixed(0),
+  });
   const title = getStatusClassTitle(statusClass, subscription.cancelAtPeriodEnd);
 
   if (subscription.paymentProvider === 'google_play') {
@@ -223,8 +228,10 @@ function getActiveSubscriptionCardState(
       action: 'none',
       actionLabel: null,
       description: subscription.cancelAtPeriodEnd
-        ? `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)} · Managed on Google Play`
-        : `${credits} · Managed on Google Play`,
+        ? `${credits} · ${i18n.t('kiloPass.ends', {
+            date: formatSubscriptionEndDate(subscription.refillAt),
+          })} · ${i18n.t('kiloPass.managedOnGooglePlay')}`
+        : `${credits} · ${i18n.t('kiloPass.managedOnGooglePlay')}`,
       title,
     };
   }
@@ -232,10 +239,12 @@ function getActiveSubscriptionCardState(
   if (subscription.paymentProvider === 'app_store') {
     return {
       action: 'open-store-management',
-      actionLabel: 'Manage',
+      actionLabel: i18n.t('kiloPass.manage'),
       description: subscription.cancelAtPeriodEnd
-        ? `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)}`
-        : `${credits} · Managed in App Store`,
+        ? `${credits} · ${i18n.t('kiloPass.ends', {
+            date: formatSubscriptionEndDate(subscription.refillAt),
+          })}`
+        : `${credits} · ${i18n.t('kiloPass.managedInAppStore')}`,
       title,
     };
   }
@@ -245,8 +254,10 @@ function getActiveSubscriptionCardState(
     action: 'none',
     actionLabel: null,
     description: subscription.cancelAtPeriodEnd
-      ? `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)} · This Kilo Pass is managed on web`
-      : `${credits} · This Kilo Pass is managed on web`,
+      ? `${credits} · ${i18n.t('kiloPass.ends', {
+          date: formatSubscriptionEndDate(subscription.refillAt),
+        })} · ${i18n.t('kiloPass.managedOnWeb')}`
+      : `${credits} · ${i18n.t('kiloPass.managedOnWeb')}`,
     title,
   };
 }

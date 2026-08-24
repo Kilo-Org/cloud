@@ -149,6 +149,9 @@ packageExtensions:
   expo-share-intent:
     dependencies:
       '@expo/plist': '*'
+  react-native-appsflyer:
+    dependencies:
+      '@expo/config-plugins': '*'
 patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch

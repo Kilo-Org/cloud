@@ -26,7 +26,7 @@ describe('enqueueUserDeletionTargets', () => {
     await cleanupDbForTest();
   });
 
-  it('creates one request with nine catalog tasks', async () => {
+  it('creates one request with the current catalog tasks', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser({ google_user_email: 'queue-target@example.com' });
 
@@ -45,12 +45,40 @@ describe('enqueueUserDeletionTargets', () => {
     expect(request?.user_id).toBe(user.id);
     expect(request?.target_email).toBe('queue-target@example.com');
     expect(request?.cloud_subject_resolution).toBe(UserDeletionCloudSubjectResolution.CurrentUser);
+    expect(request?.catalog_version).toBe(2);
 
     const steps = await db
       .select()
       .from(user_deletion_steps)
       .where(eq(user_deletion_steps.request_id, result.requestId));
-    expect(steps).toHaveLength(catalogForVersion(1).length);
+    expect(steps).toHaveLength(catalogForVersion(2).length);
+  });
+
+  it('inserts the v1 catalog when catalogVersion is 1', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser({ google_user_email: 'queue-v1@example.com' });
+
+    const [result] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: admin.id },
+      targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+      catalogVersion: 1,
+    });
+
+    expect(result.status).toBe('enqueued');
+    if (result.status !== 'enqueued') return;
+    const [request] = await db
+      .select()
+      .from(user_deletion_requests)
+      .where(eq(user_deletion_requests.id, result.requestId));
+    expect(request?.catalog_version).toBe(1);
+
+    const steps = await db
+      .select()
+      .from(user_deletion_steps)
+      .where(eq(user_deletion_steps.request_id, result.requestId));
+    expect(steps.map(step => step.step_key)).toEqual(
+      catalogForVersion(1).map(entry => entry.stepKey)
+    );
   });
 
   it('persists the Cloud user raw email and treats case variants as the same target', async () => {
@@ -80,15 +108,70 @@ describe('enqueueUserDeletionTargets', () => {
     });
   });
 
-  it('refuses email-only targets with no Cloud user', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+  it('enqueues an email with no Cloud user as authoritative_absence', async () => {
+    const admin = await insertTestUser({
+      is_admin: true,
+      google_user_email: 'enqueue-actor@example.com',
+    });
     const [result] = await enqueueUserDeletionTargets({
-      actor: { kiloUserId: admin.id },
+      actor: { kiloUserId: admin.id, email: admin.google_user_email },
       targets: [{ email: '  User@Example.com  ' }],
     });
-    expect(result).toEqual({ status: 'refused', code: 'no_cloud_user' });
-    const requests = await db.select().from(user_deletion_requests);
-    expect(requests).toHaveLength(0);
+    expect(result.status).toBe('enqueued');
+    if (result.status !== 'enqueued') return;
+    const [request] = await db
+      .select()
+      .from(user_deletion_requests)
+      .where(eq(user_deletion_requests.id, result.requestId));
+    expect(request?.user_id).toBeNull();
+    expect(request?.target_email).toBe('User@Example.com');
+    expect(request?.cloud_subject_resolution).toBe(
+      UserDeletionCloudSubjectResolution.AuthoritativeAbsence
+    );
+    expect(request?.requested_by_email).toBe('enqueue-actor@example.com');
+  });
+
+  it('enqueues a ticket-only target without Pylon HTTP', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const admin = await insertTestUser({
+      is_admin: true,
+      google_user_email: 'ticket-actor@example.com',
+    });
+    const [result] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: admin.id, email: admin.google_user_email },
+      targets: [{ pylonTicket: '#iss-ticket-only' }],
+    });
+    expect(result.status).toBe('enqueued');
+    if (result.status !== 'enqueued') return;
+    const [request] = await db
+      .select()
+      .from(user_deletion_requests)
+      .where(eq(user_deletion_requests.id, result.requestId));
+    expect(request?.pylon_ticket_ref).toBe('#iss-ticket-only');
+    expect(request?.target_email).toBeNull();
+    expect(request?.target_email_hmac).toBeNull();
+    expect(request?.user_id).toBeNull();
+    expect(request?.cloud_subject_resolution).toBe(UserDeletionCloudSubjectResolution.Unresolved);
+    expect(request?.requested_by_email).toBe('ticket-actor@example.com');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('returns already_active for a duplicate ticket-only enqueue', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const [first] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: admin.id },
+      targets: [{ pylonTicket: '#iss-dup' }],
+    });
+    const [second] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: admin.id },
+      targets: [{ pylonTicket: 'iss-dup' }],
+    });
+    expect(first.status).toBe('enqueued');
+    expect(second).toMatchObject({
+      status: 'already_active',
+      requestId: first.status === 'enqueued' ? first.requestId : undefined,
+    });
   });
 
   it('returns already_active for a duplicate email', async () => {
@@ -150,6 +233,15 @@ describe('enqueueUserDeletionTargets', () => {
     expect(
       audits.some(event => event.event_type === UserDeletionAuditEventType.IntakeRefused)
     ).toBe(true);
+  });
+
+  it('refuses blocked relay emails', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const [result] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: admin.id },
+      targets: [{ email: 'hi@app.kilocode.ai' }],
+    });
+    expect(result).toEqual({ status: 'refused', code: 'relay_or_internal_email' });
   });
 
   it('enqueues another staff-domain user', async () => {
@@ -215,10 +307,13 @@ describe('enqueueUserDeletionTargets', () => {
   });
 
   it('cancels only a pending request and scrubs the raw email', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await insertTestUser({
+      is_admin: true,
+      google_user_email: 'cancel-actor@example.com',
+    });
     const user = await insertTestUser({ google_user_email: 'cancel-me@example.com' });
     const [enqueued] = await enqueueUserDeletionTargets({
-      actor: { kiloUserId: admin.id },
+      actor: { kiloUserId: admin.id, email: admin.google_user_email },
       targets: [{ email: user.google_user_email, trustedUserId: user.id }],
     });
     expect(enqueued.status).toBe('enqueued');
@@ -234,6 +329,7 @@ describe('enqueueUserDeletionTargets', () => {
       .where(eq(user_deletion_requests.id, enqueued.requestId));
     expect(request?.status).toBe(UserDeletionRequestStatus.Cancelled);
     expect(request?.target_email).toBeNull();
+    expect(request?.requested_by_email).toBeNull();
     expect(request?.user_id).toBeNull();
     expect(request?.cancelled_at).toBeTruthy();
   });

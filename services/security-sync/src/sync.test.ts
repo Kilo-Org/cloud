@@ -15,6 +15,7 @@ afterEach(() => {
 type FakeDbOptions = {
   authInvalidAt?: string | null;
   repositories?: string[];
+  runtimeState?: Record<string, unknown>;
 };
 
 function createFakeDb(options: FakeDbOptions = {}) {
@@ -29,7 +30,14 @@ function createFakeDb(options: FakeDbOptions = {}) {
           limit: async () => {
             selectCount++;
             if (selectCount === 1) {
-              return [{ id: 'agent-config', config: {}, is_enabled: true }];
+              return [
+                {
+                  id: 'agent-config',
+                  config: {},
+                  is_enabled: true,
+                  runtime_state: options.runtimeState ?? {},
+                },
+              ];
             }
             if (selectCount === 2) {
               return [
@@ -66,6 +74,17 @@ function createFakeDb(options: FakeDbOptions = {}) {
   };
 
   return { db, sets };
+}
+
+function runtimeStateSqlText(entry: Record<string, unknown>): string {
+  const value = entry.runtime_state;
+  if (value == null || typeof value !== 'object') return '';
+  const chunks = (value as { queryChunks?: Array<{ value?: unknown }> }).queryChunks;
+  if (!Array.isArray(chunks)) return '';
+  return chunks
+    .flatMap(chunk => (Array.isArray(chunk.value) ? chunk.value : []))
+    .filter(part => typeof part === 'string')
+    .join('');
 }
 
 function createGitTokenService() {
@@ -512,6 +531,126 @@ describe('Worker GitHub auth-invalid sync', () => {
       title: 'Contact [redacted-email] or [redacted-email] about lodash',
     });
     expect(auditRows[0]?.finding_snapshot).not.toHaveProperty('dependabot_html_url');
+  });
+
+  it('stops after the first repository when the owner budget is already exhausted', async () => {
+    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-1',
+        budgetMs: 0,
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: true,
+      remainingRepoCount: 1,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    const progressWrite = sets.find(entry => entry.runtime_state != null)?.runtime_state;
+    expect(progressWrite).toBeDefined();
+    expect(progressWrite).not.toHaveProperty('sync_run');
+    expect(progressWrite).not.toHaveProperty('last_synced_at');
+  });
+
+  it('counts a fresh-run GitHub failure toward the owner budget and does not mark it complete', async () => {
+    const { db } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('Service unavailable', { status: 500 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-fail',
+        budgetMs: 0,
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: true,
+      remainingRepoCount: 2,
+      errors: 0,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not keep an incomplete GitHub failure as an error after a successful retry', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      runtimeState: {
+        sync_run: {
+          runId: 'run-budget-retry',
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(() => new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-retry',
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+      errors: 0,
+    });
+
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(true);
+  });
+
+  it('skips completed repositories and finalizes freshness on the last chunk', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      runtimeState: {
+        sync_run: {
+          runId: 'run-budget-1',
+          completedRepos: ['acme/widgets'],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-budget-1',
+      })
+    ).resolves.toMatchObject({
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+      authInvalid: 0,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(sets).toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
   });
 });
 

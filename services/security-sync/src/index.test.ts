@@ -13,6 +13,7 @@ import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } fro
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
 import { syncOwner } from './sync.js';
+import type * as SyncModule from './sync.js';
 
 vi.mock('@kilocode/db', async importOriginal => {
   const {
@@ -33,7 +34,10 @@ vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('@kilocode/db/operation-ledger', () => ({ settleOperation: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
-vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
+vi.mock('./sync.js', async importOriginal => {
+  const actual = await importOriginal<typeof SyncModule>();
+  return { ...actual, syncOwner: vi.fn() };
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -460,6 +464,70 @@ describe('manual sync dispatch', () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
+  it('enqueues a continuation and keeps a manual command running when the owner budget is exhausted', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    vi.mocked(syncOwner).mockResolvedValue({
+      synced: 1,
+      errors: 0,
+      staleRepos: [],
+      exhaustedBudget: true,
+      remainingRepoCount: 3,
+    } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'run:org:manual',
+              trigger: 'manual',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              ownerKey: 'org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              chunkIndex: 0,
+              chunkCount: 1,
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              actor: { id: 'user-123' },
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+        SYNC_QUEUE: {
+          sendBatch: async (batch: MessageSendRequest<SecuritySyncQueueMessage>[]) => {
+            queuedBatches.push(batch);
+          },
+        },
+      } as CloudflareEnv
+    );
+
+    expect(queuedBatches[0]?.[0]?.body).toMatchObject({
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      trigger: 'manual',
+      chunkIndex: 1,
+      chunkCount: 2,
+      messageId:
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:manual:1',
+    });
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledTimes(1);
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'running' })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it('accepts legacy OAuth user IDs in manual sync commands', async () => {
     const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
     const legacyUserId = 'oauth:google:1234567890';
@@ -599,12 +667,17 @@ describe('manual dismissal dispatch', () => {
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
         HYPERDRIVE: { connectionString: 'postgres://worker' },
-        SYNC_QUEUE: {
-          sendBatch: async batch => {
+        DISMISS_QUEUE: {
+          sendBatch: async (batch: MessageSendRequest<unknown>[]) => {
             queuedBatches.push(batch);
           },
         },
-      } as CloudflareEnv
+        SYNC_QUEUE: {
+          sendBatch: async () => {
+            throw new Error('dismiss must not use SYNC_QUEUE');
+          },
+        },
+      } as unknown as CloudflareEnv
     );
 
     expect(response.status).toBe(202);
@@ -643,7 +716,7 @@ describe('manual dismissal dispatch', () => {
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
         HYPERDRIVE: { connectionString: 'postgres://worker' },
-        SYNC_QUEUE: {
+        DISMISS_QUEUE: {
           sendBatch: async batch => {
             queuedBatches.push(batch);
           },
@@ -871,6 +944,42 @@ describe('manual dismissal dispatch', () => {
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
   });
+
+  it('acks an invalid message on the dismiss queue without running sync', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        queue: 'security-dismiss-jobs',
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'scheduled-sync-message',
+              trigger: 'scheduled',
+              owner: { userId: 'user-123' },
+              ownerKey: 'user:user-123',
+              chunkIndex: 0,
+              chunkCount: 1,
+              dispatchedAt: '2026-06-11T10:00:00.000Z',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+
+    expect(processSecurityFindingDismissal).not.toHaveBeenCalled();
+    expect(syncOwner).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
 });
 
 describe('same-key command dedupe (P1-A-08e)', () => {
@@ -884,6 +993,23 @@ describe('same-key command dedupe (P1-A-08e)', () => {
         },
       },
     } as CloudflareEnv;
+  }
+
+  function dismissEnv(queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][]) {
+    return {
+      INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+      HYPERDRIVE: { connectionString: 'postgres://worker' },
+      DISMISS_QUEUE: {
+        sendBatch: async (batch: MessageSendRequest<SecuritySyncQueueMessage>[]) => {
+          queuedBatches.push(batch);
+        },
+      },
+      SYNC_QUEUE: {
+        sendBatch: async () => {
+          throw new Error('dismiss must not use SYNC_QUEUE');
+        },
+      },
+    } as unknown as CloudflareEnv;
   }
 
   function manualSyncRequest(operationKey: string) {
@@ -994,11 +1120,11 @@ describe('same-key command dedupe (P1-A-08e)', () => {
 
     const first = await worker.fetch(
       dismissalRequest('dismiss-key-123'),
-      manualSyncEnv(queuedBatches)
+      dismissEnv(queuedBatches)
     );
     const second = await worker.fetch(
       dismissalRequest('dismiss-key-123'),
-      manualSyncEnv(queuedBatches)
+      dismissEnv(queuedBatches)
     );
 
     expect(first.status).toBe(202);

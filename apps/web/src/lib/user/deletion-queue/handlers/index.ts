@@ -6,7 +6,9 @@ import { handleCliV2Sessions } from '@/lib/user/deletion-queue/handlers/cli-v2';
 import { handleCustomerio } from '@/lib/user/deletion-queue/handlers/customerio';
 import { handleKiloclawDestroy } from '@/lib/user/deletion-queue/handlers/kiloclaw';
 import { handlePosthog } from '@/lib/user/deletion-queue/handlers/posthog';
+import { handleCsaSupportDb } from '@/lib/user/deletion-queue/handlers/csa-support-db';
 import { handlePylonContact } from '@/lib/user/deletion-queue/handlers/pylon-contact';
+import { handlePylonFinalize } from '@/lib/user/deletion-queue/handlers/pylon-finalize';
 import { handlePylonReply } from '@/lib/user/deletion-queue/handlers/pylon-reply';
 import { handleSubstack } from '@/lib/user/deletion-queue/handlers/substack';
 import { handleUsagePromptPrefixes } from '@/lib/user/deletion-queue/handlers/usage-prompt-prefixes';
@@ -23,7 +25,9 @@ const handlers = {
   [UserDeletionStepKey.Substack]: handleSubstack,
   [UserDeletionStepKey.Anonymize]: handleAnonymize,
   [UserDeletionStepKey.PylonReply]: handlePylonReply,
+  [UserDeletionStepKey.PylonFinalize]: handlePylonFinalize,
   [UserDeletionStepKey.PylonContact]: handlePylonContact,
+  [UserDeletionStepKey.CsaSupportDb]: handleCsaSupportDb,
 } as const satisfies Record<UserDeletionStepKey, DeletionHandler>;
 
 export function getDeletionHandler(stepKey: UserDeletionStepKey): DeletionHandler {

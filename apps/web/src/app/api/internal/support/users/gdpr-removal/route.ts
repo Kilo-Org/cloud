@@ -104,6 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const [result] = await enqueueUserDeletionTargets({
       actor: { kiloUserId: null, email: actorEmail },
       targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+      catalogVersion: 1,
     });
 
     if (!result) {

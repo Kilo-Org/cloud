@@ -312,6 +312,7 @@ describe('/api/internal/support/users/gdpr-removal', () => {
         expect(mockedEnqueueUserDeletionTargets).toHaveBeenCalledWith({
           actor: { kiloUserId: null, email: ACTOR_EMAIL },
           targets: [{ email: 'customer@example.com', trustedUserId: LEGACY_OAUTH_USER_ID }],
+          catalogVersion: 1,
         });
       });
     });

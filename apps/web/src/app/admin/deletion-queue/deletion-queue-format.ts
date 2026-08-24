@@ -58,14 +58,35 @@ const STEP_LABELS: Record<string, { label: string; description: string }> = {
     label: 'Pylon reply',
     description: 'Post the deletion reply on the ticket',
   },
+  pylon_finalize: {
+    label: 'Pylon finalize',
+    description: 'Tag delete-complete and close the ticket',
+  },
   pylon_contact: {
     label: 'Pylon delete',
     description: 'Delete the Pylon contact',
+  },
+  csa_support_db: {
+    label: 'CSA support DB',
+    description: 'Anonymize the CSA Pylon user and support artifacts',
   },
 };
 
 export function deletionStepLabel(stepKey: string): string {
   return STEP_LABELS[stepKey]?.label ?? humanizeToken(stepKey);
+}
+
+export type DeletionProgressKind = 'finished' | 'stuck' | 'current' | 'idle';
+
+export function deletionPreflightProgress(request: {
+  status: string;
+  preflightAttentionCode: string | null;
+}): DeletionProgressKind {
+  if (request.status === 'pending') {
+    return request.preflightAttentionCode ? 'stuck' : 'current';
+  }
+  if (request.status === 'cancelled') return 'idle';
+  return 'finished';
 }
 
 export function deletionStepDescription(stepKey: string): string {

@@ -1,6 +1,6 @@
 {
-  "id": "0e4da512-af5d-46b6-81ba-6794ade27977",
-  "prevId": "891c8291-ee0c-4ef8-b2d8-6dd1f3f85308",
+  "id": "c2a022da-24c7-4200-b9a6-aaddb3be114c",
+  "prevId": "0e4da512-af5d-46b6-81ba-6794ade27977",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -38371,6 +38371,12 @@
         },
         "app_version": {
           "name": "app_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "locale": {
+          "name": "locale",
           "type": "text",
           "primaryKey": false,
           "notNull": false

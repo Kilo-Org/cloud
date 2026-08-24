@@ -2399,8 +2399,8 @@
     "productsCouldNotLoad": "Kilo Pass proizvode nije moguće učitati iz App Storea.",
     "tryingAgain": "Pokušaj ponovno...",
     "kiloPassManagement": "Upravljanje Kilo Passom",
-    "legalConnectorTerms": " Pretplatom prihvaćate",
-    "legalConnectorPrivacy": " i potvrđujete",
+    "legalConnectorTerms": " Pretplatom prihvaćate ",
+    "legalConnectorPrivacy": " i potvrđujete ",
     "manageFailed": "Nije moguće otvoriti upravljanje pretplatama u App Storeu.",
     "kiloPassSetup": "Postavljanje Kilo Passa",
     "subscriptionHeaderDescription": "Mjesečna pretplata koja dodaje kredite vašem Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo — Cloud agenti, udaljene sesije i KiloClaw razgovori.",
@@ -2657,9 +2657,9 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Račun s ovom e-adresom već postoji s drugom metodom prijave. Pokušajte drugu metodu ili upotrijebite 'Više opcija prijave'.",
-    "differentOauth": "Račun s ovom e-adresom već postoji s drugom metodom prijave. Pokušajte drugu metodu ili upotrijebite 'Više opcija prijave'.",
-    "ssoError": "Vaša organizacija zahtijeva SSO. Upotrijebite 'Više opcija prijave'.",
+    "emailAlreadyUsed": "Račun s ovom e-adresom već postoji s drugom metodom prijave. Pokušajte drugu metodu ili upotrijebite '$t(login.moreSignInOptions)'.",
+    "differentOauth": "Račun s ovom e-adresom već postoji s drugom metodom prijave. Pokušajte drugu metodu ili upotrijebite '$t(login.moreSignInOptions)'.",
+    "ssoError": "Vaša organizacija zahtijeva SSO. Upotrijebite '$t(login.moreSignInOptions)'.",
     "blocked": "Ovaj račun je blokiran. Obratite se podršci.",
     "signupRateLimited": "Previše pokušaja. Pokušajte ponovno kasnije.",
     "invalidCode": "Taj kôd nije točan. Pokušajte ponovno.",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "Nije moguće dostaviti e-poštu na ovu adresu. Upotrijebite drugu e-adresu.",
     "invalidRequest": "Provjerite svoju e-adresu i pokušajte ponovno.",
     "emailDeliveryFailed": "Dostava e-pošte trenutno nije dostupna. Pokušajte ponovno kasnije.",
-    "admissionRequired": "Vaš se uređaj ne može verificirati. Upotrijebite 'Više opcija prijave' za prijavu na drugom uređaju ili putem weba.",
+    "admissionRequired": "Vaš se uređaj ne može verificirati. Upotrijebite '$t(login.moreSignInOptions)' za prijavu na drugom uređaju ili putem weba.",
     "default": "Nešto je pošlo po zlu. Pokušajte ponovno.",
     "retryableAdmission": "Nismo mogli verificirati ovaj uređaj. Provjerite svoju vezu i pokušajte ponovno."
   },

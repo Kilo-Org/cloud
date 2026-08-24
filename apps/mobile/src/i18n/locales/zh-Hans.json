@@ -2657,9 +2657,9 @@
     "sorryTitle": "很抱歉听到您这么说！"
   },
   "authErrors": {
-    "emailAlreadyUsed": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"更多登录选项\"。",
-    "differentOauth": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"更多登录选项\"。",
-    "ssoError": "您的组织要求使用 SSO。请使用\"更多登录选项\"。",
+    "emailAlreadyUsed": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"$t(login.moreSignInOptions)\"。",
+    "differentOauth": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"$t(login.moreSignInOptions)\"。",
+    "ssoError": "您的组织要求使用 SSO。请使用\"$t(login.moreSignInOptions)\"。",
     "blocked": "此账户已被封禁。请联系支持。",
     "signupRateLimited": "尝试次数过多。请稍后再试。",
     "invalidCode": "该代码不正确。请重试。",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "无法向此地址发送邮件。请使用其他邮箱。",
     "invalidRequest": "请检查您的邮箱地址并重试。",
     "emailDeliveryFailed": "邮件投递暂时不可用。请稍后再试。",
-    "admissionRequired": "无法验证您的设备。请使用\"更多登录选项\"在其他设备上或通过网页登录。",
+    "admissionRequired": "无法验证您的设备。请使用\"$t(login.moreSignInOptions)\"在其他设备上或通过网页登录。",
     "default": "出了点问题。请重试。",
     "retryableAdmission": "我们无法验证此设备。请检查您的连接并重试。"
   },

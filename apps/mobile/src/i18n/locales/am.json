@@ -337,7 +337,7 @@
         },
         "block": {
           "terminal": "ይህ ተጠቃሚ መታገድ አይችልም።",
-          "retryable": "ይህን ተጠቃሚ ማገድ አልተቻለም። ግንኙነትዎን ያረጋግጡ  እና እንደገና ይሞክሩ።"
+          "retryable": "ይህን ተጠቃሚ ማገድ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
         }
       },
       "accessDeniedMessage": "የዚህን PR ውይይት ለማየት ፍቃድ የለዎትም።",
@@ -1512,8 +1512,8 @@
       "cancelMessage": "የደህንነት ወኪሉ በሂደት ላይ ያለውን የጥገና ሙከራ ያቆማል።",
       "keepRunning": "በመስራት ላይ ያቆዩ",
       "cancelRemediation": "ጥገናውን ይሰርዙ",
-      "openPullRequest": "Open pull request{{number}}",
-      "openDraftPullRequest": "Open draft pull request{{number}}",
+      "openPullRequest": "የመጎተቻ ጥያቄን ይክፈቱ{{number}}",
+      "openDraftPullRequest": "ረቂቅ የመጎተቻ ጥያቄን ይክፈቱ{{number}}",
       "progress": "ሂደት",
       "attemptHistory": "የሙከራ ታሪክ ({{count}})",
       "attemptNumber": "ሙከራ #{{number}}",
@@ -2443,7 +2443,7 @@
     "helpImprove": "Kiloን ለማሻሻል ይርዱ",
     "helpImproveDescription": "ስም-አልባ የምርት ትንታኔዎችን እና የመጫኛ ምንጭን ያጋሩ። ይህን በማንኛውም ጊዜ በቅንብሮች መለወጥ ይችላሉ።",
     "seeFullDetails": "ሙሉ ዝርዝሮችን ይመልከቱ",
-    "privacyPolicyPrefix": "ውሂብዎ በሚከተለው መሠረት ይያዛል፡ ",
+    "privacyPolicyPrefix": "ውሂብዎ በሚከተለው መሠረት ይያዛል፡",
     "privacyPolicy": "የKilo የግላዊነት ፖሊሲ",
     "onDevice": "በመሣሪያ ላይ",
     "loading": "በመጫን ላይ…",
@@ -2461,7 +2461,7 @@
     "errorScreenshotsNote": "ጽሑፍ እና ምስሎች ማንኛውም ነገር ከመላኩ በፊት በመሣሪያዎ ላይ ይደበቃሉ።",
     "installAttributionTitle": "የመጫኛ መለያ",
     "voiceTranscriptionTitle": "የድምጽ ግልባጭ",
-    "retentionPrefix": "ሙሉ የማቆያ ጊዜዎች፣ መብቶችዎ እና የግንኙነት መረጃ በሚከተለው ውስጥ አሉ፡ ",
+    "retentionPrefix": "ሙሉ የማቆያ ጊዜዎች፣ መብቶችዎ እና የግንኙነት መረጃ በሚከተለው ውስጥ አሉ፡",
     "backToConsent": "ወደ ፈቃድ ይመለሱ",
     "back": "ይመለሱ",
     "revokeConsent": "ፈቃድን ይሰርዙ",
@@ -2657,9 +2657,9 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "በዚህ ኢሜይል ያለው መለያ በተለየ የመግቢያ ዘዴ አስቀድሞ አለ። ሌላ ዘዴ ይሞክሩ ወይም 'More sign-in options' ይጠቀሙ።",
-    "differentOauth": "በዚህ ኢሜይል ያለው መለያ በተለየ የመግቢያ ዘዴ አስቀድሞ አለ። ሌላ ዘዴ ይሞክሩ ወይም 'More sign-in options' ይጠቀሙ።",
-    "ssoError": "ድርጅትዎ SSO ይፈልጋል። 'More sign-in options' ይጠቀሙ።",
+    "emailAlreadyUsed": "በዚህ ኢሜይል ያለው መለያ በተለየ የመግቢያ ዘዴ አስቀድሞ አለ። ሌላ ዘዴ ይሞክሩ ወይም '$t(login.moreSignInOptions)' ይጠቀሙ።",
+    "differentOauth": "በዚህ ኢሜይል ያለው መለያ በተለየ የመግቢያ ዘዴ አስቀድሞ አለ። ሌላ ዘዴ ይሞክሩ ወይም '$t(login.moreSignInOptions)' ይጠቀሙ።",
+    "ssoError": "ድርጅትዎ SSO ይፈልጋል። '$t(login.moreSignInOptions)' ይጠቀሙ።",
     "blocked": "ይህ መለያ ታግዷል። እባክዎ ድጋፍን ያግኙ።",
     "signupRateLimited": "በጣም ብዙ ሙከራዎች። እባክዎ በኋላ እንደገና ይሞክሩ።",
     "invalidCode": "ያ ኮድ ትክክል አይደለም። እባክዎ እንደገና ይሞክሩ።",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "ወደዚህ አድራሻ ኢሜይል ማድረስ አልተቻለም። እባክዎ የተለየ ኢሜይል ይጠቀሙ።",
     "invalidRequest": "የኢሜይል አድራሻዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
     "emailDeliveryFailed": "የኢሜይል ማድረስ ለጊዜው አይገኝም። እባክዎ በኋላ እንደገና ይሞክሩ።",
-    "admissionRequired": "መሣሪያዎን ማረጋገጥ አይቻልም። በሌላ መሣሪያ ወይም በድር ለመግባት 'More sign-in options' ይጠቀሙ።",
+    "admissionRequired": "መሣሪያዎን ማረጋገጥ አይቻልም። በሌላ መሣሪያ ወይም በድር ለመግባት '$t(login.moreSignInOptions)' ይጠቀሙ።",
     "default": "የሆነ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
     "retryableAdmission": "ይህን መሣሪያ ማረጋገጥ አልቻልንም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
   },

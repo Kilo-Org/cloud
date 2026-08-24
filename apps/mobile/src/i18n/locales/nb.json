@@ -2399,8 +2399,8 @@
     "productsCouldNotLoad": "Kilo Pass-produktene kunne ikke lastes fra App Store.",
     "tryingAgain": "Prøver igjen...",
     "kiloPassManagement": "Kilo Pass-administrasjon",
-    "legalConnectorTerms": " By subscribing, you agree to the \t Ved å abonnere godtar du",
-    "legalConnectorPrivacy": " and acknowledge the \t og bekrefter",
+    "legalConnectorTerms": " By subscribing, you agree to the \t Ved å abonnere godtar du ",
+    "legalConnectorPrivacy": " and acknowledge the \t og bekrefter ",
     "manageFailed": "Kunne ikke åpne App Store-abonnementsadministrasjonen.",
     "kiloPassSetup": "Kilo Pass-oppsett",
     "subscriptionHeaderDescription": "Et månedlig abonnement som legger til kreditter på Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App — Cloud Agents, eksterne økter og KiloClaw-chatter.",
@@ -2657,9 +2657,9 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Det finnes allerede en konto med denne e-postadressen med en annen påloggingsmetode. Prøv en annen metode eller bruk «Flere påloggingsalternativer».",
-    "differentOauth": "Det finnes allerede en konto med denne e-postadressen med en annen påloggingsmetode. Prøv en annen metode eller bruk «Flere påloggingsalternativer».",
-    "ssoError": "Organisasjonen din krever SSO. Bruk «Flere påloggingsalternativer».",
+    "emailAlreadyUsed": "Det finnes allerede en konto med denne e-postadressen med en annen påloggingsmetode. Prøv en annen metode eller bruk «$t(login.moreSignInOptions)».",
+    "differentOauth": "Det finnes allerede en konto med denne e-postadressen med en annen påloggingsmetode. Prøv en annen metode eller bruk «$t(login.moreSignInOptions)».",
+    "ssoError": "Organisasjonen din krever SSO. Bruk «$t(login.moreSignInOptions)».",
     "blocked": "Denne kontoen er blokkert. Kontakt støtte.",
     "signupRateLimited": "For mange forsøk. Prøv igjen senere.",
     "invalidCode": "Den koden er feil. Prøv igjen.",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "Kan ikke levere e-post til denne adressen. Bruk en annen e-postadresse.",
     "invalidRequest": "Kontroller e-postadressen din og prøv igjen.",
     "emailDeliveryFailed": "E-postlevering er midlertidig utilgjengelig. Prøv igjen senere.",
-    "admissionRequired": "Enheten din kan ikke verifiseres. Bruk «Flere påloggingsalternativer» for å logge på en annen enhet eller via nettet.",
+    "admissionRequired": "Enheten din kan ikke verifiseres. Bruk «$t(login.moreSignInOptions)» for å logge på en annen enhet eller via nettet.",
     "default": "Noe gikk galt. Prøv igjen.",
     "retryableAdmission": "Vi kunne ikke verifisere denne enheten. Kontroller tilkoblingen og prøv igjen."
   },

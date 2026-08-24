@@ -2399,8 +2399,8 @@
     "productsCouldNotLoad": "Kilo Pass məhsulları App Store-dan yüklənə bilmədi.",
     "tryingAgain": "Yenidən cəhd edilir...",
     "kiloPassManagement": "Kilo Pass idarəetməsi",
-    "legalConnectorTerms": " Abunə olmaqla siz",
-    "legalConnectorPrivacy": " razılaşırsınız və",
+    "legalConnectorTerms": " Abunə olmaqla siz ",
+    "legalConnectorPrivacy": " razılaşırsınız və ",
     "manageFailed": "App Store abunəlik idarəetməsi açıla bilmədi.",
     "kiloPassSetup": "Kilo Pass quraşdırması",
     "subscriptionHeaderDescription": "Kilo App-də AI kodlaşdırma sessiyalarını — Cloud Agentlər, uzaq sessiyalar və KiloClaw söhbətlərini işlətmək üçün Kilo balansınıza kredit əlavə edən aylıq abunəlik.",
@@ -2657,9 +2657,9 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Bu e-poçtla hesab artıq başqa giriş üsulu ilə mövcuddur. Başqa üsul cəhd edin və ya 'Daha çox giriş seçimi'ni istifadə edin.",
-    "differentOauth": "Bu e-poçtla hesab artıq başqa giriş üsulu ilə mövcuddur. Başqa üsul cəhd edin və ya 'Daha çox giriş seçimi'ni istifadə edin.",
-    "ssoError": "Təşkilatınız SSO tələb edir. 'Daha çox giriş seçimi'ni istifadə edin.",
+    "emailAlreadyUsed": "Bu e-poçtla hesab artıq başqa giriş üsulu ilə mövcuddur. Başqa üsul cəhd edin və ya '$t(login.moreSignInOptions)'ni istifadə edin.",
+    "differentOauth": "Bu e-poçtla hesab artıq başqa giriş üsulu ilə mövcuddur. Başqa üsul cəhd edin və ya '$t(login.moreSignInOptions)'ni istifadə edin.",
+    "ssoError": "Təşkilatınız SSO tələb edir. '$t(login.moreSignInOptions)'ni istifadə edin.",
     "blocked": "Bu hesab bloklanıb. Zəhmət olmasa dəstək xidməti ilə əlaqə saxlayın.",
     "signupRateLimited": "Çox sayda cəhd. Zəhmət olmasa daha sonra yenidən cəhd edin.",
     "invalidCode": "Bu kod səhvdir. Zəhmət olmasa yenidən cəhd edin.",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "Bu ünvana e-poçt göndərilə bilmir. Zəhmət olmasa başqa e-poçt istifadə edin.",
     "invalidRequest": "E-poçt ünvanınızı yoxlayın və yenidən cəhd edin.",
     "emailDeliveryFailed": "E-poçt çatdırılması müvəqqəti mümkün deyil. Zəhmət olmasa daha sonra yenidən cəhd edin.",
-    "admissionRequired": "Cihazınız təsdiqlənə bilmir. Başqa cihazda və ya veb vasitəsilə daxil olmaq üçün 'Daha çox giriş seçimi'ni istifadə edin.",
+    "admissionRequired": "Cihazınız təsdiqlənə bilmir. Başqa cihazda və ya veb vasitəsilə daxil olmaq üçün '$t(login.moreSignInOptions)'ni istifadə edin.",
     "default": "Nəsə səhv oldu. Zəhmət olmasa yenidən cəhd edin.",
     "retryableAdmission": "Bu cihazı təsdiqləyə bilmədik. Əlaqənizi yoxlayın və yenidən cəhd edin."
   },

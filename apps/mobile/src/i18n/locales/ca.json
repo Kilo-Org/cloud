@@ -2399,8 +2399,8 @@
     "productsCouldNotLoad": "No s'han pogut carregar els productes de Kilo Pass des de l'App Store.",
     "tryingAgain": "Tornant a provar...",
     "kiloPassManagement": "Gestió de Kilo Pass",
-    "legalConnectorTerms": " En subscriure't, acceptes els",
-    "legalConnectorPrivacy": " i reconeixes la",
+    "legalConnectorTerms": " En subscriure't, acceptes els ",
+    "legalConnectorPrivacy": " i reconeixes la ",
     "manageFailed": "No s'ha pogut obrir la gestió de la subscripció de l'App Store.",
     "kiloPassSetup": "Configuració de Kilo Pass",
     "subscriptionHeaderDescription": "Una subscripció mensual que afegeix crèdits al teu saldo de Kilo per executar sessions de programació d'IA a l'aplicació Kilo: Cloud Agents, sessions remotes i xats de KiloClaw.",
@@ -2657,9 +2657,9 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Ja existeix un compte amb aquest correu electrònic i un mètode d'inici de sessió diferent. Proveu un altre mètode o feu servir \"Més opcions d'inici de sessió\".",
-    "differentOauth": "Ja existeix un compte amb aquest correu electrònic i un mètode d'inici de sessió diferent. Proveu un altre mètode o feu servir \"Més opcions d'inici de sessió\".",
-    "ssoError": "La vostra organització requereix SSO. Feu servir \"Més opcions d'inici de sessió\".",
+    "emailAlreadyUsed": "Ja existeix un compte amb aquest correu electrònic i un mètode d'inici de sessió diferent. Proveu un altre mètode o feu servir \"$t(login.moreSignInOptions)\".",
+    "differentOauth": "Ja existeix un compte amb aquest correu electrònic i un mètode d'inici de sessió diferent. Proveu un altre mètode o feu servir \"$t(login.moreSignInOptions)\".",
+    "ssoError": "La vostra organització requereix SSO. Feu servir \"$t(login.moreSignInOptions)\".",
     "blocked": "Aquest compte s'ha bloquejat. Contacteu amb el suport.",
     "signupRateLimited": "Massa intents. Torneu-ho a provar més tard.",
     "invalidCode": "Aquest codi és incorrecte. Torneu-ho a provar.",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "No s'ha pogut enviar el correu electrònic a aquesta adreça. Feu servir un correu electrònic diferent.",
     "invalidRequest": "Comproveu la vostra adreça de correu electrònic i torneu-ho a provar.",
     "emailDeliveryFailed": "El lliurament del correu electrònic no està disponible temporalment. Torneu-ho a provar més tard.",
-    "admissionRequired": "No es pot verificar el vostre dispositiu. Feu servir \"Més opcions d'inici de sessió\" per iniciar sessió en un altre dispositiu o mitjançant el web.",
+    "admissionRequired": "No es pot verificar el vostre dispositiu. Feu servir \"$t(login.moreSignInOptions)\" per iniciar sessió en un altre dispositiu o mitjançant el web.",
     "default": "S'ha produït un error. Torneu-ho a provar.",
     "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comproveu la connexió i torneu-ho a provar."
   },

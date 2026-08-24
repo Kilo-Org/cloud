@@ -184,8 +184,7 @@ const noLiteralCopyRule = defineRule({
         'Disallow literal user-facing copy in mobile source; every string must go through the i18n catalog.',
     },
     messages: {
-      literalCopy:
-        'Move this user-facing string into the i18n catalog and render it with t().',
+      literalCopy: 'Move this user-facing string into the i18n catalog and render it with t().',
     },
   },
   createOnce(context) {
@@ -236,7 +235,11 @@ const noLiteralCopyRule = defineRule({
           return;
         }
         if (value.type === 'Literal') {
-          if (typeof value.value === 'string' && hasLetter(value.value) && !isIgnoredValue(value.value)) {
+          if (
+            typeof value.value === 'string' &&
+            hasLetter(value.value) &&
+            !isIgnoredValue(value.value)
+          ) {
             context.report({ node, messageId: 'literalCopy' });
           }
           return;

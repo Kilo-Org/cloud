@@ -2399,8 +2399,8 @@
     "productsCouldNotLoad": "Il-prodotti ta' Kilo Pass ma setgħux jitgħabbew mill-App Store.",
     "tryingAgain": "Qed jipprova għal darb'oħra...",
     "kiloPassManagement": "Ġestjoni ta' Kilo Pass",
-    "legalConnectorTerms": " Billi tissottoskrivi, taqbel mal-",
-    "legalConnectorPrivacy": " u tirrikonoxxi l-",
+    "legalConnectorTerms": " Billi tissottoskrivi, taqbel mal- ",
+    "legalConnectorPrivacy": " u tirrikonoxxi l- ",
     "manageFailed": "Ma setgħetx tinfetaħ il-ġestjoni tas-sottoskrizzjoni fl-App Store.",
     "kiloPassSetup": "Twaqqif ta' Kilo Pass",
     "subscriptionHeaderDescription": "Sottoskrizzjoni mensili li żżid krediti mal-bilanċ ta' Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo — Cloud Agents, sessjonijiet mill-bogħod, u chats ta' KiloClaw.",
@@ -2657,9 +2657,9 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Kont b'din l-email diġà jeżisti b'metodu ta' dħul differenti. Ipprova metodu ieħor jew uża 'Għażliet oħra ta' dħul'.",
-    "differentOauth": "Kont b'din l-email diġà jeżisti b'metodu ta' dħul differenti. Ipprova metodu ieħor jew uża 'Għażliet oħra ta' dħul'.",
-    "ssoError": "L-organizzazzjoni tiegħek teħtieġ SSO. Uża 'Għażliet oħra ta' dħul'.",
+    "emailAlreadyUsed": "Kont b'din l-email diġà jeżisti b'metodu ta' dħul differenti. Ipprova metodu ieħor jew uża '$t(login.moreSignInOptions)' dħul'.",
+    "differentOauth": "Kont b'din l-email diġà jeżisti b'metodu ta' dħul differenti. Ipprova metodu ieħor jew uża '$t(login.moreSignInOptions)' dħul'.",
+    "ssoError": "L-organizzazzjoni tiegħek teħtieġ SSO. Uża '$t(login.moreSignInOptions)' dħul'.",
     "blocked": "Dan il-kont ġie bblokkjat. Jekk jogħġbok ikkuntattja l-appoġġ.",
     "signupRateLimited": "Wisq tentattivi. Jekk jogħġbok erġa' pprova aktar tard.",
     "invalidCode": "Dak il-kodiċi huwa żbaljat. Jekk jogħġbok erġa' pprova.",
@@ -2669,7 +2669,7 @@
     "invalidEmail": "Ma stajniex inwasslu l-email lil dan l-indirizz. Jekk jogħġbok uża email differenti.",
     "invalidRequest": "Iċċekkja l-indirizz tal-email tiegħek u erġa' pprova.",
     "emailDeliveryFailed": "Il-kunsinna tal-email mhix disponibbli bħalissa. Jekk jogħġbok erġa' pprova aktar tard.",
-    "admissionRequired": "L-apparat tiegħek ma jistax jiġi vverifikat. Uża 'Għażliet oħra ta' dħul' biex tidħol fuq apparat ieħor jew permezz tal-web.",
+    "admissionRequired": "L-apparat tiegħek ma jistax jiġi vverifikat. Uża '$t(login.moreSignInOptions)' dħul' biex tidħol fuq apparat ieħor jew permezz tal-web.",
     "default": "Xi ħaġa marret ħażin. Jekk jogħġbok erġa' pprova.",
     "retryableAdmission": "Ma stajniex nivverifikaw dan l-apparat. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
   },

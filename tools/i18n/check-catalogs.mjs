@@ -6,6 +6,11 @@
  * every key the source uses must exist. This runs in CI, so a locale can never
  * drift from English without the build saying so.
  *
+ * The value checks are mechanical, so they hold for a language nobody here
+ * reads: placeholders, `$t(key)` references, edge spacing, double spaces and
+ * direction marks must match English, and a message must never quote an
+ * English button label in place of the reader's own.
+ *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,11 +21,15 @@ const LANGUAGES_FILE = join(ROOT, 'apps/mobile/src/i18n/languages.ts');
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src')];
 const CATALOGS = [
   { name: 'mobile', dir: join(ROOT, 'apps/mobile/src/i18n/locales'), checkUsage: true },
-  { name: 'notifications', dir: join(ROOT, 'packages/notifications/src/locales'), checkUsage: false },
+  {
+    name: 'notifications',
+    dir: join(ROOT, 'packages/notifications/src/locales'),
+    checkUsage: false,
+  },
 ];
 
 const problems = [];
-const fail = (message) => problems.push(message);
+const fail = message => problems.push(message);
 
 /** The supported tags, read from the one source of truth. */
 function supportedLanguages() {
@@ -29,7 +38,7 @@ function supportedLanguages() {
   if (!block) {
     throw new Error('SUPPORTED_LANGUAGES not found in languages.ts');
   }
-  return [...block[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+  return [...block[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
 }
 
 /**
@@ -79,7 +88,79 @@ function flatten(value, prefix = '', out = new Map()) {
 
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
 function placeholders(value) {
-  return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map((match) => match[1]).sort().join(',');
+  return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)]
+    .map(match => match[1])
+    .sort()
+    .join(',');
+}
+
+/** The `$t(key)` set of one string. A copy names a label; it never spells it. */
+function nestingRefs(value) {
+  return [...value.matchAll(/\$t\(\s*([^)\s,]+)\s*\)/g)].map(match => match[1]).sort();
+}
+
+/** The leading and trailing whitespace of one string, as a signature. */
+function edges(value) {
+  return JSON.stringify([/^\s*/.exec(value)[0], /\s*$/.exec(value)[0]]);
+}
+
+const QUOTE_PAIRS = [
+  ['\u201c', '\u201d'],
+  ['\u201e', '\u201c'],
+  ['\u201e', '\u201d'],
+  ['\u201e', '"'],
+  ['\u00ab', '\u00bb'],
+  ['\u00bb', '\u00ab'],
+  ['\u2018', '\u2019'],
+  ['\u201a', '\u2018'],
+  ['\u201a', '\u2019'],
+  ['[', ']'],
+  ['\u300c', '\u300d'],
+  ['\u300e', '\u300f'],
+  ['\uff62', '\uff63'],
+  ['\u2039', '\u203a'],
+  ['\u300a', '\u300b'],
+  ['"', '"'],
+];
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Every quoted run short enough to name a control. A translator who spells a
+ * button label instead of naming its key leaves the run here, where the
+ * English-label check below can see it.
+ */
+function quotedRuns(value) {
+  const runs = new Set();
+  for (const [open, close] of QUOTE_PAIRS) {
+    const pattern = new RegExp(
+      `${escapeRegExp(open)}([^${escapeRegExp(close)}\n]{2,60})${escapeRegExp(close)}`,
+      'gu'
+    );
+    for (const match of value.matchAll(pattern)) {
+      runs.add(match[1].trim());
+    }
+  }
+  for (const match of value.matchAll(/(?:^|[\s(:>\p{L}])'([^'\n]{2,60})'/gu)) {
+    runs.add(match[1].trim());
+  }
+  return [...runs].filter(
+    run => /\p{L}/u.test(run) && !/\{\{/.test(run) && run.split(/\s+/).length <= 6
+  );
+}
+
+/**
+ * Whether this catalog keeps `run` as a label of its own. A product name the
+ * catalog does not translate sits in a value barely longer than the name, so
+ * quoting it is right. A label the catalog does translate has no such value,
+ * and quoting the English one names a control the user never sees.
+ */
+function holdsLabel(values, run) {
+  for (const value of values) {
+    if (value.length <= run.length + 6 && value.includes(run)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function sourceFiles(dir, out = []) {
@@ -133,8 +214,8 @@ const tags = supportedLanguages();
 
 for (const catalog of CATALOGS) {
   const present = readdirSync(catalog.dir)
-    .filter((name) => name.endsWith('.json'))
-    .map((name) => name.replace(/\.json$/, ''));
+    .filter(name => name.endsWith('.json'))
+    .map(name => name.replace(/\.json$/, ''));
 
   for (const tag of tags) {
     if (!present.includes(tag)) {
@@ -148,9 +229,22 @@ for (const catalog of CATALOGS) {
   }
 
   const english = flatten(parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`));
+  const englishValues = new Set(english.values());
   for (const [key, value] of english) {
     if (value.trim() === '') {
       fail(`${catalog.name}/en: "${key}" is empty`);
+    }
+    for (const ref of nestingRefs(value)) {
+      if (!english.has(ref)) {
+        fail(`${catalog.name}/en: "${key}" names $t(${ref}), which en.json does not define`);
+      }
+    }
+    // English must not spell a label it can name, or every translator copies
+    // the English word into a sentence they otherwise translated.
+    for (const run of quotedRuns(value)) {
+      if (englishValues.has(run)) {
+        fail(`${catalog.name}/en: "${key}" quotes the label "${run}"; name its key with $t()`);
+      }
     }
   }
 
@@ -160,6 +254,7 @@ for (const catalog of CATALOGS) {
     }
     const label = `${catalog.name}/${tag}`;
     const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
+    const ownValues = new Set(translated.values());
 
     for (const key of english.keys()) {
       if (!translated.has(key)) {
@@ -178,9 +273,30 @@ for (const catalog of CATALOGS) {
       if (value.trim() === '') {
         fail(`${label}: "${key}" is empty`);
       }
-      const expected = placeholders(english.get(key));
+      const englishValue = english.get(key);
+      const expected = placeholders(englishValue);
       if (placeholders(value) !== expected) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
+      }
+      const expectedRefs = nestingRefs(englishValue).join(',');
+      if (nestingRefs(value).join(',') !== expectedRefs) {
+        fail(`${label}: "${key}" $t() references differ from English (${expectedRefs || 'none'})`);
+      }
+      if (edges(value) !== edges(englishValue)) {
+        fail(`${label}: "${key}" leading or trailing space differs from English`);
+      }
+      if (/ {2}/.test(value) && !/ {2}/.test(englishValue)) {
+        fail(`${label}: "${key}" has a double space`);
+      }
+      if (/[\u200e\u200f\u202a-\u202e]/.test(value)) {
+        fail(`${label}: "${key}" carries a direction mark; write plain text`);
+      }
+      // A quoted English label. The copy must name the label's key with
+      // `$t(key)`, or the message points at a button this user never sees.
+      for (const run of quotedRuns(value)) {
+        if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
+          fail(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
+        }
       }
     }
   }

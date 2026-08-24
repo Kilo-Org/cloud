@@ -1992,4 +1992,28 @@ describe('SessionIngestDO clone primitives', () => {
       })
     ).toEqual({ status: 'empty' });
   });
+
+  it('swallows an R2 delete failure so resetCloneStage still returns a typed reject', async () => {
+    const harness = makeCloneHarness([itemRow(1, 'message/src', 'message', 1, 'items/blob')]);
+    harness.deleteObject.mockRejectedValueOnce(new Error('r2 unavailable'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(harness.durableObject.resetCloneStage()).resolves.toBeUndefined();
+
+    expect(harness.deleteAll).toHaveBeenCalled();
+    expect(harness.items).toHaveLength(0);
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('marks the DO deleted even when the clear R2 delete fails', async () => {
+    const harness = makeCloneHarness([itemRow(1, 'message/src', 'message', 1, 'items/blob')]);
+    harness.deleteObject.mockRejectedValueOnce(new Error('r2 unavailable'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(harness.durableObject.clear()).resolves.toBeUndefined();
+
+    expect(harness.meta.get('deleted')).toBe('true');
+    consoleError.mockRestore();
+  });
 });

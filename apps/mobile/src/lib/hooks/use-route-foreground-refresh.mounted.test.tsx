@@ -57,7 +57,9 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 });
 
 vi.mock('expo-router', () => ({
-  useIsFocused: () => focusState.isFocused,
+  // `isFocused()` is a live call, so a test can blur the route without
+  // rerendering the probe - the frozen-tab case.
+  useNavigation: () => ({ isFocused: () => focusState.isFocused }),
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
   },
@@ -65,7 +67,10 @@ vi.mock('expo-router', () => ({
 
 const KEYS: readonly (readonly unknown[])[] = [['securityAgent'], ['organizations']];
 
+const renderCount = { value: 0 };
+
 function Probe({ queryKeys }: { queryKeys: readonly (readonly unknown[])[] }) {
+  renderCount.value += 1;
   useRouteForegroundRefresh(queryKeys);
   return createElement('ProbeText', null, 'probe');
 }
@@ -129,6 +134,7 @@ describe('useRouteForegroundRefresh mounted', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     focusState.isFocused = true;
     focusEffect.effect = undefined;
+    renderCount.value = 0;
     invalidateQueries.mockReset();
   });
 
@@ -160,6 +166,22 @@ describe('useRouteForegroundRefresh mounted', () => {
     backgroundThenActive();
 
     expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('reads focus live without rerendering on the foreground transition', async () => {
+    await renderProbe(KEYS);
+    const rendersAfterMount = renderCount.value;
+
+    // A blurred tab is frozen: it never rerenders, so a focus value carried
+    // through React state or through a ref written in an effect stays stale.
+    // Blur without rerendering, then foreground the app.
+    focusState.isFocused = false;
+    backgroundThenActive();
+
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    // The hook holds no React state of its own, so the AppState transition
+    // itself cannot rerender a frozen route.
+    expect(renderCount.value).toBe(rendersAfterMount);
   });
 
   it('invalidates nothing on the first focus (mount)', async () => {

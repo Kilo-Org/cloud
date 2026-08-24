@@ -1,8 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect, useIsFocused } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
-
-import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
+import { AppState } from 'react-native';
 
 /**
  * Invalidates the given tRPC path-prefix query keys when the route regains
@@ -19,8 +18,7 @@ import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
  */
 export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[])[]): void {
   const queryClient = useQueryClient();
-  const { isActive } = useAppLifecycle();
-  const isFocused = useIsFocused();
+  const navigation = useNavigation();
 
   // Keep the latest keys in a ref so the focus effect callback stays stable:
   // the owner passes an inline array literal, which is a fresh reference every
@@ -28,22 +26,25 @@ export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[
   const queryKeysRef = useRef(queryKeys);
   queryKeysRef.current = queryKeys;
 
-  const wasActiveRef = useRef(isActive);
-  const focusedRef = useRef(isFocused);
   const firstFocusRef = useRef(true);
 
+  // Subscribe to AppState directly and read focus live via
+  // `navigation.isFocused()`. A blurred tab is frozen, so it does not
+  // rerender: a focus value carried through React state or a ref updated in
+  // an effect stays stale at `true` and would refresh an unfocused route.
   useEffect(() => {
-    focusedRef.current = isFocused;
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (!wasActiveRef.current && isActive && focusedRef.current) {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active' || !navigation.isFocused()) {
+        return;
+      }
       for (const queryKey of queryKeysRef.current) {
         void queryClient.invalidateQueries({ queryKey });
       }
-    }
-    wasActiveRef.current = isActive;
-  }, [isActive, queryClient]);
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation, queryClient]);
 
   useFocusEffect(
     useCallback(() => {

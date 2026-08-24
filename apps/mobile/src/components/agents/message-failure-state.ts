@@ -1,15 +1,17 @@
 import { type MessageDeliveryState, type MessageInfo } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
 /**
  * Fixed, safe copy for a failed user-message delivery, keyed by the delivery
  * `reason`. Never surfaces raw provider or transport text.
  */
 type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
 
-const DELIVERY_DETAIL_BY_REASON = {
-  interrupted: 'You stopped this message.',
-  exhausted: 'We could not deliver this message after several attempts.',
-  execution: 'The agent could not run this message.',
+const DELIVERY_DETAIL_KEY_BY_REASON = {
+  interrupted: 'agentChat.messageFailure.deliveryInterrupted',
+  exhausted: 'agentChat.messageFailure.deliveryExhausted',
+  execution: 'agentChat.messageFailure.deliveryExecution',
 } as const satisfies Record<DeliveryReason, string>;
 
 /**
@@ -29,16 +31,16 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
 function assistantDetail(errorName: string): string {
   switch (errorName) {
     case 'ProviderAuthError': {
-      return 'The provider rejected the request.';
+      return i18n.t('agentChat.messageFailure.assistantProviderRejected');
     }
     case 'MessageAbortedError': {
-      return 'The response was stopped.';
+      return i18n.t('agentChat.messageFailure.assistantStopped');
     }
     case 'ContextOverflowError': {
-      return 'The conversation is too long for the model.';
+      return i18n.t('agentChat.messageFailure.assistantContextOverflow');
     }
     default: {
-      return 'The response failed.';
+      return i18n.t('agentChat.messageFailure.assistantFailed');
     }
   }
 }
@@ -60,8 +62,8 @@ export function selectMessageFailure(input: {
   if (info.role === 'user' && deliveryState?.status === 'failed') {
     return {
       kind: 'delivery',
-      title: 'Failed to deliver',
-      detail: DELIVERY_DETAIL_BY_REASON[deliveryState.reason],
+      title: i18n.t('agentChat.messageFailure.deliveryTitle'),
+      detail: i18n.t(DELIVERY_DETAIL_KEY_BY_REASON[deliveryState.reason]),
       canRetry: true,
       canCopy: true,
     };
@@ -71,7 +73,7 @@ export function selectMessageFailure(input: {
     const errorName = info.error.name;
     return {
       kind: 'assistant',
-      title: 'Response failed',
+      title: i18n.t('agentChat.messageFailure.assistantTitle'),
       detail: assistantDetail(errorName),
       canRetry: !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
       canCopy: false,

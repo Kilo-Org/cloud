@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import TestRenderer from 'react-test-renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import '@/i18n';
 import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----

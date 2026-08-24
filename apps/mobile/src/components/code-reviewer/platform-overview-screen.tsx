@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -39,6 +40,7 @@ export function PlatformOverviewScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const githubStatus = useGitHubStatus(scope);
@@ -57,7 +59,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow="Code Reviewer"
+        eyebrow={t('codeReviewer.title')}
         onRetry={() => {
           permission.refetch();
         }}
@@ -93,7 +95,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow="Code Reviewer"
+        eyebrow={t('codeReviewer.title')}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -120,7 +122,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow="Code Reviewer"
+        eyebrow={t('codeReviewer.title')}
         onRetry={() => {
           void config.refetch();
         }}
@@ -176,7 +178,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+      <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
@@ -201,8 +203,7 @@ export function PlatformOverviewScreen({
                 />
               ) : (
                 <Text className="text-center text-xs text-muted-foreground">
-                  {capabilities.label} isn't connected. Only organization owners and billing
-                  managers can connect it.
+                  {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
                 </Text>
               )}
             </Animated.View>
@@ -213,9 +214,9 @@ export function PlatformOverviewScreen({
               {platform === 'gitlab' && hasWebhookSyncWarning && (
                 <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
                   <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Webhook setup incomplete</Text>
+                    <Text className="text-sm font-medium">{t('codeReviewer.webhookSetup')}</Text>
                     <Text variant="muted" className="text-xs">
-                      Some repositories may not receive automatic reviews.
+                      {t('codeReviewer.webhookSetupDescription')}
                     </Text>
                   </View>
                   <Button
@@ -230,7 +231,7 @@ export function PlatformOverviewScreen({
                     {save.isPending ? (
                       <ActivityIndicator size="small" color={colors.mutedForeground} />
                     ) : null}
-                    <Text>Retry</Text>
+                    <Text>{t('common.retry')}</Text>
                   </Button>
                 </View>
               )}
@@ -250,13 +251,13 @@ export function PlatformOverviewScreen({
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Automatic reviews</Text>
+                    <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
                     <Text variant="muted" className="text-xs">
                       {status.data?.integration?.accountLogin ?? ''}
                     </Text>
                   </View>
                   <Switch
-                    accessibilityLabel="Automatic reviews"
+                    accessibilityLabel={t('codeReviewer.autoReviews')}
                     value={config.data.isEnabled}
                     disabled={
                       !canEdit || toggle.isPending || (!hasRepoSelection && !config.data.isEnabled)
@@ -270,7 +271,7 @@ export function PlatformOverviewScreen({
                 {!hasRepoSelection && (
                   <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
-                      Select at least one repository to enable automatic reviews.
+                      {t('codeReviewer.selectRepository')}
                     </Text>
                     <Button
                       variant="outline"
@@ -280,7 +281,7 @@ export function PlatformOverviewScreen({
                         pushField('repos');
                       }}
                     >
-                      <Text>Select repositories</Text>
+                      <Text>{t('codeReviewer.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}
@@ -301,8 +302,8 @@ export function PlatformOverviewScreen({
 
               {capabilities.reviewMd && (
                 <ToggleRow
-                  title="Follow REVIEW.md"
-                  subtitle="Honor per-repo REVIEW.md instruction files"
+                  title={t('codeReviewer.followReviewMd')}
+                  subtitle={t('codeReviewer.followReviewMdSubtitle')}
                   value={!config.data.disableReviewMd}
                   disabled={!canEdit || save.isPending}
                   onValueChange={value => {
@@ -313,7 +314,7 @@ export function PlatformOverviewScreen({
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  Only organization owners and billing managers can change these settings.
+                  {t('codeReviewer.readOnlyDescription')}
                 </Text>
               )}
             </Animated.View>

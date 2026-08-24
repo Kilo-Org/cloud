@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { Circle, CircleCheck, CircleDot, CircleX } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -41,6 +42,7 @@ function iconColorFor(
  */
 export function TodoTaskRows({ tasks, truncated = false }: Readonly<TodoTaskRowsProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View>
@@ -64,8 +66,11 @@ export function TodoTaskRows({ tasks, truncated = false }: Readonly<TodoTaskRows
         );
       })}
       {truncated ? (
-        <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-          Truncated
+        <Text
+          accessibilityLabel={t('agentChat.toolCard.contentTruncated')}
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          {t('agentChat.toolCard.truncated')}
         </Text>
       ) : null}
     </View>

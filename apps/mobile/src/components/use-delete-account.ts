@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useTRPC } from '@/lib/trpc';
 
@@ -68,7 +69,7 @@ export function useDeleteAccount() {
   const executeDeletion = useMutation(
     trpc.user.requestAccountDeletion.mutationOptions({
       onSuccess: () => {
-        toast.success('Your account has been deleted.');
+        toast.success(i18n.t('profile.accountDeleted'));
         void signOut(true);
       },
       onError: error => {

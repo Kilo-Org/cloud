@@ -3,13 +3,14 @@ import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Alert, type AlertButton } from 'react-native';
 
+import { i18n } from '@/i18n';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
-const BUTTON_LABEL = {
-  save: 'Save changes',
-  discard: 'Discard',
-  'keep-editing': 'Keep Editing',
+const BUTTON_LABEL_KEY = {
+  save: 'securityAgent.settingsSave.saveChanges',
+  discard: 'securityAgent.settingsSave.discard',
+  'keep-editing': 'securityAgent.settingsSave.keepEditing',
 } as const;
 
 /**
@@ -84,11 +85,11 @@ export function useSettingsBackGuard({
     const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
     const buttons: AlertButton[] = options.map(option => {
       if (option === 'keep-editing') {
-        return { text: BUTTON_LABEL[option], style: 'cancel' };
+        return { text: i18n.t(BUTTON_LABEL_KEY[option]), style: 'cancel' };
       }
       if (option === 'discard') {
         return {
-          text: BUTTON_LABEL[option],
+          text: i18n.t(BUTTON_LABEL_KEY[option]),
           style: 'destructive',
           onPress: () => {
             navigation.dispatch(action);
@@ -96,7 +97,7 @@ export function useSettingsBackGuard({
         };
       }
       return {
-        text: BUTTON_LABEL[option],
+        text: i18n.t(BUTTON_LABEL_KEY[option]),
         onPress: () => {
           void (async () => {
             try {
@@ -110,7 +111,11 @@ export function useSettingsBackGuard({
         },
       };
     });
-    Alert.alert('Unsaved changes', 'Save your changes before leaving this screen?', buttons);
+    Alert.alert(
+      i18n.t('securityAgent.settingsSave.unsavedTitle'),
+      i18n.t('securityAgent.settingsSave.unsavedMessage'),
+      buttons
+    );
   });
 
   return {

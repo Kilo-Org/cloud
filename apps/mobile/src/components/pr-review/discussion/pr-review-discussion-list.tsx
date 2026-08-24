@@ -5,6 +5,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { type RefObject, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
@@ -180,21 +181,22 @@ function ListFooter({
 }: Readonly<ListFooterProps>) {
   // The footer is the last list content, so it owns the bottom clearance
   // that keeps the final row and every next action above the system bar.
+  const { t } = useTranslation();
   const paddingBottom = useDetailScreenBottomPadding();
 
   if (laterPageError) {
     return (
       <View className="items-center gap-2 px-4 pt-2" style={{ paddingBottom }}>
         <Text variant="muted" className="text-center text-xs">
-          Could not load more comments.
+          {t('prReview.discussion.couldNotLoadMore')}
         </Text>
         <Button
           size="sm"
           variant="outline"
           onPress={onRetryLoadMore}
-          accessibilityLabel="Retry loading more comments"
+          accessibilityLabel={t('prReview.discussion.retryLoadingMore')}
         >
-          <Text>Retry</Text>
+          <Text>{t('common.retry')}</Text>
         </Button>
       </View>
     );
@@ -209,9 +211,9 @@ function ListFooter({
         variant="outline"
         loading={isFetchingNextPage}
         onPress={onLoadMore}
-        accessibilityLabel="Load more comments"
+        accessibilityLabel={t('prReview.discussion.loadMoreComments')}
       >
-        <Text>Load more</Text>
+        <Text>{t('prReview.discussion.loadMore')}</Text>
       </Button>
     </View>
   );

@@ -1,5 +1,6 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 
@@ -40,6 +41,7 @@ export function PartRenderer({
   onOpenChildSession,
   modelOptions,
 }: Readonly<PartRendererProps>) {
+  const { t } = useTranslation();
   if (!partRendersContent(part)) {
     return null;
   }
@@ -91,7 +93,10 @@ export function PartRenderer({
   // If OpenCode ever ships diff text on the part, render it through `DiffLine`.
   if (isPatchPart(part)) {
     const fileCount = part.files.length;
-    const summary = `Updated ${fileCount} ${fileCount === 1 ? 'file' : 'files'}`;
+    const summary =
+      fileCount === 1
+        ? t('agentChat.partRenderer.updatedFile', { count: fileCount })
+        : t('agentChat.partRenderer.updatedFiles', { count: fileCount });
     return (
       <MessageErrorBoundary>
         <View className="my-1 gap-1">

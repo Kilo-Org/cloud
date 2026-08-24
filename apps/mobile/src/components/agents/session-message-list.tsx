@@ -3,6 +3,7 @@ import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
@@ -10,7 +11,7 @@ import { SessionPaginationHeader } from '@/components/agents/session-pagination-
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
 
@@ -86,6 +87,7 @@ export function SessionMessageList<T>({
     resetKey: sessionId,
   });
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   // Coalesce the trigger: only fire `onLoadOlderMessages` while there is
   // actually a cursor, we are not already loading, and we are not in a
@@ -160,7 +162,7 @@ export function SessionMessageList<T>({
         nextNewestKey,
       })
     ) {
-      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+      AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;
@@ -235,7 +237,7 @@ export function SessionMessageList<T>({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Scroll to bottom"
+            accessibilityLabel={t('agentChat.session.scrollToBottom')}
             onPress={scrollToLatestAnimated}
             hitSlop={2}
             className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-black/25 active:opacity-70"

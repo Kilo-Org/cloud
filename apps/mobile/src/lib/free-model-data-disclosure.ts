@@ -1,6 +1,15 @@
+import { i18n } from '@/i18n';
+
+/** An acronym the product keeps in English in every locale. */
 export const BYOK_MODEL_LABEL = 'BYOK';
-export const FREE_MODEL_DATA_LABEL = 'Data collected';
-export const FREE_MODEL_FREE_LABEL = 'Free';
+
+export function freeModelDataLabel(): string {
+  return i18n.t('models.dataCollected');
+}
+
+export function freeModelFreeLabel(): string {
+  return i18n.t('models.free');
+}
 
 export type ModelDataDisclosure = {
   id: string;
@@ -22,5 +31,5 @@ export function hasUserByokAvailable(model: ModelDataDisclosure | undefined) {
 }
 
 export function getFreeModelDataAccessibilityLabel(label: string) {
-  return `${label}, ${FREE_MODEL_DATA_LABEL}`;
+  return `${label}, ${freeModelDataLabel()}`;
 }

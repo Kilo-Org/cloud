@@ -1,6 +1,7 @@
 import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
 import { AlertCircle, CheckCircle2, XCircle } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -45,6 +46,7 @@ export function MessageBubbleContent({
   replyToMessage,
   onExecuteAction,
 }: Props) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
   const deliveryFailureLabel = getDeliveryFailureLabel(message);
@@ -54,7 +56,11 @@ export function MessageBubbleContent({
   }
 
   if (message.deleted) {
-    return <Text className={cn('text-sm italic opacity-50', textColor)}>[deleted message]</Text>;
+    return (
+      <Text className={cn('text-sm italic opacity-50', textColor)}>
+        {t('chat.messageBubble.deleted')}
+      </Text>
+    );
   }
 
   return (

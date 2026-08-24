@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
@@ -26,6 +27,7 @@ type Params = {
 export function PrReviewCommentComposerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const parsed = parseComposerParams(params);
   const pending = usePendingReview();
@@ -33,7 +35,7 @@ export function PrReviewCommentComposerScreen() {
   const pendingId = parsed?.pendingId;
   const isEdit = pendingId !== undefined;
   const pendingItem = isEdit ? pending.items.find(item => item.id === pendingId) : undefined;
-  const title = isEdit ? 'Edit comment' : 'Add comment';
+  const title = isEdit ? t('prReview.composer.editTitle') : t('prReview.composer.addTitle');
   const eyebrow = parsed ? `${parsed.owner}/${parsed.repo}#${parsed.number}` : '';
 
   // Edit mode is local-only: do not fire getPullRequest and do not gate on it.
@@ -52,15 +54,19 @@ export function PrReviewCommentComposerScreen() {
       return;
     }
     missingAlertedRef.current = true;
-    Alert.alert('Comment unavailable', 'This pending comment was already deleted or submitted.', [
-      {
-        text: 'OK',
-        onPress: () => {
-          router.back();
+    Alert.alert(
+      t('prReview.composer.unavailableTitle'),
+      t('prReview.composer.unavailableMessage'),
+      [
+        {
+          text: t('prReview.composer.ok'),
+          onPress: () => {
+            router.back();
+          },
         },
-      },
-    ]);
-  }, [parsed, isEdit, pendingItem, router]);
+      ]
+    );
+  }, [parsed, isEdit, pendingItem, router, t]);
 
   const dismiss = () => {
     router.back();
@@ -122,7 +128,7 @@ export function PrReviewCommentComposerScreen() {
     body = (
       <QueryError
         variant="server"
-        title="Couldn't load the comment composer"
+        title={t('prReview.composer.loadFailedTitle')}
         onRetry={() => {
           void pr.refetch();
         }}

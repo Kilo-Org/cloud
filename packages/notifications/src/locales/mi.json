@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "He whakahoutanga tā tō wātū kaihoko",
+      "chatMessage": "He karere hōu tāu",
+      "instanceLifecycle": "He whakahoutanga tā tō wae",
+      "scheduledAction": "He whakahoutanga tā tētahi mahi kua whakaritea",
+      "lowBalance": "Me aro ki tō toenga",
+      "securityFinding": "Me aro ki tētahi kitenga haumaru"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Kua oti te mahi"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "I rahua: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "I haukotia: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Kāore he taitara",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Te whakatūpato toenga iti",
+      "body": "Kua heke te toenga {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "He kitenga haumaru hōu ({{severity}})",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Te whakatūpato SLA",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Te takahitanga SLA",
+      "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Me aro ki tētahi kitenga haumaru"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "Kua rite a {{instanceName}}",
+      "body": "Pāwhiri kia tīmata te kōrero."
+    },
+    "startFailed": {
+      "title": "I rahua te tīmata a {{instanceName}}",
+      "body": "I rahua te tīmata."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "Ka tīmata anō a {{instanceName}} ākuanei",
+      "body": "Kua whakaritea kia tīmata anō i {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Kua whakakorea te tīmatanga anō a {{instanceName}}",
+      "body": "Kua whakakorea te tīmatanga anō i whakaritea i mua."
+    },
+    "versionChangeNotice": {
+      "title": "Ka whakamohoatia a {{instanceName}} ākuanei",
+      "bodyWithTag": "Whakamohoa ki {{targetImageTag}} i {{when}}.",
+      "bodyWithoutTag": "Kua whakaritea te whakamohoatanga i {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Kua whakakorea te whakamohoatanga a {{instanceName}}",
+      "body": "Kua whakakorea te whakamohoatanga i whakaritea i mua."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kua rite tō wātū Kilo kia whakahaere mai i tō waea"
+  }
+}

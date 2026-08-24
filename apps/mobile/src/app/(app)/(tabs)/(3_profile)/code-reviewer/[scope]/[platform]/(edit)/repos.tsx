@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -34,6 +35,7 @@ export default function ReposRoute() {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
+  const { t } = useTranslation();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const mode = data?.repositorySelectionMode ?? 'all';
   const githubRepos = useGitHubRepositories(scope, platform === 'github' && mode === 'selected');
@@ -86,22 +88,22 @@ export default function ReposRoute() {
   const orgScope = scope === PERSONAL_SCOPE ? undefined : scope;
   // oxlint-disable-next-line anti-slop/no-known-value-widening -- deliberately partial (bitbucket has no entry); lookup must accept the full ReviewerPlatform key set
   const manageRepoAccessLabelByPlatform: Partial<Record<ReviewerPlatform, string>> = {
-    github: 'repository access',
-    gitlab: 'repository access',
+    github: t('codeReviewer.repos.repositoryAccess'),
+    gitlab: t('codeReviewer.repos.repositoryAccess'),
   };
   const manageRepoAccessLabel = manageRepoAccessLabelByPlatform[platform];
   const emptyStateCopyByPlatform = {
     github: {
-      title: 'Install the GitHub app on repositories',
-      description: 'Grant the Kilo GitHub App access to the repositories you want reviewed.',
+      title: t('codeReviewer.repos.installGithubApp'),
+      description: t('codeReviewer.repos.installGithubAppDescription'),
     },
     gitlab: {
-      title: 'No repositories found',
-      description: 'You may need to grant access to more groups or projects on GitLab.',
+      title: t('codeReviewer.repos.noRepositoriesFound'),
+      description: t('codeReviewer.repos.gitlabNoRepositoriesDescription'),
     },
     bitbucket: {
-      title: 'No repositories found',
-      description: 'No repositories are available in this Bitbucket workspace.',
+      title: t('codeReviewer.repos.noRepositoriesFound'),
+      description: t('codeReviewer.repos.bitbucketNoRepositoriesDescription'),
     },
   } satisfies Record<ReviewerPlatform, { title: string; description: string }>;
   const emptyStateCopy = emptyStateCopyByPlatform[platform];
@@ -112,14 +114,18 @@ export default function ReposRoute() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Repositories" />
+      <ScreenHeader title={t('codeReviewer.repos.title')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {capabilities.selectionModePicker && (
-          <RadioGroup label="Repositories">
+          <RadioGroup label={t('codeReviewer.repos.title')}>
             {(['all', 'selected'] as const).map(option => (
               <ChoiceRow
                 key={option}
-                label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+                label={
+                  option === 'all'
+                    ? t('codeReviewer.repos.allRepositories')
+                    : t('codeReviewer.repos.selectedRepositories')
+                }
                 selected={mode === option}
                 disabled={configDisabled}
                 className="border-b-[0.5px] border-hair-soft"
@@ -134,7 +140,7 @@ export default function ReposRoute() {
         {(!capabilities.selectionModePicker || mode === 'selected') && (
           <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
             <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              Repositories
+              {t('codeReviewer.repos.title')}
             </Text>
             {reposLoading && (
               <View className="gap-3 pt-2">
@@ -147,7 +153,7 @@ export default function ReposRoute() {
               <QueryError
                 variant="server"
                 placement="top"
-                title="Could not load repositories"
+                title={t('codeReviewer.repos.couldNotLoad')}
                 onRetry={refetchRepos}
                 isRetrying={reposFetching}
               />
@@ -156,18 +162,18 @@ export default function ReposRoute() {
             {!reposLoading && !reposError && bitbucketNotReady && (
               <View className="items-center gap-2 pt-2">
                 <Text variant="muted" className="text-center text-xs">
-                  Repositories unavailable — finish Bitbucket setup on kilo.ai.
+                  {t('codeReviewer.repos.unavailable')}
                 </Text>
                 <Button
                   variant="outline"
                   size="sm"
                   onPress={() => {
                     void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                      label: 'Bitbucket setup',
+                      label: t('codeReviewer.repos.bitbucketSetup'),
                     });
                   }}
                 >
-                  <Text>Finish setup</Text>
+                  <Text>{t('codeReviewer.repos.finishSetup')}</Text>
                 </Button>
               </View>
             )}
@@ -194,20 +200,20 @@ export default function ReposRoute() {
                               );
                               await openExternalUrl(
                                 getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token),
-                                { label: 'repository access' }
+                                { label: t('codeReviewer.repos.repositoryAccess') }
                               );
                             } catch {
-                              toast.error('Could not open GitHub App settings');
+                              toast.error(t('codeReviewer.repos.couldNotOpenGithubSettings'));
                             }
                           } else if (platform === 'gitlab') {
                             await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
-                              label: 'repository access',
+                              label: t('codeReviewer.repos.repositoryAccess'),
                             });
                           }
                         })();
                       }}
                     >
-                      <Text>Manage access</Text>
+                      <Text>{t('codeReviewer.repos.manageAccess')}</Text>
                     </Button>
                   ) : undefined
                 }

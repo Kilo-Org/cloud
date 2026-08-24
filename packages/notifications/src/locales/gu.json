@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "તમારા એજન્ટ સત્રમાં અપડેટ છે",
+      "chatMessage": "તમારી પાસે નવો સંદેશ છે",
+      "instanceLifecycle": "તમારા ઇન્સ્ટન્સમાં અપડેટ છે",
+      "scheduledAction": "સુનિશ્ચિત ક્રિયામાં અપડેટ છે",
+      "lowBalance": "તમારી બેલેન્સ ધ્યાનની જરૂર છે",
+      "securityFinding": "સુરક્ષા તારણ ધ્યાનની જરૂર છે"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "કાર્ય પૂર્ણ"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "નિષ્ફળ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "વિક્ષેપિત: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · અનામી",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ઓછી બેલેન્સ ચેતવણી",
+      "body": "{{organizationName}} બેલેન્સ ${{minimumBalanceUsd}} ની નીચે ગઈ"
+    },
+    "securityFindingNew": {
+      "title": "નવું સુરક્ષા તારણ ({{severity}})",
+      "body": "{{repoFullName}} માં {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ચેતવણી",
+      "body": "{{repoFullName}} માં {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ભંગ",
+      "body": "{{repoFullName}} માં {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "એક સુરક્ષા તારણ ધ્યાનની જરૂર છે"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} તૈયાર છે",
+      "body": "ચેટ શરૂ કરવા ટેપ કરો."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} શરૂ થવામાં નિષ્ફળ",
+      "body": "શરૂઆત નિષ્ફળ."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ટૂંક સમયમાં ફરી શરૂ થશે",
+      "body": "{{when}} વાગ્યે ફરી શરૂ કરવા સુનિશ્ચિત છે."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} ફરી શરૂ કરવાનું રદ થયું",
+      "body": "અગાઉ સુનિશ્ચિત ફરી શરૂ કરવાનું રદ કરવામાં આવ્યું છે."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ટૂંક સમયમાં અપગ્રેડ થશે",
+      "bodyWithTag": "{{when}} વાગ્યે {{targetImageTag}} પર અપગ્રેડ.",
+      "bodyWithoutTag": "{{when}} વાગ્યે સુનિશ્ચિત અપગ્રેડ."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} અપગ્રેડ રદ થયું",
+      "body": "અગાઉ સુનિશ્ચિત અપગ્રેડ રદ કરવામાં આવ્યું છે."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "તમારું Kilo સત્ર તમારા ફોનથી નિયંત્રિત કરવા માટે તૈયાર છે"
+  }
+}

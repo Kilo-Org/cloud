@@ -1,14 +1,19 @@
 import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
-  isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import {
+  formatExploitable,
+  getAgentChatSessionHref,
+  humanize,
+} from '@/components/security-agent/finding-analysis-panel-helpers';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -31,25 +36,6 @@ type FindingAnalysisPanelProps = {
   onRetry: () => void;
 };
 
-function humanize(value: string): string {
-  return value.replaceAll('_', ' ');
-}
-
-function getAgentChatSessionHref(scope: string, cliSessionId: string | null): Href | null {
-  if (!cliSessionId) {
-    return null;
-  }
-  const path = `/(app)/agent-chat/${cliSessionId}`;
-  return (isPersonalSecurityScope(scope) ? path : `${path}?organizationId=${scope}`) as Href;
-}
-
-function formatExploitable(isExploitable: boolean | 'unknown'): string {
-  if (isExploitable === 'unknown') {
-    return 'Unknown';
-  }
-  return isExploitable ? 'Yes' : 'No';
-}
-
 // Ported from FindingDetailDialog.tsx:985 (getAnalysisPresentation) — triage
 // and sandbox evidence rendered as plain facts plus the raw technical
 // report, rather than the web's hero/summary/action/steps narrative.
@@ -63,6 +49,7 @@ export function FindingAnalysisPanel({
 }: Readonly<FindingAnalysisPanelProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const capacity = useSecurityAnalysisCapacity(scope);
   const startAnalysis = useStartSecurityAnalysis(scope);
 
@@ -78,7 +65,7 @@ export function FindingAnalysisPanel({
   if (isError && !analysis) {
     return (
       <View className="items-center justify-center py-8">
-        <QueryError message="Could not load analysis" onRetry={onRetry} />
+        <QueryError message={t('securityAgent.analysis.couldNotLoad')} onRetry={onRetry} />
       </View>
     );
   }
@@ -88,8 +75,8 @@ export function FindingAnalysisPanel({
       <EmptyState
         icon={ScanSearch}
         placement="top"
-        title="No analysis yet"
-        description="Run one from the Details tab"
+        title={t('securityAgent.analysis.noAnalysisYet')}
+        description={t('securityAgent.analysis.noAnalysisYetDescription')}
       />
     );
   }
@@ -145,12 +132,12 @@ export function FindingAnalysisPanel({
 
   const handleRestartAnalysis = () => {
     Alert.alert(
-      'Restart this analysis?',
-      'Security Agent will stop waiting for the current run and queue a new analysis. Any result that arrives from the current run will be ignored.',
+      t('securityAgent.analysis.restartTitle'),
+      t('securityAgent.analysis.restartMessage'),
       [
-        { text: 'Keep waiting', style: 'cancel' },
+        { text: t('securityAgent.analysis.keepWaiting'), style: 'cancel' },
         {
-          text: 'Restart analysis',
+          text: t('securityAgent.analysis.restartAnalysis'),
           style: 'destructive',
           onPress: () => {
             startAnalysis.mutate({ findingId, restartActive: true });
@@ -185,26 +172,28 @@ export function FindingAnalysisPanel({
                 <ActivityIndicator size="small" color={colors.primaryForeground} />
               ) : null}
               <Text className="text-primary-foreground">
-                {analysisState === 'failed' ? 'Retry analysis' : 'Analyze repository'}
+                {analysisState === 'failed'
+                  ? t('securityAgent.analysis.retryAnalysis')
+                  : t('securityAgent.analysis.analyzeRepository')}
               </Text>
             </Button>
           ) : null}
           {canStartAnalysis && capacityConfirmedFull ? (
             <Text variant="muted" className="text-xs">
-              Analysis capacity is full. Wait for an active analysis to finish.
+              {t('securityAgent.analysis.capacityFull')}
             </Text>
           ) : null}
           {canStartAnalysis && capacity.isError ? (
             <View className="flex-row items-center gap-2">
               <Text variant="muted" className="text-xs">
-                Could not check analysis capacity.
+                {t('securityAgent.analysis.couldNotCheckCapacity')}
               </Text>
               <Pressable
                 onPress={() => void capacity.refetch()}
                 accessibilityRole="button"
-                accessibilityLabel="Retry"
+                accessibilityLabel={t('common.retry')}
               >
-                <Text className="text-xs font-medium text-primary">Retry</Text>
+                <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -217,7 +206,7 @@ export function FindingAnalysisPanel({
               {startAnalysis.isPending ? (
                 <ActivityIndicator size="small" color={colors.foreground} />
               ) : null}
-              <Text>Restart analysis</Text>
+              <Text>{t('securityAgent.analysis.restartAnalysis')}</Text>
             </Button>
           ) : null}
         </View>
@@ -231,20 +220,29 @@ export function FindingAnalysisPanel({
           }}
         >
           <ExternalLink size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">Watch in Cloud Agent</Text>
+          <Text className="text-sm font-medium">
+            {t('securityAgent.analysis.watchInCloudAgent')}
+          </Text>
         </Pressable>
       ) : null}
 
       {triageState && triage ? (
         <View className="gap-2">
           <View className="rounded-lg bg-secondary px-3">
-            <KvRow label="Triage confidence" value={humanize(triage.confidence)} />
-            <KvRow label="Suggested action" value={humanize(triage.suggestedAction)} last />
+            <KvRow
+              label={t('securityAgent.analysis.triageConfidence')}
+              value={humanize(triage.confidence)}
+            />
+            <KvRow
+              label={t('securityAgent.analysis.suggestedAction')}
+              value={humanize(triage.suggestedAction)}
+              last
+            />
           </View>
           {triage.needsSandboxReasoning ? (
             <View className="rounded-lg bg-secondary p-3">
               <Text variant="muted" className="text-xs uppercase tracking-wide">
-                Triage reasoning
+                {t('securityAgent.analysis.triageReasoning')}
               </Text>
               <Text className="mt-1 text-sm" selectable>
                 {triage.needsSandboxReasoning}
@@ -257,19 +255,25 @@ export function FindingAnalysisPanel({
       {sandboxState && sandbox ? (
         <View className="gap-2">
           <View className="rounded-lg bg-secondary px-3">
-            <KvRow label="Exploitable" value={formatExploitable(sandbox.isExploitable)} />
-            <KvRow label="Suggested action" value={humanize(sandbox.suggestedAction)} />
             <KvRow
-              label="Model"
+              label={t('securityAgent.analysis.exploitable')}
+              value={formatExploitable(sandbox.isExploitable)}
+            />
+            <KvRow
+              label={t('securityAgent.analysis.suggestedAction')}
+              value={humanize(sandbox.suggestedAction)}
+            />
+            <KvRow
+              label={t('securityAgent.analysis.model')}
               value={firstNonEmpty(
                 sandbox.modelUsed,
                 analysis.analysis?.analysisModel,
-                'Not recorded'
+                t('securityAgent.analysis.notRecorded')
               )}
               selectable
             />
             <KvRow
-              label="Analyzed"
+              label={t('securityAgent.analysis.analyzed')}
               value={timeAgo(parseTimestamp(sandbox.analysisAt))}
               last
               selectable
@@ -278,7 +282,7 @@ export function FindingAnalysisPanel({
           {exploitabilityReasoning ? (
             <View className="rounded-lg bg-secondary p-3">
               <Text variant="muted" className="text-xs uppercase tracking-wide">
-                Exploitability reasoning
+                {t('securityAgent.analysis.exploitabilityReasoning')}
               </Text>
               <Text className="mt-1 text-sm" selectable>
                 {exploitabilityReasoning}
@@ -288,7 +292,7 @@ export function FindingAnalysisPanel({
           {sandbox.suggestedFix ? (
             <View className="rounded-lg bg-secondary p-3">
               <Text variant="muted" className="text-xs uppercase tracking-wide">
-                Suggested fix
+                {t('securityAgent.analysis.suggestedFix')}
               </Text>
               <Text className="mt-1 text-sm" selectable>
                 {sandbox.suggestedFix}
@@ -297,7 +301,7 @@ export function FindingAnalysisPanel({
           ) : null}
           {uniqueLocations.length > 0 ? (
             <CollapsibleSection
-              title={`Where this was found (${uniqueLocations.length})`}
+              title={t('securityAgent.analysis.whereFound', { count: uniqueLocations.length })}
               defaultExpanded={uniqueLocations.length <= 2}
             >
               {uniqueLocations.map(location => (
@@ -311,7 +315,7 @@ export function FindingAnalysisPanel({
       ) : null}
 
       {technicalMarkdown ? (
-        <CollapsibleSection title="Full generated report">
+        <CollapsibleSection title={t('securityAgent.analysis.fullReport')}>
           <MarkdownText value={technicalMarkdown} />
         </CollapsibleSection>
       ) : null}

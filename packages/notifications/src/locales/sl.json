@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Tvoja seja agenta ima posodobitev",
+      "chatMessage": "Imaš novo sporočilo",
+      "instanceLifecycle": "Tvoja instanca ima posodobitev",
+      "scheduledAction": "Načrtovano dejanje ima posodobitev",
+      "lowBalance": "Tvoje stanje potrebuje pozornost",
+      "securityFinding": "Varnostna najdba potrebuje pozornost"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Naloga dokončana"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Ni uspelo: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Prekinjeno: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Brez naslova",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Opozorilo o nizkem stanju",
+      "body": "Stanje organizacije {{organizationName}} je padlo pod ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nova varnostna najdba ({{severity}})",
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Opozorilo SLA",
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Kršitev SLA",
+      "body": "{{findingTitle}} v {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Varnostna najdba potrebuje pozornost"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} je pripravljena",
+      "body": "Dotakni se za začetek klepeta."
+    },
+    "startFailed": {
+      "title": "Zagon {{instanceName}} ni uspel",
+      "body": "Zagon ni uspel."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} se bo kmalu znova zagnala",
+      "body": "Načrtovan ponovni zagon ob {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Ponovni zagon {{instanceName}} preklican",
+      "body": "Prej načrtovani ponovni zagon je bil preklican."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} se bo kmalu posodobila",
+      "bodyWithTag": "Posodobitev na {{targetImageTag}} ob {{when}}.",
+      "bodyWithoutTag": "Načrtovana posodobitev ob {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Posodobitev {{instanceName}} preklicana",
+      "body": "Prej načrtovana posodobitev je bila preklicana."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Tvoja Kilo seja je pripravljena za upravljanje s telefona"
+  }
+}

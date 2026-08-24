@@ -3,6 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
 // The section is pure presentation of rows the caller already loaded. It runs
 // no query, so it has no retryable and no non-retryable state of its own.
 // Active-session query errors surface in the screen's inline error line, which

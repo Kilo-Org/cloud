@@ -2,6 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -66,6 +67,7 @@ const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies View
 
 export function OrganizationMembersScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
@@ -82,7 +84,7 @@ export function OrganizationMembersScreen() {
   );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title="Members" />;
+    return <OrganizationBoundary title={t('organization.members.title')} />;
   }
 
   const isLoading = orgWithMembers.isLoading;
@@ -97,11 +99,11 @@ export function OrganizationMembersScreen() {
     <EmptyState
       icon={Users}
       placement="top"
-      title="No members yet"
+      title={t('organization.members.emptyTitle')}
       description={
         canInvite
-          ? 'Invite teammates to start collaborating in this organization.'
-          : 'Ask an owner or billing manager to invite teammates.'
+          ? t('organization.members.emptyDescriptionCanInvite')
+          : t('organization.members.emptyDescriptionCannotInvite')
       }
       action={
         canInvite ? (
@@ -110,7 +112,9 @@ export function OrganizationMembersScreen() {
               router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
             }}
           >
-            <Text className="text-primary-foreground">Invite member</Text>
+            <Text className="text-primary-foreground">
+              {t('organization.members.inviteMember')}
+            </Text>
           </Button>
         ) : undefined
       }
@@ -204,7 +208,7 @@ export function OrganizationMembersScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Members"
+        title={t('organization.members.title')}
         headerRight={
           canInvite ? (
             <Pressable
@@ -213,7 +217,7 @@ export function OrganizationMembersScreen() {
               }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="Invite member"
+              accessibilityLabel={t('organization.members.inviteMember')}
               className="active:opacity-70"
             >
               <UserPlus size={22} color={colors.foreground} />

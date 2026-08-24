@@ -1,8 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 import { Pressable } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, setInstancePickerBridge } from '@/lib/picker-bridge';
 import { cn } from '@/lib/utils';
@@ -36,9 +38,9 @@ function selectorLabel({
     return `${value.name} · ${value.projectName}`;
   }
   if (isLoading) {
-    return 'Loading…';
+    return i18n.t('agentChat.instancePicker.loading');
   }
-  return 'Cloud Agent';
+  return i18n.t('agentChat.instancePicker.cloudAgent');
 }
 
 export function InstanceSelector({
@@ -50,6 +52,7 @@ export function InstanceSelector({
 }: Readonly<InstanceSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   // The Cloud Agent default is always selectable, even when the list is
   // loading or empty — only the "open the picker" path is gated.
@@ -73,7 +76,7 @@ export function InstanceSelector({
       onPress={handlePress}
       disabled={!canOpenPicker}
       accessibilityRole="button"
-      accessibilityLabel={`Run on: ${label}`}
+      accessibilityLabel={t('agentChat.instancePicker.runOnAccessibility', { label })}
       accessibilityState={{ disabled: !canOpenPicker }}
       className={cn(
         'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',

@@ -2,6 +2,8 @@ import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 import {
   type VoiceInputControllerSnapshot,
   type VoiceInputStartOptions,
@@ -147,18 +149,18 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     }
     // mode === 'blocked'
     if (consent === 'declined') {
-      toast.error('Speech stays off until you allow online transcription.');
+      toast.error(i18n.t('voiceInput.staysOff'));
       return;
     }
     // consent === 'unset' — raise the disclosure, do not start until answered.
     Alert.alert(
-      'Speech is processed online',
-      `This device cannot transcribe offline. Your recording is sent to ${
-        Platform.OS === 'ios' ? 'Apple' : 'Google'
-      } to turn it into text. Kilo does not store the audio.`,
+      i18n.t('voiceInput.onlineTitle'),
+      i18n.t('voiceInput.onlineMessage', {
+        provider: Platform.OS === 'ios' ? 'Apple' : 'Google',
+      }),
       [
         {
-          text: 'Not now',
+          text: i18n.t('common.notNow'),
           style: 'cancel',
           onPress: () => {
             if (userId) {
@@ -167,7 +169,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
           },
         },
         {
-          text: 'Allow',
+          text: i18n.t('voiceInput.allow'),
           onPress: () => {
             void (async () => {
               if (userId) {

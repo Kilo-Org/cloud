@@ -1,4 +1,5 @@
 import { type PushData } from './push-data';
+import { translatePush } from './i18n';
 
 /**
  * Android notification channels. Each push is routed to exactly one channel
@@ -43,21 +44,73 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
  * session title, message body, org name, amount, or id — the OS lock-screen
  * text must not leak private content.
  */
-export function genericPushContentForPushData(data: PushData): { title: string; body: string } {
+export function genericPushContentForPushData(
+  data: PushData,
+  // Old callers omit locale; remove the default when every caller passes a token locale.
+  locale: string | null | undefined = 'en'
+): { title: string; body: string } {
   switch (data.type) {
     case 'cloud_agent_session':
-      return { title: 'Kilo', body: 'Your agent session has an update' };
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.cloudAgentSession',
+          undefined,
+          'Your agent session has an update'
+        ),
+      };
     case 'chat.message':
-      return { title: 'Kilo', body: 'You have a new message' };
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.chatMessage',
+          undefined,
+          'You have a new message'
+        ),
+      };
     case 'instance-lifecycle':
-      return { title: 'Kilo', body: 'Your instance has an update' };
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.instanceLifecycle',
+          undefined,
+          'Your instance has an update'
+        ),
+      };
     case 'scheduled-action':
-      return { title: 'Kilo', body: 'A scheduled action has an update' };
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.scheduledAction',
+          undefined,
+          'A scheduled action has an update'
+        ),
+      };
     case 'low_balance':
-      return { title: 'Kilo', body: 'Your balance needs attention' };
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.lowBalance',
+          undefined,
+          'Your balance needs attention'
+        ),
+      };
     case 'security_finding':
     case 'security_lifecycle':
-      return { title: 'Kilo', body: 'A security finding needs attention' };
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.securityFinding',
+          undefined,
+          'A security finding needs attention'
+        ),
+      };
     default: {
       // Exhaustiveness: new PushData variants must be handled above.
       const _exhaustive: never = data;

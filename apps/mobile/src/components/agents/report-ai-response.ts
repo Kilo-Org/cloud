@@ -1,6 +1,7 @@
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
 import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { resolveMessageDisplayModel } from './message-model-label';
 
@@ -43,10 +44,6 @@ export type ReportAiResponseFailure =
   | { retryable: true; message: string }
   | { retryable: false; message: string };
 
-const RETRYABLE_MESSAGE = "Couldn't report this response.";
-const TERMINAL_MESSAGE = "This response can't be reported.";
-const RETRY_LABEL = 'Retry';
-
 /** Error toast shape: the message plus an optional retry action. */
 export type ReportAiResponseErrorToast = {
   message: string;
@@ -63,7 +60,7 @@ export function buildReportAiResponseErrorToast(
   retry: () => void
 ): ReportAiResponseErrorToast {
   if (failure.retryable) {
-    return { message: failure.message, action: { label: RETRY_LABEL, onClick: retry } };
+    return { message: failure.message, action: { label: i18n.t('common.retry'), onClick: retry } };
   }
   return { message: failure.message };
 }
@@ -75,12 +72,18 @@ export function buildReportAiResponseErrorToast(
 export function classifyReportAiResponseFailure(error: unknown): ReportAiResponseFailure {
   const code = readTrpcErrorField(error, 'code');
   if (isTerminalTrpcCode(code)) {
-    return { retryable: false, message: TERMINAL_MESSAGE };
+    return {
+      retryable: false,
+      message: i18n.t('agentChat.messageDetails.reportAiResponseFailedTerminal'),
+    };
   }
-  return { retryable: true, message: RETRYABLE_MESSAGE };
+  return {
+    retryable: true,
+    message: i18n.t('agentChat.messageDetails.reportAiResponseFailedRetryable'),
+  };
 }
 
 /** Submitted toast copy: the receipt id only, never the message body. */
 export function reportAiResponseSubmittedToast(receiptId: string): string {
-  return `Report submitted. Receipt ${receiptId}`;
+  return i18n.t('agentChat.messageDetails.reportAiResponseSubmitted', { receiptId });
 }

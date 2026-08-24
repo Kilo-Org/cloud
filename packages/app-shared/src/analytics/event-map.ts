@@ -50,6 +50,7 @@ export const STARTUP_OUTCOMES = [
   'force-update',
   'user-error',
   'consent-error',
+  'language-error',
 ] as const;
 
 /** KiloClaw onboarding enum values (grandfathered; mirrors onboarding-events.ts). */

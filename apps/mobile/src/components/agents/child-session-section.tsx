@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { Bot, ChevronRight, Loader2 } from '@/components/ui/icons';
+import { Bot, Loader2 } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   type KiloSessionId,
@@ -51,6 +53,7 @@ export function ChildSessionSection({
   modelOptions,
 }: Readonly<ChildSessionSectionProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const { agentName, taskName, latestActivity }: ChildSessionCardState = getChildSessionCardState(
     part,
@@ -81,11 +84,17 @@ export function ChildSessionSection({
         }}
         disabled={!sessionId}
         accessibilityRole="button"
-        accessibilityLabel={`${agentName}, ${taskName}${modelLabel ? `, ${modelLabel}` : ''}, ${latestActivityLabel}, ${status}`}
-        accessibilityHint={sessionId ? 'Open subagent session' : undefined}
+        accessibilityLabel={t('agentChat.childSession.accessibilityLabel', {
+          agentName,
+          taskName,
+          modelLabel: modelLabel ? `, ${modelLabel}` : '',
+          latestActivityLabel,
+          status,
+        })}
+        accessibilityHint={sessionId ? t('agentChat.childSession.openHint') : undefined}
         accessibilityState={{ disabled: !sessionId }}
       >
-        <ChevronRight size={14} color={colors.mutedForeground} />
+        <DirectionalChevronRight size={14} color={colors.mutedForeground} />
 
         {isRunning ? (
           <SpinningIcon icon={Loader2} size={16} color={colors.agentSky} />
@@ -137,8 +146,14 @@ export function ChildSessionMessage({
   onOpenChildSession: OpenChildSession;
   modelOptions?: SessionModelOption[];
 }>) {
+  const { t } = useTranslation();
+
   if (depth >= MAX_NESTING_DEPTH) {
-    return <Text className="text-xs text-muted-foreground">Maximum nesting depth reached.</Text>;
+    return (
+      <Text className="text-xs text-muted-foreground">
+        {t('agentChat.childSession.maxNestingDepth')}
+      </Text>
+    );
   }
 
   return (

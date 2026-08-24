@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Plus } from '@/components/ui/icons';
 import { RefreshControl, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { badgeBucketForInstance } from '@kilocode/notifications';
@@ -33,14 +34,14 @@ type Props = {
 // Compact labels for the per-card banner. Kept separate from
 // access-required-screen's fuller copy, which is for the dedicated
 // full-screen surface, not a list row.
-const ACCESS_ISSUE_LABELS = {
-  trial_expired: 'Trial ended, subscribe to keep using this instance',
-  subscription_canceled: 'Subscription inactive, resubscribe to keep using this instance',
-  subscription_past_due: 'Payment issue, update billing to keep using this instance',
-  quarantined: 'Instance quarantined, needs manual review',
-  multiple_current_conflict: 'Account needs review',
-  non_canonical_earlybird: 'Legacy plan needs review',
-} satisfies Record<AccessRequiredSubcase, string>;
+const ACCESS_ISSUE_LABEL_KEYS = {
+  trial_expired: 'kiloclaw.list.accessIssue.trialExpired',
+  subscription_canceled: 'kiloclaw.list.accessIssue.subscriptionCanceled',
+  subscription_past_due: 'kiloclaw.list.accessIssue.subscriptionPastDue',
+  quarantined: 'kiloclaw.list.accessIssue.quarantined',
+  multiple_current_conflict: 'kiloclaw.list.accessIssue.multipleCurrentConflict',
+  non_canonical_earlybird: 'kiloclaw.list.accessIssue.nonCanonicalEarlybird',
+} as const satisfies Record<AccessRequiredSubcase, string>;
 
 function splitInstances(instances: ClawInstance[]) {
   return {
@@ -111,10 +112,11 @@ export function InstanceListScreen({
   personalAccessIssue,
 }: Readonly<Props>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { personal, organizations } = splitInstances(instances);
   const personalCardAccessIssue: KiloClawCardAccessIssue | null = personalAccessIssue
     ? {
-        label: ACCESS_ISSUE_LABELS[personalAccessIssue],
+        label: t(ACCESS_ISSUE_LABEL_KEYS[personalAccessIssue]),
         onOpen: () => {
           void openExternalUrl(resolveAccessIssueUrl(personalAccessIssue), { label: 'kilo.ai' });
         },
@@ -133,7 +135,12 @@ export function InstanceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
+      <ScreenHeader
+        title={t('kiloclaw.title')}
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+      />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <TabScreenScrollView
           className="flex-1"
@@ -156,16 +163,16 @@ export function InstanceListScreen({
                   void Haptics.selectionAsync();
                   onCreate();
                 }}
-                accessibilityLabel="Create instance"
+                accessibilityLabel={t('kiloclaw.list.createInstance')}
               >
                 <Plus size={16} color={colors.primaryForeground} />
-                <Text>Create instance</Text>
+                <Text>{t('kiloclaw.list.createInstance')}</Text>
               </Button>
             </View>
           ) : null}
 
           <InstanceSection
-            title="Personal"
+            title={t('kiloclaw.list.personal')}
             instances={personal}
             onSelect={handleSelect}
             onSettingsPress={handleSettingsPress}
@@ -174,7 +181,7 @@ export function InstanceListScreen({
             accessIssue={personalCardAccessIssue}
           />
           <InstanceSection
-            title="Organizations"
+            title={t('kiloclaw.list.organizations')}
             instances={organizations}
             onSelect={handleSelect}
             onSettingsPress={handleSettingsPress}

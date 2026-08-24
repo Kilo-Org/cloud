@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 import { type VoiceInputControllerSnapshot } from './voice-input-controller';
 import { type VoiceInputStatus } from './voice-input-state';
 
@@ -33,7 +35,8 @@ export function resolveOwnerVoiceInputView(
 }
 
 type VoiceInputControlIcon = 'microphone' | 'stop';
-type VoiceInputAccessibilityLabel = 'Start voice input' | 'Stop voice input';
+/** Translated at call time, so the type is the catalog's output, not a literal union. */
+type VoiceInputAccessibilityLabel = string;
 
 export type VoiceInputControlState = {
   accessibilityLabel: VoiceInputAccessibilityLabel;
@@ -59,7 +62,7 @@ export function resolveVoiceInputControlState(
   switch (status) {
     case 'starting': {
       return {
-        accessibilityLabel: 'Start voice input',
+        accessibilityLabel: i18n.t('voiceInput.start'),
         busy: true,
         disabled: true,
         icon: 'microphone',
@@ -68,7 +71,7 @@ export function resolveVoiceInputControlState(
     }
     case 'listening': {
       return {
-        accessibilityLabel: 'Stop voice input',
+        accessibilityLabel: i18n.t('voiceInput.stop'),
         busy: false,
         disabled,
         icon: 'stop',
@@ -77,7 +80,7 @@ export function resolveVoiceInputControlState(
     }
     case 'stopping': {
       return {
-        accessibilityLabel: 'Stop voice input',
+        accessibilityLabel: i18n.t('voiceInput.stop'),
         busy: true,
         disabled: true,
         icon: 'stop',
@@ -86,7 +89,7 @@ export function resolveVoiceInputControlState(
     }
     case 'idle': {
       return {
-        accessibilityLabel: 'Start voice input',
+        accessibilityLabel: i18n.t('voiceInput.start'),
         busy: false,
         disabled,
         icon: 'microphone',

@@ -4,10 +4,12 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SheetHeader } from './sheet-header';
+import '@/i18n';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
+  I18nManager: { allowRTL: vi.fn(), isRTL: false, forceRTL: vi.fn() },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
@@ -72,7 +74,7 @@ describe('SheetHeader share action', () => {
     const shares = pressablesByLabel(renderer.root, 'Share report.pdf');
     expect(shares).toHaveLength(1);
     expect(shares[0]?.props.disabled).toBe(true);
-    expect(shares[0]?.props.accessibilityState).toEqual({ disabled: false, busy: true });
+    expect(shares[0]?.props.accessibilityState).toEqual({ disabled: true, busy: true });
 
     renderer.unmount();
   });
@@ -85,6 +87,26 @@ describe('SheetHeader share action', () => {
 
     expect(pressablesByLabel(renderer.root, 'Share report.pdf')).toHaveLength(0);
     expect(pressablesByLabel(renderer.root, 'Done')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('places Cancel at the start edge and Done at the end edge', async () => {
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    const cancels = pressablesByLabel(renderer.root, 'Cancel');
+    expect(cancels).toHaveLength(1);
+    expect(cancels[0]?.props.className).toContain('start-0');
+    expect(cancels[0]?.props.className).not.toContain('end-0');
+
+    const dones = pressablesByLabel(renderer.root, 'Done');
+    expect(dones).toHaveLength(1);
+    expect(dones[0]?.props.className).toContain('end-0');
+    expect(dones[0]?.props.className).not.toContain('start-0');
 
     renderer.unmount();
   });

@@ -23,6 +23,8 @@ import { Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 import { executeActionWithMobileFeedback } from '../execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from '../message-actions';
 import { canCopyMessage, canRetryFailedMessage, canToggleReaction } from '../message-presentation';
@@ -67,7 +69,9 @@ export function useConversationMessageActions({
           { messageId: message.id, emoji },
           {
             onError: err => {
-              toast.error(formatKiloChatError(err, 'Failed to remove reaction'));
+              toast.error(
+                formatKiloChatError(err, i18n.t('chat.messageActions.removeReactionFailed'))
+              );
             },
           }
         );
@@ -76,7 +80,9 @@ export function useConversationMessageActions({
           { messageId: message.id, emoji },
           {
             onError: err => {
-              toast.error(formatKiloChatError(err, 'Failed to add reaction'));
+              toast.error(
+                formatKiloChatError(err, i18n.t('chat.messageActions.addReactionFailed'))
+              );
             },
           }
         );
@@ -90,9 +96,9 @@ export function useConversationMessageActions({
   const handleCopyMessage = useCallback(async (message: Message) => {
     try {
       await Clipboard.setStringAsync(contentBlocksToText(message.content));
-      toast.success('Copied');
+      toast.success(i18n.t('chat.messageActions.copied'));
     } catch {
-      toast.error('Failed to copy');
+      toast.error(i18n.t('chat.messageActions.copyFailed'));
     }
   }, []);
 
@@ -136,7 +142,7 @@ export function useConversationMessageActions({
           options: actionSheet.options,
           cancelButtonIndex: actionSheet.cancelButtonIndex,
           destructiveButtonIndex: actionSheet.destructiveButtonIndex,
-          title: 'Message actions',
+          title: i18n.t('chat.messageActions.title'),
           containerStyle: { paddingBottom: bottom },
         },
         index => {
@@ -170,23 +176,29 @@ export function useConversationMessageActions({
             return;
           }
 
-          Alert.alert('Delete message?', 'This will remove the message from the conversation.', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: () => {
-                deleteMessage.mutate(
-                  { messageId: message.id, conversationId },
-                  {
-                    onError: err => {
-                      toast.error(formatKiloChatError(err, 'Failed to delete message'));
-                    },
-                  }
-                );
+          Alert.alert(
+            i18n.t('chat.messageActions.deleteTitle'),
+            i18n.t('chat.messageActions.deleteMessage'),
+            [
+              { text: i18n.t('common.cancel'), style: 'cancel' },
+              {
+                text: i18n.t('chat.messageActions.delete'),
+                style: 'destructive',
+                onPress: () => {
+                  deleteMessage.mutate(
+                    { messageId: message.id, conversationId },
+                    {
+                      onError: err => {
+                        toast.error(
+                          formatKiloChatError(err, i18n.t('chat.messageActions.deleteFailed'))
+                        );
+                      },
+                    }
+                  );
+                },
               },
-            },
-          ]);
+            ]
+          );
         }
       );
     },

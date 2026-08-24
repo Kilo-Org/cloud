@@ -5,7 +5,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
+import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 // ── React hooks ────────────────────────────────────────────────────
 vi.mock('react', async () => {
@@ -257,9 +271,7 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(true);
-    expect(findTextContent(element, t => t.includes('laptop'))).toBe(true);
-    expect(findTextContent(element, t => t.includes('kilo'))).toBe(true);
+    expect(findTextContent(element, t => t === 'Run on: laptop · kilo')).toBe(true);
   });
 
   // ── Case 5: Disconnected note — three contracts ──
@@ -274,7 +286,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
 
-    expect(findTextContent(element, t => t === REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE)).toBe(true);
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(true);
   });
 
   it('does not render the disconnected note when showInstanceDisconnectedNote is false', async () => {
@@ -288,9 +300,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
 
-    expect(findTextContent(element, t => t === REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE)).toBe(
-      false
-    );
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(false);
   });
 
   it('renders the disconnected note even when showRunOnSelector is true', async () => {
@@ -304,7 +314,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
     }) as Node;
 
-    expect(findTextContent(element, t => t === REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE)).toBe(true);
+    expect(findTextContent(element, t => t === remoteSpawnInstanceDisconnectedNote())).toBe(true);
   });
 
   // ── Case 6: Start spinner switch ──

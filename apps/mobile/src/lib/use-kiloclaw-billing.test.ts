@@ -1,10 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   type ClawBillingStatus,
   deriveTrialBannerState,
+  formatBillingDate,
   formatRemainingDays,
 } from './hooks/use-kiloclaw-billing';
+
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en-GB',
+}));
 
 describe('KiloClaw billing trial display', () => {
   it('formats active sub-day trials without saying zero days left', () => {
@@ -22,5 +27,9 @@ describe('KiloClaw billing trial display', () => {
     };
 
     expect(deriveTrialBannerState(trial)).toBe('trial_ending_very_soon');
+  });
+
+  it('formats billing dates with the resolved language', () => {
+    expect(formatBillingDate('2027-03-01T00:00:00+00:00')).toBe('01/03/2027');
   });
 });

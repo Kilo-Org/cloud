@@ -1,6 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -27,6 +28,7 @@ function reviewMemoryOwnerInput(scope: string) {
 
 export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
@@ -68,15 +70,15 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     footer = (
       <View className="items-center gap-2 px-6 py-4">
         <Text variant="muted" className="text-center text-xs">
-          Couldn&apos;t load more
+          {t('codeReviewer.reviewMemory.couldNotLoadMore')}
         </Text>
         <Button
           size="sm"
           variant="outline"
           onPress={() => void proposalsQuery.fetchNextPage()}
-          accessibilityLabel="Retry loading more"
+          accessibilityLabel={t('codeReviewer.reviewMemory.retryLoadingMore')}
         >
-          <Text>Retry</Text>
+          <Text>{t('common.retry')}</Text>
         </Button>
       </View>
     );
@@ -90,7 +92,10 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Review memory" eyebrow="Code Reviewer" />
+      <ScreenHeader
+        title={t('codeReviewer.reviewMemory.title')}
+        eyebrow={t('codeReviewer.title')}
+      />
       <FlashList
         data={happy ? proposals : []}
         keyExtractor={proposal => proposal.id}
@@ -107,7 +112,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         ListEmptyComponent={
           <View className="px-6 pt-4">
             {summaryLoading && (
-              <View accessibilityLabel="Loading review memory" className="gap-3">
+              <View accessibilityLabel={t('codeReviewer.reviewMemory.loading')} className="gap-3">
                 <Skeleton className="h-20 w-full rounded-lg" />
                 <Skeleton className="h-20 w-full rounded-lg" />
                 <Skeleton className="h-20 w-full rounded-lg" />
@@ -117,7 +122,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             {summaryError && (
               <QueryError
                 variant="server"
-                title="Could not load review memory"
+                title={t('codeReviewer.reviewMemory.couldNotLoad')}
                 placement="top"
                 onRetry={() => void summaryQuery.refetch()}
                 isRetrying={summaryQuery.isFetching}
@@ -126,14 +131,15 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
             {disabled && (
               <View className="items-center gap-3 pt-16">
-                <Text className="text-center text-sm font-medium">Review memory is off</Text>
+                <Text className="text-center text-sm font-medium">
+                  {t('codeReviewer.reviewMemory.off')}
+                </Text>
                 <Text variant="muted" className="text-center text-xs">
-                  Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md
-                  guidance.
+                  {t('codeReviewer.reviewMemory.offDescription')}
                 </Text>
                 {readOnly ? (
                   <Text variant="muted" className="text-center text-xs">
-                    Only organization owners and billing managers can enable review memory.
+                    {t('codeReviewer.reviewMemory.readOnlyDescription')}
                   </Text>
                 ) : (
                   <Button
@@ -141,16 +147,19 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
                       setEnabled.mutate(true);
                     }}
                     loading={setEnabled.isPending}
-                    accessibilityLabel="Enable review memory"
+                    accessibilityLabel={t('codeReviewer.reviewMemory.enable')}
                   >
-                    <Text>Enable review memory</Text>
+                    <Text>{t('codeReviewer.reviewMemory.enable')}</Text>
                   </Button>
                 )}
               </View>
             )}
 
             {proposalsLoading && (
-              <View accessibilityLabel="Loading proposals" className="gap-3">
+              <View
+                accessibilityLabel={t('codeReviewer.reviewMemory.loadingProposals')}
+                className="gap-3"
+              >
                 <Skeleton className="h-20 w-full rounded-lg" />
                 <Skeleton className="h-20 w-full rounded-lg" />
                 <Skeleton className="h-20 w-full rounded-lg" />
@@ -160,7 +169,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             {firstPageError && (
               <QueryError
                 variant="server"
-                title="Could not load proposals"
+                title={t('codeReviewer.reviewMemory.couldNotLoadProposals')}
                 placement="top"
                 onRetry={() => void proposalsQuery.refetch()}
                 isRetrying={proposalsQuery.isFetching}
@@ -171,8 +180,8 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
               <EmptyState
                 icon={Brain}
                 placement="top"
-                title="No proposals"
-                description="Review memory proposals appear here after Kilo analyzes maintainer replies."
+                title={t('codeReviewer.reviewMemory.noProposals')}
+                description={t('codeReviewer.reviewMemory.noProposalsDescription')}
               />
             )}
           </View>

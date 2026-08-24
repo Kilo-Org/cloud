@@ -5,6 +5,7 @@
  */
 
 import {
+  translatePush,
   type InstanceLifecycleEvent,
   type PushData,
   type SendInstanceLifecycleNotificationParams,
@@ -22,34 +23,62 @@ export type {
 const BODY_MAX_LENGTH = 100;
 const EMPTY_TICKET_ERRORS = { total: 0, retryable: 0, terminal: 0 } as const;
 
+export type PushTokenWithLocale = { token: string; locale: string | null };
+
 function truncate(text: string, max = BODY_MAX_LENGTH): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 3)}...`;
 }
 
-function buildTitle(event: InstanceLifecycleEvent, instanceName: string | null): string {
+function buildTitle(
+  locale: string | null,
+  event: InstanceLifecycleEvent,
+  instanceName: string | null
+): string {
+  // KiloClaw is a product name; it is never translated.
   const name = instanceName ?? 'KiloClaw';
-  if (event === 'ready') return `${name} is ready`;
-  return `${name} failed to start`;
+  if (event === 'ready') {
+    return translatePush(
+      locale,
+      'instanceLifecycle.ready.title',
+      { instanceName: name },
+      '{{instanceName}} is ready'
+    );
+  }
+  return translatePush(
+    locale,
+    'instanceLifecycle.startFailed.title',
+    { instanceName: name },
+    '{{instanceName}} failed to start'
+  );
 }
 
-function buildBody(event: InstanceLifecycleEvent, errorMessage: string | undefined): string {
-  if (event === 'ready') return 'Tap to start chatting.';
-  const fallback = 'Start failed.';
-  return truncate(errorMessage && errorMessage.trim().length > 0 ? errorMessage : fallback);
+function buildBody(
+  locale: string | null,
+  event: InstanceLifecycleEvent,
+  errorMessage: string | undefined
+): string {
+  if (event === 'ready')
+    return translatePush(
+      locale,
+      'instanceLifecycle.ready.body',
+      undefined,
+      'Tap to start chatting.'
+    );
+  const trimmed = errorMessage?.trim();
+  if (trimmed && trimmed.length > 0) return truncate(trimmed);
+  return translatePush(locale, 'instanceLifecycle.startFailed.body', undefined, 'Start failed.');
 }
 
 /**
  * Pure helper that builds the Expo push messages for a lifecycle event.
+ * Each token is translated with its own locale.
  */
 export function buildInstanceLifecycleMessages(
-  tokens: readonly string[],
+  tokens: readonly PushTokenWithLocale[],
   params: SendInstanceLifecycleNotificationParams
 ): ExpoPushMessage[] {
-  const title = buildTitle(params.event, params.instanceName);
-  const body = buildBody(params.event, params.errorMessage);
-
-  return tokens.map(token => {
+  return tokens.map(({ token, locale }) => {
     const data = {
       type: 'instance-lifecycle',
       event: params.event,
@@ -58,8 +87,8 @@ export function buildInstanceLifecycleMessages(
 
     return {
       to: token,
-      title,
-      body,
+      title: buildTitle(locale, params.event, params.instanceName),
+      body: buildBody(locale, params.event, params.errorMessage),
       data,
       sound: 'default',
       priority: 'high',
@@ -75,7 +104,7 @@ export type LifecycleDispatchDeps = {
    * `null` = successful read that returned no row → default-on.
    */
   readPreference: (userId: string) => Promise<boolean | null>;
-  getTokens: (userId: string) => Promise<string[]>;
+  getTokens: (userId: string) => Promise<PushTokenWithLocale[]>;
   deleteStaleTokens: (tokens: string[]) => Promise<void>;
   sendPush: (messages: ExpoPushMessage[]) => Promise<SendResult>;
   enqueueReceipts: (pairs: TicketTokenPair[]) => Promise<void>;

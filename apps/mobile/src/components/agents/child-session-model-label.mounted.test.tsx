@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChildSessionModelLabel } from './child-session-model-label';
+import '@/i18n';
 
 // The real `@/components/ui/text` loads `@rn-primitives/slot`, whose node_modules
 // `.mjs` contains JSX that this pipeline cannot transform. Provide a real context

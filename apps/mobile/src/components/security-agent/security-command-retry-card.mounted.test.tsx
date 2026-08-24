@@ -8,6 +8,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { SecurityCommandRetryCard } from './security-command-retry-card';
 
 vi.mock('react-native', () => ({

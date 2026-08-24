@@ -1,7 +1,20 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { IdentityStep } from './identity-step';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 const locationMocks = vi.hoisted(() => ({
   requestForegroundPermissionsAsync: vi.fn<() => Promise<{ status: string }>>(),

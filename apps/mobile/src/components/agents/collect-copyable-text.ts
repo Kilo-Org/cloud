@@ -5,6 +5,8 @@ import {
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
 type CopyableMessage = {
   parts: readonly Part[];
 };
@@ -33,7 +35,7 @@ function formatToolInput(input: Record<string, unknown>): string {
   try {
     return JSON.stringify(input, null, 2);
   } catch {
-    return '[unserializable input]';
+    return i18n.t('agentChat.collectCopyableText.unserializableInput');
   }
 }
 
@@ -47,7 +49,7 @@ function collectToolPartText(part: ToolPart): string {
     payload.push(part.state.output);
   }
   if (part.state.status === 'error' && part.state.error) {
-    payload.push(`Error: ${part.state.error}`);
+    payload.push(i18n.t('agentChat.collectCopyableText.errorPrefix', { error: part.state.error }));
   }
   // No payload yet (pending/running without output): nothing worth copying.
   if (payload.length === 0) {

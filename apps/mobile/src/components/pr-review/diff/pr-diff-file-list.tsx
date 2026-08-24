@@ -25,6 +25,7 @@
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
@@ -76,6 +77,7 @@ export function PrReviewFileList({
   onRequestOverview,
 }: PrReviewFileListProps) {
   const listRef = useRef<FlashListRef<ListItem>>(null);
+  const { t } = useTranslation();
   // Bounded font-scale metrics for diff rows. We pass the scale into
   // `extraData` so FlashList re-measures every row when the user changes
   // a11y text size. The metrics are also provided via context so memoized
@@ -259,16 +261,16 @@ export function PrReviewFileList({
     if (firstPageErrorState?.kind === 'not-found') {
       return (
         <TabStateMessage
-          title="Pull request unavailable"
-          message="This PR can't be opened. It may have been deleted, the repository is private, or the Kilo GitHub App isn't installed on it."
+          title={t('prReview.pullRequestUnavailable')}
+          message={t('prReview.pullRequestUnavailableDescription')}
         />
       );
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (
         <TabStateMessage
-          title="Access denied"
-          message="You don't have permission to view this pull request."
+          title={t('prReview.accessDenied')}
+          message={t('prReview.accessDeniedDescription')}
         />
       );
     }
@@ -309,7 +311,7 @@ export function PrReviewFileList({
 
   return (
     <DiffFontMetricsContext.Provider value={diffFontMetrics}>
-      <View className="flex-1" accessibilityLabel="Files list">
+      <View className="flex-1" accessibilityLabel={t('prReview.fileList.filesList')}>
         <PrDiffFileListHeader
           owner={owner}
           repo={repo}

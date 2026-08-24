@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "您的代理工作階段有更新",
+      "chatMessage": "您有一則新訊息",
+      "instanceLifecycle": "您的執行個體有更新",
+      "scheduledAction": "排定的操作有更新",
+      "lowBalance": "您的餘額需要留意",
+      "securityFinding": "安全發現需要留意"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "工作已完成"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "失敗：{{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "已中斷：{{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · 無標題",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "餘額不足提醒",
+      "body": "{{organizationName}} 的餘額已低於 ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "新的安全發現 ({{severity}})",
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA 警告",
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA 違規",
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "安全發現需要留意"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} 已就緒",
+      "body": "點選以開始聊天。"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} 啟動失敗",
+      "body": "啟動失敗。"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} 即將重新啟動",
+      "body": "排定於 {{when}} 重新啟動。"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} 重新啟動已取消",
+      "body": "先前排定的重新啟動已取消。"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} 即將升級",
+      "bodyWithTag": "於 {{when}} 升級至 {{targetImageTag}}。",
+      "bodyWithoutTag": "排定於 {{when}} 升級。"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} 升級已取消",
+      "body": "先前排定的升級已取消。"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "您的 Kilo 工作階段已就緒，可從手機控制"
+  }
+}

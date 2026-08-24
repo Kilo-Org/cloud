@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decidePrLinkPaste,
-  PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY,
-  PR_LINK_TOAST_INVALID_COPY,
+  prLinkToastClipboardEmptyCopy,
+  prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from './pr-link-paste';
 
@@ -59,7 +59,7 @@ describe('selectPrLinkClearButtonVisible', () => {
 
 describe('PR link toast copy', () => {
   it('exports the pinned toast copy strings', () => {
-    expect(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY).toBe('Clipboard is empty');
-    expect(PR_LINK_TOAST_INVALID_COPY).toBe('Not a GitHub pull request link');
+    expect(prLinkToastClipboardEmptyCopy()).toBe('Clipboard is empty');
+    expect(prLinkToastInvalidCopy()).toBe('Not a GitHub pull request link');
   });
 });

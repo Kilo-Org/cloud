@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
 import { type AddFileInput } from '@kilocode/kilo-chat-hooks';
 
+import { i18n } from '@/i18n';
 import { type ClipboardImageFile } from '@/lib/agent-attachments/clipboard-image';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 
@@ -70,8 +71,8 @@ export function clipboardImageToSelection(file: ClipboardImageFile): MessageAtta
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
   Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+    { text: i18n.t('common.cancel'), style: 'cancel' },
+    { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
   ]);
 }
 
@@ -79,8 +80,8 @@ export async function pickCameraImage(): Promise<MessageAttachment[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
-      title: 'Camera Access Disabled',
-      message: 'Allow camera access in Settings to take a photo.',
+      title: i18n.t('chat.attachmentPicker.cameraAccessDisabled'),
+      message: i18n.t('chat.attachmentPicker.cameraAccessMessage'),
     });
     return [];
   }

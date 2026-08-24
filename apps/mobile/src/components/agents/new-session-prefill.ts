@@ -1,5 +1,6 @@
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
+import { i18n } from '@/i18n';
 
 export type NewSessionPrefillParams = {
   repo?: string;
@@ -207,13 +208,13 @@ export function describePrefillFallback(input: {
   const modelDropped = modelRequested && !models.matched;
 
   if (repoDropped && modelDropped) {
-    return "The original session's repository and model are no longer available. Pick them below.";
+    return i18n.t('agentChat.newSession.prefillRepoAndModelUnavailable');
   }
   if (repoDropped) {
-    return `${prefill.repo} is no longer available. Pick a repository below.`;
+    return i18n.t('agentChat.newSession.prefillRepoUnavailable', { repo: prefill.repo });
   }
   if (modelDropped) {
-    return `${prefill.model} is no longer available. Using your default model.`;
+    return i18n.t('agentChat.newSession.prefillModelUnavailable', { model: prefill.model });
   }
   return null;
 }

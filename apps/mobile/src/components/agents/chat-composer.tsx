@@ -31,6 +31,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
@@ -196,7 +197,7 @@ export function ChatComposer({
   onStop,
   disabled = false,
   isStreaming = false,
-  placeholder = 'Send a message',
+  placeholder = i18n.t('agentChat.composer.sendMessage'),
   mode,
   onModeChange,
   model,
@@ -726,7 +727,7 @@ export function ChatComposer({
       return;
     }
     if (upload.hasFailedAttachments) {
-      toast.error('Remove or retry failed attachments first.');
+      toast.error(i18n.t('agentChat.composer.removeOrRetryFailed'));
       return;
     }
 
@@ -737,7 +738,7 @@ export function ChatComposer({
     });
 
     if (submission.type === 'attachment-error') {
-      toast.error('Attachments cannot be sent with slash commands.');
+      toast.error(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
       return;
     }
     if (submission.type === 'argument-error') {
@@ -765,7 +766,7 @@ export function ChatComposer({
         // Warn (never block) when a chip kept its original image because
         // metadata stripping failed: the photo may still carry EXIF/GPS.
         if (upload.attachments.some(attachment => attachment.metadataStripFailed === true)) {
-          toast.warning('Photo metadata could not be removed from an attachment.');
+          toast.warning(i18n.t('agentChat.composer.photoMetadataNotRemoved'));
         }
         const result = await upload.uploadPending();
         if (!result.ok) {
@@ -773,7 +774,7 @@ export function ChatComposer({
           // by `hasFailedAttachments`, and an upload failure already toasted in
           // `startUpload`.
           if (upload.isUploading) {
-            toast.error('Wait for attachments to finish uploading.');
+            toast.error(i18n.t('agentChat.composer.waitForUploads'));
           }
           return;
         }

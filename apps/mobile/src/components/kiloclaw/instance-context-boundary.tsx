@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { SearchX } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -23,6 +24,7 @@ type Props = {
  */
 export function InstanceContextBoundary({ title, context }: Readonly<Props>) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   if (context.status === 'error') {
     return (
@@ -30,7 +32,7 @@ export function InstanceContextBoundary({ title, context }: Readonly<Props>) {
         <ScreenHeader title={title} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load instance"
+            message={t('kiloclaw.instance.couldNotLoad')}
             onRetry={() => {
               context.refetch();
             }}
@@ -46,8 +48,8 @@ export function InstanceContextBoundary({ title, context }: Readonly<Props>) {
       <View className="flex-1 items-center justify-center">
         <EmptyState
           icon={SearchX}
-          title="Instance not found"
-          description="This instance may have been destroyed, or the link is no longer valid."
+          title={t('kiloclaw.instance.notFound')}
+          description={t('kiloclaw.instance.notFoundDescription')}
           action={
             <Button
               variant="outline"
@@ -55,7 +57,7 @@ export function InstanceContextBoundary({ title, context }: Readonly<Props>) {
                 router.replace('/(app)/(tabs)/(1_kiloclaw)' as Href);
               }}
             >
-              <Text>Back to instances</Text>
+              <Text>{t('kiloclaw.instance.backToInstances')}</Text>
             </Button>
           }
         />

@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "您的代理会话有更新",
+      "chatMessage": "您有一条新消息",
+      "instanceLifecycle": "您的实例有更新",
+      "scheduledAction": "计划的操作有更新",
+      "lowBalance": "您的余额需要关注",
+      "securityFinding": "安全发现需要关注"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "任务已完成"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "失败：{{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "已中断：{{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · 无标题",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "余额不足提醒",
+      "body": "{{organizationName}} 的余额已低于 ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "新的安全发现 ({{severity}})",
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA 警告",
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA 违约",
+      "body": "{{repoFullName}} 中的 {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "安全发现需要关注"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} 已就绪",
+      "body": "点击开始聊天。"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} 启动失败",
+      "body": "启动失败。"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} 即将重启",
+      "body": "计划于 {{when}} 重启。"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} 重启已取消",
+      "body": "之前计划的重启已取消。"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} 即将升级",
+      "bodyWithTag": "于 {{when}} 升级到 {{targetImageTag}}。",
+      "bodyWithoutTag": "计划于 {{when}} 升级。"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} 升级已取消",
+      "body": "之前计划的升级已取消。"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "您的 Kilo 会话已就绪，可从手机控制"
+  }
+}

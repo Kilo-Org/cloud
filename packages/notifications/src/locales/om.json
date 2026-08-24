@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Shumarra agent kee keessa bakka jijjiiramni jira",
+      "chatMessage": "Ergaa haaraa qabda",
+      "instanceLifecycle": "Instance kee keessa bakka jijjiiramni jira",
+      "scheduledAction": "Sochiin karoorfame keessa bakka jijjiiramni jira",
+      "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
+      "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Hojii xumurameera"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Hin milkoofne: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Ni ceeceefame: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Maqaa hin qabdu",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Akeekkachiisa baalansii xiqqaa",
+      "body": "Baalansiin {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
+    },
+    "securityFindingNew": {
+      "title": "Arganni nagaa haaraa ({{severity}})",
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Akeekkachiisa SLA",
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Diinqii SLA",
+      "body": "{{findingTitle}} keessa {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Arganni nagaa xiyyeeffannaa barbaada"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} qophaa'ee jira",
+      "body": "Walmaree jalqabuuf cuqaasa."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} jalqabuu hin danda'ine",
+      "body": "Jalqabni hin milkoofne."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} dhihootti deebi'ii jalqaba",
+      "body": "{{when}} deebi'ii jalqabuuf karoorfameera."
+    },
+    "restartCancelled": {
+      "title": "Deebi'ii jalqabni {{instanceName}} dhaabameera",
+      "body": "Deebi'ii jalqabni duraan karoorfame dhaabameera."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} dhihootti fooyyessa",
+      "bodyWithTag": "Gara {{targetImageTag}} fi {{when}} fooyyessi.",
+      "bodyWithoutTag": "{{when}} fooyyessuuf karoorfameera."
+    },
+    "versionChangeCancelled": {
+      "title": "Fooyyessin {{instanceName}} dhaabameera",
+      "body": "Fooyyessin duraan karoorfame dhaabameera."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Shumarra Kilo kee bilbilaa kee irraa bulchuuf qophaa'ee jira"
+  }
+}

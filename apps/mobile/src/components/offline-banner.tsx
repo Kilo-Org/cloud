@@ -1,5 +1,6 @@
 import { WifiOff } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ export function OfflineBanner() {
   const isOffline = useOfflineBannerState();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const prevRef = useRef<boolean | null>(null);
 
   // Announce committed transitions only, never the initial state: the first
@@ -25,10 +27,10 @@ export function OfflineBanner() {
   // OFFLINE_BANNER_SHOW_DELAY_MS after launch.
   useEffect(() => {
     if (prevRef.current !== null && prevRef.current !== isOffline) {
-      announceForA11y(isOffline ? 'No internet connection' : 'Internet connection restored');
+      announceForA11y(isOffline ? t('offline.noInternet') : t('offline.internetRestored'));
     }
     prevRef.current = isOffline;
-  }, [isOffline]);
+  }, [isOffline, t]);
 
   if (!isOffline) {
     return null;
@@ -43,11 +45,11 @@ export function OfflineBanner() {
         exiting={FadeOut.duration(150)}
         accessible
         accessibilityRole="alert"
-        accessibilityLabel="No internet connection"
+        accessibilityLabel={t('offline.noInternet')}
         className="flex-row items-center justify-center gap-2 bg-warn px-4 py-2"
       >
         <WifiOff size={14} color={colors.warnForeground} />
-        <Text className="text-sm font-medium text-warn-foreground">No internet connection</Text>
+        <Text className="text-sm font-medium text-warn-foreground">{t('offline.noInternet')}</Text>
       </Animated.View>
     </View>
   );

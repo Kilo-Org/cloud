@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import {
   type AgentSessionFilters,
@@ -64,7 +65,7 @@ export function usePersistedAgentSessionFilters() {
         // Keep the in-memory filters so the session still works, but the
         // change won't survive relaunch — tell the user so it's not a silent
         // surprise later.
-        toast.error('Could not save setting');
+        toast.error(i18n.t('common.couldNotSaveSetting'));
       }
     };
 

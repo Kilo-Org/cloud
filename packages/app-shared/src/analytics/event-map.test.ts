@@ -271,6 +271,9 @@ describe('app_startup validation', () => {
         splash_hidden: 85,
       }).success
     ).toBe(true);
+    expect(startupSchema.safeParse({ outcome: 'language-error', splash_hidden: 90 }).success).toBe(
+      true
+    );
   });
 
   it('rejects an invalid startup outcome', () => {

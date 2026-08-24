@@ -2,6 +2,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { type GestureResponderEvent } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -37,6 +38,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
 
   const handlePressLink = useCallback(
@@ -53,7 +55,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
         {
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
-          title: 'PR link actions',
+          title: t('agentChat.chatLink.prLinkActions'),
           message: href,
           containerStyle: { paddingBottom: bottom },
         },
@@ -77,7 +79,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       );
       return true;
     },
-    [bottom, prReviewEnabled, router, showActionSheetWithOptions]
+    [bottom, prReviewEnabled, router, showActionSheetWithOptions, t]
   );
 
   const handleLongPressLink = useCallback(
@@ -89,7 +91,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
         {
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
-          title: 'Link actions',
+          title: t('agentChat.chatLink.linkActions'),
           message: href,
           containerStyle: { paddingBottom: bottom },
         },
@@ -108,7 +110,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
         }
       );
     },
-    [bottom, prReviewEnabled, router, showActionSheetWithOptions]
+    [bottom, prReviewEnabled, router, showActionSheetWithOptions, t]
   );
 
   return (

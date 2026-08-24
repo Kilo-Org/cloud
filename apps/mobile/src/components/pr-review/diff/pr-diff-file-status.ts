@@ -1,26 +1,27 @@
 // Shared status helpers for PR file rows.
 
 import { File, FileMinus, FilePlus } from '@/components/ui/icons';
+import { i18n } from '@/i18n';
 
 export function fileStatusLabel(status: string): string {
   switch (status) {
     case 'added': {
-      return 'Added';
+      return i18n.t('prReview.fileStatus.added');
     }
     case 'removed': {
-      return 'Deleted';
+      return i18n.t('prReview.fileStatus.deleted');
     }
     case 'modified': {
-      return 'Modified';
+      return i18n.t('prReview.fileStatus.modified');
     }
     case 'renamed': {
-      return 'Renamed';
+      return i18n.t('prReview.fileStatus.renamed');
     }
     case 'copied': {
-      return 'Copied';
+      return i18n.t('prReview.fileStatus.copied');
     }
     case 'changed': {
-      return 'Changed';
+      return i18n.t('prReview.fileStatus.changed');
     }
     default: {
       return status;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 import { AlertCircle, Check, ChevronRight, Terminal } from '@/components/ui/icons';
 import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 
@@ -11,10 +13,11 @@ import { MonoScrollBlock } from './mono-scroll-block';
 export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
   const [expanded, setExpanded] = useState(attempt.status !== 'completed');
   const colors = useThemeColors();
+  const { t } = useTranslation();
   useEffect(() => {
     setExpanded(attempt.status !== 'completed');
   }, [attempt.id, attempt.status]);
-  const title = attemptTitle(attempt.status);
+  const title = attemptTitle(attempt.status, t);
   return (
     <View className="mx-4 my-2 overflow-hidden rounded-md border border-border bg-card">
       <Pressable
@@ -61,19 +64,33 @@ function AttemptIcon({ status }: { status: PreparationAttempt['status'] }) {
   return <AlertCircle size={16} color={colors.destructive} />;
 }
 
-function attemptTitle(status: PreparationAttempt['status']): string {
+function attemptTitle(status: PreparationAttempt['status'], t: TFunction): string {
   if (status === 'running') {
-    return 'Preparing environment';
+    return t('agentChat.preparation.preparingEnvironment');
   }
   if (status === 'completed') {
-    return 'Preparation complete';
+    return t('agentChat.preparation.preparationComplete');
   }
-  return 'Preparation failed';
+  return t('agentChat.preparation.preparationFailed');
+}
+
+function setupCommandLabel(step: PreparationStepSnapshot, t: TFunction): string | null {
+  if (step.kind !== 'setup_command' || step.commandIndex === undefined) {
+    return null;
+  }
+  if (step.commandCount) {
+    return t('agentChat.preparation.setupCommandOf', {
+      index: step.commandIndex + 1,
+      count: step.commandCount,
+    });
+  }
+  return t('agentChat.preparation.setupCommand', { index: step.commandIndex + 1 });
 }
 
 function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
   const [expanded, setExpanded] = useState(step.status !== 'completed');
   const colors = useThemeColors();
+  const { t } = useTranslation();
   useEffect(() => {
     setExpanded(step.status !== 'completed');
   }, [step.id, step.status]);
@@ -84,10 +101,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
     step.safeError,
     step.exitCode,
   ].some(value => value !== undefined && value !== '');
-  const label =
-    step.kind === 'setup_command' && step.commandIndex !== undefined
-      ? `Setup command ${step.commandIndex + 1}${step.commandCount ? ` of ${step.commandCount}` : ''}`
-      : step.label;
+  const label = setupCommandLabel(step, t) ?? step.label;
   return (
     <View className="overflow-hidden rounded border border-border">
       <Pressable
@@ -134,12 +148,16 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
             </Text>
           ) : null}
           {step.exitCode !== undefined ? (
-            <Text className="text-xs text-muted-foreground">Exit code: {step.exitCode}</Text>
+            <Text className="text-xs text-muted-foreground">
+              {t('agentChat.preparation.exitCode', { code: step.exitCode })}
+            </Text>
           ) : null}
           {step.outputTail ? (
             <>
               {step.outputTruncated ? (
-                <Text className="text-xs text-muted-foreground">Earlier output omitted</Text>
+                <Text className="text-xs text-muted-foreground">
+                  {t('agentChat.preparation.earlierOutputOmitted')}
+                </Text>
               ) : null}
               <MonoScrollBlock
                 content={step.outputTail}

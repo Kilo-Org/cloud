@@ -1,5 +1,7 @@
 import { type AccessibilityActionInfo } from 'react-native';
 
+import { i18n } from '@/i18n';
+
 /**
  * Accessibility contract applied to the agent `MessageBubble` subtree.
  *
@@ -46,12 +48,14 @@ type AgentMessageBubbleA11yInput = {
 export function buildAgentMessageBubbleAccessibilityProps(
   input: AgentMessageBubbleA11yInput
 ): AgentMessageBubbleAccessibility {
-  const accessibilityLabel = input.isUser ? 'User message' : 'Assistant message';
+  const accessibilityLabel = input.isUser
+    ? i18n.t('agentChat.messageBubble.userMessage')
+    : i18n.t('agentChat.messageBubble.assistantMessage');
   // Long-press opens the message-details sheet; copy remains available only
   // through the rotor custom action below.
-  const accessibilityHint = 'Long press for message details';
+  const accessibilityHint = i18n.t('agentChat.messageBubble.longPressHint');
   const accessibilityActions: AccessibilityActionInfo[] = input.canCopy
-    ? [{ name: 'copy', label: 'Copy message' }]
+    ? [{ name: 'copy', label: i18n.t('agentChat.messageDetails.copyMessage') }]
     : [];
 
   return {

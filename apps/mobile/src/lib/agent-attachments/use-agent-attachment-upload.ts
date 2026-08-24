@@ -5,6 +5,7 @@ import { File, Paths } from 'expo-file-system';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { createFrameCoalescer } from '@/lib/coalesce-frame';
@@ -305,13 +306,21 @@ export function useAgentAttachmentUpload(
       const generation = generationRef.current;
       const limit = canAddAttachments(attachments.length, candidates.length);
       if (!limit.ok) {
-        toast.error(`Maximum ${AGENT_ATTACHMENT_MAX_FILES} files allowed`);
+        toast.error(
+          i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
+            count: AGENT_ATTACHMENT_MAX_FILES,
+          })
+        );
         return;
       }
       const accepted = candidates.slice(0, limit.acceptedCount);
       if (limit.truncated) {
         toast.warning(
-          `Only adding ${limit.acceptedCount} of ${candidates.length} files (max ${AGENT_ATTACHMENT_MAX_FILES})`
+          i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
+            accepted: limit.acceptedCount,
+            total: candidates.length,
+            max: AGENT_ATTACHMENT_MAX_FILES,
+          })
         );
       }
 

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export function EmailOtpForm({
   onBack: () => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const codeRef = useRef('');
   const [hasCompleteCode, setHasCompleteCode] = useState(false);
   const authBusy = busy !== undefined;
@@ -30,10 +32,10 @@ export function EmailOtpForm({
     // Keyboard avoidance is owned by the login shell in login-screen.tsx.
     <View className="gap-3">
       <Text variant="muted" className="text-center text-sm">
-        Enter the code sent to {email}
+        {t('login.enterCodeSentTo', { email })}
       </Text>
       <Text variant="muted" className="text-center text-xs">
-        If this address is eligible, the code arrives within a minute.
+        {t('login.codeArrivalHint')}
       </Text>
       <TextInput
         className="h-12 rounded-md border border-input bg-background px-3 text-lg leading-[normal] tracking-widest text-foreground"
@@ -51,7 +53,7 @@ export function EmailOtpForm({
           codeRef.current = value;
           setHasCompleteCode(/^\d{6}$/.test(value));
         }}
-        accessibilityLabel={formFieldA11y({ label: 'Sign-in code', required: true })}
+        accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
       <Button
         size="lg"
@@ -62,23 +64,28 @@ export function EmailOtpForm({
             onVerify(codeRef.current);
           }
         }}
-        accessibilityLabel="Verify code"
+        accessibilityLabel={t('login.verifyCode')}
       >
         {busy === 'otp-verify' ? <ActivityIndicator size="small" /> : null}
-        <Text>Verify code</Text>
+        <Text>{t('login.verifyCode')}</Text>
       </Button>
       <Button
         variant="outline"
         className="flex-row gap-2"
         disabled={authBusy}
         onPress={onResend}
-        accessibilityLabel="Resend code"
+        accessibilityLabel={t('login.resendCode')}
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text>Resend code</Text>
+        <Text>{t('login.resendCode')}</Text>
       </Button>
-      <Button variant="ghost" disabled={authBusy} onPress={onBack} accessibilityLabel="Back">
-        <Text>Back</Text>
+      <Button
+        variant="ghost"
+        disabled={authBusy}
+        onPress={onBack}
+        accessibilityLabel={t('login.back')}
+      >
+        <Text>{t('login.back')}</Text>
       </Button>
     </View>
   );

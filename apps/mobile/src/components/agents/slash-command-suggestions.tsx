@@ -1,5 +1,6 @@
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { Pressable, ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ export function SlashCommandSuggestions({
   commands,
   onSelect,
 }: Readonly<SlashCommandSuggestionsProps>) {
+  const { t } = useTranslation();
   if (commands.length === 0) {
     return null;
   }
@@ -38,7 +40,7 @@ export function SlashCommandSuggestions({
             onSelect(command);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Use /${command.name}`}
+          accessibilityLabel={t('agentChat.slashCommands.useCommand', { command: command.name })}
           accessibilityHint={command.description ?? undefined}
           hitSlop={4}
           className={cn(
@@ -54,7 +56,9 @@ export function SlashCommandSuggestions({
               </Text>
             ) : null}
           </View>
-          <Text className="text-xs text-muted-foreground">Insert</Text>
+          <Text className="text-xs text-muted-foreground">
+            {t('agentChat.slashCommands.insert')}
+          </Text>
         </Pressable>
       ))}
     </ScrollView>

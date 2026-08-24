@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
@@ -293,9 +294,7 @@ export function useSecurityAgentCommands(scope: string): void {
     }
 
     if (unavailableIds.length > 0) {
-      announcingToast.error(
-        'A queued action could no longer be tracked. Refresh to see the latest state.'
-      );
+      announcingToast.error(i18n.t('securityAgent.queuedActionUntracked'));
       for (const id of unavailableIds) {
         processedTerminalIdsRef.current.add(id);
       }

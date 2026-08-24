@@ -14,8 +14,10 @@
 // overflow at AX5 (1.8x).
 
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
 
+import { type TFunction } from 'i18next';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
@@ -32,7 +34,6 @@ import {
 const COLUMN_GUTTER_WIDTH = 56;
 const COLUMN_INNER_PADDING = 2;
 const VERTICAL_PADDING = 2;
-const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
 
 type SideBySideRowProps = {
   row: SideBySideRowData;
@@ -73,6 +74,7 @@ type SideColumnProps = {
 
 function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumnProps) {
   const metrics = useDiffFontMetrics();
+  const { t } = useTranslation();
   const tokens = useMemo<HighlightToken[]>(
     () => highlightLine(line.text, language),
     [language, line.text]
@@ -80,7 +82,9 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
   const gutterColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const gutterText = sideGutterText(line, side);
-  const noNewlineLabel = line.noNewlineAtEndOfFile ? ` ${NO_NEWLINE_INDICATOR}` : '';
+  const noNewlineLabel = line.noNewlineAtEndOfFile
+    ? ` ${t('prReview.sideBySide.noNewlineAtEndOfFile')}`
+    : '';
 
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
   const gutterStyle: ViewStyle = {
@@ -159,6 +163,7 @@ const SideColumn = memo(
 );
 
 function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
+  const { t } = useTranslation();
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
   const gutterStyle: ViewStyle = {
     width: COLUMN_GUTTER_WIDTH,
@@ -169,7 +174,7 @@ function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
     <View
       className="flex-1 flex-row items-stretch bg-transparent"
       style={rowStyle}
-      accessibilityLabel="empty diff column"
+      accessibilityLabel={t('prReview.sideBySide.emptyDiffColumn')}
     >
       <View
         className="items-end justify-center"
@@ -180,21 +185,25 @@ function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
   );
 }
 
-function describeRow(row: SideBySideRowData): string {
+function describeRow(row: SideBySideRowData, t: TFunction): string {
   if (row.left && row.right) {
-    return `Old: ${row.left.line.text} | New: ${row.right.line.text}`;
+    return t('prReview.sideBySide.oldNew', {
+      old: row.left.line.text,
+      new: row.right.line.text,
+    });
   }
   if (row.left) {
-    return `Old only: ${row.left.line.text}`;
+    return t('prReview.sideBySide.oldOnly', { text: row.left.line.text });
   }
   if (row.right) {
-    return `New only: ${row.right.line.text}`;
+    return t('prReview.sideBySide.newOnly', { text: row.right.line.text });
   }
-  return 'Empty diff row';
+  return t('prReview.sideBySide.emptyDiffRow');
 }
 
 function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const metrics = useDiffFontMetrics();
   const isDark = colors.background === '#0E0E10';
   const leftLine = row.left?.line ?? null;
@@ -205,7 +214,7 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
     <View
       className="flex-row items-stretch border-b border-hair-soft"
       style={rowStyle}
-      accessibilityLabel={describeRow(row)}
+      accessibilityLabel={describeRow(row, t)}
       testID={rowKeyId}
     >
       {leftLine ? (
@@ -247,10 +256,11 @@ type HunkSideBySideHeaderProps = {
 
 export function HunkSideBySideHeader({ hunk }: Readonly<HunkSideBySideHeaderProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View
       className="border-b border-hair-soft bg-secondary px-4 py-1"
-      accessibilityLabel={`Hunk header ${hunk.header}`}
+      accessibilityLabel={t('prReview.hunkRows.hunkHeader', { header: hunk.header })}
     >
       <Text
         className="font-mono-medium text-[11px]"

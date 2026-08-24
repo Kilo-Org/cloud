@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -23,18 +24,18 @@ function InstructionsEditor({
   onSaved: () => void;
 }>) {
   const valueRef = useRef(initial);
+  const { t } = useTranslation();
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="gap-4">
       <Text className="text-sm text-muted-foreground">
-        Custom Instructions is planned for deprecation. Move these guidelines into a REVIEW.md file
-        in your repository instead.
+        {t('codeReviewer.instructions.deprecation')}
       </Text>
       <TextInput
         className="h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
         multiline
         textAlignVertical="top"
-        placeholder="e.g. Enforce our error-handling conventions…"
+        placeholder={t('codeReviewer.instructions.placeholder')}
         defaultValue={initial}
         onChangeText={text => {
           valueRef.current = text;
@@ -51,7 +52,7 @@ function InstructionsEditor({
           );
         }}
       >
-        <Text>Save</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
     </Animated.View>
   );
@@ -62,10 +63,11 @@ export default function InstructionsRoute() {
   const router = useRouter();
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
+  const { t } = useTranslation();
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Custom instructions" />
+      <ScreenHeader title={t('codeReviewer.instructions.title')} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="pt-4"

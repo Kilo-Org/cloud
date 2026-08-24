@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Tavas aģenta sesijas ir atjauninājums",
+      "chatMessage": "Tev ir jauns ziņojums",
+      "instanceLifecycle": "Tavas instances ir atjauninājums",
+      "scheduledAction": "Plānotajai darbībai ir atjauninājums",
+      "lowBalance": "Tava bilancei nepieciešama uzmanība",
+      "securityFinding": "Drošības atradumam nepieciešama uzmanība"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Uzdevums pabeigts"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Neizdevās: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Pārtraukts: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Bez nosaukuma",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Zema bilances brīdinājums",
+      "body": "{{organizationName}} bilance nokrita zem ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Jauns drošības atradums ({{severity}})",
+      "body": "{{findingTitle}} vietnē {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA brīdinājums",
+      "body": "{{findingTitle}} vietnē {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA pārkāpums",
+      "body": "{{findingTitle}} vietnē {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Drošības atradumam nepieciešama uzmanība"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ir gatava",
+      "body": "Pieskarieties, lai sāktu tērzēšanu."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} neizdevās startēt",
+      "body": "Startēšana neizdevās."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} drīz tiks restartēta",
+      "body": "Plānots restartēt {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} restartēšana atcelta",
+      "body": "Iepriekš plānotā restartēšana ir atcelta."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} drīz tiks jaunināta",
+      "bodyWithTag": "Jauninājums uz {{targetImageTag}} {{when}}.",
+      "bodyWithoutTag": "Plānots jauninājums {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} jauninājums atcelts",
+      "body": "Iepriekš plānotais jauninājums ir atcelts."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Tava Kilo sesija ir gatava vadīšanai no tālruņa"
+  }
+}

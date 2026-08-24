@@ -3,6 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -74,6 +75,7 @@ export function PrReviewOverview({
   const queryClient = useQueryClient();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
 
@@ -105,10 +107,10 @@ export function PrReviewOverview({
         });
         await WebBrowser.openBrowserAsync(getGitHubIntegrationUrl(WEB_BASE_URL, undefined, token));
       } catch {
-        toast.error('Could not open GitHub App settings');
+        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
       }
     })();
-  }, []);
+  }, [t]);
 
   if (pr.isLoading) {
     return <OverviewSkeleton />;
@@ -122,11 +124,11 @@ export function PrReviewOverview({
         <EmptyState
           placement="top"
           icon={GitPullRequest}
-          title="Pull request unavailable"
-          description="This PR can't be opened. It may have been deleted, the repository is private, or the Kilo GitHub App isn't installed on it."
+          title={t('prReview.pullRequestUnavailable')}
+          description={t('prReview.pullRequestUnavailableDescription')}
           action={
             <Button className="mt-3 w-full" onPress={handleInstallApp}>
-              <Text>Install the Kilo GitHub App</Text>
+              <Text>{t('prReview.installKiloGitHubApp')}</Text>
             </Button>
           }
         />
@@ -138,8 +140,8 @@ export function PrReviewOverview({
         <EmptyState
           placement="top"
           icon={GitPullRequest}
-          title="Access denied"
-          description="You don't have permission to view this pull request."
+          title={t('prReview.accessDenied')}
+          description={t('prReview.accessDeniedDescription')}
         />
       );
     }
@@ -148,11 +150,11 @@ export function PrReviewOverview({
         <EmptyState
           placement="top"
           icon={GitPullRequest}
-          title="GitHub connection expired"
-          description="Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+          title={t('prReview.connectionExpiredTitle')}
+          description={t('prReview.connectionExpiredDescription')}
           action={
             <Button className="mt-3 w-full" onPress={handleReconnect}>
-              <Text>Check connection</Text>
+              <Text>{t('prReview.checkConnection')}</Text>
             </Button>
           }
         />
@@ -163,7 +165,7 @@ export function PrReviewOverview({
       <QueryError
         placement="top"
         variant="server"
-        title="Could not load pull request"
+        title={t('prReview.couldNotLoadPullRequest')}
         onRetry={() => {
           void pr.refetch();
         }}
@@ -211,7 +213,7 @@ export function PrReviewOverview({
 
       <View className="gap-2">
         <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">
-          Description
+          {t('prReview.description')}
         </Text>
         {data.bodyMarkdown && data.bodyMarkdown.trim().length > 0 ? (
           <View className="rounded-lg bg-card p-4">
@@ -219,7 +221,7 @@ export function PrReviewOverview({
           </View>
         ) : (
           <Text variant="muted" className="text-sm italic">
-            No description provided.
+            {t('prReview.noDescriptionProvided')}
           </Text>
         )}
       </View>
@@ -228,12 +230,15 @@ export function PrReviewOverview({
 
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Review
+          {t('prReview.review')}
         </Text>
-        <Button onPress={handleOpenReviewSubmit} accessibilityLabel="Review pull request">
+        <Button
+          onPress={handleOpenReviewSubmit}
+          accessibilityLabel={t('prReview.reviewPullRequest')}
+        >
           <View className="flex-row items-center gap-2">
             <CheckCheck size={14} color={colors.primaryForeground} />
-            <Text>Review</Text>
+            <Text>{t('prReview.review')}</Text>
           </View>
         </Button>
       </View>
@@ -249,8 +254,10 @@ export function PrReviewOverview({
       />
 
       <Text variant="muted" className="text-xs">
-        {formatPrCounts(data.counts.additions, data.counts.deletions)} · head{' '}
-        {data.headSha.slice(0, 7)}
+        {t('prReview.headLine', {
+          counts: formatPrCounts(data.counts.additions, data.counts.deletions),
+          sha: data.headSha.slice(0, 7),
+        })}
       </Text>
     </View>
   );

@@ -4,6 +4,7 @@
 // trailing mark-viewed icon toggle flips the per-PR viewed set without
 // dismissing — non-nested sibling of the select pressable (AC6).
 
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { MarkViewedToggle } from '@/components/pr-review/diff/pr-diff-file-rows';
@@ -31,13 +32,18 @@ export function NavigatorFileRow({
   onToggleViewed: () => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { dir, basename } = splitPath(file.path);
   return (
     <View className="flex-row items-center gap-3 border-b border-hair-soft bg-card px-4 py-2.5">
       <Pressable
         onPress={onSelect}
         accessibilityRole="button"
-        accessibilityLabel={`Open ${file.path}${viewed ? ' (viewed)' : ''}`}
+        accessibilityLabel={
+          viewed
+            ? t('prReview.fileNavigator.openFileViewed', { path: file.path })
+            : t('prReview.fileNavigator.openFile', { path: file.path })
+        }
         className="min-h-11 min-w-0 flex-1 flex-row items-center active:opacity-70"
       >
         <View className="min-w-0 flex-1">
@@ -66,7 +72,7 @@ export function NavigatorFileRow({
             </Text>
             {file.patchMissing ? (
               <Text variant="muted" className="text-xs">
-                diff too large
+                {t('prReview.fileNavigator.diffTooLarge')}
               </Text>
             ) : null}
           </View>

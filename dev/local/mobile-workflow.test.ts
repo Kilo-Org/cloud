@@ -6,18 +6,21 @@ test('tab layout derives accessibility labels from the visible tab count', () =>
   const layout = fs.readFileSync('apps/mobile/src/app/(app)/(tabs)/_layout.tsx', 'utf8');
 
   assert.match(layout, /const tabCount = showKiloClawTab \? 4 : 3;/);
-  assert.match(layout, /tabBarAccessibilityLabel: tabAccessibilityLabel\('Home', 1, tabCount\)/);
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\('KiloClaw', 2, tabCount\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(t\('tabs\.home'\), 1, tabCount\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*'Agents',\s*showKiloClawTab \? 3 : 2,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(t\('tabs\.kiloclaw'\), 2, tabCount\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*'Profile',\s*showKiloClawTab \? 4 : 3,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.agents'\),\s*showKiloClawTab \? 3 : 2,\s*tabCount\s*\)/
+  );
+  assert.match(
+    layout,
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.profile'\),\s*showKiloClawTab \? 4 : 3,\s*tabCount\s*\)/
   );
 });
 

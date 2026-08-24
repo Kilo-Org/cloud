@@ -1,6 +1,7 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
+import type * as ReactI18next from 'react-i18next';
 
 import { SuggestToolCard } from './suggest-tool-card';
 
@@ -22,6 +23,13 @@ const { resolveSuggestionPresentation, manager, activeSuggestion } = vi.hoisted(
   };
 });
 
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('./suggestion-card-state', () => ({ resolveSuggestionPresentation }));
 vi.mock('./suggestion-card', () => ({ SuggestionCard: 'SuggestionCard' }));
 vi.mock('./fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
@@ -174,7 +182,7 @@ describe('SuggestToolCard — compact fixed row', () => {
       icon: 'Sparkles',
       label: 'Suggestion',
       status: 'pending',
-      accessibilityLabel: 'Suggestion tool, pending',
+      accessibilityLabel: 'agentChat.toolCard.accessibility',
     });
     expect(rowProps.onPress).toBeUndefined();
   });
@@ -191,7 +199,7 @@ describe('SuggestToolCard — compact fixed row', () => {
     }
     const rowProps = row.props as { label: string; accessibilityLabel: string };
     expect(rowProps.label).toBe('Suggestion');
-    expect(rowProps.accessibilityLabel).toBe('Suggestion tool, completed');
+    expect(rowProps.accessibilityLabel).toBe('agentChat.toolCard.accessibility');
   });
 
   it('uses the dismissed label for an error suggestion', () => {
@@ -207,6 +215,6 @@ describe('SuggestToolCard — compact fixed row', () => {
     const rowProps = row.props as { label: string; status: string; accessibilityLabel: string };
     expect(rowProps.label).toBe('Suggestion dismissed');
     expect(rowProps.status).toBe('error');
-    expect(rowProps.accessibilityLabel).toBe('Suggestion dismissed tool, error');
+    expect(rowProps.accessibilityLabel).toBe('agentChat.toolCard.accessibility');
   });
 });

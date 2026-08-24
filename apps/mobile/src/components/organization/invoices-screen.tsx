@@ -1,6 +1,6 @@
-import { formatCents } from '@kilocode/app-shared/utils';
 import { Download, FileText } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
@@ -12,6 +12,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatDate, formatMoneyFromCents } from '@/lib/format';
 import {
   type OrgInvoice,
   useOrgBoundary,
@@ -23,27 +25,41 @@ import {
   selectInvoiceRowState,
   shareOrganizationInvoicePdf,
 } from '@/lib/organization-invoice-download';
-import { cn, firstNonEmpty, formatDate } from '@/lib/utils';
+import { cn, firstNonEmpty } from '@/lib/utils';
 
 const STATUS_META = {
-  paid: { label: 'Paid', pillClass: 'bg-good', textClass: 'text-good-foreground' },
-  open: { label: 'Open', pillClass: 'bg-warn', textClass: 'text-warn-foreground' },
-  void: { label: 'Void', pillClass: 'bg-muted', textClass: 'text-muted-foreground' },
-} satisfies Record<string, { label: string; pillClass: string; textClass: string }>;
+  paid: {
+    labelKey: 'organization.invoices.statusPaid',
+    pillClass: 'bg-good',
+    textClass: 'text-good-foreground',
+  },
+  open: {
+    labelKey: 'organization.invoices.statusOpen',
+    pillClass: 'bg-warn',
+    textClass: 'text-warn-foreground',
+  },
+  void: {
+    labelKey: 'organization.invoices.statusVoid',
+    pillClass: 'bg-muted',
+    textClass: 'text-muted-foreground',
+  },
+} as const satisfies Record<string, { labelKey: string; pillClass: string; textClass: string }>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
   return (dictionary as Readonly<Record<string, V | undefined>>)[key];
 }
 
-function statusMeta(status: string): { label: string; pillClass: string; textClass: string } {
-  return (
-    lookup(STATUS_META, status) ?? {
-      label: status.charAt(0).toUpperCase() + status.slice(1),
-      pillClass: 'bg-muted',
-      textClass: 'text-muted-foreground',
-    }
-  );
+function statusMeta(status: string) {
+  const meta = lookup(STATUS_META, status);
+  if (meta) {
+    return { label: i18n.t(meta.labelKey), pillClass: meta.pillClass, textClass: meta.textClass };
+  }
+  return {
+    label: status.charAt(0).toUpperCase() + status.slice(1),
+    pillClass: 'bg-muted',
+    textClass: 'text-muted-foreground',
+  };
 }
 
 function InvoiceRowSkeleton() {
@@ -62,8 +78,13 @@ function InvoiceRowContent({
   invoice: OrgInvoice;
   trailing?: ReactNode;
 }>) {
+  const { t } = useTranslation();
   const meta = statusMeta(invoice.status);
-  const title = firstNonEmpty(invoice.number, invoice.description, 'Invoice');
+  const title = firstNonEmpty(
+    invoice.number,
+    invoice.description,
+    t('organization.invoices.invoiceFallback')
+  );
 
   return (
     <>
@@ -75,12 +96,12 @@ function InvoiceRowContent({
           </Text>
         </View>
         <Text className="text-sm font-medium text-foreground">
-          {formatCents(invoice.amount_due)}
+          {formatMoneyFromCents(invoice.amount_due, i18n.language)}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {formatDate(new Date(invoice.created * 1000))}
+          {formatDate(new Date(invoice.created * 1000), i18n.language)}
         </Text>
         <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
           <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
@@ -91,6 +112,7 @@ function InvoiceRowContent({
 }
 
 function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const [sharing, setSharing] = useState(false);
   const rowState = selectInvoiceRowState({
@@ -135,7 +157,9 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
       disabled={busy}
       accessibilityState={{ busy }}
       accessibilityRole="button"
-      accessibilityLabel={`Download invoice ${firstNonEmpty(invoice.number, invoice.description, invoice.id)}`}
+      accessibilityLabel={t('organization.invoices.downloadA11y', {
+        number: firstNonEmpty(invoice.number, invoice.description, invoice.id),
+      })}
       className="gap-1 rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
     >
       <InvoiceRowContent
@@ -153,12 +177,13 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
 }
 
 export function OrganizationInvoicesScreen() {
+  const { t } = useTranslation();
   const { organizationId, org, isResolving } = useOrgBoundary();
   const query = useOrgInvoices(organizationId);
   const paddingBottom = useTabBarBottomPadding();
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title="Invoices" />;
+    return <OrganizationBoundary title={t('organization.invoices.title')} />;
   }
 
   const isLoading = query.isLoading;
@@ -191,8 +216,8 @@ export function OrganizationInvoicesScreen() {
           ListEmptyComponent={
             <EmptyState
               icon={FileText}
-              title="No invoices"
-              description="Invoices are generated automatically each billing cycle and will appear here once your organization is billed."
+              title={t('organization.invoices.emptyTitle')}
+              description={t('organization.invoices.emptyDescription')}
             />
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
@@ -203,7 +228,7 @@ export function OrganizationInvoicesScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Invoices" />
+      <ScreenHeader title={t('organization.invoices.title')} />
       {body}
     </View>
   );

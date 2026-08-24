@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canResendInvite,
   emailStatusLabel,
-  INVITE_SUCCESS_MESSAGE,
+  getInviteSuccessMessage,
   invitedMemberActionOptions,
   useResendInvite,
 } from '@/components/organization/invited-member-row-state';
@@ -62,10 +62,10 @@ describe('emailStatusLabel', () => {
   });
 });
 
-describe('INVITE_SUCCESS_MESSAGE', () => {
+describe('getInviteSuccessMessage', () => {
   it('says the invite was created, not sent', () => {
-    expect(INVITE_SUCCESS_MESSAGE).toBe('Invite created');
-    expect(INVITE_SUCCESS_MESSAGE.toLowerCase()).not.toContain('sent');
+    expect(getInviteSuccessMessage()).toBe('Invite created');
+    expect(getInviteSuccessMessage().toLowerCase()).not.toContain('sent');
   });
 });
 

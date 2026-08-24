@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "La teva sessió d'agent té una actualització",
+      "chatMessage": "Tens un missatge nou",
+      "instanceLifecycle": "La teva instància té una actualització",
+      "scheduledAction": "Una acció programada té una actualització",
+      "lowBalance": "El teu saldo necessita atenció",
+      "securityFinding": "Una troballa de seguretat necessita atenció"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tasca completada"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Fallada: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Interrompuda: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Sense títol",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Avís de saldo baix",
+      "body": "El saldo de {{organizationName}} ha baixat per sota de ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nova troballa de seguretat ({{severity}})",
+      "body": "{{findingTitle}} a {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Avís d'SLA",
+      "body": "{{findingTitle}} a {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Incompliment d'SLA",
+      "body": "{{findingTitle}} a {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Una troballa de seguretat necessita atenció"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} està a punt",
+      "body": "Toqueu per començar a xatejar."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} no ha pogut iniciar-se",
+      "body": "L'inici ha fallat."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} es reiniciarà aviat",
+      "body": "Programat per reiniciar-se a les {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Reinici de {{instanceName}} cancel·lat",
+      "body": "El reinici programat anteriorment s'ha cancel·lat."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} s'actualitzarà aviat",
+      "bodyWithTag": "Actualització a {{targetImageTag}} a les {{when}}.",
+      "bodyWithoutTag": "Actualització programada a les {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Actualització de {{instanceName}} cancel·lada",
+      "body": "L'actualització programada anteriorment s'ha cancel·lat."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "La teva sessió de Kilo està a punt per controlar-la des del telèfon"
+  }
+}

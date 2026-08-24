@@ -11,6 +11,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
 
 import {
@@ -34,11 +35,8 @@ import {
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import {
-  ensureTermsAcceptedOutcome,
-  TERMS_CHECK_RETRY_COPY,
-  TERMS_OUTDATED_COPY,
-} from '@/components/pr-review/discussion/reply-input';
+import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
+import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
@@ -65,6 +63,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { owner, repo, number, headSha, title, eyebrow, onDismiss } = props;
   const router = useRouter();
   const pending = usePendingReview();
+  const { t } = useTranslation();
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
@@ -103,13 +102,13 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             setInlineError(null);
             setInlineErrorKind(null);
           } else if (outcome.kind === 'outdated') {
-            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
             setInlineErrorKind('bad-request');
           } else if (outcome.kind === 'unknown') {
-            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineError(i18n.t('prReview.discussion.termsCheckRetryCopy'));
             setInlineErrorKind('retryable');
           } else {
-            setInlineError('You must accept the Terms of Service to post.');
+            setInlineError(i18n.t('prReview.discussion.termsAcceptRequired'));
             setInlineErrorKind(null);
           }
         })();
@@ -146,7 +145,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     setPartialResult(null);
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
-      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
       setInlineErrorKind('bad-request');
       return;
     }
@@ -200,21 +199,25 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function confirmDelete(item: PendingReviewItem) {
-    Alert.alert('Delete pending comment?', 'This comment will be removed from the review queue.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          // Announce/focus only when the remove is confirmed synchronous:
-          // the provider's removeComment filters by id and returns nothing,
-          // so the item must still be queued at delete-confirm time.
-          const removed = pending.items.some(queued => queued.id === item.id);
-          pending.removeComment(item.id);
-          focusAfterPendingCommentRemoval(bodyInputRef, removed);
+    Alert.alert(
+      t('prReview.submit.deletePendingTitle'),
+      t('prReview.submit.deletePendingMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('prReview.submit.delete'),
+          style: 'destructive',
+          onPress: () => {
+            // Announce/focus only when the remove is confirmed synchronous:
+            // the provider's removeComment filters by id and returns nothing,
+            // so the item must still be queued at delete-confirm time.
+            const removed = pending.items.some(queued => queued.id === item.id);
+            pending.removeComment(item.id);
+            focusAfterPendingCommentRemoval(bodyInputRef, removed);
+          },
         },
-      },
-    ]);
+      ]
+    );
   }
 
   const submitDisabled =
@@ -260,7 +263,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             }}
           />
           <View className="gap-1.5">
-            <Text className="text-sm font-medium text-foreground">Summary (optional)</Text>
+            <Text className="text-sm font-medium text-foreground">
+              {t('prReview.submit.summaryOptional')}
+            </Text>
             <ReviewSummaryField
               bodyRef={bodyRef}
               inputRef={bodyInputRef}
@@ -274,7 +279,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
             <Text className="text-sm font-medium text-foreground">
-              {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
+              {queuedCount}{' '}
+              {queuedCount === 1
+                ? t('prReview.submit.pendingCommentSingular')
+                : t('prReview.submit.pendingCommentPlural')}
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item
@@ -340,9 +348,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             }}
             disabled={isSubmitting}
             className="mt-2"
-            accessibilityLabel="Cancel"
+            accessibilityLabel={t('common.cancel')}
           >
-            <Text>Cancel</Text>
+            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>

@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Plus } from '@/components/ui/icons';
 import { View } from 'react-native';
 
@@ -12,6 +13,7 @@ type NewTaskButtonProps = {
 
 export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
@@ -28,7 +30,7 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
         }}
       >
         <Plus size={18} color={colors.primaryForeground} />
-        <Text className="shrink text-center font-semibold">New coding task</Text>
+        <Text className="shrink text-center font-semibold">{t('home.newCodingTask')}</Text>
       </Button>
     </View>
   );

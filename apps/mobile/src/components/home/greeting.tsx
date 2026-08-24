@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 function timeOfDay(hour: number): 'morning' | 'afternoon' | 'evening' {
   if (hour < 12) {
     return 'morning';
@@ -8,7 +10,13 @@ function timeOfDay(hour: number): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
+const GREETING_KEYS = {
+  morning: 'home.greetingMorning',
+  afternoon: 'home.greetingAfternoon',
+  evening: 'home.greetingEvening',
+} as const;
+
 export function buildTimedGreeting(): string {
   const period = timeOfDay(new Date().getHours());
-  return `Good ${period}`;
+  return i18n.t(GREETING_KEYS[period]);
 }

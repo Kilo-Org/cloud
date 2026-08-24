@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "I-Kilo",
+    "body": {
+      "cloudAgentSession": "Iseshini yakho ye-agent inokubuyekezwa",
+      "chatMessage": "Unomlayezo omusha",
+      "instanceLifecycle": "I-instance yakho inokubuyekezwa",
+      "scheduledAction": "Isenzo esihleliwe sinokubuyekezwa",
+      "lowBalance": "Ibhalansi yakho idinga ukunakwa",
+      "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Umsebenzi uqediwe"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Ihlulekile: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Iphazamisekile: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Akunaso Isihloko",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Isaziso sebalansi ephansi",
+      "body": "Ibhalansi ye-{{organizationName}} yehle ngezansi kwe-${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Okutholakele okusha kokuphepha ({{severity}})",
+      "body": "{{findingTitle}} ku-{{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Isixwayiso se-SLA",
+      "body": "{{findingTitle}} ku-{{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Ukwephulwa kwe-SLA",
+      "body": "{{findingTitle}} ku-{{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "I-Kilo",
+      "body": "Okutholakele kokuphepha kudinga ukunakwa"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} isilungile",
+      "body": "Thepha ukuze uqale ukuxoxa."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} yehlulekile ukuqala",
+      "body": "Ukuqala kwehlulekile."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} izoqala kabusha maduze",
+      "body": "Kuhlelelwe ukuqala kabusha ngo-{{when}}."
+    },
+    "restartCancelled": {
+      "title": "Ukuqala kabusha kwe-{{instanceName}} kukhanseliwe",
+      "body": "Ukuqala kabusha okwakuhleliwe ngaphambilini kukhanseliwe."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} izothuthukiswa maduze",
+      "bodyWithTag": "Thuthukisa ku-{{targetImageTag}} ngo-{{when}}.",
+      "bodyWithoutTag": "Ukuthuthukiswa okuhleliwe ngo-{{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Ukuthuthukiswa kwe-{{instanceName}} kukhanseliwe",
+      "body": "Ukuthuthukiswa okwakuhleliwe ngaphambilini kukhanseliwe."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Iseshini yakho ye-Kilo isilungile ukuthi ilawulwe kusuka kufoni yakho"
+  }
+}

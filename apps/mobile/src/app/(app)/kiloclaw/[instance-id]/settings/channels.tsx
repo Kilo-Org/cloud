@@ -1,5 +1,6 @@
 import { MessageSquare } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -21,9 +22,12 @@ export default function ChannelsScreen() {
   const mutations = useKiloClawMutations(organizationId);
 
   const isLoading = catalogQuery.isPending;
+  const { t } = useTranslation();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Channels" context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.channels.title')} context={instanceContext} />
+    );
   }
 
   function renderBody() {
@@ -41,7 +45,7 @@ export default function ChannelsScreen() {
       return (
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load channels"
+            message={t('kiloclaw.channels.couldNotLoad')}
             onRetry={() => {
               void catalogQuery.refetch();
             }}
@@ -55,8 +59,8 @@ export default function ChannelsScreen() {
         <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={MessageSquare}
-            title="No channels available"
-            description="Channel integrations will appear here."
+            title={t('kiloclaw.channels.noChannels')}
+            description={t('kiloclaw.channels.noChannelsDescription')}
           />
         </View>
       );
@@ -77,9 +81,11 @@ export default function ChannelsScreen() {
                 key={channel.id}
                 item={channel}
                 mutations={mutations}
-                removeAlertTitle="Disconnect channel"
-                removeAlertMessage={`Remove ${channel.label}? This channel will be disconnected.`}
-                successMessage={`${channel.label} connected`}
+                removeAlertTitle={t('kiloclaw.channels.disconnectTitle')}
+                removeAlertMessage={t('kiloclaw.channels.disconnectMessage', {
+                  label: channel.label,
+                })}
+                successMessage={t('kiloclaw.channels.connected', { label: channel.label })}
               />
             ))}
           </Animated.View>
@@ -90,7 +96,7 @@ export default function ChannelsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Channels" />
+      <ScreenHeader title={t('kiloclaw.channels.title')} />
       {renderBody()}
     </View>
   );

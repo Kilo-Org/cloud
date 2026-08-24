@@ -1,7 +1,8 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
 import { type ReactNode, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -12,6 +13,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatDate, formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
@@ -19,7 +22,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
-import { cn, firstNonEmpty, formatDate, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function humanizeCategory(category: string): string {
   const spaced = category.replaceAll('_', ' ');
@@ -36,12 +39,13 @@ function CreditRowSkeleton() {
 }
 
 function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>) {
+  const { t } = useTranslation();
   const amount = fromMicrodollars(transaction.amount_microdollars);
   const isPositive = amount >= 0;
   const title = firstNonEmpty(
     transaction.description,
     transaction.credit_category ? humanizeCategory(transaction.credit_category) : undefined,
-    'Credit transaction'
+    t('organization.creditActivity.transactionFallback')
   );
 
   return (
@@ -52,16 +56,18 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
           {isPositive ? '+' : '-'}
-          {formatDollars(Math.abs(amount))}
+          {formatMoney(Math.abs(amount), i18n.language)}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {formatDate(parseTimestamp(transaction.created_at))}
+          {formatDate(parseTimestamp(transaction.created_at), i18n.language)}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            Expires {formatDate(parseTimestamp(transaction.expiry_date))}
+            {t('organization.creditActivity.expires', {
+              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language),
+            })}
           </Text>
         )}
       </View>
@@ -80,6 +86,7 @@ function firstSearchParam(value: string | string[] | undefined): string | undefi
 }
 
 export function OrganizationCreditActivityScreen() {
+  const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
   const orgParam = firstSearchParam(orgParamRaw);
 
@@ -122,7 +129,12 @@ export function OrganizationCreditActivityScreen() {
     org == null;
 
   if (showBoundary) {
-    return <OrganizationBoundary title="Credit activity" organizationIdOverride={orgParam} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.creditActivity.title')}
+        organizationIdOverride={orgParam}
+      />
+    );
   }
 
   const isLoading = query.isLoading;
@@ -155,8 +167,8 @@ export function OrganizationCreditActivityScreen() {
           ListEmptyComponent={
             <EmptyState
               icon={Receipt}
-              title="No credit activity"
-              description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
+              title={t('organization.creditActivity.emptyTitle')}
+              description={t('organization.creditActivity.emptyDescription')}
             />
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
@@ -167,7 +179,7 @@ export function OrganizationCreditActivityScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Credit activity" />
+      <ScreenHeader title={t('organization.creditActivity.title')} />
       {body}
     </View>
   );

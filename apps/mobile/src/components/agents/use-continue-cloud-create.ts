@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { i18n } from '@/i18n';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -61,7 +62,7 @@ export function useContinueCloudCreate(
       // A failed outbox read reads as no stored rows, so refuse instead of
       // minting a fresh key over a row whose POST the server may have accepted.
       if (!(await whenLoaded())) {
-        throw new Error('Could not read pending sessions. Try again.');
+        throw new Error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
       }
       const operationKey =
         getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);

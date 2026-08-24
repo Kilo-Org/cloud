@@ -1,6 +1,7 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { FileIcon, Share2 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { Text } from '@/components/ui/text';
@@ -24,6 +25,7 @@ function FileChip({
   partId: string;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const uri = useToolCardImageUri(partId);
   const available = uri !== undefined;
 
@@ -31,7 +33,9 @@ function FileChip({
     return (
       <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
         <FileIcon size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">File unavailable in this session.</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('agentChat.filePart.fileUnavailableInSession')}
+        </Text>
       </View>
     );
   }
@@ -44,14 +48,14 @@ function FileChip({
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
       if (reason === 'sharing-unavailable') {
-        toast.error('File sharing is not available on this device.');
+        toast.error(t('agentChat.filePart.sharingUnavailable'));
         return;
       }
       if (error instanceof ShareRemoteFileError) {
-        toast.error('Failed to share file. Please try again.');
+        toast.error(t('agentChat.filePart.shareFailedRetry'));
         return;
       }
-      toast.error('Share failed');
+      toast.error(t('agentChat.filePart.shareFailed'));
     }
   }
 
@@ -70,7 +74,7 @@ function FileChip({
           void handleShare();
         }}
         accessibilityRole="button"
-        accessibilityLabel={`Share ${label}`}
+        accessibilityLabel={t('common.share', { title: label })}
       >
         <Share2 size={16} color={colors.mutedForeground} />
       </Pressable>
@@ -79,6 +83,7 @@ function FileChip({
 }
 
 export function ToolCardFileAttachments({ part }: Readonly<{ part: ToolPart }>) {
+  const { t } = useTranslation();
   const attachments = getToolFileAttachments(part);
   if (attachments.length === 0) {
     return null;
@@ -93,7 +98,7 @@ export function ToolCardFileAttachments({ part }: Readonly<{ part: ToolPart }>) 
     return null;
   }
 
-  const label = first.filename ?? 'File';
+  const label = first.filename ?? t('agentChat.filePart.defaultName');
 
   return (
     <View className="gap-2">

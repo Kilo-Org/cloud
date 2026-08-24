@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Jūsų agento sesija turi atnaujinimą",
+      "chatMessage": "Turite naują žinutę",
+      "instanceLifecycle": "Jūsų egzempliorius turi atnaujinimą",
+      "scheduledAction": "Suplanuotas veiksmas turi atnaujinimą",
+      "lowBalance": "Jūsų balansui reikia dėmesio",
+      "securityFinding": "Saugumo radiniui reikia dėmesio"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Užduotis baigta"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Nepavyko: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Nutraukta: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Be pavadinimo",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Mažo balanso pranešimas",
+      "body": "{{organizationName}} balansas nukrito žemiau ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Naujas saugumo radinys ({{severity}})",
+      "body": "{{findingTitle}} {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA įspėjimas",
+      "body": "{{findingTitle}} {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA pažeidimas",
+      "body": "{{findingTitle}} {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Saugumo radiniui reikia dėmesio"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} paruoštas",
+      "body": "Bakstelėkite, kad pradėtumėte pokalbį."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} nepavyko paleisti",
+      "body": "Paleisti nepavyko."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} netrukus bus iš naujo paleistas",
+      "body": "Suplanuota paleisti iš naujo {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} perkrovimas atšauktas",
+      "body": "Anksčiau suplanuotas perkrovimas atšauktas."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} netrukus bus atnaujintas",
+      "bodyWithTag": "Atnaujinti į {{targetImageTag}} {{when}}.",
+      "bodyWithoutTag": "Suplanuotas atnaujinimas {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} atnaujinimas atšauktas",
+      "body": "Anksčiau suplanuotas atnaujinimas atšauktas."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Jūsų Kilo sesija paruošta valdyti iš telefono"
+  }
+}

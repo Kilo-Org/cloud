@@ -14,7 +14,6 @@ import {
   CircleCheck,
   KeyRound,
   ListTodo,
-  type LucideIcon,
   MessageSquare,
   RefreshCw,
   ShieldAlert,
@@ -22,6 +21,7 @@ import {
   Wallet,
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -48,6 +48,7 @@ import {
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getDevicePushToken,
@@ -77,6 +78,7 @@ function categoryFromVariables(
 type InlineRetryProps = Readonly<{ label: string; color: string; onPress: () => void }>;
 
 function InlineRetry({ label, color, onPress }: InlineRetryProps) {
+  const { t } = useTranslation();
   return (
     <Pressable
       className="flex-row items-center gap-1 active:opacity-70"
@@ -85,62 +87,57 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
       accessibilityLabel={label}
     >
       <RefreshCw size={14} color={color} />
-      <Text className="text-xs font-medium text-destructive">Retry</Text>
+      <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
     </Pressable>
   );
 }
 
-type CategoryMeta = Readonly<{
-  key: NotificationCategoryKey;
-  title: string;
-  subtitle: string;
-  icon: LucideIcon;
-}>;
-
-const CATEGORY_META: readonly CategoryMeta[] = [
+const CATEGORY_META = [
   {
     key: 'chatMessages',
-    title: 'Chat messages',
-    subtitle: 'replies in your conversations',
+    titleKey: 'notifications.category.chatMessagesTitle',
+    subtitleKey: 'notifications.category.chatMessagesSubtitle',
     icon: MessageSquare,
   },
   {
     key: 'agentAttention',
-    title: 'Agent needs you',
-    subtitle: 'questions, permission, input needed',
+    titleKey: 'notifications.category.agentAttentionTitle',
+    subtitleKey: 'notifications.category.agentAttentionSubtitle',
     icon: KeyRound,
   },
   {
     key: 'agentUpdates',
-    title: 'Agent updates',
-    subtitle: 'mid-task messages from the agent',
+    titleKey: 'notifications.category.agentUpdatesTitle',
+    subtitleKey: 'notifications.category.agentUpdatesSubtitle',
     icon: Bot,
   },
   {
     key: 'sessionStatus',
-    title: 'Session status',
-    subtitle: 'finished / failed / ready to control',
+    titleKey: 'notifications.category.sessionStatusTitle',
+    subtitleKey: 'notifications.category.sessionStatusSubtitle',
     icon: ListTodo,
   },
   {
     key: 'kiloclawActivity',
-    title: 'KiloClaw activity',
-    subtitle: 'instance ready/failed, scheduled actions',
+    titleKey: 'notifications.category.kiloclawActivityTitle',
+    subtitleKey: 'notifications.category.kiloclawActivitySubtitle',
     icon: Sparkles,
   },
   {
     key: 'balanceAlerts',
-    title: 'Balance alerts',
-    subtitle: 'low organization balance warnings',
+    titleKey: 'notifications.category.balanceAlertsTitle',
+    subtitleKey: 'notifications.category.balanceAlertsSubtitle',
     icon: Wallet,
   },
   {
     key: 'securityFindings',
-    title: 'Security findings',
-    subtitle: 'new findings and SLA reminders',
+    titleKey: 'notifications.category.securityFindingsTitle',
+    subtitleKey: 'notifications.category.securityFindingsSubtitle',
     icon: ShieldAlert,
   },
 ] as const;
+
+type CategoryMeta = (typeof CATEGORY_META)[number];
 
 /** Per-category availability from the preferences response `capabilities` map. */
 type NotificationCategoryCapability = Readonly<{
@@ -170,6 +167,7 @@ function CategoryRow({
   onChange,
 }: CategoryRowProps) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const Icon = meta.icon;
   // Display the optimistic value while a mutation is in flight; otherwise
   // fall back to the persisted value (or the default-ON semantics when the
@@ -183,7 +181,10 @@ function CategoryRow({
   // `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
-  const subtitle = unavailable ? (capability.unavailableReason ?? meta.subtitle) : meta.subtitle;
+  const title = t(meta.titleKey);
+  const subtitle = unavailable
+    ? (capability.unavailableReason ?? t(meta.subtitleKey))
+    : t(meta.subtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -192,7 +193,7 @@ function CategoryRow({
             drops every label below the 4.5:1 text minimum. The Switch renders
             its own disabled appearance. */}
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
-          {meta.title}
+          {title}
         </Text>
         <Text variant="muted" className="mt-0.5 text-xs">
           {subtitle}
@@ -202,7 +203,7 @@ function CategoryRow({
       <Switch
         value={displayedValue}
         disabled={isDisabled}
-        accessibilityLabel={meta.title}
+        accessibilityLabel={title}
         accessibilityState={{ disabled: isDisabled, busy: isPending }}
         onValueChange={value => {
           if (isDisabled) {
@@ -219,6 +220,7 @@ export function NotificationsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const showKiloClawActivity = useKiloClawTabVisible();
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
@@ -280,7 +282,7 @@ export function NotificationsScreen() {
   });
   const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =
-    deviceToken != null && (pushTokens ?? []).some(t => t.token === deviceToken);
+    deviceToken != null && (pushTokens ?? []).some(pushToken => pushToken.token === deviceToken);
 
   // Each *Settled is isFetched || isError for the enabled query. Do not invent
   // a "disabled → settled" mapping for deviceToken — deriveGateSettled
@@ -333,7 +335,7 @@ export function NotificationsScreen() {
         if (deviceToken) {
           queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
             ...(old ?? []),
-            { token: deviceToken, platform: getPlatform() },
+            { token: deviceToken, platform: getPlatform(), locale: getResolvedLanguage() },
           ]);
         }
         return { previous, generation };
@@ -442,14 +444,10 @@ export function NotificationsScreen() {
   const handleEnableNotifications = useCallback(async () => {
     const currentStatus = await getNotificationPermissionStatus();
     if (currentStatus === 'denied') {
-      Alert.alert(
-        'Notifications disabled',
-        'To enable notifications, turn them on in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-        ]
-      );
+      Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
+      ]);
       return;
     }
     setIsTogglingPermission(true);
@@ -463,7 +461,7 @@ export function NotificationsScreen() {
         // switch mid-flow and allow a re-entrant enable/disable.
         const token = await registerForPushNotifications();
         if (!token) {
-          toast.error('Registration failed. Check your notification permissions.');
+          toast.error(t('notifications.registrationFailed'));
           return;
         }
         setIsRegisteringToken(true);
@@ -472,6 +470,9 @@ export function NotificationsScreen() {
             token,
             platform: getPlatform(),
             appVersion: Application.nativeApplicationVersion ?? undefined,
+            // Without this the row is written with a null locale, so every push
+            // to a device enrolled from this screen arrives in English.
+            locale: getResolvedLanguage(),
           });
         } catch {
           // registerToken's onError already surfaced the toast; swallow here so
@@ -484,22 +485,18 @@ export function NotificationsScreen() {
       // A failure here comes from requestPermissionsAsync or
       // registerForPushNotifications (the registration mutation reports its own
       // error above), so surface the feedback the previous card also showed.
-      toast.error('Could not enable notifications. Please try again.');
+      toast.error(t('notifications.couldNotEnable'));
     } finally {
       setIsTogglingPermission(false);
     }
-  }, [queryClient, registerToken]);
+  }, [queryClient, registerToken, t]);
 
   const handleDisableNotifications = useCallback(() => {
-    Alert.alert(
-      'Disable notifications',
-      'To disable notifications, turn them off in your device settings.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-      ]
-    );
-  }, []);
+    Alert.alert(t('notifications.disableTitle'), t('notifications.disableMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
+    ]);
+  }, [t]);
 
   const isMasterBusy = isTogglingPermission || isRegisteringToken;
   const masterLeading = deriveMasterGateLeadingPresentation({
@@ -527,7 +524,7 @@ export function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Notifications" />
+      <ScreenHeader title={t('notifications.title')} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pt-4"
@@ -536,23 +533,23 @@ export function NotificationsScreen() {
         {/* Master gate */}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Push
+            {t('notifications.push')}
           </Text>
           <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
             {masterLeading === 'neutral' && <Skeleton className="h-[18px] w-[18px] rounded" />}
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
-              <Text className="text-sm font-medium">Notifications enabled</Text>
+              <Text className="text-sm font-medium">{t('notifications.enabled')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
-                  Push notifications are on for this device.
+                  {t('notifications.onDescription')}
                 </Text>
               )}
               {masterLeading === 'off' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
-                  Permission or device registration is off.
+                  {t('notifications.offDescription')}
                 </Text>
               )}
             </View>
@@ -564,7 +561,7 @@ export function NotificationsScreen() {
             {permissionLoading && <Skeleton className="h-[31px] w-[51px] rounded-full" />}
             {!permissionLoading && permissionError && (
               <InlineRetry
-                label="Retry checking notification permission"
+                label={t('notifications.retryPermission')}
                 color={colors.destructive}
                 onPress={() => void refetchPermission()}
               />
@@ -578,7 +575,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel="Notifications enabled"
+                  accessibilityLabel={t('notifications.enabled')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {
@@ -603,9 +600,9 @@ export function NotificationsScreen() {
               <View className="flex-row items-start gap-3">
                 <CircleCheck size={18} color={colors.foreground} />
                 <View className="flex-1 gap-1">
-                  <Text className="text-sm font-medium">Enable notifications</Text>
+                  <Text className="text-sm font-medium">{t('notifications.enable')}</Text>
                   <Text variant="muted" className="text-xs">
-                    Turn on push notifications to receive category alerts on this device.
+                    {t('notifications.enableDescription')}
                   </Text>
                 </View>
               </View>
@@ -613,14 +610,14 @@ export function NotificationsScreen() {
                 onPress={() => void handleEnableNotifications()}
                 disabled={isMasterBusy}
                 accessibilityRole="button"
-                accessibilityLabel="Enable notifications"
+                accessibilityLabel={t('notifications.enable')}
                 className="mt-3 items-center rounded-lg bg-primary py-2.5 active:opacity-80"
               >
                 {isMasterBusy ? (
                   <ActivityIndicator size="small" color={colors.primaryForeground} />
                 ) : (
                   <Text className="text-sm font-semibold text-primary-foreground">
-                    Enable notifications
+                    {t('notifications.enable')}
                   </Text>
                 )}
               </Pressable>
@@ -631,7 +628,7 @@ export function NotificationsScreen() {
         {/* Categories */}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Categories
+            {t('notifications.categories')}
           </Text>
           {preferencesLoading && (
             <>
@@ -653,7 +650,7 @@ export function NotificationsScreen() {
           {preferencesError && (
             <View className="rounded-lg bg-secondary p-3">
               <InlineRetry
-                label="Retry loading notification categories"
+                label={t('notifications.retryCategories')}
                 color={colors.destructive}
                 onPress={() => void refetchPreferences()}
               />
@@ -692,7 +689,7 @@ export function NotificationsScreen() {
         {/* Message previews */}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Message previews
+            {t('notifications.messagePreviews')}
           </Text>
           {preferencesLoading && (
             <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
@@ -706,7 +703,7 @@ export function NotificationsScreen() {
           {preferencesError && (
             <View className="rounded-lg bg-secondary p-3">
               <InlineRetry
-                label="Retry loading notification previews"
+                label={t('notifications.retryPreviews')}
                 color={colors.destructive}
                 onPress={() => void refetchPreferences()}
               />
@@ -718,12 +715,14 @@ export function NotificationsScreen() {
                 <Text
                   className={cn('text-sm font-medium', previewDisabled && 'text-muted-foreground')}
                 >
-                  {previewIsFull ? 'Always' : 'When unlocked'}
+                  {previewIsFull
+                    ? t('notifications.previewAlways')
+                    : t('notifications.previewWhenUnlocked')}
                 </Text>
                 <Text variant="muted" className="mt-0.5 text-xs">
                   {previewIsFull
-                    ? 'Notifications show the message text on your lock screen.'
-                    : 'Notifications show that something happened. Open Kilo to read it.'}
+                    ? t('notifications.previewFullDescription')
+                    : t('notifications.previewGenericDescription')}
                 </Text>
               </View>
               {isPreviewPending && (
@@ -731,7 +730,7 @@ export function NotificationsScreen() {
               )}
               {previewErrorCode !== undefined && !previewTerminal && (
                 <InlineRetry
-                  label="Retry saving notification previews"
+                  label={t('notifications.retrySavingPreviews')}
                   color={colors.destructive}
                   onPress={() => {
                     handlePreviewChange(previewIntent);
@@ -741,7 +740,7 @@ export function NotificationsScreen() {
               <Switch
                 value={previewIsFull}
                 disabled={previewDisabled}
-                accessibilityLabel="Show full previews"
+                accessibilityLabel={t('notifications.showFullPreviews')}
                 accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
                 onValueChange={value => {
                   if (previewDisabled) {
@@ -758,7 +757,7 @@ export function NotificationsScreen() {
         {(deviceTokenError || pushTokensError) && !permissionError && (
           <View className="rounded-lg bg-secondary p-3">
             <InlineRetry
-              label="Retry loading device push registration"
+              label={t('notifications.retryDeviceRegistration')}
               color={colors.destructive}
               onPress={() => {
                 void refetchDeviceToken();

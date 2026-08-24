@@ -1,6 +1,8 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
+
 export type ReadFileDisplay = {
   path: string;
   text: string;
@@ -189,10 +191,10 @@ function buildFooter(display: ReadFileDisplay): string | undefined {
   const a = formatGroupedNumber(lineStart);
   const b = formatGroupedNumber(lineEnd);
   if (truncated && lineEnd >= totalLines) {
-    return `lines ${a}–${b} (truncated)`;
+    return i18n.t('agentChat.readToolMarkdown.linesTruncated', { start: a, end: b });
   }
   const n = formatGroupedNumber(totalLines);
-  return `lines ${a}–${b} of ${n}`;
+  return i18n.t('agentChat.readToolMarkdown.linesOf', { start: a, end: b, total: n });
 }
 
 /** Shared completed-status display lookup for the markdown and code bodies. */

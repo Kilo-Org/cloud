@@ -14,9 +14,22 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { PrDiffFloatingActions } from './pr-diff-floating-actions';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 import { type SelectionState } from '@/lib/pr-review/diff-selection';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 const routerPush = vi.fn();
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));

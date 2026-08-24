@@ -1,5 +1,6 @@
 import { Download } from '@/components/ui/icons';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Linking, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,6 +32,7 @@ function makeContentContainerStyle({ top, bottom }: Insets) {
 
 export function ForceUpdateScreen() {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { top, bottom } = useSafeAreaInsets();
   const [storeOpenFailed, setStoreOpenFailed] = useState(false);
 
@@ -50,21 +52,21 @@ export function ForceUpdateScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Download size={48} color={colors.foreground} />
-      <Text className="mt-6 text-center text-2xl font-bold">Update required</Text>
+      <Text className="mt-6 text-center text-2xl font-bold">{t('forceUpdate.title')}</Text>
       <Text className="mt-3 text-center text-base text-muted-foreground">
-        A new version of Kilo is available. Please update to continue.
+        {t('forceUpdate.description')}
       </Text>
       <Button className="mt-8 w-full" size="lg" onPress={() => void openStore()}>
-        <Text>Update now</Text>
+        <Text>{t('forceUpdate.updateNow')}</Text>
       </Button>
 
       {storeOpenFailed && (
         <View className="mt-4 w-full gap-3">
           <Text className="text-center text-sm text-destructive">
-            Could not open the app store.
+            {t('forceUpdate.couldNotOpenStore')}
           </Text>
           <Button variant="outline" className="w-full" onPress={() => void openStore()}>
-            <Text>Try again</Text>
+            <Text>{t('common.tryAgain')}</Text>
           </Button>
           <Button
             variant="outline"
@@ -73,7 +75,7 @@ export function ForceUpdateScreen() {
               void openExternalUrl(STORE_URL, { label: 'app store page' });
             }}
           >
-            <Text>Open in browser</Text>
+            <Text>{t('common.openInBrowser')}</Text>
           </Button>
         </View>
       )}

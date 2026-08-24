@@ -9,11 +9,8 @@ import { View } from 'react-native';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
-import {
-  ensureTermsAcceptedOutcome,
-  TERMS_CHECK_RETRY_COPY,
-  TERMS_OUTDATED_COPY,
-} from '@/components/pr-review/discussion/reply-input';
+import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
+import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 
@@ -78,15 +75,15 @@ export function useComposerInlineError(error: unknown, isEdit: boolean) {
           setInlineErrorKind(null);
           setInlineErrorIsLocal(false);
         } else if (outcome.kind === 'outdated') {
-          setInlineError(TERMS_OUTDATED_COPY);
+          setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
           setInlineErrorKind('bad-request');
           setInlineErrorIsLocal(false);
         } else if (outcome.kind === 'unknown') {
-          setInlineError(TERMS_CHECK_RETRY_COPY);
+          setInlineError(i18n.t('prReview.discussion.termsCheckRetryCopy'));
           setInlineErrorKind('retryable');
           setInlineErrorIsLocal(false);
         } else {
-          setInlineError('You must accept the Terms of Service to post.');
+          setInlineError(i18n.t('prReview.discussion.termsAcceptRequired'));
           setInlineErrorKind(null);
           setInlineErrorIsLocal(true);
         }

@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { AlertTriangle, ExternalLink, Settings2 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { isTransitionalStatus, statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
 import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
@@ -11,6 +12,7 @@ import { agentColor } from '@/lib/agent-color';
 import { useKiloClawStatus, useKiloClawStatusQueryKey } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
+import { i18n } from '@/i18n';
 
 export type KiloClawCardAccessIssue = {
   label: string;
@@ -51,12 +53,17 @@ function resolveAccessibilityLabel(
   accessIssue: KiloClawCardAccessIssue | null | undefined
 ): string {
   if (accessIssue) {
-    return `${displayName} needs attention: ${accessIssue.label}`;
+    return i18n.t('kiloclaw.instanceCard.needsAttention', {
+      name: displayName,
+      label: accessIssue.label,
+    });
   }
   if (unreadCount > 0) {
-    return `Open ${displayName}, ${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}`;
+    return unreadCount === 1
+      ? i18n.t('kiloclaw.instanceCard.openUnreadOne', { name: displayName, count: unreadCount })
+      : i18n.t('kiloclaw.instanceCard.openUnreadMany', { name: displayName, count: unreadCount });
   }
-  return `Open ${displayName}`;
+  return i18n.t('kiloclaw.instanceCard.open', { name: displayName });
 }
 
 export function KiloClawCard({
@@ -68,6 +75,7 @@ export function KiloClawCard({
 }: Readonly<KiloClawCardProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   // Peek at the latest cached status (non-subscribing) so we can choose the
   // poll cadence before subscribing. Falls back to the list's status when
@@ -164,7 +172,7 @@ export function KiloClawCard({
             onPress={handleSettingsPress}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={`Open settings for ${displayName}`}
+            accessibilityLabel={t('kiloclaw.instanceCard.openSettings', { name: displayName })}
             className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
           >
             <Settings2 size={18} color={colors.mutedForeground} strokeWidth={1.75} />
@@ -175,7 +183,7 @@ export function KiloClawCard({
         <Pressable
           onPress={handleAccessIssuePress}
           accessibilityRole="button"
-          accessibilityLabel={`Fix on kilo.ai: ${accessIssue.label}`}
+          accessibilityLabel={t('kiloclaw.instanceCard.fixOnKiloAi', { label: accessIssue.label })}
           className="mt-3 flex-row items-center gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2 active:opacity-70"
         >
           <AlertTriangle size={14} color={colors.warn} />

@@ -4,8 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ToolDiffModel } from '../tool-diff-model';
 import { EditToolCard, EditToolCardBody } from './edit-tool-card';
 import * as React from 'react';
+import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/icons', () => ({ Pencil: 'Pencil' }));
 // Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
 vi.mock('@/components/ui/text', async () => {
@@ -193,7 +201,7 @@ describe('EditToolCard — fixed row', () => {
       icon: 'Pencil',
       label: 'app.tsx',
       status: 'completed',
-      accessibilityLabel: 'app.tsx tool, completed',
+      accessibilityLabel: 'agentChat.toolCard.accessibilityLabel',
     });
     expect(rowProps.badge).toBeUndefined();
   });

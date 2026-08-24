@@ -11,6 +11,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { Columns2, Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
@@ -46,6 +47,7 @@ export function PrDiffFileListHeader({
   const router = useRouter();
   const isTablet = useIsTablet();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const navigatorHref = useMemo<Href>(
     () => ({ pathname: FILE_NAVIGATOR_PATH, params: { owner, repo, number } }),
@@ -61,13 +63,16 @@ export function PrDiffFileListHeader({
       <Pressable
         onPress={handleOpenNavigator}
         accessibilityRole="button"
-        accessibilityLabel="Open file navigator"
+        accessibilityLabel={t('prReview.fileList.openNavigator')}
         className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
         hitSlop={6}
       >
         <Rows3 size={14} color={colors.mutedForeground} />
         <Text className="text-xs font-medium text-foreground">
-          Files · {viewedCount.toLocaleString()} of {totalListed.toLocaleString()} viewed
+          {t('prReview.fileList.filesViewed', {
+            viewed: viewedCount.toLocaleString(),
+            total: totalListed.toLocaleString(),
+          })}
         </Text>
         {isTruncated ? (
           <Text
@@ -76,7 +81,7 @@ export function PrDiffFileListHeader({
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
             style={{ color: colors.mutedForeground }}
           >
-            (listed)
+            {t('prReview.fileList.listed')}
           </Text>
         ) : null}
       </Pressable>
@@ -93,18 +98,19 @@ function ViewModeToggle({
   onChange: (mode: DiffViewMode) => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center gap-2">
       <Text variant="muted" className="text-xs">
-        Layout
+        {t('prReview.fileList.layout')}
       </Text>
       <RadioGroup
-        label="Layout"
+        label={t('prReview.fileList.layout')}
         className="flex-row overflow-hidden rounded-md border border-border bg-card"
       >
         <ViewModeButton
           active={viewMode === 'unified'}
-          label="Unified"
+          label={t('prReview.fileList.unified')}
           onPress={() => {
             onChange('unified');
           }}
@@ -113,7 +119,7 @@ function ViewModeToggle({
         />
         <ViewModeButton
           active={viewMode === 'side-by-side'}
-          label="Side by side"
+          label={t('prReview.fileList.sideBySide')}
           onPress={() => {
             onChange('side-by-side');
           }}

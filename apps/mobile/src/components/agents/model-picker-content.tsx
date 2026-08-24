@@ -4,6 +4,7 @@ import { AlertCircle, Info, Search, SearchX } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
@@ -27,6 +28,7 @@ import {
 export function ModelPickerContent() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
@@ -142,11 +144,18 @@ export function ModelPickerContent() {
   );
 
   if (!bridge) {
-    return <PickerSheet title="Select model" onDone={closePicker} scrollable={false} expired />;
+    return (
+      <PickerSheet
+        title={t('agentChat.modelPicker.title')}
+        onDone={closePicker}
+        scrollable={false}
+        expired
+      />
+    );
   }
 
   return (
-    <PickerSheet title="Select model" onDone={closePicker} scrollable={false}>
+    <PickerSheet title={t('agentChat.modelPicker.title')} onDone={closePicker} scrollable={false}>
       <FlatList
         className="flex-1 bg-background"
         data={rows}
@@ -159,7 +168,7 @@ export function ModelPickerContent() {
             <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
               <Search size={18} color={colors.mutedForeground} />
               <TextInput
-                placeholder="Search models..."
+                placeholder={t('agentChat.modelPicker.searchPlaceholder')}
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -181,9 +190,15 @@ export function ModelPickerContent() {
           <EmptyState
             icon={search.trim() ? SearchX : Info}
             placement="top"
-            title={search.trim() ? 'No matches' : 'No models available'}
+            title={
+              search.trim()
+                ? t('agentChat.repoPicker.noMatches')
+                : t('agentChat.modelPicker.noModels')
+            }
             description={
-              search.trim() ? 'Try a different search term.' : 'No models are available to select.'
+              search.trim()
+                ? t('agentChat.repoPicker.tryDifferentSearch')
+                : t('agentChat.modelPicker.noModelsDescription')
             }
           />
         }

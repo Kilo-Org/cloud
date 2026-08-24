@@ -11,6 +11,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -63,6 +64,7 @@ function MessageBubbleComponent({
   onSwipeReply,
 }: Props) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const isPending = message.id.startsWith('pending-');
   const timestamp = message.clientUpdatedAt ?? message.updatedAt;
   const edited = isMessageEdited(message);
@@ -205,7 +207,7 @@ function MessageBubbleComponent({
               {timestamp !== null && (
                 <Text className="text-[10px] text-muted-foreground">
                   {formatTimestamp(timestamp)}
-                  {edited ? ' (edited)' : ''}
+                  {edited ? ` ${t('chat.messageBubble.edited')}` : ''}
                 </Text>
               )}
             </View>
@@ -243,7 +245,7 @@ function MessageBubbleComponent({
                 )}
               >
                 {formatTimestamp(timestamp)}
-                {edited ? ' (edited)' : ''}
+                {edited ? ` ${t('chat.messageBubble.edited')}` : ''}
               </Text>
             )}
           </View>

@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 type BotPresence = {
   online: boolean;
   lastAt: number;
@@ -7,7 +9,7 @@ type BotDisplayState = 'online' | 'idle' | 'offline' | 'unknown';
 
 type BotDisplay = {
   state: BotDisplayState;
-  label: 'Online' | 'Idle' | 'Offline' | 'Unknown';
+  label: string;
 };
 
 type MessageInputAvailability = {
@@ -24,22 +26,22 @@ function computeMobileBotDisplay(params: {
   now: number;
 }): BotDisplay {
   if (params.instanceStatus !== null && params.instanceStatus !== 'running') {
-    return { state: 'offline', label: 'Offline' };
+    return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   if (!params.presence) {
-    return { state: 'unknown', label: 'Unknown' };
+    return { state: 'unknown', label: i18n.t('chat.botStatus.unknown') };
   }
   if (!params.presence.online) {
-    return { state: 'offline', label: 'Offline' };
+    return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   const elapsed = params.now - params.presence.lastAt;
   if (elapsed > 90_000) {
-    return { state: 'offline', label: 'Offline' };
+    return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   if (elapsed > 30_000) {
-    return { state: 'idle', label: 'Idle' };
+    return { state: 'idle', label: i18n.t('chat.botStatus.idle') };
   }
-  return { state: 'online', label: 'Online' };
+  return { state: 'online', label: i18n.t('chat.botStatus.online') };
 }
 
 export function resolveMobileMessageInputAvailability(params: {
@@ -60,7 +62,7 @@ export function resolveMobileMessageInputAvailability(params: {
     return {
       botDisplay,
       disabled: true,
-      disabledReason: 'Loading user...',
+      disabledReason: i18n.t('chat.botStatus.loadingUser'),
       showInstanceCta: false,
       submitDisabled: true,
     };
@@ -91,8 +93,8 @@ export function resolveMobileMessageInputAvailability(params: {
     disabled: true,
     disabledReason:
       botDisplay.state === 'unknown'
-        ? 'Waiting for bot status...'
-        : 'Bot is offline. Messages will resume when it reconnects.',
+        ? i18n.t('chat.botStatus.waitingForStatus')
+        : i18n.t('chat.botStatus.offlineMessage'),
     // Only a confirmed 'offline' surfaces the CTA. 'unknown' is the cold-cache
     // gap before the WS connects and the first bot-status round-trip resolves
     // (see useBotStatus) — every conversation open passes through it, so

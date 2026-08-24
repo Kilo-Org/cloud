@@ -1,7 +1,9 @@
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ChevronRight, Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/icons';
+import { Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -17,8 +19,8 @@ import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
   decidePrLinkPaste,
-  PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY,
-  PR_LINK_TOAST_INVALID_COPY,
+  prLinkToastClipboardEmptyCopy,
+  prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
 import { getRecentPrs, type RecentPr, removeRecentPr } from '@/lib/pr-review/recent-prs';
@@ -28,6 +30,7 @@ const URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
 export function PrReviewEntryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   // Uncontrolled iOS input — keep the raw text in a ref so the submit
   // handler reads the latest value without re-rendering on every
   // keystroke. State is only for derived UI (whether there's any text).
@@ -71,7 +74,7 @@ export function PrReviewEntryScreen() {
     const raw = inputValueRef.current;
     const parsed = parseGitHubPrUrl(raw.trim());
     if (!parsed) {
-      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
+      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     // Navigate straight to the PR route. Recents are written only after an
@@ -84,13 +87,13 @@ export function PrReviewEntryScreen() {
     const clipboard = await Clipboard.getStringAsync();
     const decision = decidePrLinkPaste(clipboard);
     if (decision.kind === 'empty') {
-      announcingToast.error(PR_LINK_TOAST_CLIPBOARD_EMPTY_COPY);
+      announcingToast.error(prLinkToastClipboardEmptyCopy());
       return;
     }
     // Replace entire field (never append-at-cursor): native field + ref + hasInput.
     applyFieldText(decision.text);
     if (decision.kind === 'non-url-text') {
-      announcingToast.error(PR_LINK_TOAST_INVALID_COPY);
+      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     handleSubmit();
@@ -107,20 +110,24 @@ export function PrReviewEntryScreen() {
   };
 
   const handleRemoveRecent = (entry: RecentPr) => {
-    Alert.alert('Remove from recents?', 'This pull request will be removed from your recents.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            await removeRecentPr(entry);
-            const list = await getRecentPrs();
-            setRecent(list);
-          })();
+    Alert.alert(
+      t('prReview.entry.removeFromRecentsTitle'),
+      t('prReview.entry.removeFromRecentsMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('prReview.entry.remove'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await removeRecentPr(entry);
+              const list = await getRecentPrs();
+              setRecent(list);
+            })();
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
@@ -132,12 +139,12 @@ export function PrReviewEntryScreen() {
     recentsBody = (
       <EmptyState
         icon={SearchX}
-        title="No recent PRs"
-        description="Paste a PR link above to start a review — it'll show up here next time."
+        title={t('prReview.entry.noRecentPrs')}
+        description={t('prReview.entry.noRecentPrsDescription')}
         placement="top"
         action={
           <Button variant="outline" onPress={focusInput}>
-            <Text>Paste a PR link</Text>
+            <Text>{t('prReview.entry.pastePrLink')}</Text>
           </Button>
         }
       />
@@ -148,7 +155,9 @@ export function PrReviewEntryScreen() {
         {recent.map((entry, index) => {
           const isLast = index === recent.length - 1;
           const rowState = selectRecentPrRowState(entry);
-          const removeLabel = `Remove ${entry.owner}/${entry.repo}#${entry.number} from recents`;
+          const removeLabel = t('prReview.entry.removeRecentAccessibility', {
+            repo: `${entry.owner}/${entry.repo}#${entry.number}`,
+          });
           return (
             <View
               key={`${entry.owner}/${entry.repo}#${entry.number}`}
@@ -170,12 +179,12 @@ export function PrReviewEntryScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <ChevronRight size={16} color={colors.mutedForeground} />
+                <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
               <View className="flex-row items-center justify-between gap-2 px-3 pb-3">
                 {rowState.failed ? (
                   <Text variant="muted" className="text-xs">
-                    Couldn&apos;t load
+                    {t('prReview.entry.couldNotLoad')}
                   </Text>
                 ) : (
                   <View />
@@ -188,9 +197,9 @@ export function PrReviewEntryScreen() {
                       onPress={() => {
                         handleRecentPress(entry);
                       }}
-                      accessibilityLabel="Retry"
+                      accessibilityLabel={t('common.retry')}
                     >
-                      <Text>Retry</Text>
+                      <Text>{t('common.retry')}</Text>
                     </Button>
                   ) : null}
                   <Button
@@ -201,7 +210,7 @@ export function PrReviewEntryScreen() {
                     }}
                     accessibilityLabel={removeLabel}
                   >
-                    <Text>Remove</Text>
+                    <Text>{t('prReview.entry.remove')}</Text>
                   </Button>
                 </View>
               </View>
@@ -217,7 +226,7 @@ export function PrReviewEntryScreen() {
       <View className="flex-row items-center gap-2">
         <Link2 size={16} color={colors.mutedForeground} />
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Paste a PR link
+          {t('prReview.entry.pastePrLink')}
         </Text>
       </View>
       <View className="gap-3">
@@ -253,7 +262,7 @@ export function PrReviewEntryScreen() {
               // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
               // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
               className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[normal]"
-              accessibilityLabel="GitHub pull request URL"
+              accessibilityLabel={t('prReview.entry.urlAccessibility')}
               returnKeyType="go"
               onSubmitEditing={handleSubmit}
             />
@@ -274,7 +283,7 @@ export function PrReviewEntryScreen() {
                   inputRef.current?.focus();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Clear pull request link"
+                accessibilityLabel={t('prReview.entry.clearLink')}
                 className="h-13 w-13 items-center justify-center active:opacity-70"
               >
                 <X size={16} color={colors.mutedForeground} />
@@ -286,15 +295,19 @@ export function PrReviewEntryScreen() {
               void handlePaste();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Paste pull request link"
+            accessibilityLabel={t('prReview.entry.pasteLink')}
             hitSlop={4}
             className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
           >
             <ClipboardIcon size={18} color={colors.mutedForeground} />
           </Pressable>
         </View>
-        <Button disabled={!hasInput} onPress={handleSubmit} accessibilityLabel="Open pull request">
-          <Text>Open</Text>
+        <Button
+          disabled={!hasInput}
+          onPress={handleSubmit}
+          accessibilityLabel={t('prReview.entry.openPullRequest')}
+        >
+          <Text>{t('prReview.entry.open')}</Text>
         </Button>
       </View>
     </View>
@@ -302,7 +315,7 @@ export function PrReviewEntryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="PR Review" eyebrow="Open a pull request by URL" />
+      <ScreenHeader title={t('prReview.entry.title')} eyebrow={t('prReview.entry.eyebrow')} />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
     </View>
   );

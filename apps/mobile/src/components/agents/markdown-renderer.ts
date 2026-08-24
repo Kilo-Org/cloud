@@ -26,8 +26,8 @@ import { isSupportedScheme, parseHtmlImages } from './markdown-html-image';
 import { MarkdownImage } from './markdown-image';
 import {
   getLinkAccessibilityActions,
+  getLinkAccessibilityHint,
   getLinkLongPressHandler,
-  LINK_ACCESSIBILITY_HINT,
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
 import { type MarkdownPalette } from './markdown-palette';
@@ -262,7 +262,7 @@ export class MarkdownRenderer extends Renderer {
     const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
     return {
       accessibilityRole: 'link' as const,
-      accessibilityHint: LINK_ACCESSIBILITY_HINT,
+      accessibilityHint: getLinkAccessibilityHint(),
       accessibilityLabel,
       accessibilityActions: getLinkAccessibilityActions(this.onLongPressLink !== undefined),
       onAccessibilityAction: (event: AccessibilityActionEvent) => {

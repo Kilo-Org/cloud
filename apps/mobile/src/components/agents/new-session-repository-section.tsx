@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 
 import { Button } from '@/components/ui/button';
@@ -38,10 +39,13 @@ export function NewSessionRepositorySection({
   value,
 }: Readonly<NewSessionRepositorySectionProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">Repository</Text>
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('agentChat.newSession.repository')}
+      </Text>
       {renderBody()}
     </View>
   );
@@ -53,8 +57,8 @@ export function NewSessionRepositorySection({
           <QueryError
             placement="top"
             variant="server"
-            title="Couldn't load repositories"
-            message="Check your connection and try again."
+            title={t('agentChat.newSession.couldNotLoadRepositories')}
+            message={t('agentChat.instancePicker.couldNotLoadDescription')}
             onRetry={onRefreshRepos}
             isRetrying={isRetrying}
           />
@@ -65,22 +69,22 @@ export function NewSessionRepositorySection({
         return (
           <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
             <View className="gap-1">
-              <Text className="text-sm font-semibold text-foreground">Connect GitHub</Text>
-              <Text variant="muted">
-                Connect GitHub in your browser, then return here to pick a repository.
+              <Text className="text-sm font-semibold text-foreground">
+                {t('agentChat.newSession.connectGithub')}
               </Text>
+              <Text variant="muted">{t('agentChat.newSession.connectGithubDescription')}</Text>
             </View>
             <View className="flex-row gap-2">
               <Button variant="outline" className="flex-1" onPress={onOpenGitHubIntegration}>
                 <ExternalLink size={16} color={colors.foreground} />
-                <Text>Open GitHub</Text>
+                <Text>{t('agentChat.newSession.openGithub')}</Text>
               </Button>
               <Button
                 variant="outline"
                 size="icon"
                 onPress={onRefreshRepos}
                 disabled={isRetrying}
-                accessibilityLabel="Refresh repositories"
+                accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
               >
                 {isRetrying ? (
                   <ActivityIndicator size="small" color={colors.foreground} />
@@ -98,11 +102,10 @@ export function NewSessionRepositorySection({
           <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
             <View className="gap-1">
               <Text className="text-sm font-semibold text-foreground">
-                We can't see your GitHub connection yet
+                {t('agentChat.newSession.githubConnectionNotVisible')}
               </Text>
               <Text variant="muted">
-                If you installed or configured the Kilo GitHub App, check again — or make sure it
-                was installed for this account/organization.
+                {t('agentChat.newSession.githubConnectionNotVisibleDescription')}
               </Text>
             </View>
             <View className="flex-row gap-2">
@@ -117,13 +120,13 @@ export function NewSessionRepositorySection({
                 ) : (
                   <RefreshCw size={16} color={colors.foreground} />
                 )}
-                <Text>Check again</Text>
+                <Text>{t('agentChat.newSession.checkAgain')}</Text>
               </Button>
               <Button
                 variant="outline"
                 size="icon"
                 onPress={onOpenGitHubIntegration}
-                accessibilityLabel="Open GitHub"
+                accessibilityLabel={t('agentChat.newSession.openGithub')}
               >
                 <ExternalLink size={16} color={colors.foreground} />
               </Button>
@@ -136,11 +139,10 @@ export function NewSessionRepositorySection({
         return (
           <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
             <View className="gap-1">
-              <Text className="text-sm font-semibold text-foreground">GitHub connected</Text>
-              <Text variant="muted">
-                No repositories visible. Check repository access for the Kilo GitHub App, then
-                refresh.
+              <Text className="text-sm font-semibold text-foreground">
+                {t('agentChat.newSession.githubConnected')}
               </Text>
+              <Text variant="muted">{t('agentChat.newSession.noRepositoriesVisible')}</Text>
             </View>
             <View className="flex-row gap-2">
               <Button
@@ -148,7 +150,7 @@ export function NewSessionRepositorySection({
                 size="icon"
                 onPress={onRefreshRepos}
                 disabled={isRetrying}
-                accessibilityLabel="Refresh repositories"
+                accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
               >
                 {isRetrying ? (
                   <ActivityIndicator size="small" color={colors.foreground} />

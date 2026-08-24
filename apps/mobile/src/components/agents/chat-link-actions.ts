@@ -2,21 +2,22 @@ import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
 
 type ChatLinkAction = 'open' | 'copy' | 'share' | 'review-pr';
 
-type ChatLinkActionOption =
-  | { kind: ChatLinkAction; label: string }
-  | { kind: 'cancel'; label: 'Cancel' };
+type ChatLinkActionOption = { kind: ChatLinkAction | 'cancel'; label: string };
 
 export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: boolean } = {}) {
   const actions: ChatLinkActionOption[] = [
-    ...(isPrLink ? ([{ kind: 'review-pr', label: 'Review PR' }] as const) : []),
-    { kind: 'open', label: 'Open link' },
-    { kind: 'copy', label: 'Copy link' },
-    { kind: 'share', label: 'Share link' },
-    { kind: 'cancel', label: 'Cancel' },
+    ...(isPrLink
+      ? ([{ kind: 'review-pr', label: i18n.t('agentChat.chatLink.reviewPr') }] as const)
+      : []),
+    { kind: 'open', label: i18n.t('agentChat.chatLink.openLink') },
+    { kind: 'copy', label: i18n.t('agentChat.chatLink.copyLink') },
+    { kind: 'share', label: i18n.t('agentChat.chatLink.shareLink') },
+    { kind: 'cancel', label: i18n.t('common.cancel') },
   ];
 
   return {
@@ -34,10 +35,10 @@ export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: bool
  */
 export function buildPrLinkTapActionSheet() {
   const actions: ChatLinkActionOption[] = [
-    { kind: 'review-pr', label: 'Review PR' },
-    { kind: 'open', label: 'Open in browser' },
-    { kind: 'share', label: 'Share' },
-    { kind: 'cancel', label: 'Cancel' },
+    { kind: 'review-pr', label: i18n.t('agentChat.chatLink.reviewPr') },
+    { kind: 'open', label: i18n.t('common.openInBrowser') },
+    { kind: 'share', label: i18n.t('agentChat.chatLink.share') },
+    { kind: 'cancel', label: i18n.t('common.cancel') },
   ];
 
   return {
@@ -61,7 +62,7 @@ export function getSelectedChatLinkAction(
 function showRetryableError(message: string, retry: () => Promise<void>) {
   toast.error(message, {
     action: {
-      label: 'Try again',
+      label: i18n.t('common.tryAgain'),
       onClick: () => {
         void retry();
       },
@@ -81,9 +82,9 @@ export async function performChatLinkAction(action: ChatLinkAction, href: string
       if (!copied) {
         throw new Error('Clipboard rejected link');
       }
-      toast.success('Link copied');
+      toast.success(i18n.t('agentChat.chatLink.linkCopied'));
     } catch {
-      showRetryableError('Could not copy link', async () => {
+      showRetryableError(i18n.t('agentChat.chatLink.couldNotCopyLink'), async () => {
         await performChatLinkAction('copy', href);
       });
     }
@@ -93,7 +94,7 @@ export async function performChatLinkAction(action: ChatLinkAction, href: string
   try {
     await Share.share({ message: href });
   } catch {
-    showRetryableError('Could not share link', async () => {
+    showRetryableError(i18n.t('agentChat.chatLink.couldNotShareLink'), async () => {
       await performChatLinkAction('share', href);
     });
   }

@@ -1,4 +1,5 @@
 import { Plus, Server } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import {
@@ -39,12 +40,14 @@ export function EmptyStateContent({
   foregroundColor,
   onCreate,
 }: Readonly<EmptyStateContentProps>) {
+  const { t } = useTranslation();
+
   if (state.state === 'pending_settlement') {
     return (
       <EmptyState
         icon={Server}
-        title="Finishing setup"
-        description="Hang tight, we're finalizing your account. This usually takes a moment."
+        title={t('kiloclaw.empty.finishingSetup')}
+        description={t('kiloclaw.empty.finishingSetupDescription')}
       />
     );
   }
@@ -53,8 +56,8 @@ export function EmptyStateContent({
     return (
       <EmptyState
         icon={Server}
-        title="New KiloClaw instances are unavailable"
-        description="A current KiloClaw subscription is required to provision an instance. Existing instances and subscriptions continue as normal."
+        title={t('kiloclaw.onboarding.unavailableTitle')}
+        description={t('kiloclaw.onboarding.unavailableDescription')}
       />
     );
   }
@@ -67,12 +70,12 @@ export function EmptyStateContent({
   return (
     <EmptyState
       icon={Server}
-      title="No KiloClaw instances"
-      description="Create your first instance to start running coding agents."
+      title={t('kiloclaw.empty.noInstances')}
+      description={t('kiloclaw.empty.noInstancesDescription')}
       action={
         <Button variant="outline" onPress={onCreate}>
           <Plus size={16} color={foregroundColor} />
-          <Text>Get started</Text>
+          <Text>{t('kiloclaw.empty.getStarted')}</Text>
         </Button>
       }
     />

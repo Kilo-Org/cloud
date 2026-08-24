@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ನಿಮ್ಮ ಏಜೆಂಟ್ ಸೆಷನ್‌ಗೆ ನವೀಕರಣವಿದೆ",
+      "chatMessage": "ನಿಮಗೆ ಹೊಸ ಸಂದೇಶವಿದೆ",
+      "instanceLifecycle": "ನಿಮ್ಮ ಇನ್‌ಸ್ಟಾನ್ಸ್‌ಗೆ ನವೀಕರಣವಿದೆ",
+      "scheduledAction": "ನಿಗದಿತ ಕ್ರಿಯೆಗೆ ನವೀಕರಣವಿದೆ",
+      "lowBalance": "ನಿಮ್ಮ ಬ್ಯಾಲೆನ್ಸ್‌ಗೆ ಗಮನ ಬೇಕು",
+      "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ಕಾರ್ಯ ಪೂರ್ಣಗೊಂಡಿದೆ"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "ವಿಫಲವಾಗಿದೆ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ಅಡಚಣೆಯಾಗಿದೆ: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ಶೀರ್ಷಿಕೆಯಿಲ್ಲದ",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ಕಡಿಮೆ ಬ್ಯಾಲೆನ್ಸ್ ಎಚ್ಚರಿಕೆ",
+      "body": "{{organizationName}} ಬ್ಯಾಲೆನ್ಸ್ ${{minimumBalanceUsd}} ಕ್ಕಿಂತ ಕಡಿಮೆಯಾಗಿದೆ"
+    },
+    "securityFindingNew": {
+      "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})",
+      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ಎಚ್ಚರಿಕೆ",
+      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ಉಲ್ಲಂಘನೆ",
+      "body": "{{repoFullName}} ನಲ್ಲಿ {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ಸಿದ್ಧವಾಗಿದೆ",
+      "body": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ಪ್ರಾರಂಭವಾಗಲು ವಿಫಲವಾಗಿದೆ",
+      "body": "ಪ್ರಾರಂಭ ವಿಫಲವಾಗಿದೆ."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ಶೀಘ್ರದಲ್ಲೇ ಮರುಪ್ರಾರಂಭಗೊಳ್ಳುತ್ತದೆ",
+      "body": "{{when}} ಕ್ಕೆ ಮರುಪ್ರಾರಂಭಿಸಲು ನಿಗದಿಯಾಗಿದೆ."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} ಮರುಪ್ರಾರಂಭ ರದ್ದಾಗಿದೆ",
+      "body": "ಹಿಂದೆ ನಿಗದಿಯಾದ ಮರುಪ್ರಾರಂಭವನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ಶೀಘ್ರದಲ್ಲೇ ಅಪ್‌ಗ್ರೇಡ್ ಆಗುತ್ತದೆ",
+      "bodyWithTag": "{{when}} ಕ್ಕೆ {{targetImageTag}} ಗೆ ಅಪ್‌ಗ್ರೇಡ್ ಮಾಡಿ.",
+      "bodyWithoutTag": "{{when}} ಕ್ಕೆ ನಿಗದಿಯಾದ ಅಪ್‌ಗ್ರೇಡ್."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} ಅಪ್‌ಗ್ರೇಡ್ ರದ್ದಾಗಿದೆ",
+      "body": "ಹಿಂದೆ ನಿಗದಿಯಾದ ಅಪ್‌ಗ್ರೇಡ್ ಅನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "ನಿಮ್ಮ Kilo ಸೆಷನ್ ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ನಿಯಂತ್ರಿಸಲು ಸಿದ್ಧವಾಗಿದೆ"
+  }
+}

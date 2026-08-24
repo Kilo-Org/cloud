@@ -1,5 +1,6 @@
 import { AlertTriangle, ExternalLink, ShieldAlert } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { CompleteStep } from '@/components/kiloclaw/onboarding/complete-step';
@@ -38,6 +39,7 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
     onOpenInstance,
   } = props;
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { errorCategory, provisionSuccess, step, botIdentity } = state;
 
   if (errorCategory === 'access_conflict') {
@@ -59,12 +61,13 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
         </View>
         <View className="items-center gap-2">
           <Text variant="eyebrow" className="text-xs">
-            Review
+            {t('kiloclaw.onboarding.flow.review')}
           </Text>
-          <Text className="text-center text-2xl font-semibold">Setup needs manual review</Text>
+          <Text className="text-center text-2xl font-semibold">
+            {t('kiloclaw.onboarding.flow.manualReviewTitle')}
+          </Text>
           <Text variant="muted" className="text-center text-base">
-            Your account state needs attention before we can create an instance. Continue on kilo.ai
-            to finish setting up.
+            {t('kiloclaw.onboarding.flow.manualReviewBody')}
           </Text>
         </View>
         <Button
@@ -76,7 +79,7 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
           }}
           accessibilityRole="link"
         >
-          <Text className="text-base">Open kilo.ai</Text>
+          <Text className="text-base">{t('kiloclaw.onboarding.flow.openKiloAi')}</Text>
           <ExternalLink size={16} color={colors.foreground} />
         </Button>
       </Animated.View>
@@ -102,15 +105,17 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
         </View>
         <View className="items-center gap-2">
           <Text variant="eyebrow" className="text-xs">
-            Provisioning
+            {t('kiloclaw.onboarding.flow.provisioning')}
           </Text>
-          <Text className="text-center text-2xl font-semibold">Something went wrong</Text>
+          <Text className="text-center text-2xl font-semibold">
+            {t('kiloclaw.onboarding.flow.somethingWentWrong')}
+          </Text>
           <Text variant="muted" className="text-center text-base">
-            We couldn&apos;t finish setting up your instance just now.
+            {t('kiloclaw.onboarding.flow.genericErrorBody')}
           </Text>
         </View>
         <Button size="lg" className="w-full" onPress={onRetry}>
-          <Text className="text-base">Try again</Text>
+          <Text className="text-base">{t('common.tryAgain')}</Text>
         </Button>
       </Animated.View>
     );

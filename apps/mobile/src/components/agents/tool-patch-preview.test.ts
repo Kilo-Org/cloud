@@ -1,12 +1,20 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/test/render-with-providers.tsx */
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import type * as ReactI18next from 'react-i18next';
 
 import { ToolPatchPreview } from './tool-patch-preview';
 import { type ToolPatchFile, type ToolPatchModel } from './tool-patch-model';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/pr-review/diff/diff-line', () => ({ DiffLine: 'DiffLine' }));
 
@@ -93,9 +101,9 @@ describe('ToolPatchPreview', () => {
     const update = makeFile({ path: 'src/b.ts', operation: 'update' });
     const del = makeFile({ path: 'src/c.ts', operation: 'delete' });
     const root = rootElement(render(makeModel({ files: [add, update, del] })));
-    expect(findText(root, 'Added')).toHaveLength(1);
-    expect(findText(root, 'Updated')).toHaveLength(1);
-    expect(findText(root, 'Deleted')).toHaveLength(1);
+    expect(findText(root, 'agentChat.toolPatch.operationAdded')).toHaveLength(1);
+    expect(findText(root, 'agentChat.toolPatch.operationUpdated')).toHaveLength(1);
+    expect(findText(root, 'agentChat.toolPatch.operationDeleted')).toHaveLength(1);
   });
 
   it('renders a DiffLine for every model line', () => {
@@ -146,7 +154,7 @@ describe('ToolPatchPreview', () => {
     const del = makeFile({ path: 'src/gone.ts', operation: 'delete', lines: [] });
     const root = rootElement(render(makeModel({ files: [del] })));
     expect(findText(root, 'src/gone.ts')).toHaveLength(1);
-    expect(findText(root, 'Deleted')).toHaveLength(1);
+    expect(findText(root, 'agentChat.toolPatch.operationDeleted')).toHaveLength(1);
     expect(findByType(root, 'DiffLine')).toHaveLength(0);
   });
 
@@ -160,20 +168,26 @@ describe('ToolPatchPreview', () => {
     const root = rootElement(render(makeModel({ truncated: true })));
     const texts = findByType(root, 'Text');
     const truncatedLabel = texts.find(
-      el => (el.props as { accessibilityLabel?: string }).accessibilityLabel === 'Content truncated'
+      el =>
+        (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
+        'monoScrollBlock.contentTruncated'
     );
     expect(truncatedLabel).toBeDefined();
     if (!truncatedLabel) {
       throw new Error('truncatedLabel not found');
     }
-    expect((truncatedLabel.props as { children?: string }).children).toBe('Truncated');
+    expect((truncatedLabel.props as { children?: string }).children).toBe(
+      'monoScrollBlock.truncated'
+    );
   });
 
   it('does not show the Truncated label when the model is not truncated', () => {
     const root = rootElement(render(makeModel({ truncated: false })));
     const texts = findByType(root, 'Text');
     const truncatedLabel = texts.find(
-      el => (el.props as { accessibilityLabel?: string }).accessibilityLabel === 'Content truncated'
+      el =>
+        (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
+        'monoScrollBlock.contentTruncated'
     );
     expect(truncatedLabel).toBeUndefined();
   });

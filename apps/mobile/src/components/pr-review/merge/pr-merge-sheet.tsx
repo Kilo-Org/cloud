@@ -16,6 +16,7 @@
 import * as Haptics from 'expo-haptics';
 import { Alert, Keyboard, ScrollView, type TextInput, useWindowDimensions } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import {
@@ -131,6 +132,8 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     onDismiss,
   } = props;
 
+  const { t } = useTranslation();
+
   const methodOptions = useMemo(() => mergeMethodOptionsFor(repoSettings), [repoSettings]);
   const safeInitial: AllowedMergeMethod = useMemo(
     () =>
@@ -223,21 +226,21 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       if (classification.kind === 'bad-request' || classification.kind === 'forbidden') {
         setInlineError(
           classification.kind === 'forbidden'
-            ? "You don't have permission to merge this pull request."
-            : 'This pull request cannot be merged as is.'
+            ? t('prReview.merge.forbidden')
+            : t('prReview.merge.cannotMerge')
         );
         setInlineErrorKind('non-retryable');
       } else if (classification.kind === 'reconnect') {
-        setInlineError('GitHub connection expired.');
+        setInlineError(t('prReview.connectionExpired'));
         setInlineErrorKind('reconnect');
       } else {
         setInlineError(
-          lastError instanceof Error ? lastError.message : 'Could not merge pull request.'
+          lastError instanceof Error ? lastError.message : t('prReview.merge.couldNotMerge')
         );
         setInlineErrorKind('retryable');
       }
     }
-  }, [lastError]);
+  }, [lastError, t]);
 
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
@@ -341,23 +344,24 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     };
 
     if (mode === 'merge') {
-      Alert.alert('Merge pull request?', 'This will merge your changes into the base branch.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Merge', style: 'destructive', onPress: submit },
+      Alert.alert(t('prReview.merge.confirmTitle'), t('prReview.merge.confirmMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('prReview.merge.merge'), style: 'destructive', onPress: submit },
       ]);
       return;
     }
     Alert.alert(
-      'Enable auto-merge?',
-      'GitHub will merge this pull request automatically when all required checks pass.',
+      t('prReview.merge.enableAutoMergeConfirmTitle'),
+      t('prReview.merge.enableAutoMergeConfirmMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Enable auto-merge', style: 'destructive', onPress: submit },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('prReview.merge.enableAutoMerge'), style: 'destructive', onPress: submit },
       ]
     );
   }
 
-  const submitLabel = mode === 'merge' ? 'Merge' : 'Enable auto-merge';
+  const submitLabel =
+    mode === 'merge' ? t('prReview.merge.merge') : t('prReview.merge.enableAutoMerge');
   // A repository can (rarely) have every merge method disabled. GitHub would
   // reject any submission, so surface it explicitly and block the action
   // rather than sending a method the repo does not allow.

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Plug } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
@@ -55,6 +56,7 @@ export function GenericToolCardBody({
 
 export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -63,7 +65,10 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
       icon={Plug}
       label={display.subtitle ?? display.title}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: part.state.status,
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

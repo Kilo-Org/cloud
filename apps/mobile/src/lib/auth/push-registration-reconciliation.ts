@@ -8,6 +8,7 @@ import {
   attemptLogoutReconciliation,
   awaitLogoutReconciliationSettled,
 } from '@/lib/auth/logout-reconciliation';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { getDevicePushTokenOutcome, getPlatform } from '@/lib/notifications';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient } from '@/lib/trpc';
@@ -31,6 +32,11 @@ const MIN_ATTEMPT_SPACING_MS = 60_000;
 let attemptInFlight: Promise<PushRegistrationOutcome> | null = null;
 let lastAttemptAtMs = 0;
 let lastAttemptUserId: string | null = null;
+// The locale the last attempt ran with. It only ever BYPASSES the spacing
+// skip, so a stale value cannot suppress a registration. Whether the server
+// row actually holds the current locale is decided by the row itself, not by
+// this hint — see `runReconciliation`.
+let lastAttemptLocale: string | null = null;
 
 export type PushRegistrationOutcome =
   | { kind: 'in-flight' }
@@ -46,6 +52,7 @@ export function resetPushRegistrationReconciliationForTests(): void {
   attemptInFlight = null;
   lastAttemptAtMs = 0;
   lastAttemptUserId = null;
+  lastAttemptLocale = null;
 }
 
 /**
@@ -67,6 +74,9 @@ export async function attemptPushRegistrationReconciliation(
   void attemptLogoutReconciliation(userId);
   await awaitLogoutReconciliationSettled();
 
+  const locale = getResolvedLanguage();
+  const localeChanged = lastAttemptLocale !== locale;
+
   if (attemptInFlight) {
     if (lastAttemptUserId === userId) {
       return { kind: 'in-flight' };
@@ -79,12 +89,16 @@ export async function attemptPushRegistrationReconciliation(
     await attemptInFlight;
   }
   const now = Date.now();
-  if (now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS && lastAttemptUserId === userId) {
+  if (
+    now - lastAttemptAtMs < MIN_ATTEMPT_SPACING_MS &&
+    lastAttemptUserId === userId &&
+    !localeChanged
+  ) {
     return { kind: 'spacing-skipped' };
   }
   lastAttemptAtMs = now;
   lastAttemptUserId = userId;
-  attemptInFlight = runReconciliation();
+  attemptInFlight = runReconciliation(locale);
   try {
     return await attemptInFlight;
   } finally {
@@ -92,7 +106,7 @@ export async function attemptPushRegistrationReconciliation(
   }
 }
 
-async function runReconciliation(): Promise<PushRegistrationOutcome> {
+async function runReconciliation(locale: string): Promise<PushRegistrationOutcome> {
   const epoch = currentAuthEpoch();
 
   const deviceOutcome = await getDevicePushTokenOutcome();
@@ -113,7 +127,15 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
     // retries after the spacing window.
     return { kind: 'register-failed' };
   }
-  if (tokens.some(t => t.token === token)) {
+  // The server row decides. A cache keyed only by locale would answer
+  // `already-registered` for the wrong account or the wrong token: the same
+  // device can carry one token across a sign-out and sign-in, and the new
+  // user's row may hold a different locale than the one last sent.
+  // `locale` is null on a row written before the column existed; that is
+  // English, so it only matches when English is the active language.
+  const registered = tokens.find(t => t.token === token);
+  if (registered && (registered.locale ?? 'en') === locale) {
+    lastAttemptLocale = locale;
     return { kind: 'already-registered' };
   }
 
@@ -128,6 +150,7 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
       token,
       platform: getPlatform(),
       appVersion: Application.nativeApplicationVersion ?? undefined,
+      locale,
     });
   } catch {
     return { kind: 'register-failed' };
@@ -139,6 +162,10 @@ async function runReconciliation(): Promise<PushRegistrationOutcome> {
     return { kind: 'register-failed' };
   }
 
+  // Set only on an outcome that proves the server row holds this locale. A
+  // failed attempt leaves it stale on purpose, so the next attempt bypasses
+  // the spacing skip and retries instead of waiting out the window.
+  lastAttemptLocale = locale;
   void queryClient.invalidateQueries({ queryKey: trpcOptions.user.getMyPushTokens.queryKey() });
   return { kind: 'registered' };
 }

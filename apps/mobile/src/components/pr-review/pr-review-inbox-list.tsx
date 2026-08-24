@@ -11,6 +11,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -18,7 +19,8 @@ import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { type PrInboxView, selectPrInboxView } from '@/components/pr-review/pr-review-inbox-view';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
+import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -93,11 +95,12 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
 
 function InboxEyebrow() {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center gap-2">
       <Inbox size={16} color={colors.mutedForeground} />
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Inbox
+        {t('prReview.inbox.title')}
       </Text>
     </View>
   );
@@ -105,11 +108,12 @@ function InboxEyebrow() {
 
 function RecentEyebrow() {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center gap-2">
       <Clock size={16} color={colors.mutedForeground} />
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Recent
+        {t('prReview.inbox.recent')}
       </Text>
     </View>
   );
@@ -118,7 +122,9 @@ function RecentEyebrow() {
 function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const updatedLabel = timeAgo(parseTimestamp(item.updatedAt));
+  const rowLabel = `${item.owner}/${item.repo}#${item.number}`;
 
   return (
     <Pressable
@@ -126,7 +132,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
         router.push(getPrReviewPath(item.owner, item.repo, item.number));
       }}
       accessibilityRole="button"
-      accessibilityLabel={`${item.owner}/${item.repo}#${item.number}`}
+      accessibilityLabel={rowLabel}
       className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
     >
       <View className="flex-1 gap-1">
@@ -140,13 +146,13 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.isDraft ? (
             <View className="rounded-full bg-secondary px-2 py-0.5">
               <Text variant="muted" className="text-[10px] font-medium">
-                Draft
+                {t('prReview.inbox.draft')}
               </Text>
             </View>
           ) : null}
         </View>
       </View>
-      <ChevronRight size={16} color={colors.mutedForeground} />
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }
@@ -156,9 +162,10 @@ function InboxEmpty({
   onRetry,
   isRetrying,
 }: Readonly<{ view: PrInboxView; onRetry: () => void; isRetrying: boolean }>) {
+  const { t } = useTranslation();
   if (view.kind === 'loading') {
     return (
-      <View accessibilityLabel="Loading inbox">
+      <View accessibilityLabel={t('prReview.inbox.loading')}>
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
           <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -174,8 +181,8 @@ function InboxEmpty({
     return (
       <EmptyState
         icon={GitPullRequest}
-        title="No review requests"
-        description="Pull requests waiting on your review show up here. You can still paste any PR link above."
+        title={t('prReview.inbox.noReviewRequests')}
+        description={t('prReview.inbox.noReviewRequestsDescription')}
         placement="top"
       />
     );
@@ -201,8 +208,7 @@ function InboxEmpty({
   return (
     <QueryError
       variant="server"
-      title="Could not load inbox"
-      message="Something went wrong on our end. Please try again."
+      title={t('prReview.inbox.couldNotLoad')}
       placement="top"
       onRetry={onRetry}
       isRetrying={isRetrying}
@@ -211,13 +217,19 @@ function InboxEmpty({
 }
 
 function LoadMoreRetry({ onRetry }: Readonly<{ onRetry: () => void }>) {
+  const { t } = useTranslation();
   return (
     <View className="items-center gap-2">
       <Text variant="muted" className="text-center text-xs">
-        Couldn&apos;t load more
+        {t('prReview.inbox.couldNotLoadMore')}
       </Text>
-      <Button size="sm" variant="outline" onPress={onRetry} accessibilityLabel="Retry loading more">
-        <Text>Retry</Text>
+      <Button
+        size="sm"
+        variant="outline"
+        onPress={onRetry}
+        accessibilityLabel={t('prReview.inbox.retryLoadingMore')}
+      >
+        <Text>{t('common.retry')}</Text>
       </Button>
     </View>
   );

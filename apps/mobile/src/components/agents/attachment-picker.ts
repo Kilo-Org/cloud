@@ -5,6 +5,7 @@ import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 
+import { i18n } from '@/i18n';
 import { AGENT_ATTACHMENT_EXTENSION_REGEX } from '@/lib/agent-attachments/constants';
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
@@ -13,8 +14,8 @@ import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
   Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+    { text: i18n.t('common.cancel'), style: 'cancel' },
+    { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
   ]);
 }
 
@@ -83,8 +84,8 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
-      title: 'Camera Access Disabled',
-      message: 'Allow camera access in Settings to take a photo.',
+      title: i18n.t('agentChat.attachmentPicker.cameraAccessDisabled'),
+      message: i18n.t('agentChat.attachmentPicker.cameraAccessMessage'),
     });
     return [];
   }
@@ -116,8 +117,14 @@ async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
 
 type AttachmentSource = 'camera' | 'library' | 'files';
 
-const ATTACHMENT_SOURCE_OPTIONS = ['Camera', 'Photo Library', 'Files', 'Cancel'];
-const ATTACHMENT_SOURCE_CANCEL_INDEX = ATTACHMENT_SOURCE_OPTIONS.length - 1;
+function buildAttachmentSourceOptions(): string[] {
+  return [
+    i18n.t('agentChat.attachmentPicker.camera'),
+    i18n.t('agentChat.attachmentPicker.photoLibrary'),
+    i18n.t('agentChat.attachmentPicker.files'),
+    i18n.t('common.cancel'),
+  ];
+}
 
 async function pickFromSource(source: AttachmentSource): Promise<AgentAttachmentCandidate[]> {
   if (source === 'camera') {
@@ -179,10 +186,11 @@ export function pickAgentAttachments(
       const result = await pickFromSource(source);
       settle(result);
     };
+    const options = buildAttachmentSourceOptions();
     showActionSheetWithOptions(
       {
-        options: ATTACHMENT_SOURCE_OPTIONS,
-        cancelButtonIndex: ATTACHMENT_SOURCE_CANCEL_INDEX,
+        options,
+        cancelButtonIndex: options.length - 1,
       },
       index => {
         if (index === 0) {

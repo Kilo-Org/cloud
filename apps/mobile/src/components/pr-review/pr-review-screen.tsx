@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Check, Share as ShareIcon } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, Share, View } from 'react-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -50,6 +51,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -207,14 +209,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={`#${number}`}
+        title={t('prReview.screen.title', { number })}
         eyebrow={`${owner}/${repo}`}
         headerRight={
           <View className="flex-row items-center gap-1">
             <Pressable
               onPress={sharePullRequest}
               accessibilityRole="button"
-              accessibilityLabel="Share pull request"
+              accessibilityLabel={t('prReview.screen.shareA11y')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
             >
               <ShareIcon size={18} color={colors.foreground} />
@@ -227,11 +229,11 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               <Button
                 size="sm"
                 onPress={openReviewSubmit}
-                accessibilityLabel="Submit review"
+                accessibilityLabel={t('prReview.submit.title')}
                 className={cn('px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>Submit review</Text>
+                <Text>{t('prReview.submit.title')}</Text>
               </Button>
             ) : null}
           </View>

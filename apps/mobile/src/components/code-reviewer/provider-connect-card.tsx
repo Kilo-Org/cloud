@@ -1,5 +1,6 @@
 import { GitBranch, GitMerge } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -17,17 +18,17 @@ import { trpcClient } from '@/lib/trpc';
 const PLATFORM_CONFIG = {
   github: {
     icon: GitBranch,
-    label: 'GitHub App',
-    buttonLabel: 'Connect GitHub',
+    label: 'codeReviewer.providerConnect.githubApp',
+    buttonLabel: 'codeReviewer.providerConnect.connectGitHub',
     getUrl: getGitHubIntegrationUrl,
-    errorMessage: 'Could not open GitHub setup. Please try again.',
+    errorMessage: 'codeReviewer.providerConnect.githubError',
   },
   gitlab: {
     icon: GitMerge,
-    label: 'GitLab account',
-    buttonLabel: 'Connect GitLab',
+    label: 'codeReviewer.providerConnect.gitlabAccount',
+    buttonLabel: 'codeReviewer.providerConnect.connectGitLab',
     getUrl: getGitLabIntegrationUrl,
-    errorMessage: 'Could not open GitLab setup. Please try again.',
+    errorMessage: 'codeReviewer.providerConnect.gitlabError',
   },
 } as const;
 
@@ -40,6 +41,7 @@ export function ProviderConnectCard<T>({
   platform: 'github' | 'gitlab';
   onConnected: () => Promise<T>;
 }>) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const [connecting, setConnecting] = useState(false);
   const { icon: Icon, label, buttonLabel, getUrl, errorMessage } = PLATFORM_CONFIG[platform];
@@ -72,7 +74,7 @@ export function ProviderConnectCard<T>({
       // returns from the plain browser.
     } catch {
       clearLaunch();
-      toast.error(errorMessage);
+      toast.error(t(errorMessage));
     } finally {
       setConnecting(false);
     }
@@ -82,7 +84,7 @@ export function ProviderConnectCard<T>({
     <View className="items-center gap-3 rounded-lg bg-secondary p-6">
       <Icon size={28} color={colors.secondaryForeground} />
       <Text className="text-center text-sm text-muted-foreground">
-        Connect the Kilo {label} to review pull requests automatically.
+        {t('codeReviewer.providerConnect.description', { label: t(label) })}
       </Text>
       <Button
         className="w-full flex-row gap-2"
@@ -92,7 +94,7 @@ export function ProviderConnectCard<T>({
         }}
       >
         {connecting ? <ActivityIndicator size="small" /> : null}
-        <Text>{buttonLabel}</Text>
+        <Text>{t(buttonLabel)}</Text>
       </Button>
     </View>
   );

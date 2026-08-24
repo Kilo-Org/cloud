@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   type ChildSessionHydrationState,
   type OlderMessagesError,
@@ -73,6 +74,7 @@ export function ChildSessionSheet({
   const messages = getChildMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
+  const { t } = useTranslation();
   // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
   // always propagate the home-indicator inset), so we floor the value with
   // a comfortable constant to keep the last row / working indicator clear
@@ -114,19 +116,22 @@ export function ChildSessionSheet({
     content =
       hydrationState.status === 'error' ? (
         <QueryError
-          title="Could not load subagent session"
+          title={t('agentChat.childSessionSheet.couldNotLoad')}
           message={hydrationState.message}
           onRetry={onRetry}
         />
       ) : (
-        <QueryError title="Subagent session failed" message={sessionError ?? undefined} />
+        <QueryError
+          title={t('agentChat.childSessionSheet.failed')}
+          message={sessionError ?? undefined}
+        />
       );
   } else if (state === 'empty') {
     content = (
       <EmptyState
         icon={Bot}
-        title="No subagent messages"
-        description="This subagent session completed without producing a transcript."
+        title={t('agentChat.childSessionSheet.noMessages')}
+        description={t('agentChat.childSessionSheet.noMessagesDescription')}
       />
     );
   } else {
@@ -134,8 +139,8 @@ export function ChildSessionSheet({
       <View className="flex-1 items-center justify-center px-6">
         <EmptyState
           icon={Bot}
-          title="Loading subagent session"
-          description="Waiting for subagent messages…"
+          title={t('agentChat.childSessionSheet.loading')}
+          description={t('agentChat.childSessionSheet.loadingDescription')}
         />
       </View>
     );

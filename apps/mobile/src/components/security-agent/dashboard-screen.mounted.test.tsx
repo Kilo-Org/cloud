@@ -14,6 +14,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { DashboardScreen } from './dashboard-screen';
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(

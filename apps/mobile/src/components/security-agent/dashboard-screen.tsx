@@ -8,6 +8,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -49,6 +50,7 @@ const METRIC_TONE_CLASS = {
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,11 +86,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildSecurityDashboardMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
-  let lastSyncLabel = 'Not yet synced';
+  let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
-    lastSyncLabel = 'Sync status unavailable';
+    lastSyncLabel = t('securityAgent.dashboard.syncStatusUnavailable');
   } else if (lastSyncTime) {
-    lastSyncLabel = `Last synced ${timeAgo(parseTimestamp(lastSyncTime))}`;
+    lastSyncLabel = t('securityAgent.dashboard.lastSynced', {
+      time: timeAgo(parseTimestamp(lastSyncTime)),
+    });
   }
 
   const handleRefresh = () => {
@@ -126,7 +130,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
       repo => repo.fullName
     );
-    const options = ['All repositories', ...repoNames, 'Cancel'];
+    const options = [
+      t('securityAgent.repositories.allRepositories'),
+      ...repoNames,
+      t('common.cancel'),
+    ];
     showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, index => {
       if (index === undefined || index === options.length - 1) {
         return;
@@ -138,7 +146,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Security Agent"
+        title={t('securityAgent.title')}
         headerRight={
           <View className="flex-row items-center">
             <Pressable
@@ -146,7 +154,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityRole="button"
-              accessibilityLabel="Findings"
+              accessibilityLabel={t('securityAgent.dashboard.findings')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
@@ -156,7 +164,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 router.push(getSecurityAgentPath(scope, 'settings'));
               }}
               accessibilityRole="button"
-              accessibilityLabel="Settings"
+              accessibilityLabel={t('securityAgent.dashboard.settings')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <Settings size={20} color={colors.foreground} />
@@ -177,11 +185,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             disabled={repoFilterUnavailable}
             className={cn('flex-1 active:opacity-70', repoFilterUnavailable && 'opacity-50')}
             accessibilityRole="button"
-            accessibilityLabel="Filter by repository"
+            accessibilityLabel={t('securityAgent.dashboard.filterByRepository')}
             accessibilityState={{ disabled: repoFilterUnavailable }}
           >
             <Text className="text-sm font-medium" numberOfLines={1}>
-              {repoFullName ?? 'All repositories'}
+              {repoFullName ?? t('securityAgent.repositories.allRepositories')}
             </Text>
             <Text variant="muted" className="text-xs">
               {lastSyncLabel}
@@ -193,7 +201,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 { repoFullName },
                 {
                   onSuccess: () => {
-                    toast.success('Sync queued');
+                    toast.success(t('securityAgent.dashboard.syncQueued'));
                   },
                   onSettled: () => {
                     refreshOutbox();
@@ -203,7 +211,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             }}
             disabled={syncDisabled}
             accessibilityRole="button"
-            accessibilityLabel="Sync now"
+            accessibilityLabel={t('securityAgent.dashboard.syncNow')}
             accessibilityState={{ disabled: syncDisabled, busy: triggerSync.isPending }}
             className={cn(
               'size-11 items-center justify-center active:opacity-70',
@@ -220,7 +228,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {refreshFailed ? (
-          <Text className="text-xs text-warn">Could not refresh — showing last synced data.</Text>
+          <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
         ) : null}
 
         {triggerSync.isError ? (
@@ -256,7 +264,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 { repoFullName: input.repoFullName, operationKey: row.operationKey },
                 {
                   onSuccess: () => {
-                    toast.success('Sync queued');
+                    toast.success(t('securityAgent.dashboard.syncQueued'));
                   },
                   onSettled: () => {
                     refreshOutbox();
@@ -305,7 +313,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                   { repoFullName },
                   {
                     onSuccess: () => {
-                      toast.success('Sync queued');
+                      toast.success(t('securityAgent.dashboard.syncQueued'));
                     },
                     onSettled: () => {
                       refreshOutbox();
@@ -315,7 +323,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               }}
               disabled={syncDisabled}
               accessibilityRole="button"
-              accessibilityLabel="Sync findings"
+              accessibilityLabel={t('securityAgent.dashboard.syncFindings')}
               accessibilityState={{
                 disabled: syncDisabled,
                 busy: triggerSync.isPending,
@@ -328,17 +336,21 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               {triggerSync.isPending && (
                 <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
               )}
-              <Text className="text-xs font-medium text-primary">Sync findings</Text>
+              <Text className="text-xs font-medium text-primary">
+                {t('securityAgent.dashboard.syncFindings')}
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
               accessibilityRole="button"
-              accessibilityLabel="Manage repositories"
+              accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
               className="min-h-11 justify-center active:opacity-70"
             >
-              <Text className="text-xs font-medium text-primary">Manage repositories</Text>
+              <Text className="text-xs font-medium text-primary">
+                {t('securityAgent.dashboard.manageRepositories')}
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -347,7 +359,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <QueryError
             variant="server"
             placement="top"
-            title="Could not load dashboard data"
+            title={t('securityAgent.dashboard.couldNotLoad')}
             onRetry={() => void dashboardStats.refetch()}
             isRetrying={dashboardStats.isFetching}
           />

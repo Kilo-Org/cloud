@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -58,6 +59,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const router = useRouter();
   const colors = useThemeColors();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   // Org-scoped stored page only (cloud-agent + cli). Active list is an
   // id/capability lookup — never a row source.
@@ -382,12 +384,12 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     <View collapsable={false} className="border-b border-border bg-background pt-4">
       <View className="h-11 flex-row items-center justify-center px-4">
         <Text className="text-lg font-semibold text-foreground" accessibilityRole="header">
-          Share to Kilo
+          {t('share.title')}
         </Text>
         <Button
           size="icon"
           variant="ghost"
-          accessibilityLabel="Close"
+          accessibilityLabel={t('share.close')}
           onPress={dismiss}
           className="absolute right-2"
         >
@@ -408,9 +410,13 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       {reviewPr ? (
         <DestinationOptionRow
           icon={GitPullRequest}
-          title="Review PR"
-          subtitle={`${reviewPr.owner}/${reviewPr.repo} #${reviewPr.number}`}
-          accessibilityLabel="Review PR"
+          title={t('share.reviewPr')}
+          subtitle={t('share.reviewPrSubtitle', {
+            owner: reviewPr.owner,
+            repo: reviewPr.repo,
+            number: reviewPr.number,
+          })}
+          accessibilityLabel={t('share.reviewPr')}
           onPress={handleReviewPr}
         />
       ) : null}
@@ -420,7 +426,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           onPress={newSessionDisabled ? undefined : handleNewSession}
           disabled={newSessionDisabled}
           accessibilityRole="button"
-          accessibilityLabel="New session"
+          accessibilityLabel={t('share.newSession')}
           accessibilityState={{ disabled: newSessionDisabled }}
           className={`flex-row items-center gap-3 border-t border-border px-4 py-3.5 ${
             newSessionDisabled ? 'opacity-50' : 'active:opacity-70'
@@ -429,7 +435,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
             <Plus size={18} color={colors.primaryForeground} />
           </View>
-          <Text className="text-base font-semibold text-foreground">New session</Text>
+          <Text className="text-base font-semibold text-foreground">{t('share.newSession')}</Text>
         </Pressable>
       ) : null}
     </View>

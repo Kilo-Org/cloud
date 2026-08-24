@@ -1,6 +1,9 @@
+import { relativeTimeFormat } from '@/lib/intl-cache';
 import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+import { i18n } from '@/i18n';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -8,30 +11,37 @@ function cn(...inputs: ClassValue[]) {
 
 const EMAIL_PATTERN = /.+@.+\..+/;
 
-/** Returns a human-readable relative time string like "3 days ago". */
-function timeAgo(date: Date): string {
+// Ordered largest-first so the first unit whose bucket fits wins; the values
+// mirror the original minute/hour/day/month/year buckets.
+const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds: number }[] = [
+  { unit: 'year', seconds: 365 * 24 * 60 * 60 },
+  { unit: 'month', seconds: 30 * 24 * 60 * 60 },
+  { unit: 'day', seconds: 24 * 60 * 60 },
+  { unit: 'hour', seconds: 60 * 60 },
+  { unit: 'minute', seconds: 60 },
+];
+
+/**
+ * Returns a human-readable relative time string like "3 days ago". Uses
+ * `Intl.RelativeTimeFormat` with the active i18n language (or the passed
+ * locale) so the unit words and direction are localized. Sub-minute ages use
+ * the catalog's `common.justNow` because RelativeTimeFormat has no sub-minute
+ * bucket.
+ */
+function timeAgo(date: Date, locale?: string): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 60) {
-    return 'just now';
+    return i18n.t('common.justNow');
   }
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
+  const resolvedLocale = locale ?? i18n.language;
+  const formatter = relativeTimeFormat(resolvedLocale, { numeric: 'auto' });
+  for (const { unit, seconds: unitSeconds } of RELATIVE_TIME_UNITS) {
+    const value = Math.floor(seconds / unitSeconds);
+    if (value >= 1) {
+      return formatter.format(-value, unit);
+    }
   }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-  const days = Math.floor(hours / 24);
-  if (days < 30) {
-    return `${days}d ago`;
-  }
-  const months = Math.floor(days / 30);
-  if (months < 12) {
-    return `${months}mo ago`;
-  }
-  const years = Math.floor(days / 365);
-  return `${years}y ago`;
+  return i18n.t('common.justNow');
 }
 
 // eslint-disable-next-line no-empty-function -- intentional no-op

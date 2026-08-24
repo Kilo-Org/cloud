@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "ଆପଣଙ୍କ ଏଜେଣ୍ଟ ସେସନରେ ଅପଡେଟ୍ ଅଛି",
+      "chatMessage": "ଆପଣଙ୍କୁ ଏକ ନୂତନ ବାର୍ତ୍ତା ଅଛି",
+      "instanceLifecycle": "ଆପଣଙ୍କ ଇନସ୍ଟାନ୍ସରେ ଅପଡେଟ୍ ଅଛି",
+      "scheduledAction": "ଏକ ନିର୍ଦ୍ଧାରିତ କାର୍ଯ୍ୟରେ ଅପଡେଟ୍ ଅଛି",
+      "lowBalance": "ଆପଣଙ୍କ ବ୍ୟାଲାନ୍ସର ଧ୍ୟାନ ଦରକାର",
+      "securityFinding": "ଏକ ସୁରକ୍ଷା ନିଷ୍କର୍ଷର ଧ୍ୟାନ ଦରକାର"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "କାର୍ଯ୍ୟ ସମାପ୍ତ"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "ବିଫଳ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ବ୍ୟାହତ: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ଶୀର୍ଷକହୀନ",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କ",
+      "body": "{{organizationName}} ବ୍ୟାଲାନ୍ସ ${{minimumBalanceUsd}} ତଳେ ଖସିଲା"
+    },
+    "securityFindingNew": {
+      "title": "ନୂତନ ସୁରକ୍ଷା ନିଷ୍କର୍ଷ ({{severity}})",
+      "body": "{{findingTitle}} {{repoFullName}} ରେ"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ସତର୍କ",
+      "body": "{{findingTitle}} {{repoFullName}} ରେ"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ଉଲ୍ଲଂଘନ",
+      "body": "{{findingTitle}} {{repoFullName}} ରେ"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ଏକ ସୁରକ୍ଷା ନିଷ୍କର୍ଷର ଧ୍ୟାନ ଦରକାର"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ପ୍ରସ୍ତୁତ",
+      "body": "ଚାଟିଂ ଆରମ୍ଭ କରିବାକୁ ଟାପ୍ କରନ୍ତୁ।"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ଆରମ୍ଭ ବିଫଳ ହେଲା",
+      "body": "ଆରମ୍ଭ ବିଫଳ।"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} ଶୀଘ୍ର ପୁନଃଆରମ୍ଭ ହେବ",
+      "body": "{{when}} ରେ ପୁନଃଆରମ୍ଭ ନିର୍ଦ୍ଧାରିତ।"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} ପୁନଃଆରମ୍ଭ ବାତିଲ",
+      "body": "ପୂର୍ବ ନିର୍ଦ୍ଧାରିତ ପୁନଃଆରମ୍ଭ ବାତିଲ ହୋଇଛି।"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} ଶୀଘ୍ର ଅପଗ୍ରେଡ୍ ହେବ",
+      "bodyWithTag": "{{when}} ରେ {{targetImageTag}} କୁ ଅପଗ୍ରେଡ୍ କରନ୍ତୁ।",
+      "bodyWithoutTag": "{{when}} ରେ ନିର୍ଦ୍ଧାରିତ ଅପଗ୍ରେଡ୍।"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} ଅପଗ୍ରେଡ୍ ବାତିଲ",
+      "body": "ପୂର୍ବ ନିର୍ଦ୍ଧାରିତ ଅପଗ୍ରେଡ୍ ବାତିଲ ହୋଇଛି।"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "ଆପଣଙ୍କ Kilo ସେସନ୍ ଆପଣଙ୍କ ଫୋନରୁ ନିୟନ୍ତ୍ରଣ କରିବାକୁ ପ୍ରସ୍ତୁତ"
+  }
+}

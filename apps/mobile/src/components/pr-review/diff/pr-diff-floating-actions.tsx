@@ -12,6 +12,7 @@
 
 import { type Href, useRouter } from 'expo-router';
 import { MessageCirclePlus } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,6 +53,7 @@ export function PrDiffFloatingActions({
 }: PrDiffFloatingActionsProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const pending = usePendingReview();
   // The bar sits on the bottom edge, so its bottom padding must include the
   // Android system inset. The measured height (onLayout) therefore already
@@ -113,27 +115,27 @@ export function PrDiffFloatingActions({
                 onClearSelection();
                 clearDiffSelection();
               }}
-              accessibilityLabel="Clear selection"
+              accessibilityLabel={t('prReview.floatingActions.clearSelection')}
             >
-              <Text>Clear</Text>
+              <Text>{t('prReview.floatingActions.clear')}</Text>
             </Button>
             <Button
               onPress={openCommentComposer}
               size="sm"
-              accessibilityLabel="Comment on selected lines"
+              accessibilityLabel={t('prReview.floatingActions.commentOnSelectedLines')}
             >
               <MessageCirclePlus size={14} color={colors.primaryForeground} />
-              <Text>Comment</Text>
+              <Text>{t('prReview.floatingActions.comment')}</Text>
             </Button>
           </View>
         ) : null}
         <Button
           onPress={openReviewSubmit}
-          accessibilityLabel="Finish review"
+          accessibilityLabel={t('prReview.floatingActions.finishReview')}
           className={cn(showSelectionAction && 'mt-1')}
         >
           <View className="relative flex-row items-center">
-            <Text>Finish review</Text>
+            <Text>{t('prReview.floatingActions.finishReview')}</Text>
             {pending.items.length > 0 ? (
               <View className="absolute -right-2.5 -top-2.5 min-h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground px-1.5">
                 <Text className="text-xs font-semibold text-primary">{pending.items.length}</Text>

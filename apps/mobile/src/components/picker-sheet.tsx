@@ -1,5 +1,6 @@
 import { Info } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,6 +15,7 @@ export function PickerSheet({
   children,
   expired = false,
   scrollable = true,
+  disabled = false,
 }: {
   title: string;
   onDone: () => void;
@@ -28,13 +30,16 @@ export function PickerSheet({
    * the header instead of nesting them in a ScrollView.
    */
   scrollable?: boolean;
+  /** Disables the header Done/Cancel controls while the caller applies a choice. */
+  disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const body = expired ? (
     <EmptyState
       icon={Info}
-      title="Options expired"
-      description="Go back and reopen this picker from the previous screen."
+      title={t('picker.optionsExpired')}
+      description={t('picker.optionsExpiredDescription')}
     />
   ) : (
     children
@@ -46,7 +51,13 @@ export function PickerSheet({
   // pinning the scroll view to the full sheet, painting it over the header.
   return (
     <>
-      <SheetHeader title={title} onDone={onDone} onCancel={onCancel} doneLabel={doneLabel} />
+      <SheetHeader
+        title={title}
+        onDone={onDone}
+        onCancel={onCancel}
+        doneLabel={doneLabel}
+        disabled={disabled}
+      />
       {scrollable ? (
         <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
       ) : (

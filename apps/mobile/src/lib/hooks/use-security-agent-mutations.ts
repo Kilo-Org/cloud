@@ -1,6 +1,7 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   isLatestMutationGeneration,
@@ -240,9 +241,7 @@ export function useSetSecurityAgentEnabled(scope: string) {
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
-        announcingToast.error(
-          'Security Agent was enabled, but the initial sync could not be queued. Sync again.'
-        );
+        announcingToast.error(i18n.t('securityAgent.initialSyncAdmissionFailed'));
       } else if ('initialSync' in result && result.initialSync) {
         trackSecurityAgentCommand(queryClient, scope, result.initialSync.commandId);
       }

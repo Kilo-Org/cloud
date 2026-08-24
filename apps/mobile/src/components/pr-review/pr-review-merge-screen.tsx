@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
@@ -29,6 +30,7 @@ const MERGE_METHODS = new Set<PrMergeMethod>(['merge', 'squash', 'rebase']);
 export function PrReviewMergeScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const owner = parseParam(params.owner) ?? '';
   const repo = parseParam(params.repo) ?? '';
@@ -38,7 +40,10 @@ export function PrReviewMergeScreen() {
   const method: PrMergeMethod = MERGE_METHODS.has(params.method as PrMergeMethod)
     ? (params.method as PrMergeMethod)
     : 'merge';
-  const sheetTitle = mode === 'enable-auto-merge' ? 'Enable auto-merge' : 'Merge pull request';
+  const sheetTitle =
+    mode === 'enable-auto-merge'
+      ? t('prReview.merge.enableAutoMerge')
+      : t('prReview.merge.mergePullRequest');
   const eyebrow = `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();
@@ -85,7 +90,7 @@ export function PrReviewMergeScreen() {
   ) : (
     <QueryError
       variant="server"
-      title="Couldn't load merge options"
+      title={t('prReview.merge.loadFailedTitle')}
       onRetry={() => {
         void pr.refetch();
       }}

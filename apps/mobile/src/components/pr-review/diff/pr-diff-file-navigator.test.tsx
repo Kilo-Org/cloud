@@ -13,6 +13,7 @@ import { createElement, Fragment, type ReactElement } from 'react';
 import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { renderWithProviders } from '@/test/render-with-providers';

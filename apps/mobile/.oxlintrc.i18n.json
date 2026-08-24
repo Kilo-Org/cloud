@@ -1,0 +1,19 @@
+{
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": [
+    {
+      "name": "no-literal-copy",
+      "specifier": "../../tools/oxlint/no-literal-copy/index.ts"
+    }
+  ],
+  "rules": {
+    "no-literal-copy/no-literal-copy": "error"
+  },
+  "ignorePatterns": [
+    "dist/*",
+    "node_modules/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**"
+  ]
+}

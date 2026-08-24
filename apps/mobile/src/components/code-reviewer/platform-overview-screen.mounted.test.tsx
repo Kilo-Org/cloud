@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
 
+import '@/i18n';
 import { PlatformOverviewScreen } from './platform-overview-screen';
 
 const config = vi.hoisted(() => ({

@@ -1,6 +1,7 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle2, type LucideIcon, Scale, Zap } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -11,8 +12,8 @@ import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 
 type AutoModelCard = {
   id: string;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   icon: LucideIcon;
   iconBg: string;
   iconColorKey: 'agentSky' | 'agentYuki';
@@ -21,11 +22,11 @@ type AutoModelCard = {
   performanceDotColor: string;
 };
 
-const AUTO_MODEL_CARDS: AutoModelCard[] = [
+const AUTO_MODEL_CARDS = [
   {
     id: 'kilo-auto/frontier',
-    label: 'Frontier',
-    description: 'Highest performance. Routes to frontier models with reasoning.',
+    labelKey: 'kiloclaw.modelPicker.frontierLabel',
+    descriptionKey: 'kiloclaw.modelPicker.frontierDescription',
     icon: Zap,
     iconBg: 'bg-agent-yuki-tile-bg',
     iconColorKey: 'agentYuki',
@@ -35,8 +36,8 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
   },
   {
     id: 'kilo-auto/balanced',
-    label: 'Balanced',
-    description: 'Smart balance of speed and capability at lower cost.',
+    labelKey: 'kiloclaw.modelPicker.balancedLabel',
+    descriptionKey: 'kiloclaw.modelPicker.balancedDescription',
     icon: Scale,
     iconBg: 'bg-agent-sky-tile-bg',
     iconColorKey: 'agentSky',
@@ -44,14 +45,15 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     performance: 2,
     performanceDotColor: 'bg-agent-sky',
   },
-];
+] as const satisfies readonly AutoModelCard[];
 
-const AUTO_MODEL_IDS = new Set(AUTO_MODEL_CARDS.map(c => c.id));
+const AUTO_MODEL_IDS = new Set<string>(AUTO_MODEL_CARDS.map(c => c.id));
 
 function CostIndicator({ level }: { level: number }) {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-xs text-muted-foreground">Cost</Text>
+      <Text className="text-xs text-muted-foreground">{t('kiloclaw.modelPicker.cost')}</Text>
       <View className="flex-row gap-0.5">
         {[0, 1, 2].map(i => (
           <Text
@@ -67,9 +69,10 @@ function CostIndicator({ level }: { level: number }) {
 }
 
 function PerformanceIndicator({ level, dotColor }: { level: number; dotColor: string }) {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-xs text-muted-foreground">Performance</Text>
+      <Text className="text-xs text-muted-foreground">{t('kiloclaw.modelPicker.performance')}</Text>
       <View className="flex-row gap-1">
         {[0, 1, 2].map(i => (
           <View
@@ -90,6 +93,7 @@ export function ModelPicker() {
   const { data: config, isLoading } = useKiloClawConfig(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
   const isAutoModel = AUTO_MODEL_IDS.has(currentModel);
@@ -117,7 +121,7 @@ export function ModelPicker() {
     <View className="gap-4">
       <View className="gap-3">
         <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Kilo Auto
+          {t('kiloclaw.modelPicker.kiloAuto')}
         </Text>
         {AUTO_MODEL_CARDS.map(card => {
           const selected = currentModel === card.id;
@@ -136,7 +140,9 @@ export function ModelPicker() {
               }}
               accessibilityRole="button"
               accessibilityState={{ selected, disabled: mutations.updateModel.isPending }}
-              accessibilityLabel={`${card.label} auto model`}
+              accessibilityLabel={t('kiloclaw.modelPicker.autoModelA11y', {
+                label: t(card.labelKey),
+              })}
             >
               {selected && (
                 <View className="absolute right-3 top-3">
@@ -147,9 +153,9 @@ export function ModelPicker() {
                 <Icon size={20} color={colors[card.iconColorKey]} />
               </View>
               <View className="gap-1">
-                <Text className="font-semibold">{card.label}</Text>
+                <Text className="font-semibold">{t(card.labelKey)}</Text>
                 <Text className="text-xs leading-relaxed text-muted-foreground">
-                  {card.description}
+                  {t(card.descriptionKey)}
                 </Text>
               </View>
               <View className="gap-1.5">
@@ -167,7 +173,9 @@ export function ModelPicker() {
       {/* Current non-auto model display */}
       {!isAutoModel && currentModel && (
         <View className="rounded-lg bg-secondary p-3">
-          <Text className="text-xs text-muted-foreground">Current model</Text>
+          <Text className="text-xs text-muted-foreground">
+            {t('kiloclaw.modelPicker.currentModel')}
+          </Text>
           <Text className="text-sm font-medium">{currentModel}</Text>
         </View>
       )}
@@ -179,9 +187,11 @@ export function ModelPicker() {
           router.push(`/(app)/kiloclaw/${instanceId}/settings/model-list` as Href);
         }}
         accessibilityRole="link"
-        accessibilityLabel="Browse all 500+ models"
+        accessibilityLabel={t('kiloclaw.modelPicker.browseAllModelsA11y')}
       >
-        <Text className="text-sm text-muted-foreground">or select from 500+ models</Text>
+        <Text className="text-sm text-muted-foreground">
+          {t('kiloclaw.modelPicker.browseAllModels')}
+        </Text>
       </Pressable>
     </View>
   );

@@ -1,4 +1,5 @@
 import { Mic, Square } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -107,8 +108,9 @@ type VoiceInputStatusProps = {
 export function VoiceInputStatus({
   status,
 }: Readonly<VoiceInputStatusProps>): React.ReactElement | null {
+  const { t } = useTranslation();
   if (status !== 'listening') {
     return null;
   }
-  return <AccessibleStatus message="Listening..." tone="status" className="text-xs" />;
+  return <AccessibleStatus message={t('voiceInput.listening')} tone="status" className="text-xs" />;
 }

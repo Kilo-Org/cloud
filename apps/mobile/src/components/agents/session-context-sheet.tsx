@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- The context sheet composes the usage ring, token totals, and per-model cost rows. */
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
@@ -69,6 +71,7 @@ export function SessionContextSheet({
   onClose,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info.percentage);
   const arcFraction = getArcFraction(info.percentage);
@@ -90,7 +93,7 @@ export function SessionContextSheet({
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
-      <SheetHeader title="Context usage" onDone={onClose} doneLabel="Done" />
+      <SheetHeader title={t('agentChat.contextUsage.title')} onDone={onClose} />
 
       {/* Rows below are exposed individually to screen readers; collapsing
           them behind a single ScrollView accessibilityLabel would shadow the
@@ -116,42 +119,47 @@ export function SessionContextSheet({
         </View>
 
         <View className="mt-6 gap-4">
-          <Row label="Used">
+          <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
               {content.usedTokens}
               {content.capacityKnown && content.windowTokens ? (
                 <Text className="text-sm text-muted-foreground">
                   {' '}
-                  of {content.windowTokens} tokens
+                  {t('agentChat.contextUsage.ofWindowTokens', { window: content.windowTokens })}
                 </Text>
               ) : (
-                <Text className="text-sm text-muted-foreground"> tokens</Text>
+                <Text className="text-sm text-muted-foreground">
+                  {' '}
+                  {t('agentChat.contextUsage.tokens')}
+                </Text>
               )}
             </Text>
           </Row>
 
           {content.capacityKnown ? (
-            <Row label="Remaining">
+            <Row label={t('agentChat.contextUsage.remaining')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {content.remainingTokens}
                 <Text className="text-sm text-muted-foreground">
                   {' '}
-                  tokens ({content.remainingPercentage})
+                  {t('agentChat.contextUsage.tokensWithPercentage', {
+                    percentage: content.remainingPercentage ?? '',
+                  })}
                 </Text>
               </Text>
             </Row>
           ) : null}
 
-          <Row label="Model">
+          <Row label={t('agentChat.messageDetails.model')}>
             <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
           </Row>
 
-          <Row label="Provider">
+          <Row label={t('agentChat.contextUsage.provider')}>
             <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
           </Row>
 
           {content.cost !== null ? (
-            <Row label="Total cost">
+            <Row label={t('agentChat.contextUsage.totalCost')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {content.cost}
               </Text>
@@ -159,20 +167,34 @@ export function SessionContextSheet({
           ) : null}
 
           <Text className="text-xs text-muted-foreground">
-            Usage reflects the latest completed assistant response.
+            {t('agentChat.contextUsage.usageReflectsLatest')}
           </Text>
         </View>
 
         <View className="mt-8 gap-4">
-          <Text className="text-sm font-semibold text-foreground">Token usage</Text>
+          <Text className="text-sm font-semibold text-foreground">
+            {t('agentChat.contextUsage.tokenUsage')}
+          </Text>
           <View className="gap-3">
-            <TokenRow label="Input" value={breakdown.totals.input} />
-            <TokenRow label="Output" value={breakdown.totals.output} />
-            <TokenRow label="Reasoning" value={breakdown.totals.reasoning} />
-            <TokenRow label="Cache read" value={breakdown.totals.cacheRead} />
-            <TokenRow label="Cache write" value={breakdown.totals.cacheWrite} />
-            <TokenRow label="Total" value={breakdown.totals.total} />
-            <Row label="Cache rate">
+            <TokenRow label={t('agentChat.messageDetails.input')} value={breakdown.totals.input} />
+            <TokenRow
+              label={t('agentChat.messageDetails.output')}
+              value={breakdown.totals.output}
+            />
+            <TokenRow
+              label={t('agentChat.messageDetails.reasoning')}
+              value={breakdown.totals.reasoning}
+            />
+            <TokenRow
+              label={t('agentChat.messageDetails.cacheRead')}
+              value={breakdown.totals.cacheRead}
+            />
+            <TokenRow
+              label={t('agentChat.messageDetails.cacheWrite')}
+              value={breakdown.totals.cacheWrite}
+            />
+            <TokenRow label={t('agentChat.messageDetails.total')} value={breakdown.totals.total} />
+            <Row label={t('agentChat.contextUsage.cacheRate')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {breakdown.totals.cacheRatePct === null
                   ? '-'
@@ -185,7 +207,7 @@ export function SessionContextSheet({
         {modelsSectionCount > 0 ? (
           <View className="mt-8 gap-3">
             <Text className="text-sm font-semibold text-foreground">
-              Models ({modelsSectionCount})
+              {t('agentChat.contextUsage.modelsCount', { count: modelsSectionCount })}
             </Text>
             <View className="gap-2">
               {visibleModels.map(model => (
@@ -203,7 +225,7 @@ export function SessionContextSheet({
               ) : null}
             </View>
             <Text className="mt-1 text-xs text-muted-foreground">
-              Token totals cover this session only and exclude subagent/child-session tokens.
+              {t('agentChat.contextUsage.tokenTotalsNote')}
             </Text>
           </View>
         ) : null}
@@ -243,8 +265,13 @@ function ModelRow({
 }>) {
   const [expanded, setExpanded] = useState(false);
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const name = friendlyModelName(model.providerID, model.modelID, modelOptions);
   const provider = resolveModelProviderName(model.providerID, model.modelID, modelOptions);
+  const stepsLabel =
+    model.steps === 1
+      ? t('agentChat.contextUsage.stepsCountOne', { steps: model.steps })
+      : t('agentChat.contextUsage.stepsCountMany', { steps: model.steps });
   return (
     <View className="overflow-hidden rounded-md border border-border">
       <Pressable
@@ -252,7 +279,12 @@ function ModelRow({
           setExpanded(value => !value);
         }}
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${provider}, ${model.steps} step${model.steps === 1 ? '' : 's'}, ${formatCost(model.costUsd)}`}
+        accessibilityLabel={t('agentChat.contextUsage.modelAccessibilityLabel', {
+          name,
+          provider,
+          steps: stepsLabel,
+          cost: formatCost(model.costUsd),
+        })}
         accessibilityState={{ expanded }}
         className="flex-row items-center gap-2 px-3 py-3 active:opacity-70"
       >
@@ -266,7 +298,7 @@ function ModelRow({
             {name}
           </Text>
           <Text className="text-xs text-muted-foreground">
-            {provider} · {model.steps} step{model.steps === 1 ? '' : 's'}
+            {provider} · {stepsLabel}
           </Text>
         </View>
         <Text className="text-sm font-medium text-foreground tabular-nums">
@@ -275,12 +307,21 @@ function ModelRow({
       </Pressable>
       {expanded ? (
         <View className="gap-2 border-t border-border px-3 py-3">
-          <TokenRow label="Input" value={model.tokens.input} />
-          <TokenRow label="Output" value={model.tokens.output} />
-          <TokenRow label="Reasoning" value={model.tokens.reasoning} />
-          <TokenRow label="Cache read" value={model.tokens.cacheRead} />
-          <TokenRow label="Cache write" value={model.tokens.cacheWrite} />
-          <TokenRow label="Total" value={model.tokens.total} />
+          <TokenRow label={t('agentChat.messageDetails.input')} value={model.tokens.input} />
+          <TokenRow label={t('agentChat.messageDetails.output')} value={model.tokens.output} />
+          <TokenRow
+            label={t('agentChat.messageDetails.reasoning')}
+            value={model.tokens.reasoning}
+          />
+          <TokenRow
+            label={t('agentChat.messageDetails.cacheRead')}
+            value={model.tokens.cacheRead}
+          />
+          <TokenRow
+            label={t('agentChat.messageDetails.cacheWrite')}
+            value={model.tokens.cacheWrite}
+          />
+          <TokenRow label={t('agentChat.messageDetails.total')} value={model.tokens.total} />
         </View>
       ) : null}
     </View>
@@ -288,11 +329,16 @@ function ModelRow({
 }
 
 function SubagentRow({ costUsd }: Readonly<{ costUsd: number }>) {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between rounded-md border border-border px-3 py-3">
       <View className="gap-0.5">
-        <Text className="text-sm font-medium text-foreground">Subagents</Text>
-        <Text className="text-xs text-muted-foreground">Residual cost from child sessions</Text>
+        <Text className="text-sm font-medium text-foreground">
+          {t('agentChat.contextUsage.subagents')}
+        </Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('agentChat.contextUsage.subagentsDescription')}
+        </Text>
       </View>
       <Text className="text-sm font-medium text-foreground tabular-nums">
         {formatCost(costUsd)}
@@ -302,12 +348,15 @@ function SubagentRow({ costUsd }: Readonly<{ costUsd: number }>) {
 }
 
 function OlderActivityRow({ costUsd }: Readonly<{ costUsd: number }>) {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between rounded-md border border-border px-3 py-3">
       <View className="gap-0.5">
-        <Text className="text-sm font-medium text-foreground">Older activity</Text>
+        <Text className="text-sm font-medium text-foreground">
+          {t('agentChat.contextUsage.olderActivity')}
+        </Text>
         <Text className="text-xs text-muted-foreground">
-          Cost not attributed to the loaded history
+          {t('agentChat.contextUsage.olderActivityDescription')}
         </Text>
       </View>
       <Text className="text-sm font-medium text-foreground tabular-nums">

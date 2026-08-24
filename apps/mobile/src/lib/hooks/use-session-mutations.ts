@@ -1,5 +1,6 @@
 import { hashKey, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -135,7 +136,7 @@ export function useSessionMutations() {
           await chainSave(sessionId, () =>
             deleteSessionMutation.mutateAsync({ session_id: sessionId })
           );
-          announcingToast.success('Session deleted');
+          announcingToast.success(i18n.t('agents.sessionRow.sessionDeleted'));
           onDeleted?.();
         } catch {
           // Already surfaced via the mutation's own onError (toast + rollback).

@@ -1130,6 +1130,9 @@ export const userRouter = createTRPCRouter({
         token: z.string().min(1),
         platform: z.enum(['ios', 'android']),
         appVersion: z.string().max(64).optional(),
+        // Old clients omit `locale`; null means English. Remove the optional
+        // field when every supported mobile version sends `locale`.
+        locale: z.string().min(1).max(32).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1140,6 +1143,7 @@ export const userRouter = createTRPCRouter({
           token: input.token,
           platform: input.platform,
           app_version: input.appVersion ?? null,
+          locale: input.locale ?? null,
         })
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
@@ -1147,6 +1151,7 @@ export const userRouter = createTRPCRouter({
             user_id: ctx.user.id,
             platform: input.platform,
             app_version: input.appVersion ?? null,
+            locale: input.locale ?? null,
             updated_at: sql`now()`,
           },
         });
@@ -1173,6 +1178,10 @@ export const userRouter = createTRPCRouter({
       .select({
         token: user_push_tokens.token,
         platform: user_push_tokens.platform,
+        // The client compares this against the app's active language: the
+        // server row, not a client-side cache, decides whether a re-register
+        // is needed. Null means English.
+        locale: user_push_tokens.locale,
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));

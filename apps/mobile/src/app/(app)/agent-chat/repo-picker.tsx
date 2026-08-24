@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -16,6 +17,7 @@ export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [bridge, setBridge] = useState(() => getRepoPickerBridge());
 
@@ -57,12 +59,17 @@ export default function RepoPickerScreen() {
 
   if (!bridge) {
     return (
-      <PickerSheet title="Select repository" onDone={closePicker} scrollable={false} expired />
+      <PickerSheet
+        title={t('agentChat.repoPicker.title')}
+        onDone={closePicker}
+        scrollable={false}
+        expired
+      />
     );
   }
 
   return (
-    <PickerSheet title="Select repository" onDone={closePicker} scrollable={false}>
+    <PickerSheet title={t('agentChat.repoPicker.title')} onDone={closePicker} scrollable={false}>
       <FlatList
         className="flex-1 bg-background"
         data={filtered}
@@ -74,8 +81,8 @@ export default function RepoPickerScreen() {
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
-              accessibilityLabel="Search repositories"
-              placeholder="Search repositories..."
+              accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
+              placeholder={t('agentChat.repoPicker.searchPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
@@ -91,11 +98,15 @@ export default function RepoPickerScreen() {
           <EmptyState
             icon={search.trim() ? SearchX : Info}
             placement="top"
-            title={search.trim() ? 'No matches' : 'No repositories available'}
+            title={
+              search.trim()
+                ? t('agentChat.repoPicker.noMatches')
+                : t('agentChat.repoPicker.noRepositories')
+            }
             description={
               search.trim()
-                ? 'Try a different search term.'
-                : 'No repositories are connected to your account.'
+                ? t('agentChat.repoPicker.tryDifferentSearch')
+                : t('agentChat.repoPicker.noRepositoriesDescription')
             }
           />
         }

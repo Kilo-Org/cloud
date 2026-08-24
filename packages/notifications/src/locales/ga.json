@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Tá nuashonrú ar do sheisiún ghníomhaire",
+      "chatMessage": "Tá teachtaireacht nua agat",
+      "instanceLifecycle": "Tá nuashonrú ar do chás",
+      "scheduledAction": "Tá nuashonrú ar ghníomh sceidealta",
+      "lowBalance": "Teastaíonn aird ar do chothromas",
+      "securityFinding": "Teastaíonn aird ar thátal slándála"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tasc críochnaithe"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Theip: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Curtha isteach: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Gan teideal",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Foláireamh chothromas íseal",
+      "body": "Thit cothromas {{organizationName}} faoi ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Tátal slándála nua ({{severity}})",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Rabhadh SLA",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Sárú SLA",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Teastaíonn aird ar thátal slándála"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "Tá {{instanceName}} réidh",
+      "body": "Tapáil le tosú ag comhrá."
+    },
+    "startFailed": {
+      "title": "Theip ar {{instanceName}} tosú",
+      "body": "Theip ar thosú."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "Atosóidh {{instanceName}} go luath",
+      "body": "Sceidealta le hatosú ag {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Atosú {{instanceName}} curtha ar ceal",
+      "body": "Cuireadh an t-atosú sceidealta roimhe sin ar ceal."
+    },
+    "versionChangeNotice": {
+      "title": "Uasghrádóidh {{instanceName}} go luath",
+      "bodyWithTag": "Uasghrádú go {{targetImageTag}} ag {{when}}.",
+      "bodyWithoutTag": "Uasghrádú sceidealta ag {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Uasghrádú {{instanceName}} curtha ar ceal",
+      "body": "Cuireadh an t-uasghrádú sceidealta roimhe sin ar ceal."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Tá do sheisiún Kilo réidh le rialú ó do ghuthán"
+  }
+}

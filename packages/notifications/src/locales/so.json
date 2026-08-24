@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Kalfadhigaaga wakiilka ayaa leh cusboonaysiin",
+      "chatMessage": "Waxaad haysaa fariin cusub",
+      "instanceLifecycle": "Instance-kaagu wuxuu leeyahay cusboonaysiin",
+      "scheduledAction": "Fal la qorsheeyay ayaa leh cusboonaysiin",
+      "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
+      "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Hawsha waa la dhammaystiray"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Guuldarraystay: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Waa la hakiyay: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Aan la magacayn",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Digniinta dheelitirka hooseeya",
+      "body": "{{organizationName}} dheelitirku wuxuu hoos u dhacay ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Natiijo ammin cusub ({{severity}})",
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Digniin SLA",
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Jebinta SLA",
+      "body": "{{findingTitle}} gudaha {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Natiijo ammin ayaa u baahan feejignaan"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} waa diyaar",
+      "body": "Taabo si aad u bilowdo sheekaysiga."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} wuu ku guuldarraystay bilowga",
+      "body": "Bilowgu wuu guuldarraystay."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} waxaa dhawaan dib loo bilaabi doonaa",
+      "body": "Waxaa loo qorsheeyay in dib loo bilaabo {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Dib-u-bilowga {{instanceName}} waa la joojiyay",
+      "body": "Dib-u-bilowgii hore loo qorsheeyay waa la joojiyay."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} waxaa dhawaan loo cusboonaysiin doonaa",
+      "bodyWithTag": "Cusboonaysiin {{targetImageTag}} {{when}}.",
+      "bodyWithoutTag": "Cusboonaysiin qorsheysan {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Cusboonaysiinta {{instanceName}} waa la joojiyay",
+      "body": "Cusboonaysiintii hore loo qorsheeyay waa la joojiyay."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kalfadhigaaga Kilo waa diyaar in laga xakameeyo taleefankaaga"
+  }
+}

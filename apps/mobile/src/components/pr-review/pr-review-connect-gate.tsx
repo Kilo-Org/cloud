@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -44,6 +45,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
   const connect = useMutation(
     trpc.githubApps.connectUserAuthorization.mutationOptions({
@@ -110,11 +112,11 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="PR Review" />
+        <ScreenHeader title={t('prReview.screenTitle')} />
         <QueryError
           variant="server"
-          title="Could not check GitHub connection"
-          message="Sign-in status is unavailable until this loads."
+          title={t('prReview.connect.checkFailedTitle')}
+          message={t('prReview.connect.checkFailedMessage')}
           onRetry={() => {
             void authorization.refetch();
           }}
@@ -127,7 +129,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="PR Review" />
+        <ScreenHeader title={t('prReview.screenTitle')} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </View>
@@ -148,16 +150,16 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
     // the safe-region midpoint (±24pt).
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="PR Review" />
+        <ScreenHeader title={t('prReview.screenTitle')} />
         <View className="flex-1" style={{ paddingBottom: insets.bottom }}>
           <EmptyState
             className="pb-[72px]"
             icon={revoked ? ShieldAlert : PlugZap}
-            title={revoked ? 'Reconnect GitHub' : 'Connect GitHub'}
+            title={revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
             description={
               revoked
-                ? 'Your GitHub connection was revoked. Reconnect to keep reviewing pull requests on mobile.'
-                : 'Connect your GitHub account to review pull requests on mobile.'
+                ? t('prReview.connect.reconnectDescription')
+                : t('prReview.connect.description')
             }
             action={
               <Button
@@ -172,7 +174,9 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
                 ) : (
                   <RefreshCcw size={16} color={colors.primaryForeground} />
                 )}
-                <Text>{revoked ? 'Reconnect GitHub' : 'Connect GitHub'}</Text>
+                <Text>
+                  {revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
+                </Text>
               </Button>
             }
           />

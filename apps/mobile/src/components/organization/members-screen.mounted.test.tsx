@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 
+import '@/i18n';
 import { OrganizationMembersScreen } from './members-screen';
 
 const withMembersQuery = vi.hoisted(() => ({

@@ -3,6 +3,7 @@ import { AppState, Platform, Pressable, useWindowDimensions, View } from 'react-
 import { useQueryClient } from '@tanstack/react-query';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Plus } from '@/components/ui/icons';
 
 import { ActiveNowSection } from '@/components/agents/active-now-section';
@@ -34,6 +35,7 @@ export function AgentSessionListScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
 
@@ -189,7 +191,7 @@ export function AgentSessionListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Agents"
+        title={t('tabs.agents')}
         size="large"
         showBackButton={false}
         className="px-[22px]"
@@ -280,7 +282,7 @@ export function AgentSessionListScreen() {
       {hasAnySessions && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="New session"
+          accessibilityLabel={t('agentChat.newSession.title')}
           testID="agents-new-session-fab"
           onPress={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);

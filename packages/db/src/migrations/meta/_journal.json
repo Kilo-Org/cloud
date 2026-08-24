@@ -1562,6 +1562,13 @@
       "when": 1787225211230,
       "tag": "0222_military_war_machine",
       "breakpoints": true
+    },
+    {
+      "idx": 223,
+      "version": "7",
+      "when": 1787579129083,
+      "tag": "0223_right_makkari",
+      "breakpoints": true
     }
   ]
 }

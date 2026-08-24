@@ -5,7 +5,7 @@ import type {
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
 } from '../notifications-binding.js';
-import { buildCloudAgentPushBody } from '../notifications/producer.js';
+import { buildCloudAgentPushBody, buildCloudAgentPushDetail } from '../notifications/producer.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import {
@@ -573,13 +573,40 @@ export function createMessageSettlementOutbox(
           ? undefined
           : (projectSafeFailure(state)?.message ??
             (state.status === 'failed' ? 'The message failed' : 'The message was interrupted'));
+      const body = buildCloudAgentPushBody(state.status, lastAssistantMessageText, failureMessage);
+      // A completed push with an assistant snippet carries user-authored text,
+      // so no i18n key applies; the raw body is the snippet. Otherwise the body
+      // is a system sentence ("Task completed" / "Failed: {{detail}}" /
+      // "Interrupted: {{detail}}") and the DO translates it per token.
+      const i18nKey =
+        state.status === 'completed'
+          ? lastAssistantMessageText
+            ? undefined
+            : 'cloudAgentSession.completed'
+          : state.status === 'failed'
+            ? 'cloudAgentSession.failed'
+            : 'cloudAgentSession.interrupted';
+      const i18nParams =
+        i18nKey !== undefined && state.status !== 'completed'
+          ? {
+              detail: buildCloudAgentPushDetail(
+                state.status,
+                lastAssistantMessageText,
+                failureMessage
+              ),
+            }
+          : undefined;
       const result = await sendPushNotification({
         userId: metadata.identity.userId,
         cliSessionId,
         executionId: state.messageId,
         status: state.status,
         category: 'status',
-        body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, failureMessage),
+        body,
+        ...(i18nKey !== undefined && {
+          i18nKey,
+          ...(i18nParams !== undefined && { i18nParams }),
+        }),
         suppressIfViewingSession: true,
       });
       if (result.dispatched) {

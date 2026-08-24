@@ -1,44 +1,17 @@
+import { i18n } from '@/i18n';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
  * Speech-friendly relative-time formatter.
  *
- * `timeAgo` (`@/lib/utils`) produces abbreviated strings like `"5m ago"`,
- * `"1h ago"`, `"3d ago"`, `"1mo ago"`, `"2y ago"`, or `"just now"`. When
- * the row renders those through `formatMeta` they are uppercased
- * (`"5M AGO"`), which VoiceOver reads letter-by-letter. This helper
- * expands every unit `timeAgo` emits into a form VoiceOver reads as words,
- * with singular/plural handled, and leaves `"just now"` unchanged.
- *
- * Inputs that don't match a known unit pass through unchanged so a future
- * `timeAgo` unit added without updating this helper doesn't get silently
- * mangled — the worst case is the same letter-by-letter reading the
- * uppercased form already has.
+ * `timeAgo` (`@/lib/utils`) now returns `Intl.RelativeTimeFormat` words
+ * like `"5 minutes ago"`, `"yesterday"`, or `"just now"`, which VoiceOver
+ * already reads as words. This helper is a pass-through wrapper that keeps
+ * the screen-reader call site explicit.
  */
 export function formatSpokenTimeAgo(timestamp: string): string {
-  const raw = timeAgo(parseTimestamp(timestamp));
-  const match = /^(\d+)([a-z]+)\s+ago$/.exec(raw);
-  if (!match) {
-    // "just now" or any future-unrecognized form
-    return raw;
-  }
-  const n = Number(match[1]);
-  const unit = match[2];
-  const singular = {
-    m: 'minute',
-    h: 'hour',
-    d: 'day',
-    mo: 'month',
-    y: 'year',
-  } satisfies Record<string, string>;
-  const word = unit ? singular[unit as keyof typeof singular] : undefined;
-  if (!word) {
-    // Unrecognized unit — pass through so a future `timeAgo` unit added
-    // without updating this helper doesn't get silently mangled.
-    return raw;
-  }
-  return `${n} ${n === 1 ? word : `${word}s`} ago`;
+  return timeAgo(parseTimestamp(timestamp));
 }
 
 /**
@@ -77,15 +50,19 @@ export function formatSpokenCost(microdollars: number | null | undefined): strin
       return null;
     }
     if (cents < 100) {
-      return `${cents} ${cents === 1 ? 'cent' : 'cents'}`;
+      return `${cents} ${i18n.t(cents === 1 ? 'agents.sessionRow.centOne' : 'agents.sessionRow.centOther')}`;
     }
     const dollars = Math.floor(cents / 100);
     const remainder = cents % 100;
-    const dollarPart = `${dollars} ${dollars === 1 ? 'dollar' : 'dollars'}`;
+    const dollarPart = `${dollars} ${i18n.t(
+      dollars === 1 ? 'agents.sessionRow.dollarOne' : 'agents.sessionRow.dollarOther'
+    )}`;
     if (remainder === 0) {
       return dollarPart;
     }
-    return `${dollarPart} ${remainder} ${remainder === 1 ? 'cent' : 'cents'}`;
+    return `${dollarPart} ${remainder} ${i18n.t(
+      remainder === 1 ? 'agents.sessionRow.centOne' : 'agents.sessionRow.centOther'
+    )}`;
   }
   // Sub-half-cent: fractional cents, 2 dp, trim trailing zeros.
   const fractional = microdollars / 10_000;
@@ -94,7 +71,7 @@ export function formatSpokenCost(microdollars: number | null | undefined): strin
     return null;
   }
   const trimmed = String(rounded);
-  return `${trimmed} cents`;
+  return `${trimmed} ${i18n.t('agents.sessionRow.centOther')}`;
 }
 
 type SessionRowAccessibilityLabelInputs = {
@@ -154,7 +131,7 @@ export function sessionRowAccessibilityLabel({
 }: SessionRowAccessibilityLabelInputs): string {
   const parts: string[] = [title];
   if (needsInput) {
-    parts.push('needs input');
+    parts.push(i18n.t('agents.sessionRow.needsInput'));
   }
   if (badge) {
     parts.push(badge);
@@ -163,7 +140,7 @@ export function sessionRowAccessibilityLabel({
     parts.push(meta);
   }
   if (platform) {
-    parts.push(`from ${platformLabel(platform)}`);
+    parts.push(i18n.t('agents.sessionRow.fromPlatform', { platform: platformLabel(platform) }));
   }
   return parts.join(', ');
 }

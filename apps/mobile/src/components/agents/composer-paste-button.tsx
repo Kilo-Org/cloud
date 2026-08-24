@@ -1,5 +1,6 @@
 import { ClipboardPaste } from '@/components/ui/icons';
 import { Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export function ComposerPasteButton({
   className,
 }: Readonly<ComposerPasteButtonProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={onPress}
@@ -45,7 +47,7 @@ export function ComposerPasteButton({
         className
       )}
       accessibilityRole="button"
-      accessibilityLabel="Paste from clipboard"
+      accessibilityLabel={t('agentChat.composer.pasteFromClipboard')}
       accessibilityState={{ disabled }}
     >
       <ClipboardPaste size={18} color={colors.mutedForeground} />

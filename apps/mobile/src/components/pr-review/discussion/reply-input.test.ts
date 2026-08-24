@@ -13,9 +13,22 @@
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { ensureTermsAcceptedOutcome, ReplyInput } from './reply-input';
 import { clearDraft } from '@/lib/persist/drafts';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 type AlertButton = { text?: string; onPress?: () => void };
 type AlertCall = { title: string; message: string; buttons: AlertButton[] };

@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "В вашей сессии агента есть обновление",
+      "chatMessage": "У вас новое сообщение",
+      "instanceLifecycle": "В вашем инстансе есть обновление",
+      "scheduledAction": "В запланированном действии есть обновление",
+      "lowBalance": "Ваш баланс требует внимания",
+      "securityFinding": "Результат безопасности требует внимания"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Задача выполнена"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Не удалось: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Прервано: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Без названия",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Предупреждение о низком балансе",
+      "body": "Баланс {{organizationName}} упал ниже ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Новый результат безопасности ({{severity}})",
+      "body": "{{findingTitle}} в {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Предупреждение SLA",
+      "body": "{{findingTitle}} в {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Нарушение SLA",
+      "body": "{{findingTitle}} в {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Результат безопасности требует внимания"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} готов",
+      "body": "Нажмите, чтобы начать чат."
+    },
+    "startFailed": {
+      "title": "Не удалось запустить {{instanceName}}",
+      "body": "Запуск не удался."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} скоро перезапустится",
+      "body": "Перезапуск запланирован на {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Перезапуск {{instanceName}} отменён",
+      "body": "Ранее запланированный перезапуск был отменён."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} скоро обновится",
+      "bodyWithTag": "Обновление до {{targetImageTag}} в {{when}}.",
+      "bodyWithoutTag": "Запланированное обновление в {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Обновление {{instanceName}} отменено",
+      "body": "Ранее запланированное обновление было отменено."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Ваша сессия Kilo готова к управлению с телефона"
+  }
+}

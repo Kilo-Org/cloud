@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "तपाईंको एजेन्ट सत्रमा अद्यावधिक छ",
+      "chatMessage": "तपाईंसँग नयाँ सन्देश छ",
+      "instanceLifecycle": "तपाईंको इन्स्ट्यान्समा अद्यावधिक छ",
+      "scheduledAction": "निर्धारित कार्यमा अद्यावधिक छ",
+      "lowBalance": "तपाईंको ब्यालेन्समा ध्यान चाहिन्छ",
+      "securityFinding": "सुरक्षा फेला परेकोमा ध्यान चाहिन्छ"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "कार्य सम्पन्न भयो"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "असफल: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "अवरुद्ध: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · शीर्षकविहीन",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "कम ब्यालेन्स सूचना",
+      "body": "{{organizationName}} ब्यालेन्स ${{minimumBalanceUsd}} तल झर्‍यो"
+    },
+    "securityFindingNew": {
+      "title": "नयाँ सुरक्षा फेला ({{severity}})",
+      "body": "{{repoFullName}} मा {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA चेतावनी",
+      "body": "{{repoFullName}} मा {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA उल्लंघन",
+      "body": "{{repoFullName}} मा {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "सुरक्षा फेला परेकोमा ध्यान चाहिन्छ"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} तयार छ",
+      "body": "च्याट सुरु गर्न ट्याप गर्नुहोस्।"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} सुरु गर्न असफल भयो",
+      "body": "सुरु गर्न असफल भयो।"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} चाँडै पुनः सुरु हुनेछ",
+      "body": "{{when}} मा पुनः सुरु गर्न निर्धारित।"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} पुनः सुरु रद्द गरियो",
+      "body": "पहिले निर्धारित पुनः सुरु रद्द गरिएको छ।"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} चाँडै अपग्रेड हुनेछ",
+      "bodyWithTag": "{{when}} मा {{targetImageTag}} मा अपग्रेड।",
+      "bodyWithoutTag": "{{when}} मा निर्धारित अपग्रेड।"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} अपग्रेड रद्द गरियो",
+      "body": "पहिले निर्धारित अपग्रेड रद्द गरिएको छ।"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "तपाईंको Kilo सत्र आफ्नो फोनबाट नियन्त्रण गर्न तयार छ"
+  }
+}

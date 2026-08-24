@@ -2,6 +2,7 @@ import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, ShieldOff } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -11,8 +12,10 @@ import { CollapsibleSection } from '@/components/security-agent/collapsible-sect
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
-import { capitalize, formatDate, parseTimestamp } from '@/lib/utils';
+import { capitalize, parseTimestamp } from '@/lib/utils';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
@@ -51,18 +54,19 @@ function AuditReportSkeleton() {
 }
 
 function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
-  const start = formatDate(parseTimestamp(report.period.start));
-  const end = formatDate(parseTimestamp(report.period.displayEnd));
-  const generatedAt = formatDate(parseTimestamp(report.generatedAt));
+  const { t } = useTranslation();
+  const start = formatDate(parseTimestamp(report.period.start), i18n.language);
+  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language);
+  const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language);
 
   return (
     <View className="gap-1">
       <Text className="text-sm font-medium">{report.owner.displayName}</Text>
       <Text variant="muted" className="text-xs">
-        {start} – {end} · UTC
+        {t('securityAgent.auditReport.periodUtc', { start, end })}
       </Text>
       <Text variant="muted" className="text-xs">
-        Generated {generatedAt}
+        {t('securityAgent.auditReport.generated', { generatedAt })}
       </Text>
     </View>
   );
@@ -80,12 +84,19 @@ function SummaryCount({ label, value }: Readonly<{ label: string; value: number 
 }
 
 function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-3 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">Report summary</Text>
+      <Text className="text-sm font-medium">{t('securityAgent.auditReport.summary')}</Text>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2">
-        <SummaryCount label="Findings" value={report.summary.findingCount} />
-        <SummaryCount label="Events" value={report.summary.activityCount} />
+        <SummaryCount
+          label={t('securityAgent.auditReport.findings')}
+          value={report.summary.findingCount}
+        />
+        <SummaryCount
+          label={t('securityAgent.auditReport.events')}
+          value={report.summary.activityCount}
+        />
         {SEVERITY_ORDER.map(severity => (
           <SummaryCount
             key={severity}
@@ -99,9 +110,11 @@ function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }
 }
 
 function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSection }>) {
-  const meta = [capitalize(finding.severity), finding.repository ?? 'Repository not recorded'].join(
-    ' · '
-  );
+  const { t } = useTranslation();
+  const meta = [
+    capitalize(finding.severity),
+    finding.repository ?? t('securityAgent.auditReport.repositoryNotRecorded'),
+  ].join(' · ');
 
   return (
     <CollapsibleSection title={finding.title}>
@@ -113,7 +126,8 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
           <View key={event.id} className="gap-0.5">
             <Text className="text-sm">{event.label}</Text>
             <Text variant="muted" className="text-xs">
-              {formatDate(parseTimestamp(event.occurredAt))} · {event.actor.displayName}
+              {formatDate(parseTimestamp(event.occurredAt), i18n.language)} ·{' '}
+              {event.actor.displayName}
             </Text>
           </View>
         ))}
@@ -123,15 +137,16 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
 }
 
 function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
+  const { t } = useTranslation();
   if (report.findings.length === 0) {
-    const start = formatDate(parseTimestamp(report.period.start));
-    const end = formatDate(parseTimestamp(report.period.displayEnd));
+    const start = formatDate(parseTimestamp(report.period.start), i18n.language);
+    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language);
     return (
       <EmptyState
         icon={FileText}
         className="flex-1"
-        title="No recorded activity"
-        description={`Kilo has no reportable Security Finding activity from ${start} to ${end}.`}
+        title={t('securityAgent.auditReport.noActivity')}
+        description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
       />
     );
   }
@@ -148,6 +163,7 @@ function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport
 }
 
 export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const query = useSecurityAgentAuditReport(scope);
   const errorCode = query.error?.data?.code;
   // The org procedure is `organizationBillingProcedure`, which rejects
@@ -160,7 +176,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Audit report" showBackButton />
+      <ScreenHeader title={t('securityAgent.auditReport.title')} showBackButton />
 
       {query.isLoading && <AuditReportSkeleton />}
 
@@ -168,15 +184,15 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
-          title="Audit report unavailable"
-          description="Only organization owners and billing managers can view audit reports. Ask an owner or billing manager to grant you access."
+          title={t('securityAgent.auditReport.unavailable')}
+          description={t('securityAgent.auditReport.unavailableDescription')}
         />
       )}
 
       {!query.isLoading && query.isError && !forbidden && (
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load the audit report"
+            message={t('securityAgent.auditReport.couldNotLoad')}
             onRetry={() => void query.refetch()}
           />
         </View>
@@ -185,7 +201,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
       {!query.isLoading && !query.isError && query.data?.status === 'query_failed' && (
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Report query did not finish. Try again."
+            message={t('securityAgent.auditReport.queryFailed')}
             onRetry={() => void query.refetch()}
           />
         </View>
@@ -195,7 +211,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 items-center justify-center">
           <QueryError
             variant="offline"
-            message="Check your connection and try again."
+            message={t('securityAgent.auditReport.checkConnection')}
             onRetry={() => void query.refetch()}
           />
         </View>

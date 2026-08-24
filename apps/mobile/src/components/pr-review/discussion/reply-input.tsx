@@ -3,6 +3,7 @@
 // (non-optimistic) reply mutation and re-fetches the list on settle.
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, TextInput, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -11,6 +12,7 @@ import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -24,15 +26,6 @@ import {
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { trpcClient } from '@/lib/trpc';
-
-const REPLY_PLACEHOLDER = 'Reply…';
-
-const TERMS_COPY = 'You must be 13 or older to post.';
-const TERMS_ACCEPT_RETRY_COPY = "Couldn't accept the Terms. Check your connection and try again.";
-export const TERMS_OUTDATED_COPY =
-  'The Terms of Service changed. Reopen this screen to accept the latest version.';
-export const TERMS_CHECK_RETRY_COPY =
-  "Couldn't check the Terms of Service. Check your connection and try again.";
 
 /**
  * Outcome of the UGC Terms gate. `accepted` means the current version is
@@ -89,18 +82,18 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
     }
     function showRetry() {
       Alert.alert(
-        'Terms of Service',
-        TERMS_ACCEPT_RETRY_COPY,
+        i18n.t('prReview.discussion.termsTitle'),
+        i18n.t('prReview.discussion.termsAcceptRetry'),
         [
           {
-            text: 'Cancel',
+            text: i18n.t('common.cancel'),
             style: 'cancel',
             onPress: () => {
               resolve({ kind: 'dismissed' });
             },
           },
           {
-            text: 'Retry',
+            text: i18n.t('common.retry'),
             onPress: () => {
               void accept();
             },
@@ -111,25 +104,25 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
     }
     const show = () => {
       Alert.alert(
-        'Terms of Service',
-        TERMS_COPY,
+        i18n.t('prReview.discussion.termsTitle'),
+        i18n.t('prReview.discussion.termsCopy'),
         [
           {
-            text: 'Cancel',
+            text: i18n.t('common.cancel'),
             style: 'cancel',
             onPress: () => {
               resolve({ kind: 'dismissed' });
             },
           },
           {
-            text: 'View terms',
+            text: i18n.t('prReview.discussion.viewTerms'),
             onPress: () => {
               void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
               show();
             },
           },
           {
-            text: 'Accept',
+            text: i18n.t('prReview.discussion.acceptTerms'),
             onPress: () => {
               void accept();
             },
@@ -153,6 +146,7 @@ type ReplyInputProps = {
 
 export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<ReplyInputProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const bodyRef = useRef<string>('');
   const inputRef = useRef<TextInput | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -200,32 +194,35 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
             setInlineError(null);
             setInlineErrorKind(null);
           } else if (outcome.kind === 'outdated') {
-            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineError(t('prReview.discussion.termsOutdatedCopy'));
             setInlineErrorKind('bad-request');
           } else if (outcome.kind === 'unknown') {
-            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
             setInlineErrorKind('retryable');
           } else {
-            setInlineError(TERMS_COPY);
+            setInlineError(t('prReview.discussion.termsCopy'));
             setInlineErrorKind(null);
           }
         })();
       } else if (classification.kind === 'bad-request') {
-        setInlineError("This reply can't be posted. The thread may have changed.");
+        setInlineError(t('prReview.discussion.replyBadRequest'));
         setInlineErrorKind('bad-request');
       } else if (classification.kind === 'forbidden') {
-        setInlineError("You don't have permission to reply to this pull request.");
+        setInlineError(t('prReview.discussion.replyForbidden'));
         setInlineErrorKind('forbidden');
       } else if (classification.kind === 'reconnect') {
-        setInlineError('GitHub connection expired.');
+        setInlineError(t('prReview.connectionExpired'));
         setInlineErrorKind('reconnect');
       } else {
-        const message = reply.error instanceof Error ? reply.error.message : 'Could not reply.';
+        const message =
+          reply.error instanceof Error
+            ? reply.error.message
+            : t('prReview.discussion.couldNotReply');
         setInlineError(message);
         setInlineErrorKind('retryable');
       }
     }
-  }, [reply.error]);
+  }, [reply.error, t]);
 
   const submit = async () => {
     const body = bodyRef.current.trim();
@@ -236,7 +233,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
     setInlineErrorKind(null);
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
-      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineError(t('prReview.discussion.termsOutdatedCopy'));
       setInlineErrorKind('bad-request');
       return;
     }
@@ -265,9 +262,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           ref={inputRef}
           defaultValue={bodyRef.current}
           editable={!reply.isPending}
-          placeholder={REPLY_PLACEHOLDER}
+          placeholder={t('prReview.discussion.replyPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
-          accessibilityLabel="Reply body"
+          accessibilityLabel={t('prReview.discussion.replyBody')}
           onChangeText={value => {
             bodyRef.current = value;
             if (userId) {
@@ -302,9 +299,9 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           onPress={() => {
             void submit();
           }}
-          accessibilityLabel="Submit reply"
+          accessibilityLabel={t('prReview.discussion.submitReply')}
         >
-          <Text>Reply</Text>
+          <Text>{t('prReview.discussion.reply')}</Text>
         </Button>
       </View>
     </View>

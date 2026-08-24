@@ -1,6 +1,7 @@
 import { ShieldCheck } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ export function SecurityAgentSetup<T>({
   const colors = useThemeColors();
   const tabBarPadding = useTabBarBottomPadding();
   const [connecting, setConnecting] = useState(false);
+  const { t } = useTranslation();
 
   const handleConnected = useCallback(() => {
     void onConnected();
@@ -49,7 +51,7 @@ export function SecurityAgentSetup<T>({
       // returns from the plain browser.
     } catch {
       clearLaunch();
-      toast.error('Could not open GitHub. Please try again.');
+      toast.error(t('securityAgent.setup.couldNotOpenGithub'));
     } finally {
       setConnecting(false);
     }

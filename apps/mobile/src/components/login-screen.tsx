@@ -1,13 +1,17 @@
+/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
-import { ExternalLink } from '@/components/ui/icons';
+import { ExternalLink, Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   AppState,
+  I18nManager,
   Keyboard,
   KeyboardAvoidingView,
   type KeyboardEvent,
   Platform,
+  Pressable,
   ScrollView,
   View,
 } from 'react-native';
@@ -21,13 +25,22 @@ import {
 } from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { IdleAuth } from '@/components/login/idle-auth';
 import { errorMessage } from '@/components/login-screen-state';
+import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  clearLoginDrafts,
+  clearPersistedLoginDrafts,
+  persistLoginDrafts,
+  restoreLoginDrafts,
+  type SsoRecoveryDraft,
+} from '@/lib/login-draft';
 
 function keyboardHeightFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
@@ -50,27 +63,56 @@ export function LoginScreen() {
   } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
   const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const [authFormBusy, setAuthFormBusy] = useState(false);
+  const [draft, setDraft] = useState<{
+    email: string;
+    ssoRecovery: SsoRecoveryDraft | null;
+  } | null>(null);
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
       setPersistError(undefined);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
+        clearLoginDrafts();
       } catch {
-        setPersistError('Could not complete sign in. Please try again.');
+        setPersistError(t('login.couldNotCompleteSignIn'));
       }
     },
-    [signIn]
+    [signIn, t]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const restoreDrafts = async () => {
+      try {
+        const restored = await restoreLoginDrafts();
+        if (!cancelled) {
+          setDraft(restored);
+          void clearPersistedLoginDrafts();
+        }
+      } catch {
+        if (!cancelled) {
+          setDraft({ email: '', ssoRecovery: null });
+        }
+      }
+    };
+    void restoreDrafts();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionEnded) {
       // id dedupes the toast if the login route remounts while still signed out
-      announcingToast.warning('Your session ended. Please sign in again.', { id: 'session-ended' });
+      announcingToast.warning(t('login.sessionEnded'), { id: 'session-ended' });
     }
-  }, [sessionEnded]);
+  }, [sessionEnded, t]);
 
   useEffect(() => {
     if (status === 'approved' && token) {
@@ -140,9 +182,9 @@ export function LoginScreen() {
                 void persistToken(token, refreshToken, expiresIn);
               }
             }}
-            accessibilityLabel="Retry sign in"
+            accessibilityLabel={t('login.retrySignIn')}
           >
-            <Text>Retry</Text>
+            <Text>{t('common.retry')}</Text>
           </Button>
         </View>
       );
@@ -161,6 +203,11 @@ export function LoginScreen() {
   // verified 704px + 63px = 767px on pixel9). Pad only when the keyboard is up so
   // the resting layout is untouched.
   const androidKeyboardPad = androidKeyboardHeight > 0 ? androidKeyboardHeight + insets.bottom : 0;
+  // The Globe stays enabled on idle, denied, expired, and error (those render
+  // an interactive IdleAuth form); it is disabled while a device-auth flow
+  // (pending/approved) or a busy auth action owns the screen.
+  const globeDisabled = status === 'pending' || authFormBusy;
+  const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
 
   return (
     // iOS: automaticallyAdjustKeyboardInsets only made the ScrollView scrollable,
@@ -180,14 +227,29 @@ export function LoginScreen() {
         // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard padding
         style={{ paddingBottom: androidKeyboardPad }}
       >
+        <Pressable
+          onPress={() => {
+            setLanguagePickerOpen(true);
+          }}
+          disabled={globeDisabled}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.language')}
+          accessibilityState={{ disabled: globeDisabled }}
+          className="absolute z-10 h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+          // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
+          style={{ top: insets.top + 8, ...globeTrailing }}
+        >
+          <Globe size={22} color={colors.foreground} />
+        </Pressable>
         <ScrollView
           className="flex-1 bg-background"
           contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
           keyboardShouldPersistTaps="handled"
         >
           <View className="w-full max-w-sm items-center gap-2">
-            <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
-            <Text className="text-center text-lg">Welcome to Kilo</Text>
+            <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
+            <Text className="text-center text-lg">{t('login.welcome')}</Text>
           </View>
 
           {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
@@ -195,23 +257,40 @@ export function LoginScreen() {
               recovering only on relaunch — so these branches render without
               animation; status swaps are instant. */}
           <View className="w-full max-w-sm gap-3">
-            {status === 'idle' && <IdleAuth start={start} />}
+            {status === 'idle' && draft === null && (
+              <>
+                {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </>
+            )}
+
+            {status === 'idle' && draft !== null && (
+              <IdleAuth
+                start={start}
+                initialEmail={draft.email}
+                initialSsoRecovery={draft.ssoRecovery}
+                onBusyChange={setAuthFormBusy}
+              />
+            )}
 
             {status === 'pending' && code && (
               <View className="w-full items-center gap-4">
                 {resumed && (
                   <Text variant="muted" className="text-center">
-                    Continuing your sign-in.
+                    {t('login.continuingSignIn')}
                   </Text>
                 )}
                 <Text variant="muted" className="text-center">
-                  Your sign-in code:
+                  {t('login.signInCode')}
                 </Text>
                 <Text
                   variant="h2"
                   className="border-b-0 pb-0 text-center tracking-widest"
-                  // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
-                  accessibilityLabel={`Sign in code: ${[...code].join(' ')}`}
+                  accessibilityLabel={t('login.signInCodeAccessibility', {
+                    // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
+                    code: [...code].join(' '),
+                  })}
                   selectable
                 >
                   {code}
@@ -225,10 +304,10 @@ export function LoginScreen() {
                     onPress={() => {
                       void openBrowser();
                     }}
-                    accessibilityLabel="Open sign-in page in browser"
+                    accessibilityLabel={t('login.openSignInPageInBrowser')}
                   >
                     <ExternalLink size={14} color={colors.foreground} />
-                    <Text className="text-center">Open in browser</Text>
+                    <Text className="text-center">{t('common.openInBrowser')}</Text>
                   </Button>
                   <Button
                     variant="outline"
@@ -237,16 +316,20 @@ export function LoginScreen() {
                     onPress={() => {
                       if (verificationUrl) {
                         void Clipboard.setStringAsync(verificationUrl);
-                        toast('Copied to clipboard');
+                        toast(t('common.copiedToClipboard'));
                       }
                     }}
-                    accessibilityLabel="Copy sign-in link"
+                    accessibilityLabel={t('login.copySignInLink')}
                   >
-                    <Text className="text-center">Copy link</Text>
+                    <Text className="text-center">{t('login.copyLink')}</Text>
                   </Button>
                 </View>
-                <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
-                  <Text>Cancel</Text>
+                <Button
+                  variant="ghost"
+                  onPress={cancel}
+                  accessibilityLabel={t('login.cancelSignIn')}
+                >
+                  <Text>{t('common.cancel')}</Text>
                 </Button>
               </View>
             )}
@@ -255,10 +338,14 @@ export function LoginScreen() {
               <View className="w-full items-center gap-3">
                 <ActivityIndicator size="small" color={colors.mutedForeground} />
                 <Text variant="muted" className="text-center">
-                  Starting sign in...
+                  {t('login.startingSignIn')}
                 </Text>
-                <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
-                  <Text>Cancel</Text>
+                <Button
+                  variant="ghost"
+                  onPress={cancel}
+                  accessibilityLabel={t('login.cancelSignIn')}
+                >
+                  <Text>{t('common.cancel')}</Text>
                 </Button>
               </View>
             )}
@@ -268,12 +355,25 @@ export function LoginScreen() {
                 <Text className="text-center text-sm text-destructive">
                   {errorMessage(status, error)}
                 </Text>
-                <IdleAuth start={start} />
+                <IdleAuth
+                  start={start}
+                  initialEmail={draft?.email ?? ''}
+                  initialSsoRecovery={draft?.ssoRecovery ?? null}
+                  onBusyChange={setAuthFormBusy}
+                />
               </View>
             )}
           </View>
         </ScrollView>
       </View>
+      <LanguagePickerSheet
+        visible={languagePickerOpen}
+        onClose={() => {
+          setLanguagePickerOpen(false);
+        }}
+        returnTarget="login"
+        beforeReload={persistLoginDrafts}
+      />
     </KeyboardAvoidingView>
   );
 }

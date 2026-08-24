@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
@@ -97,9 +98,11 @@ export function StoredSessionRow({
   metaWhileLive = false,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
-  const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
+  const title =
+    session.title && session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -210,8 +213,8 @@ export function StoredSessionRow({
 
       {renameVisible && (
         <RenameModal
-          title="Rename session"
-          placeholder="Session name"
+          title={t('agentChat.session.renameSession')}
+          placeholder={t('agentChat.session.renamePlaceholder')}
           initialValue={title}
           onClose={() => {
             setRenameVisible(false);

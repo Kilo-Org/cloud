@@ -1,6 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { Sparkles } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 
 import { useSessionManager } from '@/components/agents/session-provider';
 
@@ -11,6 +12,7 @@ import { getToolDisplay } from './tool-card-display';
 
 export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const manager = useSessionManager();
+  const { t } = useTranslation();
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const presentation = resolveSuggestionPresentation(
     part.state.status,
@@ -42,7 +44,10 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
       icon={Sparkles}
       label={label}
       status={part.state.status}
-      accessibilityLabel={`${label} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibility', {
+        label,
+        status: part.state.status,
+      })}
     />
   );
 }

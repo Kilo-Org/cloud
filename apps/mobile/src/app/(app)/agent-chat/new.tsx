@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- the route coordinates the new-session draft, model selection, and submit lifecycle. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
@@ -59,6 +60,7 @@ export default function NewSessionScreen() {
 }
 function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
+  const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
   const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
     organizationId?: string;
@@ -443,7 +445,7 @@ function NewSessionScreenBody() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="New session" />
+      <ScreenHeader title={t('agentChat.newSession.title')} />
       <NewSessionConfigureForm
         key={promptSeed === 'restore' ? 'draft' : 'empty'}
         attachments={attachments.attachments}

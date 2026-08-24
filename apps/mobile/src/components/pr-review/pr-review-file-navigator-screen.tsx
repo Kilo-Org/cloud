@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
@@ -24,6 +25,7 @@ type Params = {
 export function PrReviewFileNavigatorScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const owner = parseParam(params.owner) ?? '';
   const repo = parseParam(params.repo) ?? '';
@@ -50,7 +52,7 @@ export function PrReviewFileNavigatorScreen() {
       <View className="flex-1">
         <QueryError
           variant="server"
-          title="Couldn't load files"
+          title={t('prReview.fileNavigator.couldNotLoadFiles')}
           onRetry={() => {
             void pr.refetch();
           }}
@@ -76,7 +78,7 @@ export function PrReviewFileNavigatorScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Files"
+        title={t('prReview.fileNavigator.title')}
         eyebrow={`${owner}/${repo}#${rawNumber}`}
         modal
         onBack={() => {

@@ -1,31 +1,39 @@
-export const AUTH_ERROR_MESSAGES = {
-  'EMAIL-ALREADY-USED':
-    "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-  'DIFFERENT-OAUTH':
-    "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-  SSO_ERROR: "Your organization requires SSO. Use 'More sign-in options'.",
+import { i18n } from '@/i18n';
+
+/**
+ * Server error code to catalog key. The map holds keys, never English: a code
+ * that reaches the user must read in the user's language, and the copy lives
+ * in one place with every other string.
+ */
+const AUTH_ERROR_KEYS = {
+  'EMAIL-ALREADY-USED': 'authErrors.emailAlreadyUsed',
+  'DIFFERENT-OAUTH': 'authErrors.differentOauth',
+  SSO_ERROR: 'authErrors.ssoError',
   // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains
-  BLOCKED: 'This account has been blocked. Please contact support.',
-  'SIGNUP-RATE-LIMITED': 'Too many attempts. Please try again later.',
-  INVALID_CODE: 'That code is incorrect. Please try again.',
-  CODE_IN_PROGRESS: 'Your code is being processed. Wait a moment and try again.',
-  TOO_MANY_ATTEMPTS: 'Too many attempts. Please request a new code.',
-  INVALID_TOKEN: 'Sign-in failed. Please try again.',
-  INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',
-  INVALID_REQUEST: 'Check your email address and try again.',
-  EMAIL_DELIVERY_FAILED: 'Email delivery is temporarily unavailable. Please try again later.',
+  BLOCKED: 'authErrors.blocked',
+  'SIGNUP-RATE-LIMITED': 'authErrors.signupRateLimited',
+  INVALID_CODE: 'authErrors.invalidCode',
+  CODE_IN_PROGRESS: 'authErrors.codeInProgress',
+  TOO_MANY_ATTEMPTS: 'authErrors.tooManyAttempts',
+  INVALID_TOKEN: 'authErrors.invalidToken',
+  INVALID_EMAIL: 'authErrors.invalidEmail',
+  INVALID_REQUEST: 'authErrors.invalidRequest',
+  EMAIL_DELIVERY_FAILED: 'authErrors.emailDeliveryFailed',
   // Admission: server refuses the device under enforce mode — non-retryable.
-  ADMISSION_REQUIRED:
-    "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
+  ADMISSION_REQUIRED: 'authErrors.admissionRequired',
 } satisfies Record<string, string>;
 
-export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
-export const RETRYABLE_ADMISSION_ERROR =
-  'We could not verify this device. Check your connection and try again.';
+/** The message shown when no code matched, in the active language. */
+export function defaultErrorMessage(): string {
+  return i18n.t('authErrors.default');
+}
+
+/** The retryable device-admission message, in the active language. */
+export function retryableAdmissionError(): string {
+  return i18n.t('authErrors.retryableAdmission');
+}
 
 export function mapError(errorCode: string | undefined): string {
-  return (
-    (errorCode && AUTH_ERROR_MESSAGES[errorCode as keyof typeof AUTH_ERROR_MESSAGES]) ??
-    DEFAULT_ERROR_MESSAGE
-  );
+  const key = errorCode && AUTH_ERROR_KEYS[errorCode as keyof typeof AUTH_ERROR_KEYS];
+  return key ? i18n.t(key) : defaultErrorMessage();
 }

@@ -44,6 +44,7 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
@@ -96,6 +97,8 @@ export function PrReviewDiscussionTab({
       repo,
       number,
     });
+
+  const { t } = useTranslation();
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [suppressContentPosition, setSuppressContentPosition] = useState(false);
@@ -214,11 +217,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'permission') {
     return (
       <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
-        <QueryError
-          variant="permission"
-          title="Access denied"
-          message="You don't have permission to view this PR's discussion."
-        />
+        <QueryError variant="permission" message={t('prReview.discussion.accessDeniedMessage')} />
       </View>
     );
   }
@@ -227,8 +226,8 @@ export function PrReviewDiscussionTab({
       <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
         <QueryError
           variant="not-found"
-          title="Discussion unavailable"
-          message="This pull request may have been removed."
+          title={t('prReview.discussion.unavailable')}
+          message={t('prReview.discussion.unavailableMessage')}
         />
       </View>
     );
@@ -248,8 +247,7 @@ export function PrReviewDiscussionTab({
       <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
         <QueryError
           variant="server"
-          title="Could not load discussion"
-          message="Something went wrong on our end. Please try again."
+          title={t('prReview.discussion.couldNotLoad')}
           onRetry={() => {
             void query.refetch();
           }}
@@ -263,7 +261,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'loading') {
     return (
       <View
-        accessibilityLabel="Loading discussion"
+        accessibilityLabel={t('prReview.discussion.loading')}
         className="flex-1 gap-3 px-4 pt-3"
         style={{ paddingBottom: bottomPadding }}
       >
@@ -286,12 +284,16 @@ export function PrReviewDiscussionTab({
       <View className="flex-1 px-4" style={{ paddingBottom: bottomPadding }}>
         <EmptyState
           icon={MessageSquarePlus}
-          title="No discussion yet"
-          description="No review threads or conversation comments on this pull request."
+          title={t('prReview.discussion.noDiscussion')}
+          description={t('prReview.discussion.noDiscussionDescription')}
           action={
             onRequestFiles ? (
-              <Button variant="outline" onPress={onRequestFiles} accessibilityLabel="Review files">
-                <Text>Review files</Text>
+              <Button
+                variant="outline"
+                onPress={onRequestFiles}
+                accessibilityLabel={t('prReview.discussion.reviewFiles')}
+              >
+                <Text>{t('prReview.discussion.reviewFiles')}</Text>
               </Button>
             ) : null
           }

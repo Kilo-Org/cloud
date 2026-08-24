@@ -9,11 +9,19 @@
 /** Kilo Pass plan title. Consumed by mobile and E2E; keep exact. */
 export const KILO_PASS_TITLE = 'Kilo Pass';
 
-/** Android unavailable description. Consumed by mobile and E2E; keep exact. */
+/**
+ * Android unavailable description. The mobile app renders
+ * `kiloPass.unavailableDescription` from its catalog instead; this constant is
+ * the English source that web and E2E compare against. Keep the two in step.
+ */
 export const KILO_PASS_UNAVAILABLE_DESCRIPTION =
   'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.';
 
-/** Web-management description. Consumed by mobile and E2E; keep exact. */
+/**
+ * Web-management description. The mobile app renders
+ * `kiloPass.webManagementDescription` from its catalog instead; this constant
+ * is the English source that web and E2E compare against. Keep the two in step.
+ */
 export const KILO_PASS_WEB_MANAGEMENT_DESCRIPTION = 'This Kilo Pass is managed on the web.';
 
 /** Label for the web-management CTA. Consumed by mobile and E2E; keep exact. */

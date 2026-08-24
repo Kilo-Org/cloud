@@ -9,9 +9,11 @@ import {
   Sparkles,
 } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { type GatewayState } from '@/lib/hooks/use-kiloclaw-queries';
 
 type StatusCardProps = {
@@ -46,7 +48,7 @@ function formatLastExit(
     return exitSignal ?? '—';
   }
   const signalPart = exitSignal ? ` (${exitSignal})` : '';
-  return `Code ${String(exitCode)}${signalPart}`;
+  return `${i18n.t('kiloclaw.status.exitCode', { code: String(exitCode) })}${signalPart}`;
 }
 
 export function StatusCard({
@@ -60,6 +62,7 @@ export function StatusCard({
   lastExitSignal,
   activeModel,
 }: Readonly<StatusCardProps>) {
+  const { t } = useTranslation();
   const memoryLabel = memoryMb ? `${(memoryMb / 1024).toFixed(0)} GB` : '—';
   const cpuLabel = cpus ? `${String(cpus)} vCPU` : '—';
   const lastExitLabel = formatLastExit(lastExitCode, lastExitSignal);
@@ -72,27 +75,33 @@ export function StatusCard({
     <View className="gap-3">
       <View className="overflow-hidden rounded-2xl border border-border bg-card px-4 pb-1 pt-3">
         <Text variant="eyebrow" className="mb-1">
-          GATEWAY PROCESS
+          {t('kiloclaw.status.gatewayProcess')}
         </Text>
         <KvRow
           icon={Activity}
-          label="State"
+          label={t('kiloclaw.status.state')}
           value={gatewayLabel}
           valueTone={gatewayLabel === 'running' ? 'good' : 'default'}
         />
-        <KvRow icon={Globe} label="Uptime" value={uptimeLabel} />
-        <KvRow icon={RotateCcw} label="Restarts" value={restartsLabel} />
-        <KvRow icon={Server} label="Last exit" value={lastExitLabel} />
-        <KvRow icon={Sparkles} label="Model" value={modelLabel} valueTone="good" last />
+        <KvRow icon={Globe} label={t('kiloclaw.status.uptime')} value={uptimeLabel} />
+        <KvRow icon={RotateCcw} label={t('kiloclaw.status.restarts')} value={restartsLabel} />
+        <KvRow icon={Server} label={t('kiloclaw.status.lastExit')} value={lastExitLabel} />
+        <KvRow
+          icon={Sparkles}
+          label={t('kiloclaw.status.model')}
+          value={modelLabel}
+          valueTone="good"
+          last
+        />
       </View>
 
       <View className="overflow-hidden rounded-2xl border border-border bg-card px-4 pb-1 pt-3">
         <Text variant="eyebrow" className="mb-1">
-          RESOURCES
+          {t('kiloclaw.status.resources')}
         </Text>
-        {region ? <KvRow icon={MapPin} label="Region" value={region} /> : null}
-        <KvRow icon={Cpu} label="CPU" value={cpuLabel} />
-        <KvRow icon={MemoryStick} label="Memory" value={memoryLabel} last />
+        {region ? <KvRow icon={MapPin} label={t('kiloclaw.status.region')} value={region} /> : null}
+        <KvRow icon={Cpu} label={t('kiloclaw.status.cpu')} value={cpuLabel} />
+        <KvRow icon={MemoryStick} label={t('kiloclaw.status.memory')} value={memoryLabel} last />
       </View>
     </View>
   );

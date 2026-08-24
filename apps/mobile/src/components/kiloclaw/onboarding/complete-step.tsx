@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -28,6 +29,7 @@ type CompleteStepProps = {
 const WAVE_DELAY_MS = 450;
 
 export function CompleteStep({ botIdentity, onOpen }: Readonly<CompleteStepProps>) {
+  const { t } = useTranslation();
   const name = botIdentity?.botName ?? DEFAULT_BOT_IDENTITY.botName;
   const emoji = botIdentity?.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji;
   const tint = agentColor(emoji);
@@ -73,17 +75,19 @@ export function CompleteStep({ botIdentity, onOpen }: Readonly<CompleteStepProps
         <View className="flex-row items-center gap-2">
           <StatusDot tone="good" />
           <Text variant="eyebrow" className="text-xs">
-            Online
+            {t('kiloclaw.onboarding.complete.online')}
           </Text>
         </View>
-        <Text className="text-center text-2xl font-semibold">{name} is ready</Text>
+        <Text className="text-center text-2xl font-semibold">
+          {t('kiloclaw.onboarding.complete.ready', { name })}
+        </Text>
         <Text variant="muted" className="text-center text-base">
-          All warmed up. Say hi whenever you&apos;re ready.
+          {t('kiloclaw.onboarding.complete.warmedUp')}
         </Text>
       </View>
 
       <Button size="lg" className="w-full" onPress={onOpen}>
-        <Text className="text-base">Chat with {name}</Text>
+        <Text className="text-base">{t('kiloclaw.onboarding.complete.chatWith', { name })}</Text>
       </Button>
     </Animated.View>
   );

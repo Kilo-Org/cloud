@@ -5,6 +5,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Info } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -18,6 +19,7 @@ import {
 export default function SecurityAgentFilterFindingsRoute() {
   const router = useRouter();
   const [bridge, setBridge] = useState(() => getSecurityFindingFilterBridge());
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<SecurityFindingFilters>(
     () => getSecurityFindingFilterBridge()?.filters ?? DEFAULT_SECURITY_FINDING_FILTERS
   );
@@ -48,8 +50,8 @@ export default function SecurityAgentFilterFindingsRoute() {
         <EmptyState
           icon={Info}
           className="flex-1"
-          title="No filters available"
-          description="Go back and reopen filters from the findings list."
+          title={t('securityAgent.filter.noFilters')}
+          description={t('securityAgent.filter.noFiltersDescription')}
         />
       </View>
     );
@@ -57,10 +59,10 @@ export default function SecurityAgentFilterFindingsRoute() {
 
   return (
     <PickerSheet
-      title="Filter findings"
+      title={t('securityAgent.filter.title')}
       onDone={handleApply}
       onCancel={handleClose}
-      doneLabel="Apply"
+      doneLabel={t('common.apply')}
     >
       <FindingFilterModal filters={draft} repositories={bridge.repositories} onChange={setDraft} />
     </PickerSheet>

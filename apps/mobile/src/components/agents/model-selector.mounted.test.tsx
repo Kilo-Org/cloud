@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   BYOK_MODEL_LABEL,
-  FREE_MODEL_DATA_LABEL,
-  FREE_MODEL_FREE_LABEL,
+  freeModelDataLabel,
+  freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -112,7 +112,7 @@ describe('ModelPickerOptionRow BYOK badge', () => {
 
   it('renders no Free or data-collection indicators for a CLI-catalog option', () => {
     const renderer = renderRow(cliCatalogOption({ isFree: true, mayTrainOnYourPrompts: true }));
-    expect(textStrings(renderer.root)).not.toContain(FREE_MODEL_FREE_LABEL);
-    expect(countWithAccessibilityLabel(renderer.root, FREE_MODEL_DATA_LABEL)).toBe(0);
+    expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
+    expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
   });
 });

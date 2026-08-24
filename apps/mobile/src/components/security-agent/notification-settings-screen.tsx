@@ -5,6 +5,7 @@ import {
   parseDayCount,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
@@ -35,17 +36,18 @@ type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeveri
 // apps/web/src/components/security-agent/SecurityConfigSections.tsx — this
 // is a distinct 4-value enum from the auto-analysis/remediation severity
 // (no 'all' tier; 'low' is the catch-all instead).
-const NOTIFICATION_SEVERITY_OPTIONS: { value: NotificationSeverity; label: string }[] = [
-  { value: 'critical', label: 'Critical only' },
-  { value: 'high', label: 'High and above' },
-  { value: 'medium', label: 'Medium and above' },
-  { value: 'low', label: 'Low and above' },
-];
+const NOTIFICATION_SEVERITY_OPTIONS = [
+  { value: 'critical', labelKey: 'securityAgent.filter.severityCritical' },
+  { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
+  { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
+  { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
+] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
 
 function NotificationSettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Notifications" />
+      <ScreenHeader title={t('securityAgent.notifications.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
@@ -57,6 +59,7 @@ function NotificationSettingsSkeleton() {
 
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -139,12 +142,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
 
   const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
+  const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
+
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Notifications"
+        title={t('securityAgent.notifications.title')}
         variant="offline"
-        message="Could not load notification settings"
+        message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -159,7 +167,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Notifications"
+        title={t('securityAgent.notifications.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -180,24 +188,28 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.notifications.readOnly')}
           </Text>
         )}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            New-finding notification
+            {t('securityAgent.notifications.newFindingSection')}
           </Text>
           <ToggleRow
-            title={personal ? 'Email me about new findings' : 'Email organization owners'}
-            subtitle="Sent whenever a new finding is synced, including on first sync."
+            title={
+              personal
+                ? t('securityAgent.notifications.newFindingPersonalTitle')
+                : t('securityAgent.notifications.emailOwners')
+            }
+            subtitle={t('securityAgent.notifications.newFindingSubtitle')}
             value={newFindingNotificationsEnabled}
             disabled={!canManage}
             onValueChange={setNewFindingNotificationsEnabled}
           />
           {newFindingNotificationsEnabled && (
             <PillGroup
-              label="New-finding minimum severity"
-              options={NOTIFICATION_SEVERITY_OPTIONS}
+              label={t('securityAgent.notifications.newFindingSeverityLabel')}
+              options={severityOptions}
               value={newFindingNotificationMinSeverity}
               disabled={!canManage}
               onChange={setNewFindingNotificationMinSeverity}
@@ -207,11 +219,15 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            SLA warning notification
+            {t('securityAgent.notifications.slaSection')}
           </Text>
           <ToggleRow
-            title={personal ? 'Email me about SLA warnings' : 'Email organization owners'}
-            subtitle="Sent before and when findings approach or breach their SLA deadline."
+            title={
+              personal
+                ? t('securityAgent.notifications.slaPersonalTitle')
+                : t('securityAgent.notifications.emailOwners')
+            }
+            subtitle={t('securityAgent.notifications.slaSubtitle')}
             value={slaNotificationsEnabled}
             disabled={!canManage}
             onValueChange={setSlaNotificationsEnabled}
@@ -219,22 +235,22 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           {slaNotificationsEnabled && (
             <>
               <PillGroup
-                label="SLA notification minimum severity"
-                options={NOTIFICATION_SEVERITY_OPTIONS}
+                label={t('securityAgent.notifications.slaSeverityLabel')}
+                options={severityOptions}
                 value={slaNotificationMinSeverity}
                 disabled={!canManage}
                 onChange={setSlaNotificationMinSeverity}
               />
               <View className="gap-2">
                 <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                  SLA warning lead time (days)
+                  {t('securityAgent.notifications.slaLeadTimeLabel')}
                 </Text>
                 <TextInput
-                  accessibilityLabel="SLA warning lead time in days"
+                  accessibilityLabel={t('securityAgent.notifications.slaLeadTimeAccessibility')}
                   accessibilityHint={
                     isValidDayCount(slaNotificationWarningDays)
                       ? undefined
-                      : 'Enter a whole number between 1 and 365'
+                      : t('securityAgent.notifications.slaLeadTimeHint')
                   }
                   className={cn(
                     'h-11 rounded-lg bg-secondary px-3 text-sm leading-[normal] text-foreground',
@@ -252,7 +268,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                 />
                 {!isValidDayCount(slaNotificationWarningDays) && (
                   <Text className="text-xs text-destructive">
-                    Enter a whole number of days between 1 and 365.
+                    {t('securityAgent.notifications.slaLeadTimeError')}
                   </Text>
                 )}
               </View>

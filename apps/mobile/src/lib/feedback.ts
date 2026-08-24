@@ -4,6 +4,7 @@ import * as StoreReview from 'expo-store-review';
 import { Alert, Linking, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { captureEvent, FEEDBACK_SUBMITTED_EVENT } from '@/lib/analytics/posthog';
 import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
@@ -26,7 +27,7 @@ async function openSupportEmail(userId: string | undefined) {
   try {
     await Linking.openURL(url);
   } catch {
-    toast.error(`No email app available. You can reach us at ${SUPPORT_EMAIL}`);
+    toast.error(i18n.t('feedback.noEmailApp', { email: SUPPORT_EMAIL }));
   }
 }
 
@@ -64,49 +65,41 @@ async function rateApp() {
   try {
     await Linking.openURL(STORE_REVIEW_URL);
   } catch {
-    toast.error('Could not open the store.');
+    toast.error(i18n.t('feedback.couldNotOpenStore'));
   }
 }
 
 export function showFeedbackPrompt(userId: string | undefined) {
-  Alert.alert('How are you liking the Kilo app?', undefined, [
-    { text: 'Cancel', style: 'cancel' },
+  Alert.alert(i18n.t('feedback.promptTitle'), undefined, [
+    { text: i18n.t('common.cancel'), style: 'cancel' },
     {
-      text: 'I like it',
+      text: i18n.t('feedback.iLikeIt'),
       onPress: () => {
         captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
-        Alert.alert(
-          "We're glad to hear that!",
-          'A store review would help us out immensely. Thanks for using Kilo!',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Rate Kilo',
-              onPress: () => {
-                void rateApp();
-              },
+        Alert.alert(i18n.t('feedback.gladTitle'), i18n.t('feedback.gladMessage'), [
+          { text: i18n.t('common.notNow'), style: 'cancel' },
+          {
+            text: i18n.t('feedback.rateKilo'),
+            onPress: () => {
+              void rateApp();
             },
-          ]
-        );
+          },
+        ]);
       },
     },
     {
-      text: 'Needs work',
+      text: i18n.t('feedback.needsWork'),
       onPress: () => {
         captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
-        Alert.alert(
-          "We're sorry to hear that!",
-          'Please let us know what needs to be better. The engineer in charge of the app reads every single report!',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Email us',
-              onPress: () => {
-                void openSupportEmail(userId);
-              },
+        Alert.alert(i18n.t('feedback.sorryTitle'), i18n.t('feedback.sorryMessage'), [
+          { text: i18n.t('common.notNow'), style: 'cancel' },
+          {
+            text: i18n.t('feedback.emailUs'),
+            onPress: () => {
+              void openSupportEmail(userId);
             },
-          ]
-        );
+          },
+        ]);
       },
     },
   ]);

@@ -42,7 +42,10 @@ function fakeDeps(overrides: Partial<LifecycleDispatchDeps> = {}): {
     readPreference: async () => true,
     getTokens: async userId => {
       calls.getTokenQueries.push(userId);
-      return ['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]'];
+      return [
+        { token: 'ExponentPushToken[aaa]', locale: null },
+        { token: 'ExponentPushToken[bbb]', locale: null },
+      ];
     },
     deleteStaleTokens: async tokens => {
       calls.deletedTokens.push([...tokens]);
@@ -70,7 +73,7 @@ function fakeDeps(overrides: Partial<LifecycleDispatchDeps> = {}): {
 describe('buildInstanceLifecycleMessages', () => {
   it('builds ready message with instance name and chat deep-link data', () => {
     const messages = buildInstanceLifecycleMessages(
-      ['ExponentPushToken[aaa]'],
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
       baseParams({ event: 'ready', instanceName: 'My Bot' })
     );
     expect(messages).toHaveLength(1);
@@ -91,7 +94,7 @@ describe('buildInstanceLifecycleMessages', () => {
 
   it('falls back to "KiloClaw" when instanceName is null', () => {
     const [m] = buildInstanceLifecycleMessages(
-      ['t'],
+      [{ token: 't', locale: null }],
       baseParams({ event: 'ready', instanceName: null })
     );
     expect(m.title).toBe('KiloClaw is ready');
@@ -99,7 +102,7 @@ describe('buildInstanceLifecycleMessages', () => {
 
   it('builds start_failed message with provided errorMessage', () => {
     const [m] = buildInstanceLifecycleMessages(
-      ['t'],
+      [{ token: 't', locale: null }],
       baseParams({
         event: 'start_failed',
         instanceName: 'My Bot',
@@ -114,7 +117,7 @@ describe('buildInstanceLifecycleMessages', () => {
   it('truncates errorMessage beyond 100 chars', () => {
     const long = 'x'.repeat(150);
     const [m] = buildInstanceLifecycleMessages(
-      ['t'],
+      [{ token: 't', locale: null }],
       baseParams({ event: 'start_failed', errorMessage: long })
     );
     expect(m.body?.length).toBe(100);
@@ -123,14 +126,21 @@ describe('buildInstanceLifecycleMessages', () => {
 
   it('uses a fallback body when start_failed has no errorMessage', () => {
     const [m] = buildInstanceLifecycleMessages(
-      ['t'],
+      [{ token: 't', locale: null }],
       baseParams({ event: 'start_failed', errorMessage: undefined })
     );
     expect(m.body).toBe('Start failed.');
   });
 
   it('emits one message per token', () => {
-    const messages = buildInstanceLifecycleMessages(['a', 'b', 'c'], baseParams());
+    const messages = buildInstanceLifecycleMessages(
+      [
+        { token: 'a', locale: null },
+        { token: 'b', locale: null },
+        { token: 'c', locale: null },
+      ],
+      baseParams()
+    );
     expect(messages.map(m => m.to)).toEqual(['a', 'b', 'c']);
   });
 });

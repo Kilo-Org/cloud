@@ -8,6 +8,7 @@ import {
   ShieldAlert,
 } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Linking, Platform, View } from 'react-native';
 
 import { Button, type ButtonProps } from '@/components/ui/button';
@@ -27,64 +28,64 @@ export type { AccessRequiredSubcase };
 type CtaVariant = Extract<ButtonProps['variant'], 'default' | 'outline'>;
 
 type SubcaseContent = {
-  body: string;
-  ctaLabel: string;
+  bodyKey: string;
+  ctaLabelKey: string;
   ctaVariant: CtaVariant;
   icon: LucideIcon;
-  title: string;
+  titleKey: string;
   tone: ToneKey;
 };
 
 const SUBCASE_CONTENT = {
   trial_expired: {
-    body: "To keep using KiloClaw, go to kilo.ai/claw from your browser. You can't subscribe in the app.",
-    ctaLabel: 'Open kilo.ai/claw',
+    bodyKey: 'kiloclaw.accessRequired.trialExpiredBody',
+    ctaLabelKey: 'kiloclaw.accessRequired.trialExpiredCta',
     ctaVariant: 'default',
     icon: Clock,
-    title: 'Subscribe on the web',
+    titleKey: 'kiloclaw.accessRequired.trialExpiredTitle',
     tone: 'warn',
   },
   subscription_canceled: {
-    body: "To use KiloClaw, go to kilo.ai/claw from your browser. You can't subscribe in the app.",
-    ctaLabel: 'Open kilo.ai/claw',
+    bodyKey: 'kiloclaw.accessRequired.subscriptionCanceledBody',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: PauseCircle,
-    title: 'Subscribe on the web',
+    titleKey: 'kiloclaw.accessRequired.subscriptionCanceledTitle',
     tone: 'warn',
   },
   subscription_past_due: {
-    body: "We had trouble with your most recent payment. Go to kilo.ai/claw from your browser to update it. You can't manage billing in the app.",
-    ctaLabel: 'Open kilo.ai/claw',
+    bodyKey: 'kiloclaw.accessRequired.subscriptionPastDueBody',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionPastDueCta',
     ctaVariant: 'default',
     icon: AlertTriangle,
-    title: 'Update payment on the web',
+    titleKey: 'kiloclaw.accessRequired.subscriptionPastDueTitle',
     tone: 'danger',
   },
   quarantined: {
-    body: "Your KiloClaw instance is in a quarantined state and can't be used right now. Our team needs to help restore it.",
-    ctaLabel: 'Continue on kilo.ai',
+    bodyKey: 'kiloclaw.accessRequired.quarantinedBody',
+    ctaLabelKey: 'kiloclaw.accessRequired.quarantinedCta',
     ctaVariant: 'outline',
     icon: ShieldAlert,
-    title: 'Instance needs remediation',
+    titleKey: 'kiloclaw.accessRequired.quarantinedTitle',
     tone: 'danger',
   },
   multiple_current_conflict: {
-    body: "We found more than one active subscription on your account, so we've paused things to avoid double-billing you.",
-    ctaLabel: 'Continue on kilo.ai',
+    bodyKey: 'kiloclaw.accessRequired.multipleCurrentConflictBody',
+    ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
     ctaVariant: 'outline',
     icon: AlertTriangle,
-    title: 'Account needs review',
+    titleKey: 'kiloclaw.accessRequired.multipleCurrentConflictTitle',
     tone: 'warn',
   },
   non_canonical_earlybird: {
-    body: 'Your early-access plan needs a manual review before it can be used on mobile.',
-    ctaLabel: 'Continue on kilo.ai',
+    bodyKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdBody',
+    ctaLabelKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdCta',
     ctaVariant: 'outline',
     icon: LifeBuoy,
-    title: 'Legacy plan detected',
+    titleKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdTitle',
     tone: 'warn',
   },
-} satisfies Record<AccessRequiredSubcase, SubcaseContent>;
+} as const satisfies Record<AccessRequiredSubcase, SubcaseContent>;
 
 type AccessRequiredScreenProps = {
   subcase: AccessRequiredSubcase;
@@ -92,6 +93,7 @@ type AccessRequiredScreenProps = {
 
 export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const content = SUBCASE_CONTENT[subcase];
   const Icon = content.icon;
   const tint = toneColor(content.tone);
@@ -128,12 +130,14 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
           <AlertTriangle size={40} color={iosIconColor} />
         </View>
         <View className="items-center gap-2">
-          <Text className="text-center text-2xl font-semibold">KiloClaw unavailable in iOS</Text>
-          <Text variant="muted" className="text-center text-base">
-            KiloClaw access is managed outside the iOS app for this account.
+          <Text className="text-center text-2xl font-semibold">
+            {t('kiloclaw.accessRequired.iosTitle')}
           </Text>
           <Text variant="muted" className="text-center text-base">
-            Questions? Contact hi@kilo.ai.
+            {t('kiloclaw.accessRequired.iosBody')}
+          </Text>
+          <Text variant="muted" className="text-center text-base">
+            {t('kiloclaw.accessRequired.iosContact')}
           </Text>
         </View>
       </View>
@@ -152,9 +156,9 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
         <Icon size={40} color={iconColor} />
       </View>
       <View className="items-center gap-2">
-        <Text className="text-center text-2xl font-semibold">{content.title}</Text>
+        <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
         <Text variant="muted" className="text-center text-base">
-          {content.body}
+          {t(content.bodyKey)}
         </Text>
       </View>
       <Button
@@ -164,7 +168,7 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
         onPress={onOpen}
         accessibilityRole="link"
       >
-        <Text className="text-base">{content.ctaLabel}</Text>
+        <Text className="text-base">{t(content.ctaLabelKey)}</Text>
         <ExternalLink size={16} color={ctaIconColor} />
       </Button>
     </View>

@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
 import { Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -29,9 +30,11 @@ export function RepoSelector({
 }: Readonly<RepoSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const effectivelyDisabled = disabled || isLoading || repositories.length === 0;
 
-  const label = value || (isLoading ? 'Loading...' : 'Select repository');
+  const label =
+    value || (isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title'));
 
   function handlePress() {
     if (effectivelyDisabled) {
@@ -50,7 +53,7 @@ export function RepoSelector({
       onPress={handlePress}
       disabled={effectivelyDisabled}
       accessibilityRole="button"
-      accessibilityLabel={`Repository: ${label}`}
+      accessibilityLabel={t('agentChat.repoPicker.accessibility', { label })}
       accessibilityState={{ disabled: effectivelyDisabled }}
       className={cn(
         'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',

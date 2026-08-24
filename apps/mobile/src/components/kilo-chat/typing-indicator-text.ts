@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 export function formatTypingIndicatorText({
   botName,
   typingMemberIds,
@@ -10,7 +12,11 @@ export function formatTypingIndicatorText({
   }
 
   const names = typingMemberIds.map(memberId =>
-    memberId.startsWith('bot:') ? (botName ?? 'KiloClaw') : 'Someone'
+    memberId.startsWith('bot:')
+      ? (botName ?? i18n.t('kiloclaw.title'))
+      : i18n.t('chat.typingIndicator.someone')
   );
-  return names.length === 1 ? `${names[0]} is typing...` : `${names.join(', ')} are typing...`;
+  return names.length === 1
+    ? i18n.t('chat.typingIndicator.oneTyping', { name: names[0] })
+    : i18n.t('chat.typingIndicator.manyTyping', { names: names.join(', ') });
 }

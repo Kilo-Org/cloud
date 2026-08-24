@@ -1,6 +1,9 @@
-export const KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION =
-  'A monthly subscription that adds credits to your Kilo balance for running AI coding sessions in Kilo App — Cloud Agents, remote sessions, and KiloClaw chats.';
+import { i18n } from '@/i18n';
+
+export const KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION = i18n.t(
+  'kiloPass.subscriptionHeaderDescription'
+);
 
 export function formatKiloPassTierDescription(webMonthlyPriceUsd: number): string {
-  return `$${webMonthlyPriceUsd} paid credits added monthly for Kilo App usage.`;
+  return i18n.t('kiloPass.tierDescription', { price: webMonthlyPriceUsd });
 }

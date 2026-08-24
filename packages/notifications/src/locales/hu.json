@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Az ügynök munkameneted frissítést kapott",
+      "chatMessage": "Új üzeneted van",
+      "instanceLifecycle": "A példányod frissítést kapott",
+      "scheduledAction": "Egy ütemezett művelet frissítést kapott",
+      "lowBalance": "Az egyenleged figyelmet igényel",
+      "securityFinding": "Egy biztonsági észlelés figyelmet igényel"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Feladat befejezve"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Nem sikerült: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Megszakítva: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Cím nélkül",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alacsony egyenleg figyelmeztetés",
+      "body": "{{organizationName}} egyenlege a(z) ${{minimumBalanceUsd}} alá esett"
+    },
+    "securityFindingNew": {
+      "title": "Új biztonsági észlelés ({{severity}})",
+      "body": "{{findingTitle}} itt: {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA figyelmeztetés",
+      "body": "{{findingTitle}} itt: {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA megsértése",
+      "body": "{{findingTitle}} itt: {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Egy biztonsági észlelés figyelmet igényel"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} kész",
+      "body": "Koppints a csevegés indításához."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} nem tudott elindulni",
+      "body": "Az indítás nem sikerült."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} hamarosan újraindul",
+      "body": "Újraindítás ütemezve erre: {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} újraindítása törölve",
+      "body": "A korábban ütemezett újraindítás törlésre került."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} hamarosan frissül",
+      "bodyWithTag": "Frissítés erre: {{targetImageTag}}, ekkor: {{when}}.",
+      "bodyWithoutTag": "Ütemezett frissítés ekkor: {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} frissítése törölve",
+      "body": "A korábban ütemezett frissítés törlésre került."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "A Kilo munkameneted készen áll a telefonról történő vezérlésre"
+  }
+}

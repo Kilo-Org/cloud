@@ -11,6 +11,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import { AuditReportScreen } from './audit-report-screen';
 
 const personalQueryOptions = vi.hoisted(() => vi.fn());
@@ -39,9 +40,11 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
+vi.mock('@/lib/format', () => ({
+  formatDate: String,
+}));
 vi.mock('@/lib/utils', () => ({
   capitalize: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
-  formatDate: String,
   parseTimestamp: (value: unknown) => value,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));

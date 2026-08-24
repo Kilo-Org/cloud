@@ -4,7 +4,9 @@ import {
   getOrgKiloPassRowState,
   type OrgKiloPassSummary,
 } from '@/components/organization/org-kilo-pass-row-state';
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
+import { parseTimestamp } from '@/lib/utils';
 
 function agreement(overrides?: Partial<NonNullable<OrgKiloPassSummary['agreement']>>) {
   return {
@@ -123,7 +125,7 @@ describe('getOrgKiloPassRowState', () => {
         }),
         isError: false,
       }).subtitle
-    ).toBe(`Ends ${formatDate(parseTimestamp(paidThrough))} · $49 · 8 paid seats`);
+    ).toBe(`Ends ${formatDate(parseTimestamp(paidThrough), i18n.language)} · $49 · 8 paid seats`);
   });
 
   it('surfaces blocked / failed / manual conditions ahead of the commercial state', () => {

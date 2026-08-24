@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -65,6 +66,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   const { loading } = props;
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
 
   if (loading) {
@@ -86,7 +88,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   function handlePress() {
     // Flag off: GitHub taps fall back to the browser (same as chat links).
     if (!prReviewEnabled) {
-      void openExternalUrl(pr.url, { label: 'pull request' });
+      void openExternalUrl(pr.url, { label: t('agentChat.prBadge.externalLinkLabel') });
       return;
     }
     const target = resolveSessionPrTapTarget({
@@ -97,7 +99,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
       router.push(target.href);
       return;
     }
-    void openExternalUrl(target.url, { label: 'pull request' });
+    void openExternalUrl(target.url, { label: t('agentChat.prBadge.externalLinkLabel') });
   }
 
   return (

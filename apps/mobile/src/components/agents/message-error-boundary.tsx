@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react';
 import { View } from 'react-native';
 
+import { i18n } from '@/i18n';
 import { Text } from '@/components/ui/text';
 
 type Props = {
@@ -31,7 +32,9 @@ export class MessageErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <View className="rounded-lg border border-danger-tile-border bg-danger-tile-bg px-3 py-2">
-          <Text className="text-xs text-destructive">Failed to render content</Text>
+          <Text className="text-xs text-destructive">
+            {i18n.t('agentChat.messageErrorBoundary.failedToRender')}
+          </Text>
         </View>
       );
     }

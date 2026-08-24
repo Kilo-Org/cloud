@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -28,6 +29,7 @@ export function VoiceTranscriptionControl() {
   const { userId, isLoading, isError, refetch } = useCurrentUserId();
   const supportsOnDevice = voiceInputController.supportsOnDevice();
   const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!userId) {
@@ -54,21 +56,21 @@ export function VoiceTranscriptionControl() {
   }, [userId]);
 
   if (supportsOnDevice) {
-    return <Text className="mt-3 text-sm text-muted-foreground">On device</Text>;
+    return <Text className="mt-3 text-sm text-muted-foreground">{t('consent.onDevice')}</Text>;
   }
 
   if (isLoading) {
-    return <Text className="mt-3 text-sm text-muted-foreground">Loading…</Text>;
+    return <Text className="mt-3 text-sm text-muted-foreground">{t('consent.loading')}</Text>;
   }
 
   if (isError) {
     return (
       <View className="mt-3 gap-2">
         <Text className="text-sm text-muted-foreground">
-          Could not load your transcription setting.
+          {t('consent.couldNotLoadTranscription')}
         </Text>
-        <Button variant="outline" onPress={refetch} accessibilityLabel="Retry">
-          <Text>Retry</Text>
+        <Button variant="outline" onPress={refetch} accessibilityLabel={t('common.retry')}>
+          <Text>{t('common.retry')}</Text>
         </Button>
       </View>
     );
@@ -80,13 +82,13 @@ export function VoiceTranscriptionControl() {
   if (!userId) {
     return (
       <Text className="mt-3 text-sm text-muted-foreground">
-        Sign in to manage online transcription.
+        {t('consent.signInToManageTranscription')}
       </Text>
     );
   }
 
   const allowed = consent === 'granted';
-  const label = allowed ? 'Online, allowed' : 'Online, not allowed';
+  const label = allowed ? t('consent.onlineAllowed') : t('consent.onlineNotAllowed');
 
   const handleToggle = async (next: boolean) => {
     const value: 'granted' | 'declined' = next ? 'granted' : 'declined';
@@ -97,7 +99,7 @@ export function VoiceTranscriptionControl() {
     } catch {
       // Roll back the optimistic flip so the switch reflects the stored value.
       setConsent(previous);
-      toast.error('Could not save your choice. Please try again.');
+      toast.error(t('consent.couldNotSaveChoice'));
     }
   };
 
@@ -107,7 +109,7 @@ export function VoiceTranscriptionControl() {
       <Switch
         value={allowed}
         onValueChange={handleToggle}
-        accessibilityLabel="Online transcription"
+        accessibilityLabel={t('consent.onlineTranscription')}
       />
     </View>
   );
@@ -116,6 +118,7 @@ export function VoiceTranscriptionControl() {
 export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+  const { t } = useTranslation();
   const contentContainerStyle = {
     paddingTop: 8,
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
@@ -127,95 +130,86 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Data we share with third parties" />
+      <ScreenHeader title={t('consent.title')} />
       <ScrollView
         className="flex-1 px-6"
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
         <Section
-          title="AI model providers"
-          what="Your prompts, conversation history, and any files you attach."
-          why="To generate AI responses."
-          who="Anthropic, OpenAI, Google, and other providers you select per request."
+          title={t('consent.aiProvidersTitle')}
+          what={t('consent.aiProvidersWhat')}
+          why={t('consent.aiProvidersWhy')}
+          who={t('consent.aiProvidersWho')}
         />
         <Section
-          title="Kilo Gateway (our backend)"
-          what="Account ID, request metadata, token usage."
-          why="Authentication, routing requests, billing reconciliation."
-          who="Kilo (kilo.ai)."
+          title={t('consent.gatewayTitle')}
+          what={t('consent.gatewayWhat')}
+          why={t('consent.gatewayWhy')}
+          who={t('consent.gatewayWho')}
         />
         <Section
-          title="Crash reporting"
-          what="Crash and error reports, with app content scrubbed."
-          why="Identify and fix crashes."
-          who="Sentry."
+          title={t('consent.crashReportingTitle')}
+          what={t('consent.crashReportingWhat')}
+          why={t('consent.crashReportingWhy')}
+          who={t('consent.crashReportingWho')}
           footer={
             <View className="mt-3 gap-3">
               <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">
-                  Crash reports include no screen capture unless optional sharing is on (see below).
-                  We never capture your screen&apos;s view hierarchy.
-                </Text>
+                <Text className="text-xs text-warn">{t('consent.crashReportingNote')}</Text>
               </View>
             </View>
           }
         />
 
         <Text className="mt-6 text-sm font-semibold text-foreground">
-          {mode === 'review'
-            ? 'Optional — you can change this any time in Settings'
-            : 'Optional — on unless you turn it off'}
+          {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
         </Text>
 
         <Section
-          title="Product analytics"
-          what="App events (opens, screens viewed, feature use), device type, app version."
-          why="Measure app performance and understand how features are used."
-          who="PostHog."
+          title={t('consent.productAnalyticsTitle')}
+          what={t('consent.productAnalyticsWhat')}
+          why={t('consent.productAnalyticsWhy')}
+          who={t('consent.productAnalyticsWho')}
           footer={
             <View className="mt-3">
               <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">
-                  No prompt or conversation content is sent to product analytics.
-                </Text>
+                <Text className="text-xs text-warn">{t('consent.productAnalyticsNote')}</Text>
               </View>
             </View>
           }
         />
         <Section
-          title="Error screenshots and session replay"
-          what="Masked screenshots when an error happens, and masked recordings of a small sample of sessions."
-          why="See what the app displayed when something broke."
-          who="Sentry."
+          title={t('consent.errorScreenshotsTitle')}
+          what={t('consent.errorScreenshotsWhat')}
+          why={t('consent.errorScreenshotsWhy')}
+          who={t('consent.errorScreenshotsWho')}
           footer={
             <View className="mt-3">
               <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">
-                  Text and images are masked on your device before anything is sent.
-                </Text>
+                <Text className="text-xs text-warn">{t('consent.errorScreenshotsNote')}</Text>
               </View>
             </View>
           }
         />
         <Section
-          title="Install attribution"
-          what="Install source and campaign identifiers."
-          why="Understand which channels bring new users."
-          who="AppsFlyer."
+          title={t('consent.installAttributionTitle')}
+          what={t('consent.installAttributionWhat')}
+          why={t('consent.installAttributionWhy')}
+          who={t('consent.installAttributionWho')}
         />
         <Section
-          title="Voice transcription"
-          what="Your recording while you dictate."
-          why="To turn speech into text."
-          who="On-device only, or Apple or Google when this device cannot transcribe offline."
+          title={t('consent.voiceTranscriptionTitle')}
+          what={t('consent.voiceTranscriptionWhat')}
+          why={t('consent.voiceTranscriptionWhy')}
+          who={t('consent.voiceTranscriptionWho')}
           footer={<VoiceTranscriptionControl />}
         />
 
         <Text className="mt-6 text-xs text-muted-foreground">
-          Full retention periods, your rights, and contact information are in the{' '}
+          {t('consent.retentionPrefix')}{' '}
           <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-            Kilo privacy policy
+            {t('consent.privacyPolicy')}
           </Text>
           .
         </Text>
@@ -226,9 +220,9 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             onPress={() => {
               router.back();
             }}
-            accessibilityLabel="Back to consent"
+            accessibilityLabel={t('consent.backToConsent')}
           >
-            <Text>Back to consent</Text>
+            <Text>{t('consent.backToConsent')}</Text>
           </Button>
         </View>
       </ScrollView>

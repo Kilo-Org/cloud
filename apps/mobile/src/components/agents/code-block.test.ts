@@ -8,6 +8,7 @@ import { CodeBlock } from './code-block';
 import { tokenizeCodeLines } from './code-block-model';
 import { type MonoScrollTextMode } from './mono-scroll-block-model';
 import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import '@/i18n';
 
 const { useMonoScrollSheetMock } = vi.hoisted(() => ({
   useMonoScrollSheetMock: vi.fn<() => { mode: MonoScrollTextMode; track: () => () => void } | null>(

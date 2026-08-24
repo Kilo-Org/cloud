@@ -86,6 +86,30 @@ describe('NotificationsService.sendPushForConversation', () => {
     });
   });
 
+  it('forwards i18nKey and i18nParams from the conversation input onto dispatchPush', async () => {
+    const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
+      kind: 'delivered' as const,
+      tokenCount: 1,
+    }));
+    vi.spyOn(env.NOTIFICATION_CHANNEL_DO, 'get').mockReturnValue({
+      dispatchPush: stubSpy,
+    } as unknown as DurableObjectStub<do_module.NotificationChannelDO>);
+
+    await env.SELF.sendPushForConversation(
+      baseInput({
+        recipientUserIds: ['r1'],
+        senderUserId: null,
+        i18nKey: 'chat.untitled',
+        i18nParams: { sandboxLabel: 'SB', bodyPreview: 'hello' },
+      })
+    );
+    const firstCall = stubSpy.mock.calls[0];
+    if (!firstCall) throw new Error('expected dispatchPush to be called');
+    const call: DispatchPushInput = firstCall[0];
+    expect(call.push.i18nKey).toBe('chat.untitled');
+    expect(call.push.i18nParams).toEqual({ sandboxLabel: 'SB', bodyPreview: 'hello' });
+  });
+
   it('dispatches recipients in parallel while preserving output order', async () => {
     const dispatches = new Map<
       string,

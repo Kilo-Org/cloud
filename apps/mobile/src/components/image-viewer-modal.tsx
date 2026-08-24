@@ -1,5 +1,6 @@
 import { AlertCircle, Share, X } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -35,6 +36,7 @@ export function ImageViewerModal({
 }: ImageViewerModalProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   const [imageError, setImageError] = useState(false);
 
@@ -134,7 +136,7 @@ export function ImageViewerModal({
             onPress={onClose}
             className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
             accessibilityRole="button"
-            accessibilityLabel={`Close ${filename}`}
+            accessibilityLabel={t('imageViewer.close', { filename })}
           >
             <X size={20} color={colors.foreground} />
           </Pressable>
@@ -145,7 +147,7 @@ export function ImageViewerModal({
               accessibilityState={{ disabled: uri === null, busy: sharing }}
               className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
               accessibilityRole="button"
-              accessibilityLabel={`Share ${filename}`}
+              accessibilityLabel={t('imageViewer.share', { filename })}
             >
               <Share size={20} color={colors.foreground} />
             </Pressable>
@@ -172,7 +174,7 @@ export function ImageViewerModal({
             {uri && imageError ? (
               <View className="flex-row items-center gap-2">
                 <AlertCircle size={14} color="#ffffff" />
-                <Text className="text-xs text-white">Image unavailable</Text>
+                <Text className="text-xs text-white">{t('imageViewer.imageUnavailable')}</Text>
               </View>
             ) : null}
           </View>

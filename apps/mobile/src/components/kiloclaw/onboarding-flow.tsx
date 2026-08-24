@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { X } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import {
   COMPLETION_REACHED_EVENT,
   ONBOARDING_ENTERED_EVENT,
@@ -66,7 +68,7 @@ function resolveHeaderTitle(
   botName: string | undefined
 ): string {
   if (isIdentityStep) {
-    return 'Give your bot an identity';
+    return i18n.t('kiloclaw.onboarding.flow.identityTitle');
   }
   if (isLateStep) {
     return '';
@@ -92,6 +94,7 @@ export function OnboardingFlow() {
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const onboardingQuery = useKiloClawMobileOnboardingState();
   const mutations = useKiloClawMutations(null);
 
@@ -341,7 +344,7 @@ export function OnboardingFlow() {
     <Pressable
       onPress={onDismiss}
       hitSlop={12}
-      accessibilityLabel="Close"
+      accessibilityLabel={t('kiloclaw.onboarding.flow.close')}
       accessibilityRole="button"
       className="active:opacity-70"
     >
@@ -368,7 +371,7 @@ export function OnboardingFlow() {
         <ScreenHeader title="" modal showBackButton={false} headerRight={closeButton} />
         <View className="flex-1 items-center justify-center px-4">
           <QueryError
-            message="Could not load onboarding state"
+            message={t('kiloclaw.onboarding.flow.couldNotLoad')}
             onRetry={() => {
               void onboardingQuery.refetch();
             }}
@@ -386,7 +389,7 @@ export function OnboardingFlow() {
       <View className="items-center gap-3 px-6">
         <ActivityIndicator size="small" color={colors.mutedForeground} />
         <Text variant="muted" className="text-center">
-          Finishing setup — hang tight while we finalize your account.
+          {t('kiloclaw.onboarding.flow.finishingSetup')}
         </Text>
       </View>
     );
@@ -394,11 +397,10 @@ export function OnboardingFlow() {
       unavailableContent = (
         <View className="items-center gap-2 px-6">
           <Text className="text-center text-2xl font-semibold">
-            New KiloClaw instances are unavailable
+            {t('kiloclaw.onboarding.unavailableTitle')}
           </Text>
           <Text variant="muted" className="text-center text-base">
-            A current KiloClaw subscription is required to provision an instance. Existing instances
-            and subscriptions continue as normal.
+            {t('kiloclaw.onboarding.unavailableDescription')}
           </Text>
         </View>
       );
@@ -439,12 +441,14 @@ export function OnboardingFlow() {
     headerRight = instanceReady ? (
       <View className="flex-row items-center gap-1.5">
         <View className="h-2 w-2 rounded-full bg-good" />
-        <Text className="text-xs text-muted-foreground">Ready</Text>
+        <Text className="text-xs text-muted-foreground">{t('kiloclaw.onboarding.flow.ready')}</Text>
       </View>
     ) : (
       <View className="flex-row items-center gap-1.5">
         <ActivityIndicator size="small" color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">Setting up…</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('kiloclaw.onboarding.flow.settingUp')}
+        </Text>
       </View>
     );
   } else {

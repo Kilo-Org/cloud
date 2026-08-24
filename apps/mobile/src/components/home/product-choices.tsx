@@ -1,5 +1,6 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { SectionHeader } from '@/components/home/section-header';
@@ -15,17 +16,18 @@ type ProductChoicesProps = {
 
 export function ProductChoices({ organizationId }: Readonly<ProductChoicesProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
 
   return (
     <View>
-      <SectionHeader label="Explore" />
+      <SectionHeader label={t('home.explore')} />
       <View className="mx-4 gap-2">
         <ConfigureRow
           icon={GitPullRequest}
-          title="Code Reviewer"
-          subtitle="Automatic PR reviews"
+          title={t('profile.codeReviewer')}
+          subtitle={t('profile.codeReviewerSubtitle')}
           className="rounded-lg bg-secondary px-3"
           onPress={() => {
             router.push(getCodeReviewerProfilePath(scope));
@@ -33,8 +35,8 @@ export function ProductChoices({ organizationId }: Readonly<ProductChoicesProps>
         />
         <ConfigureRow
           icon={ShieldCheck}
-          title="Security Agent"
-          subtitle="Find and remediate vulnerabilities"
+          title={t('profile.securityAgent')}
+          subtitle={t('profile.securityAgentSubtitle')}
           className="rounded-lg bg-secondary px-3"
           last={!prReviewEnabled}
           onPress={() => {
@@ -44,8 +46,8 @@ export function ProductChoices({ organizationId }: Readonly<ProductChoicesProps>
         {prReviewEnabled ? (
           <ConfigureRow
             icon={GitMerge}
-            title="PR Review"
-            subtitle="Review pull requests on mobile"
+            title={t('profile.prReview')}
+            subtitle={t('profile.prReviewSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {

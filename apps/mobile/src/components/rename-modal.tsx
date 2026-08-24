@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ export function RenameModal<TSaveResult>({
   maxLength = 50,
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const nameRef = useRef(initialValue);
   const inputRef = useRef<TextInput>(null);
   const [canSave, setCanSave] = useState(false);
@@ -75,7 +77,7 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : 'Something went wrong');
+      setErrorText(error instanceof Error ? error.message : t('kiloclaw.dashboard.renameFailed'));
     } finally {
       setPending(false);
     }
@@ -125,7 +127,7 @@ export function RenameModal<TSaveResult>({
           {errorText ? <Text className="text-sm text-destructive">{errorText}</Text> : null}
           <View className="flex-row justify-end gap-3">
             <Button variant="outline" onPress={handleClose} disabled={pending}>
-              <Text>Cancel</Text>
+              <Text>{t('common.cancel')}</Text>
             </Button>
             <Button
               onPress={() => {
@@ -134,7 +136,7 @@ export function RenameModal<TSaveResult>({
               disabled={!canSave || saveInFlight}
               loading={pending}
             >
-              <Text className="text-primary-foreground">Save</Text>
+              <Text className="text-primary-foreground">{t('common.save')}</Text>
             </Button>
           </View>
         </Pressable>

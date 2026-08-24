@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Ihre Agentensitzung hat ein Update",
+      "chatMessage": "Sie haben eine neue Nachricht",
+      "instanceLifecycle": "Ihre Instanz hat ein Update",
+      "scheduledAction": "Eine geplante Aktion hat ein Update",
+      "lowBalance": "Ihr Guthaben benötigt Aufmerksamkeit",
+      "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Aufgabe abgeschlossen"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Fehlgeschlagen: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Unterbrochen: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Ohne Titel",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Warnung bei niedrigem Guthaben",
+      "body": "Das Guthaben von {{organizationName}} fiel unter ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Neuer Sicherheitsbefund ({{severity}})",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-Warnung",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-Verletzung",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Ein Sicherheitsbefund benötigt Aufmerksamkeit"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ist bereit",
+      "body": "Tippen, um zu chatten."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} konnte nicht gestartet werden",
+      "body": "Start fehlgeschlagen."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} wird bald neu gestartet",
+      "body": "Neustart geplant um {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Neustart von {{instanceName}} abgebrochen",
+      "body": "Der zuvor geplante Neustart wurde abgebrochen."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} wird bald aktualisiert",
+      "bodyWithTag": "Aktualisierung auf {{targetImageTag}} um {{when}}.",
+      "bodyWithoutTag": "Geplante Aktualisierung um {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Aktualisierung von {{instanceName}} abgebrochen",
+      "body": "Die zuvor geplante Aktualisierung wurde abgebrochen."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Ihre Kilo-Sitzung ist bereit, von Ihrem Telefon aus gesteuert zu werden"
+  }
+}

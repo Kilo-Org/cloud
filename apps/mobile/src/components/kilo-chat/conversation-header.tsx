@@ -1,5 +1,6 @@
 import { MoreVertical, Shuffle } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -19,6 +20,7 @@ export function ConversationHeader({
   onSwitchInstance,
   onOpenOptions,
 }: Props) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   return (
     <ScreenHeader
@@ -29,7 +31,7 @@ export function ConversationHeader({
           {canSwitchInstance ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Switch instance"
+              accessibilityLabel={t('chat.instancePicker.switchInstance')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               onPress={onSwitchInstance}
             >
@@ -39,7 +41,7 @@ export function ConversationHeader({
           {onOpenOptions ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Conversation options"
+              accessibilityLabel={t('chat.conversation.options')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               onPress={onOpenOptions}
             >

@@ -5,9 +5,9 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 
 import {
   createMobileSlashCommandList,
-  LOCAL_CLEAR_SLASH_COMMAND,
-  LOCAL_EXIT_SLASH_COMMAND,
-  LOCAL_NEW_SLASH_COMMAND,
+  getLocalClearSlashCommand,
+  getLocalExitSlashCommand,
+  getLocalNewSlashCommand,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 
@@ -28,14 +28,14 @@ function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommand
 
 describe('remote /exit command list — capability gate', () => {
   it('strips reserved CLI entries and appends canonical local /new and /exit when canExitSession is true', () => {
-    const commands = [COMPACT, LOCAL_NEW_SLASH_COMMAND, EXIT, QUIT, Q];
+    const commands = [COMPACT, getLocalNewSlashCommand(), EXIT, QUIT, Q];
     const list = createMobileSlashCommandList('remote', commands, remoteState({ commands }));
 
     expect(list).toEqual([
       COMPACT,
-      LOCAL_NEW_SLASH_COMMAND,
-      LOCAL_EXIT_SLASH_COMMAND,
-      LOCAL_CLEAR_SLASH_COMMAND,
+      getLocalNewSlashCommand(),
+      getLocalExitSlashCommand(),
+      getLocalClearSlashCommand(),
     ]);
     expect(list.filter(command => command.name === 'new')).toHaveLength(1);
     expect(list.filter(command => command.name === 'exit')).toHaveLength(1);
@@ -49,7 +49,7 @@ describe('remote /exit command list — capability gate', () => {
       [COMPACT, EXIT],
       remoteState({ commands: [COMPACT, EXIT], canExitSession: undefined })
     );
-    expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
+    expect(list).toEqual([COMPACT, getLocalNewSlashCommand()]);
     expect(list.some(command => command.name === 'exit')).toBe(false);
     expect(list.some(command => command.name === 'clear')).toBe(false);
   });
@@ -60,7 +60,7 @@ describe('remote /exit command list — capability gate', () => {
       [COMPACT, EXIT],
       remoteState({ commands: [COMPACT, EXIT], canExitSession: false })
     );
-    expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
+    expect(list).toEqual([COMPACT, getLocalNewSlashCommand()]);
     expect(list.some(command => command.name === 'exit')).toBe(false);
     expect(list.some(command => command.name === 'clear')).toBe(false);
   });
@@ -83,24 +83,28 @@ describe('remote /exit command list — capability gate', () => {
         [],
         remoteState({ commands: [EXIT], refresh: 'upgrade-required', message: 'Please upgrade' })
       )
-    ).toEqual([LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND]);
+    ).toEqual([getLocalNewSlashCommand(), getLocalExitSlashCommand(), getLocalClearSlashCommand()]);
   });
 });
 
 describe('remote /exit parser — capability gate', () => {
   it('routes exact remote /exit to exit-session when canExitSession is true', () => {
     expect(
-      parseChatComposerSubmission('/exit', [LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND], {
-        hasAttachments: false,
-        sessionType: 'remote',
-        remoteCommandState: remoteState(),
-      })
+      parseChatComposerSubmission(
+        '/exit',
+        [getLocalNewSlashCommand(), getLocalExitSlashCommand()],
+        {
+          hasAttachments: false,
+          sessionType: 'remote',
+          remoteCommandState: remoteState(),
+        }
+      )
     ).toEqual({ type: 'exit-session' });
   });
 
   it('fails closed for exact /exit when canExitSession is undefined, even with the command in the list', () => {
     expect(
-      parseChatComposerSubmission('/exit', [LOCAL_EXIT_SLASH_COMMAND], {
+      parseChatComposerSubmission('/exit', [getLocalExitSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState({ canExitSession: undefined }),
@@ -110,7 +114,7 @@ describe('remote /exit parser — capability gate', () => {
 
   it('fails closed for exact /exit when canExitSession is false', () => {
     expect(
-      parseChatComposerSubmission('/exit', [LOCAL_EXIT_SLASH_COMMAND], {
+      parseChatComposerSubmission('/exit', [getLocalExitSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState({ canExitSession: false }),
@@ -134,7 +138,7 @@ describe('remote /exit parser — capability gate', () => {
 
   it('rejects attachments with the command attachment error', () => {
     expect(
-      parseChatComposerSubmission('/exit', [LOCAL_EXIT_SLASH_COMMAND], {
+      parseChatComposerSubmission('/exit', [getLocalExitSlashCommand()], {
         hasAttachments: true,
         sessionType: 'remote',
         remoteCommandState: remoteState(),
@@ -144,7 +148,7 @@ describe('remote /exit parser — capability gate', () => {
 
   it('rejects arguments with command-specific feedback data', () => {
     expect(
-      parseChatComposerSubmission('/exit now', [LOCAL_EXIT_SLASH_COMMAND], {
+      parseChatComposerSubmission('/exit now', [getLocalExitSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState(),
@@ -154,7 +158,7 @@ describe('remote /exit parser — capability gate', () => {
 
   it.each(['/quit', '/q'])('keeps remote alias %s as an ordinary prompt', input => {
     expect(
-      parseChatComposerSubmission(input, [LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND], {
+      parseChatComposerSubmission(input, [getLocalNewSlashCommand(), getLocalExitSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState({ commands: [EXIT, QUIT, Q] }),

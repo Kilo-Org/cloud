@@ -31,6 +31,7 @@
 import * as Haptics from 'expo-haptics';
 import { Check, CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
@@ -81,6 +82,7 @@ export function DiscussionThread({
   const addReaction = useAddReactionMutation(thread.threadId);
   const removeReaction = useRemoveReactionMutation(thread.threadId);
   const reply = useReplyToCommentMutation();
+  const { t } = useTranslation();
 
   const anchorLabel = selectThreadAnchorLabel(thread);
   const badges = selectThreadBadges(thread);
@@ -133,7 +135,10 @@ export function DiscussionThread({
 
   if (expanded) {
     return (
-      <View accessibilityLabel={`Discussion thread ${anchorLabel}`} className={cardClassName}>
+      <View
+        accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
+        className={cardClassName}
+      >
         <ThreadHeader {...headerCommonProps} />
         {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
         <View className="gap-4">
@@ -166,7 +171,7 @@ export function DiscussionThread({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Discussion thread ${anchorLabel}`}
+      accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
       accessibilityState={{ expanded: false }}
       onPress={onToggleExpand}
       className={cn(cardClassName, 'active:opacity-70')}
@@ -204,12 +209,13 @@ function ThreadHeader({
   resolveDisabled,
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp)) : null;
   const LabelRow = (expanded ? Pressable : View) as typeof View;
   const labelRowA11y = expanded
     ? ({
         accessibilityRole: 'button',
-        accessibilityLabel: 'Collapse thread',
+        accessibilityLabel: t('prReview.discussion.collapseThread'),
         onPress: onToggleExpand,
       } as const)
     : ({} as const);
@@ -232,12 +238,18 @@ function ThreadHeader({
         <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
-        {resolved ? <Badge tone="good" icon={CheckCheck} label="Resolved" /> : null}
-        {outdated ? <Badge tone="muted" label="Outdated" /> : null}
-        {fileLevel && !resolved ? <Badge tone="muted" label="File" /> : null}
+        {resolved ? (
+          <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
+        ) : null}
+        {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
+        {fileLevel && !resolved ? (
+          <Badge tone="muted" label={t('prReview.discussion.file')} />
+        ) : null}
         <Text variant="muted" className="text-xs">
-          {commentCount === 1 ? '1 comment' : `${commentCount} comments`}
-          {relative ? ` · started ${relative}` : ''}
+          {commentCount === 1
+            ? t('prReview.discussion.oneComment')
+            : t('prReview.discussion.commentCount', { count: commentCount })}
+          {relative ? t('prReview.discussion.startedRelative', { relative }) : ''}
         </Text>
       </View>
     </View>
@@ -284,10 +296,13 @@ type ResolveToggleProps = {
 
 function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveToggleProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={resolved ? 'Unresolve thread' : 'Resolve thread'}
+      accessibilityLabel={
+        resolved ? t('prReview.discussion.unresolveThread') : t('prReview.discussion.resolveThread')
+      }
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}

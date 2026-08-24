@@ -23,6 +23,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Platform,
@@ -86,6 +87,7 @@ export function PrDiffFileNavigator({
 }: PrDiffFileNavigatorProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const searchRef = useRef<string>('');
   // The navigator is a formSheet whose bottom edge sits on the Android system
   // bar, so the list's bottom content padding carries the system inset.
@@ -211,10 +213,11 @@ export function PrDiffFileNavigator({
     return (
       <View className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">Pull request unavailable</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            {t('prReview.pullRequestUnavailable')}
+          </Text>
           <Text variant="muted" className="mt-1 text-center">
-            This PR can't be opened. It may have been deleted, the repository is private, or the
-            Kilo GitHub App isn't installed on it.
+            {t('prReview.pullRequestUnavailableDescription')}
           </Text>
         </View>
       </View>
@@ -224,9 +227,11 @@ export function PrDiffFileNavigator({
     return (
       <View className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">Access denied</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            {t('prReview.accessDenied')}
+          </Text>
           <Text variant="muted" className="mt-1 text-center">
-            You don't have permission to view this pull request.
+            {t('prReview.accessDeniedDescription')}
           </Text>
         </View>
       </View>
@@ -236,9 +241,11 @@ export function PrDiffFileNavigator({
     return (
       <View className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-3 px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">Couldn't load files</Text>
+          <Text className="text-lg font-semibold text-foreground">
+            {t('prReview.fileNavigator.couldNotLoadFiles')}
+          </Text>
           <Text variant="muted" className="text-center">
-            Check your connection and try again.
+            {t('prReview.fileNavigator.checkConnection')}
           </Text>
           <Pressable
             onPress={() => {
@@ -246,9 +253,9 @@ export function PrDiffFileNavigator({
             }}
             className="mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70"
             accessibilityRole="button"
-            accessibilityLabel="Retry loading files"
+            accessibilityLabel={t('prReview.fileNavigator.retryLoadingFiles')}
           >
-            <Text className="text-sm font-medium text-foreground">Retry</Text>
+            <Text className="text-sm font-medium text-foreground">{t('common.retry')}</Text>
           </Pressable>
         </View>
       </View>
@@ -265,9 +272,9 @@ export function PrDiffFileNavigator({
               ref={inputRef}
               defaultValue=""
               editable={false}
-              placeholder="Filter files by path"
+              placeholder={t('prReview.fileNavigator.filterPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
-              accessibilityLabel="Filter files by path"
+              accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
               className="flex-1 text-sm leading-[normal] text-foreground"
             />
           </View>
@@ -290,8 +297,8 @@ export function PrDiffFileNavigator({
       <View className="flex-1 bg-background">
         <EmptyState
           icon={Search}
-          title="No files changed"
-          description="This pull request has no file changes."
+          title={t('prReview.noFilesChanged')}
+          description={t('prReview.noFilesChangedDescription')}
         />
       </View>
     );
@@ -302,8 +309,12 @@ export function PrDiffFileNavigator({
   // `!fetchAll.error` keeps it mutually exclusive with the load-all banner.
   const showLaterPageRetry = laterPageError && !hasActiveSearch && !fetchAll.error;
   const showRetry = showLoadAllRetry || showLaterPageRetry;
-  const retryMessage = showLoadAllRetry ? 'Failed to load all files' : "Couldn't load more files";
-  const retryLabel = showLoadAllRetry ? 'Retry loading all files' : 'Retry loading more files';
+  const retryMessage = showLoadAllRetry
+    ? t('prReview.fileNavigator.failedToLoadAllFiles')
+    : t('prReview.fileNavigator.couldNotLoadMoreFiles');
+  const retryLabel = showLoadAllRetry
+    ? t('prReview.fileNavigator.retryLoadingAllFiles')
+    : t('prReview.fileNavigator.retryLoadingMoreFiles');
   const retryAction = showLoadAllRetry ? fetchAll.run : query.fetchNextPage;
   // Truncated when pagination hasn't finished, errored, or GitHub's 3,000-file
   // listing cap left fewer listed files than the overview's changed-file count.
@@ -316,9 +327,9 @@ export function PrDiffFileNavigator({
         <TextInput
           ref={inputRef}
           defaultValue=""
-          placeholder="Filter files by path"
+          placeholder={t('prReview.fileNavigator.filterPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
-          accessibilityLabel="Filter files by path"
+          accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
           onChangeText={value => {
             searchRef.current = value;
             setSearchVersion(version => version + 1);
@@ -333,14 +344,24 @@ export function PrDiffFileNavigator({
 
       <View className="mx-4 mt-2 flex-row items-center justify-between">
         <Text variant="muted" className="text-xs">
-          {viewedCount.toLocaleString()} of {files.length.toLocaleString()} viewed
-          {isTruncated ? ' of listed files' : ''}
+          {isTruncated
+            ? t('prReview.fileNavigator.viewedOfListed', {
+                viewed: viewedCount.toLocaleString(),
+                total: files.length.toLocaleString(),
+              })
+            : t('prReview.fileNavigator.viewedCount', {
+                viewed: viewedCount.toLocaleString(),
+                total: files.length.toLocaleString(),
+              })}
         </Text>
         {fetchAll.isRunning ? (
           <View className="flex-row items-center gap-1.5">
             <ActivityIndicator size="small" color={colors.mutedForeground} />
             <Text variant="muted" className="text-xs">
-              Loading {fetchAll.loadedFiles.toLocaleString()} of {changedFiles.toLocaleString()}…
+              {t('prReview.fileNavigator.loadingFiles', {
+                loaded: fetchAll.loadedFiles.toLocaleString(),
+                total: changedFiles.toLocaleString(),
+              })}
             </Text>
           </View>
         ) : null}
@@ -355,7 +376,7 @@ export function PrDiffFileNavigator({
             accessibilityRole="button"
             accessibilityLabel={retryLabel}
           >
-            <Text className="text-xs font-medium text-foreground">Retry</Text>
+            <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -377,7 +398,7 @@ export function PrDiffFileNavigator({
         ListEmptyComponent={
           <View className="px-6 py-12">
             <Text variant="muted" className="text-center text-sm">
-              No files match "{searchRef.current}"
+              {t('prReview.fileNavigator.noMatches', { query: searchRef.current })}
             </Text>
           </View>
         }

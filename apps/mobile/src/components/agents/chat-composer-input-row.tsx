@@ -1,5 +1,6 @@
 import { ArrowUp, Paperclip, Square } from '@/components/ui/icons';
 import { type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
@@ -84,6 +85,7 @@ export function ChatComposerInputRow({
   voiceInputStatus,
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const inputScrollable = shouldEnableComposerInputScroll(measureHeight, maxInputHeight);
 
   return (
@@ -98,7 +100,7 @@ export function ChatComposerInputRow({
             paperclipDisabled && 'opacity-50'
           )}
           accessibilityRole="button"
-          accessibilityLabel="Add attachment"
+          accessibilityLabel={t('agentChat.composer.addAttachment')}
           accessibilityState={{ disabled: paperclipDisabled }}
         >
           <Paperclip size={18} color={colors.mutedForeground} />
@@ -152,7 +154,7 @@ export function ChatComposerInputRow({
           disabled={disabled}
           hitSlop={CONTROL_HIT_SLOP}
           accessibilityRole="button"
-          accessibilityLabel="Stop generating"
+          accessibilityLabel={t('agentChat.composer.stopGenerating')}
           accessibilityState={{ disabled }}
           className={cn(
             'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
@@ -167,7 +169,7 @@ export function ChatComposerInputRow({
           disabled={!canSend}
           hitSlop={CONTROL_HIT_SLOP}
           accessibilityRole="button"
-          accessibilityLabel="Send message"
+          accessibilityLabel={t('agentChat.composer.sendMessage')}
           accessibilityState={{ disabled: !canSend, busy: isSending }}
           className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
             canSend ? 'bg-accent-soft' : 'bg-muted'

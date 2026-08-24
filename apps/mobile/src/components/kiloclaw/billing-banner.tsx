@@ -2,6 +2,7 @@ import { AlertTriangle, Clock, Info, type LucideIcon } from '@/components/ui/ico
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { toneColor, type ToneKey } from '@/lib/agent-color';
 import {
   type ClawBillingStatus,
@@ -61,7 +62,9 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
     case 'trial_active': {
       return {
         icon: Info,
-        message: `Trial: ${String(billing.trial?.daysRemaining ?? 0)} days remaining`,
+        message: i18n.t('kiloclaw.billing.trialDaysRemaining', {
+          days: billing.trial?.daysRemaining ?? 0,
+        }),
         severity: 'info',
       };
     }
@@ -69,7 +72,9 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
     case 'trial_ending_very_soon': {
       return {
         icon: Clock,
-        message: `Trial ending soon: ${formatRemainingDays(billing.trial?.daysRemaining ?? 0)}`,
+        message: i18n.t('kiloclaw.billing.trialEndingSoon', {
+          days: formatRemainingDays(billing.trial?.daysRemaining ?? 0),
+        }),
         severity: 'warn',
       };
     }
@@ -77,7 +82,9 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
       return {
         icon: Info,
         message: billing.earlybird
-          ? `Earlybird access until ${formatBillingDate(billing.earlybird.expiresAt)}`
+          ? i18n.t('kiloclaw.billing.earlybirdAccessUntil', {
+              date: formatBillingDate(billing.earlybird.expiresAt),
+            })
           : '',
         severity: 'info',
       };
@@ -85,7 +92,9 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
     case 'earlybird_ending_soon': {
       return {
         icon: Clock,
-        message: `Earlybird ending: ${String(billing.earlybird?.daysRemaining ?? 0)} days left`,
+        message: i18n.t('kiloclaw.billing.earlybirdEnding', {
+          days: billing.earlybird?.daysRemaining ?? 0,
+        }),
         severity: 'warn',
       };
     }
@@ -93,7 +102,9 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
       return {
         icon: AlertTriangle,
         message: billing.subscription
-          ? `Subscription cancels ${formatBillingDate(billing.subscription.currentPeriodEnd)}`
+          ? i18n.t('kiloclaw.billing.subscriptionCancels', {
+              date: formatBillingDate(billing.subscription.currentPeriodEnd),
+            })
           : '',
         severity: 'danger',
       };
@@ -101,7 +112,7 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
     case 'subscription_past_due': {
       return {
         icon: AlertTriangle,
-        message: 'Payment past due. Please update your payment method.',
+        message: i18n.t('kiloclaw.billing.paymentPastDue'),
         severity: 'danger',
       };
     }

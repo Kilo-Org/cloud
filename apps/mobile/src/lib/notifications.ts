@@ -6,10 +6,12 @@ import { z } from 'zod';
 import * as Sentry from '@sentry/react-native';
 import {
   ANDROID_NOTIFICATION_CHANNELS,
+  type AndroidNotificationChannelId,
   type PushData,
   pushDataSchema,
 } from '@kilocode/notifications';
 
+import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
 
@@ -148,6 +150,46 @@ export function ensureAndroidNotificationChannels(): Promise<void> {
   }
   androidChannelsPromise ??= createAndroidNotificationChannels();
   return androidChannelsPromise;
+}
+
+const CHANNEL_NAME_KEYS = {
+  agent: 'notifications.channel.agent',
+  chat: 'notifications.channel.chat',
+  kiloclaw: 'notifications.channel.kiloclaw',
+  balance: 'notifications.channel.balance',
+  security: 'notifications.channel.security',
+} as const satisfies Record<AndroidNotificationChannelId, string>;
+
+/**
+ * Re-set every Android channel name with the active catalog translation. Not
+ * single-flight and never cached: a language change must always re-write the
+ * names, even when `ensureAndroidNotificationChannels` already returned its
+ * cached promise. No-op on iOS.
+ */
+export async function renameAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+  for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
+      await Notifications.setNotificationChannelAsync(channel.id, {
+        name: i18n.t(CHANNEL_NAME_KEYS[channel.id]),
+        importance:
+          channel.importance === 'high'
+            ? Notifications.AndroidImportance.HIGH
+            : Notifications.AndroidImportance.DEFAULT,
+      });
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'rename_android_channel',
+          'notification.channel': channel.id,
+        },
+      });
+    }
+  }
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {

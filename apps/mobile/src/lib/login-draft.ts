@@ -33,7 +33,9 @@ export async function persistLoginDrafts(): Promise<void> {
   }
 }
 
-/** Read and clear the persisted drafts on login mount. */
+/** Read the persisted drafts on login mount. The caller deletes only after it
+ * applies the restored values, because a cancelled mount must not lose the
+ * drafts. */
 export async function restoreLoginDrafts(): Promise<{
   email: string;
   ssoRecovery: SsoRecoveryDraft | null;
@@ -41,10 +43,6 @@ export async function restoreLoginDrafts(): Promise<{
   const [email, ssoRaw] = await Promise.all([
     SecureStore.getItemAsync(LOGIN_EMAIL_DRAFT_KEY),
     SecureStore.getItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY),
-  ]);
-  await Promise.all([
-    SecureStore.deleteItemAsync(LOGIN_EMAIL_DRAFT_KEY),
-    SecureStore.deleteItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY),
   ]);
 
   let ssoRecovery: SsoRecoveryDraft | null = null;
@@ -62,6 +60,14 @@ export async function restoreLoginDrafts(): Promise<{
     }
   }
   return { email: email ?? '', ssoRecovery };
+}
+
+/** Delete the persisted drafts after the caller applies the restored values. */
+export async function clearPersistedLoginDrafts(): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(LOGIN_EMAIL_DRAFT_KEY),
+    SecureStore.deleteItemAsync(LOGIN_SSO_RECOVERY_DRAFT_KEY),
+  ]);
 }
 
 /** Drop the drafts after a successful sign-in. */

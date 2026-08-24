@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as use-device-auth.test.ts) */
+/* eslint-disable max-lines -- The mounted tests keep the refresh boundary, error mapping, globe, and draft-restore contracts together. */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
 import '@/i18n';
-import { restoreLoginDrafts } from '@/lib/login-draft';
+import { clearPersistedLoginDrafts, restoreLoginDrafts } from '@/lib/login-draft';
 import { LoginScreen } from './login-screen';
 import { errorMessage } from './login-screen-state';
 
@@ -81,6 +82,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/login-draft', () => ({
   clearLoginDrafts: vi.fn(),
+  clearPersistedLoginDrafts: vi.fn(),
   persistLoginDrafts: vi.fn(),
   restoreLoginDrafts: vi.fn().mockResolvedValue(null),
 }));
@@ -308,6 +310,7 @@ describe('login-screen idle skeleton', () => {
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
     vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+    vi.mocked(clearPersistedLoginDrafts).mockClear();
   });
 
   it('shows a form skeleton until the draft restore finishes', async () => {
@@ -332,6 +335,30 @@ describe('login-screen idle skeleton', () => {
 
     expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('deletes the persisted drafts only after applying them', async () => {
+    const state: {
+      resolve: ((value: { email: string; ssoRecovery: null }) => void) | undefined;
+    } = { resolve: undefined };
+    vi.mocked(restoreLoginDrafts).mockReturnValue(
+      new Promise(resolve => {
+        state.resolve = resolve;
+      })
+    );
+
+    const renderer = await mountLoginScreen();
+
+    expect(clearPersistedLoginDrafts).not.toHaveBeenCalled();
+
+    await act(async () => {
+      state.resolve?.({ email: '', ssoRecovery: null });
+      await Promise.resolve();
+    });
+
+    expect(clearPersistedLoginDrafts).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

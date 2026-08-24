@@ -339,6 +339,8 @@ function RootLayoutNav() {
       if (syncRtl(resolved)) {
         try {
           await reloadAppAsync();
+          // The native reload tears down this JS context; nothing below runs.
+          return;
         } catch {
           // Reload failed: keep going so the language still loads, then show
           // the Retry/Continue screen instead of first-painting in the wrong
@@ -348,11 +350,15 @@ function RootLayoutNav() {
       }
       // Reopen the screen the user was on before an RTL reload. Read once,
       // after the reload path, so the helper's one-shot delete is the only read.
+      // On a failed reload the key stays in SecureStore, so Retry's successful
+      // reloadAppAsync() still reopens the right screen on the relaunch.
       let returnTarget: 'login' | 'profile' | null = null;
-      try {
-        returnTarget = await readLanguageReturnTarget();
-      } catch {
-        // Failed read: fall through so the splash still hides.
+      if (!reloadFailed) {
+        try {
+          returnTarget = await readLanguageReturnTarget();
+        } catch {
+          // Failed read: fall through so the splash still hides.
+        }
       }
       if (returnTarget === 'login') {
         router.replace('/(auth)/login');

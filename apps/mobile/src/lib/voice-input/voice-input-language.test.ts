@@ -92,6 +92,12 @@ describe('pickSupportedVoiceInputLanguageTag', () => {
   it('underscore-form supported identifier returns the original spelling', () => {
     expect(pickSupportedVoiceInputLanguageTag(['en-DE'], ['en_US'])).toBe('en_US');
   });
+
+  it('keeps the device Chinese script when only a region differs', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hant-TW'], ['zh-CN', 'zh-Hant'])).toBe(
+      'zh-Hant'
+    );
+  });
 });
 
 describe('resolveVoiceInputStartLanguageTag', () => {
@@ -181,5 +187,15 @@ describe('resolveVoiceInputStartLanguageTag', () => {
     });
 
     expect(await resolveVoiceInputStartLanguageTag('en')).toBe('en-GB');
+  });
+
+  it('keeps the selected Chinese script before a different device script', async () => {
+    localizationMock.getLocales.mockReturnValue([{ languageTag: 'zh-CN' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['zh-CN', 'zh-Hant'],
+      installedLocales: [],
+    });
+
+    expect(await resolveVoiceInputStartLanguageTag('zh-Hant')).toBe('zh-Hant');
   });
 });

@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} imechaguliwa, gusa kubadilisha uteuzi",
-      "tapToComment": "{{label}}, gusa kutoa maoni"
+      "tapToComment": "{{label}}, gusa kutoa maoni",
+      "truncationBanner": "Inaonyesha {{limit}} za kwanza kati ya {{total}} faili zilizobadilishwa — kikomo cha API ya GitHub"
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu",
     "linkPasteNotAPullRequest": "Si kiungo cha ombi la kuvuta la GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Chagua mfano",
       "searchPlaceholder": "Tafuta mifano...",
       "noModels": "Hakuna mifano inayopatikana",
-      "noModelsDescription": "Hakuna mifano inayopatikana ya kuchagua."
+      "noModelsDescription": "Hakuna mifano inayopatikana ya kuchagua.",
+      "favorites": "Vipendwa",
+      "recommended": "Vinapendekezwa",
+      "allModels": "Miundo yote"
     },
     "modelSelector": {
       "model": "Mfano",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Kutoa kikao hiki?",
     "signOutThisSessionMessage": "{{device}} itatoka. Inaweza kuweka upatikanaji wa API hadi saa moja.",
     "signOutConfirm": "Ondoka",
-    "signOutMessage": "Utahitaji kuingia tena ili kupata upatikanaji wa nafasi yako ya kazi."
+    "signOutMessage": "Utahitaji kuingia tena ili kupata upatikanaji wa nafasi yako ya kazi.",
+    "webBrowser": "Kivinjari cha wavuti"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Haikuweza kufungua duka la app.",

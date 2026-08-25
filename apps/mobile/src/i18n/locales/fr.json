@@ -1707,7 +1707,10 @@
       "title": "Sélectionner le modèle",
       "searchPlaceholder": "Rechercher des modèles...",
       "noModels": "Aucun modèle disponible",
-      "noModelsDescription": "Aucun modèle n'est disponible à la sélection."
+      "noModelsDescription": "Aucun modèle n'est disponible à la sélection.",
+      "favorites": "Favoris",
+      "recommended": "Recommandés",
+      "allModels": "Tous les modèles"
     },
     "modelSelector": {
       "model": "Modèle",
@@ -1891,7 +1894,8 @@
     "signOutThisSessionTitle": "Déconnecter cette session ?",
     "signOutThisSessionMessage": "{{device}} sera déconnecté. Il peut conserver l'accès à l'API jusqu'à une heure.",
     "signOutConfirm": "Se déconnecter",
-    "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail."
+    "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
+    "webBrowser": "Navigateur web"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Impossible d'ouvrir l'App Store.",
@@ -2564,7 +2568,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} sélectionné, touchez pour modifier la sélection",
-      "tapToComment": "{{label}}, touchez pour commenter"
+      "tapToComment": "{{label}}, touchez pour commenter",
+      "truncationBanner": "Affichage des {{limit}} premiers fichiers modifiés sur {{total}} — limite de l'API GitHub"
     },
     "linkPasteClipboardEmpty": "Le presse-papiers est vide",
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de pull request GitHub"

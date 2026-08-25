@@ -64,6 +64,10 @@ export function formatDate(date: Date, locale: string): string {
   return dateTimeFormat(locale, {}).format(date);
 }
 
+export function formatCalendarDate(value: string, locale: string): string {
+  return dateTimeFormat(locale, { timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
+}
+
 export function formatNumber(
   value: number,
   locale: string,

@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ଚୟନ ହେଲା, ଚୟନ ବଦଳାଇବାକୁ ଟାପ୍ କରନ୍ତୁ",
-      "tapToComment": "{{label}}, ମନ୍ତବ୍ୟ ଦେବାକୁ ଟାପ୍ କରନ୍ତୁ"
+      "tapToComment": "{{label}}, ମନ୍ତବ୍ୟ ଦେବାକୁ ଟାପ୍ କରନ୍ତୁ",
+      "truncationBanner": "ମୋଟ {{total}} ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ପରିବର୍ତ୍ତିତ ଫାଇଲ ଦେଖାଯାଉଛି — GitHub API ସୀମା"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପ୍ବୋର୍ଡ ଖାଲି ଅଛି",
     "linkPasteNotAPullRequest": "ଏହା GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ"
@@ -2144,8 +2145,11 @@
     "modelPicker": {
       "title": "ମଡେଲ ଚୟନ କରନ୍ତୁ",
       "searchPlaceholder": "ମଡେଲ ସନ୍ଧାନ କରନ୍ତୁ...",
+      "allModels": "ସମସ୍ତ ମଡେଲ",
+      "favorites": "ପସନ୍ଦ",
       "noModels": "କୌଣସି ମଡେଲ ଉପଲବ୍ଧ ନାହିଁ",
-      "noModelsDescription": "ଚୟନ କରିବାକୁ କୌଣସି ମଡେଲ ଉପଲବ୍ଧ ନାହିଁ।"
+      "noModelsDescription": "ଚୟନ କରିବାକୁ କୌଣସି ମଡେଲ ଉପଲବ୍ଧ ନାହିଁ।",
+      "recommended": "ସୁପାରିଶ କରାଯାଇଛି"
     },
     "modelSelector": {
       "model": "ମଡେଲ",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ଏହି ସେସନ୍ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionMessage": "{{device}} ସାଇନ୍ ଆଉଟ୍ ହେବ। ଏହା ଏକ ଘଣ୍ଟା ପର୍ଯ୍ୟନ୍ତ API ଆକ୍ସେସ୍ ରଖିପାରିବ।",
     "signOutConfirm": "ସାଇନ୍ ଆଉଟ୍",
-    "signOutMessage": "ଆପଣଙ୍କ ୱର୍କସ୍ପେସ୍ ଆକ୍ସେସ୍ କରିବାକୁ ଆପଣଙ୍କୁ ପୁନର୍ବାର ସାଇନ୍ ଇନ୍ କରିବାକୁ ପଡ଼ିବ।"
+    "signOutMessage": "ଆପଣଙ୍କ ୱର୍କସ୍ପେସ୍ ଆକ୍ସେସ୍ କରିବାକୁ ଆପଣଙ୍କୁ ପୁନର୍ବାର ସାଇନ୍ ଇନ୍ କରିବାକୁ ପଡ଼ିବ।",
+    "webBrowser": "ୱେବ ବ୍ରାଉଜର"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ଆପ୍ ଷ୍ଟୋର ଖୋଲାଯାଇପାରିଲା ନାହିଁ।",

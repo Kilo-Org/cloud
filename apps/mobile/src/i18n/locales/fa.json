@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} انتخاب شد، برای تغییر انتخاب ضربه بزنید",
-      "tapToComment": "{{label}}، برای نظر ضربه بزنید"
+      "tapToComment": "{{label}}، برای نظر ضربه بزنید",
+      "truncationBanner": "نمایش {{limit}} فایل اول از {{total}} فایل تغییر یافته — سقف API گیتهاب"
     },
     "linkPasteClipboardEmpty": "کلیپبورد خالی است",
     "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست"
@@ -2145,7 +2146,10 @@
       "title": "انتخاب مدل",
       "searchPlaceholder": "جستجوی مدل‌ها...",
       "noModels": "مدلی در دسترس نیست",
-      "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست."
+      "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
+      "favorites": "موردعلاقهها",
+      "recommended": "پیشنهادی",
+      "allModels": "همه مدلها"
     },
     "modelSelector": {
       "model": "مدل",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "از این جلسه خارج شوم؟",
     "signOutThisSessionMessage": "{{device}} از سیستم خارج می‌شود. تا یک ساعت دسترسی API را حفظ می‌کند.",
     "signOutConfirm": "خروج",
-    "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید."
+    "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
+    "webBrowser": "مرورگر وب"
   },
   "forceUpdate": {
     "couldNotOpenStore": "باز کردن فروشگاه برنامه ممکن نشد.",

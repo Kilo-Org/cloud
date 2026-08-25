@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Yan {{label}}, tẹ lati yi yiyan pada",
-      "tapToComment": "{{label}}, tẹ lati sọ asọye"
+      "tapToComment": "{{label}}, tẹ lati sọ asọye",
+      "truncationBanner": "Ìfihàn àwọn fáìlì àkọ́kọ́ {{limit}} nínú {{total}} fáìlì tí a yí padà — ìpẹ̀kun API GitHub"
     },
     "linkPasteClipboardEmpty": "Àtẹ̀ àkójọpọ̀ ti ṣófo",
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà asopọ́ pull request GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Yan awoṣe",
       "searchPlaceholder": "Wa awọn awoṣe...",
       "noModels": "Ko si awoṣe to wa",
-      "noModelsDescription": "Ko si awoṣe to wa lati yan."
+      "noModelsDescription": "Ko si awoṣe to wa lati yan.",
+      "allModels": "Gbogbo àwọn awoṣe",
+      "favorites": "Àwọn ààyàn",
+      "recommended": "Àwọn tí a dámọ̀ràn"
     },
     "modelSelector": {
       "model": "Awoṣe",
@@ -2305,6 +2309,7 @@
     "onlyKiloAppSignIns": "Awọn iwọle app Kilo nikan ni o han nibi. Awọn iwọle Editor ati CLI ko si ninu àkọọlẹ.",
     "signedIn": "Ti wọle {{signedIn}} · Ti ri kẹhin {{lastSeen}}",
     "thisDevice": "Ẹrọ yii",
+    "webBrowser": "Aṣàwákiri wẹ́ẹ̀bù",
     "title": "Awọn igba-ijiroro ẹrọ",
     "viewProfile": "Wo profaìlì",
     "signOutThisDevice": "Wọle jade lori ẹrọ yii",

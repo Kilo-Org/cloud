@@ -10,6 +10,7 @@ import {
   setLanguagePreferenceAsync,
 } from '@/lib/hooks/use-language-preference';
 import { renameAndroidNotificationChannels } from '@/lib/notifications';
+import { prewarmIntl } from '@/lib/intl-cache';
 
 export type ApplyLanguageOutcome =
   | { kind: 'applied-ltr' }
@@ -66,6 +67,7 @@ export async function applyLanguagePreference(
   const previousLanguage = i18n.language;
   try {
     await i18n.changeLanguage(resolved);
+    prewarmIntl(resolved);
   } catch {
     return { kind: 'catalog-failed' };
   }
@@ -74,6 +76,7 @@ export async function applyLanguagePreference(
   if (!persisted) {
     try {
       await i18n.changeLanguage(previousLanguage);
+      prewarmIntl(previousLanguage);
     } catch {
       // Ignore: the rollback is best-effort; the persist failure already surfaced.
     }

@@ -1766,7 +1766,10 @@
       "title": "모델 선택",
       "searchPlaceholder": "모델 검색...",
       "noModels": "사용 가능한 모델이 없습니다",
-      "noModelsDescription": "선택할 수 있는 모델이 없습니다."
+      "noModelsDescription": "선택할 수 있는 모델이 없습니다.",
+      "favorites": "즐겨찾기",
+      "recommended": "추천",
+      "allModels": "모든 모델"
     },
     "modelSelector": {
       "model": "모델",
@@ -1935,7 +1938,8 @@
     "signOutThisSessionTitle": "이 세션을 로그아웃하시겠습니까?",
     "signOutThisSessionMessage": "{{device}}이(가) 로그아웃됩니다. 최대 1시간 동안 API 액세스를 유지할 수 있습니다.",
     "signOutConfirm": "로그아웃",
-    "signOutMessage": "작업 영역에 액세스하려면 다시 로그인해야 합니다."
+    "signOutMessage": "작업 영역에 액세스하려면 다시 로그인해야 합니다.",
+    "webBrowser": "웹 브라우저"
   },
   "forceUpdate": {
     "couldNotOpenStore": "앱 스토어를 열 수 없습니다.",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
-      "tapToComment": "{{label}}, 탭하여 댓글 달기"
+      "tapToComment": "{{label}}, 탭하여 댓글 달기",
+      "truncationBanner": "변경된 파일 {{total}}개 중 처음 {{limit}}개를 표시 중 — GitHub API 제한"
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다",
     "linkPasteNotAPullRequest": "GitHub 풀 리퀘스트 링크가 아닙니다"

@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Избрано {{label}}, допрете за да го промените изборот",
-      "tapToComment": "{{label}}, допрете за да коментирате"
+      "tapToComment": "{{label}}, допрете за да коментирате",
+      "truncationBanner": "Прикажува првите {{limit}} од {{total}} изменети датотеки — GitHub API лимит"
     },
     "linkPasteClipboardEmpty": "Таблата со клипборд е празна",
     "linkPasteNotAPullRequest": "Ова не е линк до GitHub pull request"
@@ -2145,7 +2146,10 @@
       "title": "Изберете модел",
       "searchPlaceholder": "Пребарувај модели...",
       "noModels": "Нема достапни модели",
-      "noModelsDescription": "Нема достапни модели за избор."
+      "noModelsDescription": "Нема достапни модели за избор.",
+      "favorites": "Омилени",
+      "recommended": "Препорачано",
+      "allModels": "Сите модели"
     },
     "modelSelector": {
       "model": "Модел",
@@ -2307,6 +2311,7 @@
     "thisDevice": "Овој уред",
     "title": "Сесии на уредот",
     "viewProfile": "Прикажи профил",
+    "webBrowser": "Веб прелистувач",
     "signOutThisDevice": "Одјави го овој уред",
     "signOutThisSession": "Одјави ја оваа сесија",
     "sessionSignedOut": "Сесијата е одјавена.",

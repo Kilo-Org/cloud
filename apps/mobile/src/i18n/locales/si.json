@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} තේරී ඇත, තේරීම වෙනස් කිරීමට තට්ටු කරන්න",
-      "tapToComment": "{{label}}, අදහස් දැක්වීමට තට්ටු කරන්න"
+      "tapToComment": "{{label}}, අදහස් දැක්වීමට තට්ටු කරන්න",
+      "truncationBanner": "වෙනස් කළ ගොනු {{total}} අතරින් පළමු {{limit}} පෙන්වයි — GitHub API සීමාව"
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස් ය",
     "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ"
@@ -2145,7 +2146,10 @@
       "title": "මාදිලිය තෝරන්න",
       "searchPlaceholder": "මාදිලි සොයන්න...",
       "noModels": "මාදිලි නොමැත",
-      "noModelsDescription": "තේරීමට මාදිලි නොමැත."
+      "noModelsDescription": "තේරීමට මාදිලි නොමැත.",
+      "favorites": "ප්‍රියතම",
+      "recommended": "නිර්දේශිත",
+      "allModels": "සියලුම ආකෘති"
     },
     "modelSelector": {
       "model": "මාදිලිය",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",
     "signOutThisSessionMessage": "{{device}} පිටවනු ඇත. එයට පැයක් දක්වා API ප්‍රවේශය පැවතිය හැක.",
     "signOutConfirm": "පිටවීම",
-    "signOutMessage": "ඔබගේ වැඩබිමට ප්‍රවේශ වීමට ඔබට නැවත පුරනය වීමට සිදුවේ."
+    "signOutMessage": "ඔබගේ වැඩබිමට ප්‍රවේශ වීමට ඔබට නැවත පුරනය වීමට සිදුවේ.",
+    "webBrowser": "වෙබ් බ්රවුසරය"
   },
   "forceUpdate": {
     "couldNotOpenStore": "යෙදුම් වෙළඳසැල විවෘත කළ නොහැකි විය.",

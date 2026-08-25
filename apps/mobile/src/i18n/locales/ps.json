@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} غوره شوی، د انتخاب بدلولو لپاره ټک وکړئ",
-      "tapToComment": "{{label}}، د تبصرې لپاره ټک وکړئ"
+      "tapToComment": "{{label}}، د تبصرې لپاره ټک وکړئ",
+      "truncationBanner": "د {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کیږي — د GitHub API حد"
     },
     "linkPasteClipboardEmpty": "کلیپبورډ خالي دی",
     "linkPasteNotAPullRequest": "دا د GitHub pull request لینک نه دی"
@@ -2144,8 +2145,11 @@
     "modelPicker": {
       "title": "ماډل وټاکئ",
       "searchPlaceholder": "ماډلونه ولټوئ...",
+      "allModels": "ټول ماډلونه",
+      "favorites": "غوره شوي",
       "noModels": "هیڅ ماډل شتون نلري",
-      "noModelsDescription": "د ټاکنې لپاره هیڅ ماډل شتون نلري."
+      "noModelsDescription": "د ټاکنې لپاره هیڅ ماډل شتون نلري.",
+      "recommended": "وړاندیز شوی"
     },
     "modelSelector": {
       "model": "ماډل",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "له دې غونډې ووځئ؟",
     "signOutThisSessionMessage": "{{device}} به ووځي. دا کولای شي تر یو ساعت پورې د API لاسرسی وساتي.",
     "signOutConfirm": "وتل",
-    "signOutMessage": "د خپل کاري ځای لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ."
+    "signOutMessage": "د خپل کاري ځای لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
+    "webBrowser": "ویب براوزر"
   },
   "forceUpdate": {
     "couldNotOpenStore": "د ایپ پلورنځی نه شو خلاصېدلای.",

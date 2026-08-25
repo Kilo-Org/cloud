@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Selected {{label}}, tap to change selection",
-      "tapToComment": "{{label}}, tap to comment"
+      "tapToComment": "{{label}}, tap to comment",
+      "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
     "linkPasteNotAPullRequest": "Not a GitHub pull request link"
@@ -2145,7 +2146,10 @@
       "title": "Select model",
       "searchPlaceholder": "Search models...",
       "noModels": "No models available",
-      "noModelsDescription": "No models are available to select."
+      "noModelsDescription": "No models are available to select.",
+      "favorites": "Favorites",
+      "recommended": "Recommended",
+      "allModels": "All models"
     },
     "modelSelector": {
       "model": "Model",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Sign out this session?",
     "signOutThisSessionMessage": "{{device}} will be signed out. It can keep API access for up to an hour.",
     "signOutConfirm": "Sign out",
-    "signOutMessage": "You will need to sign in again to access your workspace."
+    "signOutMessage": "You will need to sign in again to access your workspace.",
+    "webBrowser": "Web browser"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Could not open the app store.",

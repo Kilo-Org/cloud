@@ -540,7 +540,8 @@
     },
     "diff": {
       "selectedTapToChange": "Magħżul {{label}}, mess biex tibdel l-għażla",
-      "tapToComment": "{{label}}, mess biex tikkummenta"
+      "tapToComment": "{{label}}, mess biex tikkummenta",
+      "truncationBanner": "Qed juri l-ewwel {{limit}} minn {{total}} fajls mibdula — il-limitu tal-API ta' GitHub"
     },
     "linkPasteClipboardEmpty": "L-appostru huwa vojt",
     "linkPasteNotAPullRequest": "Mhux link ta' pull request ta' GitHub"
@@ -2196,7 +2197,10 @@
       "title": "Agħżel il-mudell",
       "searchPlaceholder": "Fittex il-mudelli...",
       "noModels": "L-ebda mudell disponibbli",
-      "noModelsDescription": "M'hemm l-ebda mudell disponibbli biex tagħżel."
+      "noModelsDescription": "M'hemm l-ebda mudell disponibbli biex tagħżel.",
+      "favorites": "Favoriti",
+      "recommended": "Rrakkomandat",
+      "allModels": "Il-mudelli kollha"
     },
     "modelSelector": {
       "model": "Mudell",
@@ -2361,6 +2365,7 @@
     "thisDevice": "Dan it-tagħmir",
     "title": "Sessjonijiet tat-tagħmir",
     "viewProfile": "Ara l-profil",
+    "webBrowser": "Browser tal-web",
     "signOutThisDevice": "Oħroġ minn dan it-tagħmir",
     "signOutThisSession": "Oħroġ minn din is-sessjoni",
     "sessionSignedOut": "Is-sessjoni ħarġet.",

@@ -1805,7 +1805,10 @@
     "modelPicker": {
       "title": "اختيار النموذج",
       "searchPlaceholder": "البحث عن النماذج...",
+      "allModels": "كل النماذج",
+      "favorites": "المفضلة",
       "noModels": "لا توجد نماذج متاحة",
+      "recommended": "الموصى بها",
       "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
     },
     "modelSelector": {
@@ -1971,6 +1974,7 @@
     "signedIn": "تم تسجيل الدخول {{signedIn}} · آخر ظهور {{lastSeen}}",
     "thisDevice": "هذا الجهاز",
     "title": "جلسات الأجهزة",
+    "webBrowser": "متصفح الويب",
     "viewProfile": "عرض الملف الشخصي",
     "signOutThisDevice": "تسجيل الخروج من هذا الجهاز",
     "signOutThisSession": "تسجيل الخروج من هذه الجلسة",
@@ -2618,6 +2622,7 @@
     },
     "diff": {
       "selectedTapToChange": "تم تحديد {{label}}، اضغط لتغيير التحديد",
+      "truncationBanner": "عرض أول {{limit}} من أصل {{total}} ملفًا تم تغييرها — حد GitHub API",
       "tapToComment": "{{label}}، اضغط للتعليق"
     },
     "linkPasteClipboardEmpty": "الحافظة فارغة",

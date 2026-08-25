@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Kukhethiwe {{label}}, thepha ukuze ushintshe okukhethiwe",
-      "tapToComment": "{{label}}, thepha ukuze ubhale amazwana"
+      "tapToComment": "{{label}}, thepha ukuze ubhale amazwana",
+      "truncationBanner": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} aguquliwe — umkhawulo we-GitHub API"
     },
     "linkPasteClipboardEmpty": "Ikliphuphodi ayinalutho",
     "linkPasteNotAPullRequest": "Akuyona isixhumanisi sokudonsa se-GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Khetha imodeli",
       "searchPlaceholder": "Sesha amamodeli...",
       "noModels": "Azikho amamodeli atholakalayo",
-      "noModelsDescription": "Akukho mamodeli ongawakhetha."
+      "noModelsDescription": "Akukho mamodeli ongawakhetha.",
+      "allModels": "Wonke amamodeli",
+      "favorites": "Okuthandwayo",
+      "recommended": "Kutuswayo"
     },
     "modelSelector": {
       "model": "Imodeli",
@@ -2305,6 +2309,7 @@
     "onlyKiloAppSignIns": "Ukungena kwe-app ye-Kilo kuphela okuvela lapha. Ukungena kwe-Editor ne-CLI akubalwa.",
     "signedIn": "Ungene {{signedIn}} · Ugcine ukubonwa {{lastSeen}}",
     "thisDevice": "Le divayisi",
+    "webBrowser": "Isiphequluli sewebhu",
     "title": "Amaseshini edivayisi",
     "viewProfile": "Buka iphrofayili",
     "signOutThisDevice": "Phuma kule divayisi",

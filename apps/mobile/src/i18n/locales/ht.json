@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Chwazi {{label}}, tape pou chanje seleksyon",
-      "tapToComment": "{{label}}, tape pou kòmante"
+      "tapToComment": "{{label}}, tape pou kòmante",
+      "truncationBanner": "Ap montre premye {{limit}} sou {{total}} fichye ki chanje — limit API GitHub"
     },
     "linkPasteClipboardEmpty": "Clipboard la vid",
     "linkPasteNotAPullRequest": "Se pa yon lyen pull request GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Chwazi modèl",
       "searchPlaceholder": "Chèche modèl...",
       "noModels": "Pa gen modèl disponib",
-      "noModelsDescription": "Pa gen modèl disponib pou chwazi."
+      "noModelsDescription": "Pa gen modèl disponib pou chwazi.",
+      "favorites": "Favori",
+      "recommended": "Rekòmande",
+      "allModels": "Tout modèl"
     },
     "modelSelector": {
       "model": "Modèl",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Siyen deyò nan sesyon sa a?",
     "signOutThisSessionMessage": "{{device}} ap siyen deyò. Li ka kenbe akse API pou jiska yon èdtan.",
     "signOutConfirm": "Siyen deyò",
-    "signOutMessage": "Ou ap bezwen siyen nan ankò pou akse espas travay ou."
+    "signOutMessage": "Ou ap bezwen siyen nan ankò pou akse espas travay ou.",
+    "webBrowser": "Navigatè entènèt"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Pa t ka louvri magazen aplikasyon an.",

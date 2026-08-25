@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} منتخب، انتخاب تبدیل کرنے کے لیے تھپتھپائیں",
-      "tapToComment": "{{label}}، تبصرہ کرنے کے لیے تھپتھپائیں"
+      "tapToComment": "{{label}}، تبصرہ کرنے کے لیے تھپتھپائیں",
+      "truncationBanner": "کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں — GitHub API حد"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے",
     "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ لنک نہیں ہے"
@@ -2145,7 +2146,10 @@
       "title": "ماڈل منتخب کریں",
       "searchPlaceholder": "ماڈلز تلاش کریں...",
       "noModels": "کوئی ماڈل دستیاب نہیں",
-      "noModelsDescription": "منتخب کرنے کے لیے کوئی ماڈل دستیاب نہیں ہے۔"
+      "noModelsDescription": "منتخب کرنے کے لیے کوئی ماڈل دستیاب نہیں ہے۔",
+      "allModels": "تمام ماڈلز",
+      "favorites": "پسندیدہ",
+      "recommended": "تجویز کردہ"
     },
     "modelSelector": {
       "model": "ماڈل",
@@ -2305,6 +2309,7 @@
     "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",
     "signedIn": "{{signedIn}} میں سائن ان · آخری بار دیکھا گیا {{lastSeen}}",
     "thisDevice": "یہ ڈیوائس",
+    "webBrowser": "ویب براؤزر",
     "title": "ڈیوائس سیشنز",
     "viewProfile": "پروفائل دیکھیں",
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",

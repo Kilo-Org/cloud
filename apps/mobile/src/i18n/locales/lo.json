@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "ເລືອກ {{label}}, ແຕະເພື່ອປ່ຽນການເລືອກ",
-      "tapToComment": "{{label}}, ແຕະເພື່ອໃສ່ຄຳເຫັນ"
+      "tapToComment": "{{label}}, ແຕະເພື່ອໃສ່ຄຳເຫັນ",
+      "truncationBanner": "ກຳລັງສະແດງ {{limit}} ທຳອິດຈາກ {{total}} ໄຟລ໌ທີ່ປ່ຽນແປງ — ຂີດຈຳກັດ GitHub API"
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ",
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງ pull request ຂອງ GitHub"
@@ -2145,7 +2146,10 @@
       "title": "ເລືອກຮູບແບບ",
       "searchPlaceholder": "ຄົ້ນຫາຮູບແບບ...",
       "noModels": "ບໍ່ມີຮູບແບບ",
-      "noModelsDescription": "ບໍ່ມີຮູບແບບໃຫ້ເລືອກ."
+      "noModelsDescription": "ບໍ່ມີຮູບແບບໃຫ້ເລືອກ.",
+      "favorites": "ລາຍການທີ່ມັກ",
+      "recommended": "ແນະນຳ",
+      "allModels": "ທຸກໂມເດວ"
     },
     "modelSelector": {
       "model": "ຮູບແບບ",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ອອກຈາກລະບົບເຊດຊັນນີ້?",
     "signOutThisSessionMessage": "{{device}} ຈະຖືກອອກຈາກລະບົບ. ມັນສາມາດຮັກສາການເຂົ້າເຖິງ API ໄດ້ສູງສຸດຫນຶ່ງຊົ່ວໂມງ.",
     "signOutConfirm": "ອອກຈາກລະບົບ",
-    "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບອີກເພື່ອເຂົ້າເຖິງ workspace ຂອງທ່ານ."
+    "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບອີກເພື່ອເຂົ້າເຖິງ workspace ຂອງທ່ານ.",
+    "webBrowser": "ຕົວທ່ອງເວັບ"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ບໍ່ສາມາດເປີດ app store.",

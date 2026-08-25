@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Valittu {{label}}, napauta vaihtaaksesi valinnan",
-      "tapToComment": "{{label}}, napauta kommentoidaksesi"
+      "tapToComment": "{{label}}, napauta kommentoidaksesi",
+      "truncationBanner": "Näytetään ensimmäiset {{limit}} muutetuista {{total}} tiedostosta — GitHub API:n raja"
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä",
     "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki"
@@ -2145,7 +2146,10 @@
       "title": "Valitse malli",
       "searchPlaceholder": "Hae malleja...",
       "noModels": "Ei malleja saatavilla",
-      "noModelsDescription": "Ei ole malleja valittavaksi."
+      "noModelsDescription": "Ei ole malleja valittavaksi.",
+      "favorites": "Suosikit",
+      "recommended": "Suositellut",
+      "allModels": "Kaikki mallit"
     },
     "modelSelector": {
       "model": "Malli",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Kirjaudu ulos tästä istunnosta?",
     "signOutThisSessionMessage": "{{device}} kirjataan ulos. Se voi säilyttää API-käytön enintään tunnin ajan.",
     "signOutConfirm": "Kirjaudu ulos",
-    "signOutMessage": "Sinun on kirjauduttava sisään uudelleen päästäksesi työtilaan."
+    "signOutMessage": "Sinun on kirjauduttava sisään uudelleen päästäksesi työtilaan.",
+    "webBrowser": "Verkkoselain"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Sovelluskauppaa ei voitu avata.",

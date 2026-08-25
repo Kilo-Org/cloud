@@ -1766,7 +1766,10 @@
       "title": "モデルを選択",
       "searchPlaceholder": "モデルを検索...",
       "noModels": "利用可能なモデルはありません",
-      "noModelsDescription": "選択できるモデルはありません。"
+      "noModelsDescription": "選択できるモデルはありません。",
+      "favorites": "お気に入り",
+      "recommended": "おすすめ",
+      "allModels": "すべてのモデル"
     },
     "modelSelector": {
       "model": "モデル",
@@ -1935,7 +1938,8 @@
     "signOutThisSessionTitle": "このセッションをサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}がサインアウトされます。最大1時間はAPIアクセスを維持できます。",
     "signOutConfirm": "サインアウト",
-    "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。"
+    "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
+    "webBrowser": "Webブラウザ"
   },
   "forceUpdate": {
     "couldNotOpenStore": "アプリストアを開けませんでした。",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",
-      "tapToComment": "{{label}}をタップしてコメント"
+      "tapToComment": "{{label}}をタップしてコメント",
+      "truncationBanner": "変更されたファイル {{total}} 件中、最初の {{limit}} 件を表示中 — GitHub API の制限"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です",
     "linkPasteNotAPullRequest": "GitHub のプルリクエストリンクではありません"

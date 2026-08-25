@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Waa la doortay {{label}}, taabo si aad u beddesho xulista",
-      "tapToComment": "{{label}}, taabo si aad faallo u dajiso"
+      "tapToComment": "{{label}}, taabo si aad faallo u dajiso",
+      "truncationBanner": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub"
     },
     "linkPasteClipboardEmpty": "Qalabka koobigu waa madhan",
     "linkPasteNotAPullRequest": "Kuma aha xiriiriyaha codsiga jiidista GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Xulo model",
       "searchPlaceholder": "Raadi models...",
       "noModels": "Ma jiro models",
-      "noModelsDescription": "Ma jiro models aad dooran karto."
+      "noModelsDescription": "Ma jiro models aad dooran karto.",
+      "favorites": "Kuwa la jecel yahay",
+      "recommended": "Kuwa la soo jeediyo",
+      "allModels": "Dhammaan moodoelada"
     },
     "modelSelector": {
       "model": "Model",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Saxiix bax kalfadhiyahan?",
     "signOutThisSessionMessage": "{{device}} waa la saxiixi doonaa bax. Wuxuu sii hayn karaa gelitaanka API ilaa saacad.",
     "signOutConfirm": "Saxiix bax",
-    "signOutMessage": "Waxaad u baahan doontaa inaad mar kale saxiixato si aad u gasho meeshaada shaqada."
+    "signOutMessage": "Waxaad u baahan doontaa inaad mar kale saxiixato si aad u gasho meeshaada shaqada.",
+    "webBrowser": "Browser-ka webka"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Dukaanka app-ka lama furi karin.",

@@ -1766,7 +1766,10 @@
       "title": "Model seç",
       "searchPlaceholder": "Model ara...",
       "noModels": "Kullanılabilir model yok",
-      "noModelsDescription": "Seçilebilecek model yok."
+      "noModelsDescription": "Seçilebilecek model yok.",
+      "allModels": "Tüm modeller",
+      "favorites": "Favoriler",
+      "recommended": "Önerilen"
     },
     "modelSelector": {
       "model": "Model",
@@ -1926,6 +1929,7 @@
     "onlyKiloAppSignIns": "Burada yalnızca Kilo uygulaması oturumları görünür. Editör ve CLI oturumları listelenmez.",
     "signedIn": "{{signedIn}} tarihinde oturum açıldı · Son görülme {{lastSeen}}",
     "thisDevice": "Bu cihaz",
+    "webBrowser": "Web tarayıcısı",
     "title": "Cihaz oturumları",
     "viewProfile": "Profili görüntüle",
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "Seçilen {{label}}, seçimi değiştirmek için dokunun",
-      "tapToComment": "{{label}}, yorum yapmak için dokunun"
+      "tapToComment": "{{label}}, yorum yapmak için dokunun",
+      "truncationBanner": "Değiştirilen dosyaların ilk {{limit}} tanesi gösteriliyor (toplam {{total}}) — GitHub API sınırı"
     },
     "linkPasteClipboardEmpty": "Pano boş",
     "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil"

@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} પસંદ કર્યું, પસંદગી બદલવા ટેપ કરો",
-      "tapToComment": "{{label}}, ટિપ્પણી કરવા ટેપ કરો"
+      "tapToComment": "{{label}}, ટિપ્પણી કરવા ટેપ કરો",
+      "truncationBanner": "બદલાયેલી {{total}} ફાઇલોમાંથી પ્રથમ {{limit}} બતાવી રહ્યાં છીએ — GitHub API મર્યાદા"
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે",
     "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી"
@@ -2145,7 +2146,10 @@
       "title": "મોડલ પસંદ કરો",
       "searchPlaceholder": "મોડલ્સ શોધો...",
       "noModels": "કોઈ મોડલ ઉપલબ્ધ નથી",
-      "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી."
+      "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી.",
+      "favorites": "ફેવરિટ",
+      "recommended": "ભલામણ કરેલ",
+      "allModels": "બધા મોડેલ"
     },
     "modelSelector": {
       "model": "મોડલ",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "આ સત્ર સાઇન આઉટ કરવું છે?",
     "signOutThisSessionMessage": "{{device}} સાઇન આઉટ થશે. તે એક કલાક સુધી API ઍક્સેસ રાખી શકે છે.",
     "signOutConfirm": "સાઇન આઉટ",
-    "signOutMessage": "તમારા વર્કસ્પેસને ઍક્સેસ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે."
+    "signOutMessage": "તમારા વર્કસ્પેસને ઍક્સેસ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
+    "webBrowser": "વેબ બ્રાઉઝર"
   },
   "forceUpdate": {
     "couldNotOpenStore": "એપ સ્ટોર ખોલી શકાયું નહીં.",

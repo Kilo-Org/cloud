@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Valgt {{label}}, tryk for at ændre markering",
-      "tapToComment": "{{label}}, tryk for at kommentere"
+      "tapToComment": "{{label}}, tryk for at kommentere",
+      "truncationBanner": "Viser de første {{limit}} af {{total}} ændrede filer — GitHub API-grænse"
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom",
     "linkPasteNotAPullRequest": "Ikke et GitHub pull request-link"
@@ -2145,7 +2146,10 @@
       "title": "Vælg model",
       "searchPlaceholder": "Søg modeller...",
       "noModels": "Ingen modeller tilgængelige",
-      "noModelsDescription": "Der er ingen modeller at vælge."
+      "noModelsDescription": "Der er ingen modeller at vælge.",
+      "favorites": "Favoritter",
+      "recommended": "Anbefalede",
+      "allModels": "Alle modeller"
     },
     "modelSelector": {
       "model": "Model",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Log ud af denne session?",
     "signOutThisSessionMessage": "{{device}} vil blive logget ud. Den kan beholde API-adgang i op til en time.",
     "signOutConfirm": "Log ud",
-    "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde."
+    "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
+    "webBrowser": "Webbrowser"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Kunne ikke åbne app-butikken.",

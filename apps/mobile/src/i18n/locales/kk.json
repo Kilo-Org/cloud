@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} таңдалды, таңдауды өзгерту үшін түртіңіз",
-      "tapToComment": "{{label}}, пікір қалдыру үшін түртіңіз"
+      "tapToComment": "{{label}}, пікір қалдыру үшін түртіңіз",
+      "truncationBanner": "Өзгертілген {{total}} файлдың алғашқы {{limit}}-і көрсетілуде — GitHub API шегі"
     },
     "linkPasteClipboardEmpty": "Айырбастау буфері бос",
     "linkPasteNotAPullRequest": "GitHub pull request сілтемесі емес"
@@ -2145,7 +2146,10 @@
       "title": "Модельді таңдау",
       "searchPlaceholder": "Модельдерді іздеу...",
       "noModels": "Қолжетімді модельдер жоқ",
-      "noModelsDescription": "Таңдауға болатын модельдер жоқ."
+      "noModelsDescription": "Таңдауға болатын модельдер жоқ.",
+      "favorites": "Таңдаулылар",
+      "recommended": "Ұсынылған",
+      "allModels": "Барлық модельдер"
     },
     "modelSelector": {
       "model": "Модель",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Бұл сессиядан шығасыз ба?",
     "signOutThisSessionMessage": "{{device}} шығарылады. Ол бір сағатқа дейін API қолжетімділігін сақтай алады.",
     "signOutConfirm": "Шығу",
-    "signOutMessage": "Жұмыс кеңістігіне кіру үшін қайта кіру керек болады."
+    "signOutMessage": "Жұмыс кеңістігіне кіру үшін қайта кіру керек болады.",
+    "webBrowser": "Веб браузер"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Қосымшалар дүкенін ашу мүмкін болмады.",

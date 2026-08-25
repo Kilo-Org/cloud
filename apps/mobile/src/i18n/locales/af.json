@@ -519,6 +519,7 @@
     },
     "diff": {
       "selectedTapToChange": "Gekies {{label}}, tik om seleksie te verander",
+      "truncationBanner": "Wys die eerste {{limit}} van {{total}} veranderde lêers — GitHub API-limiet",
       "tapToComment": "{{label}}, tik om kommentaar te lewer"
     },
     "linkPasteClipboardEmpty": "Knipbord is leeg",
@@ -2144,7 +2145,10 @@
     "modelPicker": {
       "title": "Kies model",
       "searchPlaceholder": "Soek modelle...",
+      "allModels": "Alle modelle",
+      "favorites": "Gunstelinge",
       "noModels": "Geen modelle beskikbaar nie",
+      "recommended": "Aanbeveel",
       "noModelsDescription": "Geen modelle is beskikbaar om te kies nie."
     },
     "modelSelector": {
@@ -2306,6 +2310,7 @@
     "signedIn": "Aangeteken {{signedIn}} · Laas gesien {{lastSeen}}",
     "thisDevice": "Hierdie toestel",
     "title": "Toestelsessies",
+    "webBrowser": "Webblaaier",
     "viewProfile": "Bekyk profiel",
     "signOutThisDevice": "Teken hierdie toestel uit",
     "signOutThisSession": "Teken hierdie sessie uit",

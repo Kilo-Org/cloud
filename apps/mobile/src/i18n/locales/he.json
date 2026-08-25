@@ -1776,7 +1776,10 @@
       "title": "בחר דגם",
       "searchPlaceholder": "חפש דגמים...",
       "noModels": "אין דגמים זמינים",
-      "noModelsDescription": "אין דגמים זמינים לבחירה."
+      "noModelsDescription": "אין דגמים זמינים לבחירה.",
+      "favorites": "מועדפים",
+      "recommended": "מומלץ",
+      "allModels": "כל הדגמים"
     },
     "modelSelector": {
       "model": "דגם",
@@ -1946,7 +1949,8 @@
     "signOutThisSessionTitle": "להתנתק מההפעלה הזו?",
     "signOutThisSessionMessage": "{{device}} ינותק. הוא יכול לשמור על גישת API עד שעה.",
     "signOutConfirm": "התנתק",
-    "signOutMessage": "יהיה עליך להיכנס שוב כדי לגשת לסביבת העבודה שלך."
+    "signOutMessage": "יהיה עליך להיכנס שוב כדי לגשת לסביבת העבודה שלך.",
+    "webBrowser": "דפדפן"
   },
   "forceUpdate": {
     "couldNotOpenStore": "לא ניתן היה לפתוח את חנות האפליקציות.",
@@ -2564,7 +2568,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} נבחר, הקש כדי לשנות את הבחירה",
-      "tapToComment": "{{label}}, הקש כדי להגיב"
+      "tapToComment": "{{label}}, הקש כדי להגיב",
+      "truncationBanner": "מציג את {{limit}} הראשונים מתוך {{total}} קבצים ששונו — מגבלת API של GitHub"
     },
     "linkPasteClipboardEmpty": "הלוח ריק",
     "linkPasteNotAPullRequest": "לא קישור לבקשת משיכה ב-GitHub"

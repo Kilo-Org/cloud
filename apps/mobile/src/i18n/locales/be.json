@@ -533,6 +533,7 @@
     },
     "diff": {
       "selectedTapToChange": "Выбрана {{label}}, дакраніцеся, каб змяніць выбар",
+      "truncationBanner": "Паказаны першыя {{limit}} з {{total}} змененых файлаў — ліміт GitHub API",
       "tapToComment": "{{label}}, дакраніцеся, каб пакінуць каментар"
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты",
@@ -2178,7 +2179,10 @@
     "modelPicker": {
       "title": "Выбраць мадэль",
       "searchPlaceholder": "Пошук мадэляў...",
+      "allModels": "Усе мадэлі",
+      "favorites": "Абранае",
       "noModels": "Няма даступных мадэляў",
+      "recommended": "Рэкамендаваныя",
       "noModelsDescription": "Няма мадэляў для выбару."
     },
     "modelSelector": {
@@ -2342,6 +2346,7 @@
     "signedIn": "Уваход {{signedIn}} · Апошні візіт {{lastSeen}}",
     "thisDevice": "Гэтая прылада",
     "title": "Сеансы прылады",
+    "webBrowser": "Вэб-браўзер",
     "viewProfile": "Праглядзець профіль",
     "signOutThisDevice": "Выйсці з гэтай прылады",
     "signOutThisSession": "Выйсці з гэтага сеанса",

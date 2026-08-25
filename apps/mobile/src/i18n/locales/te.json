@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ఎంచుకోబడింది, ఎంపికను మార్చడానికి తాప్ చేయండి",
-      "tapToComment": "{{label}}, వ్యాఖ్య చేయడానికి తాప్ చేయండి"
+      "tapToComment": "{{label}}, వ్యాఖ్య చేయడానికి తాప్ చేయండి",
+      "truncationBanner": "మొదటి {{limit}} / {{total}} మార్చబడిన ఫైళ్లు చూపుతోంది — GitHub API పరిమితి"
     },
     "linkPasteClipboardEmpty": "క్లిప్బోర్డ్ ఖాళీగా ఉంది",
     "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు"
@@ -2145,7 +2146,10 @@
       "title": "మోడల్ను ఎంచుకోండి",
       "searchPlaceholder": "మోడల్లను శోధించండి...",
       "noModels": "ఏ మోడల్లు అందుబాటులో లేవు",
-      "noModelsDescription": "ఎంచుకోవడానికి ఏ మోడల్లు అందుబాటులో లేవు."
+      "noModelsDescription": "ఎంచుకోవడానికి ఏ మోడల్లు అందుబాటులో లేవు.",
+      "favorites": "ఇష్టమైనవి",
+      "recommended": "సిఫార్సు చేయబడినవి",
+      "allModels": "అన్ని మోడల్లు"
     },
     "modelSelector": {
       "model": "మోడల్",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionMessage": "{{device}} సైన్ అవుట్ చేయబడుతుంది. ఇది గంట వరకు API యాక్సెస్ను ఉంచుకోవచ్చు.",
     "signOutConfirm": "సైన్ అవుట్",
-    "signOutMessage": "మీ వర్క్స్పేస్ను యాక్సెస్ చేయడానికి మీరు మళ్లీ సైన్ ఇన్ చేయాలి."
+    "signOutMessage": "మీ వర్క్స్పేస్ను యాక్సెస్ చేయడానికి మీరు మళ్లీ సైన్ ఇన్ చేయాలి.",
+    "webBrowser": "వెబ్ బ్రౌజర్"
   },
   "forceUpdate": {
     "couldNotOpenStore": "యాప్ స్టోర్ను తెరవలేకపోయాము.",

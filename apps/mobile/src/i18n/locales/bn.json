@@ -519,6 +519,7 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} নির্বাচিত, নির্বাচন পরিবর্তন করতে আলতো চাপুন",
+      "truncationBanner": "পরিবর্তিত {{total}}টি ফাইলের মধ্যে প্রথম {{limit}}টি দেখানো হচ্ছে — GitHub API সীমা",
       "tapToComment": "{{label}}, মন্তব্য করতে আলতো চাপুন"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি",
@@ -2144,7 +2145,10 @@
     "modelPicker": {
       "title": "মডেল নির্বাচন করুন",
       "searchPlaceholder": "মডেল অনুসন্ধান করুন...",
+      "allModels": "সব মডেল",
+      "favorites": "প্রিয়",
       "noModels": "কোনো মডেল উপলব্ধ নেই",
+      "recommended": "সুপারিশকৃত",
       "noModelsDescription": "নির্বাচন করার মতো কোনো মডেল উপলব্ধ নেই।"
     },
     "modelSelector": {
@@ -2306,6 +2310,7 @@
     "signedIn": "সাইন ইন {{signedIn}} · সর্বশেষ দেখা {{lastSeen}}",
     "thisDevice": "এই ডিভাইস",
     "title": "ডিভাইস সেশন",
+    "webBrowser": "ওয়েব ব্রাউজার",
     "viewProfile": "প্রোফাইল দেখুন",
     "signOutThisDevice": "এই ডিভাইস থেকে সাইন আউট",
     "signOutThisSession": "এই সেশন থেকে সাইন আউট",

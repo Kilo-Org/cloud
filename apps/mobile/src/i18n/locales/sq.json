@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "E përzgjedhur {{label}}, prek për të ndryshuar përzgjedhjen",
-      "tapToComment": "{{label}}, prek për të komentuar"
+      "tapToComment": "{{label}}, prek për të komentuar",
+      "truncationBanner": "Duke shfaqur {{limit}}-in e parë nga {{total}} skedarë të ndryshuar — kufiri i API-së së GitHub"
     },
     "linkPasteClipboardEmpty": "Kujtesa është bosh",
     "linkPasteNotAPullRequest": "Nuk është një lidhje e pull request në GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Zgjidh modelin",
       "searchPlaceholder": "Kërko modele...",
       "noModels": "Nuk ka modele të disponueshme",
-      "noModelsDescription": "Nuk ka modele të disponueshme për të zgjedhur."
+      "noModelsDescription": "Nuk ka modele të disponueshme për të zgjedhur.",
+      "favorites": "Të preferuarat",
+      "recommended": "Të rekomanduara",
+      "allModels": "Të gjitha modelet"
     },
     "modelSelector": {
       "model": "Modeli",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Të dilni nga kjo seancë?",
     "signOutThisSessionMessage": "{{device}} do të dalë. Mund të mbajë akses API deri në një orë.",
     "signOutConfirm": "Dilni",
-    "signOutMessage": "Do t'ju duhet të hyni përsëri për të aksesuar hapësirën tuaj të punës."
+    "signOutMessage": "Do t'ju duhet të hyni përsëri për të aksesuar hapësirën tuaj të punës.",
+    "webBrowser": "Shfletuesi i uebit"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Dyqani i aplikacioneve nuk mund të hapej.",

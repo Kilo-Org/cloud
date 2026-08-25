@@ -526,7 +526,8 @@
     },
     "diff": {
       "selectedTapToChange": "Izabrano {{label}}, dodirnite da promenite izbor",
-      "tapToComment": "{{label}}, dodirnite da komentarišete"
+      "tapToComment": "{{label}}, dodirnite da komentarišete",
+      "truncationBanner": "Prikazuje se prvih {{limit}} od {{total}} izmenjenih fajlova — GitHub API limit"
     },
     "linkPasteClipboardEmpty": "Klipbord je prazan",
     "linkPasteNotAPullRequest": "Nije GitHub pull request link"
@@ -2162,7 +2163,10 @@
       "title": "Izaberi model",
       "searchPlaceholder": "Pretraži modele...",
       "noModels": "Nema dostupnih modela",
-      "noModelsDescription": "Nema dostupnih modela za izbor."
+      "noModelsDescription": "Nema dostupnih modela za izbor.",
+      "favorites": "Omiljeni",
+      "recommended": "Preporučeno",
+      "allModels": "Svi modeli"
     },
     "modelSelector": {
       "model": "Model",
@@ -2332,7 +2336,8 @@
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
     "signOutThisSessionMessage": "{{device}} će biti odjavljen. Može zadržati API pristup do jednog sata.",
     "signOutConfirm": "Odjavi se",
-    "signOutMessage": "Morat ćete se ponovo prijaviti da biste pristupili svom radnom prostoru."
+    "signOutMessage": "Morat ćete se ponovo prijaviti da biste pristupili svom radnom prostoru.",
+    "webBrowser": "Veb pregledač"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Otvaranje prodavnice aplikacija nije uspelo.",

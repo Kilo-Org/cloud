@@ -533,6 +533,7 @@
     },
     "diff": {
       "selectedTapToChange": "Vybráno {{label}}, klepnutím změníte výběr",
+      "truncationBanner": "Zobrazuje se prvních {{limit}} z {{total}} změněných souborů — limit rozhraní GitHub API",
       "tapToComment": "{{label}}, klepnutím okomentujete"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná",
@@ -2178,7 +2179,10 @@
     "modelPicker": {
       "title": "Vyberte model",
       "searchPlaceholder": "Hledat modely...",
+      "allModels": "Všechny modely",
+      "favorites": "Oblíbené",
       "noModels": "Žádné modely nejsou k dispozici",
+      "recommended": "Doporučené",
       "noModelsDescription": "K výběru nejsou k dispozici žádné modely."
     },
     "modelSelector": {
@@ -2342,6 +2346,7 @@
     "signedIn": "Přihlášeno {{signedIn}} · Naposledy viděno {{lastSeen}}",
     "thisDevice": "Toto zařízení",
     "title": "Relace zařízení",
+    "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
     "signOutThisDevice": "Odhlásit toto zařízení",
     "signOutThisSession": "Odhlásit tuto relaci",

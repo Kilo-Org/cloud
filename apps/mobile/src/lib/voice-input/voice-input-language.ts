@@ -27,6 +27,13 @@ function normalizeLocale(tag: string): string {
   return tag.toLowerCase().replaceAll('_', '-');
 }
 
+function scriptSubtag(tag: string): string | undefined {
+  return normalizeLocale(tag)
+    .split('-')
+    .slice(1)
+    .find(part => part.length === 4);
+}
+
 /**
  * Pick the best supported voice-input language tag from the device's
  * preferred-language list. Returns the matched tag in the spelling used by
@@ -39,10 +46,11 @@ function normalizeLocale(tag: string): string {
  *   a. Exact normalized match in `supportedTags` → return it.
  *   b. Same-language fallback among `supportedTags` sharing the primary
  *      language subtag, with these tie-breaks in order:
- *        i.  Eponymous region: `<lang>-<LANG>` as a plain string rule
+ *        i.  The same script subtag, when the device tag has one.
+ *        ii. Eponymous region: `<lang>-<LANG>` as a plain string rule
  *            (e.g. `de`→`de-DE`, `fr`→`fr-FR`).
- *        ii. `<lang>-US` if present.
- *        iii. Otherwise the first candidate in `supportedTags` order.
+ *        iii. `<lang>-US` if present.
+ *        iv. Otherwise the first candidate in `supportedTags` order.
  *
  * No match for any device tag → `null`.
  */
@@ -66,19 +74,27 @@ export function pickSupportedVoiceInputLanguageTag(
       const [deviceLang] = deviceTag.split('-');
       const sameLang = normalized.filter(([n]) => n.split('-')[0] === deviceLang);
       if (sameLang.length > 0) {
-        // i. Eponymous region: <lang>-<LANG>
+        const deviceScript = scriptSubtag(deviceTag);
+        const sameScript = deviceScript
+          ? sameLang.find(([n]) => scriptSubtag(n) === deviceScript)
+          : undefined;
+        if (sameScript) {
+          return sameScript[1];
+        }
+
+        // ii. Eponymous region: <lang>-<LANG>
         const eponymous = sameLang.find(([n]) => n === `${deviceLang}-${deviceLang}`.toLowerCase());
         if (eponymous) {
           return eponymous[1];
         }
 
-        // ii. <lang>-US
+        // iii. <lang>-US
         const usVariant = sameLang.find(([n]) => n === `${deviceLang}-us`);
         if (usVariant) {
           return usVariant[1];
         }
 
-        // iii. First candidate in supportedTags order
+        // iv. First candidate in supportedTags order
         const first = sameLang[0];
         if (first) {
           return first[1];
@@ -121,10 +137,12 @@ export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Pr
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: guards against a real-device value diverging from expo-localization's static type.
     .filter((t): t is string => typeof t === 'string' && t.length > 0);
   const language = normalizeLocale(appLanguage).split('-')[0];
-  const preferredTags = [
-    ...deviceTags.filter(tag => normalizeLocale(tag).split('-')[0] === language),
-    appLanguage,
-  ];
+  const matchingDeviceTags = deviceTags.filter(
+    tag => normalizeLocale(tag).split('-')[0] === language
+  );
+  const preferredTags = scriptSubtag(appLanguage)
+    ? [appLanguage, ...matchingDeviceTags]
+    : [...matchingDeviceTags, appLanguage];
 
   const supported = await fetchSupportedLanguageTags();
   if (!supported || supported.length === 0) {

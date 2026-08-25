@@ -1786,7 +1786,10 @@
       "title": "Вибрати модель",
       "searchPlaceholder": "Пошук моделей...",
       "noModels": "Немає доступних моделей",
-      "noModelsDescription": "Немає доступних моделей для вибору."
+      "noModelsDescription": "Немає доступних моделей для вибору.",
+      "allModels": "Усі моделі",
+      "favorites": "Обрані",
+      "recommended": "Рекомендовані"
     },
     "modelSelector": {
       "model": "Модель",
@@ -1948,6 +1951,7 @@
     "onlyKiloAppSignIns": "Тут відображаються лише входи в застосунок Kilo. Входи редактора та CLI не вказано.",
     "signedIn": "Вхід {{signedIn}} · Востаннє бачили {{lastSeen}}",
     "thisDevice": "Цей пристрій",
+    "webBrowser": "Веб-браузер",
     "title": "Сеанси пристроїв",
     "viewProfile": "Переглянути профіль",
     "signOutThisDevice": "Вийти з цього пристрою",
@@ -2582,7 +2586,8 @@
     },
     "diff": {
       "selectedTapToChange": "Вибрано {{label}}, торкніться, щоб змінити вибір",
-      "tapToComment": "{{label}}, торкніться, щоб додати коментар"
+      "tapToComment": "{{label}}, торкніться, щоб додати коментар",
+      "truncationBanner": "Показано перші {{limit}} зі {{total}} змінених файлів — обмеження GitHub API"
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній",
     "linkPasteNotAPullRequest": "Це не посилання на pull request GitHub"

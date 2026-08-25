@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} hautatuta, sakatu hautaketa aldatzeko",
-      "tapToComment": "{{label}}, sakatu iruzkintzeko"
+      "tapToComment": "{{label}}, sakatu iruzkintzeko",
+      "truncationBanner": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten — GitHub API muga"
     },
     "linkPasteClipboardEmpty": "Arbel hutsik dago",
     "linkPasteNotAPullRequest": "Ez da GitHub-en pull request esteka bat"
@@ -2145,7 +2146,10 @@
       "title": "Hautatu modeloa",
       "searchPlaceholder": "Bilatu modeloak...",
       "noModels": "Ez dago modelorik erabilgarri",
-      "noModelsDescription": "Ez dago hautatzeko moduko modelorik."
+      "noModelsDescription": "Ez dago hautatzeko moduko modelorik.",
+      "favorites": "Gogokoak",
+      "recommended": "Gomendatuak",
+      "allModels": "Modelo guztiak"
     },
     "modelSelector": {
       "model": "Modeloa",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Itxi saio hau?",
     "signOutThisSessionMessage": "{{device}} saioa itxiko da. Ordubetez gorde dezake API sarbidea.",
     "signOutConfirm": "Itxi saioa",
-    "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa."
+    "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
+    "webBrowser": "Web arakatzailea"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ezin izan da aplikazio-denda ireki.",

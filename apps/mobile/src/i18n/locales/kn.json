@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ಆಯ್ಕೆಮಾಡಲಾಗಿದೆ, ಆಯ್ಕೆ ಬದಲಾಯಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
-      "tapToComment": "{{label}}, ಕಾಮೆಂಟ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ"
+      "tapToComment": "{{label}}, ಕಾಮೆಂಟ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
+      "truncationBanner": "ಬದಲಾದ {{total}} ಫೈಲ್ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ತೋರಿಸಲಾಗುತ್ತಿದೆ — GitHub API ಮಿತಿ"
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ",
     "linkPasteNotAPullRequest": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ"
@@ -2145,7 +2146,10 @@
       "title": "ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ",
       "searchPlaceholder": "ಮಾದರಿಗಳನ್ನು ಹುಡುಕಿ...",
       "noModels": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
-      "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ."
+      "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      "favorites": "ಮೆಚ್ಚಿನವುಗಳು",
+      "recommended": "ಶಿಫಾರಸು ಮಾಡಲಾದ",
+      "allModels": "ಎಲ್ಲಾ ಮಾದರಿಗಳು"
     },
     "modelSelector": {
       "model": "ಮಾದರಿ",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ಈ ಸೆಷನ್ನಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡುವುದೇ?",
     "signOutThisSessionMessage": "{{device}} ಸೈನ್ ಔಟ್ ಆಗುತ್ತದೆ. ಇದು ಒಂದು ಗಂಟೆಯವರೆಗೆ API ಪ್ರವೇಶವನ್ನು ಹೊಂದಬಹುದು.",
     "signOutConfirm": "ಸೈನ್ ಔಟ್",
-    "signOutMessage": "ನಿಮ್ಮ ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಪ್ರವೇಶಿಸಲು ನೀವು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕಾಗುತ್ತದೆ."
+    "signOutMessage": "ನಿಮ್ಮ ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಪ್ರವೇಶಿಸಲು ನೀವು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕಾಗುತ್ತದೆ.",
+    "webBrowser": "ವೆಬ್ ಬ್ರೌಸರ್"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ಅಪ್ ಸ್ಟೋರ್ ಅನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

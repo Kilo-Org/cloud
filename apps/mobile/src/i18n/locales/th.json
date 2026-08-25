@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "เลือก {{label}} แล้ว แตะเพื่อเปลี่ยนการเลือก",
-      "tapToComment": "{{label}}, แตะเพื่อแสดงความคิดเห็น"
+      "tapToComment": "{{label}}, แตะเพื่อแสดงความคิดเห็น",
+      "truncationBanner": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์คำขอดึงของ GitHub"
@@ -2145,7 +2146,10 @@
       "title": "เลือกโมเดล",
       "searchPlaceholder": "ค้นหาโมเดล...",
       "noModels": "ไม่มีโมเดลพร้อมใช้งาน",
-      "noModelsDescription": "ไม่มีโมเดลให้เลือก"
+      "noModelsDescription": "ไม่มีโมเดลให้เลือก",
+      "favorites": "รายการโปรด",
+      "recommended": "แนะนำ",
+      "allModels": "โมเดลทั้งหมด"
     },
     "modelSelector": {
       "model": "โมเดล",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ออกจากระบบเซสชันนี้หรือไม่?",
     "signOutThisSessionMessage": "{{device}} จะถูกออกจากระบบ โดยสามารถเข้าถึง API ได้นานถึงหนึ่งชั่วโมง",
     "signOutConfirm": "ออกจากระบบ",
-    "signOutMessage": "คุณจะต้องลงชื่อเข้าใหม่อีกครั้งเพื่อเข้าถึงพื้นที่ทำงานของคุณ"
+    "signOutMessage": "คุณจะต้องลงชื่อเข้าใหม่อีกครั้งเพื่อเข้าถึงพื้นที่ทำงานของคุณ",
+    "webBrowser": "เว็บเบราว์เซอร์"
   },
   "forceUpdate": {
     "couldNotOpenStore": "เปิด App Store ไม่สำเร็จ",

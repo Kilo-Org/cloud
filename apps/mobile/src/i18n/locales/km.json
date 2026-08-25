@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "បានជ្រើសរើស {{label}} ប៉ះដើម្បីប្តូរការជ្រើសរើស",
-      "tapToComment": "{{label}} ប៉ះដើម្បីធ្វើអត្ថាធិប្បាយ"
+      "tapToComment": "{{label}} ប៉ះដើម្បីធ្វើអត្ថាធិប្បាយ",
+      "truncationBanner": "កំពុងបង្ហាញ {{limit}} ដំបូងក្នុងចំណោម {{total}} ឯកសារដែលបានផ្លាស់ប្តូរ — ដែនកំណត់ GitHub API"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ",
     "linkPasteNotAPullRequest": "មិនមែនជាតំណ pull request របស់ GitHub ទេ"
@@ -2145,7 +2146,10 @@
       "title": "ជ្រើសរើសម៉ូដែល",
       "searchPlaceholder": "ស្វែងរកម៉ូដែល...",
       "noModels": "គ្មានម៉ូដែលអាចប្រើបានទេ",
-      "noModelsDescription": "គ្មានម៉ូដែលណាអាចជ្រើសរើសបានទេ។"
+      "noModelsDescription": "គ្មានម៉ូដែលណាអាចជ្រើសរើសបានទេ។",
+      "favorites": "ចំណូលចិត្ត",
+      "recommended": "បានណែនាំ",
+      "allModels": "គ្រប់ម៉ូដែល"
     },
     "modelSelector": {
       "model": "ម៉ូដែល",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ចេញពីគណនីវគ្គនេះ?",
     "signOutThisSessionMessage": "{{device}} នឹងត្រូវបានចេញពីគណនី។ វាអាចរក្សាការចូលប្រើ API រហូតដល់មួយម៉ោង។",
     "signOutConfirm": "ចេញពីគណនី",
-    "signOutMessage": "អ្នកនឹងត្រូវចូលគណនីម្តងទៀតដើម្បីចូលប្រើ workspace របស់អ្នក។"
+    "signOutMessage": "អ្នកនឹងត្រូវចូលគណនីម្តងទៀតដើម្បីចូលប្រើ workspace របស់អ្នក។",
+    "webBrowser": "កម្មវិធីរុករកវេប"
   },
   "forceUpdate": {
     "couldNotOpenStore": "មិនអាចបើកហាងកម្មវិធីបានទេ។",

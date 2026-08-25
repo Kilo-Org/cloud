@@ -526,7 +526,8 @@
     },
     "diff": {
       "selectedTapToChange": "Atlasīts {{label}}, pieskarieties, lai mainītu atlasi",
-      "tapToComment": "{{label}}, pieskarieties, lai komentētu"
+      "tapToComment": "{{label}}, pieskarieties, lai komentētu",
+      "truncationBanner": "Tiek rādīti pirmie {{limit}} no {{total}} mainītajiem failiem — GitHub API ierobežojums"
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša",
     "linkPasteNotAPullRequest": "Nav GitHub pieprasījuma saite"
@@ -2162,7 +2163,10 @@
       "title": "Izvēlēties modeli",
       "searchPlaceholder": "Meklēt modeļus...",
       "noModels": "Nav pieejamu modeļu",
-      "noModelsDescription": "Nav pieejamu modeļu, ko izvēlēties."
+      "noModelsDescription": "Nav pieejamu modeļu, ko izvēlēties.",
+      "favorites": "Izlase",
+      "recommended": "Ieteicamais",
+      "allModels": "Visi modeļi"
     },
     "modelSelector": {
       "model": "Modelis",
@@ -2325,6 +2329,7 @@
     "thisDevice": "Šī ierīce",
     "title": "Ierīču sesijas",
     "viewProfile": "Skatīt profilu",
+    "webBrowser": "Tīmekļa pārlūks",
     "signOutThisDevice": "Izrakstīties no šīs ierīces",
     "signOutThisSession": "Izrakstīties no šīs sesijas",
     "sessionSignedOut": "Sesija izrakstīta.",

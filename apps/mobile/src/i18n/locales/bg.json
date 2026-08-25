@@ -519,6 +519,7 @@
     },
     "diff": {
       "selectedTapToChange": "Избрано {{label}}, докосни, за да промениш избора",
+      "truncationBanner": "Показват се първите {{limit}} от {{total}} променени файла — лимит на GitHub API",
       "tapToComment": "{{label}}, докосни, за да коментираш"
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен",
@@ -2144,7 +2145,10 @@
     "modelPicker": {
       "title": "Изберете модел",
       "searchPlaceholder": "Търсене на модели...",
+      "allModels": "Всички модели",
+      "favorites": "Любими",
       "noModels": "Няма налични модели",
+      "recommended": "Препоръчани",
       "noModelsDescription": "Няма налични модели за избор."
     },
     "modelSelector": {
@@ -2306,6 +2310,7 @@
     "signedIn": "Вписан {{signedIn}} · Виждан за последно {{lastSeen}}",
     "thisDevice": "Това устройство",
     "title": "Сесии на устройства",
+    "webBrowser": "Уеб браузър",
     "viewProfile": "Вижте профила",
     "signOutThisDevice": "Излезте от това устройство",
     "signOutThisSession": "Излезте от тази сесия",

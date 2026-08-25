@@ -519,7 +519,7 @@ describe('buildSessionModelOptions capacity projection', () => {
       buildModelPickerRows({ models: result.options, search: '', favoriteIds: new Set() })
         .filter(row => row.type === 'header')
         .map(row => row.title)
-    ).toEqual(['RECOMMENDED', 'ALL MODELS']);
+    ).toEqual(['Recommended', 'All models']);
   });
 
   it('projects Cloud Agent Gateway context_length onto every option', () => {

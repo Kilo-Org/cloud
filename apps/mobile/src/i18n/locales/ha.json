@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "An zaɓi {{label}}, danna don canza zaɓi",
-      "tapToComment": "{{label}}, danna don tsokaci"
+      "tapToComment": "{{label}}, danna don tsokaci",
+      "truncationBanner": "Ana nuna farkon {{limit}} na {{total}} fayilolin da aka canza — iyakar GitHub API"
     },
     "linkPasteClipboardEmpty": "Allon kwafi babu kome",
     "linkPasteNotAPullRequest": "Ba hanyar GitHub pull request ba"
@@ -2145,7 +2146,10 @@
       "title": "Zaɓi model",
       "searchPlaceholder": "Nemo models...",
       "noModels": "Babu models da ake da su",
-      "noModelsDescription": "Babu models da za a zaɓa."
+      "noModelsDescription": "Babu models da za a zaɓa.",
+      "favorites": "Waɗanda ake so",
+      "recommended": "An ba da shawara",
+      "allModels": "Duk samfuran"
     },
     "modelSelector": {
       "model": "Model",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Fita daga wannan zaman?",
     "signOutThisSessionMessage": "Za a fitar da {{device}}. Za ta iya riƙe damar API na har awa ɗaya.",
     "signOutConfirm": "Fita",
-    "signOutMessage": "Za ka buƙaci sake shiga don samun damar sararin aikinka."
+    "signOutMessage": "Za ka buƙaci sake shiga don samun damar sararin aikinka.",
+    "webBrowser": "Browser na yanar gizo"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ba a iya buɗe kantin apps ba.",

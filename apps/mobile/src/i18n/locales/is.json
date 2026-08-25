@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Valið {{label}}, bankaðu til að breyta vali",
-      "tapToComment": "{{label}}, bankaðu til að skrifa athugasemd"
+      "tapToComment": "{{label}}, bankaðu til að skrifa athugasemd",
+      "truncationBanner": "Sýni fyrstu {{limit}} af {{total}} breyttum skrám — GitHub API takmörk"
     },
     "linkPasteClipboardEmpty": "Klippiborð er tómt",
     "linkPasteNotAPullRequest": "Ekki GitHub pull request hlekkur"
@@ -2145,7 +2146,10 @@
       "title": "Veldu líkan",
       "searchPlaceholder": "Leita að líkönum...",
       "noModels": "Engin líkön tiltæk",
-      "noModelsDescription": "Engin líkön eru tiltæk til vals."
+      "noModelsDescription": "Engin líkön eru tiltæk til vals.",
+      "favorites": "Eftirlæti",
+      "recommended": "Mælt með",
+      "allModels": "Allar líkön"
     },
     "modelSelector": {
       "model": "Líkan",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Skrá þessa lotu út?",
     "signOutThisSessionMessage": "{{device}} verður skráð út. Það getur haldið API-aðgangi í allt að klukkustund.",
     "signOutConfirm": "Skrá út",
-    "signOutMessage": "Þú þarft að skrá þig inn aftur til að fá aðgang að vinnusvæðinu þínu."
+    "signOutMessage": "Þú þarft að skrá þig inn aftur til að fá aðgang að vinnusvæðinu þínu.",
+    "webBrowser": "Vafri"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ekki tókst að opna app-verslunina.",

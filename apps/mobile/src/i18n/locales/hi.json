@@ -1732,7 +1732,10 @@
       "title": "मॉडल चुनें",
       "searchPlaceholder": "मॉडल खोजें...",
       "noModels": "कोई मॉडल उपलब्ध नहीं",
-      "noModelsDescription": "चुनने के लिए कोई मॉडल उपलब्ध नहीं है।"
+      "noModelsDescription": "चुनने के लिए कोई मॉडल उपलब्ध नहीं है।",
+      "favorites": "पसंदीदा",
+      "recommended": "अनुशंसित",
+      "allModels": "सभी मॉडल"
     },
     "modelSelector": {
       "model": "मॉडल",
@@ -1935,7 +1938,8 @@
     "signOutThisSessionTitle": "इस सत्र को साइन आउट करें?",
     "signOutThisSessionMessage": "{{device}} साइन आउट हो जाएगा। यह एक घंटे तक API पहुँच रख सकता है।",
     "signOutConfirm": "साइन आउट करें",
-    "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।"
+    "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
+    "webBrowser": "वेब ब्राउज़र"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ऐप स्टोर नहीं खुल सका।",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} चुना गया, चयन बदलने के लिए टैप करें",
-      "tapToComment": "{{label}}, टिप्पणी करने के लिए टैप करें"
+      "tapToComment": "{{label}}, टिप्पणी करने के लिए टैप करें",
+      "truncationBanner": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API सीमा"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है",
     "linkPasteNotAPullRequest": "यह GitHub पुल रिक्वेस्ट लिंक नहीं है"

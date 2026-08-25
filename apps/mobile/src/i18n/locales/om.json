@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} filatame, filannoo jijjiiruuf tuqi",
-      "tapToComment": "{{label}}, yaada kennuuf tuqi"
+      "tapToComment": "{{label}}, yaada kennuuf tuqi",
+      "truncationBanner": "Faayiloota jijjiramaniin walii {{total}} keessaa isaan jalqabaa {{limit}} agarsiifamaa jira — GitHub API daangaa"
     },
     "linkPasteClipboardEmpty": "Kibirri duwwaa dha",
     "linkPasteNotAPullRequest": "Hidhaa pull request GitHub hin taane"
@@ -2144,8 +2145,11 @@
     "modelPicker": {
       "title": "Moodela filadhu",
       "searchPlaceholder": "Moodeloota barbaadi...",
+      "allModels": "Modeeloota hundumaa",
+      "favorites": "Jaallatamoota",
       "noModels": "Moodela hin jiru",
-      "noModelsDescription": "Moodela filachuuf argame hin jiru."
+      "noModelsDescription": "Moodela filachuuf argame hin jiru.",
+      "recommended": "Gorfame"
     },
     "modelSelector": {
       "model": "Moodela",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Shumarra kana baasaa?",
     "signOutThisSessionMessage": "{{device}} ni bahama. Gara sa'aatii tokkoof hirama API eeguu ni danda'a.",
     "signOutConfirm": "Bahi",
-    "signOutMessage": "Warshada kee gahuuf ammas seenuu qabda."
+    "signOutMessage": "Warshada kee gahuuf ammas seenuu qabda.",
+    "webBrowser": "Braawzarii weebii"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Suuqa app banuu hin danda'ine.",

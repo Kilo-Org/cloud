@@ -526,6 +526,7 @@
     },
     "diff": {
       "selectedTapToChange": "Odabrano {{label}}, dodirnite za promjenu odabira",
+      "truncationBanner": "Prikazano je prvih {{limit}} od {{total}} promijenjenih datoteka — GitHub API ograničenje",
       "tapToComment": "{{label}}, dodirnite za komentar"
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan",
@@ -2161,7 +2162,10 @@
     "modelPicker": {
       "title": "Odaberi model",
       "searchPlaceholder": "Pretraži modele...",
+      "allModels": "Svi modeli",
+      "favorites": "Omiljeni",
       "noModels": "Nema dostupnih modela",
+      "recommended": "Preporučeno",
       "noModelsDescription": "Nijedan model nije dostupan za odabir."
     },
     "modelSelector": {
@@ -2324,6 +2328,7 @@
     "signedIn": "Prijavljen {{signedIn}} · Zadnji put viđen {{lastSeen}}",
     "thisDevice": "Ovaj uređaj",
     "title": "Sesije uređaja",
+    "webBrowser": "Web preglednik",
     "viewProfile": "Pogledaj profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
     "signOutThisSession": "Odjavi ovu sesiju",

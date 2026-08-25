@@ -1766,7 +1766,10 @@
       "title": "Chọn mô hình",
       "searchPlaceholder": "Tìm kiếm mô hình...",
       "noModels": "Không có mô hình khả dụng",
-      "noModelsDescription": "Không có mô hình nào để chọn."
+      "noModelsDescription": "Không có mô hình nào để chọn.",
+      "allModels": "Tất cả mô hình",
+      "favorites": "Mục yêu thích",
+      "recommended": "Được đề xuất"
     },
     "modelSelector": {
       "model": "Mô hình",
@@ -1926,6 +1929,7 @@
     "onlyKiloAppSignIns": "Chỉ các lần đăng nhập ứng dụng Kilo xuất hiện tại đây. Đăng nhập Editor và CLI không được liệt kê.",
     "signedIn": "Đã đăng nhập {{signedIn}} · Lần cuối hoạt động {{lastSeen}}",
     "thisDevice": "Thiết bị này",
+    "webBrowser": "Trình duyệt web",
     "title": "Phiên thiết bị",
     "viewProfile": "Xem hồ sơ",
     "signOutThisDevice": "Đăng xuất thiết bị này",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "Đã chọn {{label}}, chạm để đổi lựa chọn",
-      "tapToComment": "{{label}}, chạm để bình luận"
+      "tapToComment": "{{label}}, chạm để bình luận",
+      "truncationBanner": "Hiển thị {{limit}} tệp đã thay đổi đầu tiên trong tổng số {{total}} — giới hạn API của GitHub"
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống",
     "linkPasteNotAPullRequest": "Không phải là liên kết yêu cầu kéo GitHub"

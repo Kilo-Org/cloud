@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} தேர்ந்தெடுக்கப்பட்டது, தேர்வை மாற்ற தட்டவும்",
-      "tapToComment": "{{label}}, கருத்து தெரிவிக்க தட்டவும்"
+      "tapToComment": "{{label}}, கருத்து தெரிவிக்க தட்டவும்",
+      "truncationBanner": "மாற்றப்பட்ட {{total}} கோப்புகளில் முதல் {{limit}} காட்டப்படுகின்றன — GitHub API வரம்பு"
     },
     "linkPasteClipboardEmpty": "கிளிப்போர்டு காலியாக உள்ளது",
     "linkPasteNotAPullRequest": "GitHub புல் ரீக்வெஸ்ட் இணைப்பு இல்லை"
@@ -2145,7 +2146,10 @@
       "title": "மாதிரியைத் தேர்ந்தெடுக்கவும்",
       "searchPlaceholder": "மாதிரிகளைத் தேடு...",
       "noModels": "மாதிரிகள் இல்லை",
-      "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை."
+      "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை.",
+      "favorites": "பிடித்தவை",
+      "recommended": "பரிந்துரைக்கப்பட்டவை",
+      "allModels": "அனைத்து மாதிரிகள்"
     },
     "modelSelector": {
       "model": "மாதிரி",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "இந்த அமர்விலிருந்து வெளியேறவா?",
     "signOutThisSessionMessage": "{{device}} வெளியேற்றப்படும். இது ஒரு மணி நேரம் வரை API அணுகலை வைத்திருக்க முடியும்.",
     "signOutConfirm": "வெளியேறு",
-    "signOutMessage": "உங்கள் பணியிடத்தை அணுக மீண்டும் உள்நுழைய வேண்டும்."
+    "signOutMessage": "உங்கள் பணியிடத்தை அணுக மீண்டும் உள்நுழைய வேண்டும்.",
+    "webBrowser": "இணைய உலாவி"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ஆப் ஸ்டோரைத் திறக்க முடியவில்லை.",

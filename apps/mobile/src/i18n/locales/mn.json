@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Сонгосон {{label}}, сонголтыг өөрчлөхийн тулд товшино уу",
-      "tapToComment": "{{label}}, сэтгэгдэл бичихийн тулд товшино уу"
+      "tapToComment": "{{label}}, сэтгэгдэл бичихийн тулд товшино уу",
+      "truncationBanner": "Өөрчлөгдсөн {{total}} файлаас эхний {{limit}}-ыг харуулж байна — GitHub API хязгаар"
     },
     "linkPasteClipboardEmpty": "Хуулбар самбар хоосон байна",
     "linkPasteNotAPullRequest": "Энэ нь GitHub pull request холбоос биш"
@@ -2145,7 +2146,10 @@
       "title": "Загвар сонгох",
       "searchPlaceholder": "Загвар хайх...",
       "noModels": "Загвар байхгүй",
-      "noModelsDescription": "Сонгох боломжтой загвар алга."
+      "noModelsDescription": "Сонгох боломжтой загвар алга.",
+      "favorites": "Дуртай",
+      "recommended": "Санал болгосон",
+      "allModels": "Бүх загварууд"
     },
     "modelSelector": {
       "model": "Загвар",
@@ -2307,6 +2311,7 @@
     "thisDevice": "Энэ төхөөрөмж",
     "title": "Төхөөрөмжийн сессий",
     "viewProfile": "Профайл үзэх",
+    "webBrowser": "Вэб хөтөч",
     "signOutThisDevice": "Энэ төхөөрөмжөөс гарах",
     "signOutThisSession": "Энэ сессийг гарах",
     "sessionSignedOut": "Сессий гараад дууссан.",

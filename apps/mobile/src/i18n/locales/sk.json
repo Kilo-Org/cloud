@@ -533,7 +533,8 @@
     },
     "diff": {
       "selectedTapToChange": "Vybrané {{label}}, klepnutím zmeníte výber",
-      "tapToComment": "{{label}}, klepnutím komentujete"
+      "tapToComment": "{{label}}, klepnutím komentujete",
+      "truncationBanner": "Zobrazuje sa prvých {{limit}} z {{total}} zmenených súborov — limit GitHub API"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna",
     "linkPasteNotAPullRequest": "Nie je to odkaz na GitHub pull request"
@@ -2179,7 +2180,10 @@
       "title": "Vybrať model",
       "searchPlaceholder": "Hľadať modely...",
       "noModels": "Nie sú k dispozícii žiadne modely",
-      "noModelsDescription": "Nie sú k dispozícii žiadne modely na výber."
+      "noModelsDescription": "Nie sú k dispozícii žiadne modely na výber.",
+      "favorites": "Obľúbené",
+      "recommended": "Odporúčané",
+      "allModels": "Všetky modely"
     },
     "modelSelector": {
       "model": "Model",
@@ -2350,7 +2354,8 @@
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "{{device}} bude odhlásený. Môže si ponechať prístup k API až hodinu.",
     "signOutConfirm": "Odhlásiť",
-    "signOutMessage": "Ak chcete pristupovať k svojmu pracovnému priestoru, budete sa musieť znova prihlásiť."
+    "signOutMessage": "Ak chcete pristupovať k svojmu pracovnému priestoru, budete sa musieť znova prihlásiť.",
+    "webBrowser": "Webový prehliadač"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Obchod s aplikáciami sa nepodarilo otvoriť.",

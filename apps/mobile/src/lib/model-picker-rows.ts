@@ -1,4 +1,5 @@
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { i18n } from '@/i18n';
 
 export type ModelPickerRow =
   | { key: string; title: string; type: 'header' }
@@ -90,7 +91,11 @@ export function buildModelPickerRows({
   const rows: ModelPickerRow[] = [];
 
   if (favorites.length > 0) {
-    rows.push({ key: 'favorites', title: 'FAVORITES', type: 'header' });
+    rows.push({
+      key: 'favorites',
+      title: i18n.t('agentChat.modelPicker.favorites'),
+      type: 'header',
+    });
     for (const model of favorites) {
       rows.push({ key: `model:${model.id}`, model, isFavorite: true, type: 'model' });
     }
@@ -132,7 +137,7 @@ function groupForModel(model: SessionModelOption): Pick<ModelGroup, 'key' | 'tit
     };
   }
   if (model.isPreferred) {
-    return { key: 'recommended', title: 'RECOMMENDED' };
+    return { key: 'recommended', title: i18n.t('agentChat.modelPicker.recommended') };
   }
-  return { key: 'all', title: 'ALL MODELS' };
+  return { key: 'all', title: i18n.t('agentChat.modelPicker.allModels') };
 }

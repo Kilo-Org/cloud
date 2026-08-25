@@ -33,7 +33,10 @@ let usesSegmenterPolyfill = false;
 let usesLocalePolyfill = false;
 
 function localeOrEnglish(locale: string): string {
-  return locale || 'en';
+  if (!locale) {
+    return 'en';
+  }
+  return locale === 'pt' ? 'pt-PT' : locale;
 }
 
 function localeDataLanguage(locale: string): SupportedLanguage {
@@ -104,10 +107,11 @@ export function dateTimeFormat(
   locale: Intl.LocalesArgument,
   options: Intl.DateTimeFormatOptions
 ): Intl.DateTimeFormat {
-  const key = `${JSON.stringify(locale)}|${JSON.stringify(options)}`;
+  const activeLocale = locale === 'pt' ? 'pt-PT' : locale;
+  const key = `${JSON.stringify(activeLocale)}|${JSON.stringify(options)}`;
   let format = dateTimeFormats.get(key);
   if (!format) {
-    format = new Intl.DateTimeFormat(locale, options);
+    format = new Intl.DateTimeFormat(activeLocale, options);
     dateTimeFormats.set(key, format);
   }
   return format;
@@ -184,4 +188,12 @@ export function segmenter(locale: string, options: Intl.SegmenterOptions): Intl.
     segmenters.set(key, format);
   }
   return format;
+}
+
+export function prewarmIntl(locale: string): void {
+  numberFormat(locale, {});
+  listFormat(locale, { type: 'conjunction' });
+  relativeTimeFormat(locale, { numeric: 'auto' });
+  durationFormat(locale, { style: 'short' });
+  segmenter(locale, { granularity: 'grapheme' });
 }

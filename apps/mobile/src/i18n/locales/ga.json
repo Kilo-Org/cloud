@@ -540,7 +540,8 @@
     },
     "diff": {
       "selectedTapToChange": "Roghnaithe {{label}}, tapáil chun an roghnú a athrú",
-      "tapToComment": "{{label}}, tapáil chun trácht a dhéanamh"
+      "tapToComment": "{{label}}, tapáil chun trácht a dhéanamh",
+      "truncationBanner": "Ag taispeáint an chéad {{limit}} de na {{total}} chomhad athraithe — teorainn API GitHub"
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh",
     "linkPasteNotAPullRequest": "Ní nasc pull request GitHub é seo"
@@ -2196,7 +2197,10 @@
       "title": "Roghnaigh samhail",
       "searchPlaceholder": "Cuardaigh samhlacha...",
       "noModels": "Níl aon samhlacha ar fáil",
-      "noModelsDescription": "Níl aon samhlacha ar fáil le roghnú."
+      "noModelsDescription": "Níl aon samhlacha ar fáil le roghnú.",
+      "favorites": "Cinn is fearr leat",
+      "recommended": "Molta",
+      "allModels": "Gach múnla"
     },
     "modelSelector": {
       "model": "Samhail",
@@ -2368,7 +2372,8 @@
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",
     "signOutThisSessionMessage": "Beidh {{device}} sínithe amach. Is féidir rochtain API a choinneáil aige ar feadh uair an chloig ar a mhéad.",
     "signOutConfirm": "Sínigh amach",
-    "signOutMessage": "Beidh ort síniú isteach arís le rochtain a fháil ar do spás oibre."
+    "signOutMessage": "Beidh ort síniú isteach arís le rochtain a fháil ar do spás oibre.",
+    "webBrowser": "Brabhsálaí gréasáin"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Níorbh fhéidir an siopa aip a oscailt.",

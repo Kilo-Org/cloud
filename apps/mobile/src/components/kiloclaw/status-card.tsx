@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
+import { statusLabel } from '@/components/kiloclaw/status-badge';
 import { i18n } from '@/i18n';
 import { formatDuration, formatNumber } from '@/lib/format';
 import { type GatewayState } from '@/lib/hooks/use-kiloclaw-queries';
@@ -57,7 +58,7 @@ export function StatusCard({
     : '—';
   const cpuLabel = cpus ? `${formatNumber(cpus, i18n.language)} vCPU` : '—';
   const lastExitLabel = formatLastExit(lastExitCode, lastExitSignal);
-  const gatewayLabel = gatewayState ?? '—';
+  const gatewayLabel = gatewayState ? statusLabel(gatewayState) : '—';
   const uptimeLabel = uptime == null ? '—' : formatDuration(uptime, i18n.language);
   const restartsLabel = restarts == null ? '—' : formatNumber(restarts, i18n.language);
   const modelLabel = activeModel ?? '—';
@@ -72,7 +73,7 @@ export function StatusCard({
           icon={Activity}
           label={t('kiloclaw.status.state')}
           value={gatewayLabel}
-          valueTone={gatewayLabel === 'running' ? 'good' : 'default'}
+          valueTone={gatewayState === 'running' ? 'good' : 'default'}
         />
         <KvRow icon={Globe} label={t('kiloclaw.status.uptime')} value={uptimeLabel} />
         <KvRow icon={RotateCcw} label={t('kiloclaw.status.restarts')} value={restartsLabel} />

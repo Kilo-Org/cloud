@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} निवडले, निवड बदलण्यासाठी टॅप करा",
-      "tapToComment": "{{label}}, टिप्पणी करण्यासाठी टॅप करा"
+      "tapToComment": "{{label}}, टिप्पणी करण्यासाठी टॅप करा",
+      "truncationBanner": "{{total}} बदललेल्या फाइल्सपैकी पहिल्या {{limit}} दाखवत आहे — GitHub API मर्यादा"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे",
     "linkPasteNotAPullRequest": "ही GitHub पुल रिक्वेस्ट लिंक नाही"
@@ -2145,7 +2146,10 @@
       "title": "मॉडेल निवडा",
       "searchPlaceholder": "मॉडेल शोधा...",
       "noModels": "कोणतेही मॉडेल उपलब्ध नाही",
-      "noModelsDescription": "निवडण्यासाठी कोणतेही मॉडेल उपलब्ध नाही."
+      "noModelsDescription": "निवडण्यासाठी कोणतेही मॉडेल उपलब्ध नाही.",
+      "favorites": "आवडी",
+      "recommended": "शिफारस केलेले",
+      "allModels": "सर्व मॉडेल्स"
     },
     "modelSelector": {
       "model": "मॉडेल",
@@ -2307,6 +2311,7 @@
     "thisDevice": "ही डिव्हाइस",
     "title": "डिव्हाइस सत्रे",
     "viewProfile": "प्रोफाइल पहा",
+    "webBrowser": "वेब ब्राउझर",
     "signOutThisDevice": "या डिव्हाइसवरून साइन आउट करा",
     "signOutThisSession": "या सत्रातून साइन आउट करा",
     "sessionSignedOut": "सत्र साइन आउट झाले.",

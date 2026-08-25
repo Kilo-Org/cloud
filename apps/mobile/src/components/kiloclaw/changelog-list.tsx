@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
+import { formatCalendarDate } from '@/lib/format';
 import { type useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -56,7 +58,7 @@ export function ChangelogList({
             <View className="flex-row items-center gap-2">
               <Icon size={14} color={iconColor} />
               <Text variant="muted" className="text-xs">
-                {entry.date}
+                {formatCalendarDate(entry.date, i18n.language)}
               </Text>
               {deployHint && (
                 <View className={cn('rounded px-1.5 py-0.5', deployHint.bgClass)}>

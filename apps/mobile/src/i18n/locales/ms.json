@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Memilih {{label}}, ketik untuk menukar pilihan",
-      "tapToComment": "{{label}}, ketik untuk mengomen"
+      "tapToComment": "{{label}}, ketik untuk mengomen",
+      "truncationBanner": "Menunjukkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub"
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong",
     "linkPasteNotAPullRequest": "Bukan pautan permintaan tarik GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Pilih model",
       "searchPlaceholder": "Cari model...",
       "noModels": "Tiada model tersedia",
-      "noModelsDescription": "Tiada model tersedia untuk dipilih."
+      "noModelsDescription": "Tiada model tersedia untuk dipilih.",
+      "favorites": "Kegemaran",
+      "recommended": "Disyorkan",
+      "allModels": "Semua model"
     },
     "modelSelector": {
       "model": "Model",
@@ -2307,6 +2311,7 @@
     "thisDevice": "Peranti ini",
     "title": "Sesi peranti",
     "viewProfile": "Lihat profil",
+    "webBrowser": "Penyemak imbas web",
     "signOutThisDevice": "Log keluar peranti ini",
     "signOutThisSession": "Log keluar sesi ini",
     "sessionSignedOut": "Sesi dilog keluar.",

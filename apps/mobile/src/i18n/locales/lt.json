@@ -533,7 +533,8 @@
     },
     "diff": {
       "selectedTapToChange": "Pasirinkta {{label}}, bakstelėkite, kad pakeistumėte pasirinkimą",
-      "tapToComment": "{{label}}, bakstelėkite, kad pakomentuotumėte"
+      "tapToComment": "{{label}}, bakstelėkite, kad pakomentuotumėte",
+      "truncationBanner": "Rodoma pirmi {{limit}} iš {{total}} pakeistų failų — „GitHub“ API limitas"
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia",
     "linkPasteNotAPullRequest": "Tai ne „GitHub“ pull request nuoroda"
@@ -2179,7 +2180,10 @@
       "title": "Pasirinkti modelį",
       "searchPlaceholder": "Ieškoti modelių...",
       "noModels": "Nėra prieinamų modelių",
-      "noModelsDescription": "Nėra prieinamų modelių, kuriuos būtų galima pasirinkti."
+      "noModelsDescription": "Nėra prieinamų modelių, kuriuos būtų galima pasirinkti.",
+      "favorites": "Mėgstamiausi",
+      "recommended": "Rekomenduojami",
+      "allModels": "Visi modeliai"
     },
     "modelSelector": {
       "model": "Modelis",
@@ -2350,7 +2354,8 @@
     "signOutThisSessionTitle": "Atsijungti šią sesiją?",
     "signOutThisSessionMessage": "{{device}} bus atsijungtas. Jis gali išlaikyti API prieigą iki valandos.",
     "signOutConfirm": "Atsijungti",
-    "signOutMessage": "Norėdami pasiekti savo darbo sritį, turėsite prisijungti iš naujo."
+    "signOutMessage": "Norėdami pasiekti savo darbo sritį, turėsite prisijungti iš naujo.",
+    "webBrowser": "Žiniatinklio naršyklė"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Nepavyko atidaryti programų parduotuvės.",

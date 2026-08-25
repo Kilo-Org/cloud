@@ -526,7 +526,8 @@
     },
     "diff": {
       "selectedTapToChange": "Selectat {{label}}, atinge pentru a schimba selecția",
-      "tapToComment": "{{label}}, atinge pentru a comenta"
+      "tapToComment": "{{label}}, atinge pentru a comenta",
+      "truncationBanner": "Se afișează primele {{limit}} din {{total}} fișiere modificate — limita API GitHub"
     },
     "linkPasteClipboardEmpty": "Clipboard-ul este gol",
     "linkPasteNotAPullRequest": "Nu este un link de pull request GitHub"
@@ -2161,8 +2162,11 @@
     "modelPicker": {
       "title": "Selectează modelul",
       "searchPlaceholder": "Caută modele...",
+      "allModels": "Toate modelele",
+      "favorites": "Favorite",
       "noModels": "Niciun model disponibil",
-      "noModelsDescription": "Nu există modele disponibile de selectat."
+      "noModelsDescription": "Nu există modele disponibile de selectat.",
+      "recommended": "Recomandat"
     },
     "modelSelector": {
       "model": "Model",
@@ -2332,7 +2336,8 @@
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
     "signOutThisSessionMessage": "{{device}} va fi deconectat. Poate păstra acces API până la o oră.",
     "signOutConfirm": "Deconectare",
-    "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul de lucru."
+    "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul de lucru.",
+    "webBrowser": "Browser web"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Magazinul de aplicații nu a putut fi deschis.",

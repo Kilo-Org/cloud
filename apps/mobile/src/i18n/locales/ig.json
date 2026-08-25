@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Ahọpụtara {{label}}, pịa iji gbanwee nhọrọ",
-      "tapToComment": "{{label}}, pịa iji kọwaa"
+      "tapToComment": "{{label}}, pịa iji kọwaa",
+      "truncationBanner": "Na-egosi nke mbụ {{limit}} n'ime {{total}} faịlụ agbanwere — njedebe API GitHub"
     },
     "linkPasteClipboardEmpty": "Mbadamba ederede tọgbọrọ chakachara",
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ndọta GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Họrọ ụdị",
       "searchPlaceholder": "Chọọ ụdị...",
       "noModels": "Enweghị ụdị dị",
-      "noModelsDescription": "Ọ dịghị ụdị ọ bụla ịhọrọ."
+      "noModelsDescription": "Ọ dịghị ụdị ọ bụla ịhọrọ.",
+      "favorites": "Ọkacha mmasị",
+      "recommended": "Akwadoro",
+      "allModels": "Modelị niile"
     },
     "modelSelector": {
       "model": "Ụdị",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Ị pụọ na nnọkọ a?",
     "signOutThisSessionMessage": "A ga-ewepụ {{device}} na nnọkọ. Ọ nwere ike ịnọgide na-enweta API ruo otu awa.",
     "signOutConfirm": "Pụọ",
-    "signOutMessage": "Ị ga-abanye ọzọ ka ị nweta oghere ọrụ gị."
+    "signOutMessage": "Ị ga-abanye ọzọ ka ị nweta oghere ọrụ gị.",
+    "webBrowser": "Ihe nchọgharị weebụ"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Enweghị ike imeghe ụlọ ahịa ngwa.",

@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Ընտրված {{label}}, հպեք ընտրությունը փոխելու համար",
-      "tapToComment": "{{label}}, հպեք մեկնաբանելու համար"
+      "tapToComment": "{{label}}, հպեք մեկնաբանելու համար",
+      "truncationBanner": "Ցուցադրվում են փոփոխված {{total}} ֆայլերից առաջին {{limit}}-ը — GitHub API-ի սահմանաչափ"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է",
     "linkPasteNotAPullRequest": "Սա GitHub-ի pull request հղում չէ"
@@ -2145,7 +2146,10 @@
       "title": "Ընտրել մոդել",
       "searchPlaceholder": "Որոնել մոդելներ...",
       "noModels": "Մոդելներ հասանելի չեն",
-      "noModelsDescription": "Ընտրելու համար մոդելներ հասանելի չեն:"
+      "noModelsDescription": "Ընտրելու համար մոդելներ հասանելի չեն:",
+      "favorites": "Նախընտրածներ",
+      "recommended": "Առաջարկվող",
+      "allModels": "Բոլոր մոդելները"
     },
     "modelSelector": {
       "model": "Մոդել",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Դուրս գալ այս նիստից:",
     "signOutThisSessionMessage": "{{device}}-ը դուրս կգա: Այն կարող է պահպանել API հասանելիությունը մինչև մեկ ժամ:",
     "signOutConfirm": "Դուրս գալ",
-    "signOutMessage": "Ձեզ անհրաժեշտ կլինի նորից մուտք գործել՝ ձեր աշխատանքային տարածք մուտք գործելու համար:"
+    "signOutMessage": "Ձեզ անհրաժեշտ կլինի նորից մուտք գործել՝ ձեր աշխատանքային տարածք մուտք գործելու համար:",
+    "webBrowser": "Վեբ զննարկիչ"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Հնարավոր չեղավ բացել հավելվածների խանութը:",

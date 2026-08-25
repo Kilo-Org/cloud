@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ਚੁਣਿਆ ਗਿਆ, ਚੋਣ ਬਦਲਣ ਲਈ ਟੈਪ ਕਰੋ",
-      "tapToComment": "{{label}}, ਟਿੱਪਣੀ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ"
+      "tapToComment": "{{label}}, ਟਿੱਪਣੀ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ",
+      "truncationBanner": "ਕੁੱਲ {{total}} ਬਦਲੀਆਂ ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੇ {{limit}} ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ — GitHub API ਸੀਮਾ"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ",
     "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਸਟ ਲਿੰਕ ਨਹੀਂ ਹੈ"
@@ -2144,8 +2145,11 @@
     "modelPicker": {
       "title": "ਮਾਡਲ ਚੁਣੋ",
       "searchPlaceholder": "ਮਾਡਲ ਖੋਜੋ...",
+      "allModels": "ਸਾਰੇ ਮਾਡਲ",
+      "favorites": "ਪਸੰਦੀਦਾ",
       "noModels": "ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ",
-      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।"
+      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+      "recommended": "ਸਿਫਾਰਸ਼ੀ"
     },
     "modelSelector": {
       "model": "ਮਾਡਲ",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ?",
     "signOutThisSessionMessage": "{{device}} ਸਾਈਨ ਆਉਟ ਕੀਤਾ ਜਾਵੇਗਾ। ਇਹ ਇੱਕ ਘੰਟੇ ਤੱਕ API ਪਹੁੰਚ ਰੱਖ ਸਕਦਾ ਹੈ।",
     "signOutConfirm": "ਸਾਈਨ ਆਉਟ ਕਰੋ",
-    "signOutMessage": "ਆਪਣੇ ਵਰਕਸਪੇਸ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਲਈ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਦੀ ਲੋੜ ਹੋਵੇਗੀ।"
+    "signOutMessage": "ਆਪਣੇ ਵਰਕਸਪੇਸ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਲਈ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨ ਦੀ ਲੋੜ ਹੋਵੇਗੀ।",
+    "webBrowser": "ਵੈੱਬ ਬ੍ਰਾਊਜ਼ਰ"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ਐਪ ਸਟੋਰ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",

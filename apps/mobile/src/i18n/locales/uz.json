@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} tanlandi, tanlovni o'zgartirish uchun bosing",
-      "tapToComment": "{{label}}, izoh qoldirish uchun bosing"
+      "tapToComment": "{{label}}, izoh qoldirish uchun bosing",
+      "truncationBanner": "Jami {{total}} ta o'zgartirilgan fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — GitHub API chegarasi"
     },
     "linkPasteClipboardEmpty": "Vaqtinchalik xotira bo‘sh",
     "linkPasteNotAPullRequest": "Bu GitHub pull request havolasi emas"
@@ -2145,7 +2146,10 @@
       "title": "Modelni tanlash",
       "searchPlaceholder": "Modellarni qidirish...",
       "noModels": "Modellar mavjud emas",
-      "noModelsDescription": "Tanlash uchun modellar mavjud emas."
+      "noModelsDescription": "Tanlash uchun modellar mavjud emas.",
+      "allModels": "Barcha modellar",
+      "favorites": "Sevimlilar",
+      "recommended": "Tavsiya etilgan"
     },
     "modelSelector": {
       "model": "Model",
@@ -2305,6 +2309,7 @@
     "onlyKiloAppSignIns": "Bu yerda faqat Kilo ilovasi kirishlari ko'rinadi. Editor va CLI kirishlari ro'yxatga olinmagan.",
     "signedIn": "{{signedIn}} da kirilgan · Oxirgi ko'rinish {{lastSeen}}",
     "thisDevice": "Bu qurilma",
+    "webBrowser": "Veb-brauzer",
     "title": "Qurilma sessiyalari",
     "viewProfile": "Profilni ko'rish",
     "signOutThisDevice": "Bu qurilmadan chiqish",

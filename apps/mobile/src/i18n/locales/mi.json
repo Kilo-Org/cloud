@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Kua kōwhiria {{label}}, pāwhiria kia huri i te kōwhiringa",
-      "tapToComment": "{{label}}, pāwhiria kia kōrero"
+      "tapToComment": "{{label}}, pāwhiria kia kōrero",
+      "truncationBanner": "E whakaatu ana i ngā {{limit}} tuatahi o ngā {{total}} kōnae kua hurihia — te rohe API a GitHub"
     },
     "linkPasteClipboardEmpty": "Kei te putua tonu te papapātuhi",
     "linkPasteNotAPullRequest": "Ehara tēnei i te hononga GitHub pull request"
@@ -2145,7 +2146,10 @@
       "title": "Kōwhiri te tauira",
       "searchPlaceholder": "Rapu tauira...",
       "noModels": "Kāore he tauira e wātea ana",
-      "noModelsDescription": "Kāore he tauira e wātea ana hei kōwhiri."
+      "noModelsDescription": "Kāore he tauira e wātea ana hei kōwhiri.",
+      "favorites": "Ngā makau",
+      "recommended": "E tūtohutia ana",
+      "allModels": "Ngā tauira katoa"
     },
     "modelSelector": {
       "model": "Tauira",
@@ -2307,6 +2311,7 @@
     "thisDevice": "Tēnei pūrere",
     "title": "Ngā wātū pūrere",
     "viewProfile": "Tirohia te kōtaha",
+    "webBrowser": "Pūtirotiro tukutuku",
     "signOutThisDevice": "Whakaputa atu i tēnei pūrere",
     "signOutThisSession": "Whakaputa atu i tēnei wātū",
     "sessionSignedOut": "Kua whakaputa te wātū.",

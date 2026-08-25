@@ -1766,7 +1766,10 @@
       "title": "Pilih model",
       "searchPlaceholder": "Cari model...",
       "noModels": "Tidak ada model tersedia",
-      "noModelsDescription": "Tidak ada model yang tersedia untuk dipilih."
+      "noModelsDescription": "Tidak ada model yang tersedia untuk dipilih.",
+      "favorites": "Favorit",
+      "recommended": "Direkomendasikan",
+      "allModels": "Semua model"
     },
     "modelSelector": {
       "model": "Model",
@@ -1935,7 +1938,8 @@
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
     "signOutThisSessionMessage": "{{device}} akan dikeluarkan. Perangkat ini dapat mempertahankan akses API hingga satu jam.",
     "signOutConfirm": "Keluar",
-    "signOutMessage": "Anda perlu masuk lagi untuk mengakses ruang kerja Anda."
+    "signOutMessage": "Anda perlu masuk lagi untuk mengakses ruang kerja Anda.",
+    "webBrowser": "Peramban web"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Tidak dapat membuka toko aplikasi.",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "Dipilih {{label}}, ketuk untuk mengubah pilihan",
-      "tapToComment": "{{label}}, ketuk untuk berkomentar"
+      "tapToComment": "{{label}}, ketuk untuk berkomentar",
+      "truncationBanner": "Menampilkan {{limit}} file pertama dari {{total}} file yang diubah — batas API GitHub"
     },
     "linkPasteClipboardEmpty": "Clipboard kosong",
     "linkPasteNotAPullRequest": "Bukan tautan pull request GitHub"

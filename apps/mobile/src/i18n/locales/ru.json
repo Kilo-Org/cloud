@@ -1785,8 +1785,11 @@
     "modelPicker": {
       "title": "Выбрать модель",
       "searchPlaceholder": "Поиск моделей...",
+      "allModels": "Все модели",
+      "favorites": "Избранное",
       "noModels": "Нет доступных моделей",
-      "noModelsDescription": "Нет моделей, доступных для выбора."
+      "noModelsDescription": "Нет моделей, доступных для выбора.",
+      "recommended": "Рекомендуемые"
     },
     "modelSelector": {
       "model": "Модель",
@@ -1957,7 +1960,8 @@
     "signOutThisSessionTitle": "Выйти из этого сеанса?",
     "signOutThisSessionMessage": "{{device}} будет выведено из системы. Оно может сохранять доступ к API до одного часа.",
     "signOutConfirm": "Выйти",
-    "signOutMessage": "Вам нужно будет войти снова, чтобы получить доступ к рабочему пространству."
+    "signOutMessage": "Вам нужно будет войти снова, чтобы получить доступ к рабочему пространству.",
+    "webBrowser": "Веб-браузер"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Не удалось открыть магазин приложений.",
@@ -2582,7 +2586,8 @@
     },
     "diff": {
       "selectedTapToChange": "Выбрано {{label}}, нажмите, чтобы изменить выбор",
-      "tapToComment": "{{label}}, нажмите, чтобы оставить комментарий"
+      "tapToComment": "{{label}}, нажмите, чтобы оставить комментарий",
+      "truncationBanner": "Показаны первые {{limit}} из {{total}} изменённых файлов — лимит API GitHub"
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст",
     "linkPasteNotAPullRequest": "Это не ссылка на pull request GitHub"

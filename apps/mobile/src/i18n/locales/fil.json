@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Napili ang {{label}}, tap para baguhin ang pagpili",
-      "tapToComment": "{{label}}, tap para magkomento"
+      "tapToComment": "{{label}}, tap para magkomento",
+      "truncationBanner": "Ipinapakita ang unang {{limit}} sa {{total}} binagong file — limitasyon sa API ng GitHub"
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard",
     "linkPasteNotAPullRequest": "Hindi link ng GitHub pull request"
@@ -2145,7 +2146,10 @@
       "title": "Pumili ng modelo",
       "searchPlaceholder": "Maghanap ng mga modelo...",
       "noModels": "Walang available na modelo",
-      "noModelsDescription": "Walang available na modelo na mapipili."
+      "noModelsDescription": "Walang available na modelo na mapipili.",
+      "favorites": "Mga Paborito",
+      "recommended": "Inirerekomenda",
+      "allModels": "Lahat ng modelo"
     },
     "modelSelector": {
       "model": "Modelo",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "I-sign out ang session na ito?",
     "signOutThisSessionMessage": "Ma-sign out ang {{device}}. Maaari itong magpanatili ng API access nang hanggang isang oras.",
     "signOutConfirm": "Mag-sign out",
-    "signOutMessage": "Kailangan mong mag-sign in muli para ma-access ang iyong workspace."
+    "signOutMessage": "Kailangan mong mag-sign in muli para ma-access ang iyong workspace.",
+    "webBrowser": "Web browser"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Hindi mabuksan ang app store.",

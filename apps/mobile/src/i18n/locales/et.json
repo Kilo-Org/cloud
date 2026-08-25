@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Valitud {{label}}, puuduta valiku muutmiseks",
-      "tapToComment": "{{label}}, puuduta kommenteerimiseks"
+      "tapToComment": "{{label}}, puuduta kommenteerimiseks",
+      "truncationBanner": "Kuvatakse esimesed {{limit}} muudetud faili kokku {{total}}-st — GitHubi API piirang"
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi",
     "linkPasteNotAPullRequest": "Pole GitHub pull requesti link"
@@ -2145,7 +2146,10 @@
       "title": "Vali mudel",
       "searchPlaceholder": "Otsi mudeleid...",
       "noModels": "Ühtegi mudelit pole saadaval",
-      "noModelsDescription": "Valimiseks pole ühtegi mudelit saadaval."
+      "noModelsDescription": "Valimiseks pole ühtegi mudelit saadaval.",
+      "favorites": "Lemmikud",
+      "recommended": "Soovitatud",
+      "allModels": "Kõik mudelid"
     },
     "modelSelector": {
       "model": "Mudel",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Logi see seanss välja?",
     "signOutThisSessionMessage": "{{device}} logitakse välja. See võib säilitada API juurdepääsu kuni tunni.",
     "signOutConfirm": "Logi välja",
-    "signOutMessage": "Tööruumile juurdepääsuks peate uuesti sisse logima."
+    "signOutMessage": "Tööruumile juurdepääsuks peate uuesti sisse logima.",
+    "webBrowser": "Veebibrauser"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Rakendusepoodi ei õnnestunud avada.",

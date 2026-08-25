@@ -14,8 +14,8 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
-import { DashboardScreen } from './dashboard-screen';
+import { i18n } from '@/i18n';
+import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
   () => 'We could not record this action. Please try again later.'
@@ -76,6 +76,9 @@ const outbox = vi.hoisted(() => ({
   }[],
   remove: vi.fn(),
   refresh: vi.fn(),
+}));
+const sharedMetrics = vi.hoisted(() => ({
+  build: vi.fn(),
 }));
 
 // Captures the useFocusEffect callback so a test can simulate a focus event.
@@ -161,7 +164,13 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   },
 }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
-  buildSecurityDashboardMetrics: () => [],
+  buildSecurityDashboardMetrics: sharedMetrics.build,
+  getAnalysisIncompleteCount: (analysis: {
+    triageComplete: number;
+    analyzing: number;
+    notAnalyzed: number;
+    failed: number;
+  }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
   getSecurityRepositoriesInScope: () => [],
 }));
 vi.mock('@/lib/security-agent', () => ({
@@ -235,6 +244,10 @@ function renderedTexts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+function dashboardMetric(id: string) {
+  return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
+}
+
 describe('DashboardScreen sync control terminal states', () => {
   beforeEach(() => {
     triggerSync.mutate.mockClear();
@@ -259,6 +272,7 @@ describe('DashboardScreen sync control terminal states', () => {
     outbox.refresh.mockClear();
     retryCards.cards = [];
     focusEffect.effect = undefined;
+    sharedMetrics.build.mockReturnValue([]);
   });
 
   it('keeps both sync controls enabled in the happy state', () => {
@@ -316,6 +330,59 @@ describe('DashboardScreen sync control terminal states', () => {
       { repoFullName: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+});
+
+describe('buildLocalizedMetrics', () => {
+  it('localizes every metric branch and its structured values', async () => {
+    await i18n.changeLanguage('de');
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 1234,
+        exploitable: 2,
+        needsReview: 3,
+        triageComplete: 1,
+        analyzing: 1,
+        notAnalyzed: 1,
+        failed: 1,
+      },
+      severity: { critical: 2, high: 3 },
+      sla: {
+        overall: { total: 10, withinSla: 7, overdue: 3 },
+        bySeverity: { critical: { overdue: 1 }, high: { overdue: 2 } },
+        dueSoon: { total: 4, exploitable: 2 },
+        untrackedCount: 5,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        dashboardMetric(id)
+      )
+    );
+    const analysisMetrics = buildLocalizedMetrics(data, false);
+    sharedMetrics.build.mockReturnValueOnce(
+      ['slaCompliance', 'deadlinePassed', 'dueSoon', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const slaMetrics = buildLocalizedMetrics(data, true);
+
+    expect([...analysisMetrics, ...slaMetrics].map(item => item.id)).toEqual([
+      'openFindings',
+      'exploitable',
+      'needsReview',
+      'analysisIncomplete',
+      'slaCompliance',
+      'deadlinePassed',
+      'dueSoon',
+      'noDeadline',
+    ]);
+    expect(analysisMetrics[0]?.value).toBe('1.234');
+    expect(slaMetrics[0]?.value).toMatch(/^70[\s\u00A0\u202F]*%$/);
+    expect(analysisMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(
+      true
+    );
+    expect(slaMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(true);
+    await i18n.changeLanguage('en');
   });
 });
 

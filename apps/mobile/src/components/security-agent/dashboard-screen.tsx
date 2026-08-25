@@ -2,6 +2,7 @@
 import {
   buildSecurityDashboardMetrics,
   type DashboardMetricTone,
+  type DashboardStats,
   getAnalysisIncompleteCount,
   getSecurityRepositoriesInScope,
 } from '@kilocode/app-shared/security-agent';
@@ -50,9 +51,7 @@ const METRIC_TONE_CLASS = {
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
 
-type DashboardStats = NonNullable<ReturnType<typeof useSecurityAgentDashboardStats>['data']>;
-
-function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
+export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
 

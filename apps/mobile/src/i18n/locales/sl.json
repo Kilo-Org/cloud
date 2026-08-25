@@ -533,7 +533,8 @@
     },
     "diff": {
       "selectedTapToChange": "Izbrano {{label}}, tapnite za spremembo izbora",
-      "tapToComment": "{{label}}, tapnite za komentar"
+      "tapToComment": "{{label}}, tapnite za komentar",
+      "truncationBanner": "Prikaz prvih {{limit}} od {{total}} spremenjenih datotek — omejitev API GitHub"
     },
     "linkPasteClipboardEmpty": "Odložišče je prazno",
     "linkPasteNotAPullRequest": "To ni povezava do pull requesta na GitHubu"
@@ -2179,7 +2180,10 @@
       "title": "Izberi model",
       "searchPlaceholder": "Išči modele...",
       "noModels": "Ni na voljo modelov",
-      "noModelsDescription": "Ni modelov, ki bi jih bilo mogoče izbrati."
+      "noModelsDescription": "Ni modelov, ki bi jih bilo mogoče izbrati.",
+      "favorites": "Priljubljeni",
+      "recommended": "Priporočeno",
+      "allModels": "Vsi modeli"
     },
     "modelSelector": {
       "model": "Model",
@@ -2350,7 +2354,8 @@
     "signOutThisSessionTitle": "Odjavi to sejo?",
     "signOutThisSessionMessage": "{{device}} bo odjavljen. Dostop do API lahko ohrani do ene ure.",
     "signOutConfirm": "Odjava",
-    "signOutMessage": "Za dostop do svojega delovnega prostora se boš moral znova prijaviti."
+    "signOutMessage": "Za dostop do svojega delovnega prostora se boš moral znova prijaviti.",
+    "webBrowser": "Spletni brskalnik"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Trgovine z aplikacijami ni bilo mogoče odpreti.",

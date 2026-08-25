@@ -547,7 +547,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} wedi'i ddewis, tapiwch i newid y dewis",
-      "tapToComment": "{{label}}, tapiwch i sylwebu"
+      "tapToComment": "{{label}}, tapiwch i sylwebu",
+      "truncationBanner": "Yn dangos y {{limit}} cyntaf o {{total}} ffeil a newidiwyd — terfyn API GitHub"
     },
     "linkPasteClipboardEmpty": "Mae'r clipfwrdd yn wag",
     "linkPasteNotAPullRequest": "Nid dolen GitHub pull request yw hon"
@@ -2213,7 +2214,10 @@
       "title": "Dewis model",
       "searchPlaceholder": "Chwilio modelau...",
       "noModels": "Dim modelau ar gael",
-      "noModelsDescription": "Does dim modelau ar gael i'w dewis."
+      "noModelsDescription": "Does dim modelau ar gael i'w dewis.",
+      "favorites": "Ffefrynnau",
+      "recommended": "Argymelledig",
+      "allModels": "Pob model"
     },
     "modelSelector": {
       "model": "Model",
@@ -2386,7 +2390,8 @@
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",
     "signOutThisSessionMessage": "Bydd {{device}} yn cael ei allgofnodi. Gall gadw mynediad API am hyd at awr.",
     "signOutConfirm": "Allgofnodi",
-    "signOutMessage": "Bydd angen i chi fewngofnodi eto i gael mynediad i'ch gweithle."
+    "signOutMessage": "Bydd angen i chi fewngofnodi eto i gael mynediad i'ch gweithle.",
+    "webBrowser": "Porwr gwe"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Methwyd agor y siop apiau.",

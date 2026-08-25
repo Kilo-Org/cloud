@@ -526,7 +526,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} selecionado, toque para mudar a seleção",
-      "tapToComment": "{{label}}, toque para comentar"
+      "tapToComment": "{{label}}, toque para comentar",
+      "truncationBanner": "A mostrar os primeiros {{limit}} de {{total}} ficheiros alterados — limite da API do GitHub"
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia",
     "linkPasteNotAPullRequest": "Não é uma ligação de pull request do GitHub"
@@ -2161,8 +2162,11 @@
     "modelPicker": {
       "title": "Selecionar modelo",
       "searchPlaceholder": "Procurar modelos...",
+      "allModels": "Todos os modelos",
+      "favorites": "Favoritos",
       "noModels": "Sem modelos disponíveis",
-      "noModelsDescription": "Não há modelos disponíveis para selecionar."
+      "noModelsDescription": "Não há modelos disponíveis para selecionar.",
+      "recommended": "Recomendado"
     },
     "modelSelector": {
       "model": "Modelo",
@@ -2332,7 +2336,8 @@
     "signOutThisSessionTitle": "Terminar sessão nesta sessão?",
     "signOutThisSessionMessage": "{{device}} será desconectado. Pode manter o acesso à API por até uma hora.",
     "signOutConfirm": "Terminar sessão",
-    "signOutMessage": "Precisará de iniciar sessão novamente para aceder ao seu espaço de trabalho."
+    "signOutMessage": "Precisará de iniciar sessão novamente para aceder ao seu espaço de trabalho.",
+    "webBrowser": "Navegador web"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Não foi possível abrir a loja de aplicações.",

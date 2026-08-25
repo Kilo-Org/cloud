@@ -519,6 +519,7 @@
     },
     "diff": {
       "selectedTapToChange": "هەڵبژێردراو {{label}}، بۆ گۆڕینی هەڵبژاردن لێی بدە",
+      "truncationBanner": "پێشاندانی یەکەم {{limit}} لە {{total}} فایلێکی گۆڕاو — سنووری APIـی GitHub",
       "tapToComment": "{{label}}، بۆ بۆچوون لێی بدە"
     },
     "linkPasteClipboardEmpty": "کلیپبۆردەکە بەتاڵە",
@@ -2144,7 +2145,10 @@
     "modelPicker": {
       "title": "هەڵبژاردنی مۆدێل",
       "searchPlaceholder": "گەڕان لە مۆدێلەکان...",
+      "allModels": "هەموو مۆدێلەکان",
+      "favorites": "دڵخوازەکان",
       "noModels": "هیچ مۆدێلێک بەردەست نییە",
+      "recommended": "پێشنیارکراوەکان",
       "noModelsDescription": "هیچ مۆدێلێک نییە بۆ هەڵبژاردن."
     },
     "modelSelector": {
@@ -2306,6 +2310,7 @@
     "signedIn": "چووە ژوورەوە {{signedIn}} · دوایین بینین {{lastSeen}}",
     "thisDevice": "ئەم ئامێرە",
     "title": "دانیشتنەکانی ئامێر",
+    "webBrowser": "وێب بڕاوزەر",
     "viewProfile": "بینینی پڕۆفایل",
     "signOutThisDevice": "دەرچوون لەم ئامێرە",
     "signOutThisSession": "دەرچوون لەم دانیشتنە",

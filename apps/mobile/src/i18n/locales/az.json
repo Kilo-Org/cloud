@@ -519,6 +519,7 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} seçildi, seçimi dəyişmək üçün toxunun",
+      "truncationBanner": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — GitHub API limiti",
       "tapToComment": "{{label}}, şərh üçün toxunun"
     },
     "linkPasteClipboardEmpty": "Panoda heç nə yoxdur",
@@ -2144,7 +2145,10 @@
     "modelPicker": {
       "title": "Model seç",
       "searchPlaceholder": "Modelləri axtar...",
+      "allModels": "Bütün modellər",
+      "favorites": "Sevimlilər",
       "noModels": "Mövcud model yoxdur",
+      "recommended": "Tövsiyə olunanlar",
       "noModelsDescription": "Seçmək üçün mövcud model yoxdur."
     },
     "modelSelector": {
@@ -2306,6 +2310,7 @@
     "signedIn": "{{signedIn}} tarixində daxil olundu · Son görünmə {{lastSeen}}",
     "thisDevice": "Bu cihaz",
     "title": "Cihaz sessiyaları",
+    "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",
     "signOutThisDevice": "Bu cihazdan çıxış et",
     "signOutThisSession": "Bu sessiyadan çıxış et",

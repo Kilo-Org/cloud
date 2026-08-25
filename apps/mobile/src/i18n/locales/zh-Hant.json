@@ -1766,7 +1766,10 @@
       "title": "選取模型",
       "searchPlaceholder": "搜尋模型...",
       "noModels": "沒有可用的模型",
-      "noModelsDescription": "沒有可選取的模型。"
+      "noModelsDescription": "沒有可選取的模型。",
+      "allModels": "所有模型",
+      "favorites": "我的最愛",
+      "recommended": "推薦"
     },
     "modelSelector": {
       "model": "模型",
@@ -1926,6 +1929,7 @@
     "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入。編輯器和 CLI 登入不會列出。",
     "signedIn": "登入於 {{signedIn}} · 最後上線 {{lastSeen}}",
     "thisDevice": "此裝置",
+    "webBrowser": "網頁瀏覽器",
     "title": "裝置工作階段",
     "viewProfile": "檢視個人資料",
     "signOutThisDevice": "登出此裝置",
@@ -2546,7 +2550,8 @@
     },
     "diff": {
       "selectedTapToChange": "已選取 {{label}}，點擊即可變更選取",
-      "tapToComment": "{{label}}，點擊即可留言"
+      "tapToComment": "{{label}}，點擊即可留言",
+      "truncationBanner": "正在顯示前 {{limit}} 個（共 {{total}} 個）已變更檔案 — GitHub API 限制"
     },
     "linkPasteClipboardEmpty": "剪貼簿是空的",
     "linkPasteNotAPullRequest": "不是 GitHub 提取請求的連結"

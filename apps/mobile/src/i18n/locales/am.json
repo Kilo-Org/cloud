@@ -519,6 +519,7 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ተመርጧል፣ ምርጫውን ለመቀየር ይንኩ",
+      "truncationBanner": "ከ{{total}} የተለወጡ ፋይሎች ውስጥ የመጀመሪያዎቹን {{limit}} ያሳያል — GitHub API ገደብ",
       "tapToComment": "{{label}}፣ አስተያየት ለመስጠት ይንኩ"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው",
@@ -2144,7 +2145,10 @@
     "modelPicker": {
       "title": "ሞዴል ይምረጡ",
       "searchPlaceholder": "ሞዴሎችን ይፈልጉ...",
+      "allModels": "ሁሉም ሞዴሎች",
+      "favorites": "ተወዳጆች",
       "noModels": "ምንም ሞዴሎች የሉም",
+      "recommended": "የሚመከሩ",
       "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።"
     },
     "modelSelector": {
@@ -2306,6 +2310,7 @@
     "signedIn": "የገባው {{signedIn}} · የመጨረሻ ጊዜ {{lastSeen}}",
     "thisDevice": "ይህ መሣሪያ",
     "title": "የመሣሪያ ክፍለ-ጊዜዎች",
+    "webBrowser": "የድር አሳሽ",
     "viewProfile": "መገለጫ ይመልከቱ",
     "signOutThisDevice": "ከዚህ መሣሪያ ይውጡ",
     "signOutThisSession": "ከዚህ ክፍለ-ጊዜ ይውጡ",

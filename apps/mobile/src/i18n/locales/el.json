@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Επιλεγμένο {{label}}, πατήστε για αλλαγή επιλογής",
-      "tapToComment": "{{label}}, πατήστε για σχόλιο"
+      "tapToComment": "{{label}}, πατήστε για σχόλιο",
+      "truncationBanner": "Εμφάνιση των πρώτων {{limit}} από {{total}} αλλαγμένα αρχεία — όριο API του GitHub"
     },
     "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο",
     "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub"
@@ -2145,7 +2146,10 @@
       "title": "Επιλογή μοντέλου",
       "searchPlaceholder": "Αναζήτηση μοντέλων...",
       "noModels": "Δεν υπάρχουν διαθέσιμα μοντέλα",
-      "noModelsDescription": "Δεν υπάρχουν διαθέσιμα μοντέλα για επιλογή."
+      "noModelsDescription": "Δεν υπάρχουν διαθέσιμα μοντέλα για επιλογή.",
+      "favorites": "Αγαπημένα",
+      "recommended": "Προτεινόμενα",
+      "allModels": "Όλα τα μοντέλα"
     },
     "modelSelector": {
       "model": "Μοντέλο",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Αποσύνδεση από αυτή τη συνεδρία;",
     "signOutThisSessionMessage": "Το {{device}} θα αποσυνδεθεί. Μπορεί να διατηρήσει πρόσβαση API έως και μία ώρα.",
     "signOutConfirm": "Αποσύνδεση",
-    "signOutMessage": "Θα χρειαστεί να συνδεθείτε ξανά για πρόσβαση στον χώρο εργασίας σας."
+    "signOutMessage": "Θα χρειαστεί να συνδεθείτε ξανά για πρόσβαση στον χώρο εργασίας σας.",
+    "webBrowser": "Πρόγραμμα περιήγησης ιστού"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Δεν ήταν δυνατό το άνοιγμα του καταστήματος εφαρμογών.",

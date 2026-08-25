@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Kijelölve: {{label}}, koppintson a kijelölés módosításához",
-      "tapToComment": "{{label}}, koppintson a megjegyzéshez"
+      "tapToComment": "{{label}}, koppintson a megjegyzéshez",
+      "truncationBanner": "A módosított {{total}} fájl közül az első {{limit}} megjelenítése — GitHub API-korlát"
     },
     "linkPasteClipboardEmpty": "A vágólap üres",
     "linkPasteNotAPullRequest": "Nem GitHub pull request hivatkozás"
@@ -2145,7 +2146,10 @@
       "title": "Modell kiválasztása",
       "searchPlaceholder": "Modell keresése...",
       "noModels": "Nincs elérhető modell",
-      "noModelsDescription": "Nincs kiválasztható modell."
+      "noModelsDescription": "Nincs kiválasztható modell.",
+      "favorites": "Kedvencek",
+      "recommended": "Ajánlott",
+      "allModels": "Összes modell"
     },
     "modelSelector": {
       "model": "Modell",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",
     "signOutThisSessionMessage": "{{device}} ki lesz jelentkeztetve. Akár egy óráig megtarthatja az API-hozzáférést.",
     "signOutConfirm": "Kijelentkezés",
-    "signOutMessage": "A munkaterület eléréséhez újra be kell jelentkezned."
+    "signOutMessage": "A munkaterület eléréséhez újra be kell jelentkezned.",
+    "webBrowser": "Webböngésző"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Az alkalmazásbolt nem nyitható meg.",

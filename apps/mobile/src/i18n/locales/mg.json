@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "Voafidy {{label}}, tsindrio mba hanova ny fisafidianana",
-      "tapToComment": "{{label}}, tsindrio mba hanehoana hevitra"
+      "tapToComment": "{{label}}, tsindrio mba hanehoana hevitra",
+      "truncationBanner": "Mampiseho ny {{limit}} voalohany amin'ny {{total}} rakitra novaina — fetran'ny API GitHub"
     },
     "linkPasteClipboardEmpty": "Foana ny tahiry",
     "linkPasteNotAPullRequest": "Tsy rohy pull request amin'ny GitHub io"
@@ -2145,7 +2146,10 @@
       "title": "Fidio modely",
       "searchPlaceholder": "Fikarohana modely...",
       "noModels": "Tsy misy modely azo",
-      "noModelsDescription": "Tsy misy modely azo fidina."
+      "noModelsDescription": "Tsy misy modely azo fidina.",
+      "favorites": "Ankafizina",
+      "recommended": "Atolotra",
+      "allModels": "Modely rehetra"
     },
     "modelSelector": {
       "model": "Modely",
@@ -2307,6 +2311,7 @@
     "thisDevice": "Ity fitaovana ity",
     "title": "Session fitaovana",
     "viewProfile": "Jereo ny profil",
+    "webBrowser": "Navigateur tranonkala",
     "signOutThisDevice": "Hivoaka amin'ity fitaovana ity",
     "signOutThisSession": "Hivoaka amin'ity session ity",
     "sessionSignedOut": "Nivoaka ny session.",

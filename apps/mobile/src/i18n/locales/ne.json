@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} चयन गरियो, चयन परिवर्तन गर्न ट्याप गर्नुहोस्",
-      "tapToComment": "{{label}}, टिप्पणी गर्न ट्याप गर्नुहोस्"
+      "tapToComment": "{{label}}, टिप्पणी गर्न ट्याप गर्नुहोस्",
+      "truncationBanner": "कुल {{total}} परिवर्तन गरिएका फाइलहरूमध्ये पहिलो {{limit}} देखाइँदै — GitHub API सीमा"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ",
     "linkPasteNotAPullRequest": "GitHub पुल रिक्वेस्ट लिंक होइन"
@@ -2144,8 +2145,11 @@
     "modelPicker": {
       "title": "मोडेल चयन गर्नुहोस्",
       "searchPlaceholder": "मोडेल खोज्नुहोस्...",
+      "allModels": "सबै मोडेलहरू",
+      "favorites": "मनपर्ने",
       "noModels": "कुनै मोडेल उपलब्ध छैन",
-      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।"
+      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।",
+      "recommended": "सिफारिस गरिएको"
     },
     "modelSelector": {
       "model": "मोडेल",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",
     "signOutThisSessionMessage": "{{device}} साइन आउट गरिनेछ। यसले एक घण्टासम्म API पहुँच राख्न सक्छ।",
     "signOutConfirm": "साइन आउट",
-    "signOutMessage": "तपाईंको कार्यक्षेत्रमा पहुँच गर्न फेरि साइन इन गर्नुपर्नेछ।"
+    "signOutMessage": "तपाईंको कार्यक्षेत्रमा पहुँच गर्न फेरि साइन इन गर्नुपर्नेछ।",
+    "webBrowser": "वेब ब्राउजर"
   },
   "forceUpdate": {
     "couldNotOpenStore": "एप स्टोर खोल्न सकिएन।",

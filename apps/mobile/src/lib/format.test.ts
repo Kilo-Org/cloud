@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   firstGrapheme,
+  formatCalendarDate,
   formatFileSize,
   formatList,
   formatMoney,
@@ -19,6 +20,11 @@ describe('formatMoney', () => {
     expect(formatMoney(1234.5, 'ar')).not.toContain('US$');
     expect(de).not.toBe(en);
   });
+
+  it('uses Portugal rules for Portuguese and Brazil rules for Brazilian Portuguese', () => {
+    expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+\$$/);
+    expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^\$[\s\u00A0\u202F]*1\.234,50$/);
+  });
 });
 
 describe('localized format helpers', () => {
@@ -32,5 +38,9 @@ describe('localized format helpers', () => {
     expect(parseLocalizedNumber('1.234,5', 'de-DE')).toBe(1234.5);
     expect(parseLocalizedNumber('1 234,5', 'ru')).toBe(1234.5);
     expect(parseLocalizedNumber('twelve', 'en')).toBeNull();
+  });
+
+  it('formats a calendar date without a time-zone shift', () => {
+    expect(formatCalendarDate('2026-08-03', 'en-US')).toBe('8/3/2026');
   });
 });

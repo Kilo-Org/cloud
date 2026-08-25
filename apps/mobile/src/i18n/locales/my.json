@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ရွေးထားသည်၊ ရွေးချယ်မှုပြောင်းရန် နှိပ်ပါ",
-      "tapToComment": "{{label}}, မှတ်ချက်ပေးရန် နှိပ်ပါ"
+      "tapToComment": "{{label}}, မှတ်ချက်ပေးရန် နှိပ်ပါ",
+      "truncationBanner": "ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမဆုံး {{limit}} ခုကို ပြသနေသည် — GitHub API ကန့်သတ်ချက်"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ် ဗလာဖြစ်သည်",
     "linkPasteNotAPullRequest": "GitHub pull request လင့်ခ် မဟုတ်ပါ"
@@ -2145,7 +2146,10 @@
       "title": "မော်ဒယ် ရွေးရန်",
       "searchPlaceholder": "မော်ဒယ်များ ရှာဖွေရန်...",
       "noModels": "မော်ဒယ်များ မရနိုင်ပါ",
-      "noModelsDescription": "ရွေးချယ်ရန် မော်ဒယ်များ မရှိပါ။"
+      "noModelsDescription": "ရွေးချယ်ရန် မော်ဒယ်များ မရှိပါ။",
+      "favorites": "စိတ်ကြိုက်",
+      "recommended": "အကြံပြုထား",
+      "allModels": "မော်ဒယ်များအားလုံး"
     },
     "modelSelector": {
       "model": "မော်ဒယ်",
@@ -2307,6 +2311,7 @@
     "thisDevice": "ဤစက်",
     "title": "စက် session များ",
     "viewProfile": "profile ကြည့်ရန်",
+    "webBrowser": "ဝဘ်ဘရောက်ဆာ",
     "signOutThisDevice": "ဤစက်မှ ထွက်ရန်",
     "signOutThisSession": "ဤ session မှ ထွက်ရန်",
     "sessionSignedOut": "session မှ ထွက်သွားပြီးပါပြီ။",

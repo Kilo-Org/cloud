@@ -1785,8 +1785,11 @@
     "modelPicker": {
       "title": "Wybierz model",
       "searchPlaceholder": "Szukaj modeli...",
+      "allModels": "Wszystkie modele",
+      "favorites": "Ulubione",
       "noModels": "Brak dostępnych modeli",
-      "noModelsDescription": "Brak modeli do wyboru."
+      "noModelsDescription": "Brak modeli do wyboru.",
+      "recommended": "Polecane"
     },
     "modelSelector": {
       "model": "Model",
@@ -1957,7 +1960,8 @@
     "signOutThisSessionTitle": "Wylogować tę sesję?",
     "signOutThisSessionMessage": "{{device}} zostanie wylogowane. Może zachować dostęp do API przez maksymalnie godzinę.",
     "signOutConfirm": "Wyloguj się",
-    "signOutMessage": "Aby uzyskać dostęp do swojego obszaru roboczego, musisz zalogować się ponownie."
+    "signOutMessage": "Aby uzyskać dostęp do swojego obszaru roboczego, musisz zalogować się ponownie.",
+    "webBrowser": "Przeglądarka internetowa"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Nie można otworzyć sklepu z aplikacjami.",
@@ -2582,7 +2586,8 @@
     },
     "diff": {
       "selectedTapToChange": "Wybrano {{label}}, dotknij, aby zmienić wybór",
-      "tapToComment": "{{label}}, dotknij, aby skomentować"
+      "tapToComment": "{{label}}, dotknij, aby skomentować",
+      "truncationBanner": "Wyświetlanie pierwszych {{limit}} z {{total}} zmienionych plików — limit API GitHub"
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty",
     "linkPasteNotAPullRequest": "To nie jest link do pull requesta na GitHub"

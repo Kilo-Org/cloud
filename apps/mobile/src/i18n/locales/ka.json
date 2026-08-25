@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "არჩეულია {{label}}, შეეხეთ არჩევანის შესაცვლელად",
-      "tapToComment": "{{label}}, შეეხეთ კომენტარისთვის"
+      "tapToComment": "{{label}}, შეეხეთ კომენტარისთვის",
+      "truncationBanner": "ნაჩვენებია შეცვლილი ფაილების {{total}}-დან პირველი {{limit}} — GitHub API ლიმიტი"
     },
     "linkPasteClipboardEmpty": "ბუფერი ცარიელია",
     "linkPasteNotAPullRequest": "არ არის GitHub pull request ბმული"
@@ -2145,7 +2146,10 @@
       "title": "მოდელის არჩევა",
       "searchPlaceholder": "მოდელების ძებნა...",
       "noModels": "მოდელები ხელმისაწვდომი არ არის",
-      "noModelsDescription": "ასარჩევი მოდელები ხელმისაწვდომი არ არის."
+      "noModelsDescription": "ასარჩევი მოდელები ხელმისაწვდომი არ არის.",
+      "favorites": "რჩეულები",
+      "recommended": "რეკომენდირებული",
+      "allModels": "ყველა მოდელი"
     },
     "modelSelector": {
       "model": "მოდელი",
@@ -2314,7 +2318,8 @@
     "signOutThisSessionTitle": "გავიდეთ ამ სესიიდან?",
     "signOutThisSessionMessage": "{{device}} გავა. მას API წვდომა ერთ საათამდე შეიძლება შეუნარჩუნდეს.",
     "signOutConfirm": "გასვლა",
-    "signOutMessage": "სამუშაო სივრცეში შესასვლელად კვლავ მოგიწევთ შესვლა."
+    "signOutMessage": "სამუშაო სივრცეში შესასვლელად კვლავ მოგიწევთ შესვლა.",
+    "webBrowser": "ვებ ბრაუზერი"
   },
   "forceUpdate": {
     "couldNotOpenStore": "აპლიკაციების მაღაზიის გახსნა ვერ მოხერხდა.",

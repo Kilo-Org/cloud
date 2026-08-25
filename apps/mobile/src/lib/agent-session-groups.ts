@@ -62,6 +62,9 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
   );
 
   const yesterday = addDays(now, -1);
+  const todayLabel = i18n.t('chat.conversationList.today');
+  const yesterdayLabel = i18n.t('chat.conversationList.yesterday');
+  const olderLabel = i18n.t('chat.conversationList.older');
 
   const buckets = new Map<string, T[]>();
   const bucketOrder: string[] = [];
@@ -80,16 +83,16 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
     const date = parseTimestamp(getAgentSessionTimestamp(session, resolvedSort));
 
     if (isSameDay(date, now)) {
-      addToBucket('Today', session);
+      addToBucket(todayLabel, session);
     } else if (isSameDay(date, yesterday)) {
-      addToBucket('Yesterday', session);
+      addToBucket(yesterdayLabel, session);
     } else {
       const diffMs = now.getTime() - date.getTime();
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
       if (diffDays <= 7) {
         addToBucket(getWeekdayName(date), session);
       } else {
-        addToBucket('Older', session);
+        addToBucket(olderLabel, session);
       }
     }
   }
@@ -97,7 +100,7 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
   // The weekday bucket holds sessions in their sorted (newest-first) order
   // already; Older needs a second pass because it's keyed by label, not by
   // insertion order of distinct days.
-  const olderBucket = buckets.get('Older');
+  const olderBucket = buckets.get(olderLabel);
   if (olderBucket) {
     olderBucket.sort((a, b) => timestampMs(b, resolvedSort) - timestampMs(a, resolvedSort));
   }

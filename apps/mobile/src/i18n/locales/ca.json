@@ -526,6 +526,7 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} seleccionat, toca per canviar la selecció",
+      "truncationBanner": "Es mostren els primers {{limit}} de {{total}} fitxers modificats — límit de l'API de GitHub",
       "tapToComment": "{{label}}, toca per comentar"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit",
@@ -2161,7 +2162,10 @@
     "modelPicker": {
       "title": "Selecciona el model",
       "searchPlaceholder": "Cerca models...",
+      "allModels": "Tots els models",
+      "favorites": "Preferits",
       "noModels": "No hi ha models disponibles",
+      "recommended": "Recomanats",
       "noModelsDescription": "No hi ha cap model per seleccionar."
     },
     "modelSelector": {
@@ -2324,6 +2328,7 @@
     "signedIn": "Iniciat la sessió el {{signedIn}} · Vist per última vegada el {{lastSeen}}",
     "thisDevice": "Aquest dispositiu",
     "title": "Sessions de dispositiu",
+    "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",
     "signOutThisDevice": "Tanca la sessió d'aquest dispositiu",
     "signOutThisSession": "Tanca aquesta sessió",

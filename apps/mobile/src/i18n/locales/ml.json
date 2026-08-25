@@ -519,7 +519,8 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} തിരഞ്ഞെടുത്തു, തിരഞ്ഞെടുപ്പ് മാറ്റാൻ ടാപ്പ് ചെയ്യുക",
-      "tapToComment": "{{label}}, അഭിപ്രായമിടാൻ ടാപ്പ് ചെയ്യുക"
+      "tapToComment": "{{label}}, അഭിപ്രായമിടാൻ ടാപ്പ് ചെയ്യുക",
+      "truncationBanner": "{{total}} മാറ്റപ്പെട്ട ഫയലുകളിൽ ആദ്യത്തെ {{limit}} കാണിക്കുന്നു — GitHub API പരിധി"
     },
     "linkPasteClipboardEmpty": "ക്ലിപ്പ്ബോർഡ് ശൂന്യമാണ്",
     "linkPasteNotAPullRequest": "ഇത് ഒരു GitHub പുൾ റിക്വസ്റ്റ് ലിങ്ക് അല്ല"
@@ -2145,7 +2146,10 @@
       "title": "മോഡൽ തിരഞ്ഞെടുക്കുക",
       "searchPlaceholder": "മോഡലുകൾ തിരയുക...",
       "noModels": "മോഡലുകൾ ലഭ്യമല്ല",
-      "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല."
+      "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല.",
+      "favorites": "പ്രിയപ്പെട്ടവ",
+      "recommended": "ശുപാർശ ചെയ്യുന്നത്",
+      "allModels": "എല്ലാ മോഡലുകൾ"
     },
     "modelSelector": {
       "model": "മോഡൽ",
@@ -2307,6 +2311,7 @@
     "thisDevice": "ഈ ഉപകരണം",
     "title": "ഉപകരണ സെഷനുകൾ",
     "viewProfile": "പ്രൊഫൈൽ കാണുക",
+    "webBrowser": "വെബ് ബ്രൗസർ",
     "signOutThisDevice": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
     "signOutThisSession": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",

@@ -18,6 +18,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
+import { normalizeAlias } from './session-config';
 import { usePostHog } from 'posthog-js/react';
 
 const ManagerContext = createContext<SessionManager | null>(null);
@@ -307,7 +308,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           organizationId: sessionResult.organization_id,
           gitUrl: sessionResult.git_url,
           gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
-          mode: rs?.mode ?? null,
+          mode: normalizeAlias(rs?.mode),
           model: rs?.model ?? null,
           variant: rs?.variant ?? null,
           repository: rs?.githubRepo ?? null,

@@ -13,7 +13,14 @@ import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
-import type { ModeOption } from '@/components/shared/ModeCombobox';
+import {
+  dedupeCustomModeOptions,
+  ensureSelectedCustomOption,
+  modeControlValue,
+  normalizeAlias,
+  type CustomModeOption,
+} from './session-config';
+import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { MessageBubble } from './MessageBubble';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
@@ -497,7 +504,7 @@ export default function CloudChatPage({
         payload: {
           type: 'prompt',
           prompt,
-          mode: sessionConfig?.mode ?? 'code',
+          mode: normalizeAlias(sessionConfig?.mode) || 'code',
           model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
           variant: agentModelOverrideForSend
             ? agentVariantOverrideForSend
@@ -658,18 +665,56 @@ export default function CloudChatPage({
     focusTarget.focus();
   }, []);
 
-  // Expose the session's custom agents to the chat picker. Slug + name only;
-  // the full config stays server-side. `GetSessionOutput.runtimeAgents`
-  // already filters to enabled & non-hidden at send time, so we just pass
-  // through.
-  const customModeOptions: ModeOption<AgentMode>[] | undefined = sessionConfig?.runtimeAgents
-    ?.length
-    ? sessionConfig.runtimeAgents.map(a => ({
-        value: a.slug as AgentMode,
-        label: a.name,
-        description: '',
-      }))
-    : undefined;
+  // Surface the session's custom agents plus the current visible profile
+  // agents to the chat picker. `runtimeAgents` are the agents active when the
+  // session was created; the profile list keeps the current default profile's
+  // agents selectable even when that profile changed since.
+  //
+  // Only agents that would surface in NewSessionPanel's picker are included
+  // (not disabled, not hidden, not subagent-only). Built-in slugs are dropped
+  // and the selected slug is appended once when it is neither built-in nor
+  // already listed, so an inherited custom slug stays visible.
+  const { data: combinedProfilesData } = useCombinedProfiles({
+    organizationId: organizationId ?? '',
+    enabled: !!organizationId,
+  });
+  const { data: personalProfiles } = useProfiles({
+    organizationId: undefined,
+    enabled: !organizationId,
+  });
+  const effectiveAgentProfileId = organizationId
+    ? (combinedProfilesData?.effectiveDefaultId ?? null)
+    : (personalProfiles?.find(p => p.isDefault)?.id ?? null);
+  const effectiveAgentProfileOrg =
+    effectiveAgentProfileId && organizationId
+      ? combinedProfilesData?.orgProfiles.some(p => p.id === effectiveAgentProfileId)
+        ? organizationId
+        : undefined
+      : undefined;
+  const { data: selectedProfileDetails } = useProfile(effectiveAgentProfileId ?? '', {
+    organizationId: effectiveAgentProfileOrg,
+    enabled: !!effectiveAgentProfileId,
+  });
+  const visibleProfileAgents = (selectedProfileDetails?.agents ?? []).filter(
+    a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent'
+  );
+
+  const runtimeCustomOptions: CustomModeOption[] = (sessionConfig?.runtimeAgents ?? []).map(a => ({
+    value: a.slug,
+    label: a.name,
+    description: '',
+  }));
+  const profileCustomOptions: CustomModeOption[] = visibleProfileAgents.map(a => ({
+    value: a.slug,
+    label: a.name,
+    description: a.config.description ?? '',
+  }));
+  const combinedCustomOptions = ensureSelectedCustomOption(
+    dedupeCustomModeOptions([...runtimeCustomOptions, ...profileCustomOptions]),
+    sessionConfig?.mode ?? ''
+  );
+  const customModeOptions: CustomModeOption[] | undefined =
+    combinedCustomOptions.length > 0 ? combinedCustomOptions : undefined;
 
   // If the selected custom agent pins a model, the chat model picker must
   // reflect + lock that value. The agent's `variant` is only meaningful when
@@ -1002,7 +1047,7 @@ export default function CloudChatPage({
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}
-                                mode={sessionConfig?.mode as AgentMode | undefined}
+                                mode={modeControlValue(sessionConfig?.mode ?? null)}
                                 model={displayModel}
                                 modelOptions={modelOptions}
                                 isLoadingModels={isLoadingModels}

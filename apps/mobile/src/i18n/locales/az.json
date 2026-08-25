@@ -2237,6 +2237,18 @@
       "updating": "Yenilənir, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Yüklə",
+      "loadWithHost": "Yüklə {{host}}",
+      "httpsOnly": "Yalnız HTTPS şəkilləri"
+    },
+    "markdownLink": {
+      "invalidLink": "Bu link açıla bilmir.",
+      "hostConfirmTitle": "Xarici link açılsın?",
+      "hostConfirmMessage": "Bu link {{host}} səhifəsini brauzerinizdə açır.",
+      "open": "Aç",
+      "trustThisHost": "Bu hosta etibar et"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Toplanan məlumatlar",
     "free": "Pulsuz"
+  },
+  "trustedHosts": {
+    "title": "Etibarlı hostlar",
+    "subtitle": "Sorğusuz açılmasına etibar etdiyiniz hostlar",
+    "emptyTitle": "Etibarlı host yoxdur",
+    "emptyDescription": "Bir linkin hostuna etibar etdikdə, link yenidən sorğusuz açılır.",
+    "revoke": "{{host}} üçün etibarı ləğv et",
+    "backToPreferences": "Tənzimləmələrə qayıt"
   }
 }

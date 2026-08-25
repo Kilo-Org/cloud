@@ -2237,6 +2237,18 @@
       "updating": "Fooyyachaa jira, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Feedi",
+      "loadWithHost": "Feedi {{host}}",
+      "httpsOnly": "Suuraalee HTTPS qofa"
+    },
+    "markdownLink": {
+      "invalidLink": "Liinkiin kun banamuu hin danda'u.",
+      "hostConfirmTitle": "Liinkii alaa bannee?",
+      "hostConfirmMessage": "Liinkiin kun {{host}} brawzarii kee keessatti bana.",
+      "open": "Bani",
+      "trustThisHost": "Hosii kana amani"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Daataan walitti qabame",
     "free": "Bilisa"
+  },
+  "trustedHosts": {
+    "title": "Hostoonni amanamoo",
+    "subtitle": "Hostoonni gaafachuu malee banuuf amantu",
+    "emptyTitle": "Hostoonni amanamoon hin jiran",
+    "emptyDescription": "Yeroo hostii liinkii amantu, gaafachuu malee deebi'ee bana.",
+    "revoke": "Haqi {{host}}",
+    "backToPreferences": "Gara filatootaatti deebi'i"
   }
 }

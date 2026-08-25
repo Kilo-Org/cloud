@@ -2237,6 +2237,18 @@
       "updating": "در حال به‌روزرسانی، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "درخواست کشش"
+    },
+    "markdownImage": {
+      "load": "بارگذاری",
+      "loadWithHost": "بارگذاری {{host}}",
+      "httpsOnly": "فقط تصاویر HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "این پیوند باز نمیشود.",
+      "hostConfirmTitle": "پیوند خارجی باز شود؟",
+      "hostConfirmMessage": "این پیوند {{host}} را در مرورگر شما باز میکند.",
+      "open": "باز کردن",
+      "trustThisHost": "اعتماد به این میزبان"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "دادههای جمعآوریشده",
     "free": "رایگان"
+  },
+  "trustedHosts": {
+    "title": "میزبانهای مورد اعتماد",
+    "subtitle": "میزبانهایی که به آنها اعتماد دارید تا بدون پرسیدن باز شوند",
+    "emptyTitle": "میزبان مورد اعتمادی نیست",
+    "emptyDescription": "وقتی به میزبان یک پیوند اعتماد کنید، بدون پرسیدن دوباره باز میشود.",
+    "revoke": "بازگرداندن {{host}}",
+    "backToPreferences": "بازگشت به تنظیمات"
   }
 }

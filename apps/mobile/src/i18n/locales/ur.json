@@ -2237,6 +2237,18 @@
       "updating": "اپڈیٹ ہو رہا ہے، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "پل ریکویسٹ"
+    },
+    "markdownImage": {
+      "load": "لوڈ کریں",
+      "loadWithHost": "لوڈ کریں {{host}}",
+      "httpsOnly": "صرف HTTPS تصاویر"
+    },
+    "markdownLink": {
+      "invalidLink": "یہ لنک نہیں کھولا جا سکتا۔",
+      "hostConfirmTitle": "بیرونی لنک کھولیں؟",
+      "hostConfirmMessage": "یہ لنک {{host}} کو آپ کے براؤزر میں کھولتا ہے۔",
+      "open": "کھولیں",
+      "trustThisHost": "اس ہوسٹ پر بھروسہ کریں"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "جمع کردہ ڈیٹا",
     "free": "مفت"
+  },
+  "trustedHosts": {
+    "title": "بھروسے کے ہوسٹس",
+    "subtitle": "وہ ہوسٹس جن پر آپ بغیر پوچھے کھولنے کا بھروسہ کرتے ہیں",
+    "emptyTitle": "کوئی بھروسے کا ہوسٹ نہیں",
+    "emptyDescription": "جب آپ کسی لنک کے ہوسٹ پر بھروسہ کرتے ہیں، تو یہ دوبارہ بغیر پوچھے کھل جاتا ہے۔",
+    "revoke": "{{host}} کو منسوخ کریں",
+    "backToPreferences": "ترجیحات پر واپس جائیں"
   }
 }

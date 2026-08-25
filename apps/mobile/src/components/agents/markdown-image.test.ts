@@ -38,22 +38,35 @@ function texts(root: TestRenderer.ReactTestInstance): string[] {
   });
 }
 
-function findLoadButtons(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+function loadLabel(uri: string): string {
+  return `Load ${new URL(uri).hostname.toLowerCase()}`;
+}
+
+function findLoadButtons(
+  root: TestRenderer.ReactTestInstance,
+  uri: string
+): TestRenderer.ReactTestInstance[] {
   return root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
-      node.props.accessibilityLabel === 'Load'
+      node.props.accessibilityLabel === loadLabel(uri)
   );
 }
 
-async function mount(uri: string, alt = ''): Promise<TestRenderer.ReactTestRenderer> {
+async function mount(
+  uri: string,
+  alt = '',
+  onShowLinkActions?: () => void
+): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
   };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(MarkdownImage, { uri, alt }));
+    rendererRef.current = TestRenderer.create(
+      createElement(MarkdownImage, { uri, alt, onShowLinkActions })
+    );
   });
   const renderer = rendererRef.current;
   if (!renderer) {
@@ -74,12 +87,7 @@ describe('MarkdownImage inert-until-load', () => {
     const renderer = await mount('https://example.com/a.png');
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
 
-    const loadButtons = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Load'
-    );
+    const loadButtons = findLoadButtons(renderer.root, 'https://example.com/a.png');
     expect(loadButtons).toHaveLength(1);
     const loadButton = loadButtons[0];
     if (!loadButton) {
@@ -96,12 +104,7 @@ describe('MarkdownImage inert-until-load', () => {
 
   it('remembers a confirmed HTTPS URI across remounts', async () => {
     const first = await mount('https://example.com/a.png');
-    const loadButtons = first.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Load'
-    );
+    const loadButtons = findLoadButtons(first.root, 'https://example.com/a.png');
     const loadButton = loadButtons[0];
     if (!loadButton) {
       throw new Error('load button not found');
@@ -114,14 +117,7 @@ describe('MarkdownImage inert-until-load', () => {
 
     const second = await mount('https://example.com/a.png');
     expect(ofType(second.root, 'Image')).toHaveLength(1);
-    expect(
-      second.root.findAll(
-        node =>
-          typeof node.type === 'string' &&
-          (node.type as string) === 'Pressable' &&
-          node.props.accessibilityLabel === 'Load'
-      )
-    ).toHaveLength(0);
+    expect(findLoadButtons(second.root, 'https://example.com/a.png')).toHaveLength(0);
     await unmount(second);
   });
 
@@ -188,7 +184,7 @@ describe('MarkdownImage inert-until-load', () => {
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
 
     // Confirm a.png through the Load chip.
-    const firstLoad = findLoadButtons(renderer.root)[0];
+    const firstLoad = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
     if (!firstLoad) {
       throw new Error('load button not found');
     }
@@ -205,7 +201,7 @@ describe('MarkdownImage inert-until-load', () => {
       renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));
     });
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
-    expect(findLoadButtons(renderer.root)).toHaveLength(1);
+    expect(findLoadButtons(renderer.root, 'https://example.com/b.png')).toHaveLength(1);
 
     // Recycle back to a URI confirmed earlier in the session: it mounts the
     // Image with no Load chip, and b.png never inherited any consent.
@@ -214,7 +210,125 @@ describe('MarkdownImage inert-until-load', () => {
       renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/a.png', alt: '' }));
     });
     expect(ofType(renderer.root, 'Image')).toHaveLength(1);
-    expect(findLoadButtons(renderer.root)).toHaveLength(0);
+    expect(findLoadButtons(renderer.root, 'https://example.com/a.png')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('resets failed state when recycled to a new URI after a fail', async () => {
+    confirmMarkdownImage('https://example.com/a.png');
+    const renderer = await mount('https://example.com/a.png', 'shot');
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+    // Old URI shows the retry chip.
+    expect(texts(renderer.root)).toContain('Image unavailable shot');
+
+    // Recycle to a new, unconfirmed URI: it must show Load, never the old chip.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));
+    });
+    expect(texts(renderer.root)).not.toContain('Image unavailable shot');
+    expect(ofType(renderer.root, 'Image')).toHaveLength(0);
+    expect(findLoadButtons(renderer.root, 'https://example.com/b.png')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('dismisses the viewer when recycled to a new URI', async () => {
+    confirmMarkdownImage('https://example.com/a.png');
+    const renderer = await mount('https://example.com/a.png', 'shot');
+    const imageButton = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === 'View image shot'
+    );
+    await act(async () => {
+      await Promise.resolve();
+      (imageButton.props.onPress as () => void)();
+    });
+    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));
+    });
+    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('exposes showLinkActions on the Load chip and routes it to the callback', async () => {
+    const onShow = vi.fn<() => void>();
+    const renderer = await mount('https://example.com/a.png', '', onShow);
+    const load = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
+    if (!load) {
+      throw new Error('load button not found');
+    }
+    expect(load.props.accessibilityActions).toEqual([
+      { name: 'showLinkActions', label: 'Show link actions' },
+    ]);
+    await act(async () => {
+      await Promise.resolve();
+      (load.props.onAccessibilityAction as (event: unknown) => void)({
+        nativeEvent: { actionName: 'showLinkActions' },
+      });
+    });
+    expect(onShow).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('omits showLinkActions when no callback is provided', async () => {
+    const renderer = await mount('https://example.com/a.png');
+    const load = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
+    if (!load) {
+      throw new Error('load button not found');
+    }
+    expect(load.props.accessibilityActions).toBeUndefined();
+
+    await unmount(renderer);
+  });
+
+  it('keeps the viewer as the default action after load and carries showLinkActions', async () => {
+    confirmMarkdownImage('https://example.com/a.png');
+    const onShow = vi.fn<() => void>();
+    const renderer = await mount('https://example.com/a.png', 'shot', onShow);
+    const imageButton = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === 'View image shot'
+    );
+    expect(imageButton.props.accessibilityActions).toEqual([
+      { name: 'showLinkActions', label: 'Show link actions' },
+    ]);
+    // Default action still opens the viewer, not a browser.
+    await act(async () => {
+      await Promise.resolve();
+      (imageButton.props.onPress as () => void)();
+    });
+    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('Load control is at least 44pt and announces host plus action', async () => {
+    const renderer = await mount('https://example.com/a.png');
+    const load = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
+    if (!load) {
+      throw new Error('load button not found');
+    }
+    expect(load.props.className).toContain('min-h-11');
+    expect(load.props.className).toContain('min-w-11');
+    expect(load.props.accessibilityLabel).toBe('Load example.com');
 
     await unmount(renderer);
   });

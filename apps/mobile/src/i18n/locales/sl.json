@@ -2237,6 +2237,18 @@
       "updating": "Posodabljanje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Naloži",
+      "loadWithHost": "Naloži {{host}}",
+      "httpsOnly": "Samo HTTPS slike"
+    },
+    "markdownLink": {
+      "invalidLink": "Tega povezave ni mogoče odpreti.",
+      "hostConfirmTitle": "Odpreti zunanjo povezavo?",
+      "hostConfirmMessage": "Ta povezava v brskalniku odpre {{host}}.",
+      "open": "Odpri",
+      "trustThisHost": "Zaupaj temu gostitelju"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Zbrani podatki",
     "free": "Brezplačno"
+  },
+  "trustedHosts": {
+    "title": "Zaupanja vredni gostitelji",
+    "subtitle": "Gostitelji, ki jim zaupaš in se odprejo brez vprašanja",
+    "emptyTitle": "Ni zaupanja vrednih gostiteljev",
+    "emptyDescription": "Ko zaupaš gostitelju povezave, se odpre brez ponovnega vprašanja.",
+    "revoke": "Prekliči {{host}}",
+    "backToPreferences": "Nazaj na nastavitve"
   }
 }

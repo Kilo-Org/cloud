@@ -2237,6 +2237,18 @@
       "updating": "अपडेट होत आहे, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "पुल रिक्वेस्ट"
+    },
+    "markdownImage": {
+      "load": "लोड करा",
+      "loadWithHost": "लोड करा {{host}}",
+      "httpsOnly": "फक्त HTTPS प्रतिमा"
+    },
+    "markdownLink": {
+      "invalidLink": "ही लिंक उघडता येत नाही.",
+      "hostConfirmTitle": "बाह्य लिंक उघडायची?",
+      "hostConfirmMessage": "ही लिंक तुमच्या ब्राउझरमध्ये {{host}} उघडते.",
+      "open": "उघडा",
+      "trustThisHost": "या होस्टवर विश्वास ठेवा"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "संकलित डेटा",
     "free": "मोफत"
+  },
+  "trustedHosts": {
+    "title": "विश्वासार्ह होस्ट",
+    "subtitle": "तुम्ही विचारल्याशिवाय उघडणाऱ्या होस्ट",
+    "emptyTitle": "विश्वासार्ह होस्ट नाहीत",
+    "emptyDescription": "जेव्हा तुम्ही लिंकच्या होस्टवर विश्वास ठेवता, तेव्हा ती पुन्हा न विचारता उघडते.",
+    "revoke": "{{host}} रद्द करा",
+    "backToPreferences": "प्राधान्यांवर परत जा"
   }
 }

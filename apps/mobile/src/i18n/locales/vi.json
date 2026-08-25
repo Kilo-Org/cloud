@@ -1865,6 +1865,18 @@
       "updating": "Đang cập nhật, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "yêu cầu kéo"
+    },
+    "markdownImage": {
+      "load": "Tải",
+      "loadWithHost": "Tải {{host}}",
+      "httpsOnly": "Chỉ hình ảnh HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Không thể mở liên kết này.",
+      "hostConfirmTitle": "Mở liên kết ngoài?",
+      "hostConfirmMessage": "Liên kết này mở {{host}} trong trình duyệt của bạn.",
+      "open": "Mở",
+      "trustThisHost": "Tin cậy máy chủ này"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Dữ liệu đã thu thập",
     "free": "Miễn phí"
+  },
+  "trustedHosts": {
+    "title": "Máy chủ đáng tin cậy",
+    "subtitle": "Các máy chủ bạn tin cậy để mở mà không cần hỏi",
+    "emptyTitle": "Không có máy chủ đáng tin cậy",
+    "emptyDescription": "Khi bạn tin cậy máy chủ của một liên kết, liên kết đó sẽ mở mà không hỏi lại.",
+    "revoke": "Thu hồi {{host}}",
+    "backToPreferences": "Quay lại cài đặt"
   }
 }

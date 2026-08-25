@@ -2237,6 +2237,18 @@
       "updating": "Ap aktyalize, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "demann tiray"
+    },
+    "markdownImage": {
+      "load": "Chaje",
+      "loadWithHost": "Chaje {{host}}",
+      "httpsOnly": "Imaj HTTPS sèlman"
+    },
+    "markdownLink": {
+      "invalidLink": "Lyen sa a pa ka louvri.",
+      "hostConfirmTitle": "Louvri lyen ekstèn?",
+      "hostConfirmMessage": "Lyen sa a louvri {{host}} nan navigatè w la.",
+      "open": "Louvri",
+      "trustThisHost": "Fè konfyans ak host sa a"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Done kolekte",
     "free": "Gratis"
+  },
+  "trustedHosts": {
+    "title": "Host konfiye",
+    "subtitle": "Host ou fè konfyans pou louvri san mande",
+    "emptyTitle": "Pa gen host konfiye",
+    "emptyDescription": "Lè ou fè konfyans ak host yon lyen, li louvri san mande ankò.",
+    "revoke": "Retire {{host}}",
+    "backToPreferences": "Retounen nan preferans"
   }
 }

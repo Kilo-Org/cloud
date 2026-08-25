@@ -966,7 +966,7 @@ describe('User', () => {
       ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
     });
 
-    it('deletes the user\'s cloud agent pending-upload rows and leaves other users\' rows', async () => {
+    it("deletes the user's cloud agent pending-upload rows and leaves other users' rows", async () => {
       const user = await insertTestUser({ google_user_email: 'pending-upload-user@example.com' });
       const otherUser = await insertTestUser();
 

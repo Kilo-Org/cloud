@@ -14,6 +14,7 @@ import type { Env, SandboxInstance } from '../../types.js';
 import type { CredentialContainment, SessionMetadata } from '../../persistence/session-metadata.js';
 import { WrapperClient, WrapperError } from '../../kilo/wrapper-client.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
+import { SYSTEM_GIT_CONFIG_ENV } from '../../shared/runtime-environment.js';
 import type { EnsureWrapperRequest } from '../protocol.js';
 import { CloudflareAgentSandbox, deriveSetupEnvironment } from './cloudflare-agent-sandbox.js';
 import { buildWorkspaceBackupCandidate } from '../../workspace-backup-cache.js';
@@ -250,6 +251,33 @@ describe('deriveSetupEnvironment', () => {
         { API_TOKEN: 'resolved-secret' }
       )
     ).toBeNull();
+  });
+
+  it('ignores git config keys the runtime strips before the sandbox starts', () => {
+    expect(
+      deriveSetupEnvironment(
+        {
+          envVars: {
+            CACHE_VARIANT: 'profile-value',
+            GIT_CONFIG_GLOBAL: '/tmp/evil.gitconfig',
+            GIT_CONFIG_KEY_2: 'credential.helper',
+          },
+        },
+        { CACHE_VARIANT: 'resolved-profile-value', ...SYSTEM_GIT_CONFIG_ENV }
+      )
+    ).toEqual({
+      variables: { CACHE_VARIANT: 'resolved-profile-value' },
+      secretIdentities: {},
+    });
+  });
+
+  it('keeps the pinned git config in the cache key when a profile declares it', () => {
+    expect(
+      deriveSetupEnvironment({ envVars: { GIT_CONFIG_COUNT: '99' } }, { ...SYSTEM_GIT_CONFIG_ENV })
+    ).toEqual({
+      variables: { GIT_CONFIG_COUNT: '2' },
+      secretIdentities: {},
+    });
   });
 });
 

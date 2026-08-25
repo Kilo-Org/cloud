@@ -56,15 +56,15 @@ const STEP_LABELS: Record<string, { label: string; description: string }> = {
   },
   pylon_reply: {
     label: 'Pylon reply',
-    description: 'Post the deletion reply on the ticket',
+    description: 'Ticket reply. Not sent when there is no Pylon ticket.',
   },
   pylon_finalize: {
     label: 'Pylon finalize',
-    description: 'Tag delete-complete and close the ticket',
+    description: 'Tag delete-complete and close the ticket. Not used without a Pylon ticket.',
   },
   completion_email: {
     label: 'Completion email',
-    description: 'Notify the customer after account deletion',
+    description: 'Direct email. Not sent when a Pylon ticket exists.',
   },
   pylon_contact: {
     label: 'Pylon delete',
@@ -95,6 +95,40 @@ export function deletionPreflightProgress(request: {
 
 export function deletionStepDescription(stepKey: string): string {
   return STEP_LABELS[stepKey]?.description ?? '';
+}
+
+export type DeletionNotifyChannel = 'pylon' | 'email';
+
+const USED_NOTIFY_STATUSES = new Set([
+  'succeeded',
+  'manually_verified',
+  'running',
+  'needs_attention',
+  'manual_action_required',
+  'retry_wait',
+]);
+
+export function deletionNotifyChannel(input: {
+  pylonTicket: string | null;
+  tasks: readonly { stepKey: string; status: string }[];
+}): DeletionNotifyChannel {
+  if (input.pylonTicket) return 'pylon';
+
+  const reply = input.tasks.find(task => task.stepKey === 'pylon_reply');
+  const email = input.tasks.find(task => task.stepKey === 'completion_email');
+  if (email?.status === 'not_applicable' && reply) return 'pylon';
+  if (reply?.status === 'not_applicable' && email) return 'email';
+  if (reply && USED_NOTIFY_STATUSES.has(reply.status)) return 'pylon';
+  if (email && USED_NOTIFY_STATUSES.has(email.status)) return 'email';
+  return 'email';
+}
+
+export function deletionNotifyStepSkipped(
+  stepKey: string,
+  channel: DeletionNotifyChannel
+): boolean {
+  if (channel === 'pylon') return stepKey === 'completion_email';
+  return stepKey === 'pylon_reply' || stepKey === 'pylon_finalize';
 }
 
 export function deletionStepCountLabel(stepKey: string, count: number): string {

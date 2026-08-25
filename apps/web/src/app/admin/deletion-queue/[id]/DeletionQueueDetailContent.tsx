@@ -40,7 +40,10 @@ import {
   deletionManualSearchHref,
 } from '@/lib/user/deletion-queue/deletion-hints';
 import {
+  deletionNotifyChannel,
+  deletionNotifyStepSkipped,
   deletionPreflightProgress,
+  type DeletionNotifyChannel,
   deletionStepDescription,
   deletionStepLabel,
   deletionStepProgressLabel,
@@ -106,6 +109,10 @@ export function DeletionQueueDetailContent({
 
   const detail = detailQuery.data;
   const request = detail.request;
+  const notifyChannel = deletionNotifyChannel({
+    pylonTicket: request.pylonTicket,
+    tasks: detail.tasks,
+  });
   if (compact) {
     return (
       <CompactDeletionDetail
@@ -221,7 +228,9 @@ export function DeletionQueueDetailContent({
       <Card>
         <CardHeader>
           <CardTitle>Steps</CardTitle>
-          <CardDescription>Preflight, then cleanup, then Cloud user, then Pylon.</CardDescription>
+          <CardDescription>
+            Customer notification is the Pylon reply or the completion email, never both.
+          </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -238,6 +247,7 @@ export function DeletionQueueDetailContent({
             </TableHeader>
             <TableBody>
               {detail.tasks.map(task => {
+                const skipped = deletionNotifyStepSkipped(task.stepKey, notifyChannel);
                 const stuck =
                   task.status === 'needs_attention' || task.status === 'manual_action_required';
                 const hint = stuck ? deletionAttentionHint(task.lastErrorCode) : null;
@@ -249,7 +259,14 @@ export function DeletionQueueDetailContent({
                   : null;
                 return (
                   <TableRow key={task.stepKey}>
-                    <TableCell className="text-xs">{deletionStepLabel(task.stepKey)}</TableCell>
+                    <TableCell className="text-xs">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{deletionStepLabel(task.stepKey)}</span>
+                        {skipped ? (
+                          <span className="text-muted-foreground">Not sent for this request</span>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusBadgeClass(task.status)}>
                         {humanizeToken(task.status)}
@@ -390,6 +407,10 @@ function CompactDeletionDetail({
 }) {
   const request = detail.request;
   const preflightKind = deletionPreflightProgress(request);
+  const notifyChannel = deletionNotifyChannel({
+    pylonTicket: request.pylonTicket,
+    tasks: detail.tasks,
+  });
   const ticket = request.pylonTicket ? `#${request.pylonTicket.replace(/^#/, '')}` : null;
   const stuckTask = detail.tasks.find(
     task => task.status === 'needs_attention' || task.status === 'manual_action_required'
@@ -484,13 +505,19 @@ function CompactDeletionDetail({
             />
           </ProgressGroup>
           {PROGRESS_GROUPS.map((group, groupIndex) => {
+            if (
+              group.stepKeys.every(stepKey => deletionNotifyStepSkipped(stepKey, notifyChannel))
+            ) {
+              return null;
+            }
             const tasks = group.stepKeys.flatMap(stepKey => {
               const task = detail.tasks.find(item => item.stepKey === stepKey);
               return task ? [task] : [];
             });
             if (tasks.length === 0) return null;
             const unlocked =
-              preflightKind === 'finished' && isProgressGroupUnlocked(detail.tasks, groupIndex);
+              preflightKind === 'finished' &&
+              isProgressGroupUnlocked(detail.tasks, groupIndex, notifyChannel);
             return (
               <ProgressGroup key={group.label} label={group.label} hint={group.hint} showThen>
                 <div
@@ -605,7 +632,7 @@ const PROGRESS_GROUPS = [
   },
   {
     label: 'Pylon reply',
-    hint: 'After the Cloud user is anonymized',
+    hint: 'Customer notification for this ticket. No completion email.',
     stepKeys: [UserDeletionStepKey.PylonReply],
   },
   {
@@ -615,12 +642,12 @@ const PROGRESS_GROUPS = [
   },
   {
     label: 'Completion email',
-    hint: 'After the account is fully deleted',
+    hint: 'Direct email because there is no Pylon ticket.',
     stepKeys: [UserDeletionStepKey.CompletionEmail],
   },
   {
     label: 'Pylon delete',
-    hint: 'After the ticket is tagged and closed',
+    hint: 'After customer notification',
     stepKeys: [UserDeletionStepKey.PylonContact],
   },
   {
@@ -642,11 +669,17 @@ function isOpenTask(status: string): boolean {
   return !isFinishedTask(status) && !isStuckTask(status);
 }
 
-function isProgressGroupUnlocked(tasks: Task[], groupIndex: number): boolean {
+function isProgressGroupUnlocked(
+  tasks: Task[],
+  groupIndex: number,
+  notifyChannel: DeletionNotifyChannel
+): boolean {
   return PROGRESS_GROUPS.slice(0, groupIndex).every(group =>
     group.stepKeys.every(stepKey => {
       const task = tasks.find(item => item.stepKey === stepKey);
-      return !task || isFinishedTask(task.status);
+      return (
+        !task || isFinishedTask(task.status) || deletionNotifyStepSkipped(stepKey, notifyChannel)
+      );
     })
   );
 }

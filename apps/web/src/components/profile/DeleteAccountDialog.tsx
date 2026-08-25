@@ -68,7 +68,11 @@ export function DeleteAccountDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant="destructive" className="min-h-control-touch">
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-control-touch self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+        >
           Delete account
         </Button>
       </DialogTrigger>

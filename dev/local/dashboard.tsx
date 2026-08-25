@@ -11,7 +11,13 @@ import {
   resolveGroupTransitiveDeps,
 } from './services';
 import type { ServiceGroup } from './services';
-import { getSessionName, killSession, findOtherKiloDevSessions } from './tmux';
+import {
+  getSessionName,
+  killSession,
+  findOtherKiloDevSessions,
+  findServicePane,
+  paneHasRunningService,
+} from './tmux';
 import {
   findRepoRoot,
   probePort,
@@ -24,7 +30,12 @@ import {
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
+  ensureDeadServiceLogPipes,
+  snapshotCloudAgentPublicTunnelEnv,
+  waitForCloudAgentPublicTunnelCapture,
+  cloudAgentDevVarsPath,
 } from './runner';
+import { isPortlessServiceHealthy, readCapturedTunnelUrl } from './tunnel-health';
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -50,6 +61,7 @@ type ViewedTarget =
   | null;
 
 const REFRESH_MS = 2000;
+const TUNNEL_REFRESH_MS = 15_000;
 const STARTING_GRACE_MS = 30_000;
 const START_DELAY_MS = 300;
 const SIDEBAR_WIDTH = 40;
@@ -307,6 +319,11 @@ function Dashboard({
     () => new Map(initialServiceNames.map(n => [n, 'starting' as const]))
   );
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [stackIssues, setStackIssues] = useState<string[]>([]);
+  const refreshInFlight = useRef(false);
+  const lastWorkerUrl = useRef<string | undefined>(undefined);
+  const reloadingWorker = useRef(false);
+  const lastTunnelProbe = useRef(new Map<string, { at: number; up: boolean }>());
   const [, bumpViewedRevision] = useState(0);
 
   const viewedRef = useRef<ViewedTarget>(
@@ -371,25 +388,85 @@ function Dashboard({
   // --- Status polling ---
   useEffect(() => {
     const refresh = async () => {
-      const servicesToProbe = [...runningServices];
-      if (servicesToProbe.length === 0) return;
+      if (refreshInFlight.current) return;
+      refreshInFlight.current = true;
+      try {
+        const servicesToProbe = [...runningServices];
+        if (servicesToProbe.length === 0) return;
 
-      const inGrace = Date.now() - startTimeRef.current < STARTING_GRACE_MS;
-      const entries = await Promise.all(
-        servicesToProbe.map(async (name): Promise<[string, ServiceStatus]> => {
-          const svc = getService(name);
-          if (svc.port === 0) return [name, 'up'];
-          const up = await probePort(svc.port);
-          return [name, up ? 'up' : inGrace ? 'starting' : 'down'];
-        })
-      );
-      setStatuses(prev => {
-        const changed = entries.some(([name, status]) => prev.get(name) !== status);
-        if (!changed) return prev;
-        return new Map(entries);
-      });
+        const repairedPipes = ensureDeadServiceLogPipes(sessionName, servicesToProbe);
+        const inGrace = Date.now() - startTimeRef.current < STARTING_GRACE_MS;
+        const entries = await Promise.all(
+          servicesToProbe.map(async (name): Promise<[string, ServiceStatus]> => {
+            const svc = getService(name);
+            if (svc.port === 0) {
+              const pane = findServicePane(sessionName, name);
+              const paneAlive = pane !== undefined && paneHasRunningService(sessionName, pane);
+              const url = readCapturedTunnelUrl(repoRoot, name);
+              let up: boolean;
+              if (url === undefined) {
+                up = paneAlive;
+              } else {
+                const now = Date.now();
+                const cached = lastTunnelProbe.current.get(url);
+                if (cached !== undefined && now - cached.at < TUNNEL_REFRESH_MS) {
+                  up = cached.up;
+                } else {
+                  up = await isPortlessServiceHealthy(repoRoot, name, paneAlive, 1500);
+                  lastTunnelProbe.current.set(url, { at: now, up });
+                }
+              }
+              return [name, up ? 'up' : inGrace ? 'starting' : 'down'];
+            }
+            const up = await probePort(svc.port);
+            return [name, up ? 'up' : inGrace ? 'starting' : 'down'];
+          })
+        );
+        setStatuses(prev => {
+          const changed = entries.some(([name, status]) => prev.get(name) !== status);
+          if (!changed) return prev;
+          return new Map(entries);
+        });
+
+        const issues: string[] = [];
+        const down = entries.filter(([, status]) => status === 'down').map(([name]) => name);
+        if (down.includes('cloud-agent-public-tunnels')) {
+          issues.push('tunnels: public URL is down');
+        }
+        for (const name of down) {
+          if (name === 'cloud-agent-public-tunnels') continue;
+          issues.push(`${name} is down`);
+        }
+        if (repairedPipes.length > 0) {
+          issues.push(`reattached logs: ${repairedPipes.join(', ')}`);
+        }
+        const workerUrl = readEnvValue(cloudAgentDevVarsPath(repoRoot), 'WORKER_URL');
+        if (
+          lastWorkerUrl.current !== undefined &&
+          workerUrl !== undefined &&
+          workerUrl !== lastWorkerUrl.current &&
+          runningServices.has('cloud-agent-next') &&
+          !reloadingWorker.current
+        ) {
+          reloadingWorker.current = true;
+          issues.push('reloading worker for new tunnel URL');
+          void restartServiceInTmux(sessionName, 'cloud-agent-next').finally(() => {
+            reloadingWorker.current = false;
+          });
+        }
+        lastWorkerUrl.current = workerUrl;
+        setStackIssues(prev => {
+          if (prev.length === issues.length && prev.every((item, i) => item === issues[i])) {
+            return prev;
+          }
+          return issues;
+        });
+      } finally {
+        refreshInFlight.current = false;
+      }
     };
     void refresh().catch(error => {
+      refreshInFlight.current = false;
       console.error('Failed to refresh service statuses:', error);
     });
     const timer = setInterval(refresh, REFRESH_MS);
@@ -694,7 +771,38 @@ function Dashboard({
       const item = sidebarItems[selectedIdx];
       if (!item || item.kind !== 'service') return;
       if (!runningServices.has(item.name)) return;
-      void restartServiceInTmux(sessionName, item.name);
+      if (item.name !== 'cloud-agent-public-tunnels') {
+        void restartServiceInTmux(sessionName, item.name);
+        return;
+      }
+      const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+      void (async () => {
+        const outcome = await restartServiceInTmux(sessionName, item.name);
+        if (outcome === 'gave-up') {
+          setStackIssues(['tunnels: restart did not finish']);
+          return;
+        }
+        const captured = await waitForCloudAgentPublicTunnelCapture(
+          repoRoot,
+          previous,
+          CAPTURE_TIMEOUT_MS
+        );
+        if (!captured) {
+          setStackIssues(['tunnels: no new public URL captured']);
+          return;
+        }
+        if (
+          !runningServices.has('cloud-agent-next') &&
+          !findServicePane(sessionName, 'cloud-agent-next')
+        ) {
+          return;
+        }
+        reloadingWorker.current = true;
+        setStackIssues(['reloading worker for new tunnel URL']);
+        await restartServiceInTmux(sessionName, 'cloud-agent-next').finally(() => {
+          reloadingWorker.current = false;
+        });
+      })();
       return;
     }
     if (input === 'q') {
@@ -789,7 +897,7 @@ function Dashboard({
 
   // --- Scrolling ---
   const headerCount = 2;
-  const footerCount = 1;
+  const footerCount = stackIssues.length > 0 ? 2 : 1;
   const visibleCount = Math.max(1, rows - headerCount - footerCount);
   if (selectedIdx >= scrollRef.current + visibleCount) {
     scrollRef.current = selectedIdx - visibleCount + 1;
@@ -843,6 +951,14 @@ function Dashboard({
         })}
       </Box>
 
+      {stackIssues.length > 0 && (
+        <Text color="yellow">
+          {' '}
+          {stackIssues[0].length > SIDEBAR_WIDTH - 1
+            ? `${stackIssues[0].slice(0, SIDEBAR_WIDTH - 2)}\u2026`
+            : stackIssues[0]}
+        </Text>
+      )}
       <Text dimColor>
         {' '}
         {'\u2191\u2193'} navigate {'\u23ce'} view/start space stop r restart q quit

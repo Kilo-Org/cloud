@@ -98,6 +98,7 @@ type PrepareSessionSharedFields = {
   variant?: string;
   // GitHub-specific params
   githubRepo?: string;
+  githubIntegrationId?: string;
   /** GitHub Personal Access Token for private repositories */
   githubToken?: string;
   // Generic git params for GitLab and other providers

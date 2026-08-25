@@ -519,4 +519,16 @@ describe('VercelAgentSandbox', () => {
     expect(client.inspectByName).not.toHaveBeenCalled();
     expect(client.stopSession).not.toHaveBeenCalled();
   });
+
+  it('admits billing as a no-op and observes wrappers through discover', async () => {
+    const sandbox = new VercelAgentSandbox(metadata(), config, undefined, {
+      restClient: asRestClient(restClient()),
+    });
+
+    await expect(sandbox.ensureBillingAdmission()).resolves.toEqual({ success: true });
+    await expect(sandbox.isBillingBlocked()).resolves.toBe(false);
+    await expect(sandbox.isBillingBlocked(true)).resolves.toBe(false);
+    await expect(sandbox.getBillingRuntimeStatus()).resolves.toBeUndefined();
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
+  });
 });

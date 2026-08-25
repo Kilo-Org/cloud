@@ -404,6 +404,24 @@ export class VercelAgentSandbox implements AgentSandbox {
     throw new Error('Vercel wrapper did not report the persisted lease');
   }
 
+  // TODO: Vercel is not on the Cloudflare container meter. These admit and
+  // never block so AgentSandbox callers do not throw; wire real billing later.
+  async ensureBillingAdmission() {
+    return { success: true as const };
+  }
+
+  async isBillingBlocked(_enforcementRequested = false): Promise<boolean> {
+    return false;
+  }
+
+  async getBillingRuntimeStatus() {
+    return undefined;
+  }
+
+  observeWrappersWithoutWaking(): Promise<WrapperObservation> {
+    return this.discoverSessionWrappers();
+  }
+
   async ensureWrapper(request: EnsureWrapperRequest) {
     const instance = request.leasedInstance;
     if (!instance) throw new Error('Vercel wrapper startup requires a physical wrapper lease');

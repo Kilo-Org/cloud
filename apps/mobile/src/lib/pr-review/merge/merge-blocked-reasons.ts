@@ -6,37 +6,16 @@
 // pulling in lucide-react-native (whose ESM build uses `import.meta` in
 // ways the repo's vitest setup doesn't transform).
 
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
 export type PrMergeMethod = 'merge' | 'squash' | 'rebase';
-type PrReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 
-export type PrOverviewRepoSettings = {
-  allowMergeCommit: boolean;
-  allowSquashMerge: boolean;
-  allowRebaseMerge: boolean;
-  allowAutoMerge: boolean;
-  deleteBranchOnMerge: boolean;
-  allowUpdateBranch: boolean;
-  viewerCanPush: boolean;
-  viewerCanAdmin: boolean;
-};
-
-export type PrOverviewDto = {
-  state: 'open' | 'closed' | 'merged';
-  draft: boolean;
-  baseRef: string;
-  headRef: string;
-  isCrossRepo: boolean;
-  headSha: string;
-  prNodeId: string;
-  title: string;
-  bodyMarkdown: string | null;
-  number: number;
-  mergeable: boolean | null;
-  mergeableState: string | null;
-  autoMerge: { method: string } | null;
-  reviewDecision: PrReviewDecision;
-  repo: PrOverviewRepoSettings;
-};
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+export type PrOverviewDto = RouterOutputs['githubPrReview']['getPullRequest'];
+// The repo settings the merge surfaces consume. Derived from the overview DTO;
+// `viewerLogin` is carried on the wire but never read by mobile, so it is
+// dropped here (keeping the existing test/mock object literals valid).
+export type PrOverviewRepoSettings = Omit<PrOverviewDto['repo'], 'viewerLogin'>;
 
 type MergeabilityStatus = 'unknown' | 'blocked' | 'mergeable' | 'terminal';
 
@@ -65,7 +44,7 @@ export type MergeBlockedReasonsArgs = {
   draft: PrOverviewDto['draft'];
   mergeable: PrOverviewDto['mergeable'];
   mergeableState: PrOverviewDto['mergeableState'];
-  reviewDecision: PrReviewDecision;
+  reviewDecision: PrOverviewDto['reviewDecision'];
   allowUpdateBranch: boolean;
 };
 

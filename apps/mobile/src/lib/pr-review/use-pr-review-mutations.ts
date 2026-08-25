@@ -23,6 +23,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -54,18 +55,11 @@ async function invalidateReviewCaches(
   ]);
 }
 
-export type CreateReviewCommentInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  body: string;
-  path: string;
-  line: number;
-  side: 'LEFT' | 'RIGHT';
-  startLine?: number;
-  startSide?: 'LEFT' | 'RIGHT';
-  commitSha: string;
-};
+type RouterInputs = inferRouterInputs<MobileRouter>;
+
+export type CreateReviewCommentInput = RouterInputs['githubPrReview']['createReviewComment'];
+export type SubmitReviewInput = RouterInputs['githubPrReview']['submitReview'];
+export type SubmitReviewComment = NonNullable<SubmitReviewInput['comments']>[number];
 
 export function useCreateReviewCommentMutation(ref: PrRef) {
   const queryClient = useQueryClient();
@@ -102,25 +96,6 @@ export function useCreateReviewCommentMutation(ref: PrRef) {
     },
   });
 }
-
-export type SubmitReviewComment = {
-  path: string;
-  line: number;
-  side: 'LEFT' | 'RIGHT';
-  startLine?: number;
-  startSide?: 'LEFT' | 'RIGHT';
-  body: string;
-};
-
-export type SubmitReviewInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
-  body?: string;
-  commitSha: string;
-  comments?: SubmitReviewComment[];
-};
 
 export function useSubmitReviewMutation(ref: PrRef) {
   const queryClient = useQueryClient();

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { hasInFlightReview, isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -116,13 +117,8 @@ export function useRetriggerReview(scope: string) {
   });
 }
 
-type CreateManualReviewInput = {
-  platform: 'github' | 'gitlab';
-  url: string;
-  modelSlug: string;
-  thinkingEffort?: string | null;
-  instructions?: string;
-};
+type RouterInputs = inferRouterInputs<MobileRouter>;
+type CreateManualReviewInput = RouterInputs['personalReviewAgent']['createManualReviewJob'];
 
 export async function createManualReviewMutationFn(scope: string, vars: CreateManualReviewInput) {
   // Same typed-error pattern: a domain failure throws so the screen's

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -22,20 +23,15 @@ import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+type CheckRun = RouterOutputs['githubPrReview']['listChecks']['checkRuns'][number];
+
 type PrReviewChecksSectionProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
   /** Head SHA to fetch check runs for. */
   readonly headSha: string;
-};
-
-type CheckRun = {
-  name: string;
-  status: string;
-  conclusion: string | null;
-  detailsUrl: string | null;
-  appName: string | null;
 };
 
 type CheckTone = 'success' | 'failure' | 'pending' | 'skipped' | 'neutral' | 'warning';

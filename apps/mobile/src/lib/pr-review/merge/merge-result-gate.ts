@@ -28,11 +28,21 @@
 // server widens `merged = Boolean(response.data.merged)` and the
 // subsequent branches only narrow the other fields.
 
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
 import { MergeNotCompletedError } from './merge-result-error';
 
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+
+// The inferred `mergePullRequest` output simplifies to the two variants with
+// `merged: boolean` / `merged: true` — the server's `branchDeleteError` variant
+// is a structural subtype of the first, so declaration emit folds it away. The
+// merge gate narrows on `'branchDeleteError' in result` to surface the
+// merged-but-branch-delete-failed banner, so that variant is re-added
+// explicitly; the base stays derived from the router so the two stable shapes
+// cannot drift from the server contract.
 export type MergePullRequestResult =
-  | { merged: boolean; sha: string; branchDeleted: false }
-  | { merged: true; sha: string; branchDeleted: true }
+  | RouterOutputs['githubPrReview']['mergePullRequest']
   | { merged: true; sha: string; branchDeleted: false; branchDeleteError: string };
 
 type MergeResultGate =

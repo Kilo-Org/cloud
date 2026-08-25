@@ -98,6 +98,8 @@ type UsageAnalyticsDashboardProps =
        */
       callerRole?: OrganizationRole;
       organizationPlan?: Organization['plan'];
+      /** Renders the populated sales-demo default view and trims demo-only panels. */
+      isSalesDemo?: boolean;
       /** Page title override. */
       title?: string;
     };
@@ -141,6 +143,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const organizationId = org?.organizationId ?? null;
   const organizationName = org?.organizationName;
   const callerRole = org?.callerRole;
+  const isSalesDemo = org?.isSalesDemo === true;
 
   const trpc = useTRPC();
   // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
@@ -152,8 +155,17 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     organizationId && searchParams.get('scope') == null && searchParams.get('viewAs') === 'org-wide'
       ? organizationId
       : undefined;
+  const salesDemoDefaults =
+    isSalesDemo && organizationId
+      ? {
+          usageView: 'ai-usage' as const,
+          period: '30d' as const,
+          granularity: 'day' as const,
+          orgScope: organizationId,
+        }
+      : undefined;
   const { state, setState } = useUsageDashboardState(
-    legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined
+    salesDemoDefaults ?? (legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined)
   );
   const {
     period,
@@ -461,9 +473,10 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const userLabelFor = useCallback(
     (value: string) => {
       const match = userResolution?.users.find(u => u.id === value);
+      if (isSalesDemo) return match?.name || match?.email || value;
       return match?.email || match?.name || value;
     },
-    [userResolution]
+    [userResolution, isSalesDemo]
   );
 
   const featureLabelFor = useCallback((value: string) => humanize(value), []);
@@ -779,7 +792,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
 
         <div className="flex-1 overflow-y-auto">
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-            <UsageAvailabilityBanner />
+            {!isSalesDemo && <UsageAvailabilityBanner />}
 
             {hasEnterpriseUsageViews && (
               <div className="space-y-4">
@@ -792,6 +805,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                 <UsageViewNavigation
                   value={usageView}
                   onValueChange={nextView => setState({ usageView: nextView })}
+                  isSalesDemo={isSalesDemo}
                 />
               </div>
             )}
@@ -833,7 +847,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                     {/* Org-level panels follow the selected single org so they
                         don't mix scopes; hidden in the All Organizations aggregate
                         (effectiveOrgId is null) which they cannot represent. */}
-                    {isOrgContext && effectiveOrgId && (
+                    {!isSalesDemo && isOrgContext && effectiveOrgId && (
                       <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
                     )}
 
@@ -923,7 +937,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                       }
                     />
 
-                    {isOrgAdmin && effectiveOrgId && (
+                    {!isSalesDemo && isOrgAdmin && effectiveOrgId && (
                       <ActiveKiloclawsTable organizationId={effectiveOrgId} />
                     )}
                   </>

@@ -71,7 +71,19 @@ describe('auth utilities', () => {
 
       const token = extractBearerToken(c);
 
-      expect(token).toBe('');
+      expect(token).toBeNull();
+    });
+
+    it('extracts token case-insensitively per RFC 6750', () => {
+      const c = createMockContext();
+      (c.req.header as jest.Mock).mockImplementation((name: string) => {
+        if (name === 'Authorization') return 'bearer my-token-123';
+        return undefined;
+      });
+
+      const token = extractBearerToken(c);
+
+      expect(token).toBe('my-token-123');
     });
   });
 

@@ -24,6 +24,7 @@
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
+    "./extract-bearer-token": "./src/extract-bearer-token.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
     "./cloud-agent-failure": "./src/cloud-agent-failure.ts",
     "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",

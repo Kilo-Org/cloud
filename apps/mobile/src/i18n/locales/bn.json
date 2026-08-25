@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "শেষ হলে এজেন্টের চিন্তাভাবনা প্রসারিত দেখান।",
     "keepScreenOn": "সেশন পেজে থাকাকালীন স্ক্রিন চালু রাখুন",
     "keepScreenOnSubtitle": "সেশন কাজ করার সময় স্ক্রিন জাগ্রত রাখুন।",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "চেহারা",
     "notifications": "বিজ্ঞপ্তি",

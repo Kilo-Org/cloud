@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
     "keepScreenOn": "セッションページで画面を常時オン",
     "keepScreenOnSubtitle": "セッションの動作中は画面を起動したままにします。",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "外観",
     "notifications": "通知",

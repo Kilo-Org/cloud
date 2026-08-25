@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "代理完成时展开显示其思考过程。",
     "keepScreenOn": "在会话页面保持屏幕常亮",
     "keepScreenOnSubtitle": "会话运行期间保持屏幕唤醒。",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "外观",
     "notifications": "通知",

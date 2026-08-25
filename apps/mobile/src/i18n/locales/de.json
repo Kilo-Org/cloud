@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "Das Denken des Agenten erweitert anzeigen, wenn es fertig ist.",
     "keepScreenOn": "Bildschirm auf der Sitzungsseite anlassen",
     "keepScreenOnSubtitle": "Den Bildschirm wach halten, während die Sitzung arbeitet.",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "Erscheinungsbild",
     "notifications": "Benachrichtigungen",

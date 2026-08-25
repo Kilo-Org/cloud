@@ -294,7 +294,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                 }}
               />
             ) : (
-              <Skeleton className="min-h-14 max-h-32" />
+              <Skeleton className="h-32" />
             )}
           </View>
 

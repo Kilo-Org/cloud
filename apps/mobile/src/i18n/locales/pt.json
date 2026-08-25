@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "Mostrar o raciocínio do agente expandido quando termina.",
     "keepScreenOn": "Manter o ecrã ligado na página da sessão",
     "keepScreenOnSubtitle": "Manter o ecrã ativo enquanto a sessão está a trabalhar.",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "Aparência",
     "notifications": "Notificações",

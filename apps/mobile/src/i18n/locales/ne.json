@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "समाप्त हुँदा एजेन्टको सोच विस्तार गरेर देखाउनुहोस्।",
     "keepScreenOn": "सत्र पृष्ठमा रहँदा स्क्रिन खुला राख्नुहोस्",
     "keepScreenOnSubtitle": "सत्र काम गर्दै गर्दा स्क्रिन जगाएर राख्नुहोस्।",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "रूप",
     "notifications": "सूचनाहरू",

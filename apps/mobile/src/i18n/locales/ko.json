@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "에이전트가 완료되면 사고를 펼쳐서 표시합니다.",
     "keepScreenOn": "세션 페이지에서 화면 켜짐 유지",
     "keepScreenOnSubtitle": "세션이 작업하는 동안 화면을 깨어 있게 유지합니다.",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "모양",
     "notifications": "알림",

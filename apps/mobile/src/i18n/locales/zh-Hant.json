@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "代理完成時，以展開狀態顯示其思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕開啟",
     "keepScreenOnSubtitle": "工作階段運作時保持螢幕喚醒。",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "外觀",
     "notifications": "通知",

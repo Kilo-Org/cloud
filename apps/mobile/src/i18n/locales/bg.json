@@ -137,7 +137,7 @@
     "autoExpandThinkingSubtitle": "Показвай мисленето на агента разгънато, когато приключи.",
     "keepScreenOn": "Дръж екрана включен на страницата на сесията",
     "keepScreenOnSubtitle": "Дръж екрана буден, докато сесията работи.",
-    "prReviewAttribution": "Add app attribution to PR reviews.",
+    "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "Изглед",
     "notifications": "Известия",

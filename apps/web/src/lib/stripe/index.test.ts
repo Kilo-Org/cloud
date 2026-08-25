@@ -62,7 +62,6 @@ import {
   processStripePaymentEventHook,
   handleSuccessfulChargeWithPayment,
   isCardFingerprintEligibleForFreeCredits,
-  getStripeInvoicesPage,
 } from '@/lib/stripe';
 import {
   type User,
@@ -3971,8 +3970,6 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
 describe('getStripeInvoicesPage', () => {
   test('returns hasMore, entries, and nextCursor from the last invoice', async () => {
-    const { client } = await import('@/lib/stripe-client');
-
     const invoices = [
       {
         id: 'in_page_1',
@@ -4000,46 +3997,64 @@ describe('getStripeInvoicesPage', () => {
       },
     ] as unknown as Stripe.Invoice[];
 
-    const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
-      data: invoices,
-      has_more: true,
-    } as unknown as Awaited<ReturnType<typeof client.invoices.list>>);
+    try {
+      jest.resetModules();
+      await jest.isolateModulesAsync(async () => {
+        const stripe = await import('@/lib/stripe');
+        const { client } = await import('@/lib/stripe-client');
 
-    const result = await getStripeInvoicesPage('cus_page_test');
+        const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
+          data: invoices,
+          has_more: true,
+        } as unknown as Awaited<ReturnType<typeof client.invoices.list>>);
 
-    expect(listSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_page_test', limit: 25 })
-    );
-    expect(result.hasMore).toBe(true);
-    expect(result.entries).toHaveLength(2);
-    expect(result.nextCursor).toBe('in_page_2');
+        const result = await stripe.getStripeInvoicesPage('cus_page_test');
 
-    listSpy.mockRestore();
+        expect(listSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ customer: 'cus_page_test', limit: 25 })
+        );
+        expect(result.hasMore).toBe(true);
+        expect(result.entries).toHaveLength(2);
+        expect(result.nextCursor).toBe('in_page_2');
+
+        listSpy.mockRestore();
+      });
+    } finally {
+      jest.resetModules();
+    }
   });
 
   test('passes starting_after and date threshold through to Stripe', async () => {
-    const { client } = await import('@/lib/stripe-client');
+    try {
+      jest.resetModules();
+      await jest.isolateModulesAsync(async () => {
+        const stripe = await import('@/lib/stripe');
+        const { client } = await import('@/lib/stripe-client');
 
-    const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
-      data: [],
-      has_more: false,
-    } as unknown as Awaited<ReturnType<typeof client.invoices.list>>);
+        const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
+          data: [],
+          has_more: false,
+        } as unknown as Awaited<ReturnType<typeof client.invoices.list>>);
 
-    const threshold = new Date('2026-01-01T00:00:00.000Z');
-    const result = await getStripeInvoicesPage('cus_page_test', threshold, 'in_cursor');
+        const threshold = new Date('2026-01-01T00:00:00.000Z');
+        const result = await stripe.getStripeInvoicesPage('cus_page_test', threshold, 'in_cursor');
 
-    expect(listSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer: 'cus_page_test',
-        limit: 25,
-        starting_after: 'in_cursor',
-        created: { gte: Math.floor(threshold.getTime() / 1000) },
-      })
-    );
-    expect(result.hasMore).toBe(false);
-    expect(result.entries).toEqual([]);
-    expect(result.nextCursor).toBeNull();
+        expect(listSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            customer: 'cus_page_test',
+            limit: 25,
+            starting_after: 'in_cursor',
+            created: { gte: Math.floor(threshold.getTime() / 1000) },
+          })
+        );
+        expect(result.hasMore).toBe(false);
+        expect(result.entries).toEqual([]);
+        expect(result.nextCursor).toBeNull();
 
-    listSpy.mockRestore();
+        listSpy.mockRestore();
+      });
+    } finally {
+      jest.resetModules();
+    }
   });
 });

@@ -174,5 +174,35 @@ describe('media-proxy', () => {
         'exceeds the size limit'
       );
     });
+
+    it('stops reading at the size cap without buffering the full body', async () => {
+      const totalBytes = 20 * 1024 * 1024;
+      let produced = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (produced >= totalBytes) {
+            controller.close();
+            return;
+          }
+          const size = Math.min(1024 * 1024, totalBytes - produced);
+          const chunk = new Uint8Array(size);
+          produced += size;
+          controller.enqueue(chunk);
+        },
+      });
+
+      mockFetch.mockResolvedValue(
+        new Response(stream, { status: 200, headers: { 'content-type': 'image/png' } })
+      );
+
+      await expect(fetchSafeMedia('https://example.com/big.png')).rejects.toThrow(
+        'exceeds the size limit'
+      );
+
+      // The upstream stream offers 20 MiB; the proxy must abort long before the
+      // producer can emit it all. If the proxy buffered the whole body (the old
+      // arrayBuffer path), `produced` would reach `totalBytes`.
+      expect(produced).toBeLessThan(totalBytes);
+    });
   });
 });

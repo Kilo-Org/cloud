@@ -225,27 +225,24 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(byId.get(linkedRow)).toBe('linked');
   });
 
-  it('releasePendingUploads deletes only the caller pending row and leaves linked and other-user rows', async () => {
+  it('releasePendingUploads deletes only the caller pending row and its R2 object', async () => {
+    mockSend.mockResolvedValue({});
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const otherUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const releasedAttachment = crypto.randomUUID();
-    const keptPendingAttachment = crypto.randomUUID();
     const linkedAttachment = crypto.randomUUID();
     const otherUserAttachment = crypto.randomUUID();
+    const releasedKey = buildObjectKey(kiloUserId, messageUuid, releasedAttachment);
+    const linkedKey = buildObjectKey(kiloUserId, messageUuid, linkedAttachment);
+    const otherUserKey = buildObjectKey(otherUserId, messageUuid, otherUserAttachment);
 
     const releasedRow = await insertPendingRow({
       kiloUserId,
       messageUuid,
       attachmentId: releasedAttachment,
-      expiresAt: future,
-    });
-    const keptPendingRow = await insertPendingRow({
-      kiloUserId,
-      messageUuid,
-      attachmentId: keptPendingAttachment,
       expiresAt: future,
     });
     const linkedRow = await insertPendingRow({
@@ -263,11 +260,11 @@ describe('cloud-agent pending-upload ledger', () => {
     });
 
     await releasePendingUploads(kiloUserId, [
-      buildObjectKey(kiloUserId, messageUuid, releasedAttachment),
+      releasedKey,
       // Linked row belongs to the caller but must survive (status predicate).
-      buildObjectKey(kiloUserId, messageUuid, linkedAttachment),
+      linkedKey,
       // Other user's pending row must survive (owner predicate).
-      buildObjectKey(otherUserId, messageUuid, otherUserAttachment),
+      otherUserKey,
     ]);
 
     const remaining = await db
@@ -276,8 +273,13 @@ describe('cloud-agent pending-upload ledger', () => {
     const ids = new Set(remaining.map(row => row.id));
 
     expect(ids.has(releasedRow)).toBe(false);
-    expect(ids.has(keptPendingRow)).toBe(true);
     expect(ids.has(linkedRow)).toBe(true);
     expect(ids.has(otherUserRow)).toBe(true);
+
+    const sentCommands = mockSend.mock.calls.map(
+      call => call[0] as { input: { Key: string }; name: string }
+    );
+    expect(sentCommands.map(command => command.name)).toEqual(['DeleteObjectCommand']);
+    expect(sentCommands.map(command => command.input.Key)).toEqual([releasedKey]);
   });
 });

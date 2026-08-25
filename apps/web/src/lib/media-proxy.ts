@@ -105,6 +105,50 @@ function baseContentType(header: string | null): string {
 }
 
 /**
+ * Reads the response body through its stream reader and stops the moment the
+ * accumulated bytes exceed `maxBytes`, cancelling the stream so an oversized
+ * upstream body is never buffered in full.
+ */
+async function readCappedBody(response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (!response.body) {
+    return new Uint8Array(0);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      if (total + value.byteLength > maxBytes) {
+        throw new MediaProxyError('Media body exceeds the size limit.');
+      }
+      total += value.byteLength;
+      chunks.push(value);
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // The stream may already be closed or errored; a failed cancel is not
+      // relevant to the caller.
+    }
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+/**
  * Fetches a media URL through the proxy safety chain: validates the URL and
  * every redirect hop, follows at most three hops, requires an allowlisted
  * image content type, caps the body at 10 MiB, and forwards only a sanitized
@@ -138,10 +182,7 @@ export async function fetchSafeMedia(urlString: string): Promise<Response> {
       throw new MediaProxyError('Media is not an allowed image type.');
     }
 
-    const body = new Uint8Array(await response.arrayBuffer());
-    if (body.byteLength > MAX_BODY_BYTES) {
-      throw new MediaProxyError('Media body exceeds the size limit.');
-    }
+    const body = await readCappedBody(response, MAX_BODY_BYTES);
 
     const headers = new Headers();
     headers.set('content-type', contentType);

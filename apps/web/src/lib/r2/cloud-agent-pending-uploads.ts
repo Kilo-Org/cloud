@@ -104,8 +104,10 @@ export type ReapAbandonedUploadsSummary = {
 /**
  * Release a set of pending rows back out of the per-message quota when the
  * caller abandons the files before sending (e.g. removes them from the
- * composer). Only the caller's own 'pending' rows are deleted; 'linked' rows
- * (already sent) and other users' rows stay untouched.
+ * composer). Only the caller's own 'pending' rows are released; 'linked' rows
+ * (already sent) and other users' rows stay untouched. The R2 objects behind
+ * the rows it actually releases are deleted too, so an abandoned upload is
+ * never left unreaped.
  */
 export async function releasePendingUploads(
   kiloUserId: string,
@@ -113,7 +115,7 @@ export async function releasePendingUploads(
 ): Promise<void> {
   if (objectKeys.length === 0) return;
 
-  await db
+  const released = await db
     .delete(cloud_agent_pending_uploads)
     .where(
       and(
@@ -121,7 +123,17 @@ export async function releasePendingUploads(
         eq(cloud_agent_pending_uploads.status, 'pending'),
         inArray(cloud_agent_pending_uploads.object_key, objectKeys)
       )
+    )
+    .returning({ object_key: cloud_agent_pending_uploads.object_key });
+
+  for (const row of released) {
+    await r2Client.send(
+      new DeleteObjectCommand({
+        Bucket: r2CloudAgentAttachmentsBucketName,
+        Key: row.object_key,
+      })
     );
+  }
 }
 
 /**

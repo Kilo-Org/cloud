@@ -136,9 +136,7 @@ export function useNewSessionCreator({
       mode,
       model,
       variant: variant || undefined,
-      repo: selectedRepository
-        ? `${selectedRepository.platform}/${selectedRepository.fullName}`
-        : '',
+      repo: selectedRepository ? selectedRepository.fullName : '',
       autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,

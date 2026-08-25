@@ -262,7 +262,7 @@ describe('sessionRowAccessibilityLabel', () => {
           subtitle: 'feature/x',
           prNumber: 42,
         })
-      ).toBe('Fix login bug, feature/x, pull request 42, CLI');
+      ).toBe('Fix login bug, feature/x, pull request 42, and CLI');
     });
 
     it('keeps the fixed order with needs input, branch, PR, badge, and meta', () => {
@@ -275,7 +275,7 @@ describe('sessionRowAccessibilityLabel', () => {
           subtitle: 'feature/x',
           prNumber: 7,
         })
-      ).toBe('Fix login bug, needs input, feature/x, pull request 7, CLI, 5 minutes ago');
+      ).toBe('Fix login bug, needs input, feature/x, pull request 7, CLI, and 5 minutes ago');
     });
 
     it('omits the pull-request phrase when the row has no PR', () => {
@@ -286,7 +286,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           subtitle: 'feature/x',
         })
-      ).toBe('Plain session, feature/x, CLI');
+      ).toBe('Plain session, feature/x, and CLI');
       expect(
         sessionRowAccessibilityLabel({
           title: 'Plain session',
@@ -295,7 +295,7 @@ describe('sessionRowAccessibilityLabel', () => {
           subtitle: 'feature/x',
           prNumber: null,
         })
-      ).toBe('Plain session, feature/x, CLI');
+      ).toBe('Plain session, feature/x, and CLI');
     });
 
     it('omits the branch phrase when no subtitle is present', () => {
@@ -306,7 +306,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           prNumber: 42,
         })
-      ).toBe('Plain session, pull request 42, CLI');
+      ).toBe('Plain session, pull request 42, and CLI');
     });
   });
 

@@ -109,7 +109,6 @@ describe('local fake deterministic model', () => {
       id: 'custom',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
-      disableRequestTimeout: true,
     });
     env.restore();
   });

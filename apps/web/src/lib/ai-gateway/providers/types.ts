@@ -58,6 +58,4 @@ export type Provider = {
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;
-  /** Skip the gateway abort timeout so parked SSE streams can stay open. */
-  disableRequestTimeout?: boolean;
 };

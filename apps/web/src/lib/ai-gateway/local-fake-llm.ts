@@ -73,17 +73,14 @@ export function getLocalFakeLlmProvider(): Provider | null {
   const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
   if (!isLocalFakeLlmEnabled() || !url) return null;
   const baseUrl = url.href.replace(/\/$/, '');
-  return {
-    ...buildDirectProvider(
-      'custom',
-      ['chat_completions'],
-      {
-        base_url: `${baseUrl}/api/openrouter`,
-        internal_id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
-        api_key: 'local-fake-llm',
-      },
-      null
-    ),
-    disableRequestTimeout: true,
-  };
+  return buildDirectProvider(
+    'custom',
+    ['chat_completions'],
+    {
+      base_url: `${baseUrl}/api/openrouter`,
+      internal_id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
+      api_key: 'local-fake-llm',
+    },
+    null
+  );
 }

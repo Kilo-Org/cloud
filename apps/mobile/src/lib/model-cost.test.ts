@@ -29,46 +29,46 @@ describe('formatModelCostPer1M', () => {
 
   it('renders $120-class with trailing zeros stripped', () => {
     expect(formatModelCostPer1M({ prompt: '0.00012', completion: '0.000014' })).toBe(
-      'In $120 · Out $14 per 1M tokens'
+      'Input $120 · Output $14 / 1M tokens'
     );
   });
 
   it('renders $3 with trailing zeros stripped', () => {
     expect(formatModelCostPer1M({ prompt: '0.000003', completion: '0.000014' })).toBe(
-      'In $3 · Out $14 per 1M tokens'
+      'Input $3 · Output $14 / 1M tokens'
     );
   });
 
   it('renders $1.75 and $1.5 with proper trim rules', () => {
     expect(formatModelCostPer1M({ prompt: '0.00000175', completion: '0.0000015' })).toBe(
-      'In $1.75 · Out $1.5 per 1M tokens'
+      'Input $1.75 · Output $1.5 / 1M tokens'
     );
   });
 
   it('renders $0.15', () => {
     expect(formatModelCostPer1M({ prompt: '0.00000015', completion: '0.000014' })).toBe(
-      'In $0.15 · Out $14 per 1M tokens'
+      'Input $0.15 · Output $14 / 1M tokens'
     );
   });
 
   it('renders $0.03', () => {
     expect(formatModelCostPer1M({ prompt: '0.00000003', completion: '0.000014' })).toBe(
-      'In $0.03 · Out $14 per 1M tokens'
+      'Input $0.03 · Output $14 / 1M tokens'
     );
   });
 
   it('renders <$0.01 for sub-cent (but positive) prices', () => {
     expect(formatModelCostPer1M({ prompt: '0.000000009', completion: '0.000014' })).toBe(
-      'In <$0.01 · Out $14 per 1M tokens'
+      'Input <$0.01 · Output $14 / 1M tokens'
     );
     expect(formatModelCostPer1M({ prompt: '0.00000175', completion: '0.000000009' })).toBe(
-      'In $1.75 · Out <$0.01 per 1M tokens'
+      'Input $1.75 · Output <$0.01 / 1M tokens'
     );
   });
 
   it('renders asymmetric pairs with one side sub-cent', () => {
     expect(formatModelCostPer1M({ prompt: '0.000000005', completion: '0.00003' })).toBe(
-      'In <$0.01 · Out $30 per 1M tokens'
+      'Input <$0.01 · Output $30 / 1M tokens'
     );
   });
 });
@@ -97,7 +97,7 @@ describe('modelPickerCostLabel', () => {
       modelPickerCostLabel({
         pricing: { prompt: '0.00000175', completion: '0.000014' },
       })
-    ).toBe('In $1.75 · Out $14 per 1M tokens');
+    ).toBe('Input $1.75 · Output $14 / 1M tokens');
   });
 
   it('returns null for undefined pricing on non-free, non-BYOK option', () => {

@@ -13,7 +13,7 @@ import {
   buildCreateRemoteSessionInput,
   type CreateSessionOutcome,
 } from '@/lib/hooks/remote-instance-spawn-classifier';
-import { REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST } from '@/lib/remote-spawn-admission';
+import { remoteSpawnFilesNotSupportedToast } from '@/lib/remote-spawn-admission';
 import { remoteSpawnRetryableToast } from '@/lib/remote-submit-outcome';
 
 import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
@@ -438,7 +438,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     onStart();
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith(REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST);
+    expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
   });
 
   it('does not call the admitted callback without a target instance', () => {

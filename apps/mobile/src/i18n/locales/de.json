@@ -22,7 +22,12 @@
     "required": "erforderlich",
     "error": "Fehler: {{error}}",
     "notNow": "Nicht jetzt",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "back": "Zurück",
+    "somethingWentWrong": "Etwas ist schiefgelaufen",
+    "couldNotOpen": "{{label}} konnte nicht geöffnet werden",
+    "link": "Link",
+    "takingLonger": "Dies dauert länger als erwartet. Du kannst dies schließen und später erneut prüfen."
   },
   "language": {
     "title": "Sprache",
@@ -137,15 +142,15 @@
     "autoExpandThinkingSubtitle": "Das Denken des Agenten erweitert anzeigen, wenn es fertig ist.",
     "keepScreenOn": "Bildschirm auf der Sitzungsseite anlassen",
     "keepScreenOnSubtitle": "Den Bildschirm wach halten, während die Sitzung arbeitet.",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "appearance": "Erscheinungsbild",
     "notifications": "Benachrichtigungen",
     "notificationsSubtitle": "Push-Einstellungen",
     "appearanceSystem": "System",
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -203,7 +208,8 @@
     "agents": "Agenten",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, Tab, {{position}} von {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -244,7 +250,7 @@
       "recent": "Zuletzt",
       "common": "Häufig",
       "reactWith": "Mit {{reaction}} reagieren",
-      "accessibility": "{{emoji}}-Reaktion, {{count}}"
+      "accessibility": "{{emoji}}-Reaktion, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Antwortet auf",
@@ -273,11 +279,21 @@
       "imageUnavailable": "Bild nicht verfügbar",
       "openFailed": "Anhang konnte nicht geöffnet werden. Überprüfe deine Verbindung und versuche es erneut.",
       "attachFailed": "Datei konnte nicht angehängt werden",
-      "limit": "Du kannst bis zu {{count}} Dateien anhängen.",
+      "limit": "Du kannst bis zu {{displayCount}} Dateien anhängen.",
       "sizeRejection": "{{filename}} überschreitet das Anhang-Limit von {{limit}}.",
       "unreadable": "{{filename}} konnte nicht gelesen werden.",
       "pastedImage": "das eingefügte Bild",
-      "defaultName": "Anhang"
+      "defaultName": "Anhang",
+      "classificationDenied": "Ausführbare Dateien können nicht angehängt werden",
+      "classificationEmpty": "Die Datei ist leer",
+      "classificationTooLarge": "Dateien dürfen höchstens 20 MB groß sein",
+      "classificationUnreadable": "Diese Datei konnte nicht gelesen werden",
+      "announceUploaded": "Anhang hochgeladen",
+      "cantUpload": "Diese Datei kann nicht hochgeladen werden.",
+      "networkError": "Netzwerkfehler",
+      "uploadFailed": "Hochladen fehlgeschlagen",
+      "failedToUploadFile": "Datei konnte nicht hochgeladen werden: {{reason}}",
+      "nothingToPaste": "Nichts einzufügen"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -291,7 +307,9 @@
       "moreActions": "Weitere Aktionen",
       "message": "Nachricht",
       "notDelivered": "Nicht zugestellt",
-      "edited": "(bearbeitet)"
+      "edited": "(bearbeitet)",
+      "image": "Bild",
+      "attachment": "Anhang"
     },
     "messageActions": {
       "copied": "Kopiert",
@@ -321,8 +339,9 @@
     },
     "typingIndicator": {
       "someone": "Jemand",
-      "oneTyping": "{{name}} tippt...",
-      "manyTyping": "{{names}} tippen..."
+      "typing_one": "{{name}} tippt...",
+      "typing": "{{names}} tippen...",
+      "typing_other": "{{names}} tippen..."
     },
     "botStatus": {
       "online": "Online",
@@ -332,6 +351,12 @@
       "loadingUser": "Benutzer wird geladen...",
       "waitingForStatus": "Warte auf Bot-Status...",
       "offlineMessage": "Der Bot ist offline. Nachrichten werden fortgesetzt, sobald er sich wieder verbindet."
+    },
+    "errors": {
+      "notAllowed": "Nicht erlaubt",
+      "messageTooLong": "Die Nachricht ist zu lang — halte sie unter {{limit}} Zeichen",
+      "titleTooLong": "Der Titel ist zu lang — halte ihn unter {{limit}} Zeichen",
+      "messageEmpty": "Die Nachricht darf nicht leer sein"
     }
   },
   "kiloclaw": {
@@ -344,6 +369,7 @@
       "finalTermEnds": "Letzte Laufzeit endet",
       "afterFinalTerm": "Nach der letzten Laufzeit",
       "remaining": "Verbleibend",
+      "lessThanOneDay": "Weniger als 1 Tag",
       "ends": "Endet",
       "expires": "Läuft ab",
       "noActivePlan": "Kein aktiver Tarif",
@@ -352,23 +378,25 @@
       "couldNotLoad": "Abrechnungsdaten konnten nicht geladen werden",
       "manageOnWeb": "Abrechnung im Web verwalten",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} Tage verbleibend",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Deine letzte Commit-Laufzeit endet am {{date}}. Fahre als Standard für {{price}} fort, oder das Hosting endet.",
       "freeTrial": "Kostenlose Testphase",
       "hostingEnds": "Hosting endet",
-      "oneDayLeft": "1 Tag verbleibend",
       "renews": "Verlängert sich",
       "standardMonthToMonth": "Standard monatlich",
       "standardStartsOn": "Standard beginnt am {{date}} für {{price}}.",
       "yourStandardMonthlyPrice": "dein monatlicher Standard-Preis",
       "perMonth": "/Monat",
       "earlybirdAccessUntil": "Earlybird-Zugang bis {{date}}",
-      "earlybirdEnding": "Earlybird endet: noch {{days}} Tage",
+      "earlybirdEnding": "Earlybird endet: {{remaining}}",
       "paymentPastDue": "Zahlung überfällig. Bitte aktualisiere deine Zahlungsmethode.",
       "subscriptionCancels": "Abo endet am {{date}}",
-      "trialDaysRemaining": "Testphase: noch {{days}} Tage",
-      "trialEndingSoon": "Testphase endet bald: {{days}}"
+      "trialDaysRemaining": "Testphase: noch {{remaining}}",
+      "trialEndingSoon": "Testphase endet bald: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Neuigkeiten",
@@ -568,8 +596,9 @@
       "needsAttention": "{{name}} braucht Aufmerksamkeit: {{label}}",
       "open": "{{name}} öffnen",
       "openSettings": "Einstellungen für {{name}} öffnen",
-      "openUnreadMany": "{{name}} öffnen, {{count}} ungelesene Nachrichten",
-      "openUnreadOne": "{{name}} öffnen, {{count}} ungelesene Nachricht"
+      "openUnread": "{{name}} öffnen, {{displayCount}} ungelesene Nachrichten",
+      "openUnread_other": "{{name}} öffnen, {{displayCount}} ungelesene Nachrichten",
+      "openUnread_one": "{{name}} öffnen, {{displayCount}} ungelesene Nachricht"
     },
     "list": {
       "createInstance": "Instanz erstellen",
@@ -667,7 +696,7 @@
         "startingSandbox": "Sandbox wird gestartet",
         "stoppedBody": "Die Instanz von {{name}} wurde während der Einrichtung unerwartet gestoppt.",
         "stoppedTitle": "Einrichtung gestoppt",
-        "timeoutBody": "Die Einrichtung von {{name}} dauert länger als üblich (über {{minutes}} Minuten).",
+        "timeoutBody": "Die Einrichtung von {{name}} dauert länger als üblich (über {{displayMinutes}} Minuten).",
         "timeoutTitle": "Dauert länger als erwartet"
       },
       "unavailableDescription": "Ein aktuelles KiloClaw-Abo ist erforderlich, um eine Instanz bereitzustellen. Bestehende Instanzen und Abos laufen normal weiter.",
@@ -694,7 +723,8 @@
       "starting": "WIRD GESTARTET",
       "stopped": "GESTOPPT",
       "stopping": "WIRD GESTOPPT",
-      "unknown": "UNBEKANNT"
+      "unknown": "UNBEKANNT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -733,7 +763,9 @@
       "sparkles": "Glitzer",
       "strongArm": "Starker Arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Diese Instanz kann keine Dateien empfangen.",
+    "instanceSwitcherTitle": "KiloClaw-Instanz"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -914,13 +946,77 @@
       "focusAreas": "Fokusbereiche",
       "mergeGate": "Merge-Gate",
       "model": "Modell",
-      "nSelected": "{{count}} ausgewählt",
+      "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene REVIEW.md-Leitlinien",
       "repositories": "Repositories",
       "reviewMemory": "Review-Speicher",
       "reviewStyle": "Review-Stil",
       "set": "Gesetzt"
-    }
+    },
+    "updateFailed": "Reviewer konnte nicht aktualisiert werden",
+    "configSaveFailed": "Review-Konfiguration konnte nicht gespeichert werden",
+    "status": {
+      "pending": "Ausstehend",
+      "queued": "In Warteschlange",
+      "running": "Läuft",
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen",
+      "cancelled": "Abgebrochen",
+      "interrupted": "Unterbrochen"
+    },
+    "reviewStyle": {
+      "strict": "Streng",
+      "balanced": "Ausgewogen",
+      "lenient": "Milde",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sicherheit",
+      "performance": "Leistung",
+      "bugs": "Fehler",
+      "style": "Stil",
+      "testing": "Tests",
+      "documentation": "Dokumentation"
+    },
+    "gateThreshold": {
+      "off": "Aus",
+      "all": "Alle",
+      "warning": "Warnung",
+      "critical": "Kritisch"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer braucht Aufmerksamkeit",
+        "description": "Code Reviewer wurde deaktiviert, weil Kilo mit einer aktiven GitHub-App-Installation nicht auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere Code Reviewer anschließend wieder.",
+        "recoveryLabel": "GitHub-App aktualisieren"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer braucht Aufmerksamkeit",
+        "description": "Code Reviewer wurde deaktiviert, weil diese GitHub-Organisation eine IP-Allowlist verwendet, die Kilo blockiert. Kontaktiere hi@kilocode.ai für Hilfe und aktiviere Code Reviewer anschließend wieder.",
+        "recoveryLabel": "Support kontaktieren"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer braucht Aufmerksamkeit",
+        "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses Projekt kein GitLab Project Access Token erstellen kann. Gewähre Maintainer-Zugriff oder aktiviere Project Access Tokens und aktiviere Code Reviewer anschließend wieder.",
+        "recoveryLabel": "GitLab-Integration aktualisieren"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer braucht Aufmerksamkeit",
+        "description": "Code Reviewer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig, widerrufen oder ohne Berechtigung ist. Aktualisiere den Schlüssel oder wähle ein anderes Modell und aktiviere Code Reviewer anschließend wieder.",
+        "recoveryLabel": "BYOK-Einstellungen aktualisieren"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer braucht Aufmerksamkeit",
+        "description": "Code Reviewer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere Code Reviewer anschließend wieder.",
+        "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer braucht Aufmerksamkeit",
+        "description": "Code Reviewer wurde deaktiviert, weil heute drei Zeitüberschreitungen beim Klonen von Repositories aufgetreten sind. Kontaktiere hi@kilocode.ai für Hilfe und aktiviere Code Reviewer anschließend wieder.",
+        "recoveryLabel": "Support kontaktieren"
+      }
+    },
+    "unknownError": "Unbekannter Fehler"
   },
   "securityAgent": {
     "filter": {
@@ -983,7 +1079,7 @@
       "triageReasoning": "Triage-Begründung",
       "unknown": "Unbekannt",
       "watchInCloudAgent": "In Cloud Agent ansehen",
-      "whereFound": "Wo dies gefunden wurde ({{count}})",
+      "whereFound": "Wo dies gefunden wurde ({{displayCount}})",
       "yes": "Ja"
     },
     "analysisSettings": {
@@ -1041,8 +1137,9 @@
       "includeExistingFindingsRemediationSubtitle": "Stellt auch bereits analysierte infrage kommende Findings in die Warteschlange. Doppelte PRs bleiben unterdrückt.",
       "minimumSeverity": "Mindestschweregrad",
       "permissionNote": "Nur Organisationsinhaber und Abrechnungsmanager können diese Einstellungen ändern.",
-      "queuedMany": "{{count}} bestehende Findings zur Analyse eingereiht.",
-      "queuedOne": "{{count}} bestehendes Finding zur Analyse eingereiht.",
+      "queued": "{{displayCount}} bestehende Findings zur Analyse eingereiht.",
+      "queued_other": "{{displayCount}} bestehende Findings zur Analyse eingereiht.",
+      "queued_one": "{{displayCount}} bestehendes Finding zur Analyse eingereiht.",
       "requireApproval": "Genehmigung vor automatischer Behebung erforderlich",
       "requireApprovalSubtitle": "Die automatische Behebung wartet vor dem Öffnen von PRs auf deine Genehmigung.",
       "severityAll": "Alle Schweregrade",
@@ -1062,11 +1159,11 @@
       "confirmedExploitable": "Bestätigt ausnutzbar",
       "couldNotLoad": "Dashboard-Daten konnten nicht geladen werden",
       "criticalOverdue": "Kritisch überfällig",
-      "daysOverdue": "{{count}} Tage überfällig",
+      "daysOverdue": "{{displayCount}} Tage überfällig",
       "deadlineToday": "Frist heute erreicht",
       "filterByRepository": "Nach Repository filtern",
       "findings": "Findings",
-      "findingsCount": "{{count}} Findings",
+      "findingsCount": "{{displayCount}} Findings",
       "highOverdue": "Hoch überfällig",
       "lastSynced": "Zuletzt synchronisiert {{time}}",
       "manageRepositories": "Repositories verwalten",
@@ -1091,6 +1188,27 @@
       "syncQueued": "Synchronisierung eingereiht",
       "syncStatusUnavailable": "Synchronisierungsstatus nicht verfügbar",
       "withinDeadline": "Innerhalb der Frist"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Offene Findings",
+      "openFindingsDetail": "{{critical}} kritisch, {{high}} hoch",
+      "confirmedExploitable": "Bestätigt ausnutzbar",
+      "confirmedExploitableDetail": "Projektrisiko durch Analyse bestätigt",
+      "needsReview": "Braucht deine Prüfung",
+      "needsReviewDetail": "Menschliche Entscheidung erforderlich",
+      "analysisIncomplete": "Analyse nicht abgeschlossen",
+      "analysisIncompleteDetail": "Projektrisiko weiterhin unbekannt",
+      "slaCompliance": "SLA-Einhaltung",
+      "notMeasured": "Nicht gemessen",
+      "withinDeadlineDetail": "{{within}} von {{total}} innerhalb der Frist",
+      "noDeadlineData": "Noch keine Findings mit SLA-Frist",
+      "deadlinePassed": "Frist abgelaufen",
+      "deadlinePassedDetail": "{{critical}} kritisch, {{high}} hoch",
+      "dueThisWeek": "Diese Woche fällig",
+      "dueThisWeekDetail": "{{exploitable}} bestätigt ausnutzbar",
+      "noDeadline": "Keine Frist",
+      "reviewSlaAssignment": "SLA-Zuweisung prüfen",
+      "allOpenFindingsTracked": "Alle offenen Findings werden erfasst"
     },
     "dismiss": {
       "alreadyResolvedDescription": "Dieses Finding wurde bereits behoben und akzeptiert keine Verwerfung mehr.",
@@ -1144,7 +1262,17 @@
       "unknown": "Unbekannt",
       "updated": "Aktualisiert",
       "viewAdvisory": "Advisory auf GitHub ansehen",
-      "vulnerableVersions": "Anfällige Versionen"
+      "vulnerableVersions": "Anfällige Versionen",
+      "statusSuperseded": "Ersetzt",
+      "statusFixed": "Behoben",
+      "statusOpen": "Offen",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "ein Fix wurde bereits gestartet",
+      "reasonNoBandwidth": "keine Kapazität verfügbar",
+      "reasonTolerableRisk": "das Risiko ist tolerierbar",
+      "reasonInaccurate": "das Finding ist ungenau",
+      "reasonNotUsed": "der anfällige Code wird nicht verwendet",
+      "reasonAfterReview": "nach Prüfung"
     },
     "findingList": {
       "clearFilters": "Filter löschen",
@@ -1189,7 +1317,7 @@
       "title": "Benachrichtigungen"
     },
     "remediation": {
-      "attemptHistory": "Versuchsverlauf ({{count}})",
+      "attemptHistory": "Versuchsverlauf ({{displayCount}})",
       "attemptNumber": "Versuch Nr. {{number}}",
       "branch": "Branch",
       "cancelMessage": "Security Agent stoppt den laufenden Behebungsversuch.",
@@ -1257,7 +1385,7 @@
       "analysisModeSubtitle": "Analyse: {{mode}}",
       "automation": "Automatisierung",
       "automationAllOff": "Alles aus",
-      "automationCount": "{{count}} von 3 aktiviert",
+      "automationCount": "{{displayCount}} von 3 aktiviert",
       "couldNotLoadPermissions": "Berechtigungen konnten nicht geladen werden",
       "couldNotLoadRepositories": "Repositories konnten nicht geladen werden",
       "couldNotLoadSettings": "Security-Agent-Einstellungen konnten nicht geladen werden",
@@ -1268,12 +1396,13 @@
       "enabled": "Aktiviert",
       "modelsAndAnalysis": "Modelle & Analyse",
       "notifications": "Benachrichtigungen",
-      "notificationsCount": "{{count}} von 2 aktiviert",
+      "notificationsCount": "{{displayCount}} von 2 aktiviert",
       "off": "Aus",
       "on": "Ein",
       "repositories": "Repositories",
-      "repositoriesSelected": "{{count}} Repositories ausgewählt",
-      "repositorySelected": "{{count}} Repository ausgewählt",
+      "repositoriesCount": "{{displayCount}} Repositories ausgewählt",
+      "repositoriesCount_other": "{{displayCount}} Repositories ausgewählt",
+      "repositoriesCount_one": "{{displayCount}} Repository ausgewählt",
       "securityAgent": "Security Agent",
       "selectRepositories": "Repositories auswählen",
       "selectRepositoriesSubtitle": "Wähle, welche Repositories Security Agent überwacht",
@@ -1311,7 +1440,140 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent wurde aktiviert, aber die erste Synchronisierung konnte nicht eingereiht werden. Synchronisiere erneut.",
-    "queuedActionUntracked": "Eine eingereihte Aktion konnte nicht mehr verfolgt werden. Aktualisiere, um den neuesten Status zu sehen."
+    "queuedActionUntracked": "Eine eingereihte Aktion konnte nicht mehr verfolgt werden. Aktualisiere, um den neuesten Status zu sehen.",
+    "commands": {
+      "findingAlreadyDismissed": "Finding bereits verworfen",
+      "findingDismissed": "Finding verworfen",
+      "noRemediationsQueued": "Keine bestehenden Findings in der Warteschlange",
+      "remediationsQueued": "Bestehende Behebungen eingereiht",
+      "analysisComplete": "Analyse abgeschlossen",
+      "syncComplete": "Synchronisierung abgeschlossen"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Der Sicherheitsdienst ist nicht konfiguriert. Erneutes Senden kann nicht gelingen, bis dies behoben ist.",
+      "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie, um sie abzugleichen, oder verwerfe sie.",
+      "syncInProgress": "Eine Sicherheitssynchronisierung läuft bereits. Bitte versuche es erneut.",
+      "dismissalInProgress": "Diese Verwerfung ist bereits im Gange. Bitte versuche es erneut.",
+      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut."
+    },
+    "analysisState": {
+      "queued": "Analyse eingereiht",
+      "queuedTitle": "Analyse eingereiht",
+      "queuedDescription": "Warte, bis Analysekapazität verfügbar ist.",
+      "analyzing": "Wird analysiert",
+      "analyzingTitle": "Wird analysiert",
+      "analyzingDescription": "Prüft, ob der Anwendungscode die betroffene Funktion erreichen kann.",
+      "failed": "Analyse fehlgeschlagen",
+      "failedTitle": "Analyse fehlgeschlagen",
+      "failedDescription": "Security Agent konnte die Analyse nicht abschließen.",
+      "extractionFailed": "Braucht Prüfung",
+      "extractionFailedTitle": "Braucht Prüfung",
+      "extractionFailedDescription": "Der technische Bericht konnte nicht in ein strukturiertes Ergebnis umgewandelt werden.",
+      "exploitable": "Ausnutzbar",
+      "exploitableTitle": "Ausnutzbar",
+      "exploitableDescription": "Der Anwendungscode kann die betroffene Funktion erreichen.",
+      "notExploitable": "Nicht erreichbar",
+      "notExploitableTitle": "Nicht erreichbar",
+      "notExploitableDescription": "In diesem Repository wurde kein erreichbarer Pfad gefunden.",
+      "unknown": "Braucht Prüfung",
+      "unknownTitle": "Braucht Prüfung",
+      "unknownDescription": "Die Analyse konnte nicht bestätigen, ob die anfällige Funktion erreichbar ist.",
+      "safeToDismiss": "Sicher zu verwerfen",
+      "safeToDismissTitle": "Sicher zu verwerfen",
+      "safeToDismissDescription": "Triage hat festgestellt, dass dies ohne Codebase-Analyse sicher verworfen werden kann.",
+      "manualReview": "Braucht Prüfung",
+      "manualReviewTitle": "Braucht manuelle Prüfung",
+      "manualReviewDescription": "Triage hat dieses Finding zur manuellen Prüfung markiert.",
+      "analysisRequired": "Analyse erforderlich",
+      "analysisRequiredTitle": "Codebase-Analyse erforderlich",
+      "analysisRequiredDescription": "Triage empfiehlt, das Repository zu analysieren, bevor du über eine Maßnahme entscheidest.",
+      "completed": "Analysiert",
+      "completedTitle": "Analysiert",
+      "completedDescription": "Die Analyse wurde abgeschlossen, ohne dass ein spezifisches Ergebnis erfasst wurde.",
+      "notAnalyzed": "Nicht analysiert",
+      "notAnalyzedTitle": "Nicht analysiert",
+      "notAnalyzedDescription": "Für dieses Finding wurde noch keine Codebase-Analyse ausgeführt."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "Vor der Frist behoben",
+      "fixed": "Behoben",
+      "fixedOn": "Behoben am {{date}}",
+      "resolutionRecorded": "Lösung erfasst",
+      "superseded": "Ersetzt",
+      "dismissed": "Verworfen",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "Keine Frist festgelegt",
+      "noSlaDeadline": "Keine SLA-Frist",
+      "dueOn": "Fällig am {{date}}",
+      "overdueNow": "Überfällig",
+      "overdue_one": "{{count}} Tag überfällig",
+      "overdue_other": "{{count}} Tage überfällig",
+      "dueToday": "Heute fällig",
+      "dueTomorrow": "Morgen fällig",
+      "dueInDays_one": "Fällig in {{count}} Tag",
+      "dueInDays_other": "Fällig in {{count}} Tagen",
+      "overdue": "{{count}} Tage überfällig",
+      "dueInDays": "Fällig in {{count}} Tagen"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "Abbruch angefordert",
+      "notStarted": "Nicht gestartet",
+      "queued": "Eingereiht",
+      "starting": "Wird gestartet",
+      "inProgress": "In Bearbeitung",
+      "draftPrOpened": "Entwurfs-PR geöffnet",
+      "prOpened": "PR geöffnet",
+      "blocked": "Blockiert",
+      "failed": "Fehlgeschlagen",
+      "noChangesNeeded": "Keine Änderungen nötig",
+      "cancelled": "Abgebrochen",
+      "originAutomaticPolicy": "Automatische Richtlinie",
+      "originIncludeExistingPolicy": "Bestehende Richtlinie einbeziehen",
+      "originManual": "Manuell",
+      "validationCheck": "Validierungsprüfung {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "Das Security-Finding existiert nicht mehr.",
+      "approvalRequired": "Die automatische Behebung erfordert eine Genehmigung. Starte die Behebung manuell, um sie zu genehmigen.",
+      "findingNotOpen": "Das Finding ist nicht mehr offen.",
+      "repoNotInScope": "Das Repository ist nicht für Security Agent ausgewählt.",
+      "analysisRequired": "Führe eine Codebase-Analyse aus, bevor du die Behebung startest.",
+      "sandboxAnalysisRequired": "Führe eine Codebase-Analyse aus, bevor du die Behebung startest.",
+      "staleAnalysis": "Das Finding hat sich nach der Analyse geändert. Führe die Analyse erneut aus, bevor du die Behebung startest.",
+      "notExploitable": "Die Analyse fand keinen erreichbaren anfälligen Pfad. Die automatische Behebung ist nicht verfügbar.",
+      "exploitabilityUnknown": "Die Analyse konnte die Ausnutzbarkeit nicht bestätigen. Vor der Ein-Klick-Behebung ist eine manuelle Prüfung erforderlich.",
+      "manualReviewRequired": "Die Analyse empfiehlt eine manuelle Prüfung, daher ist die Ein-Klick-Behebung nicht verfügbar.",
+      "monitorRequired": "Die Analyse empfiehlt Überwachung statt eines PR.",
+      "triageOnly": "Nur die Triage ist abgeschlossen. Führe eine Codebase-Analyse aus, bevor du die Behebung startest.",
+      "actionNotConcrete": "Es ist kein konkreter Abhängigkeits-Patch oder vorgeschlagener Fix verfügbar.",
+      "remediationActive": "Ein Behebungsversuch ist bereits aktiv.",
+      "prAlreadyOpened": "Ein Behebungs-PR ist bereits offen.",
+      "duplicateAnalysisResult": "Dieses Analyseergebnis hat bereits Behebungsarbeit erzeugt.",
+      "retryNotAllowed": "Für diesen Versuch ist kein erneuter Versuch möglich.",
+      "securityAgentDisabled": "Security Agent ist für diesen Inhaber deaktiviert.",
+      "autoRemediationDisabled": "Die automatische Behebung ist deaktiviert. Die manuelle Behebung kann weiterhin starten, wenn die Sicherheitsgates bestanden sind.",
+      "includeExistingDisabled": "Bestehende Findings sind von der automatischen Behebung ausgeschlossen.",
+      "belowThreshold": "Das Finding liegt unter der automatischen Schweregradschwelle. Die manuelle Behebung kann weiterhin starten, wenn die Sicherheitsgates bestanden sind.",
+      "beforeEnablement": "Die Analyse wurde abgeschlossen, bevor die automatische Behebung aktiviert wurde. Die manuelle Behebung kann weiterhin starten, wenn die Sicherheitsgates bestanden sind.",
+      "generic": "Die Behebung ist für dieses Finding nicht verfügbar."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Die Analysekapazität ist voll. Warte, bis eine aktive Analyse abgeschlossen ist, und versuche es dann erneut.",
+      "githubTokenUnavailable": "Die GitHub-Autorisierung braucht Aufmerksamkeit. Autorisiere die GitHub-App erneut und versuche es anschließend erneut.",
+      "githubAuthInvalid": "Die GitHub-Autorisierung braucht Aufmerksamkeit. Autorisiere die GitHub-App erneut und versuche es anschließend erneut.",
+      "findingUnavailable": "Das Finding ist nicht mehr verfügbar. Aktualisiere die Findings und versuche es erneut, wenn es weiterhin offen ist.",
+      "repositoryUnavailable": "Das Repository ist für die GitHub-App nicht mehr verfügbar. Aktualisiere den Repository-Zugriff und versuche es anschließend erneut.",
+      "invalidDismissTarget": "Das Finding kann nicht verworfen werden, weil sein Dependabot-Ziel ungültig ist.",
+      "commandStalled": "Die eingereihte Aktion wurde nicht rechtzeitig abgeschlossen. Wiederhole die Aktion.",
+      "queueRetriesExhausted": "Die Aktion konnte nach mehreren Versuchen nicht abgeschlossen werden. Wiederhole die Aktion.",
+      "queueAdmissionFailed": "Die eingereihte Aktion konnte nicht angenommen werden. Wiederhole die Aktion.",
+      "generic": "Die eingereihte Aktion ist fehlgeschlagen. Wiederhole die Aktion."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Oberflächlich",
+      "deep": "Tief"
+    }
   },
   "agents": {
     "activeNow": "Jetzt aktiv",
@@ -1350,14 +1612,29 @@
       "sessionDeleted": "Sitzung gelöscht",
       "needsInput": "Eingabe erforderlich",
       "fromPlatform": "von {{platform}}",
-      "centOne": "Cent",
-      "centOther": "Cent",
-      "dollarOne": "Dollar",
-      "dollarOther": "Dollar"
+      "cent_one": "Cent",
+      "cent": "Cent",
+      "cent_other": "Cent",
+      "dollar_one": "Dollar",
+      "dollar": "Dollar",
+      "dollar_other": "Dollar",
+      "costSpoken": "Kosten {{cost}}",
+      "costSpokenWithTime": "Kosten {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Das Setup der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
-      "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden"
+      "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden",
+      "installedTitle": "GitHub App installiert",
+      "installedMessage": "Deine Repositories sind jetzt verbunden.",
+      "pendingTitle": "Genehmigung durch Admin ausstehend",
+      "pendingMessage": "Ein Organisationsadministrator muss die Installationsanfrage genehmigen.",
+      "accountMismatchTitle": "Konten stimmen nicht überein",
+      "accountMismatchMessage": "Diese Verbindung wurde aus der Kilo App heraus gestartet, während ein anderes Konto angemeldet war. Melde dich im Web mit diesem Konto an oder starte erneut aus der App.",
+      "cannotCompleteTitle": "Installation kann nicht abgeschlossen werden",
+      "notAdminMessage": "Nur ein GitHub-Admin dieses Kontos kann es verbinden. Bitte einen Organisationsadministrator, Kilo zu installieren.",
+      "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
+      "didNotCompleteTitle": "Installation wurde nicht abgeschlossen",
+      "didNotCompleteMessage": "Die Installation der GitHub App wurde nicht abgeschlossen. Versuche es erneut aus der App."
     },
     "sessionExited": "Sitzung beendet",
     "remoteSpawnRetryable": "Die Instanz konnte nicht erreicht werden – sie wurde möglicherweise getrennt.",
@@ -1400,7 +1677,10 @@
       "exitMessage": "Dies stoppt die laufende Sitzung, behält aber ihren Verlauf.",
       "keepSessionRunning": "Sitzung weiterlaufen lassen",
       "exitSession": "Sitzung beenden",
-      "restartExitFailed": "Neue Sitzung gestartet. Die vorherige Sitzung ist noch geöffnet."
+      "restartExitFailed": "Neue Sitzung gestartet. Die vorherige Sitzung ist noch geöffnet.",
+      "exitNotSupported": "Das Beenden der Remote-Sitzung wird für die aktuelle Sitzung nicht unterstützt",
+      "exitUnavailable": "Das Beenden der Remote-Sitzung ist für die aktuelle Sitzung nicht verfügbar",
+      "exitNeedsNewerCli": "Slash-Befehle in Remote-Sitzungen erfordern eine neuere Kilo CLI. Aktualisiere die Kilo CLI und verbinde dich erneut."
     },
     "sessionConnection": {
       "connecting": "Verbinde…",
@@ -1422,7 +1702,6 @@
       "githubConnected": "GitHub verbunden",
       "noRepositoriesVisible": "Keine Repositories sichtbar. Prüfe den Repository-Zugriff für die Kilo GitHub App und aktualisiere dann.",
       "runOnWithTarget": "Ausführen auf: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Umgebung",
       "couldNotLoadEnvironment": "Deine Umgebung konnte nicht geladen werden",
       "retryLoadingEnvironment": "Laden der Umgebung erneut versuchen",
@@ -1445,11 +1724,13 @@
       "discardDraftMessage": "Dein Prompt geht verloren.",
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
-      "keepEditing": "Weiter bearbeiten"
+      "keepEditing": "Weiter bearbeiten",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} Datei aktualisiert",
-      "updatedFiles": "{{count}} Dateien aktualisiert"
+      "updatedFileCount_one": "{{displayCount}} Datei aktualisiert",
+      "updatedFileCount": "{{displayCount}} Dateien aktualisiert",
+      "updatedFileCount_other": "{{displayCount}} Dateien aktualisiert"
     },
     "toolPatch": {
       "operationAdded": "Hinzugefügt",
@@ -1474,9 +1755,9 @@
       "toolTask": "Aufgabe",
       "readTodos": "Aufgaben lesen",
       "updateTodos": "Aufgaben aktualisieren",
-      "linesBadge": "{{count}} Zeilen",
-      "filesBadge": "{{count}} Dateien",
-      "matchesBadge": "{{count}} Treffer"
+      "linesBadge": "{{displayCount}} Zeilen",
+      "filesBadge": "{{displayCount}} Dateien",
+      "matchesBadge": "{{displayCount}} Treffer"
     },
     "readToolMarkdown": {
       "linesTruncated": "Zeilen {{start}}–{{end}} (abgeschnitten)",
@@ -1560,6 +1841,10 @@
       "reportAiResponseFailedTerminal": "Diese Antwort kann nicht gemeldet werden.",
       "reportAiResponseSubmitted": "Meldung gesendet. Beleg {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Details nicht verfügbar",
       "textDisplay": "Textanzeige",
@@ -1618,7 +1903,7 @@
       "preparationComplete": "Vorbereitung abgeschlossen",
       "preparationFailed": "Vorbereitung fehlgeschlagen",
       "setupCommand": "Einrichtungsbefehl {{index}}",
-      "setupCommandOf": "Einrichtungsbefehl {{index}} von {{count}}"
+      "setupCommandOf": "Einrichtungsbefehl {{index}} von {{displayCount}}"
     },
     "permissionCard": {
       "title": "Berechtigung erforderlich",
@@ -1655,7 +1940,7 @@
       "submissionFailed": "Senden fehlgeschlagen. Bitte versuche es erneut.",
       "questionAnnouncement": "Der Agent benötigt deine Eingabe. Der Composer ist pausiert, während du antwortest.",
       "permissionAnnouncement": "Der Agent benötigt eine Berechtigung, um fortzufahren. Der Composer ist pausiert, während du entscheidest.",
-      "positionHint": "(1 von {{count}})",
+      "positionHint": "(1 von {{displayCount}})",
       "movedPastPrompt": "Der Agent ist über diesen Prompt hinausgegangen. Diese Karte schließt sich, wenn die Sitzung fortgesetzt wird.",
       "waitingForAnswer": "Der Agent wartet auf deine Antwort. Solange diese Frage offen ist, ist deine Nachricht an den Agenten pausiert.",
       "waitingForPermission": "Der Agent wartet auf eine Berechtigung. Solange diese Anfrage offen ist, ist deine Nachricht an den Agenten pausiert."
@@ -1690,8 +1975,9 @@
     "olderMessages": {
       "arrived": "Frühere Nachrichten geladen",
       "retryHint": "Versucht erneut, ältere Nachrichten dieser Sitzung zu laden.",
-      "omittedOne": "Ein früherer Eintrag dieser Sitzung konnte nicht angezeigt werden.",
-      "omittedMany": "{{count}} frühere Einträge dieser Sitzung konnten nicht angezeigt werden.",
+      "omitted_one": "Ein früherer Eintrag dieser Sitzung konnte nicht angezeigt werden.",
+      "omitted": "{{displayCount}} frühere Einträge dieser Sitzung konnten nicht angezeigt werden.",
+      "omitted_other": "{{displayCount}} frühere Einträge dieser Sitzung konnten nicht angezeigt werden.",
       "couldNotLoad": "Frühere Nachrichten konnten nicht geladen werden.",
       "unavailable": "Frühere Nachrichten sind nicht verfügbar.",
       "tooLarge": "Frühere Nachrichten sind zu groß zum Laden."
@@ -1700,10 +1986,12 @@
       "viewTable": "Tabelle ansehen",
       "title": "Tabelle",
       "close": "Tabelle schließen",
-      "column": "Spalte",
-      "columns": "Spalten",
-      "row": "Zeile",
-      "rows": "Zeilen",
+      "columnCount_one": "Spalte",
+      "columnCount": "Spalten",
+      "columnCount_other": "Spalten",
+      "rowCount_one": "Zeile",
+      "rowCount": "Zeilen",
+      "rowCount_other": "Zeilen",
       "opensFullScreen": "öffnet Vollbild"
     },
     "sessionFilter": {
@@ -1734,7 +2022,10 @@
       "title": "Modell wählen",
       "searchPlaceholder": "Modelle suchen...",
       "noModels": "Keine Modelle verfügbar",
-      "noModelsDescription": "Keine Modelle zum Auswählen verfügbar."
+      "noModelsDescription": "Keine Modelle zum Auswählen verfügbar.",
+      "favorites": "Favoriten",
+      "recommended": "Empfohlen",
+      "allModels": "Alle Modelle"
     },
     "modelSelector": {
       "model": "Modell",
@@ -1751,7 +2042,8 @@
       "addToFavorites": "{{name}} zu Favoriten hinzufügen",
       "removeFromFavorites": "{{name}} aus Favoriten entfernen",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mittel"
+      "thinkingEffortMedium": "Mittel",
+      "sessionModel": "Sitzungsmodell"
     },
     "attachmentPreview": {
       "openFailedRetry": "Datei konnte nicht geöffnet werden. Bitte versuche es erneut.",
@@ -1773,7 +2065,7 @@
       "cameraAccessDisabled": "Kamerazugriff deaktiviert",
       "cameraAccessMessage": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
       "couldNotOpenPhotoPicker": "Die Fotoauswahl konnte nicht geöffnet werden. Starte Kilo neu und versuche es erneut.",
-      "maxFilesAllowed": "Maximal {{count}} Dateien erlaubt",
+      "maxFilesAllowed": "Maximal {{displayCount}} Dateien erlaubt",
       "onlyAddingFiles": "Es werden nur {{accepted}} von {{total}} Dateien hinzugefügt (max. {{max}})"
     },
     "composer": {
@@ -1819,7 +2111,8 @@
       "delegatingWork": "Arbeit delegieren",
       "askingQuestion": "Frage stellen",
       "consideringNextSteps": "Nächste Schritte abwägen",
-      "writingResponse": "Antwort schreiben"
+      "writingResponse": "Antwort schreiben",
+      "initializingSnapshot": "Snapshot wird initialisiert…"
     },
     "slashCommands": {
       "startNewSession": "Neue Sitzung starten",
@@ -1838,7 +2131,7 @@
       "costPrefix": "Kosten {{cost}}",
       "costSuffix": ", Kosten {{cost}}",
       "tokensWindowUnavailable": "Kontext {{used}} Tokens, Fenster nicht verfügbar",
-      "tokensUsage": "Kontext {{used}} von {{window}} Tokens, {{percentage}}% verwendet",
+      "tokensUsage": "Kontext {{used}} von {{window}} Tokens, {{percentage}} verwendet",
       "title": "Kontextnutzung",
       "used": "Verwendet",
       "remaining": "Verbleibend",
@@ -1847,7 +2140,7 @@
       "usageReflectsLatest": "Die Nutzung spiegelt die letzte abgeschlossene Assistenten-Antwort wider.",
       "tokenUsage": "Token-Nutzung",
       "cacheRate": "Cache-Rate",
-      "modelsCount": "Modelle ({{count}})",
+      "modelsCount": "Modelle ({{displayCount}})",
       "tokenTotalsNote": "Token-Gesamtsummen umfassen nur diese Sitzung und schließen Subagenten-/Kindersitzungs-Tokens aus.",
       "subagents": "Subagenten",
       "subagentsDescription": "Restkosten aus Kindersitzungen",
@@ -1856,8 +2149,9 @@
       "ofWindowTokens": "von {{window}} Tokens",
       "tokens": "Tokens",
       "tokensWithPercentage": "Tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} Schritt",
-      "stepsCountMany": "{{steps}} Schritte",
+      "stepsCount_one": "{{steps}} Schritt",
+      "stepsCount": "{{steps}} Schritte",
+      "stepsCount_other": "{{steps}} Schritte",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -1882,7 +2176,8 @@
   },
   "addCredits": {
     "cta": "Guthaben hinzufügen",
-    "description": "Guthaben hinzufügen, damit die Nutzung weiterläuft."
+    "description": "Guthaben hinzufügen, damit die Nutzung weiterläuft.",
+    "billingPage": "Abrechnungsseite"
   },
   "deviceSessions": {
     "couldNotLoad": "Sitzungen konnten nicht geladen werden",
@@ -1902,25 +2197,24 @@
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",
     "signOutThisSessionMessage": "{{device}} wird abgemeldet. Es kann bis zu einer Stunde lang API-Zugriff behalten.",
     "signOutConfirm": "Abmelden",
-    "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen."
+    "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
+    "webBrowser": "Webbrowser"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Der App Store konnte nicht geöffnet werden.",
     "description": "Eine neue Version von Kilo ist verfügbar. Bitte aktualisiere, um fortzufahren.",
     "title": "Update erforderlich",
-    "updateNow": "Jetzt aktualisieren"
+    "updateNow": "Jetzt aktualisieren",
+    "appStorePage": "App-Store-Seite"
   },
   "home": {
     "couldNotLoadSessions": "Sitzungen konnten nicht geladen werden",
     "couldNotLoadActiveSessions": "Aktive Sitzungen konnten nicht geladen werden",
     "agentSessions": "Agentensitzungen",
-    "noLiveSessions": "Nothing running right now",
     "newCodingTask": "Neue Codieraufgabe",
     "explore": "Entdecken",
     "seeAll": "Alle ansehen",
-    "greetingMorning": "Guten Morgen",
-    "greetingAfternoon": "Guten Nachmittag",
-    "greetingEvening": "Guten Abend"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} schließen",
@@ -1974,7 +2268,17 @@
     "onlineTitle": "Sprache wird online verarbeitet",
     "staysOff": "Sprache bleibt aus, bis du die Online-Transkription erlaubst.",
     "start": "Spracheingabe starten",
-    "stop": "Spracheingabe stoppen"
+    "stop": "Spracheingabe stoppen",
+    "restricted": "Spracheingabe ist auf diesem Gerät eingeschränkt.",
+    "micRequired": "Für die Spracheingabe ist Mikrofonzugriff erforderlich.",
+    "micOff": "Mikrofonzugriff ist deaktiviert. Aktiviere ihn in den Einstellungen, um die Spracheingabe zu verwenden.",
+    "micOffTitle": "Mikrofonzugriff ist deaktiviert",
+    "noSpeech": "Keine Sprache erkannt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
+    "needsConnection": "Spracheingabe benötigt gerade eine Verbindung. Versuche es erneut.",
+    "busy": "Spracheingabe ist beschäftigt. Versuche es erneut.",
+    "stopped": "Die Spracheingabe wurde gestoppt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
+    "unavailableDevice": "Spracheingabe ist auf diesem Gerät nicht verfügbar.",
+    "unavailableLanguage": "Spracheingabe ist für diese Gerätesprache nicht verfügbar."
   },
   "share": {
     "title": "An Kilo teilen",
@@ -1986,7 +2290,7 @@
     "connectedCli": "Auf einer verbundenen CLI",
     "newSessionOn": "Neue Sitzung auf {{name}}",
     "noMatchingSessions": "Keine passenden Sitzungen.",
-    "onlyFirstFilesAttached": "Nur die ersten {{count}} Dateien werden angehängt.",
+    "onlyFirstFilesAttached": "Nur die ersten {{displayCount}} Dateien werden angehängt.",
     "staleMessage": "Dieses Teilen ist nicht mehr verfügbar.",
     "retryableMessage": "Deine Sitzungen konnten nicht geladen werden.",
     "emptyMessage": "Noch keine Sitzungen — starte eine neue, um dies zu senden.",
@@ -2019,7 +2323,7 @@
     "otherAccountCopy": "Der Kilo Pass auf diesem Apple-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um ihn zu verwalten.",
     "alreadySubscribed": "Du hast bereits ein Kilo-Pass-Abo.",
     "purchaseUnavailable": "Der Kilo-Pass-Kauf ist gerade nicht verfügbar.",
-    "tierCredits": "${{amount}} Guthaben",
+    "tierCredits": "{{amount}} Guthaben",
     "perMonth": "{{price}}/Monat",
     "verifyPurchaseFailed": "Dein Kauf konnte nicht bestätigt werden. Prüfe deine Verbindung und versuche es erneut.",
     "productsCouldNotLoad": "Kilo-Pass-Produkte konnten nicht aus dem App Store geladen werden.",
@@ -2030,7 +2334,7 @@
     "manageFailed": "App Store-Abonnementverwaltung konnte nicht geöffnet werden.",
     "kiloPassSetup": "Kilo Pass einrichten",
     "subscriptionHeaderDescription": "Ein monatliches Abonnement, das deinem Kilo-Guthaben Credits für AI-Codierungssitzungen in der Kilo App hinzufügt – Cloud Agents, Remote-Sitzungen und KiloClaw-Chats.",
-    "tierDescription": "${{price}} bezahlte Credits monatlich für die Nutzung der Kilo App hinzugefügt.",
+    "tierDescription": "{{price}} bezahlte Credits monatlich für die Nutzung der Kilo App hinzugefügt.",
     "subscribe": "Abonnieren",
     "subscribeDescription": "Monatliche Credits mit Bonus-Fortschritt",
     "manage": "Verwalten",
@@ -2038,7 +2342,7 @@
     "statusPending": "Kilo Pass ausstehend",
     "statusCanceling": "Kilo Pass wird storniert",
     "statusPastDue": "Kilo Pass überfällig",
-    "monthlyCredits": "${{credits}} monatliche Credits",
+    "monthlyCredits": "{{credits}} monatliche Credits",
     "ends": "Endet {{date}}",
     "periodEnd": "Ende des Zeitraums",
     "managedOnGooglePlay": "Verwaltet über Google Play",
@@ -2052,7 +2356,15 @@
     "webManagementDescription": "Dieser Kilo Pass wird im Web verwaltet.",
     "legalDisclosure": "Kilo Pass ist ein automatisch verlängerbares Monatsabonnement. Die Zahlung wird bei Kaufbestätigung deiner Apple-ID belastet. Abonnements verlängern sich automatisch jeden Monat zum angezeigten Preis, sofern sie nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums gekündigt werden. Jederzeit in deinen App-Store-Kontoeinstellungen verwalten oder kündigen.",
     "legalPrivacyPolicy": "Datenschutzrichtlinie",
-    "legalTermsOfUse": "Nutzungsbedingungen (EULA)"
+    "legalTermsOfUse": "Nutzungsbedingungen (EULA)",
+    "purchaseDifferentAccount": "Dieser App-Store-Kauf ist nicht mit deinem Kilo-Konto verknüpft. Melde dich mit dem Apple-Konto an, mit dem der Kauf getätigt wurde, und versuche es erneut.",
+    "restoreFailed": "Käufe konnten nicht wiederhergestellt werden. Versuche es erneut.",
+    "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden.",
+    "purchaseStartFailed": "Der App-Store-Kauf konnte nicht gestartet werden.",
+    "purchaseOwnedByAnotherAccount": "Der Kilo Pass auf diesem Apple-Konto gehört zu einem anderen Kilo-Konto.",
+    "couldNotConnectToAppStore": "Keine Verbindung zum App Store möglich. Überprüfe deine Verbindung und versuche es erneut.",
+    "noMatchingProducts": "Der App Store hat keine passenden Kilo-Pass-Produkte zurückgegeben.",
+    "purchaseMissingSignedTransaction": "Der App-Store-Kauf enthielt keine signierte Transaktions-JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2142,17 +2454,17 @@
     "accessDeniedDescription": "Du hast keine Berechtigung, diesen Pull Request anzusehen.",
     "checkConnection": "Verbindung prüfen",
     "checks": {
-      "checksCount": "{{count}} Checks",
+      "checksCount": "{{displayCount}} Checks",
       "couldNotLoad": "Checks konnten nicht geladen werden.",
-      "failed": "{{count}} fehlgeschlagen",
+      "failed": "{{displayCount}} fehlgeschlagen",
       "noAccess": "Du hast keinen Zugriff auf die Checks dieses Repositories.",
       "noChecksReported": "Keine Checks gemeldet",
       "notAvailable": "Checks sind noch nicht verfügbar. Der Head-Commit wurde möglicherweise noch nicht verarbeitet oder die Kilo GitHub App ist nicht auf dem Head-Repository installiert.",
       "openDetails": "Details zu {{name}} öffnen",
-      "passed": "{{count}} bestanden",
-      "pending": "{{count}} ausstehend",
+      "passed": "{{displayCount}} bestanden",
+      "pending": "{{displayCount}} ausstehend",
       "retryChecks": "Checks erneut versuchen",
-      "skipped": "{{count}} übersprungen",
+      "skipped": "{{displayCount}} übersprungen",
       "title": "Checks",
       "viewOnGitHub": "PR auf GitHub ansehen",
       "checkDetails": "Check-Details",
@@ -2203,7 +2515,8 @@
       "closeReactions": "Reaktionen schließen",
       "collapseThread": "Thread einklappen",
       "commentActions": "Kommentaraktionen",
-      "commentCount": "{{count}} Kommentare",
+      "comment": "{{displayCount}} Kommentare",
+      "comment_other": "{{displayCount}} Kommentare",
       "couldNotLoad": "Diskussion konnte nicht geladen werden",
       "couldNotLoadMore": "Weitere Kommentare konnten nicht geladen werden.",
       "couldNotReply": "Antwort konnte nicht gesendet werden.",
@@ -2229,17 +2542,18 @@
           "terminal": "Dieser Benutzer kann nicht gemeldet werden."
         }
       },
-      "moreLinesAbove": "… {{count}} weitere Zeilen darüber",
+      "moreLinesAbove": "… {{displayCount}} weitere Zeilen darüber",
       "mute": "Stummschalten",
       "mutedUser": "{{login}} stummgeschaltet",
       "noDiscussion": "Noch keine Diskussion",
       "noDiscussionDescription": "Keine Review-Threads oder Konversationskommentare zu diesem Pull Request.",
-      "oneComment": "1 Kommentar",
+      "comment_one": "1 Kommentar",
       "outdated": "Veraltet",
       "quotedDiffSnippet": "Zitierter Diff-Ausschnitt",
-      "reactionPill": "{{emoji}} Reaktion, {{count}} {{countLabel}}",
-      "reactionPlural": "Reaktionen",
-      "reactionSingular": "Reaktion",
+      "reactionPill": "{{emoji}} Reaktion, {{displayCount}} {{countLabel}}",
+      "reaction": "Reaktionen",
+      "reaction_other": "Reaktionen",
+      "reaction_one": "Reaktion",
       "reactionsTitle": "Reaktionen",
       "reply": "Antworten",
       "replyBadRequest": "Diese Antwort kann nicht gesendet werden. Der Thread hat sich möglicherweise geändert.",
@@ -2266,7 +2580,25 @@
       "viewTerms": "Bedingungen ansehen",
       "termsAcceptRequired": "Du musst die Nutzungsbedingungen akzeptieren, um zu posten.",
       "termsCheckRetryCopy": "Die Nutzungsbedingungen konnten nicht geprüft werden. Prüfe deine Verbindung und versuche es erneut.",
-      "termsOutdatedCopy": "Die Nutzungsbedingungen haben sich geändert. Öffne diesen Bildschirm erneut, um die neueste Version zu akzeptieren."
+      "termsOutdatedCopy": "Die Nutzungsbedingungen haben sich geändert. Öffne diesen Bildschirm erneut, um die neueste Version zu akzeptieren.",
+      "reactions": {
+        "thumbsUp": "Daumen hoch",
+        "thumbsDown": "Daumen runter",
+        "laugh": "Lachen",
+        "hooray": "Hurra",
+        "confused": "Verwirrt",
+        "heart": "Herz",
+        "rocket": "Rakete",
+        "eyes": "Augen"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Dateikommentar zu {{path}}",
+        "fileComment": "Dateikommentar",
+        "outdatedOnPathLines": "Veraltet auf {{path}} {{lines}}",
+        "outdatedOnLines": "Veraltet auf {{lines}}",
+        "outdatedOnPath": "Veraltet auf {{path}}"
+      },
+      "deletedUser": "gelöschter Benutzer"
     },
     "entry": {
       "clearLink": "Pull-Request-Link löschen",
@@ -2340,18 +2672,20 @@
     "hunkRows": {
       "contextUnavailable": "Kontext bei dieser Referenz nicht verfügbar",
       "expandAll": "Alle ausklappen",
-      "expandAllLines": "Alle {{count}} Zeilen ausklappen",
+      "expandAllLines": "Alle {{displayCount}} Zeilen ausklappen",
       "expandContext": "Kontext ausklappen",
-      "expandLines": "{{count}} Zeilen ausklappen ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} Kontextzeilen ausklappen",
+      "expandLines": "{{displayCount}} Zeilen ausklappen ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} Kontextzeilen ausklappen",
       "expandMoreContext": "Mehr Kontext ausklappen",
-      "expandMoreLines": "{{count}} weitere Zeilen ausklappen ({{start}}–{{end}})",
+      "expandMoreLines": "{{displayCount}} weitere Zeilen ausklappen ({{start}}–{{end}})",
       "failedToLoadContext": "Kontext konnte nicht geladen werden — zum erneuten Versuch tippen",
       "failedToLoadMoreFiles": "Weitere Dateien konnten nicht geladen werden — zum erneuten Versuch tippen",
-      "fileLoaded": "{{count}} Datei geladen",
-      "fileLoadedOfTotal": "{{count}} Datei von {{total}} geladen",
-      "filesLoaded": "{{count}} Dateien geladen",
-      "filesLoadedOfTotal": "{{count}} Dateien von {{total}} geladen",
+      "fileLoadedCount_one": "{{displayCount}} Datei geladen",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} Datei von {{total}} geladen",
+      "fileLoadedCount": "{{displayCount}} Dateien geladen",
+      "fileLoadedCount_other": "{{displayCount}} Dateien geladen",
+      "fileLoadedOfTotalCount": "{{displayCount}} Dateien von {{total}} geladen",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} Dateien von {{total}} geladen",
       "filesStillLoading": "Dateien werden noch geladen. Zum Aktualisieren nach unten ziehen.",
       "goToOverview": "Zur Übersicht",
       "goToOverviewTab": "Zum Übersicht-Tab",
@@ -2421,16 +2755,47 @@
         "closed": "Dieser Pull Request ist geschlossen"
       },
       "updateBranch": "Branch aktualisieren",
-      "updateBranchFromBase": "Branch vom Basis-Branch aktualisieren"
+      "updateBranchFromBase": "Branch vom Basis-Branch aktualisieren",
+      "blocked": {
+        "unknownStateTitle": "GitHub hat keinen Merge-Status gemeldet",
+        "unknownStateDetail": "Versuche gleich, die Übersicht zu aktualisieren.",
+        "conflictsTitle": "Merge-Konflikte",
+        "conflictsDetail": "Löse die Merge-Konflikte auf diesem Branch, bevor du zusammenführst.",
+        "requiredReviewsTitle": "Erforderliche Reviews fehlen",
+        "requiredReviewsDetail": "Genehmigungen der erforderlichen Reviewer fehlen oder stehen aus.",
+        "failingChecksTitle": "Erforderliche Checks schlagen fehl",
+        "failingChecksDetail": "Erforderliche Status-Checks schlagen fehl.",
+        "unstableTitle": "Einige Checks schlagen fehl",
+        "unstableDetail": "Nicht erforderliche Checks schlagen fehl. Sie blockieren den Merge nicht.",
+        "draftTitle": "Pull Request als Entwurf",
+        "draftDetail": "Markiere den Pull Request als für Review bereit, bevor du zusammenführst.",
+        "behindTitle": "Branch ist nicht mehr aktuell",
+        "behindDetailUpdatable": "Aktualisiere den Branch vom Basis-Branch aus oder führe ein Rebase durch, bevor du zusammenführst.",
+        "behindDetail": "Der Branch ist gegenüber dem Basis-Branch nicht mehr aktuell. Führe ein Rebase durch oder aktualisiere den Branch, bevor du zusammenführst.",
+        "notMergeableTitle": "Dieser Pull Request kann noch nicht zusammengeführt werden",
+        "notMergeableDetail": "GitHub hat einen {{state}}-Merge-Status gemeldet."
+      },
+      "methodLabels": {
+        "merge": "Merge-Commit erstellen",
+        "squash": "Squash und zusammenführen",
+        "rebase": "Rebase und zusammenführen"
+      },
+      "methodDescriptions": {
+        "merge": "Fasse alle Commits dieses Branchs mit einem Merge-Commit im Basis-Branch zusammen.",
+        "squash": "Fasse alle Commits dieses Branchs zu einem einzigen Commit im Basis-Branch zusammen.",
+        "rebase": "Übertrage alle Commits dieses Branchs ohne Merge-Commit auf den Basis-Branch."
+      }
     },
     "noDescriptionProvided": "Keine Beschreibung vorhanden.",
     "noFilesChanged": "Keine Dateien geändert",
     "noFilesChangedDescription": "Dieser Pull Request enthält keine Dateiänderungen.",
     "overview": {
-      "commitPlural": "Commits",
-      "commitSingular": "Commit",
-      "filePlural": "Dateien",
-      "fileSingular": "Datei",
+      "commit": "Commits",
+      "commit_other": "Commits",
+      "commit_one": "Commit",
+      "file": "Dateien",
+      "file_other": "Dateien",
+      "file_one": "Datei",
       "stateClosed": "Geschlossen",
       "stateDraft": "Entwurf",
       "stateMerged": "Zusammengeführt",
@@ -2481,13 +2846,16 @@
       "deletePendingMessage": "Dieser Kommentar wird aus der Review-Warteschlange entfernt.",
       "deletePendingTitle": "Ausstehenden Kommentar löschen?",
       "loadFailedTitle": "Review-Übermittlung konnte nicht geladen werden",
-      "pendingCommentPlural": "ausstehende Kommentare",
-      "pendingCommentSingular": "ausstehender Kommentar",
+      "pendingComment": "ausstehende Kommentare",
+      "pendingComment_other": "ausstehende Kommentare",
+      "pendingComment_one": "ausstehender Kommentar",
       "summaryOptional": "Zusammenfassung (optional)",
       "title": "Review senden",
-      "partialPostedMessage": "{{freshCount}} Kommentar(e) gesendet. {{staleCount}} Kommentar(e) beziehen sich auf einen älteren Commit und bleiben in deiner Warteschlange.",
-      "submitCountOfTotal": "{{freshCount}} von {{totalCount}} Kommentaren senden",
-      "submitReview": "Review senden"
+      "partialPostedMessage": "{{displayFreshCount}} Kommentar(e) gesendet. {{displayStaleCount}} Kommentar(e) beziehen sich auf einen älteren Commit und bleiben in deiner Warteschlange.",
+      "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitReview": "Review senden",
+      "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
+      "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um einen Kommentar-Review zu senden."
     },
     "fileStatus": {
       "added": "Hinzugefügt",
@@ -2504,10 +2872,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ausgewählt, tippen zum Ändern der Auswahl",
-      "tapToComment": "{{label}}, tippen zum Kommentieren"
+      "tapToComment": "{{label}}, tippen zum Kommentieren",
+      "truncationBanner": "Zeigt die ersten {{limit}} von {{total}} geänderten Dateien — GitHub-API-Limit",
+      "statusAdded": "Hinzugefügt",
+      "statusContext": "Kontext",
+      "statusDeleted": "Gelöscht",
+      "lineLabel": "{{status}} Zeile {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(leer)"
     },
     "linkPasteClipboardEmpty": "Zwischenablage ist leer",
-    "linkPasteNotAPullRequest": "Kein GitHub-Pull-Request-Link"
+    "linkPasteNotAPullRequest": "Kein GitHub-Pull-Request-Link",
+    "announce": {
+      "commentPosted": "Kommentar veröffentlicht",
+      "reviewSubmitted": "Review eingereicht",
+      "autoMergeEnabled": "Auto-Merge aktiviert"
+    },
+    "mutationError": {
+      "commentNotPosted": "Dieser Kommentar kann nicht veröffentlicht werden. Die ausgewählte Zeile könnte sich geändert haben, oder der PR wurde aktualisiert.",
+      "reviewNotSubmitted": "Dieses Review kann nicht gesendet werden. Der PR könnte sich geändert haben, oder du kannst deinen eigenen Pull Request nicht prüfen.",
+      "couldNotPostComment": "Kommentar konnte nicht veröffentlicht werden.",
+      "couldNotSubmitReview": "Review konnte nicht gesendet werden. Prüfe deine Verbindung und versuche es erneut."
+    },
+    "operation": {
+      "couldNotReply": "Antwort konnte nicht gesendet werden.",
+      "couldNotCompleteAction": "Diese Aktion konnte nicht abgeschlossen werden.",
+      "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen.",
+      "ambiguous": "Konnte nicht bestätigt werden — prüfe den PR, bevor du es erneut versuchst.",
+      "persistenceFailed": "Wir konnten diese Aktion nicht aufzeichnen. Bitte versuche es später erneut.",
+      "forbidden": "Verboten"
+    }
   },
   "organization": {
     "boundary": {
@@ -2524,7 +2918,17 @@
       "emptyTitle": "Keine Guthabenaktivität",
       "expires": "Läuft ab am {{date}}",
       "title": "Guthabenaktivität",
-      "transactionFallback": "Guthabentransaktion"
+      "transactionFallback": "Guthabentransaktion",
+      "category": {
+        "organization_custom": "Organisationsspezifisch",
+        "parent_to_child_transfer_in": "Eingehende Übertragung von übergeordneter zu untergeordneter Organisation",
+        "parent_to_child_transfer_out": "Ausgehende Übertragung von übergeordneter zu untergeordneter Organisation",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Buchhaltungsanpassung",
+        "credits_expired": "Abgelaufene Credits"
+      }
     },
     "hub": {
       "balance": "Guthaben",
@@ -2551,9 +2955,16 @@
       "emptyTitle": "Keine Rechnungen",
       "invoiceFallback": "Rechnung",
       "title": "Rechnungen",
-      "statusPaid": "Bezahlt",
-      "statusOpen": "Offen",
-      "statusVoid": "Ungültig"
+      "downloadFailed": "Rechnung konnte nicht heruntergeladen werden. Prüfe deine Verbindung und versuche es erneut.",
+      "sharingUnavailable": "Teilen ist auf diesem Gerät nicht verfügbar.",
+      "status": {
+        "paid": "Bezahlt",
+        "open": "Offen",
+        "void": "Ungültig",
+        "draft": "Entwurf",
+        "uncollectible": "Nicht einziehbar",
+        "unknown": "Unbekannt"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@firma.de",
@@ -2630,8 +3041,9 @@
       "manageHint": "Öffnet die Kilo-Pass-Verwaltung im Web.",
       "notSubscribed": "Nicht abonniert",
       "overallocated": "Pass-Zuweisungen überschreiten bezahlte Plätze",
-      "paidSeatOne": "{{count}} bezahlter Platz",
-      "paidSeatOther": "{{count}} bezahlte Plätze",
+      "paidSeat_one": "{{displayCount}} bezahlter Platz",
+      "paidSeat": "{{displayCount}} bezahlte Plätze",
+      "paidSeat_other": "{{displayCount}} bezahlte Plätze",
       "paymentNeedsAttention": "Zahlung braucht Aufmerksamkeit",
       "paymentPending": "Zahlung ausstehend",
       "processingBlocked": "Verarbeitung blockiert",
@@ -2652,7 +3064,8 @@
     "promptTitle": "Wie gefällt dir die Kilo-App?",
     "rateKilo": "Kilo bewerten",
     "sorryMessage": "Bitte sag uns, was besser werden muss. Der für die App zuständige Entwickler liest jeden einzelnen Bericht!",
-    "sorryTitle": "Das tut uns leid!"
+    "sorryTitle": "Das tut uns leid!",
+    "emailSubject": "Feedback zur Mobile-App"
   },
   "authErrors": {
     "emailAlreadyUsed": "Ein Konto mit dieser E-Mail existiert bereits mit einer anderen Anmeldemethode. Versuche eine andere Methode oder nutze „$t(login.moreSignInOptions)“.",
@@ -2669,10 +3082,28 @@
     "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Nutze „$t(login.moreSignInOptions)“, um dich auf einem anderen Gerät oder über das Web anzumelden.",
     "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Überprüfe deine Verbindung und versuche es erneut."
+    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Überprüfe deine Verbindung und versuche es erneut.",
+    "startSignInFailed": "Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
+    "signInTimedOut": "Die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
+    "signInFailed": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "networkError": "Netzwerkfehler. Bitte versuche es erneut.",
+    "accessDeniedByUser": "Zugriff vom Nutzer verweigert",
+    "codeExpired": "Der Code ist abgelaufen",
+    "tooManySignInAttempts": "Zu viele Anmeldeversuche. Bitte warte und versuche es erneut."
   },
   "models": {
     "dataCollected": "Erfasste Daten",
-    "free": "Kostenlos"
+    "free": "Kostenlos",
+    "couldNotUpdateFavorites": "Favoriten konnten nicht aktualisiert werden",
+    "thinkingEffort": {
+      "none": "Keine",
+      "minimal": "Minimal",
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch",
+      "xhigh": "Extra hoch",
+      "max": "Max"
+    }
   }
 }

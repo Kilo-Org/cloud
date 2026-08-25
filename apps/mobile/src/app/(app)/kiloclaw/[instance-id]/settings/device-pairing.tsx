@@ -30,6 +30,7 @@ import {
   useKiloClawPairing,
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { capitalize } from '@/lib/utils';
 
 const CHANNEL_LABELS = {
   telegram: 'Telegram',
@@ -37,6 +38,12 @@ const CHANNEL_LABELS = {
   slack: 'Slack',
   github: 'GitHub',
 } satisfies Record<string, string>;
+
+function channelLabel(channel: string): string {
+  return Object.hasOwn(CHANNEL_LABELS, channel)
+    ? CHANNEL_LABELS[channel as keyof typeof CHANNEL_LABELS]
+    : capitalize(channel);
+}
 
 export default function DevicePairingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -128,9 +135,7 @@ export default function DevicePairingScreen() {
   const hasAnyRequests = channelRequests.length > 0 || deviceRequests.length > 0;
 
   function handleApproveChannel(channel: string, code: string) {
-    const label = Object.hasOwn(CHANNEL_LABELS, channel)
-      ? CHANNEL_LABELS[channel as keyof typeof CHANNEL_LABELS]
-      : channel.charAt(0).toUpperCase() + channel.slice(1);
+    const label = channelLabel(channel);
     Alert.alert(
       t('kiloclaw.devicePairing.approveTitle'),
       t('kiloclaw.devicePairing.approveMessage', { label, code }),
@@ -212,11 +217,7 @@ export default function DevicePairingScreen() {
                         <MessageSquare size={18} color={colors.foreground} />
                       )}
                       <View className="flex-1 gap-0.5">
-                        <Text className="text-sm font-medium">
-                          {Object.hasOwn(CHANNEL_LABELS, request.channel)
-                            ? CHANNEL_LABELS[request.channel as keyof typeof CHANNEL_LABELS]
-                            : request.channel.charAt(0).toUpperCase() + request.channel.slice(1)}
-                        </Text>
+                        <Text className="text-sm font-medium">{channelLabel(request.channel)}</Text>
                         <View className="flex-row items-center gap-1.5">
                           <View className="rounded bg-muted px-1.5 py-0.5">
                             <Text className="text-xs font-mono text-muted-foreground">

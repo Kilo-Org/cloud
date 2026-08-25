@@ -10,6 +10,7 @@ import {
   type AgentAttachmentMime,
 } from './constants';
 import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
+import { i18n } from '@/i18n';
 
 const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>([
   'png',
@@ -204,10 +205,10 @@ export function canAddAttachments(
 }
 
 const CLASSIFICATION_FAILURE_MESSAGES = {
-  denied: "Executable files can't be attached",
-  empty: 'File is empty',
-  'too-large': 'Files must be 20 MB or smaller',
-  unreadable: "Couldn't read this file",
+  denied: 'chat.attachment.classificationDenied',
+  empty: 'chat.attachment.classificationEmpty',
+  'too-large': 'chat.attachment.classificationTooLarge',
+  unreadable: 'chat.attachment.classificationUnreadable',
 } as const satisfies Record<'denied' | 'empty' | 'too-large' | 'unreadable', string>;
 
 /**
@@ -217,5 +218,5 @@ const CLASSIFICATION_FAILURE_MESSAGES = {
 export function describeClassificationFailure(
   reason: 'denied' | 'empty' | 'too-large' | 'unreadable'
 ): string {
-  return CLASSIFICATION_FAILURE_MESSAGES[reason];
+  return i18n.t(CLASSIFICATION_FAILURE_MESSAGES[reason]);
 }

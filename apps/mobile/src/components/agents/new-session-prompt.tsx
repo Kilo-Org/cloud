@@ -34,7 +34,7 @@ import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-con
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
-  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  clipboardPasteEmptyMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
@@ -185,7 +185,7 @@ export function NewSessionPrompt({
     },
     onFailure: reason => {
       toast.error(
-        reason === 'empty' ? CLIPBOARD_PASTE_EMPTY_MESSAGE : describeClassificationFailure(reason)
+        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
       );
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,

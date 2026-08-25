@@ -256,7 +256,7 @@ export function QuestionCard({
                       >
                         <Text
                           className={cn(
-                            'text-left text-sm',
+                            'text-sm',
                             isSelected ? 'text-primary-foreground' : 'text-foreground'
                           )}
                         >

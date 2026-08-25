@@ -16,6 +16,8 @@ import { Pressable, View } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
@@ -70,8 +72,8 @@ export function PrDiffFileListHeader({
         <Rows3 size={14} color={colors.mutedForeground} />
         <Text className="text-xs font-medium text-foreground">
           {t('prReview.fileList.filesViewed', {
-            viewed: viewedCount.toLocaleString(),
-            total: totalListed.toLocaleString(),
+            viewed: formatNumber(viewedCount, i18n.language),
+            total: formatNumber(totalListed, i18n.language),
           })}
         </Text>
         {isTruncated ? (

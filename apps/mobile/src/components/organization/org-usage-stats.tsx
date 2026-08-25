@@ -7,7 +7,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber } from '@/lib/format';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 function StatTile({ label, value }: Readonly<{ label: string; value: string }>) {
@@ -68,17 +68,17 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
           />
           <StatTile
             label={t('organization.usageStats.requests')}
-            value={data.totalRequestCount.toLocaleString()}
+            value={formatNumber(data.totalRequestCount, i18n.language)}
           />
         </View>
         <View className="flex-row gap-3">
           <StatTile
             label={t('organization.usageStats.inputTokens')}
-            value={data.totalInputTokens.toLocaleString()}
+            value={formatNumber(data.totalInputTokens, i18n.language)}
           />
           <StatTile
             label={t('organization.usageStats.outputTokens')}
-            value={data.totalOutputTokens.toLocaleString()}
+            value={formatNumber(data.totalOutputTokens, i18n.language)}
           />
         </View>
       </Animated.View>

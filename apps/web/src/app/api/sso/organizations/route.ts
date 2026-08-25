@@ -73,8 +73,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         level: 'error',
         tags: { source: 'sso-organizations-rate-limit' },
         extra: {
-          ipLimiterError: ipLimit.error ?? null,
-          emailLimiterError: emailLimit.error ?? null,
+          ipLimiterUnavailable: Boolean(ipLimit.error),
+          emailLimiterUnavailable: Boolean(emailLimit.error),
         },
       });
       return NextResponse.json({ error: 'Please try again later.' }, { status: 503 });

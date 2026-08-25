@@ -239,9 +239,20 @@ describe('POST /api/sso/organizations', () => {
       .mockResolvedValueOnce({ rateLimited: false, error: 'not-found' })
       .mockResolvedValueOnce({
         rateLimited: false,
+        error: 'blocked',
       });
 
     expect((await POST(request({ email: 'user@example.com' }))).status).toBe(503);
     expect(mockGetAllUserProviders).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith('Sign-in discovery rate limit unavailable', {
+      level: 'error',
+      tags: { source: 'sso-organizations-rate-limit' },
+      extra: {
+        ipLimiterUnavailable: true,
+        emailLimiterUnavailable: true,
+      },
+    });
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('not-found');
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('blocked');
   });
 });

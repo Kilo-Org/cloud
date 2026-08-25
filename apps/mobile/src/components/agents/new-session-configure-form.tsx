@@ -68,6 +68,8 @@ type NewSessionConfigureFormProps = {
   onConnectProvider: (platform: RepositoryPlatform) => void;
   onRefreshRepos: () => void;
   repositories: NewSessionRepository[];
+  /** Recently used rows, threaded to the picker's "Recently used" section. */
+  recents: NewSessionRepository[];
   selectedRepo: string;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
@@ -125,6 +127,7 @@ export function NewSessionConfigureForm({
   onConnectProvider,
   onRefreshRepos,
   repositories,
+  recents,
   selectedRepo,
   profile,
   isProfileLoading,
@@ -271,6 +274,7 @@ export function NewSessionConfigureForm({
           onConnect={onConnectProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
+          recents={recents}
           value={selectedRepo}
         />
       ) : null}

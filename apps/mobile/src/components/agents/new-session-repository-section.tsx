@@ -21,6 +21,8 @@ type NewSessionRepositorySectionProps = {
   onConnect: (platform: RepositoryPlatform) => void;
   onRefreshRepos: () => void;
   repositories: NewSessionRepository[];
+  /** Recently used rows for the picker's "Recently used" section. */
+  recents: NewSessionRepository[];
   groups: RepositoryGroup[];
   value: string;
 };
@@ -31,18 +33,24 @@ const PROVIDER_COPY = {
     connectDescription: 'agentChat.newSession.connectGithubDescription',
     openLabel: 'agentChat.newSession.openGithub',
     connectedTitle: 'agentChat.newSession.githubConnected',
+    errorTitle: 'agentChat.newSession.couldNotLoadGithubRepositories',
+    emptyDescription: 'agentChat.newSession.noRepositoriesVisible',
   },
   gitlab: {
     connectTitle: 'agentChat.newSession.connectGitlab',
     connectDescription: 'agentChat.newSession.connectGitlabDescription',
     openLabel: 'agentChat.newSession.openGitlab',
     connectedTitle: 'agentChat.newSession.gitlabConnected',
+    errorTitle: 'agentChat.newSession.couldNotLoadGitlabRepositories',
+    emptyDescription: 'agentChat.newSession.noRepositoriesVisibleGitlab',
   },
   bitbucket: {
     connectTitle: 'agentChat.newSession.connectBitbucket',
     connectDescription: 'agentChat.newSession.connectBitbucketDescription',
     openLabel: 'agentChat.newSession.openBitbucket',
     connectedTitle: 'agentChat.newSession.bitbucketConnected',
+    errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
+    emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
   },
 } satisfies Record<
   RepositoryPlatform,
@@ -51,6 +59,8 @@ const PROVIDER_COPY = {
     connectDescription: string;
     openLabel: string;
     connectedTitle: string;
+    errorTitle: string;
+    emptyDescription: string;
   }
 >;
 
@@ -66,6 +76,7 @@ export function NewSessionRepositorySection({
   onConnect,
   onRefreshRepos,
   repositories,
+  recents,
   groups,
   value,
 }: Readonly<NewSessionRepositorySectionProps>) {
@@ -85,6 +96,7 @@ export function NewSessionRepositorySection({
         <RepoSelector
           value={value}
           repositories={repositories}
+          recents={recents}
           isLoading={!hasRepos && anyLoading}
           onChange={onChange}
           disabled={disabled}
@@ -114,7 +126,7 @@ export function NewSessionRepositorySection({
             <QueryError
               placement="top"
               variant="server"
-              title={t('agentChat.newSession.couldNotLoadRepositories')}
+              title={t(PROVIDER_COPY[platform].errorTitle)}
               message={t('agentChat.instancePicker.couldNotLoadDescription')}
               onRetry={onRefreshRepos}
               isRetrying={isRetrying}
@@ -177,7 +189,7 @@ export function NewSessionRepositorySection({
       <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
         <View className="gap-1">
           <Text className="text-sm font-semibold text-foreground">{t(copy.connectedTitle)}</Text>
-          <Text variant="muted">{t('agentChat.newSession.noRepositoriesVisible')}</Text>
+          <Text variant="muted">{t(copy.emptyDescription)}</Text>
         </View>
         <View className="flex-row gap-2">
           <Button

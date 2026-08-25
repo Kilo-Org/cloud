@@ -32,6 +32,8 @@ type UseNewSessionReposArgs = {
 type UseNewSessionReposResult = {
   /** Merged + deduped rows (recents first) for the picker and prefill. */
   repositories: NewSessionRepository[];
+  /** Recently used rows resolved against connected providers ("Recently used" picker section). */
+  recents: NewSessionRepository[];
   groups: RepositoryGroup[];
   isRetrying: boolean;
   /** True once every provider query has settled and at least one repo is visible. */
@@ -179,7 +181,7 @@ export function useNewSessionRepos({
     repositoryCount: bitbucketRepositories.length,
   });
 
-  const { groups } = useMemo<RepositoryGroups>(
+  const { groups, recents } = useMemo<RepositoryGroups>(
     () =>
       resolveRepositoryGroups({
         organizationId,
@@ -352,6 +354,7 @@ export function useNewSessionRepos({
 
   return {
     repositories,
+    recents,
     groups,
     isRetrying,
     reposSettled,

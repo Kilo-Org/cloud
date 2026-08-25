@@ -166,6 +166,7 @@ function defaultProps() {
     onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
     repositories: [] as NewSessionRepository[],
+    recents: [] as NewSessionRepository[],
     selectedRepo: '',
     profile: null as {
       id: string;
@@ -225,6 +226,28 @@ describe('NewSessionConfigureForm', () => {
     expect(section).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(section!.repositories).toEqual(orderedRepositories);
+  });
+
+  // ── Case 1c: recents pass through unchanged ──
+  it('passes the recents array unchanged into NewSessionRepositorySection', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const recentRows: NewSessionRepository[] = [
+      { platform: 'github', fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { platform: 'gitlab', fullName: 'acme/widgets', isPrivate: true },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      recents: recentRows,
+    }) as Node;
+
+    const section = findElementByType(element, 'NewSessionRepositorySection');
+    expect(section).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(section!.recents).toEqual(recentRows);
   });
 
   // ── Case 2: Cloud, selector hidden ──

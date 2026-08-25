@@ -153,6 +153,7 @@ export function NewSessionScreenBody() {
   const trpc = useTRPC();
   const {
     repositories,
+    recents,
     groups,
     isRetrying,
     reposSettled,
@@ -486,6 +487,7 @@ export function NewSessionScreenBody() {
         onConnectProvider={openIntegration}
         onRefreshRepos={() => void refreshReposForceFresh()}
         repositories={repositories}
+        recents={recents}
         selectedRepo={selectedRepo}
         profile={profile}
         isProfileLoading={isProfileLoading}

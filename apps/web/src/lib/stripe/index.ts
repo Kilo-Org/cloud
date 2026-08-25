@@ -657,6 +657,7 @@ async function recordKiloclawEarlybirdPurchase(user: User, charge: Stripe.Charge
   }
 }
 
+// old form: array limit 100, no hasMore; remove when every client pages.
 export async function getStripeInvoices(
   stripeCustomerId: string,
   dateThreshold?: Date | null
@@ -702,6 +703,73 @@ export async function getStripeInvoices(
       description: firstLineDescription,
     };
   });
+}
+
+function mapStripeInvoicesToUnified(invoices: Stripe.Invoice[]): UnifiedInvoice[] {
+  return invoices.map(invoice => {
+    // Classify as 'seats' if any line item has seats metadata or a known paid seat price ID
+    const isSeatInvoice =
+      invoice.lines?.data?.some(line => {
+        const hasSeatsMetadata =
+          line.metadata != null && Object.prototype.hasOwnProperty.call(line.metadata, 'seats');
+        const priceId = line.pricing?.price_details?.price;
+        const hasSeatPriceId = priceId != null && KNOWN_SEAT_PRICE_IDS.has(priceId);
+        return hasSeatsMetadata || hasSeatPriceId;
+      }) ?? false;
+
+    const firstLineDescription = invoice.lines?.data?.[0]?.description || null;
+
+    return {
+      id: invoice.id || '',
+      number: invoice.number,
+      status: invoice.status || 'unknown',
+      amount_due: invoice.amount_due || 0,
+      currency: invoice.currency || 'usd',
+      created: invoice.created || 0,
+      hosted_invoice_url: invoice.hosted_invoice_url || null,
+      invoice_pdf: invoice.invoice_pdf || null,
+      invoice_type: isSeatInvoice ? 'seats' : 'topup',
+      description: firstLineDescription,
+    };
+  });
+}
+
+export type StripeInvoicesPage = {
+  entries: UnifiedInvoice[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+export async function getStripeInvoicesPage(
+  stripeCustomerId: string,
+  dateThreshold?: Date | null,
+  startingAfter?: string | null
+): Promise<StripeInvoicesPage> {
+  const listParams: Stripe.InvoiceListParams = {
+    customer: stripeCustomerId,
+    limit: 25,
+    expand: ['data.payment_intent', 'data.lines.data'],
+  };
+
+  if (dateThreshold) {
+    listParams.created = {
+      gte: Math.floor(dateThreshold.getTime() / 1000), // Convert to Unix timestamp
+    };
+  }
+
+  if (startingAfter) {
+    listParams.starting_after = startingAfter;
+  }
+
+  const invoices = await client.invoices.list(listParams);
+  const entries = mapStripeInvoicesToUnified(invoices.data);
+  const lastInvoice = invoices.data[invoices.data.length - 1];
+
+  return {
+    entries,
+    hasMore: invoices.has_more,
+    nextCursor: lastInvoice ? lastInvoice.id : null,
+  };
 }
 
 async function handlePaymentMethodEvent(

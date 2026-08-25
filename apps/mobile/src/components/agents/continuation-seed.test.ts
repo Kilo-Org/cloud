@@ -88,4 +88,23 @@ describe('resolveContinuationResolution', () => {
 
     expect(result).toEqual({ kind: 'unresolved-model' });
   });
+
+  it('preserves repository integration provenance when continuing', () => {
+    const result = resolveContinuationResolution({
+      gitUrl: GIT_URL,
+      mode: 'code',
+      model: 'test-model',
+      variant: 'default',
+      repositories: [{ fullName: 'owner/repo', platformIntegrationId: 'integration-1' }],
+      models: MODELS,
+    });
+
+    expect(result).toEqual({
+      kind: 'cloud-agent',
+      repo: 'owner/repo',
+      model: 'test-model',
+      variant: 'default',
+      githubIntegrationId: 'integration-1',
+    });
+  });
 });

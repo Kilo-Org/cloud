@@ -2,7 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { Pressable, SectionList, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearRepoPickerBridge, getRepoPickerBridge } from '@/lib/picker-bridge';
-import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { filterRepoPickerOptions, groupRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 export default function RepoPickerScreen() {
   const router = useRouter();
@@ -45,6 +45,7 @@ export default function RepoPickerScreen() {
     () => filterRepoPickerOptions({ repositories: bridge?.repositories ?? [], search }),
     [bridge, search]
   );
+  const sections = useMemo(() => groupRepoPickerOptions(filtered), [filtered]);
 
   const handleSelect = useCallback(
     (repo: string) => {
@@ -70,10 +71,10 @@ export default function RepoPickerScreen() {
 
   return (
     <PickerSheet title={t('agentChat.repoPicker.title')} onDone={closePicker} scrollable={false}>
-      <FlatList
+      <SectionList
         className="flex-1 bg-background"
-        data={filtered}
-        keyExtractor={repo => repo.fullName}
+        sections={sections}
+        keyExtractor={repo => repo.key}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingBottom: bottom }}
@@ -110,11 +111,18 @@ export default function RepoPickerScreen() {
             }
           />
         }
+        renderSectionHeader={({ section }) =>
+          section.title ? (
+            <Text className="bg-background px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {section.title}
+            </Text>
+          ) : null
+        }
         renderItem={({ item: repo }) => (
           <Pressable
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
             onPress={() => {
-              handleSelect(repo.fullName);
+              handleSelect(repo.key);
             }}
             accessibilityRole="button"
             accessibilityLabel={repo.fullName}
@@ -127,9 +135,7 @@ export default function RepoPickerScreen() {
             <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
               {repo.fullName}
             </Text>
-            {bridge.currentValue === repo.fullName ? (
-              <Check size={18} color={colors.primary} />
-            ) : null}
+            {bridge.currentValue === repo.key ? <Check size={18} color={colors.primary} /> : null}
           </Pressable>
         )}
       />

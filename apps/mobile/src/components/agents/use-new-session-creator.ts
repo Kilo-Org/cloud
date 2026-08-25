@@ -28,6 +28,7 @@ type UseNewSessionCreatorInput = {
   /** Invoked on the success path before navigation; failures never fire it. */
   onCreated?: () => void;
   selectedRepo: string;
+  githubIntegrationId?: string;
   setIsCreating: (value: boolean) => void;
   variant: string;
   /** Commit and push the agent's changes (true) or leave them uncommitted (false). */
@@ -43,6 +44,7 @@ type PrepareSessionInput = {
   model: string;
   variant: string | undefined;
   githubRepo: string;
+  githubIntegrationId?: string;
   autoCommit: boolean;
   autoInitiate: boolean;
   operationKey: string;
@@ -69,6 +71,7 @@ export function useNewSessionCreator({
   organizationId,
   onCreated,
   selectedRepo,
+  githubIntegrationId,
   setIsCreating,
   variant,
   autoCommit,
@@ -133,6 +136,7 @@ export function useNewSessionCreator({
       model,
       variant: variant || undefined,
       repo: selectedRepo,
+      githubIntegrationId: githubIntegrationId ?? null,
       autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
@@ -160,6 +164,7 @@ export function useNewSessionCreator({
         model,
         variant: variant || undefined,
         githubRepo: selectedRepo,
+        ...(githubIntegrationId ? { githubIntegrationId } : {}),
         autoCommit,
         autoInitiate: true,
         operationKey,
@@ -240,6 +245,7 @@ export function useNewSessionCreator({
     }
   }, [
     selectedRepo,
+    githubIntegrationId,
     model,
     mode,
     variant,

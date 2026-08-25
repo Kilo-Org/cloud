@@ -162,7 +162,7 @@ function defaultProps() {
     onChangeRepo: vi.fn(),
     onOpenGitHubIntegration: vi.fn(),
     onRefreshRepos: vi.fn(),
-    repositories: [] as { fullName: string; isPrivate: boolean }[],
+    repositories: [] as { key: string; fullName: string; isPrivate: boolean }[],
     selectedRepo: '',
     profile: null as {
       id: string;
@@ -206,9 +206,9 @@ describe('NewSessionConfigureForm', () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const orderedRepositories = [
-      { fullName: 'Kilo-Org/cloud', isPrivate: true },
-      { fullName: 'octocat/Hello-World', isPrivate: false },
-      { fullName: 'acme/widgets', isPrivate: true },
+      { key: 'Kilo-Org/cloud', fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { key: 'octocat/Hello-World', fullName: 'octocat/Hello-World', isPrivate: false },
+      { key: 'acme/widgets', fullName: 'acme/widgets', isPrivate: true },
     ];
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

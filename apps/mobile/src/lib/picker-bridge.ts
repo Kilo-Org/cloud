@@ -42,9 +42,21 @@ type ModePickerBridge = {
 };
 
 export type RepoOption = {
+  key: string;
   fullName: string;
   isPrivate: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
 };
+
+export function getRepoOptionKey(repository: {
+  fullName: string;
+  platformIntegrationId?: string;
+}): string {
+  return repository.platformIntegrationId
+    ? `${repository.platformIntegrationId}:${repository.fullName}`
+    : repository.fullName;
+}
 
 type RepoPickerBridge = {
   repositories: RepoOption[];

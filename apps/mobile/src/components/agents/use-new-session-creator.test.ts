@@ -278,6 +278,7 @@ function runCreator(args: {
   variant?: string;
   organizationId?: string;
   selectedRepo?: string;
+  githubIntegrationId?: string;
   autoCommit?: boolean;
   profileId?: string | null;
 }): CreatorResult {
@@ -318,6 +319,7 @@ function runCreator(args: {
       model: args.model ?? 'model-1',
       organizationId: args.organizationId,
       selectedRepo: args.selectedRepo ?? 'owner/repo',
+      ...(args.githubIntegrationId ? { githubIntegrationId: args.githubIntegrationId } : {}),
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
@@ -572,6 +574,31 @@ describe('useNewSessionCreator mode passthrough', () => {
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
       mode: 'reviewer',
     });
+  });
+});
+
+describe('useNewSessionCreator repository provenance', () => {
+  it('includes the selected GitHub integration when available', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ githubIntegrationId: 'integration-1' });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      githubRepo: 'owner/repo',
+      githubIntegrationId: 'integration-1',
+    });
+  });
+
+  it('omits the integration for repositories from legacy responses', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('githubIntegrationId');
   });
 });
 

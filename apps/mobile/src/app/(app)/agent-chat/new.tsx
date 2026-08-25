@@ -179,6 +179,7 @@ function NewSessionScreenBody() {
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
+  const selectedRepository = repositories.find(repository => repository.key === selectedRepo);
 
   const {
     profile,
@@ -240,7 +241,8 @@ function NewSessionScreenBody() {
     model: displayModel,
     organizationId,
     onCreated: handleCreated,
-    selectedRepo,
+    selectedRepo: selectedRepository?.fullName ?? '',
+    githubIntegrationId: selectedRepository?.platformIntegrationId,
     setIsCreating,
     variant: displayVariant,
     autoCommit,
@@ -428,7 +430,7 @@ function NewSessionScreenBody() {
         isRemoteTargetSelected,
         isSubmitting,
         model: displayModel,
-        selectedRepo,
+        selectedRepo: selectedRepository?.key ?? '',
         isProfileLoading,
       });
 

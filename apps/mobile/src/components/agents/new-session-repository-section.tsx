@@ -8,9 +8,8 @@ import { Text } from '@/components/ui/text';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type RepoOption } from '@/lib/picker-bridge';
 import { type RepositorySectionView } from './new-session-repository-state';
-
-type RepositoryItem = { fullName: string; isPrivate: boolean };
 
 type NewSessionRepositorySectionProps = {
   disabled: boolean;
@@ -19,7 +18,7 @@ type NewSessionRepositorySectionProps = {
   onChange: (value: string) => void;
   onOpenGitHubIntegration: () => void;
   onRefreshRepos: () => void;
-  repositories: RepositoryItem[];
+  repositories: RepoOption[];
   value: string;
 };
 

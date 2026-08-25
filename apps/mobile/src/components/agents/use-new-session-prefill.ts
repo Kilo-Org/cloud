@@ -33,7 +33,7 @@ export function useNewSessionPrefill(): NewSessionPrefill {
 }
 
 export type UseNewSessionPrefillTargetsInput = {
-  repositories: { fullName: string }[];
+  repositories: { key: string; fullName: string }[];
   // !isLoadingRepos && !isReposError && repositories.length > 0
   reposSettled: boolean;
   models: { id: string; variants: string[] }[];
@@ -61,7 +61,9 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
     hasAppliedRepo.current = true;
     const resolved = resolvePrefillRepo(repositories, prefill);
     if (resolved) {
-      setSelectedRepo(resolved);
+      setSelectedRepo(
+        repositories.find(repository => repository.fullName === resolved)?.key ?? resolved
+      );
     }
   }
 

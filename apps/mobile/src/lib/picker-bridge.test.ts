@@ -5,6 +5,7 @@ import {
   clearModelPickerBridge,
   commitModelPickerSelection,
   getModelPickerBridge,
+  getRepoOptionKey,
   resolveModelPickerSelection,
   setModelPickerBridge,
 } from './picker-bridge';
@@ -131,5 +132,19 @@ describe('model picker bridge', () => {
 
     expect(commitModelPickerSelection(bridge, remoteOption.id, 'high')).toBe(true);
     expect(onSelect).toHaveBeenCalledWith({ option: remoteOption, variant: 'high' });
+  });
+});
+
+describe('repository picker bridge', () => {
+  const repository = { fullName: 'owner/repo' };
+
+  it('distinguishes duplicate repositories across integrations', () => {
+    expect(getRepoOptionKey({ ...repository, platformIntegrationId: 'integration-1' })).not.toBe(
+      getRepoOptionKey({ ...repository, platformIntegrationId: 'integration-2' })
+    );
+  });
+
+  it('uses the legacy full name when provenance is absent', () => {
+    expect(getRepoOptionKey(repository)).toBe('owner/repo');
   });
 });

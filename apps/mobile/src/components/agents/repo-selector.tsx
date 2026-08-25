@@ -5,13 +5,8 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { setRepoPickerBridge } from '@/lib/picker-bridge';
+import { type RepoOption, setRepoPickerBridge } from '@/lib/picker-bridge';
 import { cn } from '@/lib/utils';
-
-type RepoOption = {
-  fullName: string;
-  isPrivate: boolean;
-};
 
 type RepoSelectorProps = {
   value: string;
@@ -32,9 +27,11 @@ export function RepoSelector({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const effectivelyDisabled = disabled || isLoading || repositories.length === 0;
+  const selectedRepository = repositories.find(repository => repository.key === value);
 
   const label =
-    value || (isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title'));
+    selectedRepository?.fullName ??
+    (isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title'));
 
   function handlePress() {
     if (effectivelyDisabled) {

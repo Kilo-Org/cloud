@@ -172,8 +172,8 @@ export function resolvePrefillRepo(
   }
 
   const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(r => r.fullName.toLowerCase() === lower);
-  return match?.fullName ?? null;
+  const matches = repositories.filter(r => r.fullName.toLowerCase() === lower);
+  return matches.length === 1 ? (matches[0]?.fullName ?? null) : null;
 }
 
 /**

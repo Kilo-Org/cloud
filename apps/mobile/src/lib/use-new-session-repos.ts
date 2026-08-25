@@ -6,6 +6,7 @@ import {
   resolveRepositorySectionView,
 } from '@/components/agents/new-session-repository-state';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
+import { getRepoOptionKey, type RepoOption } from '@/lib/picker-bridge';
 import { useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
@@ -13,7 +14,7 @@ type UseNewSessionReposArgs = {
 };
 
 type UseNewSessionReposResult = {
-  repositories: { fullName: string; isPrivate: boolean }[];
+  repositories: RepoOption[];
   view: RepositorySectionView;
   isRetrying: boolean;
   openGitHubIntegration: () => void;
@@ -60,10 +61,24 @@ export function useNewSessionRepos({
     if (!repoData?.repositories) {
       return [];
     }
-    return repoData.repositories.map(r => ({
-      fullName: r.fullName,
-      isPrivate: r.private,
-    }));
+    return repoData.repositories.map(r => {
+      // Optional while older API deployments remain reachable.
+      const repository = r as typeof r & {
+        platformIntegrationId?: string;
+        platformAccountLogin?: string;
+      };
+      return {
+        key: getRepoOptionKey(repository),
+        fullName: repository.fullName,
+        isPrivate: repository.private,
+        ...(repository.platformIntegrationId
+          ? { platformIntegrationId: repository.platformIntegrationId }
+          : {}),
+        ...(repository.platformAccountLogin
+          ? { platformAccountLogin: repository.platformAccountLogin }
+          : {}),
+      };
+    });
   }, [repoData]);
 
   return { repositories, view, isRetrying, openGitHubIntegration, refreshReposForceFresh };

@@ -7,7 +7,13 @@ import {
 } from '@/components/agents/new-session-prefill';
 
 export type ContinuationResolution =
-  | { kind: 'cloud-agent'; repo: string; model: string; variant: string }
+  | {
+      kind: 'cloud-agent';
+      repo: string;
+      model: string;
+      variant: string;
+      githubIntegrationId?: string;
+    }
   | { kind: 'unmatched-repository' }
   | { kind: 'unresolved-model' };
 
@@ -22,7 +28,7 @@ export function resolveContinuationResolution(args: {
   mode: string;
   model: string;
   variant: string;
-  repositories: { fullName: string }[];
+  repositories: { fullName: string; platformIntegrationId?: string }[];
   models: { id: string; variants: string[] }[];
 }): ContinuationResolution {
   const { gitUrl, mode, model, variant, repositories, models } = args;
@@ -50,10 +56,18 @@ export function resolveContinuationResolution(args: {
     return { kind: 'unresolved-model' };
   }
 
+  const matchingRepositories = repositories.filter(candidate => candidate.fullName === repo);
+  if (matchingRepositories.length !== 1) {
+    return { kind: 'unmatched-repository' };
+  }
+  const repository = matchingRepositories[0];
   return {
     kind: 'cloud-agent',
     repo,
     model: resolvedModel.model,
     variant: resolvedModel.variant,
+    ...(repository?.platformIntegrationId
+      ? { githubIntegrationId: repository.platformIntegrationId }
+      : {}),
   };
 }

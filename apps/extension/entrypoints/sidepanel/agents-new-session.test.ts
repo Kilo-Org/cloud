@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildPrepareSessionInput,
   buildSubmitInput,
+  getRepoOptionKey,
   isModelPreferencesGetResult,
   MODE,
   PROMPT_MAX_LENGTH,
@@ -131,6 +132,29 @@ describe('buildSubmitInput helper', () => {
   it('does not include organizationId (handled by caller)', () => {
     const result = buildSubmitInput(baseParams);
     expect(result).not.toHaveProperty('organizationId');
+  });
+
+  it('includes repository integration provenance when available', () => {
+    const result = buildSubmitInput({ ...baseParams, githubIntegrationId: 'integration-1' });
+    expect(result['githubIntegrationId']).toBe('integration-1');
+  });
+
+  it('omits repository integration provenance for legacy responses', () => {
+    expect(buildSubmitInput(baseParams)).not.toHaveProperty('githubIntegrationId');
+  });
+});
+
+describe('getRepoOptionKey helper', () => {
+  const repository = { fullName: 'owner/repo', id: 1, name: 'repo', private: false };
+
+  it('distinguishes duplicate repositories across integrations', () => {
+    expect(getRepoOptionKey({ ...repository, platformIntegrationId: 'integration-1' })).not.toBe(
+      getRepoOptionKey({ ...repository, platformIntegrationId: 'integration-2' })
+    );
+  });
+
+  it('uses the legacy full name when provenance is absent', () => {
+    expect(getRepoOptionKey(repository)).toBe('owner/repo');
   });
 });
 

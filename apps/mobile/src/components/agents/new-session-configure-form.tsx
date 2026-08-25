@@ -19,7 +19,11 @@ import {
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
+import {
+  type InstancePickerInstance,
+  type ModelPickerSelection,
+  type RepoOption,
+} from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 type NewSessionConfigureFormProps = {
@@ -63,7 +67,7 @@ type NewSessionConfigureFormProps = {
   onChangeRepo: (fullName: string) => void;
   onOpenGitHubIntegration: () => void;
   onRefreshRepos: () => void;
-  repositories: { fullName: string; isPrivate: boolean }[];
+  repositories: RepoOption[];
   selectedRepo: string;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;

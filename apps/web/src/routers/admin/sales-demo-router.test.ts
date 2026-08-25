@@ -8,6 +8,7 @@ import {
   organization_memberships,
   organization_user_usage,
   organizations,
+  sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -81,6 +82,9 @@ describe('sales demo router', () => {
       await db
         .delete(organization_memberships)
         .where(inArray(organization_memberships.organization_id, orgIds));
+      await db
+        .delete(sales_demo_spend_ledger)
+        .where(inArray(sales_demo_spend_ledger.organization_id, orgIds));
       await db.delete(organizations).where(inArray(organizations.id, orgIds));
     }
 
@@ -273,6 +277,11 @@ describe('sales demo router', () => {
       organization_id: firstOrgId,
     });
 
+    await db
+      .update(organizations)
+      .set({ microdollars_used: sql`${organizations.microdollars_used} + 1000000` })
+      .where(eq(organizations.id, firstOrgId));
+
     const extraGrant = await grantEntityCreditForCategory(
       { user: admin, organization: before },
       { credit_category: 'sales-demo', counts_as_selfservice: false, amount_usd: 10 }
@@ -392,6 +401,29 @@ describe('sales demo router', () => {
       .where(eq(credit_transactions.organization_id, firstOrgId));
     const total = txns.reduce((acc, tx) => acc + Number(tx.amount_microdollars), 0);
     expect(total).toBe(50_000_000);
+
+    const ledger = await db
+      .select()
+      .from(sales_demo_spend_ledger)
+      .where(eq(sales_demo_spend_ledger.organization_id, firstOrgId));
+    expect(ledger).toHaveLength(1);
+    expect(Number(ledger[0].microdollars_used)).toBe(1_000_000);
+    expect(ledger[0].owner_kilo_user_id).toBe(target.id);
+    expect(new Date(ledger[0].period_start).getTime()).toBe(
+      new Date(before.settings.sales_demo_last_reset_at ?? before.created_at).getTime()
+    );
+  });
+
+  it('writes no ledger row when a demo org reset discards no spend', async () => {
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.salesDemo.reset({ organizationId: secondOrgId });
+
+    const ledger = await db
+      .select({ id: sales_demo_spend_ledger.id })
+      .from(sales_demo_spend_ledger)
+      .where(eq(sales_demo_spend_ledger.organization_id, secondOrgId));
+    expect(ledger).toHaveLength(0);
   });
 
   it('rejects reset for a normal org with NOT_FOUND', async () => {

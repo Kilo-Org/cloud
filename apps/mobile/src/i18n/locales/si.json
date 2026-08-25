@@ -2129,7 +2129,10 @@
       "exitMessage": "මෙය ධාවනය වන සැසිය නවත්වන නමුත් එහි ඉතිහාසය තබා ගනී.",
       "keepSessionRunning": "සැසිය දිගටම ධාවනය කරන්න",
       "exitSession": "සැසියෙන් ඉවත් වන්න",
-      "restartExitFailed": "නව සැසියක් ආරම්භ කර ඇත. පෙර සැසිය තවමත් විවෘතයි."
+      "restartExitFailed": "නව සැසියක් ආරම්භ කර ඇත. පෙර සැසිය තවමත් විවෘතයි.",
+      "exitNotSupported": "වත්මන් සැසිය සඳහා දුරස්ථ සැසියෙන් පිටවීම සහාය නොදක්වයි",
+      "exitUnavailable": "වත්මන් සැසිය සඳහා දුරස්ථ සැසියෙන් පිටවීම ලබා ගත නොහැක",
+      "exitNeedsNewerCli": "දුරස්ථ ස්ලෑෂ් විධාන සඳහා නව Kilo CLI එකක් අවශ්ය වේ. Kilo CLI යාවත්කාලීන කර නැවත සම්බන්ධ වන්න."
     },
     "sessionConnection": {
       "connecting": "සම්බන්ධ වෙමින්…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "කාර්යය පැවරීම",
       "askingQuestion": "ප්‍රශ්නයක් අසමින්",
       "consideringNextSteps": "ඊළඟ පියවර සලකා බලමින්",
-      "writingResponse": "ප්‍රතිචාරය ලියමින්"
+      "writingResponse": "ප්‍රතිචාරය ලියමින්",
+      "initializingSnapshot": "ස්නැප්ෂොට් එක ආරම්භ කරමින්…"
     },
     "slashCommands": {
       "startNewSession": "නව සැසියක් ආරම්භ කරන්න",

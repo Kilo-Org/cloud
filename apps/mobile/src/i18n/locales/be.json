@@ -2159,7 +2159,10 @@
       "exitMessage": "Гэта спыняе працуючы сеанс, але захоўвае яго гісторыю.",
       "keepSessionRunning": "Працягваць сеанс",
       "exitSession": "Выйсці з сеанса",
-      "restartExitFailed": "Пачаты новы сеанс. Папярэдні сеанс усё яшчэ адкрыты."
+      "restartExitFailed": "Пачаты новы сеанс. Папярэдні сеанс усё яшчэ адкрыты.",
+      "exitNotSupported": "Выхад з аддаленага сеанса не падтрымліваецца для бягучага сеанса",
+      "exitUnavailable": "Выхад з аддаленага сеанса недаступны для бягучага сеанса",
+      "exitNeedsNewerCli": "Аддаленыя слаш-каманды патрабуюць навейшага Kilo CLI. Абнавіце Kilo CLI і падключыцеся зноў."
     },
     "sessionConnection": {
       "connecting": "Падключэнне…",
@@ -2597,7 +2600,8 @@
       "delegatingWork": "Перадача работы",
       "askingQuestion": "Заданне пытання",
       "consideringNextSteps": "Разгляд наступных крокаў",
-      "writingResponse": "Напісанне адказу"
+      "writingResponse": "Напісанне адказу",
+      "initializingSnapshot": "Ініцыялізацыя здымка…"
     },
     "slashCommands": {
       "startNewSession": "Пачаць новы сеанс",

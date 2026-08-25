@@ -2129,7 +2129,10 @@
       "exitMessage": "สิ่งนี้หยุด session ที่ทำงานอยู่แต่เก็บประวัติไว้",
       "keepSessionRunning": "ให้ session ทำงานต่อไป",
       "exitSession": "ออกจาก session",
-      "restartExitFailed": "เริ่ม session ใหม่แล้ว session ก่อนหน้ายังเปิดอยู่"
+      "restartExitFailed": "เริ่ม session ใหม่แล้ว session ก่อนหน้ายังเปิดอยู่",
+      "exitNotSupported": "การออกจาก remote session ไม่รองรับสำหรับ session ปัจจุบัน",
+      "exitUnavailable": "การออกจาก remote session ไม่พร้อมใช้งานสำหรับ session ปัจจุบัน",
+      "exitNeedsNewerCli": "คำสั่งเครื่องหมายทับใน remote session ต้องใช้ Kilo CLI ที่ใหม่กว่า อัปเดต Kilo CLI และเชื่อมต่อใหม่"
     },
     "sessionConnection": {
       "connecting": "กำลังเชื่อมต่อ…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "กำลังมอบหมายงาน",
       "askingQuestion": "กำลังถามคำถาม",
       "consideringNextSteps": "กำลังพิจารณาขั้นตอนถัดไป",
-      "writingResponse": "กำลังเขียนคำตอบ"
+      "writingResponse": "กำลังเขียนคำตอบ",
+      "initializingSnapshot": "กำลังเริ่มต้น snapshot…"
     },
     "slashCommands": {
       "startNewSession": "เริ่มเซสชันใหม่",

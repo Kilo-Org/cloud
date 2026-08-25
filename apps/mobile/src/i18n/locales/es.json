@@ -1683,7 +1683,10 @@
       "exitMessage": "Esto detiene la sesión en ejecución pero conserva su historial.",
       "keepSessionRunning": "Mantener la sesión en ejecución",
       "exitSession": "Salir de la sesión",
-      "restartExitFailed": "Se inició una nueva sesión. La sesión anterior sigue abierta."
+      "restartExitFailed": "Se inició una nueva sesión. La sesión anterior sigue abierta.",
+      "exitNotSupported": "La salida de la sesión remota no se admite para la sesión actual",
+      "exitUnavailable": "La salida de la sesión remota no está disponible para la sesión actual",
+      "exitNeedsNewerCli": "Los comandos slash remotos requieren una versión más reciente de Kilo CLI. Actualiza Kilo CLI y vuelve a conectarte."
     },
     "sessionConnection": {
       "connecting": "Conectando…",
@@ -2117,7 +2120,8 @@
       "delegatingWork": "Delegando trabajo",
       "askingQuestion": "Haciendo una pregunta",
       "consideringNextSteps": "Considerando los próximos pasos",
-      "writingResponse": "Escribiendo la respuesta"
+      "writingResponse": "Escribiendo la respuesta",
+      "initializingSnapshot": "Inicializando snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Iniciar una nueva sesión",

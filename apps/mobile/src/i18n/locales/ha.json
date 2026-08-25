@@ -2129,7 +2129,10 @@
       "exitMessage": "Wannan yana dakatar da zaman da ke gudana amma yana kiyaye tarihinsa.",
       "keepSessionRunning": "Ci gaba da gudanar da zaman",
       "exitSession": "Fita daga zaman",
-      "restartExitFailed": "An fara sabon zaman. Zaman da ya gabata har yanzu a buɗe yake."
+      "restartExitFailed": "An fara sabon zaman. Zaman da ya gabata har yanzu a buɗe yake.",
+      "exitNotSupported": "Ba a goyan bayan fita daga zaman na nesa don wannan zaman ba",
+      "exitUnavailable": "Fita daga zaman na nesa ba ya samuwa don wannan zaman",
+      "exitNeedsNewerCli": "Umarnin slash na nesa suna buƙatar sabuwar Kilo CLI. Sabunta Kilo CLI kuma sake haɗawa."
     },
     "sessionConnection": {
       "connecting": "Ana haɗawa…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Ba da aiki",
       "askingQuestion": "Yin tambaya",
       "consideringNextSteps": "Yin la'akari da matakai na gaba",
-      "writingResponse": "Rubuta amsa"
+      "writingResponse": "Rubuta amsa",
+      "initializingSnapshot": "Ana fara snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Fara sabon zama",

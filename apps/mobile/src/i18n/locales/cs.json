@@ -2159,7 +2159,10 @@
       "exitMessage": "Tím se zastaví běžící relace, ale zachová se její historie.",
       "keepSessionRunning": "Nechat relaci běžet",
       "exitSession": "Ukončit relaci",
-      "restartExitFailed": "Byla spuštěna nová relace. Předchozí relace je stále otevřená."
+      "restartExitFailed": "Byla spuštěna nová relace. Předchozí relace je stále otevřená.",
+      "exitNotSupported": "Ukončení vzdálené relace není pro aktuální relaci podporováno",
+      "exitUnavailable": "Ukončení vzdálené relace není pro aktuální relaci k dispozici",
+      "exitNeedsNewerCli": "Slash příkazy pro vzdálenou relaci vyžadují novější Kilo CLI. Aktualizujte Kilo CLI a připojte se znovu."
     },
     "sessionConnection": {
       "connecting": "Připojování…",
@@ -2597,7 +2600,8 @@
       "delegatingWork": "Předávání práce",
       "askingQuestion": "Položení otázky",
       "consideringNextSteps": "Zvažování dalších kroků",
-      "writingResponse": "Psaní odpovědi"
+      "writingResponse": "Psaní odpovědi",
+      "initializingSnapshot": "Inicializace snímku…"
     },
     "slashCommands": {
       "startNewSession": "Zahájit novou relaci",

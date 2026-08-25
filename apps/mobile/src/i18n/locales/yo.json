@@ -2129,7 +2129,10 @@
       "exitMessage": "Eyi da akoko ti n ṣiṣẹ duro ṣugbọn o pa itan rẹ mọ.",
       "keepSessionRunning": "Pa akoko ṣiṣẹ mọ",
       "exitSession": "Jade kuro ni akoko",
-      "restartExitFailed": "Bẹrẹ akoko tuntun. Akoko ti tẹlẹ ṣi ṣii."
+      "restartExitFailed": "Bẹrẹ akoko tuntun. Akoko ti tẹlẹ ṣi ṣii.",
+      "exitNotSupported": "Ko ṣee ṣe lati jade kuro ni akoko jijin fun akoko lọwọlọwọ",
+      "exitUnavailable": "Jade kuro ni akoko jijin ko wa fun akoko lọwọlọwọ",
+      "exitNeedsNewerCli": "Awọn aṣẹ slash jijin nilo Kilo CLI tuntun kan. Ṣe imudojuiwọn Kilo CLI ki o si tun so."
     },
     "sessionConnection": {
       "connecting": "Ti n sopọ…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Nfún iṣẹ lọ",
       "askingQuestion": "Nbi ibeere",
       "consideringNextSteps": "Nro awọn igbese atẹle",
-      "writingResponse": "Nkọ esi"
+      "writingResponse": "Nkọ esi",
+      "initializingSnapshot": "Npilẹṣẹ aworan…"
     },
     "slashCommands": {
       "startNewSession": "Bẹrẹ igba-ijiroro tuntun",

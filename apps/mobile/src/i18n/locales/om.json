@@ -2129,7 +2129,10 @@
       "exitMessage": "Kun xalayyii hojjechaa jiru dhaaba garuu seenaa isaa eega.",
       "keepSessionRunning": "Xalayyii hojjechuu itti fufi",
       "exitSession": "Xalayyii keessaa ba'i",
-      "restartExitFailed": "Xalayyii haaraa jalqabe. Xalayyiin duraanii hamma ammaatti banamaa jira."
+      "restartExitFailed": "Xalayyii haaraa jalqabe. Xalayyiin duraanii hamma ammaatti banamaa jira.",
+      "exitNotSupported": "Xalayyii fagoo keessaa ba'uun sessa ammaa kanaaf hin deeggaramu",
+      "exitUnavailable": "Xalayyii fagoo keessaa ba'uun sessa ammaa kanaaf hin argamu",
+      "exitNeedsNewerCli": "Ajajootni slash fagoo Kilo CLI haaraa barbaadu. Kilo CLI haaromsiitii deebi'ii walqabi."
     },
     "sessionConnection": {
       "connecting": "Wal qabachaa jira…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Hojii ramaduu jira",
       "askingQuestion": "Gaaffii gaafachaa jira",
       "consideringNextSteps": "Tarkaanfii itti aanu yaadachaa jira",
-      "writingResponse": "Deebii barreessaa jira"
+      "writingResponse": "Deebii barreessaa jira",
+      "initializingSnapshot": "Snapshot jalqabaa jira…"
     },
     "slashCommands": {
       "startNewSession": "Shumarra haaraa jalqabi",

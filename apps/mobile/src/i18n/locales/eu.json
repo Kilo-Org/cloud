@@ -2129,7 +2129,10 @@
       "exitMessage": "Honek egiten ari den saioa gelditzen du, baina haren historia gordetzen du.",
       "keepSessionRunning": "Saioa exekutatzen mantendu",
       "exitSession": "Irten saiotik",
-      "restartExitFailed": "Saio berri bat hasi da. Aurreko saioa oraindik irekita dago."
+      "restartExitFailed": "Saio berri bat hasi da. Aurreko saioa oraindik irekita dago.",
+      "exitNotSupported": "Urruneko saiotik irtetea ez da onartzen uneko saioarentzat",
+      "exitUnavailable": "Urruneko saiotik irtetea ez dago eskuragarri uneko saioarentzat",
+      "exitNeedsNewerCli": "Urruneko slash komandoek Kilo CLI bertsio berriago bat behar dute. Eguneratu Kilo CLI eta konektatu berriro."
     },
     "sessionConnection": {
       "connecting": "Konektatzen…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Lana eskuordetzen",
       "askingQuestion": "Galdera bat egiten",
       "consideringNextSteps": "Hurrengo urratsak aztertzen",
-      "writingResponse": "Erantzuna idazten"
+      "writingResponse": "Erantzuna idazten",
+      "initializingSnapshot": "Snapshot-a hasieratzen…"
     },
     "slashCommands": {
       "startNewSession": "Hasi saio berri bat",

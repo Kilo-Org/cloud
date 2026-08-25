@@ -2129,7 +2129,10 @@
       "exitMessage": "Hijanonan'ny session mitohy izany saingy hotahiry ny tantarany.",
       "keepSessionRunning": "Tohizo ny fampandehanana ny session",
       "exitSession": "Mivoaha amin'ny session",
-      "restartExitFailed": "Nanomboka session vaovao. Mbola misokatra ny session taloha."
+      "restartExitFailed": "Nanomboka session vaovao. Mbola misokatra ny session taloha.",
+      "exitNotSupported": "Tsy tohanana ny fivoahana amin'ny session lavitra ho an'ny session amin'izao fotoana izao.",
+      "exitUnavailable": "Tsy azo ampiasaina ny fivoahana amin'ny session lavitra ho an'ny session amin'izao fotoana izao.",
+      "exitNeedsNewerCli": "Mitaky Kilo CLI vaovao ny baiko slash lavitra. Vaovao ny Kilo CLI ary hampifandray indray."
     },
     "sessionConnection": {
       "connecting": "Mampifandray…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Mandefa asa",
       "askingQuestion": "Mametraka fanontaniana",
       "consideringNextSteps": "Mieritreritra ny dingana manaraka",
-      "writingResponse": "Manoratra valiny"
+      "writingResponse": "Manoratra valiny",
+      "initializingSnapshot": "Manomboka ny snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Atombohy session vaovao",

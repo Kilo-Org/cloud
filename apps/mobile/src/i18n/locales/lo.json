@@ -2129,7 +2129,10 @@
       "exitMessage": "ອັນນີ້ຢຸດເຊດຊັນທີ່ກຳລັງດຳເນີນຢູ່ ແຕ່ເກັບປະຫວັດຂອງມັນໄວ້.",
       "keepSessionRunning": "ໃຫ້ເຊດຊັນດຳເນີນການຕໍ່ໄປ",
       "exitSession": "ອອກຈາກເຊດຊັນ",
-      "restartExitFailed": "ເລີ່ມເຊດຊັນໃໝ່ແລ້ວ. ເຊດຊັນກ່ອນໜ້າຍັງເປີດຢູ່."
+      "restartExitFailed": "ເລີ່ມເຊດຊັນໃໝ່ແລ້ວ. ເຊດຊັນກ່ອນໜ້າຍັງເປີດຢູ່.",
+      "exitNotSupported": "ການອອກຈາກເຊດຊັນທາງໄກບໍ່ຮອງຮັບສຳລັບເຊດຊັນປັດຈຸບັນ",
+      "exitUnavailable": "ການອອກຈາກເຊດຊັນທາງໄກບໍ່ສາມາດໃຊ້ໄດ້ສຳລັບເຊດຊັນປັດຈຸບັນ",
+      "exitNeedsNewerCli": "ຄຳສັ່ງ slash ທາງໄກຕ້ອງການ Kilo CLI ຮຸ່ນໃໝ່ກວ່າ. ອັບເດດ Kilo CLI ແລະ ເຊື່ອມຕໍ່ໃໝ່."
     },
     "sessionConnection": {
       "connecting": "ກຳລັງເຊື່ອມຕໍ່…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "ກຳລັງມອບໝາຍວຽກ",
       "askingQuestion": "ກຳລັງຖາມຄຳຖາມ",
       "consideringNextSteps": "ກຳລັງພິຈາລະນາຂັ້ນຕອນຕໍ່ໄປ",
-      "writingResponse": "ກຳລັງຂຽນຄຳຕອບ"
+      "writingResponse": "ກຳລັງຂຽນຄຳຕອບ",
+      "initializingSnapshot": "ກຳລັງເລີ່ມສ້າງ snapshot…"
     },
     "slashCommands": {
       "startNewSession": "ເລີ່ມເຊດຊັນໃໝ່",

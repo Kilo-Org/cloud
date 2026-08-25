@@ -2144,7 +2144,10 @@
       "exitMessage": "Tas aptur notiekošo sesiju, bet saglabā tās vēsturi.",
       "keepSessionRunning": "Turpināt sesijas darbību",
       "exitSession": "Iziet no sesijas",
-      "restartExitFailed": "Sākta jauna sesija. Iepriekšējā sesija joprojām ir atvērta."
+      "restartExitFailed": "Sākta jauna sesija. Iepriekšējā sesija joprojām ir atvērta.",
+      "exitNotSupported": "Pašreizējai sesijai attālās sesijas iziešana netiek atbalstīta",
+      "exitUnavailable": "Pašreizējai sesijai attālās sesijas iziešana nav pieejama",
+      "exitNeedsNewerCli": "Attālās slash komandas prasa jaunāku Kilo CLI versiju. Atjaunini Kilo CLI un savienojies vēlreiz."
     },
     "sessionConnection": {
       "connecting": "Savienojas…",
@@ -2578,7 +2581,8 @@
       "delegatingWork": "Deleģē darbu",
       "askingQuestion": "Uzdod jautājumu",
       "consideringNextSteps": "Apsver nākamās darbības",
-      "writingResponse": "Raksta atbildi"
+      "writingResponse": "Raksta atbildi",
+      "initializingSnapshot": "Notiek momentuzņēmuma inicializācija…"
     },
     "slashCommands": {
       "startNewSession": "Sākt jaunu sesiju",

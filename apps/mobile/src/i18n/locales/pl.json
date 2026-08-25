@@ -1691,7 +1691,10 @@
       "exitMessage": "Spowoduje to zatrzymanie działającej sesji, ale zachowa jej historię.",
       "keepSessionRunning": "Pozostaw sesję uruchomioną",
       "exitSession": "Zakończ sesję",
-      "restartExitFailed": "Rozpoczęto nową sesję. Poprzednia sesja jest nadal otwarta."
+      "restartExitFailed": "Rozpoczęto nową sesję. Poprzednia sesja jest nadal otwarta.",
+      "exitNotSupported": "Zakończenie sesji zdalnej nie jest obsługiwane dla bieżącej sesji",
+      "exitUnavailable": "Zakończenie sesji zdalnej jest niedostępne dla bieżącej sesji",
+      "exitNeedsNewerCli": "Zdalne polecenia slash wymagają nowszej wersji Kilo CLI. Zaktualizuj Kilo CLI i połącz się ponownie."
     },
     "sessionConnection": {
       "connecting": "Łączenie…",
@@ -2129,7 +2132,8 @@
       "delegatingWork": "Delegowanie pracy",
       "askingQuestion": "Zadawanie pytania",
       "consideringNextSteps": "Rozważanie kolejnych kroków",
-      "writingResponse": "Pisanie odpowiedzi"
+      "writingResponse": "Pisanie odpowiedzi",
+      "initializingSnapshot": "Inicjalizowanie migawki…"
     },
     "slashCommands": {
       "startNewSession": "Rozpocznij nową sesję",

@@ -1675,7 +1675,10 @@
       "exitMessage": "Thao tác này dừng phiên đang chạy nhưng giữ lại lịch sử của nó.",
       "keepSessionRunning": "Giữ phiên chạy",
       "exitSession": "Thoát phiên",
-      "restartExitFailed": "Đã bắt đầu phiên mới. Phiên trước vẫn đang mở."
+      "restartExitFailed": "Đã bắt đầu phiên mới. Phiên trước vẫn đang mở.",
+      "exitNotSupported": "Thoát phiên từ xa không được hỗ trợ cho phiên hiện tại",
+      "exitUnavailable": "Thoát phiên từ xa không khả dụng cho phiên hiện tại",
+      "exitNeedsNewerCli": "Lệnh gạch chéo từ xa yêu cầu Kilo CLI mới hơn. Hãy cập nhật Kilo CLI và kết nối lại."
     },
     "sessionConnection": {
       "connecting": "Đang kết nối…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "Đang phân công công việc",
       "askingQuestion": "Đang đặt câu hỏi",
       "consideringNextSteps": "Đang cân nhắc các bước tiếp theo",
-      "writingResponse": "Đang viết phản hồi"
+      "writingResponse": "Đang viết phản hồi",
+      "initializingSnapshot": "Đang khởi tạo ảnh chụp nhanh…"
     },
     "slashCommands": {
       "startNewSession": "Bắt đầu phiên mới",

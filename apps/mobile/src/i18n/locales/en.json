@@ -2129,7 +2129,10 @@
       "exitMessage": "This stops the running session but keeps its history.",
       "keepSessionRunning": "Keep session running",
       "exitSession": "Exit session",
-      "restartExitFailed": "Started a new session. The previous session is still open."
+      "restartExitFailed": "Started a new session. The previous session is still open.",
+      "exitNotSupported": "Remote session exit is not supported for the current session",
+      "exitUnavailable": "Remote session exit is unavailable for the current session",
+      "exitNeedsNewerCli": "Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect."
     },
     "sessionConnection": {
       "connecting": "Connecting…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegating work",
       "askingQuestion": "Asking a question",
       "consideringNextSteps": "Considering next steps",
-      "writingResponse": "Writing response"
+      "writingResponse": "Writing response",
+      "initializingSnapshot": "Initializing snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Start a new session",

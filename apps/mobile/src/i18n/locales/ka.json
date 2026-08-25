@@ -2129,7 +2129,10 @@
       "exitMessage": "ეს აჩერებს მიმდინარე სესიას, მაგრამ ინახავს მის ისტორიას.",
       "keepSessionRunning": "სესიის გაშვების გაგრძელება",
       "exitSession": "სესიიდან გასვლა",
-      "restartExitFailed": "ახალი სესია დაიწყო. წინა სესია კვლავ ღიაა."
+      "restartExitFailed": "ახალი სესია დაიწყო. წინა სესია კვლავ ღიაა.",
+      "exitNotSupported": "დისტანციური სესიიდან გასვლა არ არის მხარდაჭერილი მიმდინარე სესიისთვის",
+      "exitUnavailable": "დისტანციური სესიიდან გასვლა მიუწვდომელია მიმდინარე სესიისთვის",
+      "exitNeedsNewerCli": "დისტანციური სლეშ ბრძანებები საჭიროებენ Kilo CLI-ის უფრო ახალ ვერსიას. განაახლეთ Kilo CLI და ხელახლა დაუკავშირდით."
     },
     "sessionConnection": {
       "connecting": "კავშირი…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "სამუშაოს დელეგირება",
       "askingQuestion": "შეკითხვის დასმა",
       "consideringNextSteps": "შემდეგი ნაბიჯების განხილვა",
-      "writingResponse": "პასუხის წერა"
+      "writingResponse": "პასუხის წერა",
+      "initializingSnapshot": "სნეფშოტის ინიციალიზაცია…"
     },
     "slashCommands": {
       "startNewSession": "ახალი სესიის დაწყება",

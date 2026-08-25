@@ -2129,7 +2129,10 @@
       "exitMessage": "Ова ја запира тековната сесија, но ја зачувува нејзината историја.",
       "keepSessionRunning": "Продолжи сесијата да работи",
       "exitSession": "Напушти сесија",
-      "restartExitFailed": "Започната е нова сесија. Претходната сесија е сè уште отворена."
+      "restartExitFailed": "Започната е нова сесија. Претходната сесија е сè уште отворена.",
+      "exitNotSupported": "Напуштањето на далечинската сесија не е поддржано за тековната сесија.",
+      "exitUnavailable": "Напуштањето на далечинската сесија е недостапно за тековната сесија.",
+      "exitNeedsNewerCli": "Далечинските slash команди бараат понов Kilo CLI. Ажурирајте го Kilo CLI и поврзете се повторно."
     },
     "sessionConnection": {
       "connecting": "Поврзување…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Делегирање на работа",
       "askingQuestion": "Поставување прашање",
       "consideringNextSteps": "Разгледување на следните чекори",
-      "writingResponse": "Пишување одговор"
+      "writingResponse": "Пишување одговор",
+      "initializingSnapshot": "Иницијализирање снимка…"
     },
     "slashCommands": {
       "startNewSession": "Започни нова сесија",

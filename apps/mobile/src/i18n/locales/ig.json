@@ -2129,7 +2129,10 @@
       "exitMessage": "Nke a na-akwụsị nzukọ na-agba ọsọ ma na-edobe akụkọ ya.",
       "keepSessionRunning": "Nọgidenụ ka nzukọ na-agba",
       "exitSession": "Pụọ na nzukọ",
-      "restartExitFailed": "Malitere nzukọ ọhụrụ. Nzukọ gara aga ka mepere emepe."
+      "restartExitFailed": "Malitere nzukọ ọhụrụ. Nzukọ gara aga ka mepere emepe.",
+      "exitNotSupported": "Ịpụ na nzukọ dị anya adịghị kwado maka nzukọ dị ugbu a",
+      "exitUnavailable": "Ịpụ na nzukọ dị anya adịghị maka nzukọ dị ugbu a",
+      "exitNeedsNewerCli": "Iwu slash dị anya chọrọ Kilo CLI ọhụrụ. Melite Kilo CLI ma jikọọ ọzọ."
     },
     "sessionConnection": {
       "connecting": "Na-ejikọ…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Na-enyefe ọrụ",
       "askingQuestion": "Na-ajụ ajụjụ",
       "consideringNextSteps": "Na-atụle usoro ndị na-esote",
-      "writingResponse": "Na-ede nzaghachi"
+      "writingResponse": "Na-ede nzaghachi",
+      "initializingSnapshot": "Na-amalite snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Malite nnọkọ ọhụrụ",

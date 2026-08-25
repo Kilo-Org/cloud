@@ -2159,7 +2159,10 @@
       "exitMessage": "Tai sustabdo vykdomą sesiją, bet išsaugo jos istoriją.",
       "keepSessionRunning": "Toliau vykdyti sesiją",
       "exitSession": "Baigti sesiją",
-      "restartExitFailed": "Pradėta nauja sesija. Ankstesnė sesija vis dar atidaryta."
+      "restartExitFailed": "Pradėta nauja sesija. Ankstesnė sesija vis dar atidaryta.",
+      "exitNotSupported": "Dabartinei sesijai nuotolinės sesijos nutraukimas nepalaikomas",
+      "exitUnavailable": "Dabartinei sesijai nuotolinės sesijos nutraukimas nepasiekiamas",
+      "exitNeedsNewerCli": "Nuotolinės slash komandos reikalauja naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "sessionConnection": {
       "connecting": "Jungiama…",
@@ -2597,7 +2600,8 @@
       "delegatingWork": "Perduodamas darbas",
       "askingQuestion": "Užduodamas klausimas",
       "consideringNextSteps": "Svarstomi kiti žingsniai",
-      "writingResponse": "Rašomas atsakymas"
+      "writingResponse": "Rašomas atsakymas",
+      "initializingSnapshot": "Inicijuojama momentinė kopija…"
     },
     "slashCommands": {
       "startNewSession": "Pradėti naują sesiją",

@@ -1675,7 +1675,10 @@
       "exitMessage": "Bu, çalışan oturumu durdurur ancak geçmişini korur.",
       "keepSessionRunning": "Oturumu çalışır durumda tut",
       "exitSession": "Oturumdan çık",
-      "restartExitFailed": "Yeni oturum başlatıldı. Önceki oturum hâlâ açık."
+      "restartExitFailed": "Yeni oturum başlatıldı. Önceki oturum hâlâ açık.",
+      "exitNotSupported": "Uzak oturumdan çıkış, geçerli oturum için desteklenmiyor.",
+      "exitUnavailable": "Uzak oturumdan çıkış, geçerli oturum için kullanılamıyor.",
+      "exitNeedsNewerCli": "Uzak eğik çizgi komutları daha yeni bir Kilo CLI gerektirir. Kilo CLI'yı güncelleyin ve yeniden bağlanın."
     },
     "sessionConnection": {
       "connecting": "Bağlanıyor…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "İş dağıtıyor",
       "askingQuestion": "Soru soruyor",
       "consideringNextSteps": "Sonraki adımları değerlendiriyor",
-      "writingResponse": "Yanıt yazıyor"
+      "writingResponse": "Yanıt yazıyor",
+      "initializingSnapshot": "Anlık görüntü başlatılıyor…"
     },
     "slashCommands": {
       "startNewSession": "Yeni bir oturum başlat",

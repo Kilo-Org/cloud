@@ -2129,7 +2129,10 @@
       "exitMessage": "Bu işləyən sessiyanı dayandırır, lakin tarixçəsini saxlayır.",
       "keepSessionRunning": "Sessiyanı işləməyə davam etdir",
       "exitSession": "Sessiyadan çıx",
-      "restartExitFailed": "Yeni sessiya başladıldı. Əvvəlki sessiya hələ də açıqdır."
+      "restartExitFailed": "Yeni sessiya başladıldı. Əvvəlki sessiya hələ də açıqdır.",
+      "exitNotSupported": "Uzaq sessiyadan çıxış cari sessiya üçün dəstəklənmir",
+      "exitUnavailable": "Uzaq sessiyadan çıxış cari sessiya üçün mövcud deyil",
+      "exitNeedsNewerCli": "Uzaq slash əmrləri daha yeni Kilo CLI tələb edir. Kilo CLI-ni yeniləyin və yenidən qoşulun."
     },
     "sessionConnection": {
       "connecting": "Qoşulur…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "İş ötürülür",
       "askingQuestion": "Sual verilir",
       "consideringNextSteps": "Növbəti addımlar nəzərdən keçirilir",
-      "writingResponse": "Cavab yazılır"
+      "writingResponse": "Cavab yazılır",
+      "initializingSnapshot": "Anlıq görüntü işə salınır…"
     },
     "slashCommands": {
       "startNewSession": "Yeni sessiyaya başla",

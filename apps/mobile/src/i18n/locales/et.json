@@ -2129,7 +2129,10 @@
       "exitMessage": "See peatab käimasoleva seansi, kuid säilitab selle ajaloo.",
       "keepSessionRunning": "Jäta seanss käima",
       "exitSession": "Välju seansist",
-      "restartExitFailed": "Alustati uut seanssi. Eelmine seanss on endiselt avatud."
+      "restartExitFailed": "Alustati uut seanssi. Eelmine seanss on endiselt avatud.",
+      "exitNotSupported": "Kaugseansist väljumine ei ole praeguse seansi jaoks toetatud",
+      "exitUnavailable": "Kaugseansist väljumine ei ole praeguse seansi jaoks saadaval",
+      "exitNeedsNewerCli": "Kaugseansi slash-käsud nõuavad uuemat Kilo CLI-d. Uuenda Kilo CLI-d ja ühendu uuesti."
     },
     "sessionConnection": {
       "connecting": "Ühendamine…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Töö delegeerimine",
       "askingQuestion": "Küsimuse esitamine",
       "consideringNextSteps": "Järgmiste sammude kaalumine",
-      "writingResponse": "Vastuse kirjutamine"
+      "writingResponse": "Vastuse kirjutamine",
+      "initializingSnapshot": "Snapshoti initsialiseerimine…"
     },
     "slashCommands": {
       "startNewSession": "Alusta uut seanssi",

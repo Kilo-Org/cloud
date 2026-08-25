@@ -1691,7 +1691,10 @@
       "exitMessage": "Это остановит текущий сеанс, но сохранит его историю.",
       "keepSessionRunning": "Оставить сеанс запущенным",
       "exitSession": "Выйти из сеанса",
-      "restartExitFailed": "Начата новая сессия. Предыдущая сессия всё ещё открыта."
+      "restartExitFailed": "Начата новая сессия. Предыдущая сессия всё ещё открыта.",
+      "exitNotSupported": "Выход из удаленного сеанса не поддерживается для текущего сеанса",
+      "exitUnavailable": "Выход из удаленного сеанса недоступен для текущего сеанса",
+      "exitNeedsNewerCli": "Удаленные команды со слешем требуют более новый Kilo CLI. Обновите Kilo CLI и переподключитесь."
     },
     "sessionConnection": {
       "connecting": "Подключение…",
@@ -2129,7 +2132,8 @@
       "delegatingWork": "Делегирование работы",
       "askingQuestion": "Задает вопрос",
       "consideringNextSteps": "Обдумывание следующих шагов",
-      "writingResponse": "Написание ответа"
+      "writingResponse": "Написание ответа",
+      "initializingSnapshot": "Инициализация снимка…"
     },
     "slashCommands": {
       "startNewSession": "Начать новый сеанс",

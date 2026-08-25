@@ -2129,7 +2129,10 @@
       "exitMessage": "Ito ay nagpapatigil sa tumatakbong session ngunit pinapanatili ang kasaysayan nito.",
       "keepSessionRunning": "Panatilihing tumatakbo ang session",
       "exitSession": "Lumabas sa session",
-      "restartExitFailed": "Nagsimula ng bagong session. Bukas pa rin ang nakaraang session."
+      "restartExitFailed": "Nagsimula ng bagong session. Bukas pa rin ang nakaraang session.",
+      "exitNotSupported": "Hindi sinusuportahan ang paglabas sa remote session para sa kasalukuyang session",
+      "exitUnavailable": "Hindi available ang paglabas sa remote session para sa kasalukuyang session",
+      "exitNeedsNewerCli": "Ang mga remote slash command ay nangangailangan ng mas bagong Kilo CLI. I-update ang Kilo CLI at muling kumonekta."
     },
     "sessionConnection": {
       "connecting": "Kumokonekta…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Nagde-delegate ng trabaho",
       "askingQuestion": "Nagtatanong",
       "consideringNextSteps": "Isinasaalang-alang ang mga susunod na hakbang",
-      "writingResponse": "Sinusulat ang tugon"
+      "writingResponse": "Sinusulat ang tugon",
+      "initializingSnapshot": "Sinisimulan ang snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Magsimula ng bagong session",

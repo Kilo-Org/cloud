@@ -2129,7 +2129,10 @@
       "exitMessage": "Hii inasimamisha kikao kinachoendelea lakini inahifadhi historia yake.",
       "keepSessionRunning": "Endeleza kikao kinachoendelea",
       "exitSession": "Toka kwenye kikao",
-      "restartExitFailed": "Imeanza kikao kipya. Kikao cha awali bado kimefunguliwa."
+      "restartExitFailed": "Imeanza kikao kipya. Kikao cha awali bado kimefunguliwa.",
+      "exitNotSupported": "Kutoka kwenye kikao cha mbali hakuungwi mkono kwa kikao cha sasa.",
+      "exitUnavailable": "Kutoka kwenye kikao cha mbali hakupatikani kwa kikao cha sasa.",
+      "exitNeedsNewerCli": "Amri za slash za mbali zinahitaji Kilo CLI mpya zaidi. Sasisha Kilo CLI na unganisha tena."
     },
     "sessionConnection": {
       "connecting": "Inaunganisha…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Inagawia kazi",
       "askingQuestion": "Inauliza swali",
       "consideringNextSteps": "Inazingatia hatua zinazofuata",
-      "writingResponse": "Inaandika jibu"
+      "writingResponse": "Inaandika jibu",
+      "initializingSnapshot": "Inaanzisha snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Anza kikao kipya",

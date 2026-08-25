@@ -1683,7 +1683,10 @@
       "exitMessage": "פעולה זו עוצרת את ההפעלה הרצה אך שומרת על ההיסטוריה שלה.",
       "keepSessionRunning": "השאר את ההפעלה רצה",
       "exitSession": "צא מההפעלה",
-      "restartExitFailed": "התחילה הפעלה חדשה. ההפעלה הקודמת עדיין פתוחה."
+      "restartExitFailed": "התחילה הפעלה חדשה. ההפעלה הקודמת עדיין פתוחה.",
+      "exitNotSupported": "יציאה מהפעלה מרוחקת אינה נתמכת בהפעלה הנוכחית",
+      "exitUnavailable": "יציאה מההפעלה המרוחקת אינה זמינה בהפעלה הנוכחית",
+      "exitNeedsNewerCli": "פקודות slash מרוחקות דורשות Kilo CLI חדש יותר. עדכן את Kilo CLI והתחבר מחדש."
     },
     "sessionConnection": {
       "connecting": "מתחבר…",
@@ -2117,7 +2120,8 @@
       "delegatingWork": "מאציל עבודה",
       "askingQuestion": "שואל שאלה",
       "consideringNextSteps": "שוקל את הצעדים הבאים",
-      "writingResponse": "כותב תשובה"
+      "writingResponse": "כותב תשובה",
+      "initializingSnapshot": "מאתחל תמונת מצב…"
     },
     "slashCommands": {
       "startNewSession": "התחל הפעלה חדשה",

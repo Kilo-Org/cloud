@@ -2129,7 +2129,10 @@
       "exitMessage": "၎င်းသည် လုပ်ဆောင်နေသော စက်ရှင်ကို ရပ်တန့်သော်လည်း ၎င်း၏ မှတ်တမ်းကို သိမ်းဆည်းထားသည်။",
       "keepSessionRunning": "စက်ရှင်ကို ဆက်လက်လုပ်ဆောင်ပါ",
       "exitSession": "စက်ရှင်မှ ထွက်ပါ",
-      "restartExitFailed": "စက်ရှင်အသစ်တစ်ခု စတင်ခဲ့သည်။ ယခင်စက်ရှင်သည် ဆက်လက်ဖွင့်ထားဆဲဖြစ်သည်။"
+      "restartExitFailed": "စက်ရှင်အသစ်တစ်ခု စတင်ခဲ့သည်။ ယခင်စက်ရှင်သည် ဆက်လက်ဖွင့်ထားဆဲဖြစ်သည်။",
+      "exitNotSupported": "အဝေးစက်ရှင်မှ ထွက်ခြင်းကို လက်ရှိ စက်ရှင်တွင် မပံ့ပိုးပါ။",
+      "exitUnavailable": "အဝေးစက်ရှင်မှ ထွက်ခြင်းကို လက်ရှိ စက်ရှင်တွင် မရရှိနိုင်ပါ။",
+      "exitNeedsNewerCli": "အဝေး slash command များအတွက် Kilo CLI အသစ် လိုအပ်ပါသည်။ Kilo CLI ကို အဆင့်မြှင့်ပြီး ပြန်ချိတ်ဆက်ပါ။"
     },
     "sessionConnection": {
       "connecting": "ချိတ်ဆက်နေသည်…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "လုပ်ငန်းများ လွှဲပြောင်းနေသည်",
       "askingQuestion": "မေးခွန်းတစ်ခု မေးနေသည်",
       "consideringNextSteps": "နောက်လုပ်ဆောင်ချက်များ စဉ်းစားနေသည်",
-      "writingResponse": "တုံ့ပြန်ချက် ရေးနေသည်"
+      "writingResponse": "တုံ့ပြန်ချက် ရေးနေသည်",
+      "initializingSnapshot": "snapshot စတင်နေသည်…"
     },
     "slashCommands": {
       "startNewSession": "session အသစ် စတင်ရန်",

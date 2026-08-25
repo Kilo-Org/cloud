@@ -2189,7 +2189,10 @@
       "exitMessage": "Mae hyn yn stopio'r sesiwn sy'n rhedeg ond yn cadw ei hanes.",
       "keepSessionRunning": "Parhau i gadw'r sesiwn yn rhedeg",
       "exitSession": "Gadael sesiwn",
-      "restartExitFailed": "Dechreuwyd sesiwn newydd. Mae'r sesiwn flaenorol yn dal ar agor."
+      "restartExitFailed": "Dechreuwyd sesiwn newydd. Mae'r sesiwn flaenorol yn dal ar agor.",
+      "exitNotSupported": "Nid yw gadael y sesiwn o bell yn cael ei gefnogi ar gyfer y sesiwn gyfredol",
+      "exitUnavailable": "Nid yw gadael y sesiwn o bell ar gael ar gyfer y sesiwn gyfredol",
+      "exitNeedsNewerCli": "Mae angen Kilo CLI mwy newydd ar orchmynion slaes o bell. Diweddarwch Kilo CLI ac ailgysylltwch."
     },
     "sessionConnection": {
       "connecting": "Yn cysylltu…",
@@ -2635,7 +2638,8 @@
       "delegatingWork": "Dirprwyo gwaith",
       "askingQuestion": "Gofyn cwestiwn",
       "consideringNextSteps": "Ystyried y camau nesaf",
-      "writingResponse": "Ysgrifennu ymateb"
+      "writingResponse": "Ysgrifennu ymateb",
+      "initializingSnapshot": "Cychwyn ciplun…"
     },
     "slashCommands": {
       "startNewSession": "Dechrau sesiwn newydd",

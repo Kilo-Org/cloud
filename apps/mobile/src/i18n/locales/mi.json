@@ -2129,7 +2129,10 @@
       "exitMessage": "Ka mutu tēnei i te wātūtū e oma ana engari ka tiakina tōna hītori.",
       "keepSessionRunning": "Me oma tonu te wātūtū",
       "exitSession": "Puta i te wātūtū",
-      "restartExitFailed": "Kua tīmata tētahi wātūtū hou. Kei te tūwhera tonu te wātūtū o mua."
+      "restartExitFailed": "Kua tīmata tētahi wātūtū hou. Kei te tūwhera tonu te wātūtū o mua.",
+      "exitNotSupported": "Kāore e tautokona te putanga i te wātūtū mamao mō te wātūtū o nāianei.",
+      "exitUnavailable": "Kāore e wātea ana te putanga i te wātūtū mamao mō te wātūtū o nāianei.",
+      "exitNeedsNewerCli": "E hiahiatia ana he Kilo CLI hōu e ngā whakahau slash mamao. Whakamohoatia te Kilo CLI ka hono anō."
     },
     "sessionConnection": {
       "connecting": "Kei te hono…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "E tuku ana i te mahi",
       "askingQuestion": "E pātai ana i he pātai",
       "consideringNextSteps": "E whakaaro ana i ngā mahi e whai ake nei",
-      "writingResponse": "E tuhi ana i te whakautu"
+      "writingResponse": "E tuhi ana i te whakautu",
+      "initializingSnapshot": "E tīmata ana te hopukanga…"
     },
     "slashCommands": {
       "startNewSession": "Tīmata he wātū hōu",

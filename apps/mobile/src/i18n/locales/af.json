@@ -2129,7 +2129,10 @@
       "exitMessage": "Dit stop die lopende sessie maar hou sy geskiedenis.",
       "keepSessionRunning": "Hou sessie aan die loop",
       "exitSession": "Sluit sessie",
-      "restartExitFailed": "'n Nuwe sessie begin. Die vorige sessie is steeds oop."
+      "restartExitFailed": "'n Nuwe sessie begin. Die vorige sessie is steeds oop.",
+      "exitNotSupported": "Om 'n afgeleë sessie te verlaat, word nie vir die huidige sessie ondersteun nie",
+      "exitUnavailable": "Om 'n afgeleë sessie te verlaat, is nie vir die huidige sessie beskikbaar nie",
+      "exitNeedsNewerCli": "Afgeleë skuinsstreep-opdragte vereis 'n nuwer Kilo CLI. Dateer Kilo CLI op en maak weer verbinding."
     },
     "sessionConnection": {
       "connecting": "Koppel…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegeer werk",
       "askingQuestion": "Vra 'n vraag",
       "consideringNextSteps": "Oorweeg volgende stappe",
-      "writingResponse": "Skryf antwoord"
+      "writingResponse": "Skryf antwoord",
+      "initializingSnapshot": "Inisialiseer momentopname…"
     },
     "slashCommands": {
       "startNewSession": "Begin 'n nuwe sessie",

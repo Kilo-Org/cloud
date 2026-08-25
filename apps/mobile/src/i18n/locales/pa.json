@@ -2129,7 +2129,10 @@
       "exitMessage": "ਇਹ ਚੱਲ ਰਹੇ ਸੈਸ਼ਨ ਨੂੰ ਰੋਕਦਾ ਹੈ ਪਰ ਇਸਦਾ ਇਤਿਹਾਸ ਰੱਖਦਾ ਹੈ।",
       "keepSessionRunning": "ਸੈਸ਼ਨ ਚਲਦਾ ਰੱਖੋ",
       "exitSession": "ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਨਿਕਲੋ",
-      "restartExitFailed": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ। ਪਿਛਲਾ ਸੈਸ਼ਨ ਅਜੇ ਵੀ ਖੁੱਲ੍ਹਾ ਹੈ।"
+      "restartExitFailed": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ। ਪਿਛਲਾ ਸੈਸ਼ਨ ਅਜੇ ਵੀ ਖੁੱਲ੍ਹਾ ਹੈ।",
+      "exitNotSupported": "ਮੌਜੂਦਾ ਸੈਸ਼ਨ ਲਈ ਰਿਮੋਟ ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਜਾਣਾ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ",
+      "exitUnavailable": "ਮੌਜੂਦਾ ਸੈਸ਼ਨ ਲਈ ਰਿਮੋਟ ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਜਾਣਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
+      "exitNeedsNewerCli": "ਰਿਮੋਟ ਸਲੈਸ਼ ਕਮਾਂਡਾਂ ਲਈ ਇੱਕ ਨਵਾਂ Kilo CLI ਲੋੜੀਂਦਾ ਹੈ। Kilo CLI ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ।"
     },
     "sessionConnection": {
       "connecting": "ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "ਕੰਮ ਸੌਂਪਿਆ ਜਾ ਰਿਹਾ ਹੈ",
       "askingQuestion": "ਇੱਕ ਸਵਾਲ ਪੁੱਛਿਆ ਜਾ ਰਿਹਾ ਹੈ",
       "consideringNextSteps": "ਅਗਲੇ ਕਦਮਾਂ 'ਤੇ ਵਿਚਾਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
-      "writingResponse": "ਜਵਾਬ ਲਿਖਿਆ ਜਾ ਰਿਹਾ ਹੈ"
+      "writingResponse": "ਜਵਾਬ ਲਿਖਿਆ ਜਾ ਰਿਹਾ ਹੈ",
+      "initializingSnapshot": "ਸਨੈਪਸ਼ਾਟ ਸ਼ੁਰੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…"
     },
     "slashCommands": {
       "startNewSession": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",

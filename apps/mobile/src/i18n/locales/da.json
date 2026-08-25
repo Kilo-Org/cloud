@@ -2129,7 +2129,10 @@
       "exitMessage": "Dette stopper den kørende session, men bevarer dens historik.",
       "keepSessionRunning": "Hold sessionen kørende",
       "exitSession": "Afslut session",
-      "restartExitFailed": "Startede en ny session. Den tidligere session er stadig åben."
+      "restartExitFailed": "Startede en ny session. Den tidligere session er stadig åben.",
+      "exitNotSupported": "Afslutning af fjernsession understøttes ikke for den aktuelle session",
+      "exitUnavailable": "Afslutning af fjernsession er ikke tilgængelig for den aktuelle session",
+      "exitNeedsNewerCli": "Fjern-slash-kommandoer kræver en nyere Kilo CLI. Opdater Kilo CLI, og opret forbindelse igen."
     },
     "sessionConnection": {
       "connecting": "Forbinder…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegerer arbejde",
       "askingQuestion": "Stiller et spørgsmål",
       "consideringNextSteps": "Overvejer næste trin",
-      "writingResponse": "Skriver svar"
+      "writingResponse": "Skriver svar",
+      "initializingSnapshot": "Initialiserer snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Start en ny session",

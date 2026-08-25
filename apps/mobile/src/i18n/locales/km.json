@@ -2129,7 +2129,10 @@
       "exitMessage": "នេះបញ្ឈប់វគ្គដែលកំពុងដំណើរការ ប៉ុន្តែរក្សាទុកប្រវត្តិរបស់វា។",
       "keepSessionRunning": "បន្តដំណើរការវគ្គ",
       "exitSession": "ចាកចេញពីវគ្គ",
-      "restartExitFailed": "បានចាប់ផ្តើមវគ្គថ្មី។ វគ្គមុននៅតែបើក។"
+      "restartExitFailed": "បានចាប់ផ្តើមវគ្គថ្មី។ វគ្គមុននៅតែបើក។",
+      "exitNotSupported": "ការចាកចេញពីវគ្គពីចម្ងាយមិនត្រូវបានគាំទ្រសម្រាប់វគ្គបច្ចុប្បន្នទេ",
+      "exitUnavailable": "ការចាកចេញពីវគ្គពីចម្ងាយមិនអាចប្រើបានសម្រាប់វគ្គបច្ចុប្បន្នទេ",
+      "exitNeedsNewerCli": "ពាក្យបញ្ជាស្លេសពីចម្ងាយត្រូវការ Kilo CLI ថ្មីជាងនេះ។ ធ្វើបច្ចុប្បន្នភាព Kilo CLI ហើយភ្ជាប់ឡើងវិញ។"
     },
     "sessionConnection": {
       "connecting": "កំពុងភ្ជាប់…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "កំពុងប្រគល់ការងារ",
       "askingQuestion": "កំពុងសួរសំណួរ",
       "consideringNextSteps": "កំពុងពិចារណាជំហានបន្ទាប់",
-      "writingResponse": "កំពុងសរសេរការឆ្លើយតប"
+      "writingResponse": "កំពុងសរសេរការឆ្លើយតប",
+      "initializingSnapshot": "កំពុងចាប់ផ្តើម snapshot…"
     },
     "slashCommands": {
       "startNewSession": "ចាប់ផ្តើមវគ្គថ្មី",

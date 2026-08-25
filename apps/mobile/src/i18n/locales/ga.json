@@ -2174,7 +2174,10 @@
       "exitMessage": "Stopann sé seo an seisiún atá ar siúl ach coinníonn sé a stair.",
       "keepSessionRunning": "Coinnigh an seisiún ar siúl",
       "exitSession": "Scoir den seisiún",
-      "restartExitFailed": "Tosaíodh seisiún nua. Tá an seisiún roimhe sin fós oscailte."
+      "restartExitFailed": "Tosaíodh seisiún nua. Tá an seisiún roimhe sin fós oscailte.",
+      "exitNotSupported": "Ní thacaítear le scoir an tseisiúin chianda don seisiún reatha",
+      "exitUnavailable": "Níl scoir an tseisiúin chianda ar fáil don seisiún reatha",
+      "exitNeedsNewerCli": "Éilíonn orduithe slais cianda Kilo CLI níos nua. Nuashonraigh Kilo CLI agus athcheangail."
     },
     "sessionConnection": {
       "connecting": "Ag nascadh…",
@@ -2616,7 +2619,8 @@
       "delegatingWork": "Ag tarmligean obair",
       "askingQuestion": "Ag cur ceist",
       "consideringNextSteps": "Ag smaoineamh ar na chéad chéimeanna eile",
-      "writingResponse": "Ag scríobh freagra"
+      "writingResponse": "Ag scríobh freagra",
+      "initializingSnapshot": "Ag tosú an snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Tosaigh seisiún nua",

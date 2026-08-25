@@ -2129,7 +2129,10 @@
       "exitMessage": "ଏହା ଚାଲୁଥିବା ସେସନ୍ ବନ୍ଦ କରେ କିନ୍ତୁ ଏହାର ଇତିହାସ ରଖେ।",
       "keepSessionRunning": "ସେସନ୍ ଚାଲୁ ରଖନ୍ତୁ",
       "exitSession": "ସେସନ୍ ବାହାରନ୍ତୁ",
-      "restartExitFailed": "ଏକ ନୂଆ ସେସନ୍ ଆରମ୍ଭ ହେଲା। ପୂର୍ବ ସେସନ୍ ଏପର୍ଯ୍ୟନ୍ତ ଖୋଲା।"
+      "restartExitFailed": "ଏକ ନୂଆ ସେସନ୍ ଆରମ୍ଭ ହେଲା। ପୂର୍ବ ସେସନ୍ ଏପର୍ଯ୍ୟନ୍ତ ଖୋଲା।",
+      "exitNotSupported": "ବର୍ତ୍ତମାନ ସେସନ୍ ପାଇଁ ଦୂରସ୍ଥ ସେସନ୍ ବାହାରିବା ସମର୍ଥିତ ନୁହେଁ",
+      "exitUnavailable": "ବର୍ତ୍ତମାନ ସେସନ୍ ପାଇଁ ଦୂରସ୍ଥ ସେସନ୍ ବାହାରିବା ଉପଲବ୍ଧ ନାହିଁ",
+      "exitNeedsNewerCli": "ଦୂରସ୍ଥ ସ୍ଲାସ୍ କମାଣ୍ଡଗୁଡ଼ିକ ଏକ ନୂତନ Kilo CLI ଆବଶ୍ୟକ କରନ୍ତି। Kilo CLI ଅଦ୍ୟତନ କରି ପୁନଃସଂଯୋଗ କରନ୍ତୁ।"
     },
     "sessionConnection": {
       "connecting": "ସଂଯୋଗ କରୁଛି…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "କାର୍ଯ୍ୟ ଅର୍ପଣ କରୁଛି",
       "askingQuestion": "ପ୍ରଶ୍ନ ପଚାରୁଛି",
       "consideringNextSteps": "ପରବର୍ତ୍ତୀ ପଦକ୍ଷେପ ବିଚାର କରୁଛି",
-      "writingResponse": "ଉତ୍ତର ଲେଖୁଛି"
+      "writingResponse": "ଉତ୍ତର ଲେଖୁଛି",
+      "initializingSnapshot": "ସ୍ନାପସଟ୍ ଆରମ୍ଭ କରୁଛି…"
     },
     "slashCommands": {
       "startNewSession": "ନୂତନ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",

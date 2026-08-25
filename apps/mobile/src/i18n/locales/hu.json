@@ -2129,7 +2129,10 @@
       "exitMessage": "Ez leállítja a futó munkamenetet, de megőrzi az előzményeit.",
       "keepSessionRunning": "Munkamenet futva tartása",
       "exitSession": "Kilépés a munkamenetből",
-      "restartExitFailed": "Új munkamenet indult. Az előző munkamenet még mindig nyitva van."
+      "restartExitFailed": "Új munkamenet indult. Az előző munkamenet még mindig nyitva van.",
+      "exitNotSupported": "A távoli munkamenetből való kilépés nem támogatott az aktuális munkamenetben",
+      "exitUnavailable": "A távoli munkamenetből való kilépés nem érhető el az aktuális munkamenetben",
+      "exitNeedsNewerCli": "A távoli slash parancsokhoz újabb Kilo CLI szükséges. Frissítsd a Kilo CLI-t, és csatlakozz újra."
     },
     "sessionConnection": {
       "connecting": "Csatlakozás…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Munka delegálása",
       "askingQuestion": "Kérdés feltevése",
       "consideringNextSteps": "Következő lépések mérlegelése",
-      "writingResponse": "Válasz írása"
+      "writingResponse": "Válasz írása",
+      "initializingSnapshot": "Pillanatkép inicializálása…"
     },
     "slashCommands": {
       "startNewSession": "Új munkamenet indítása",

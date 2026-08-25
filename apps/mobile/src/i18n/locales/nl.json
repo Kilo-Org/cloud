@@ -1675,7 +1675,10 @@
       "exitMessage": "Dit stopt de lopende sessie maar behoudt de geschiedenis.",
       "keepSessionRunning": "Sessie laten draaien",
       "exitSession": "Sessie afsluiten",
-      "restartExitFailed": "Nieuwe sessie gestart. De vorige sessie is nog open."
+      "restartExitFailed": "Nieuwe sessie gestart. De vorige sessie is nog open.",
+      "exitNotSupported": "Het afsluiten van een externe sessie wordt niet ondersteund voor de huidige sessie",
+      "exitUnavailable": "Het afsluiten van een externe sessie is niet beschikbaar voor de huidige sessie",
+      "exitNeedsNewerCli": "Externe slash-opdrachten vereisen een nieuwere Kilo CLI. Werk Kilo CLI bij en maak opnieuw verbinding."
     },
     "sessionConnection": {
       "connecting": "Verbinden…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "Werk delegeren",
       "askingQuestion": "Een vraag stellen",
       "consideringNextSteps": "Volgende stappen overwegen",
-      "writingResponse": "Antwoord schrijven"
+      "writingResponse": "Antwoord schrijven",
+      "initializingSnapshot": "Snapshot initialiseren…"
     },
     "slashCommands": {
       "startNewSession": "Een nieuwe sessie starten",

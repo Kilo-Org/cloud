@@ -2129,7 +2129,10 @@
       "exitMessage": "এটি চলমান সেশনটি বন্ধ করে কিন্তু এর ইতিহাস রাখে।",
       "keepSessionRunning": "সেশন চলমান রাখুন",
       "exitSession": "সেশন শেষ করুন",
-      "restartExitFailed": "একটি নতুন সেশন শুরু হয়েছে। আগের সেশনটি এখনও খোলা আছে।"
+      "restartExitFailed": "একটি নতুন সেশন শুরু হয়েছে। আগের সেশনটি এখনও খোলা আছে।",
+      "exitNotSupported": "বর্তমান সেশনের জন্য দূরবর্তী সেশন থেকে প্রস্থান সমর্থিত নয়",
+      "exitUnavailable": "বর্তমান সেশনের জন্য দূরবর্তী সেশন থেকে প্রস্থান উপলব্ধ নয়",
+      "exitNeedsNewerCli": "দূরবর্তী স্ল্যাশ কমান্ডের জন্য একটি নতুন Kilo CLI প্রয়োজন। Kilo CLI আপডেট করুন এবং পুনরায় সংযোগ করুন।"
     },
     "sessionConnection": {
       "connecting": "সংযোগ হচ্ছে…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "কাজ অর্পণ করছে",
       "askingQuestion": "একটি প্রশ্ন জিজ্ঞাসা করছে",
       "consideringNextSteps": "পরবর্তী পদক্ষেপ বিবেচনা করছে",
-      "writingResponse": "উত্তর লিখছে"
+      "writingResponse": "উত্তর লিখছে",
+      "initializingSnapshot": "স্ন্যাপশট প্রস্তুত করা হচ্ছে…"
     },
     "slashCommands": {
       "startNewSession": "একটি নতুন সেশন শুরু করুন",

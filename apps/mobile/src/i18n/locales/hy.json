@@ -2129,7 +2129,10 @@
       "exitMessage": "Սա կկանգնեցնի ընթացիկ նիստը, բայց կպահպանի դրա պատմությունը։",
       "keepSessionRunning": "Շարունակել նիստը",
       "exitSession": "Փակել նիստը",
-      "restartExitFailed": "Սկսվեց նոր նիստ։ Նախորդ նիստը դեռ բաց է։"
+      "restartExitFailed": "Սկսվեց նոր նիստ։ Նախորդ նիստը դեռ բաց է։",
+      "exitNotSupported": "Հեռավոր նիստից ելքը չի աջակցվում ընթացիկ նիստի համար",
+      "exitUnavailable": "Հեռավոր նիստից ելքը հասանելի չէ ընթացիկ նիստի համար",
+      "exitNeedsNewerCli": "Հեռավոր slash հրամանների համար անհրաժեշտ է ավելի նոր Kilo CLI։ Թարմացրեք Kilo CLI-ն և միացեք կրկին։"
     },
     "sessionConnection": {
       "connecting": "Միանում…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Պատվիրակում է աշխատանք",
       "askingQuestion": "Հարց է տալիս",
       "consideringNextSteps": "Քննարկում է հաջորդ քայլերը",
-      "writingResponse": "Գրում է պատասխան"
+      "writingResponse": "Գրում է պատասխան",
+      "initializingSnapshot": "Սկզբնավորվում է snapshot-ը…"
     },
     "slashCommands": {
       "startNewSession": "Սկսել նոր նիստ",

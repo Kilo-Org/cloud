@@ -2144,7 +2144,10 @@
       "exitMessage": "Aceasta oprește sesiunea în curs, dar îi păstrează istoricul.",
       "keepSessionRunning": "Păstrează sesiunea în curs",
       "exitSession": "Închide sesiunea",
-      "restartExitFailed": "A început o sesiune nouă. Sesiunea anterioară este încă deschisă."
+      "restartExitFailed": "A început o sesiune nouă. Sesiunea anterioară este încă deschisă.",
+      "exitNotSupported": "Ieșirea din sesiunea de la distanță nu este acceptată pentru sesiunea curentă",
+      "exitUnavailable": "Ieșirea din sesiunea de la distanță nu este disponibilă pentru sesiunea curentă",
+      "exitNeedsNewerCli": "Comenzile slash de la distanță necesită un Kilo CLI mai nou. Actualizează Kilo CLI și reconectează-te."
     },
     "sessionConnection": {
       "connecting": "Se conectează…",
@@ -2578,7 +2581,8 @@
       "delegatingWork": "Deleagă activitate",
       "askingQuestion": "Pune o întrebare",
       "consideringNextSteps": "Analizează pașii următori",
-      "writingResponse": "Scrie răspunsul"
+      "writingResponse": "Scrie răspunsul",
+      "initializingSnapshot": "Se inițializează instantaneul…"
     },
     "slashCommands": {
       "startNewSession": "Începe o sesiune nouă",

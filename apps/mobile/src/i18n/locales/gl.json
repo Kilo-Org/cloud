@@ -2129,7 +2129,10 @@
       "exitMessage": "Isto detén a sesión en execución pero conserva o seu historial.",
       "keepSessionRunning": "Manter a sesión en execución",
       "exitSession": "Saír da sesión",
-      "restartExitFailed": "Iniciouse unha nova sesión. A sesión anterior segue aberta."
+      "restartExitFailed": "Iniciouse unha nova sesión. A sesión anterior segue aberta.",
+      "exitNotSupported": "Non se admite a saída da sesión remota para a sesión actual",
+      "exitUnavailable": "A saída da sesión remota non está dispoñible para a sesión actual",
+      "exitNeedsNewerCli": "Os comandos de barra remotos requiren un Kilo CLI máis novo. Actualiza o Kilo CLI e reconéctate."
     },
     "sessionConnection": {
       "connecting": "Conectando…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegando traballo",
       "askingQuestion": "Facendo unha pregunta",
       "consideringNextSteps": "Considerando os seguintes pasos",
-      "writingResponse": "Redactando a resposta"
+      "writingResponse": "Redactando a resposta",
+      "initializingSnapshot": "Inicializando a instantánea…"
     },
     "slashCommands": {
       "startNewSession": "Iniciar unha nova sesión",

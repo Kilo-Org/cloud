@@ -2129,7 +2129,10 @@
       "exitMessage": "Þetta stöðvar keyrslulotu en geymir sögu hennar.",
       "keepSessionRunning": "Halda lotu í gangi",
       "exitSession": "Ljúka lotu",
-      "restartExitFailed": "Byrjaði nýja lotu. Fyrri lotan er enn opin."
+      "restartExitFailed": "Byrjaði nýja lotu. Fyrri lotan er enn opin.",
+      "exitNotSupported": "Ekki er stutt að hætta í fjarlægri lotu fyrir núverandi lotu",
+      "exitUnavailable": "Ekki er hægt að hætta í fjarlægri lotu fyrir núverandi lotu",
+      "exitNeedsNewerCli": "Fjarlæg slash-skipun krefst nýrri Kilo CLI. Uppfærðu Kilo CLI og tengdu aftur."
     },
     "sessionConnection": {
       "connecting": "Tengist…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Úthlutar verkefnum",
       "askingQuestion": "Spyr spurningu",
       "consideringNextSteps": "Hugleiðir næstu skref",
-      "writingResponse": "Skrifar svar"
+      "writingResponse": "Skrifar svar",
+      "initializingSnapshot": "Upphafsstilling myndatöku…"
     },
     "slashCommands": {
       "startNewSession": "Byrja nýja lotu",

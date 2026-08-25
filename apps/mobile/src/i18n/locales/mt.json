@@ -2174,7 +2174,10 @@
       "exitMessage": "Dan iwaqqaf is-sessjoni għaddejja iżda jżomm l-istorja tagħha.",
       "keepSessionRunning": "Żomm is-sessjoni għaddejja",
       "exitSession": "Ispeċċa s-sessjoni",
-      "restartExitFailed": "Bdiet sessjoni ġdida. Is-sessjoni preċedenti għadha miftuħa."
+      "restartExitFailed": "Bdiet sessjoni ġdida. Is-sessjoni preċedenti għadha miftuħa.",
+      "exitNotSupported": "Il-ħruġ mis-sessjoni remota mhux appoġġjat għas-sessjoni attwali.",
+      "exitUnavailable": "Il-ħruġ mis-sessjoni remota mhux disponibbli għas-sessjoni attwali.",
+      "exitNeedsNewerCli": "Il-kmandi slash remoti jeħtieġu Kilo CLI aktar ġdid. Aġġorna l-Kilo CLI u erġa' kkonnetta."
     },
     "sessionConnection": {
       "connecting": "Qed jikkonnettja…",
@@ -2616,7 +2619,8 @@
       "delegatingWork": "Qed jiddelega x-xogħol",
       "askingQuestion": "Qed jagħmel mistoqsija",
       "consideringNextSteps": "Qed jikkunsidra l-passi li jmiss",
-      "writingResponse": "Qed jikteb ir-risposta"
+      "writingResponse": "Qed jikteb ir-risposta",
+      "initializingSnapshot": "Qed jibda is-snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Ibda sessjoni ġdida",

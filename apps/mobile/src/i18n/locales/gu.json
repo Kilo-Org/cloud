@@ -2129,7 +2129,10 @@
       "exitMessage": "આ ચાલુ સત્ર રોકશે પણ તેનો ઇતિહાસ રાખશે.",
       "keepSessionRunning": "સત્ર ચાલતું રાખો",
       "exitSession": "સત્રમાંથી બહાર નીકળો",
-      "restartExitFailed": "નવું સત્ર શરૂ થયું. પહેલું સત્ર હજુ ખુલ્લું છે."
+      "restartExitFailed": "નવું સત્ર શરૂ થયું. પહેલું સત્ર હજુ ખુલ્લું છે.",
+      "exitNotSupported": "વર્તમાન સત્ર માટે રિમોટ સત્રમાંથી બહાર નીકળવું સમર્થિત નથી",
+      "exitUnavailable": "વર્તમાન સત્ર માટે રિમોટ સત્રમાંથી બહાર નીકળવું ઉપલબ્ધ નથી",
+      "exitNeedsNewerCli": "રિમોટ સ્લેશ કમાન્ડ માટે નવા Kilo CLIની જરૂર છે. Kilo CLI અપડેટ કરો અને ફરી કનેક્ટ કરો."
     },
     "sessionConnection": {
       "connecting": "કનેક્ટ થઈ રહ્યું છે…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "કાર્ય સોંપી રહ્યું છે",
       "askingQuestion": "પ્રશ્ન પૂછી રહ્યું છે",
       "consideringNextSteps": "આગળના પગલાંઓ વિચારી રહ્યું છે",
-      "writingResponse": "જવાબ લખી રહ્યું છે"
+      "writingResponse": "જવાબ લખી રહ્યું છે",
+      "initializingSnapshot": "સ્નેપશોટ પ્રારંભ કરી રહ્યું છે…"
     },
     "slashCommands": {
       "startNewSession": "નવું સત્ર શરૂ કરો",

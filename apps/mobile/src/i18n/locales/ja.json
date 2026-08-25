@@ -1675,7 +1675,10 @@
       "exitMessage": "実行中のセッションは停止しますが、履歴は保持されます。",
       "keepSessionRunning": "セッションを実行したままにする",
       "exitSession": "セッションを終了",
-      "restartExitFailed": "新しいセッションを開始しました。前のセッションはまだ開いています。"
+      "restartExitFailed": "新しいセッションを開始しました。前のセッションはまだ開いています。",
+      "exitNotSupported": "現在のセッションではリモートセッションの終了はサポートされていません",
+      "exitUnavailable": "現在のセッションではリモートセッションの終了を利用できません",
+      "exitNeedsNewerCli": "リモートのスラッシュコマンドには新しいKilo CLIが必要です。Kilo CLIを更新して再接続してください。"
     },
     "sessionConnection": {
       "connecting": "接続中…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "作業を委任中",
       "askingQuestion": "質問中",
       "consideringNextSteps": "次のステップを検討中",
-      "writingResponse": "応答を作成中"
+      "writingResponse": "応答を作成中",
+      "initializingSnapshot": "スナップショットを初期化中…"
     },
     "slashCommands": {
       "startNewSession": "新しいセッションを開始",

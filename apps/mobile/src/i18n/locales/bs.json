@@ -2144,7 +2144,10 @@
       "exitMessage": "Ovo zaustavlja sesiju u tijeku, ali zadržava njezinu povijest.",
       "keepSessionRunning": "Nastavi sesiju izvoditi",
       "exitSession": "Izađi iz sesije",
-      "restartExitFailed": "Započeta je nova sesija. Prethodna sesija je još uvijek otvorena."
+      "restartExitFailed": "Započeta je nova sesija. Prethodna sesija je još uvijek otvorena.",
+      "exitNotSupported": "Izlazak iz daljinske sesije nije podržan za trenutnu sesiju",
+      "exitUnavailable": "Izlazak iz daljinske sesije nije dostupan za trenutnu sesiju",
+      "exitNeedsNewerCli": "Daljinske komande sa kosom crtom zahtijevaju noviji Kilo CLI. Ažurirajte Kilo CLI i ponovno se povežite."
     },
     "sessionConnection": {
       "connecting": "Povezivanje…",
@@ -2578,7 +2581,8 @@
       "delegatingWork": "Delegiranje posla",
       "askingQuestion": "Postavljanje pitanja",
       "consideringNextSteps": "Razmatranje sljedećih koraka",
-      "writingResponse": "Pisanje odgovora"
+      "writingResponse": "Pisanje odgovora",
+      "initializingSnapshot": "Inicijalizacija snimke…"
     },
     "slashCommands": {
       "startNewSession": "Započni novu sesiju",

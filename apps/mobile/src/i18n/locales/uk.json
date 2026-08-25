@@ -1691,7 +1691,10 @@
       "exitMessage": "Це зупиняє запущений сеанс, але зберігає його історію.",
       "keepSessionRunning": "Залишити сеанс запущеним",
       "exitSession": "Завершити сеанс",
-      "restartExitFailed": "Розпочато новий сеанс. Попередній сеанс ще відкритий."
+      "restartExitFailed": "Розпочато новий сеанс. Попередній сеанс ще відкритий.",
+      "exitNotSupported": "Завершення віддаленого сеансу не підтримується для поточного сеансу.",
+      "exitUnavailable": "Завершення віддаленого сеансу недоступне для поточного сеансу.",
+      "exitNeedsNewerCli": "Віддалені слеш-команди потребують новішої версії Kilo CLI. Оновіть Kilo CLI та підключіться знову."
     },
     "sessionConnection": {
       "connecting": "Підключення…",
@@ -2129,7 +2132,8 @@
       "delegatingWork": "Делегування роботи",
       "askingQuestion": "Постановка запитання",
       "consideringNextSteps": "Обмірковування наступних кроків",
-      "writingResponse": "Написання відповіді"
+      "writingResponse": "Написання відповіді",
+      "initializingSnapshot": "Ініціалізація знімка…"
     },
     "slashCommands": {
       "startNewSession": "Розпочати новий сеанс",

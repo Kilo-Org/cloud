@@ -1675,7 +1675,10 @@
       "exitMessage": "Dies stoppt die laufende Sitzung, behält aber ihren Verlauf.",
       "keepSessionRunning": "Sitzung weiterlaufen lassen",
       "exitSession": "Sitzung beenden",
-      "restartExitFailed": "Neue Sitzung gestartet. Die vorherige Sitzung ist noch geöffnet."
+      "restartExitFailed": "Neue Sitzung gestartet. Die vorherige Sitzung ist noch geöffnet.",
+      "exitNotSupported": "Das Beenden der Remote-Sitzung wird für die aktuelle Sitzung nicht unterstützt",
+      "exitUnavailable": "Das Beenden der Remote-Sitzung ist für die aktuelle Sitzung nicht verfügbar",
+      "exitNeedsNewerCli": "Slash-Befehle in Remote-Sitzungen erfordern eine neuere Kilo CLI. Aktualisiere die Kilo CLI und verbinde dich erneut."
     },
     "sessionConnection": {
       "connecting": "Verbinde…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "Arbeit delegieren",
       "askingQuestion": "Frage stellen",
       "consideringNextSteps": "Nächste Schritte abwägen",
-      "writingResponse": "Antwort schreiben"
+      "writingResponse": "Antwort schreiben",
+      "initializingSnapshot": "Snapshot wird initialisiert…"
     },
     "slashCommands": {
       "startNewSession": "Neue Sitzung starten",

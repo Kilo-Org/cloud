@@ -1707,7 +1707,10 @@
       "exitMessage": "يؤدي هذا إلى إيقاف الجلسة الجارية مع الاحتفاظ بسجلها.",
       "keepSessionRunning": "إبقاء الجلسة قيد التشغيل",
       "exitSession": "الخروج من الجلسة",
-      "restartExitFailed": "بدأت جلسة جديدة. الجلسة السابقة ما تزال مفتوحة."
+      "restartExitFailed": "بدأت جلسة جديدة. الجلسة السابقة ما تزال مفتوحة.",
+      "exitNotSupported": "الخروج من الجلسة البعيدة غير مدعوم للجلسة الحالية",
+      "exitUnavailable": "الخروج من الجلسة البعيدة غير متاح للجلسة الحالية",
+      "exitNeedsNewerCli": "تتطلب أوامر الشرطة المائلة عن بُعد إصدارًا أحدث من Kilo CLI. حدّث Kilo CLI وأعد الاتصال."
     },
     "sessionConnection": {
       "connecting": "جارٍ الاتصال…",
@@ -2153,7 +2156,8 @@
       "delegatingWork": "جارٍ تفويض العمل",
       "askingQuestion": "جارٍ طرح سؤال",
       "consideringNextSteps": "جارٍ النظر في الخطوات التالية",
-      "writingResponse": "جارٍ كتابة الرد"
+      "writingResponse": "جارٍ كتابة الرد",
+      "initializingSnapshot": "جارٍ تهيئة اللقطة…"
     },
     "slashCommands": {
       "startNewSession": "بدء جلسة جديدة",

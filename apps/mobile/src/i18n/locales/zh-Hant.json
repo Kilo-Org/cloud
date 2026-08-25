@@ -1675,7 +1675,10 @@
       "exitMessage": "這會停止執行中的工作階段，但保留其記錄。",
       "keepSessionRunning": "保持工作階段執行",
       "exitSession": "結束工作階段",
-      "restartExitFailed": "已開始新工作階段。上一個工作階段仍處於開啟狀態。"
+      "restartExitFailed": "已開始新工作階段。上一個工作階段仍處於開啟狀態。",
+      "exitNotSupported": "目前的工作階段不支援結束遠端工作階段",
+      "exitUnavailable": "目前的工作階段無法結束遠端工作階段",
+      "exitNeedsNewerCli": "遠端斜線指令需要更新的 Kilo CLI。請更新 Kilo CLI 並重新連接。"
     },
     "sessionConnection": {
       "connecting": "連線中…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "正在分派工作",
       "askingQuestion": "正在提問",
       "consideringNextSteps": "正在考慮後續步驟",
-      "writingResponse": "正在撰寫回覆"
+      "writingResponse": "正在撰寫回覆",
+      "initializingSnapshot": "正在初始化快照…"
     },
     "slashCommands": {
       "startNewSession": "開始新工作階段",

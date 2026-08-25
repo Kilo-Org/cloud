@@ -2129,7 +2129,10 @@
       "exitMessage": "Энэ нь ажиллаж буй сессийг зогсоох боловч түүх нь үлдэнэ.",
       "keepSessionRunning": "Сессийг ажиллуулахыг үргэлжлүүлэх",
       "exitSession": "Сессээс гарах",
-      "restartExitFailed": "Шинэ сесс эхэлсэн. Өмнөх сесс нээлттэй хэвээр байна."
+      "restartExitFailed": "Шинэ сесс эхэлсэн. Өмнөх сесс нээлттэй хэвээр байна.",
+      "exitNotSupported": "Алсын сессээс гарах нь одоогийн сессэд дэмжигдэхгүй.",
+      "exitUnavailable": "Алсын сессээс гарах нь одоогийн сессэд боломжгүй.",
+      "exitNeedsNewerCli": "Алсын slash командуудад шинэ Kilo CLI шаардлагатай. Kilo CLI-ээ шинэчлээд дахин холбоно уу."
     },
     "sessionConnection": {
       "connecting": "Холбогдож байна…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Ажлыг шилжүүлж байна",
       "askingQuestion": "Асуулт асууж байна",
       "consideringNextSteps": "Дараагийн алхмуудыг авч үзэж байна",
-      "writingResponse": "Хариулт бичиж байна"
+      "writingResponse": "Хариулт бичиж байна",
+      "initializingSnapshot": "Снапшотыг эхлүүлж байна…"
     },
     "slashCommands": {
       "startNewSession": "Шинэ сесси эхлүүлэх",

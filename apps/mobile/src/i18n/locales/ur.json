@@ -2129,7 +2129,10 @@
       "exitMessage": "یہ چلتے ہوئے سیشن کو روکتا ہے لیکن اس کی تاریخ محفوظ رکھتا ہے۔",
       "keepSessionRunning": "سیشن چلاتے رہیں",
       "exitSession": "سیشن سے باہر نکلیں",
-      "restartExitFailed": "نیا سیشن شروع ہوا۔ پچھلا سیشن اب بھی کھلا ہے۔"
+      "restartExitFailed": "نیا سیشن شروع ہوا۔ پچھلا سیشن اب بھی کھلا ہے۔",
+      "exitNotSupported": "موجودہ سیشن کے لیے ریموٹ سیشن سے باہر نکلنا سپورٹ نہیں کیا جاتا۔",
+      "exitUnavailable": "موجودہ سیشن کے لیے ریموٹ سیشن سے باہر نکلنا دستیاب نہیں۔",
+      "exitNeedsNewerCli": "ریموٹ سلیش کمانڈز کے لیے نئے Kilo CLI کی ضرورت ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ جڑیں۔"
     },
     "sessionConnection": {
       "connecting": "جڑ رہے ہیں…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "کام تفویض کر رہے ہیں",
       "askingQuestion": "سوال پوچھ رہے ہیں",
       "consideringNextSteps": "اگلے اقدامات پر غور کر رہے ہیں",
-      "writingResponse": "جواب لکھ رہے ہیں"
+      "writingResponse": "جواب لکھ رہے ہیں",
+      "initializingSnapshot": "سنیپ شاٹ شروع ہو رہا ہے…"
     },
     "slashCommands": {
       "startNewSession": "نیا سیشن شروع کریں",

@@ -1675,7 +1675,10 @@
       "exitMessage": "这会停止正在运行的会话，但保留其历史记录。",
       "keepSessionRunning": "保持会话运行",
       "exitSession": "退出会话",
-      "restartExitFailed": "已开始新会话。上一个会话仍处于打开状态。"
+      "restartExitFailed": "已开始新会话。上一个会话仍处于打开状态。",
+      "exitNotSupported": "当前会话不支持退出远程会话",
+      "exitUnavailable": "当前会话无法退出远程会话",
+      "exitNeedsNewerCli": "远程斜杠命令需要更新的 Kilo CLI。请更新 Kilo CLI 并重新连接。"
     },
     "sessionConnection": {
       "connecting": "正在连接…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "正在委派工作",
       "askingQuestion": "正在提问",
       "consideringNextSteps": "正在考虑下一步",
-      "writingResponse": "正在撰写回复"
+      "writingResponse": "正在撰写回复",
+      "initializingSnapshot": "正在初始化快照…"
     },
     "slashCommands": {
       "startNewSession": "开始一个新会话",

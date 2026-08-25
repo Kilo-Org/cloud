@@ -1681,7 +1681,10 @@
       "exitSession": "सत्र से बाहर निकलें",
       "exitTitle": "सत्र से बाहर निकलें?",
       "keepSessionRunning": "सत्र चालू रखें",
-      "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।"
+      "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।",
+      "exitNotSupported": "वर्तमान सत्र के लिए रिमोट सत्र से बाहर निकलना समर्थित नहीं है",
+      "exitUnavailable": "वर्तमान सत्र के लिए रिमोट सत्र से बाहर निकलना उपलब्ध नहीं है",
+      "exitNeedsNewerCli": "रिमोट स्लैश कमांड के लिए नए Kilo CLI की आवश्यकता है। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "newSession": {
       "title": "नया सत्र",
@@ -2071,7 +2074,8 @@
       "delegatingWork": "काम सौंप रहा है",
       "askingQuestion": "प्रश्न पूछ रहा है",
       "consideringNextSteps": "अगले चरणों पर विचार कर रहा है",
-      "writingResponse": "प्रतिक्रिया लिख रहा है"
+      "writingResponse": "प्रतिक्रिया लिख रहा है",
+      "initializingSnapshot": "स्नैपशॉट आरंभ किया जा रहा है…"
     },
     "slashCommands": {
       "startNewSession": "नया सत्र शुरू करें",

@@ -2129,7 +2129,10 @@
       "exitMessage": "ይህ በሂደት ላይ ያለውን ክፍለ ጊዜ ያቆማል ግን ታሪኩን ይይዛል።",
       "keepSessionRunning": "ክፍለ ጊዜውን በስራ ላይ ያቆዩ",
       "exitSession": "ከክፍለ ጊዜው ውጣ",
-      "restartExitFailed": "አዲስ ክፍለ ጊዜ ተጀምሯል። የቀድሞው ክፍለ ጊዜ አሁንም ክፍት ነው።"
+      "restartExitFailed": "አዲስ ክፍለ ጊዜ ተጀምሯል። የቀድሞው ክፍለ ጊዜ አሁንም ክፍት ነው።",
+      "exitNotSupported": "የርቀት ክፍለ ጊዜ መውጣት ለአሁኑ ክፍለ ጊዜ አይደገፍም",
+      "exitUnavailable": "የርቀት ክፍለ ጊዜ መውጣት ለአሁኑ ክፍለ ጊዜ አይገኝም",
+      "exitNeedsNewerCli": "የርቀት ስላሽ ትዕዛዞች የበለጠ አዲስ Kilo CLI ይጠይቃሉ። Kilo CLIን ያዘምኑ እና እንደገና ይገናኙ።"
     },
     "sessionConnection": {
       "connecting": "በማገናኘት ላይ…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "ሥራን በመላክ ላይ",
       "askingQuestion": "ጥያቄ በመጠየቅ ላይ",
       "consideringNextSteps": "ቀጣይ እርምጃዎችን እያሰበ ላይ",
-      "writingResponse": "ምላሽ በመጻፍ ላይ"
+      "writingResponse": "ምላሽ በመጻፍ ላይ",
+      "initializingSnapshot": "ቅጽበታዊ ገጽታን በማስጀመር ላይ…"
     },
     "slashCommands": {
       "startNewSession": "አዲስ ክፍለ-ጊዜ ይጀምሩ",

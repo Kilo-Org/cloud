@@ -2144,7 +2144,10 @@
       "exitMessage": "Això atura la sessió en execució però conserva el seu historial.",
       "keepSessionRunning": "Mantén la sessió en execució",
       "exitSession": "Finalitza la sessió",
-      "restartExitFailed": "S'ha iniciat una sessió nova. La sessió anterior encara està oberta."
+      "restartExitFailed": "S'ha iniciat una sessió nova. La sessió anterior encara està oberta.",
+      "exitNotSupported": "La sortida de la sessió remota no és compatible amb la sessió actual",
+      "exitUnavailable": "La sortida de la sessió remota no està disponible per a la sessió actual",
+      "exitNeedsNewerCli": "Les ordres de barra remotes requereixen una versió més nova del CLI de Kilo. Actualitzeu el CLI de Kilo i torneu-vos a connectar."
     },
     "sessionConnection": {
       "connecting": "Connectant…",
@@ -2578,7 +2581,8 @@
       "delegatingWork": "Delegant feina",
       "askingQuestion": "Fent una pregunta",
       "consideringNextSteps": "Considerant els propers passos",
-      "writingResponse": "Escrivint la resposta"
+      "writingResponse": "Escrivint la resposta",
+      "initializingSnapshot": "Inicialitzant la instantània…"
     },
     "slashCommands": {
       "startNewSession": "Inicia una nova sessió",

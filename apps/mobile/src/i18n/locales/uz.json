@@ -2129,7 +2129,10 @@
       "exitMessage": "Bu davom etayotgan sessiyani to'xtatadi, lekin uning tarixini saqlaydi.",
       "keepSessionRunning": "Sessiyani ishda saqlash",
       "exitSession": "Sessiyadan chiqish",
-      "restartExitFailed": "Yangi sessiya boshlandi. Avvalgi sessiya hali ham ochiq."
+      "restartExitFailed": "Yangi sessiya boshlandi. Avvalgi sessiya hali ham ochiq.",
+      "exitNotSupported": "Joriy sessiya uchun masofaviy sessiyadan chiqish qo'llab-quvvatlanmaydi.",
+      "exitUnavailable": "Joriy sessiya uchun masofaviy sessiyadan chiqish mavjud emas.",
+      "exitNeedsNewerCli": "Masofaviy slash buyruqlari yangiroq Kilo CLI'ni talab qiladi. Kilo CLI'ni yangilang va qayta ulaning."
     },
     "sessionConnection": {
       "connecting": "Ulanish…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Ish topshirilmoqda",
       "askingQuestion": "Savol berilmoqda",
       "consideringNextSteps": "Keyingi qadamlar ko'rib chiqilmoqda",
-      "writingResponse": "Javob yozilmoqda"
+      "writingResponse": "Javob yozilmoqda",
+      "initializingSnapshot": "Snapshot boshlanmoqda…"
     },
     "slashCommands": {
       "startNewSession": "Yangi sessiya boshlash",

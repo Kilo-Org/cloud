@@ -2129,7 +2129,10 @@
       "exitMessage": "ئەمە سێشنی ڕێکخراو دەوەستێنێت بەڵام مێژووەکەی دەپارێزێت.",
       "keepSessionRunning": "سێشن بەردەوام بە لە کار",
       "exitSession": "دەرچوون لە سێشن",
-      "restartExitFailed": "سێشنێکی نوێ دەستپێکرا. سێشنی پێشوو هێشتا کراوە."
+      "restartExitFailed": "سێشنێکی نوێ دەستپێکرا. سێشنی پێشوو هێشتا کراوە.",
+      "exitNotSupported": "دەرچوون لە سێشنی دوور بۆ سێشنی ئێستا پشتگیری ناکرێت",
+      "exitUnavailable": "دەرچوون لە سێشنی دوور بۆ سێشنی ئێستا بەردەست نییە",
+      "exitNeedsNewerCli": "فەرمانەکانی سلاشی دوور پێویستیان بە وەشانی نوێتری Kilo CLI هەیە. Kilo CLI نوێ بکەرەوە و دووبارە پەیوەندی بکەرەوە."
     },
     "sessionConnection": {
       "connecting": "پەیوەندیکردن…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "سپاردنی کار",
       "askingQuestion": "پرسیار کردن",
       "consideringNextSteps": "بیرکردنەوە لە هەنگاوەکانی داهاتوو",
-      "writingResponse": "نووسینی وەڵام"
+      "writingResponse": "نووسینی وەڵام",
+      "initializingSnapshot": "دەستپێکردنی snapshot…"
     },
     "slashCommands": {
       "startNewSession": "دەستپێکردنی دانیشتنێکی نوێ",

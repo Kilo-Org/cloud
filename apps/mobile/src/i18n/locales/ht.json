@@ -2129,7 +2129,10 @@
       "exitMessage": "Sa a sispann sesyon an k ap kouri a men li kenbe istwa li.",
       "keepSessionRunning": "Kenbe sesyon an k ap kouri",
       "exitSession": "Soti nan sesyon an",
-      "restartExitFailed": "Te kòmanse yon nouvo sesyon. Ansyen sesyon an toujou louvri."
+      "restartExitFailed": "Te kòmanse yon nouvo sesyon. Ansyen sesyon an toujou louvri.",
+      "exitNotSupported": "Sòti nan sesyon aleka pa sipòte pou sesyon aktyèl la",
+      "exitUnavailable": "Sòti nan sesyon aleka pa disponib pou sesyon aktyèl la",
+      "exitNeedsNewerCli": "Kòmandman slash aleka mande yon nouvo Kilo CLI. Mete ajou Kilo CLI a epi rekonekte."
     },
     "sessionConnection": {
       "connecting": "Ap konekte…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Ap delege travay",
       "askingQuestion": "Ap poze yon kesyon",
       "consideringNextSteps": "Ap konsidere pwochen etap",
-      "writingResponse": "Ap ekri repons"
+      "writingResponse": "Ap ekri repons",
+      "initializingSnapshot": "Ap inisyalize snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Kòmanse yon nouvo sesyon",

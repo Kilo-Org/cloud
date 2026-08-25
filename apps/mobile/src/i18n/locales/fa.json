@@ -2129,7 +2129,10 @@
       "exitMessage": "این نشست در حال اجرا را متوقف میکند اما تاریخچه آن را نگه میدارد.",
       "keepSessionRunning": "نشست در حال اجرا بماند",
       "exitSession": "خروج از نشست",
-      "restartExitFailed": "یک نشست جدید شروع شد. نشست قبلی همچنان باز است."
+      "restartExitFailed": "یک نشست جدید شروع شد. نشست قبلی همچنان باز است.",
+      "exitNotSupported": "خروج از نشست از راه دور برای نشست فعلی پشتیبانی نمی‌شود",
+      "exitUnavailable": "خروج از نشست از راه دور برای نشست فعلی در دسترس نیست",
+      "exitNeedsNewerCli": "دستورات اسلش از راه دور به نسخه جدیدتری از Kilo CLI نیاز دارند. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "sessionConnection": {
       "connecting": "در حال اتصال…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "در حال واگذاری کار",
       "askingQuestion": "در حال پرسیدن سؤال",
       "consideringNextSteps": "در حال بررسی گام‌های بعدی",
-      "writingResponse": "در حال نوشتن پاسخ"
+      "writingResponse": "در حال نوشتن پاسخ",
+      "initializingSnapshot": "در حال راه‌اندازی اسنپ‌شات…"
     },
     "slashCommands": {
       "startNewSession": "شروع یک جلسه جدید",

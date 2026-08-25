@@ -1601,7 +1601,10 @@
       "exitMessage": "Cela arrête la session en cours mais conserve son historique.",
       "keepSessionRunning": "Garder la session active",
       "exitSession": "Quitter la session",
-      "restartExitFailed": "Nouvelle session démarrée. La session précédente est encore ouverte."
+      "restartExitFailed": "Nouvelle session démarrée. La session précédente est encore ouverte.",
+      "exitNotSupported": "La sortie de session distante n'est pas prise en charge pour la session actuelle",
+      "exitUnavailable": "La sortie de session distante est indisponible pour la session actuelle",
+      "exitNeedsNewerCli": "Les commandes slash à distance nécessitent une CLI Kilo plus récente. Mettez à jour la CLI Kilo et reconnectez-vous."
     },
     "sessionConnection": {
       "connecting": "Connexion…",
@@ -2035,7 +2038,8 @@
       "delegatingWork": "Délègue le travail",
       "askingQuestion": "Pose une question",
       "consideringNextSteps": "Étudie les prochaines étapes",
-      "writingResponse": "Rédige la réponse"
+      "writingResponse": "Rédige la réponse",
+      "initializingSnapshot": "Initialisation de l'instantané…"
     },
     "slashCommands": {
       "startNewSession": "Démarrer une nouvelle session",

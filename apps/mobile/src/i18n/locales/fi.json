@@ -2129,7 +2129,10 @@
       "exitMessage": "Tämä pysäyttää käynnissä olevan istunnon mutta säilyttää sen historian.",
       "keepSessionRunning": "Pidä istunto käynnissä",
       "exitSession": "Poistu istunnosta",
-      "restartExitFailed": "Aloitettiin uusi istunto. Edellinen istunto on edelleen avoinna."
+      "restartExitFailed": "Aloitettiin uusi istunto. Edellinen istunto on edelleen avoinna.",
+      "exitNotSupported": "Etäistunnosta poistuminen ei ole tuettu nykyiselle istunnolle",
+      "exitUnavailable": "Etäistunnosta poistuminen ei ole käytettävissä nykyiselle istunnolle",
+      "exitNeedsNewerCli": "Etä-slash-komennot edellyttävät uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "sessionConnection": {
       "connecting": "Yhdistetään…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegoimassa työtä",
       "askingQuestion": "Esitetään kysymys",
       "consideringNextSteps": "Harkitaan seuraavia vaiheita",
-      "writingResponse": "Kirjoitetaan vastausta"
+      "writingResponse": "Kirjoitetaan vastausta",
+      "initializingSnapshot": "Alustetaan tilannekuvaa…"
     },
     "slashCommands": {
       "startNewSession": "Aloita uusi istunto",

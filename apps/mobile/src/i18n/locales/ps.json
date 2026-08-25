@@ -2129,7 +2129,10 @@
       "exitMessage": "دا روانه ناسته ودروي خو تاریخچه یې ساتي.",
       "keepSessionRunning": "ناسته روانه وساتئ",
       "exitSession": "له ناستې ووځئ",
-      "restartExitFailed": "نوې ناسته پیل شوه. مخکینۍ ناسته لا هم خلاصه ده."
+      "restartExitFailed": "نوې ناسته پیل شوه. مخکینۍ ناسته لا هم خلاصه ده.",
+      "exitNotSupported": "د اوسنۍ غونډې لپاره د لیرې ناستې وتل ملاتړ نه کیږي",
+      "exitUnavailable": "د اوسنۍ غونډې لپاره د لیرې ناستې وتل شتون نلري",
+      "exitNeedsNewerCli": "د لیرې سلیش کمانډونو لپاره نوې Kilo CLI اړینه ده. Kilo CLI تازه کړئ او بیا ونښلئ."
     },
     "sessionConnection": {
       "connecting": "نښلېږي…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "کار سپارل",
       "askingQuestion": "پوښتنه کول",
       "consideringNextSteps": "راتلونکي ګامونه غور کول",
-      "writingResponse": "ځواب لیکل"
+      "writingResponse": "ځواب لیکل",
+      "initializingSnapshot": "سنپ شاټ پیل کیږي…"
     },
     "slashCommands": {
       "startNewSession": "نوې غونډه پیل کړئ",

@@ -2129,7 +2129,10 @@
       "exitMessage": "Lokhu kuyeka iseshini esebenzayo kodwa kugcina umlando wayo.",
       "keepSessionRunning": "Qhubeka iseshini isebenze",
       "exitSession": "Phuma eseshini",
-      "restartExitFailed": "Kuqalwe iseshini entsha. Iseshini yangaphambilini isavuliwe."
+      "restartExitFailed": "Kuqalwe iseshini entsha. Iseshini yangaphambilini isavuliwe.",
+      "exitNotSupported": "Ukuphuma eseshini ekude akusekelwa kulesi seshini samanje",
+      "exitUnavailable": "Ukuphuma eseshini ekude akutholakali kulesi seshini samanje",
+      "exitNeedsNewerCli": "Imiyalo ye-slash ekude idinga i-Kilo CLI entsha. Buyekeza i-Kilo CLI bese uxhumana futhi."
     },
     "sessionConnection": {
       "connecting": "Iyaxhuma…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Ithuma umsebenzi",
       "askingQuestion": "Ibuza umbuzo",
       "consideringNextSteps": "Icabanga ngezinyathelo ezilandelayo",
-      "writingResponse": "Ibhala impendulo"
+      "writingResponse": "Ibhala impendulo",
+      "initializingSnapshot": "Iqala i-snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Qala iseshini entsha",

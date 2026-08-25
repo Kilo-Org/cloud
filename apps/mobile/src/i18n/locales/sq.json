@@ -2129,7 +2129,10 @@
       "exitMessage": "Kjo ndalon seancën që po ekzekutohet, por ruan historinë e saj.",
       "keepSessionRunning": "Mbaje seancën në ekzekutim",
       "exitSession": "Mbyll seancën",
-      "restartExitFailed": "Filloi një seancë e re. Seanca e mëparshme është ende e hapur."
+      "restartExitFailed": "Filloi një seancë e re. Seanca e mëparshme është ende e hapur.",
+      "exitNotSupported": "Dalja nga seanca në distancë nuk mbështetet për seancën aktuale",
+      "exitUnavailable": "Dalja nga seanca në distancë nuk është e disponueshme për seancën aktuale",
+      "exitNeedsNewerCli": "Komandat e pjerrëta në distancë kërkojnë një Kilo CLI më të ri. Përditësoni Kilo CLI dhe rilidhuni."
     },
     "sessionConnection": {
       "connecting": "Duke u lidhur…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Duke deleguar punën",
       "askingQuestion": "Duke bërë një pyetje",
       "consideringNextSteps": "Duke shqyrtuar hapat e ardhshëm",
-      "writingResponse": "Duke shkruar përgjigjen"
+      "writingResponse": "Duke shkruar përgjigjen",
+      "initializingSnapshot": "Duke inicializuar snapshot-in…"
     },
     "slashCommands": {
       "startNewSession": "Filloni një seancë të re",

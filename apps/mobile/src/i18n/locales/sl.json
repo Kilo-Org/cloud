@@ -2159,7 +2159,10 @@
       "exitMessage": "To ustavi izvajano sejo, vendar ohrani njeno zgodovino.",
       "keepSessionRunning": "Pusti sejo izvajati",
       "exitSession": "Zapusti sejo",
-      "restartExitFailed": "Začela se je nova seja. Prejšnja seja je še vedno odprta."
+      "restartExitFailed": "Začela se je nova seja. Prejšnja seja je še vedno odprta.",
+      "exitNotSupported": "Zapustitev oddaljene seje za trenutno sejo ni podprta",
+      "exitUnavailable": "Zapustitev oddaljene seje za trenutno sejo ni na voljo",
+      "exitNeedsNewerCli": "Oddaljeni ukazi s poševnico zahtevajo novejši Kilo CLI. Posodobite Kilo CLI in se ponovno povežite."
     },
     "sessionConnection": {
       "connecting": "Povezovanje…",
@@ -2597,7 +2600,8 @@
       "delegatingWork": "Delegiranje dela",
       "askingQuestion": "Postavljanje vprašanja",
       "consideringNextSteps": "Premišljevanje o naslednjih korakih",
-      "writingResponse": "Pisanje odgovora"
+      "writingResponse": "Pisanje odgovora",
+      "initializingSnapshot": "Inicializacija posnetka…"
     },
     "slashCommands": {
       "startNewSession": "Začni novo sejo",

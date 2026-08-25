@@ -2159,7 +2159,10 @@
       "exitMessage": "Týmto sa zastaví bežiace sedenie, ale jeho história sa zachová.",
       "keepSessionRunning": "Nechajte sedenie bežať",
       "exitSession": "Ukončiť sedenie",
-      "restartExitFailed": "Spustilo sa nové sedenie. Predchádzajúce sedenie je stále otvorené."
+      "restartExitFailed": "Spustilo sa nové sedenie. Predchádzajúce sedenie je stále otvorené.",
+      "exitNotSupported": "Ukončenie vzdialeného sedenia nie je pre aktuálne sedenie podporované",
+      "exitUnavailable": "Ukončenie vzdialeného sedenia nie je pre aktuálne sedenie dostupné",
+      "exitNeedsNewerCli": "Vzdialené príkazy so lomkou vyžadujú novšie Kilo CLI. Aktualizujte Kilo CLI a znovu sa pripojte."
     },
     "sessionConnection": {
       "connecting": "Pripája sa…",
@@ -2597,7 +2600,8 @@
       "delegatingWork": "Delegujem prácu",
       "askingQuestion": "Kladiem otázku",
       "consideringNextSteps": "Zvažujem ďalšie kroky",
-      "writingResponse": "Píšem odpoveď"
+      "writingResponse": "Píšem odpoveď",
+      "initializingSnapshot": "Inicializujem snímku…"
     },
     "slashCommands": {
       "startNewSession": "Spustiť novú reláciu",

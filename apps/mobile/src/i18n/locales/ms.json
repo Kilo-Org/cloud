@@ -2129,7 +2129,10 @@
       "exitMessage": "Ini menghentikan sesi yang berjalan tetapi mengekalkan sejarahnya.",
       "keepSessionRunning": "Teruskan sesi berjalan",
       "exitSession": "Keluar dari sesi",
-      "restartExitFailed": "Memulakan sesi baharu. Sesi sebelumnya masih terbuka."
+      "restartExitFailed": "Memulakan sesi baharu. Sesi sebelumnya masih terbuka.",
+      "exitNotSupported": "Keluar dari sesi jauh tidak disokong untuk sesi semasa.",
+      "exitUnavailable": "Keluar dari sesi jauh tidak tersedia untuk sesi semasa.",
+      "exitNeedsNewerCli": "Arahan slash jauh memerlukan Kilo CLI yang lebih baharu. Naik taraf Kilo CLI dan sambung semula."
     },
     "sessionConnection": {
       "connecting": "Menyambung…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Mewakilkan kerja",
       "askingQuestion": "Mengemukakan soalan",
       "consideringNextSteps": "Mempertimbangkan langkah seterusnya",
-      "writingResponse": "Menulis respons"
+      "writingResponse": "Menulis respons",
+      "initializingSnapshot": "Memulakan snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Mulakan sesi baharu",

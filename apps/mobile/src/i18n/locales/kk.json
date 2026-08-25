@@ -2129,7 +2129,10 @@
       "exitMessage": "Бұл орындалып жатқан сессияны тоқтатады, бірақ оның тарихын сақтайды.",
       "keepSessionRunning": "Сессияның орындалуын жалғастыру",
       "exitSession": "Сессиядан шығу",
-      "restartExitFailed": "Жаңа сессия басталды. Алдыңғы сессия әлі ашық."
+      "restartExitFailed": "Жаңа сессия басталды. Алдыңғы сессия әлі ашық.",
+      "exitNotSupported": "Ағымдағы сессия үшін қашықтағы сессиядан шығу қолдау көрсетілмейді",
+      "exitUnavailable": "Ағымдағы сессия үшін қашықтағы сессиядан шығу қолжетімсіз",
+      "exitNeedsNewerCli": "Қашықтағы слеш пәрмендері Kilo CLI-дің жаңа нұсқасын қажет етеді. Kilo CLI жаңартып, қайта қосылыңыз."
     },
     "sessionConnection": {
       "connecting": "Қосылуда…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Жұмыс тапсырылуда",
       "askingQuestion": "Сұрақ қойылуда",
       "consideringNextSteps": "Келесі қадамдар қарастырылуда",
-      "writingResponse": "Жауап жазылуда"
+      "writingResponse": "Жауап жазылуда",
+      "initializingSnapshot": "Снэпшот инициализациялануда…"
     },
     "slashCommands": {
       "startNewSession": "Жаңа сессияны бастау",

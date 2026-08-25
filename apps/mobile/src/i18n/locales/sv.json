@@ -2129,7 +2129,10 @@
       "exitMessage": "Detta stoppar den körande sessionen men behåller dess historik.",
       "keepSessionRunning": "Fortsätt köra sessionen",
       "exitSession": "Avsluta sessionen",
-      "restartExitFailed": "Startade en ny session. Den föregående sessionen är fortfarande öppen."
+      "restartExitFailed": "Startade en ny session. Den föregående sessionen är fortfarande öppen.",
+      "exitNotSupported": "Att avsluta fjärrsessionen stöds inte för den aktuella sessionen.",
+      "exitUnavailable": "Att avsluta fjärrsessionen är inte tillgängligt för den aktuella sessionen.",
+      "exitNeedsNewerCli": "Snedstreckskommandon i fjärrsessioner kräver en nyare Kilo CLI. Uppdatera Kilo CLI och återanslut."
     },
     "sessionConnection": {
       "connecting": "Ansluter…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegerar arbete",
       "askingQuestion": "Ställer en fråga",
       "consideringNextSteps": "Överväger nästa steg",
-      "writingResponse": "Skriver svar"
+      "writingResponse": "Skriver svar",
+      "initializingSnapshot": "Initierar snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Starta en ny session",

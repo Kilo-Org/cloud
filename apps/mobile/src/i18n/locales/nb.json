@@ -2129,7 +2129,10 @@
       "exitMessage": "Dette stopper den kjørende økten, men beholder historikken.",
       "keepSessionRunning": "La økten fortsette å kjøre",
       "exitSession": "Avslutt økt",
-      "restartExitFailed": "Startet en ny økt. Den forrige økten er fortsatt åpen."
+      "restartExitFailed": "Startet en ny økt. Den forrige økten er fortsatt åpen.",
+      "exitNotSupported": "Avslutning av ekstern økt støttes ikke for den gjeldende økten",
+      "exitUnavailable": "Avslutning av ekstern økt er utilgjengelig for den gjeldende økten",
+      "exitNeedsNewerCli": "Eksterne skråstrekskommandoer krever en nyere Kilo CLI. Oppdater Kilo CLI og koble til på nytt."
     },
     "sessionConnection": {
       "connecting": "Kobler til…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Delegerer arbeid",
       "askingQuestion": "Stiller et spørsmål",
       "consideringNextSteps": "Vurderer neste steg",
-      "writingResponse": "Skriver svar"
+      "writingResponse": "Skriver svar",
+      "initializingSnapshot": "Initialiserer øyeblikksbilde…"
     },
     "slashCommands": {
       "startNewSession": "Start en ny økt",

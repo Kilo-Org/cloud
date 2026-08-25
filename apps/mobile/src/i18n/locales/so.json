@@ -2129,7 +2129,10 @@
       "exitMessage": "Tani waxay joojinaysaa kalfadhiga socda laakiin waxay keydisaa taariikhdiisa.",
       "keepSessionRunning": "Si wad u socodsii kalfadhiga",
       "exitSession": "Ka bax kalfadhiga",
-      "restartExitFailed": "Waxaa la bilaabay kalfadhi cusub. Kalfadhigii hore wali wuu furan yahay."
+      "restartExitFailed": "Waxaa la bilaabay kalfadhi cusub. Kalfadhigii hore wali wuu furan yahay.",
+      "exitNotSupported": "Ka bixidda kalfadhiga fog looma taageero kalfadhiga hadda jira",
+      "exitUnavailable": "Ka bixidda kalfadhiga fog looma heli karo kalfadhiga hadda jira",
+      "exitNeedsNewerCli": "Amarrada jiidka ee fog waxay u baahan yihiin Kilo CLI ka cusub. Cusboonaysii Kilo CLI oo dib u xir."
     },
     "sessionConnection": {
       "connecting": "Ku xirid...",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "Waxaa dhiibaya hawsha",
       "askingQuestion": "Waydiinaya su'aal",
       "consideringNextSteps": "Tixgelinaya tillaabooyinka xiga",
-      "writingResponse": "Qoraya jawaabta"
+      "writingResponse": "Qoraya jawaabta",
+      "initializingSnapshot": "Bilaabaya snapshot-ka…"
     },
     "slashCommands": {
       "startNewSession": "Bilow kalfadhi cusub",

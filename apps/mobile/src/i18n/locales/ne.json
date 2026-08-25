@@ -2129,7 +2129,10 @@
       "exitMessage": "यसले चलिरहेको सत्र रोक्छ तर यसको इतिहास राख्छ।",
       "keepSessionRunning": "सत्र चलाइराख्नुहोस्",
       "exitSession": "सत्र बाहिरिनुहोस्",
-      "restartExitFailed": "नयाँ सत्र सुरु गरियो। अघिल्लो सत्र अझै खुला छ।"
+      "restartExitFailed": "नयाँ सत्र सुरु गरियो। अघिल्लो सत्र अझै खुला छ।",
+      "exitNotSupported": "वर्तमान सत्रका लागि दूरस्थ सत्रबाट बाहिरिने समर्थन छैन",
+      "exitUnavailable": "वर्तमान सत्रका लागि दूरस्थ सत्रबाट बाहिरिने उपलब्ध छैन",
+      "exitNeedsNewerCli": "दूरस्थ स्ल्यास कमाण्डहरूका लागि नयाँ Kilo CLI चाहिन्छ। Kilo CLI अद्यावधिक गरेर पुनः जडान गर्नुहोस्।"
     },
     "sessionConnection": {
       "connecting": "जडान गर्दै…",
@@ -2559,7 +2562,8 @@
       "delegatingWork": "काम सुम्पिँदै",
       "askingQuestion": "प्रश्न सोध्दै",
       "consideringNextSteps": "अर्को चरणहरू विचार गर्दै",
-      "writingResponse": "प्रतिक्रिया लेख्दै"
+      "writingResponse": "प्रतिक्रिया लेख्दै",
+      "initializingSnapshot": "स्न्यापसट सुरु गर्दै…"
     },
     "slashCommands": {
       "startNewSession": "नयाँ सत्र सुरु गर्नुहोस्",

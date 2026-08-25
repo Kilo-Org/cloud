@@ -1675,7 +1675,10 @@
       "exitMessage": "실행 중인 세션을 중지하지만 기록은 유지됩니다.",
       "keepSessionRunning": "세션 계속 실행",
       "exitSession": "세션 종료",
-      "restartExitFailed": "새 세션을 시작했습니다. 이전 세션은 아직 열려 있습니다."
+      "restartExitFailed": "새 세션을 시작했습니다. 이전 세션은 아직 열려 있습니다.",
+      "exitNotSupported": "현재 세션에서는 원격 세션 종료가 지원되지 않습니다",
+      "exitUnavailable": "현재 세션에서는 원격 세션 종료를 사용할 수 없습니다",
+      "exitNeedsNewerCli": "원격 슬래시 명령에는 최신 Kilo CLI가 필요합니다. Kilo CLI를 업데이트하고 다시 연결하세요."
     },
     "sessionConnection": {
       "connecting": "연결 중…",
@@ -2105,7 +2108,8 @@
       "delegatingWork": "작업 위임 중",
       "askingQuestion": "질문하는 중",
       "consideringNextSteps": "다음 단계 검토 중",
-      "writingResponse": "응답 작성 중"
+      "writingResponse": "응답 작성 중",
+      "initializingSnapshot": "스냅샷 초기화 중…"
     },
     "slashCommands": {
       "startNewSession": "새 세션 시작",

@@ -18,20 +18,6 @@ Change `packages/db/src/schema.ts` first, then generate migrations with
 `pnpm drizzle generate`. Do not hand-write or edit generated DDL, snapshots, or
 journal entries. If generated DDL is wrong, correct the schema and regenerate.
 
-For an index declared with Drizzle's `.concurrently()`, the generated SQL may
-receive only the transaction boundaries needed by this repository's
-transactional migrator: add `COMMIT;` immediately before and `BEGIN;`
-immediately after the unchanged generated `CREATE [UNIQUE] INDEX CONCURRENTLY`
-statement group, each separated with `--> statement-breakpoint`. Do not alter
-the generated index definition, name, or expression; leave snapshots, journal,
-and all other generated index DDL untouched. This narrow exception is not
-permission to hand-edit arbitrary generated DDL.
-
-Do not automatically add `IF NOT EXISTS` to concurrent-index migrations. If a
-concurrent build fails, first inspect the index state; recover an invalid index
-explicitly with `DROP INDEX CONCURRENTLY` or `REINDEX INDEX CONCURRENTLY` as
-appropriate before retrying. `IF NOT EXISTS` can mask an invalid index.
-
 Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
 Review generated migrations for data loss. Prefer additive or staged schema
 changes over destructive operations; when generated DDL is unsafe, revise the

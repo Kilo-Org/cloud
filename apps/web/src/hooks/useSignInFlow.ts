@@ -4,32 +4,15 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { useSignInHint, type SignInHint } from '@/hooks/useSignInHint';
 import { emailSchema, validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { sendMagicLink } from '@/lib/auth/send-magic-link';
 import { shouldDiscardSsoHintOnError } from '@/lib/auth/sign-in-hint-recovery';
-import { SignInDiscoveryResponseSchema } from '@/lib/schemas/sso-organizations';
-import { orderNewAccountProviders, resolveSignInMethods } from '@/lib/auth/sign-in-methods';
+import type { SSOOrganizationsResponse } from '@/lib/schemas/sso-organizations';
 
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
 export type Tier = 'returning' | 'new' | 'invite';
-
-const callbackAuthErrors = new Set([
-  'BLOCKED',
-  'DIFFERENT-OAUTH',
-  'ACCOUNT-ALREADY-LINKED',
-  'PROVIDER-ALREADY-LINKED',
-  'LINKING-FAILED',
-  'SIGNUP-RATE-LIMITED',
-  'EMAIL-ALREADY-USED',
-  'EMAIL-MUST-BE-LOWERCASE',
-  'EMAIL-CANNOT-CONTAIN-PLUS',
-]);
-
-function getInitialCallbackError(error: string | undefined): string {
-  if (!error) return '';
-  return callbackAuthErrors.has(error) ? error : 'UNKNOWN_CALLBACK_ERROR';
-}
 
 /**
  * Only used for Storybook to mock out component state.
@@ -61,7 +44,6 @@ export type SignInFlowReturn = {
   tier: Tier;
   showTurnstile: boolean;
   isVerifying: boolean;
-  isDeliveringMagicLink: boolean;
   showEmailInput: boolean;
   isHintLoaded: boolean;
 
@@ -76,7 +58,6 @@ export type SignInFlowReturn = {
   error: string;
   pendingSignIn: AuthProviderId | null;
   turnstileError: boolean;
-  turnstileAttemptId: number;
 
   // Handlers
   handleEmailChange: (value: string) => void;
@@ -85,10 +66,10 @@ export type SignInFlowReturn = {
   handleSSOContinue: (orgId: string) => void;
   handleClearHint: () => void;
   handleClearInvite: () => void;
-  handleProviderSelect: (provider: AuthProviderId) => Promise<boolean>;
+  handleProviderSelect: (provider: AuthProviderId) => Promise<void>;
   handleBack: () => void;
-  handleTurnstileSuccess: (token: string, attemptId?: number) => void;
-  handleTurnstileError: (attemptId: number) => void;
+  handleTurnstileSuccess: (token: string) => void;
+  handleTurnstileError: () => void;
   handleRetryTurnstile: () => void;
   handleSendMagicLink: () => Promise<void>;
   handleShowEmailInput: () => void;
@@ -110,7 +91,6 @@ export function useSignInFlow({
   const saveHint = realHint.saveHint;
   // For storybook, consider hints always loaded; otherwise use the real loading state
   const isHintLoaded = storybookInitialState ? true : realHint.isLoaded;
-  const [isInviteCleared, setIsInviteCleared] = useState(false);
 
   // Determine tier based on hint and params
   const tier = useMemo<Tier>(() => {
@@ -120,14 +100,14 @@ export function useSignInFlow({
     // On sign-up pages, never show returning user tier - always show all providers
     if (isSignUp) {
       // Tier 3: Invite params take precedence even on sign-up
-      if (!isInviteCleared && params.email && params.org) {
+      if (params.email && params.org) {
         return 'invite';
       }
       // Always show new user flow on sign-up
       return 'new';
     }
     // Tier 3: Invite params take precedence
-    if (!isInviteCleared && params.email && params.org) {
+    if (params.email && params.org) {
       return 'invite';
     }
     // Tier 1: Returning user with hint
@@ -136,7 +116,7 @@ export function useSignInFlow({
     }
     // Tier 2: New/unknown user (default)
     return 'new';
-  }, [params, hint, storybookInitialState, isInviteCleared, isSignUp]);
+  }, [params, hint, storybookInitialState, isSignUp]);
 
   // Flow state - always starts at landing unless Storybook override
   const [flowState, setFlowState] = useState<FlowState>(
@@ -152,7 +132,6 @@ export function useSignInFlow({
   // Initialize email from hint or params
   useEffect(() => {
     if (storybookInitialState) return;
-    if (isInviteCleared) return;
 
     if (tier === 'returning' && hint?.lastEmail && emailState !== hint.lastEmail) {
       setEmailState(hint.lastEmail);
@@ -162,19 +141,17 @@ export function useSignInFlow({
       // Prefill from query params (e.g., redirect with error)
       setEmailState(params.email);
     }
-  }, [tier, hint?.lastEmail, params.email, storybookInitialState, isInviteCleared]);
+  }, [tier, hint?.lastEmail, params.email, storybookInitialState]);
 
-  const [error, setError] = useState(() => getInitialCallbackError(initialError));
+  const [error, setError] = useState(initialError || '');
   const [showTurnstile, setShowTurnstile] = useState(storybookInitialState?.showTurnstile ?? false);
   const [pendingSignIn, setPendingSignIn] = useState<AuthProviderId | null>(
     storybookInitialState?.pendingSignIn ?? null
   );
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isDeliveringMagicLink, setIsDeliveringMagicLink] = useState(false);
   const [turnstileError, setTurnstileError] = useState(
     storybookInitialState?.turnstileError ?? false
   );
-  const [turnstileAttemptId, setTurnstileAttemptId] = useState(0);
   const [availableProviders, setAvailableProviders] = useState<AuthProviderId[]>(
     storybookInitialState?.availableProviders ?? []
   );
@@ -183,8 +160,7 @@ export function useSignInFlow({
   // UI state for new user flow (show email input when "Continue with Email" is clicked or in SSO mode)
   // Auto-show email input if DIFFERENT-OAUTH error - user needs to re-enter email
   const [showEmailInput, setShowEmailInput] = useState(
-    storybookInitialState?.showEmailInput ??
-      (!isSignUp || ssoMode || initialError === 'DIFFERENT-OAUTH')
+    storybookInitialState?.showEmailInput ?? (ssoMode || initialError === 'DIFFERENT-OAUTH')
   );
 
   // Recover from a stale SSO hint. A hint pointing at a WorkOS organization that
@@ -217,117 +193,6 @@ export function useSignInFlow({
 
   // Store pending SSO orgId in ref instead of window object
   const pendingSSOOrgIdRef = useRef<string | null>(null);
-  const clearPendingSso = useCallback(() => {
-    pendingSSOOrgIdRef.current = null;
-  }, []);
-  // A Turnstile verification can outlive the UI that initiated it. Keep the
-  // generation in this hook so a late discovery response cannot resume an
-  // abandoned email flow or redirect the browser for a stale address.
-  const discoveryRequestRef = useRef<{ generation: number; controller: AbortController | null }>({
-    generation: 0,
-    controller: null,
-  });
-  const activeTurnstileAttemptRef = useRef<number | null>(0);
-  const nextTurnstileAttemptRef = useRef(0);
-  // Turnstile can invoke onSuccess more than once before React commits the
-  // loading view. Keep this synchronous guard through discovery and magic-link
-  // delivery so a second callback cannot start another request.
-  const isTurnstileSubmissionPendingRef = useRef(false);
-
-  const invalidateDiscoveryRequest = useCallback(() => {
-    discoveryRequestRef.current.generation += 1;
-    discoveryRequestRef.current.controller?.abort();
-    discoveryRequestRef.current.controller = null;
-  }, []);
-
-  const retireTurnstileWidget = useCallback(() => {
-    invalidateDiscoveryRequest();
-    activeTurnstileAttemptRef.current = null;
-    setIsDeliveringMagicLink(false);
-  }, [invalidateDiscoveryRequest]);
-
-  const createTurnstileWidgetAttempt = useCallback(() => {
-    invalidateDiscoveryRequest();
-    nextTurnstileAttemptRef.current += 1;
-    activeTurnstileAttemptRef.current = nextTurnstileAttemptRef.current;
-    setTurnstileAttemptId(nextTurnstileAttemptRef.current);
-  }, [invalidateDiscoveryRequest]);
-
-  const beginDiscoveryRequest = useCallback(() => {
-    invalidateDiscoveryRequest();
-    return discoveryRequestRef.current.generation;
-  }, [invalidateDiscoveryRequest]);
-
-  const isCurrentDiscoveryRequest = useCallback(
-    (generation: number) => discoveryRequestRef.current.generation === generation,
-    []
-  );
-
-  const deliverMagicLink = useCallback(
-    async (generation: number): Promise<boolean> => {
-      if (!email.trim() || !isCurrentDiscoveryRequest(generation)) {
-        return false;
-      }
-
-      setIsDeliveringMagicLink(true);
-      const callbackUrl = getSignInCallbackUrl(params);
-      try {
-        const result = await sendMagicLink(email, callbackUrl);
-        if (!isCurrentDiscoveryRequest(generation)) return false;
-
-        if (result.success) {
-          saveHint({
-            lastEmail: email,
-            lastAuthMethod: 'email',
-            lastLogin: new Date().toISOString(),
-          });
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setFlowState('magic-link-sent');
-          return false;
-        }
-        if (result.ssoOrganizationId) {
-          saveHint({
-            lastEmail: email,
-            lastAuthMethod: 'workos',
-            orgId: result.ssoOrganizationId,
-            lastLogin: new Date().toISOString(),
-          });
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setFlowState('redirecting');
-          await signIn('workos', { callbackUrl }, { organization: result.ssoOrganizationId });
-          return true;
-        }
-        setIsVerifying(false);
-        setShowTurnstile(false);
-        setError('MAGIC_LINK_DELIVERY_FAILED');
-        setFlowState('landing');
-        return false;
-      } catch (error) {
-        if (!isCurrentDiscoveryRequest(generation)) return false;
-        console.error('[SignInForm] Magic link request failed:', error);
-        setIsVerifying(false);
-        setShowTurnstile(false);
-        setError('MAGIC_LINK_DELIVERY_FAILED');
-        setFlowState('landing');
-        return false;
-      } finally {
-        if (isCurrentDiscoveryRequest(generation)) {
-          setIsDeliveringMagicLink(false);
-        }
-      }
-    },
-    [email, isCurrentDiscoveryRequest, params, saveHint]
-  );
-
-  useEffect(
-    () => () => {
-      clearPendingSso();
-      retireTurnstileWidget();
-    },
-    [clearPendingSso, retireTurnstileWidget]
-  );
 
   // Extract invite info from params
   const inviteOrgId = useMemo(() => {
@@ -365,48 +230,18 @@ export function useSignInFlow({
     return { isValid: true, error: null };
   }, [email, isSignUp, pendingSignIn]);
 
-  // Query-email verification is a one-shot action for each distinct address in
-  // this mounted flow. In particular, returning from provider selection must
-  // leave the prefilled address editable rather than reopening Turnstile.
-  const autoVerifiedQueryEmailsRef = useRef(new Set<string>());
-
-  // Auto-trigger Turnstile when email is prefilled from query params.
+  // Auto-trigger Turnstile when email is prefilled from query params
   // Note: This shows Turnstile but doesn't automatically perform lookup.
   // The lookup happens after user completes Turnstile verification in handleTurnstileSuccess.
   useEffect(() => {
-    // Query-email verification belongs to normal email-first sign-in only.
-    // Explicit sign-up is provider-first, and invite URLs own their SSO CTA.
-    // DIFFERENT-OAUTH recovery still pre-fills and displays the normal email
-    // form through showEmailInput; it must not silently resume discovery.
-    const prefilledEmail = params.email;
-    if (
-      prefilledEmail &&
-      !storybookInitialState &&
-      !initialError &&
-      !isSignUp &&
-      !isInviteCleared &&
-      flowState === 'landing' &&
-      tier !== 'invite' &&
-      !autoVerifiedQueryEmailsRef.current.has(prefilledEmail)
-    ) {
+    if (params.email && !storybookInitialState && !initialError) {
+      const prefilledEmail = params.email;
       if (emailSchema.safeParse({ email: prefilledEmail }).success) {
-        autoVerifiedQueryEmailsRef.current.add(prefilledEmail);
-        setEmailState(prefilledEmail);
-        createTurnstileWidgetAttempt();
         setShowTurnstile(true);
         setTurnstileError(false);
       }
     }
-  }, [
-    params.email,
-    storybookInitialState,
-    initialError,
-    isSignUp,
-    isInviteCleared,
-    flowState,
-    tier,
-    createTurnstileWidgetAttempt,
-  ]);
+  }, [params.email, storybookInitialState, initialError]);
 
   const handleEmailChange = useCallback(
     (value: string) => {
@@ -414,143 +249,103 @@ export function useSignInFlow({
       setError('');
       // Reset provider state when email changes
       if (value !== email) {
-        isTurnstileSubmissionPendingRef.current = false;
-        createTurnstileWidgetAttempt();
-        clearPendingSso();
         setAvailableProviders([]);
       }
     },
-    [clearPendingSso, createTurnstileWidgetAttempt, email]
+    [email]
   );
 
-  const lookupEmailProviderAndContinue = useCallback(
-    async (generation: number) => {
-      if (!email.trim()) {
+  const lookupEmailProviderAndContinue = useCallback(async () => {
+    if (!email.trim()) {
+      return;
+    }
+
+    try {
+      const checkResponse = await fetch('/api/sso/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const checkResult = (await checkResponse.json()) as SSOOrganizationsResponse;
+      if (!checkResponse.ok) {
+        console.error('[SignInForm] Domain check failed:', checkResult);
+        setIsVerifying(false);
+        setShowTurnstile(false);
+        setError('An error occurred. Please try again.');
+        setFlowState('landing');
         return;
       }
 
-      const controller = new AbortController();
-      discoveryRequestRef.current.controller?.abort();
-      discoveryRequestRef.current.controller = controller;
-      const isCurrent = () => !controller.signal.aborted && isCurrentDiscoveryRequest(generation);
-
-      try {
-        const checkResponse = await fetch('/api/sso/organizations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-          signal: controller.signal,
+      // SSO domain - redirect to WorkOS (only SSO option)
+      if (checkResult.organizationId) {
+        // Save hint before redirecting so returning user experience works
+        saveHint({
+          lastEmail: email,
+          lastAuthMethod: 'workos',
+          orgId: checkResult.organizationId,
+          lastLogin: new Date().toISOString(),
         });
 
-        const responseBody: unknown = await checkResponse.json().catch(() => undefined);
-        if (!isCurrent()) return;
-        if (!checkResponse.ok) {
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setError(checkResponse.status === 429 ? 'DISCOVERY_RATE_LIMITED' : 'DISCOVERY_FAILED');
-          setFlowState('landing');
-          return;
-        }
-        const parsedResponse = SignInDiscoveryResponseSchema.safeParse(responseBody);
-        if (!parsedResponse.success) {
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setError('DISCOVERY_FAILED');
-          setFlowState('landing');
-          return;
-        }
-        const checkResult = parsedResponse.data;
-
-        // SSO domain - redirect to WorkOS (only SSO option)
-        if (checkResult.kind === 'sso') {
-          if (!isCurrent()) return;
-          // Save hint before redirecting so returning user experience works
-          saveHint({
-            lastEmail: email,
-            lastAuthMethod: 'workos',
-            orgId: checkResult.organizationId,
-            lastLogin: new Date().toISOString(),
-          });
-
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setFlowState('redirecting');
-          const callbackUrl = getSignInCallbackUrl(params);
-          await signIn('workos', { callbackUrl }, { organization: checkResult.organizationId });
-          return;
-        }
-
-        if (checkResult.kind === 'new') {
-          setIsNewUser(true);
-          setIsVerifying(false);
-          setAvailableProviders(orderNewAccountProviders(checkResult.providers));
-          setFlowState('provider-select');
-          setShowTurnstile(false);
-          return;
-        }
-
-        setIsNewUser(false);
-        const resolution = resolveSignInMethods(checkResult.providers);
-        if (resolution.kind === 'automatic-oauth') {
-          if (!isCurrent()) return;
-          saveHint({
-            lastEmail: email,
-            lastAuthMethod: resolution.provider,
-            lastLogin: new Date().toISOString(),
-          });
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setFlowState('redirecting');
-          const callbackUrl = getSignInCallbackUrl(params);
-          await signIn(resolution.provider, { callbackUrl });
-          return;
-        }
-        if (resolution.kind === 'automatic-email') {
-          if (!isCurrent()) return;
-          await deliverMagicLink(generation);
-          return;
-        }
-        if (resolution.kind === 'provider-select') {
-          setIsVerifying(false);
-          setShowTurnstile(false);
-          setAvailableProviders(resolution.providers);
-          setFlowState('provider-select');
-          return;
-        }
-        setError('NO_SUPPORTED_SIGN_IN_METHOD');
         setIsVerifying(false);
         setShowTurnstile(false);
-        setFlowState('landing');
-      } catch (_error) {
-        if (!isCurrent()) return;
-        setIsDeliveringMagicLink(false);
-        console.error('[SignInForm] Error during email sign-in method discovery');
-        setIsVerifying(false);
-        setShowTurnstile(false);
-        setError('DISCOVERY_FAILED');
-        setFlowState('landing');
-      } finally {
-        if (isCurrentDiscoveryRequest(generation)) {
-          discoveryRequestRef.current.controller = null;
+        setFlowState('redirecting');
+        const callbackUrl = getSignInCallbackUrl(params);
+        await signIn('workos', { callbackUrl }, { organization: checkResult.organizationId });
+        return;
+      }
+
+      // Save hint before showing provider selection
+      if (checkResult.providers.length > 0) {
+        saveHint({
+          lastEmail: email,
+          lastAuthMethod: checkResult.providers[0] as AuthProviderId,
+          lastLogin: new Date().toISOString(),
+        });
+      }
+
+      // Determine available providers based on user status
+      const isNewUser = checkResult.newUser;
+      setIsNewUser(isNewUser);
+
+      let providersToShow: AuthProviderId[];
+      if (isNewUser) {
+        // New user: show all available providers (they can choose any to create account)
+        providersToShow = [...ProdNonSSOAuthProviders];
+        // For new users (signup), filter out magic link if email is invalid
+        const magicLinkValidation = validateMagicLinkSignupEmail(email);
+        if (!magicLinkValidation.valid) {
+          providersToShow = providersToShow.filter(p => p !== 'email');
+        }
+      } else {
+        // Existing user: only show providers they actually have linked
+        // This prevents "OAuth different" errors from picking wrong provider
+        providersToShow = checkResult.providers.filter((p): p is AuthProviderId =>
+          ProdNonSSOAuthProviders.includes(p as AuthProviderId)
+        );
+        // If for some reason no valid providers found, fall back to showing all
+        if (providersToShow.length === 0) {
+          providersToShow = [...ProdNonSSOAuthProviders];
         }
       }
-    },
-    [deliverMagicLink, email, isCurrentDiscoveryRequest, params, saveHint]
-  );
+
+      setIsVerifying(false);
+      setAvailableProviders(providersToShow);
+      setFlowState('provider-select');
+      setShowTurnstile(false);
+    } catch (error) {
+      console.error('[SignInForm] Error during email check:', error);
+      setIsVerifying(false);
+      setShowTurnstile(false);
+      setError('An error occurred. Please try again.');
+      setFlowState('landing');
+    }
+  }, [email, params, saveHint]);
 
   const handleEmailSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (isTurnstileSubmissionPendingRef.current) return;
-      retireTurnstileWidget();
-      clearPendingSso();
       setError('');
-      // Explicit provider-first sign-up chose Email before entering this form.
-      // Preserve that choice so verified Turnstile success sends its magic link;
-      // normal email-first sign-in has no pending method and performs discovery.
-      if (!(isSignUp && pendingSignIn === 'email')) {
-        setPendingSignIn(null);
-      }
 
       const result = emailSchema.safeParse({ email });
       if (!result.success) {
@@ -559,24 +354,14 @@ export function useSignInFlow({
       }
 
       // Show Turnstile for verification
-      createTurnstileWidgetAttempt();
       setShowTurnstile(true);
       setTurnstileError(false);
     },
-    [
-      clearPendingSso,
-      createTurnstileWidgetAttempt,
-      email,
-      isSignUp,
-      pendingSignIn,
-      retireTurnstileWidget,
-    ]
+    [email]
   );
 
   const handleOAuthClick = useCallback(
     async (provider: AuthProviderId) => {
-      createTurnstileWidgetAttempt();
-      clearPendingSso();
       setPendingSignIn(provider);
 
       // If clicking email provider but we don't have their email, show email input instead of Turnstile
@@ -597,41 +382,54 @@ export function useSignInFlow({
       setTurnstileError(false);
       setShowTurnstile(true);
     },
-    [clearPendingSso, createTurnstileWidgetAttempt, email, isSignUp]
+    [email, isSignUp]
   );
 
-  const handleSSOContinue = useCallback(
-    async (orgId: string) => {
-      createTurnstileWidgetAttempt();
-      setTurnstileError(false);
-      setShowTurnstile(true);
-      setPendingSignIn('workos');
-      // Store orgId temporarily for turnstile success handler
-      pendingSSOOrgIdRef.current = orgId;
-    },
-    [createTurnstileWidgetAttempt]
-  );
+  const handleSSOContinue = useCallback(async (orgId: string) => {
+    setTurnstileError(false);
+    setShowTurnstile(true);
+    setPendingSignIn('workos');
+    // Store orgId temporarily for turnstile success handler
+    pendingSSOOrgIdRef.current = orgId;
+  }, []);
 
-  const sendMagicLinkAndGetRedirectOutcome = useCallback(async (): Promise<boolean> => {
-    const generation = beginDiscoveryRequest();
-    return deliverMagicLink(generation);
-  }, [beginDiscoveryRequest, deliverMagicLink]);
+  const handleSendMagicLink = useCallback(async () => {
+    if (!email.trim()) {
+      console.error('[SignIn] handleSendMagicLink called without email');
+      return;
+    }
 
-  const handleSendMagicLink = useCallback(async (): Promise<void> => {
-    await sendMagicLinkAndGetRedirectOutcome();
-  }, [sendMagicLinkAndGetRedirectOutcome]);
+    try {
+      const callbackUrl = getSignInCallbackUrl(params);
+      const result = await sendMagicLink(email, callbackUrl);
+      if (result.success) {
+        saveHint({
+          lastEmail: email,
+          lastAuthMethod: 'email',
+          lastLogin: new Date().toISOString(),
+        });
+        setFlowState('magic-link-sent');
+      } else if (result.ssoOrganizationId) {
+        saveHint({
+          lastEmail: email,
+          lastAuthMethod: 'workos',
+          orgId: result.ssoOrganizationId,
+          lastLogin: new Date().toISOString(),
+        });
+        setFlowState('redirecting');
+        const callbackUrl = getSignInCallbackUrl(params);
+        await signIn('workos', { callbackUrl }, { organization: result.ssoOrganizationId });
+      } else {
+        setError(result.error);
+      }
+    } catch (error) {
+      console.error('[SignInForm] Magic link request failed:', error);
+      setError('Failed to send magic link. Please try again.');
+    }
+  }, [email, params, saveHint]);
 
   const handleTurnstileSuccess = useCallback(
-    async (token: string, attemptId?: number) => {
-      if (
-        attemptId !== undefined &&
-        (attemptId !== activeTurnstileAttemptRef.current || attemptId !== turnstileAttemptId)
-      ) {
-        return;
-      }
-      if (isTurnstileSubmissionPendingRef.current) return;
-      isTurnstileSubmissionPendingRef.current = true;
-      const discoveryGeneration = beginDiscoveryRequest();
+    async (token: string) => {
       setIsVerifying(true);
       setTurnstileError(false);
 
@@ -643,7 +441,6 @@ export function useSignInFlow({
         });
 
         const verifyResult = await verifyResponse.json();
-        if (!isCurrentDiscoveryRequest(discoveryGeneration)) return;
         if (!verifyResponse.ok || !verifyResult.success) {
           console.error('[SignInForm] Turnstile verification failed:', verifyResult.error);
           setIsVerifying(false);
@@ -675,7 +472,9 @@ export function useSignInFlow({
         // Handle returning user clicking "Continue with Email" when we already have their email
         // Skip the lookup and directly send magic link
         if (pendingSignIn === 'email' && email.trim()) {
-          await deliverMagicLink(discoveryGeneration);
+          setIsVerifying(false);
+          setShowTurnstile(false);
+          await handleSendMagicLink();
           return;
         }
 
@@ -698,7 +497,7 @@ export function useSignInFlow({
 
         // Handle email lookup - only when no explicit provider was selected
         if (email.trim()) {
-          await lookupEmailProviderAndContinue(discoveryGeneration);
+          await lookupEmailProviderAndContinue();
           return;
         }
 
@@ -709,67 +508,37 @@ export function useSignInFlow({
         setShowTurnstile(false);
         setFlowState('landing');
       } catch (error) {
-        if (!isCurrentDiscoveryRequest(discoveryGeneration)) return;
         console.error('[SignInForm] Error during sign-in flow:', error);
         setError('An error occurred. Please try again.');
         setShowTurnstile(false);
         setFlowState('landing');
         setIsVerifying(false);
-      } finally {
-        if (isCurrentDiscoveryRequest(discoveryGeneration)) {
-          isTurnstileSubmissionPendingRef.current = false;
-        }
       }
     },
-    [
-      beginDiscoveryRequest,
-      turnstileAttemptId,
-      activeTurnstileAttemptRef,
-      email,
-      params,
-      pendingSignIn,
-      lookupEmailProviderAndContinue,
-      saveHint,
-      deliverMagicLink,
-      isCurrentDiscoveryRequest,
-    ]
+    [email, params, pendingSignIn, lookupEmailProviderAndContinue, saveHint, handleSendMagicLink]
   );
 
-  const handleTurnstileError = useCallback(
-    (attemptId: number) => {
-      // A retired widget can report an error after a retry, navigation, or a
-      // newer verification has begun. It must not invalidate that newer flow.
-      if (attemptId !== activeTurnstileAttemptRef.current) return;
-      // Once this widget has successfully submitted, a later error is stale
-      // relative to the verification/discovery it started. Only an unsubmitted
-      // active replacement widget can transition into the retryable error.
-      if (isTurnstileSubmissionPendingRef.current) return;
-
-      retireTurnstileWidget();
-      setIsVerifying(false);
-      setTurnstileError(true);
-    },
-    [retireTurnstileWidget]
-  );
+  const handleTurnstileError = useCallback(() => {
+    setIsVerifying(false);
+    setTurnstileError(true);
+  }, []);
 
   const handleRetryTurnstile = useCallback(() => {
-    isTurnstileSubmissionPendingRef.current = false;
-    createTurnstileWidgetAttempt();
     setTurnstileError(false);
-    // The keyed widget remounts when its immutable attempt ID changes; no
-    // delayed state write is needed, so reset/back/unmount cannot resurrect it.
-    setShowTurnstile(true);
-  }, [createTurnstileWidgetAttempt]);
+    setShowTurnstile(false);
+    setTimeout(() => {
+      setShowTurnstile(true);
+    }, 100);
+  }, []);
 
   const handleProviderSelect = useCallback(
-    async (provider: AuthProviderId): Promise<boolean> => {
+    async (provider: AuthProviderId) => {
       // If no email was entered, show Turnstile first
       if (email.trim() === '') {
-        createTurnstileWidgetAttempt();
         setPendingSignIn(provider);
         setShowTurnstile(true);
         setTurnstileError(false);
-        return false;
+        return;
       }
 
       // Email was entered and verified, proceed with OAuth
@@ -779,11 +548,12 @@ export function useSignInFlow({
           const validation = validateMagicLinkSignupEmail(email);
           if (!validation.valid) {
             setError(validation.error ?? 'Invalid email for signup');
-            return false;
+            return;
           }
         }
         // Handle magic link
-        return sendMagicLinkAndGetRedirectOutcome();
+        await handleSendMagicLink();
+        return;
       }
 
       try {
@@ -796,73 +566,53 @@ export function useSignInFlow({
         setFlowState('redirecting');
         const callbackUrl = getSignInCallbackUrl(params);
         await signIn(provider, { callbackUrl });
-        return true;
       } catch (error) {
         console.error('[SignInForm] OAuth sign-in failed:', error);
         setError('Failed to sign in. Please try again.');
         setFlowState('provider-select');
-        return false;
       }
     },
-    [params, email, sendMagicLinkAndGetRedirectOutcome, saveHint, createTurnstileWidgetAttempt]
+    [params, email, handleSendMagicLink, saveHint]
   );
 
   const handleBack = useCallback(() => {
-    isTurnstileSubmissionPendingRef.current = false;
-    retireTurnstileWidget();
-    clearPendingSso();
     setFlowState('landing');
     setShowTurnstile(false);
     setPendingSignIn(null);
     setTurnstileError(false);
     setError('');
     setAvailableProviders([]);
-    setShowEmailInput(!isSignUp);
-  }, [clearPendingSso, isSignUp, retireTurnstileWidget]);
+    setShowEmailInput(false);
+  }, []);
 
   const handleShowEmailInput = useCallback(() => {
-    retireTurnstileWidget();
-    clearPendingSso();
     setShowEmailInput(true);
     setPendingSignIn('email');
-  }, [clearPendingSso, retireTurnstileWidget]);
+  }, []);
 
   const handleClearHint = useCallback(() => {
-    isTurnstileSubmissionPendingRef.current = false;
-    retireTurnstileWidget();
-    clearPendingSso();
     clearHint();
     setEmailState('');
     setFlowState('landing');
-    setShowEmailInput(true);
-  }, [clearHint, clearPendingSso, retireTurnstileWidget]);
+    setShowEmailInput(false);
+  }, [clearHint]);
 
   const handleClearInvite = useCallback(() => {
-    isTurnstileSubmissionPendingRef.current = false;
-    retireTurnstileWidget();
-    clearPendingSso();
-    setIsInviteCleared(true);
-    setEmailState('');
     // Clear invite params by navigating without them
     const newParams = new URLSearchParams(params);
     newParams.delete('email');
     newParams.delete('org');
-    const query = newParams.toString();
-    window.history.replaceState(
-      {},
-      '',
-      query ? `${window.location.pathname}?${query}` : window.location.pathname
-    );
+    window.history.replaceState({}, '', `${window.location.pathname}?${newParams.toString()}`);
+    setEmailState('');
     setFlowState('landing');
-    setShowEmailInput(true);
-  }, [clearPendingSso, params, retireTurnstileWidget]);
+    setShowEmailInput(false);
+  }, [params]);
 
   return {
     flowState,
     tier,
     showTurnstile,
     isVerifying,
-    isDeliveringMagicLink,
     showEmailInput,
     isHintLoaded,
     email,
@@ -875,7 +625,6 @@ export function useSignInFlow({
     error,
     pendingSignIn,
     turnstileError,
-    turnstileAttemptId,
     handleEmailChange,
     handleEmailSubmit,
     handleOAuthClick,

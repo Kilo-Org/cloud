@@ -88,22 +88,6 @@ export type EmailSignInEligibility =
     };
 
 /**
- * Applies the static rules for a new account's magic-link option without
- * creating a token, sending mail, or consuming a rate-limit allowance.
- */
-export async function isNewAccountEligibleForMagicLink(email: string): Promise<boolean> {
-  if (!validateMagicLinkSignupEmail(email).valid) {
-    return false;
-  }
-
-  if (await isEmailBlacklistedByDomainAsync(email)) {
-    return false;
-  }
-
-  return !isBlockedTLD(email);
-}
-
-/**
  * Checks whether an email is eligible for email sign-in: not rate limited,
  * not blacklisted, not SSO-enforced for its domain, and (for new users) not
  * blocked by TLD or signup email rules.

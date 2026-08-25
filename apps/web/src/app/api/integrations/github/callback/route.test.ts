@@ -113,6 +113,15 @@ const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
 const GITHUB_USER_ID = '12345';
 const INSTALLATION_ID = '98765';
 
+beforeEach(() => {
+  mockedExchangeGitHubOAuthCode.mockResolvedValue({
+    id: GITHUB_USER_ID,
+    login: 'octocat',
+    accessToken: 'ghu_test-token',
+  });
+  mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+});
+
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
 }
@@ -288,7 +297,7 @@ describe('GET /api/integrations/github/callback installation flow', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=update&state=user_${USER_ID}%7Creturn%3D%252Fgithub-app`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=update&state=user_${USER_ID}%7Creturn%3D%252Fgithub-app&code=abc`
       ) as never
     );
 
@@ -360,7 +369,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -506,7 +515,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${PREFIXED_DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${PREFIXED_DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -541,7 +550,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -569,7 +578,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -630,7 +639,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -662,7 +671,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -723,7 +732,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -783,7 +792,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -812,7 +821,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -902,7 +911,7 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=org_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=org_${USER_ID}&code=abc`
       ) as never
     );
 
@@ -935,7 +944,7 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
       ) as never
     );
 
@@ -950,7 +959,7 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
       ) as never
     );
 
@@ -965,7 +974,7 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
       ) as never
     );
 
@@ -975,7 +984,7 @@ describe('GET /api/integrations/github/callback legacy flag gating', () => {
   });
 });
 
-describe('GET /api/integrations/github/callback admin proof (report mode)', () => {
+describe('GET /api/integrations/github/callback admin proof', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -1019,7 +1028,7 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     });
   });
 
-  test('completes an install when code is absent (report mode)', async () => {
+  test('rejects an install when code is absent', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
@@ -1028,14 +1037,14 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
-    // Admin proof was not run.
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
-  test('completes an install when code is present and user is admin (report mode)', async () => {
+  test('completes an install when code is present and user is admin', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
@@ -1053,7 +1062,7 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
   });
 
-  test('still completes install when admin check returns false (report mode does not block non-admin)', async () => {
+  test('rejects an install when admin check returns false', async () => {
     mockedAssertUserAdministersInstallation.mockResolvedValue(false);
 
     const { GET } = await import('./route');
@@ -1063,15 +1072,15 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
       ) as never
     );
 
-    // Report mode: non-admin is logged but the install proceeds.
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalled();
     expect(mockedAssertUserAdministersInstallation).toHaveBeenCalled();
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
-  test('still completes install when code exchange fails (report mode)', async () => {
+  test('rejects an install when code exchange fails', async () => {
     mockedExchangeGitHubOAuthCode.mockRejectedValue(new Error('Token exchange failed'));
 
     const { GET } = await import('./route');
@@ -1081,10 +1090,10 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
       ) as never
     );
 
-    // API failure in admin proof does not block the install.
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/integrations/github?success=installed`);
-    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
   test('redirects with installation_already_claimed when upsert detects cross-owner claim', async () => {
@@ -1096,7 +1105,7 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=user_${USER_ID}&code=abc`
       ) as never
     );
 
@@ -1104,7 +1113,7 @@ describe('GET /api/integrations/github/callback admin proof (report mode)', () =
     expectRedirectLocation(response, `/integrations/github?error=installation_already_claimed`);
   });
 
-  test('logs distinct messages for code-absent vs non-admin (report mode distinguishes)', async () => {
+  test('logs distinct messages for code-absent vs non-admin', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
     // Case 1: code absent — should log code_absent.
@@ -1190,7 +1199,7 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}&code=abc`
       ) as never
     );
 
@@ -1234,7 +1243,7 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}`
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${RAW_TOKEN}&code=abc`
       ) as never
     );
 

@@ -7,6 +7,8 @@ import { AlertCircle, Download } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { buildAuthHeaders } from '@/lib/auth/auth-header';
+import { getActiveToken } from '@/lib/auth/token-owner';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { confirmMarkdownImage, isMarkdownImageConfirmed } from './markdown-image-confirm';
@@ -132,7 +134,12 @@ export function MarkdownImage({
     return <Text className="text-xs text-muted-foreground">{alt || 'image'}</Text>;
   }
 
-  if (failed) {
+  // The media proxy requires authentication. With no sync token we cannot
+  // request the image, so render the retry fail chip and never fetch (an
+  // unauthenticated expo-image source would just 401).
+  const token = getActiveToken();
+
+  if (failed || !token) {
     return (
       <Pressable
         onPress={() => {
@@ -175,7 +182,10 @@ export function MarkdownImage({
         {measuredAspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}
         <Image
           key={attempt}
-          source={{ uri: resolveMarkdownImageSrc(uri) }}
+          source={{
+            uri: resolveMarkdownImageSrc(uri),
+            headers: buildAuthHeaders(token.token),
+          }}
           cachePolicy="memory"
           className="h-full w-full"
           contentFit="contain"

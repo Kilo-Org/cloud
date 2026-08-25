@@ -16,6 +16,12 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
 }));
+vi.mock('@/lib/auth/token-owner', () => ({
+  getActiveToken: () => ({ token: 'test-token', expiresAtMs: null }),
+}));
+vi.mock('@/lib/config', () => ({
+  API_BASE_URL: 'https://api.test',
+}));
 
 beforeEach(() => {
   clearMarkdownImageConfirmMemory();

@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti",
     "couldNotLoadActiveSessions": "Aktivnih sej ni bilo mogoče naložiti",
     "agentSessions": "Seje agenta",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Začni novo sejo Kilo Agenta",
     "newCodingTask": "Nova naloga kodiranja",
     "explore": "Razišči",

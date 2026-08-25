@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "session များကို မတင်နိုင်ပါ",
     "couldNotLoadActiveSessions": "လက်ရှိ session များကို မတင်နိုင်ပါ",
     "agentSessions": "Agent session များ",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Kilo Agent session အသစ် စတင်ရန်",
     "newCodingTask": "coding အလုပ်အသစ်",
     "explore": "ရှာဖွေပါ",

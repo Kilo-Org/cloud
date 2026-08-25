@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "Nie można załadować sesji",
     "couldNotLoadActiveSessions": "Nie można załadować aktywnych sesji",
     "agentSessions": "Sesje agenta",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Rozpocznij nową sesję agenta Kilo",
     "newCodingTask": "Nowe zadanie kodowania",
     "explore": "Odkrywaj",

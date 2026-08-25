@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Сессийг ачаалж чадсангүй",
     "couldNotLoadActiveSessions": "Идэвхтэй сессийг ачаалж чадсангүй",
     "agentSessions": "Агентын сессий",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Шинэ Kilo Agent сесси эхлүүлэх",
     "newCodingTask": "Шинэ кодчилолын даалгавар",
     "explore": "Судлах",

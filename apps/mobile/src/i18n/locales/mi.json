@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Kāore i taea te uta ngā wātū",
     "couldNotLoadActiveSessions": "Kāore i taea te uta ngā wātū mahi",
     "agentSessions": "Ngā wātū kaihoko",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Tīmata he wātū Kaihoko Kilo hōu",
     "newCodingTask": "Mahi whakawaehere hōu",
     "explore": "Torotoro",

@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Не можев да ги вчитам сесиите",
     "couldNotLoadActiveSessions": "Не можев да ги вчитам активните сесии",
     "agentSessions": "Сесии на агенти",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Започни нова сесија на Kilo Agent",
     "newCodingTask": "Нова задача за кодирање",
     "explore": "Истражувај",

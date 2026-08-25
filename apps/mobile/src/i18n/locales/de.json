@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "Sitzungen konnten nicht geladen werden",
     "couldNotLoadActiveSessions": "Aktive Sitzungen konnten nicht geladen werden",
     "agentSessions": "Agentensitzungen",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Neue Kilo-Agent-Sitzung starten",
     "newCodingTask": "Neue Codieraufgabe",
     "explore": "Entdecken",

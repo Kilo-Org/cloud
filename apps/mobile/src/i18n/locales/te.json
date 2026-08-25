@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "సెషన్లను లోడ్ చేయలేకపోయాము",
     "couldNotLoadActiveSessions": "యాక్టివ్ సెషన్లను లోడ్ చేయలేకపోయాము",
     "agentSessions": "ఏజెంట్ సెషన్లు",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "కొత్త Kilo ఏజెంట్ సెషన్ను ప్రారంభించండి",
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",

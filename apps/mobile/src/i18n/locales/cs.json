@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Relace se nepodařilo načíst",
     "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst",
     "agentSessions": "Relace agenta",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Zahájit novou relaci Kilo Agent",
     "newCodingTask": "Nový programovací úkol",
     "explore": "Prozkoumat",

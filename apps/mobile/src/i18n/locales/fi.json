@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Istuntoja ei voitu ladata",
     "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata",
     "agentSessions": "Agentti-istunnot",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Aloita uusi Kilo Agent -istunto",
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",

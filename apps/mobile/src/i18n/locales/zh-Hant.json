@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "無法載入工作階段",
     "couldNotLoadActiveSessions": "無法載入使用中的工作階段",
     "agentSessions": "代理工作階段",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "開始新的 Kilo Agent 工作階段",
     "newCodingTask": "新程式設計任務",
     "explore": "探索",

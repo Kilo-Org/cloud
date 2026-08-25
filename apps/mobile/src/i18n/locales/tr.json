@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "Oturumlar yüklenemedi",
     "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi",
     "agentSessions": "Ajan oturumları",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Yeni bir Kilo Ajanı oturumu başlat",
     "newCodingTask": "Yeni kodlama görevi",
     "explore": "Keşfet",

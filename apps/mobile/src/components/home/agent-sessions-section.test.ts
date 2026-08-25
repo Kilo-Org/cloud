@@ -20,12 +20,12 @@ vi.mock('@/components/agents/remote-session-row', () => ({
   RemoteSessionRow: () => null,
 }));
 
-vi.mock('@/components/agents/session-row', () => ({
-  StoredSessionRow: () => null,
+vi.mock('@/components/ui/text', () => ({
+  Text: () => null,
 }));
 
-vi.mock('@/components/ui/icons', () => ({
-  Plus: () => null,
+vi.mock('@/components/agents/session-row', () => ({
+  StoredSessionRow: () => null,
 }));
 
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
@@ -69,53 +69,58 @@ function makeStored(over: Partial<StoredSession> = {}): StoredSession {
 }
 
 describe('buildRows', () => {
-  it('yields three placeholders when there are no live sessions', () => {
+  it('yields no rows when there are no live sessions', () => {
     const rows = buildRows({
       activeSessions: [],
       storedSessions: [],
       activeSessionIds: new Set(),
     });
-    expect(rows).toHaveLength(3);
-    expect(rows.every(row => row.kind === 'placeholder')).toBe(true);
-    expect(rows.map(row => row.key)).toEqual(['placeholder:0', 'placeholder:1', 'placeholder:2']);
+    expect(rows).toEqual([]);
   });
 
-  it('yields one live row and two placeholders for one active session', () => {
+  it('yields one row for one active session', () => {
     const active = makeActive();
     const rows = buildRows({
       activeSessions: [active],
       storedSessions: [],
       activeSessionIds: new Set([active.id]),
     });
-    expect(rows).toHaveLength(3);
-    expect(rows.filter(row => row.kind === 'active')).toHaveLength(1);
-    expect(rows.filter(row => row.kind === 'placeholder')).toHaveLength(2);
+    expect(rows.map(row => row.key)).toEqual(['active:a1']);
   });
 
-  it('yields three live rows and zero placeholders for three active sessions', () => {
+  it('caps the rows at three live sessions', () => {
     const activeSessions = [
       makeActive({ id: 'a1' }),
       makeActive({ id: 'a2' }),
       makeActive({ id: 'a3' }),
+      makeActive({ id: 'a4' }),
     ];
     const rows = buildRows({
       activeSessions,
       storedSessions: [],
-      activeSessionIds: new Set(['a1', 'a2', 'a3']),
+      activeSessionIds: new Set(['a1', 'a2', 'a3', 'a4']),
     });
     expect(rows).toHaveLength(3);
-    expect(rows.filter(row => row.kind === 'active')).toHaveLength(3);
-    expect(rows.filter(row => row.kind === 'placeholder')).toHaveLength(0);
+    expect(rows.every(row => row.kind === 'active')).toBe(true);
   });
 
-  it('does not occupy a slot with an offline stored session', () => {
+  it('drops an offline stored session', () => {
     const offline = makeStored({ session_id: 'off1', created_on_platform: 'cloud-agent' });
     const rows = buildRows({
       activeSessions: [],
       storedSessions: [offline],
       activeSessionIds: new Set(),
     });
-    expect(rows).toHaveLength(3);
-    expect(rows.every(row => row.kind === 'placeholder')).toBe(true);
+    expect(rows).toEqual([]);
+  });
+
+  it('keeps a live cloud-agent stored session', () => {
+    const live = makeStored({ session_id: 'on1', created_on_platform: 'cloud-agent' });
+    const rows = buildRows({
+      activeSessions: [],
+      storedSessions: [live],
+      activeSessionIds: new Set(['on1']),
+    });
+    expect(rows.map(row => row.key)).toEqual(['stored:on1']);
   });
 });

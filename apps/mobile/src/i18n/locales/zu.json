@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini",
     "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo",
     "agentSessions": "Amaseshini e-agent",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Qala iseshini entsha ye-Kilo Agent",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "explore": "Hlola",

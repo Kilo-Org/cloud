@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Հնարավոր չեղավ բեռնել նիստերը",
     "couldNotLoadActiveSessions": "Հնարավոր չեղավ բեռնել ակտիվ նիստերը",
     "agentSessions": "Գործակալի նիստեր",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Սկսել նոր Kilo Agent նիստ",
     "newCodingTask": "Նոր ծրագրավորման առաջադրանք",
     "explore": "Ուսումնասիրել",

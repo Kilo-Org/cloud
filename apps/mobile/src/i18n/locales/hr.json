@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Nije moguće učitati sesije",
     "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije",
     "agentSessions": "Sesije agenata",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Pokreni novu Kilo Agent sesiju",
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",

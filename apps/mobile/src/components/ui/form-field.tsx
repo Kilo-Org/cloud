@@ -77,7 +77,11 @@ function FormField({
           }
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground',
+          // min-h with no vertical padding: iOS insets the already-centered
+          // text rect of a single-line input by the padding, which pushes the
+          // text and the placeholder below the middle. The height centers them
+          // instead, and min-h (not h) still lets Dynamic Type grow the field.
+          'min-h-11 rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground',
           'focus:border-ring',
           displayedError && 'border-destructive',
           disabled && 'opacity-50',

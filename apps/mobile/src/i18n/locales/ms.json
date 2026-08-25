@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi",
     "couldNotLoadActiveSessions": "Tidak dapat memuatkan sesi aktif",
     "agentSessions": "Sesi ejen",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Mulakan sesi Kilo Agent baharu",
     "newCodingTask": "Tugas pengekodan baharu",
     "explore": "Teroka",

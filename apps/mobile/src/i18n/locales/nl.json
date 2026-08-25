@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "Sessies konden niet worden geladen",
     "couldNotLoadActiveSessions": "Actieve sessies konden niet worden geladen",
     "agentSessions": "Agentsessies",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Een nieuwe Kilo Agent-sessie starten",
     "newCodingTask": "Nieuwe codeertaak",
     "explore": "Verkennen",

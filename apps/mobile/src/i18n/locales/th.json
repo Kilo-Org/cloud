@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "โหลดเซสชันไม่สำเร็จ",
     "couldNotLoadActiveSessions": "โหลดเซสชันที่ใช้งานอยู่ไม่สำเร็จ",
     "agentSessions": "เซสชันเอเจนต์",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "เริ่มเซสชัน Kilo Agent ใหม่",
     "newCodingTask": "งานการเขียนโค้ดใหม่",
     "explore": "สำรวจ",

@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "មិនអាចផ្ទុកវគ្គបានទេ",
     "couldNotLoadActiveSessions": "មិនអាចផ្ទុកវគ្គសកម្មបានទេ",
     "agentSessions": "វគ្គភ្នាក់ងារ",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "ចាប់ផ្តើមវគ្គ Kilo Agent ថ្មី",
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
     "explore": "ស្វែងយល់",

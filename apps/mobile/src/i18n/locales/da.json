@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Kunne ikke indlæse sessioner",
     "couldNotLoadActiveSessions": "Kunne ikke indlæse aktive sessioner",
     "agentSessions": "Agentsessioner",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Start en ny Kilo Agent-session",
     "newCodingTask": "Ny kodningsopgave",
     "explore": "Udforsk",

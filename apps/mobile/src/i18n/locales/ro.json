@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Sesiunile nu au putut fi încărcate",
     "couldNotLoadActiveSessions": "Sesiunile active nu au putut fi încărcate",
     "agentSessions": "Sesiuni de agent",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Începe o sesiune nouă de Kilo Agent",
     "newCodingTask": "Sarcină de codare nouă",
     "explore": "Explorează",

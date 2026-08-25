@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "agentSessions": "ਏਜੰਟ ਸੈਸ਼ਨ",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "ਨਵਾਂ Kilo ਏਜੰਟ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
     "explore": "ਪੜਚੋਲ ਕਰੋ",

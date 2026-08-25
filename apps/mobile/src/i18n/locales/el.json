@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Δεν ήταν δυνατή η φόρτωση συνεδριών",
     "couldNotLoadActiveSessions": "Δεν ήταν δυνατή η φόρτωση ενεργών συνεδριών",
     "agentSessions": "Συνεδρίες πράκτορα",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Έναρξη νέας συνεδρίας Kilo Agent",
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "explore": "Εξερεύνηση",

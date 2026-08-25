@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Haikuweza kupakia vikao",
     "couldNotLoadActiveSessions": "Haikuweza kupakia vikao vya sasa",
     "agentSessions": "Vikao vya wakala",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Anza kikao kipya cha Kilo Agent",
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
     "explore": "Chunguza",

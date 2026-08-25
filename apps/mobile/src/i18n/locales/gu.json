@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "સત્રો લોડ કરી શકાયા નહીં",
     "couldNotLoadActiveSessions": "સક્રિય સત્રો લોડ કરી શકાયા નહીં",
     "agentSessions": "એજન્ટ સત્રો",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "નવું Kilo એજન્ટ સત્ર શરૂ કરો",
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "explore": "શોધો",

@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Ezin izan dira saioak kargatu",
     "couldNotLoadActiveSessions": "Ezin izan dira saio aktiboak kargatu",
     "agentSessions": "Agentearen saioak",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Hasi Kilo Agent saio berri bat",
     "newCodingTask": "Kodetze-lan berria",
     "explore": "Arakatu",

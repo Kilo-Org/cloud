@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
     "couldNotLoadActiveSessions": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
     "agentSessions": "ଏଜେଣ୍ଟ ସେସନ୍",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "ନୂତନ Kilo Agent ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
     "newCodingTask": "ନୂତନ କୋଡିଂ କାର୍ଯ୍ୟ",
     "explore": "ଅନୁସନ୍ଧାନ",

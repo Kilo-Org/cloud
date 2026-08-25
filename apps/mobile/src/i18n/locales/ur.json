@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے",
     "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے",
     "agentSessions": "ایجنٹ سیشنز",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "نیا Kilo ایجنٹ سیشن شروع کریں",
     "newCodingTask": "نیا کوڈنگ کام",
     "explore": "دریافت کریں",

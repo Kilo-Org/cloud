@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "Не удалось загрузить сеансы",
     "couldNotLoadActiveSessions": "Не удалось загрузить активные сеансы",
     "agentSessions": "Сеансы агента",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Начать новый сеанс агента Kilo",
     "newCodingTask": "Новая задача кодирования",
     "explore": "Исследовать",

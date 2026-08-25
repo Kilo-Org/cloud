@@ -1,20 +1,18 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { SectionHeader } from '@/components/home/section-header';
-import { Plus } from '@/components/ui/icons';
+import { Text } from '@/components/ui/text';
 import {
   type ActiveSession,
   type StoredSession,
   useAgentSessions,
 } from '@/lib/hooks/use-agent-sessions';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp } from '@/lib/utils';
 
 export const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
@@ -32,10 +30,6 @@ type Row =
       key: string;
       kind: 'stored';
       session: StoredSession;
-    }
-  | {
-      key: string;
-      kind: 'placeholder';
     };
 
 export function buildRows(params: {
@@ -75,12 +69,6 @@ export function buildRows(params: {
     }
   }
 
-  // Fill the remaining slots with empty placeholders so Home always renders
-  // exactly three Live now slots.
-  while (rows.length < MAX_ROWS) {
-    rows.push({ key: `placeholder:${rows.length}`, kind: 'placeholder' });
-  }
-
   return rows;
 }
 
@@ -108,10 +96,8 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
         }}
       />
       <View className="mx-4 gap-2">
+        {rows.length === 0 && <LiveNowEmpty />}
         {rows.map(row => {
-          if (row.kind === 'placeholder') {
-            return <LiveNowPlaceholder key={row.key} organizationId={organizationId} />;
-          }
           if (row.kind === 'active') {
             const { session } = row;
             return (
@@ -159,28 +145,19 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
   );
 }
 
-function LiveNowPlaceholder({ organizationId }: Readonly<{ organizationId: string | null }>) {
-  const router = useRouter();
+function LiveNowEmpty() {
   const { t } = useTranslation();
-  const colors = useThemeColors();
 
   return (
     <View
       className={cn(
-        'overflow-hidden rounded-2xl border border-dashed border-border bg-card',
+        'items-center justify-center rounded-2xl border border-border bg-card px-4',
         HOME_LIVE_SLOT_MIN_CLASS
       )}
     >
-      <Pressable
-        onPress={() => {
-          router.push(getNewAgentSessionPath(organizationId) as Href);
-        }}
-        className="flex-1 items-center justify-center py-[13px] pl-[18px] pr-3 active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('home.startNewAgentSession')}
-      >
-        <Plus size={18} color={colors.mutedForeground} />
-      </Pressable>
+      <Text variant="muted" className="text-sm">
+        {t('home.noLiveSessions')}
+      </Text>
     </View>
   );
 }

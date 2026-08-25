@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады",
     "couldNotLoadActiveSessions": "Белсенді сессияларды жүктеу мүмкін болмады",
     "agentSessions": "Агент сессиялары",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Жаңа Kilo Agent сессиясын бастау",
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
     "explore": "Зерттеу",

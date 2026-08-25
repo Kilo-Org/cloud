@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "সেশন লোড করা যায়নি",
     "couldNotLoadActiveSessions": "সক্রিয় সেশন লোড করা যায়নি",
     "agentSessions": "এজেন্ট সেশন",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "একটি নতুন Kilo Agent সেশন শুরু করুন",
     "newCodingTask": "নতুন কোডিং কাজ",
     "explore": "অন্বেষণ",

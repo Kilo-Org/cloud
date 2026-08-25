@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "无法加载会话",
     "couldNotLoadActiveSessions": "无法加载活动会话",
     "agentSessions": "智能体会话",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "开始新的 Kilo Agent 会话",
     "newCodingTask": "新编程任务",
     "explore": "探索",

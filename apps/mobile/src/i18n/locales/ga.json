@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Níorbh fhéidir seisiúin a lódáil",
     "couldNotLoadActiveSessions": "Níorbh fhéidir seisiúin ghníomhacha a lódáil",
     "agentSessions": "Seisiúin ghníomhaire",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Tosaigh seisiún Kilo Agent nua",
     "newCodingTask": "Tasc códaithe nua",
     "explore": "Taiscéal",

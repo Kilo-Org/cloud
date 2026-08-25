@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Tsy afaka nampidirina ny session",
     "couldNotLoadActiveSessions": "Tsy afaka nampidirina ny session mavitrika",
     "agentSessions": "Session agent",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Atombohy session Kilo Agent vaovao",
     "newCodingTask": "Asa coding vaovao",
     "explore": "Mijerena",

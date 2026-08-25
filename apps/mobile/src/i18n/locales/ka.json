@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "სესიების ჩატვირთვა ვერ მოხერხდა",
     "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა",
     "agentSessions": "აგენტის სესიები",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "ახალი Kilo აგენტის სესიის დაწყება",
     "newCodingTask": "ახალი კოდირების ამოცანა",
     "explore": "გამოკვლევა",

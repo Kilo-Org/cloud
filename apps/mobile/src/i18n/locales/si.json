@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය",
     "couldNotLoadActiveSessions": "ක්‍රියාකාරී සැසි පූරණය කළ නොහැකි විය",
     "agentSessions": "ඒජන්ත සැසි",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "නව Kilo Agent සැසියක් ආරම්භ කරන්න",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "explore": "ගවේෂණය",

@@ -1914,6 +1914,7 @@
     "couldNotLoadSessions": "לא ניתן לטעון הפעלות",
     "couldNotLoadActiveSessions": "לא ניתן לטעון הפעלות פעילות",
     "agentSessions": "הפעלות סוכן",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "התחל הפעלת Kilo Agent חדשה",
     "newCodingTask": "משימת קידוד חדשה",
     "explore": "חקור",

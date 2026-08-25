@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Nepavyko įkelti sesijų",
     "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų",
     "agentSessions": "Agentų sesijos",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Pradėti naują Kilo agento sesiją",
     "newCodingTask": "Nauja kodavimo užduotis",
     "explore": "Naršyti",

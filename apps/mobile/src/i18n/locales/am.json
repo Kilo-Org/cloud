@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "ክፍለ-ጊዜዎችን መጫን አልተቻለም",
     "couldNotLoadActiveSessions": "ንቁ ክፍለ-ጊዜዎችን መጫን አልተቻለም",
     "agentSessions": "የወኪል ክፍለ-ጊዜዎች",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "አዲስ የKilo Agent ክፍለ-ጊዜ ይጀምሩ",
     "newCodingTask": "አዲስ የኮዲንግ ተግባር",
     "explore": "ይቃኙ",

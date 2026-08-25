@@ -2286,6 +2286,7 @@
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas",
     "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas",
     "agentSessions": "Aģenta sesijas",
+    "noLiveSessions": "Nothing running right now",
     "startNewAgentSession": "Sākt jaunu Kilo Agent sesiju",
     "newCodingTask": "Jauns kodēšanas uzdevums",
     "explore": "Izpētīt",

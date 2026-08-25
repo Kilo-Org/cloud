@@ -67,8 +67,8 @@ export function HomeScreen() {
                 <Skeleton className="h-3 w-28 rounded" />
               </View>
               <View className="gap-2 px-4">
-                <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
-                <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
+                {/* One slot: the loaded state is one row per live session, or a
+                    single empty card, so a single skeleton avoids a jump. */}
                 <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
               </View>
             </Animated.View>
@@ -104,8 +104,8 @@ function renderSessionsOrError(params: {
 }) {
   // A stored-list failure blocks all sessions, so it wins. A cold active poll
   // failure is retryable but still hides the section until it recovers.
-  // Otherwise Home always renders the section, whose placeholders cover the
-  // empty Live-now state.
+  // Otherwise Home always renders the section, which shows an empty card when
+  // nothing is live.
   if (params.storedIsError) {
     return (
       <QueryError

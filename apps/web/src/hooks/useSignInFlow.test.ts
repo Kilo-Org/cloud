@@ -115,6 +115,7 @@ function FlowProbe({ props = { searchParams: {} } }: { props?: SignInFlowProps }
     createElement('output', { id: 'verifying' }, String(flow.isVerifying)),
     createElement('output', { id: 'delivering' }, String(flow.isDeliveringMagicLink)),
     createElement('output', { id: 'turnstile-error' }, String(flow.turnstileError)),
+    createElement('output', { id: 'error' }, flow.error),
     createElement('output', { id: 'attempt' }, String(flow.turnstileAttemptId)),
     createElement('button', {
       id: 'first',
@@ -450,6 +451,12 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('does not treat an untrusted callback query error as an operational error', () => {
+    mounted = mountFlow({ searchParams: {}, error: 'DISCOVERY_FAILED' });
+
+    expect(mounted.container.querySelector('#error')?.textContent).toBe('UNKNOWN_CALLBACK_ERROR');
+  });
+
   it('does not auto-verify an invite email before its SSO CTA is selected', async () => {
     mounted = mountFlow({
       searchParams: { email: 'invited@example.com', org: 'org-1' },
@@ -569,7 +576,34 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
     expect(mounted.container.querySelector('#verifying')?.textContent).toBe('false');
     expect(mounted.container.querySelector('#delivering')?.textContent).toBe('false');
+    expect(mounted.container.querySelector('#error')?.textContent).toBe(
+      'MAGIC_LINK_DELIVERY_FAILED'
+    );
   });
+
+  it.each([
+    [429, { ignored: true }, 'DISCOVERY_RATE_LIMITED'],
+    [503, { ignored: true }, 'DISCOVERY_FAILED'],
+    [200, { kind: 'existing', providers: [] }, 'NO_SUPPORTED_SIGN_IN_METHOD'],
+  ])(
+    'preserves the controlled discovery error for status %i',
+    async (status, body, expectedError) => {
+      fetchMock
+        .mockResolvedValueOnce(response({ success: true }))
+        .mockResolvedValueOnce({ ok: status === 200, status, json: async () => body } as Response);
+      mounted = mountFlow();
+
+      act(() => button(mounted!.container, 'old-email').click());
+      act(() => button(mounted!.container, 'submit-email').click());
+      await act(async () => {
+        button(mounted!.container, 'first').click();
+        await flushAsyncWork();
+      });
+
+      expect(mounted.container.querySelector('#state')?.textContent).toBe('landing');
+      expect(mounted.container.querySelector('#error')?.textContent).toBe(expectedError);
+    }
+  );
 
   it('keeps explicit sign-up Email delivery pending and suppresses its completion after reset', async () => {
     const delivery = deferred<{ success: true }>();

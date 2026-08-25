@@ -14,6 +14,23 @@ import { orderNewAccountProviders, resolveSignInMethods } from '@/lib/auth/sign-
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
 export type Tier = 'returning' | 'new' | 'invite';
 
+const callbackAuthErrors = new Set([
+  'BLOCKED',
+  'DIFFERENT-OAUTH',
+  'ACCOUNT-ALREADY-LINKED',
+  'PROVIDER-ALREADY-LINKED',
+  'LINKING-FAILED',
+  'SIGNUP-RATE-LIMITED',
+  'EMAIL-ALREADY-USED',
+  'EMAIL-MUST-BE-LOWERCASE',
+  'EMAIL-CANNOT-CONTAIN-PLUS',
+]);
+
+function getInitialCallbackError(error: string | undefined): string {
+  if (!error) return '';
+  return callbackAuthErrors.has(error) ? error : 'UNKNOWN_CALLBACK_ERROR';
+}
+
 /**
  * Only used for Storybook to mock out component state.
  */
@@ -147,7 +164,7 @@ export function useSignInFlow({
     }
   }, [tier, hint?.lastEmail, params.email, storybookInitialState, isInviteCleared]);
 
-  const [error, setError] = useState(initialError || '');
+  const [error, setError] = useState(() => getInitialCallbackError(initialError));
   const [showTurnstile, setShowTurnstile] = useState(storybookInitialState?.showTurnstile ?? false);
   const [pendingSignIn, setPendingSignIn] = useState<AuthProviderId | null>(
     storybookInitialState?.pendingSignIn ?? null
@@ -284,7 +301,7 @@ export function useSignInFlow({
         }
         setIsVerifying(false);
         setShowTurnstile(false);
-        setError(result.error);
+        setError('MAGIC_LINK_DELIVERY_FAILED');
         setFlowState('landing');
         return false;
       } catch (error) {
@@ -292,7 +309,7 @@ export function useSignInFlow({
         console.error('[SignInForm] Magic link request failed:', error);
         setIsVerifying(false);
         setShowTurnstile(false);
-        setError('Failed to send magic link. Please try again.');
+        setError('MAGIC_LINK_DELIVERY_FAILED');
         setFlowState('landing');
         return false;
       } finally {
@@ -430,11 +447,7 @@ export function useSignInFlow({
         if (!checkResponse.ok) {
           setIsVerifying(false);
           setShowTurnstile(false);
-          setError(
-            checkResponse.status === 429
-              ? 'Too many attempts. Please try again later.'
-              : 'Unable to find sign-in methods. Please try again.'
-          );
+          setError(checkResponse.status === 429 ? 'DISCOVERY_RATE_LIMITED' : 'DISCOVERY_FAILED');
           setFlowState('landing');
           return;
         }
@@ -442,7 +455,7 @@ export function useSignInFlow({
         if (!parsedResponse.success) {
           setIsVerifying(false);
           setShowTurnstile(false);
-          setError('Unable to find sign-in methods. Please try again.');
+          setError('DISCOVERY_FAILED');
           setFlowState('landing');
           return;
         }
@@ -504,9 +517,7 @@ export function useSignInFlow({
           setFlowState('provider-select');
           return;
         }
-        setError(
-          'No supported sign-in method is available for this account. Use a different email.'
-        );
+        setError('NO_SUPPORTED_SIGN_IN_METHOD');
         setIsVerifying(false);
         setShowTurnstile(false);
         setFlowState('landing');
@@ -516,7 +527,7 @@ export function useSignInFlow({
         console.error('[SignInForm] Error during email sign-in method discovery');
         setIsVerifying(false);
         setShowTurnstile(false);
-        setError('Unable to find sign-in methods. Please try again.');
+        setError('DISCOVERY_FAILED');
         setFlowState('landing');
       } finally {
         if (isCurrentDiscoveryRequest(generation)) {

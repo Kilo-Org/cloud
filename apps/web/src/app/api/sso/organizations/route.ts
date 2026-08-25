@@ -82,6 +82,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const providerLookup = await getAllUserProviders(email);
     if (providerLookup.kind === 'ambiguous') {
+      warnInSentry('Ambiguous sign-in provider lookup');
       return NextResponse.json(
         { error: 'Unable to find sign-in methods. Please try again.' },
         { status: 503 }

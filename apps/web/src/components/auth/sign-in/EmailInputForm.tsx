@@ -2,12 +2,12 @@
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import React from 'react';
 import { useState } from 'react';
 
 type EmailInputFormProps = {
   email: string;
   emailValidation: { isValid: boolean; error: string | null };
-  error?: string;
   onSubmit: (e: React.FormEvent) => void;
   onEmailChange: (value: string) => void;
   placeholder?: string;
@@ -23,7 +23,6 @@ type EmailInputFormProps = {
 export function EmailInputForm({
   email,
   emailValidation,
-  error,
   onSubmit,
   onEmailChange,
   placeholder = 'you@example.com',
@@ -34,7 +33,7 @@ export function EmailInputForm({
   const [hasBlurred, setHasBlurred] = useState(false);
   const validationError =
     hasBlurred && email && !emailValidation.isValid ? emailValidation.error : null;
-  const visibleError = validationError ?? error;
+  const visibleError = validationError;
   const errorId = 'sign-in-email-error';
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-md space-y-6">

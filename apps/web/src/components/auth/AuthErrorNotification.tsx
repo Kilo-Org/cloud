@@ -15,6 +15,42 @@ export function AuthErrorNotification({ error }: { error: string }) {
       </div>
     );
 
+  if (error === 'DISCOVERY_RATE_LIMITED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Too Many Attempts">
+          Too many sign-in attempts. Please try again later.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'DISCOVERY_FAILED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Sign-in Methods Unavailable">
+          We could not find your sign-in methods. Please try again.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'NO_SUPPORTED_SIGN_IN_METHOD')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="No Supported Sign-in Method">
+          No supported sign-in method is available for this account. Use a different email.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'MAGIC_LINK_DELIVERY_FAILED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Magic Link Not Sent">
+          We could not send your magic link. Please try again.
+        </ErrorNotificationBox>
+      </div>
+    );
+
   if (error === 'ACCOUNT-ALREADY-LINKED')
     return (
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">

@@ -1,4 +1,5 @@
 import { checkRateLimit } from '@vercel/firewall';
+import { captureMessage } from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
@@ -6,6 +7,7 @@ import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-s
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
 
 jest.mock('@vercel/firewall');
+jest.mock('@sentry/nextjs');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
 jest.mock('@/lib/user');
 jest.mock('@/lib/organizations/organization-sso-policy');
@@ -15,6 +17,7 @@ jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'test-secret' }));
 import { discoveryEmailRateLimitKey, POST } from './route';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockCaptureMessage = jest.mocked(captureMessage);
 const mockVerifyTurnstileJWT = jest.mocked(verifyTurnstileJWT);
 const mockGetAllUserProviders = jest.mocked(getAllUserProviders);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
@@ -181,6 +184,11 @@ describe('POST /api/sso/organizations', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       error: 'Unable to find sign-in methods. Please try again.',
+    });
+    expect(mockCaptureMessage).toHaveBeenCalledWith('Ambiguous sign-in provider lookup', {
+      level: 'warning',
+      tags: { source: 'sso-organizations' },
+      extra: undefined,
     });
     expect(mockIsNewAccountEligibleForMagicLink).not.toHaveBeenCalled();
   });

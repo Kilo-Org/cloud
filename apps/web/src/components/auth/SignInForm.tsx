@@ -63,11 +63,7 @@ export function SignInForm({
     );
   }
 
-  // Syntax errors belong to the email field. Discovery and provider errors need
-  // one global live region rather than being announced twice.
-  const fieldError = flow.emailValidation.error ?? undefined;
-  const errorNotification =
-    flow.error && !fieldError ? <AuthErrorNotification error={flow.error} /> : null;
+  const errorNotification = flow.error ? <AuthErrorNotification error={flow.error} /> : null;
 
   // Turnstile overlay
   if (flow.showTurnstile) {
@@ -225,7 +221,6 @@ export function SignInForm({
               <EmailInputForm
                 email={flow.email}
                 emailValidation={flow.emailValidation}
-                error={fieldError}
                 onSubmit={flow.handleEmailSubmit}
                 onEmailChange={flow.handleEmailChange}
                 placeholder="you@example.com"
@@ -276,7 +271,6 @@ export function SignInForm({
                   <EmailInputForm
                     email={flow.email}
                     emailValidation={flow.emailValidation}
-                    error={fieldError}
                     onSubmit={flow.handleEmailSubmit}
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"

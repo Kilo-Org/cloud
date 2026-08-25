@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { REACTION_EMOJI, REACTION_LABEL, selectReactionPills } from './reaction-pills';
+import { REACTION_EMOJI, reactionLabel, selectReactionPills } from './reaction-pills';
 import { REVIEW_REACTION_CONTENTS } from './review-discussion-types';
 
 describe('selectReactionPills', () => {
@@ -41,14 +41,14 @@ describe('selectReactionPills', () => {
   });
 });
 
-describe('REACTION_EMOJI and REACTION_LABEL', () => {
+describe('REACTION_EMOJI and reactionLabel', () => {
   it('cover all 8 REVIEW_REACTION_CONTENTS', () => {
     expect(REVIEW_REACTION_CONTENTS).toHaveLength(8);
     for (const content of REVIEW_REACTION_CONTENTS) {
       expect(REACTION_EMOJI[content]).toBeTruthy();
       expect(typeof REACTION_EMOJI[content]).toBe('string');
-      expect(REACTION_LABEL[content]).toBeTruthy();
-      expect(typeof REACTION_LABEL[content]).toBe('string');
+      expect(reactionLabel(content)).toBeTruthy();
+      expect(typeof reactionLabel(content)).toBe('string');
     }
   });
 });

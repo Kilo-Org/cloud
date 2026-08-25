@@ -29,7 +29,7 @@ export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
         size="sm"
         variant="outline"
         onPress={() => {
-          void openExternalUrl(url, { label: 'billing page' });
+          void openExternalUrl(url, { label: t('addCredits.billingPage') });
         }}
       >
         <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>

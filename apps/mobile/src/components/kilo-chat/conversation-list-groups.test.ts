@@ -20,7 +20,7 @@ function conversation(
 
 describe('groupConversationsByActivity', () => {
   it('groups conversations by local activity day', () => {
-    const todayStart = new Date(2026, 4, 4).getTime();
+    const todayStart = new Date(2026, 4, 7).getTime();
     const nowMs = todayStart + 12 * 60 * 60 * 1000;
     const yesterday = todayStart - 60 * 60 * 1000;
     const thisWeek = todayStart - 3 * 24 * 60 * 60 * 1000;
@@ -34,7 +34,8 @@ describe('groupConversationsByActivity', () => {
           conversation('this-week', thisWeek),
           conversation('older', older),
         ],
-        nowMs
+        nowMs,
+        1
       )
     ).toEqual([
       { label: 'Today', items: [conversation('today', nowMs)] },
@@ -45,14 +46,15 @@ describe('groupConversationsByActivity', () => {
   });
 
   it('uses joined time when last activity is missing', () => {
-    const todayStart = new Date(2026, 4, 4).getTime();
+    const todayStart = new Date(2026, 4, 7).getTime();
     const nowMs = todayStart + 12 * 60 * 60 * 1000;
     const joinedAt = todayStart - 2 * 24 * 60 * 60 * 1000;
 
     expect(
       groupConversationsByActivity(
         [conversation('joined-only', nowMs, { lastActivityAt: null, joinedAt })],
-        nowMs
+        nowMs,
+        1
       )
     ).toEqual([
       {

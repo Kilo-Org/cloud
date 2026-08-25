@@ -11,6 +11,7 @@ import PersonalAppSidebar from './PersonalAppSidebar';
 import OrganizationAppSidebar from './OrganizationAppSidebar';
 import { GastownTownSidebar } from '@/components/gastown/GastownTownSidebar';
 import { WastelandSidebar } from '@/components/wasteland/WastelandSidebar';
+import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 
 const UUID = '[0-9a-f-]{36}';
 
@@ -72,13 +73,10 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
       trpc: { context: { skipBatch: true } },
     })
   );
-  // Match the server-side default (oldest org) so the sidebar org is consistent
-  // with getProfileRedirectPath.
+  // Match the server-side default (sales demo org, then oldest org) so the
+  // sidebar org is consistent with getProfileRedirectPath.
   const defaultOrganizationId = organizations?.length
-    ? [...organizations].sort((a, b) => {
-        const byCreatedAt = a.created_at.localeCompare(b.created_at);
-        return byCreatedAt !== 0 ? byCreatedAt : a.organizationId.localeCompare(b.organizationId);
-      })[0].organizationId
+    ? [...organizations].sort(compareOrganizationsForDefault)[0].organizationId
     : null;
   const previousSidebarOpen = useRef<boolean | null>(null);
   const currentSidebarOpen = useRef(open);

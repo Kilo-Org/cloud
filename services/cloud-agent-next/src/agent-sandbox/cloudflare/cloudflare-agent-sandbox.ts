@@ -50,6 +50,7 @@ import {
 import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../../sandbox-recovery.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
+import { isStrippedGitConfigEnvVar } from '../../shared/runtime-environment.js';
 import { ExecutionError } from '../../execution/errors.js';
 import { readProfileBundle, type SessionProfileBundle } from '../../session-profile.js';
 import {
@@ -158,6 +159,11 @@ export function deriveSetupEnvironment(
   const variables: Record<string, string> = {};
   for (const key of Object.keys(profile.envVars ?? {})) {
     if (Object.hasOwn(encryptedSecrets, key)) continue;
+    // The runtime environment owns git's configuration and drops these before
+    // the sandbox starts, so they are absent from `materializedEnvironment` by
+    // design. Treating that as an unresolved variable would silently disable
+    // workspace snapshots for every session on the profile.
+    if (isStrippedGitConfigEnvVar(key)) continue;
     if (!Object.hasOwn(materializedEnvironment, key)) return null;
     const value = materializedEnvironment[key];
     if (value === undefined) return null;

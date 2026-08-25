@@ -85,6 +85,11 @@ export function OrganizationDashboard({
       return;
     }
 
+    // Sales-demo orgs skip the welcome banner chrome entirely.
+    if (organizationData.settings.is_sales_demo) {
+      return;
+    }
+
     if (shouldShowBanner) {
       if (currentRole === 'owner') {
         const orgCreationDate = new Date(organizationData.created_at).getTime();

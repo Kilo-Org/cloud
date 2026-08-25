@@ -14,7 +14,6 @@ import {
   buildMessageActionAvailability,
   contentBlocksToText,
   type ExecApprovalDecision,
-  formatKiloChatError,
   type KiloChatClient,
   type Message,
 } from '@kilocode/kilo-chat';
@@ -26,6 +25,7 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 
 import { executeActionWithMobileFeedback } from '../execute-action-feedback';
+import { formatMobileKiloChatError } from '../kilo-chat-error';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from '../message-actions';
 import { canCopyMessage, canRetryFailedMessage, canToggleReaction } from '../message-presentation';
 
@@ -70,7 +70,7 @@ export function useConversationMessageActions({
           {
             onError: err => {
               toast.error(
-                formatKiloChatError(err, i18n.t('chat.messageActions.removeReactionFailed'))
+                formatMobileKiloChatError(err, i18n.t('chat.messageActions.removeReactionFailed'))
               );
             },
           }
@@ -81,7 +81,7 @@ export function useConversationMessageActions({
           {
             onError: err => {
               toast.error(
-                formatKiloChatError(err, i18n.t('chat.messageActions.addReactionFailed'))
+                formatMobileKiloChatError(err, i18n.t('chat.messageActions.addReactionFailed'))
               );
             },
           }
@@ -190,7 +190,7 @@ export function useConversationMessageActions({
                     {
                       onError: err => {
                         toast.error(
-                          formatKiloChatError(err, i18n.t('chat.messageActions.deleteFailed'))
+                          formatMobileKiloChatError(err, i18n.t('chat.messageActions.deleteFailed'))
                         );
                       },
                     }

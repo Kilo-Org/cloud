@@ -168,8 +168,8 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <KiloCrabIcon className="size-4" />,
   },
   {
-    title: () => 'KiloClaw referrals',
-    url: '/admin/kiloclaw-referrals',
+    title: () => 'Impact referrals',
+    url: '/admin/impact-referrals',
     icon: () => <KiloCrabIcon className="size-4" />,
   },
   {

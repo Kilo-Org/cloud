@@ -1243,30 +1243,45 @@ export const organizationAdminRouter = createTRPCRouter({
         : baseQueryWithCommonJoins;
 
       // Add mode-based and stripe_status conditions
-      const statusConditions = whereCondition ? [whereCondition] : [];
+      const statusConditions: (SQL | undefined)[] = whereCondition ? [whereCondition] : [];
 
       if (mode === 'paying') {
-        // Paying: has at least one seats purchase record (active or churned customers)
+        // Old form required a seats purchase; sales-demo orgs have none;
+        // include them so admins can reopen.
         statusConditions.push(
-          sql`EXISTS (
-            SELECT 1 FROM ${organization_seats_purchases}
-            WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-          )`
+          or(
+            sql`EXISTS (
+              SELECT 1 FROM ${organization_seats_purchases}
+              WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+            )`,
+            sql`${organizations.settings}->>'is_sales_demo' = 'true'`
+          )
         );
       } else if (mode === 'trial') {
-        // Trial: has never had a seats purchase
+        // Trial: has never had a seats purchase. Exclude sales-demo orgs so
+        // they don't appear on both the paying and trial lists.
         statusConditions.push(
           sql`NOT EXISTS (
             SELECT 1 FROM ${organization_seats_purchases}
             WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
           )`
         );
+        statusConditions.push(
+          sql`${organizations.settings}->>'is_sales_demo' IS DISTINCT FROM 'true'`
+        );
       }
       // mode === 'all': no subscription filter
 
       // Filter by Stripe subscription status (latest subscription for this org)
       if (stripe_status) {
-        statusConditions.push(sql`${latestSubscriptions.subscription_status} = ${stripe_status}`);
+        // Old form required the latest subscription status to match; sales-demo
+        // orgs have no seats purchase, so include them for admins.
+        statusConditions.push(
+          or(
+            sql`${latestSubscriptions.subscription_status} = ${stripe_status}`,
+            sql`${organizations.settings}->>'is_sales_demo' = 'true'`
+          )
+        );
       }
 
       const finalWhereCondition =

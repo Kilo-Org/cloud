@@ -19,7 +19,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import {
   type AllowedMergeMethod,
-  PR_MERGE_DESCRIPTIONS,
+  prMergeDescription,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
@@ -60,7 +60,7 @@ function MethodPicker({
                 onChange(option.value);
               }}
               {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
-              accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
+              accessibilityHint={prMergeDescription(option.value)}
               className={cn(
                 'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
                 active && 'border-primary bg-primary',

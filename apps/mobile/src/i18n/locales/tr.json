@@ -24,7 +24,10 @@
     "notNow": "Şimdi değil",
     "continue": "Devam et",
     "back": "Geri",
-    "somethingWentWrong": "Bir şeyler ters gitti"
+    "somethingWentWrong": "Bir şeyler ters gitti",
+    "couldNotOpen": "{{label}} açılamadı",
+    "link": "bağlantı",
+    "takingLonger": "Bu beklenenden uzun sürüyor. Bunu kapatıp tekrar kontrol edebilirsin."
   },
   "language": {
     "title": "Dil",
@@ -283,7 +286,12 @@
       "classificationEmpty": "Dosya boş",
       "classificationTooLarge": "Dosyalar 20 MB veya daha küçük olmalı",
       "classificationUnreadable": "Bu dosya okunamadı",
-      "announceUploaded": "Ek yüklendi"
+      "announceUploaded": "Ek yüklendi",
+      "cantUpload": "Bu dosya yüklenemiyor.",
+      "networkError": "Ağ hatası",
+      "uploadFailed": "Yükleme başarısız oldu",
+      "failedToUploadFile": "Dosya yüklenemedi: {{reason}}",
+      "nothingToPaste": "Yapıştırılacak bir şey yok"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "Parıltılar",
       "strongArm": "Güçlü kol",
       "talisman": "Tılsım"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Bu instance dosya alamıyor."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "İnceleme belleği",
       "reviewStyle": "İnceleme stili",
       "set": "Ayarlı"
-    }
+    },
+    "updateFailed": "İnceleyici güncellenemedi",
+    "configSaveFailed": "İnceleme yapılandırması kaydedilemedi"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "Mevcut iyileştirmeler kuyruğa alındı",
       "analysisComplete": "Analiz tamamlandı",
       "syncComplete": "Senkronizasyon tamamlandı"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Güvenlik hizmeti yapılandırılmamış. Bu düzeltilene kadar yeniden gönderme başarılı olamaz.",
+      "syncMayNotHaveCompleted": "Bir eşitleme tamamlanmamış olabilir. Uzlaştırmak için tekrar deneyin ya da atın.",
+      "syncInProgress": "Bir güvenlik eşitlemesi zaten devam ediyor. Lütfen tekrar deneyin.",
+      "dismissalInProgress": "Bu yok sayma zaten devam ediyor. Lütfen tekrar deneyin.",
+      "couldNotReadPendingSyncs": "Bekleyen eşitlemeler okunamadı. Tekrar deneyin."
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "Konuşma çevrimiçi işleniyor",
     "staysOff": "Çevrimiçi transkripsiyona izin verene kadar konuşma kapalı kalır.",
     "start": "Sesli girişi başlat",
-    "stop": "Sesli girişi durdur"
+    "stop": "Sesli girişi durdur",
+    "restricted": "Bu cihazda sesli giriş kısıtlıdır.",
+    "micRequired": "Sesli giriş için mikrofon erişimi gerekir.",
+    "micOff": "Mikrofon erişimi kapalı. Sesli girişi kullanmak için Ayarlar'dan etkinleştirin.",
+    "micOffTitle": "Mikrofon erişimi kapalı",
+    "noSpeech": "Konuşma algılanmadı. Tekrar denemek için mikrofona dokunun.",
+    "needsConnection": "Sesli giriş şu anda bir bağlantı gerektiriyor. Tekrar deneyin.",
+    "busy": "Sesli giriş meşgul. Tekrar deneyin.",
+    "stopped": "Sesli giriş durdu. Tekrar denemek için mikrofona dokunun.",
+    "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
+    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor."
   },
   "share": {
     "title": "Kilo'ya paylaş",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "Bu Kilo Pass web üzerinden yönetiliyor.",
     "legalDisclosure": "Kilo Pass, otomatik yenilenen aylık bir aboneliktir. Ödeme, satın alma onayında Apple Kimliğinize yansıtılır. Abonelikler, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece her ay gösterilen fiyattan otomatik yenilenir. App Store hesap ayarlarınızdan istediğiniz zaman yönetin veya iptal edin.",
     "legalPrivacyPolicy": "Gizlilik Politikası",
-    "legalTermsOfUse": "Kullanım Koşulları (EULA)"
+    "legalTermsOfUse": "Kullanım Koşulları (EULA)",
+    "purchaseNotLinked": "Bu App Store satın alımı Kilo hesabınıza bağlı değil. Satın alımı yapan Apple ID ile oturum açtığınızdan emin olun, sonra tekrar deneyin.",
+    "purchaseDifferentAccount": "Bu App Store satın alımı Kilo hesabınıza bağlı değil. Satın alımda kullanılan Apple hesabına giriş yapın, sonra tekrar deneyin.",
+    "restoreFailed": "Satın alımlar geri yüklenemedi. Tekrar deneyin.",
+    "purchaseFailed": "Satın alma tamamlanamadı.",
+    "purchaseStartFailed": "App Store satın alımı başlatılamadı."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "Yorum gönderildi",
       "reviewSubmitted": "İnceleme gönderildi",
       "autoMergeEnabled": "Otomatik birleştirme etkinleştirildi"
+    },
+    "mutationError": {
+      "commentNotPosted": "Bu yorum gönderilemiyor. Seçili satır değişmiş ya da PR güncellenmiş olabilir.",
+      "reviewNotSubmitted": "Bu inceleme bu şekilde gönderilemiyor. PR değişmiş olabilir ya da kendi pull request'inizi inceleyemezsiniz.",
+      "couldNotPostComment": "Yorum gönderilemedi.",
+      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene."
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "Faturalar",
       "statusPaid": "Ödendi",
       "statusOpen": "Açık",
-      "statusVoid": "Geçersiz"
+      "statusVoid": "Geçersiz",
+      "downloadFailed": "Fatura indirilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "sharingUnavailable": "Paylaşım bu cihazda kullanılamıyor."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Oturum açma başarısız oldu. Lütfen tekrar deneyin.",
     "networkError": "Ağ hatası. Lütfen tekrar deneyin.",
     "accessDeniedByUser": "Kullanıcı erişimi reddetti",
-    "codeExpired": "Kodun süresi doldu"
+    "codeExpired": "Kodun süresi doldu",
+    "tooManySignInAttempts": "Çok fazla oturum açma denemesi yapıldı. Lütfen bekleyin ve tekrar deneyin."
   },
   "models": {
     "dataCollected": "Toplanan veriler",

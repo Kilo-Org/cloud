@@ -69,7 +69,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
             return;
           }
           if (action === 'open') {
-            void openExternalUrl(href, { label: 'link' });
+            void openExternalUrl(href);
             return;
           }
           if (action === 'share') {

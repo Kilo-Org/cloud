@@ -24,7 +24,10 @@
     "notNow": "暂不",
     "continue": "继续",
     "back": "返回",
-    "somethingWentWrong": "出了点问题"
+    "somethingWentWrong": "出了点问题",
+    "couldNotOpen": "无法打开 {{label}}",
+    "link": "链接",
+    "takingLonger": "这比预期耗时更长。您可以关闭此页面，稍后再查看。"
   },
   "language": {
     "title": "语言",
@@ -283,7 +286,12 @@
       "classificationEmpty": "文件为空",
       "classificationTooLarge": "文件必须为 20 MB 或更小",
       "classificationUnreadable": "无法读取此文件",
-      "announceUploaded": "附件已上传"
+      "announceUploaded": "附件已上传",
+      "cantUpload": "无法上传此文件。",
+      "networkError": "网络错误",
+      "uploadFailed": "上传失败",
+      "failedToUploadFile": "上传文件失败：{{reason}}",
+      "nothingToPaste": "没有可粘贴的内容"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "星光",
       "strongArm": "强壮手臂",
       "talisman": "护身符"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "此实例无法接收文件。"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "审查记忆",
       "reviewStyle": "审查风格",
       "set": "设置"
-    }
+    },
+    "updateFailed": "更新审查器失败",
+    "configSaveFailed": "保存审查配置失败"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "现有修复已加入队列",
       "analysisComplete": "分析完成",
       "syncComplete": "同步完成"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "安全服务未配置。在修复此问题之前，重新提交无法成功。",
+      "syncMayNotHaveCompleted": "同步可能尚未完成。请重试以进行对账，或将其丢弃。",
+      "syncInProgress": "已有安全同步正在进行。请重试。",
+      "dismissalInProgress": "此忽略操作正在进行中。请重试。",
+      "couldNotReadPendingSyncs": "无法读取待处理的同步。请重试。"
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "语音将在线处理",
     "staysOff": "在您允许在线转录之前，语音将保持关闭。",
     "start": "开始语音输入",
-    "stop": "停止语音输入"
+    "stop": "停止语音输入",
+    "restricted": "此设备上的语音输入受到限制。",
+    "micRequired": "语音输入需要麦克风访问权限。",
+    "micOff": "麦克风访问权限已关闭。请在设置中开启，以使用语音输入。",
+    "micOffTitle": "麦克风访问权限已关闭",
+    "noSpeech": "未检测到语音。点击麦克风重试。",
+    "needsConnection": "语音输入当前需要网络连接。请重试。",
+    "busy": "语音输入正忙。请重试。",
+    "stopped": "语音输入已停止。点击麦克风重试。",
+    "unavailableDevice": "此设备不支持语音输入。",
+    "unavailableLanguage": "语音输入不支持此设备的语言。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "此 Kilo Pass 在网页上管理。",
     "legalDisclosure": "Kilo Pass 是可自动续订的月度订阅。付款在购买确认时从您的 Apple ID 扣费。订阅每月按所示价格自动续订，除非在当前周期结束前至少 24 小时取消。可随时在您的 App Store 账户设置中管理或取消。",
     "legalPrivacyPolicy": "隐私政策",
-    "legalTermsOfUse": "使用条款（EULA）"
+    "legalTermsOfUse": "使用条款（EULA）",
+    "purchaseNotLinked": "此 App Store 购买尚未关联到您的 Kilo 账户。请确认您已登录用于购买此项目的 Apple ID，然后重试。",
+    "purchaseDifferentAccount": "此 App Store 购买尚未关联到您的 Kilo 账户。请登录购买时使用的 Apple 账户，然后重试。",
+    "restoreFailed": "恢复购买失败。请重试。",
+    "purchaseFailed": "完成购买失败。",
+    "purchaseStartFailed": "启动 App Store 购买失败。"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "评论已发布",
       "reviewSubmitted": "审查已提交",
       "autoMergeEnabled": "已开启自动合并"
+    },
+    "mutationError": {
+      "commentNotPosted": "无法发布此评论。所选行可能已更改，或 PR 可能已更新。",
+      "reviewNotSubmitted": "此审查无法按现状提交。PR 可能已更改，或您无法审查自己的拉取请求。",
+      "couldNotPostComment": "无法发布评论。",
+      "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。"
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "发票",
       "statusPaid": "已支付",
       "statusOpen": "待支付",
-      "statusVoid": "已作废"
+      "statusVoid": "已作废",
+      "downloadFailed": "无法下载发票。请检查网络连接后重试。",
+      "sharingUnavailable": "此设备不支持分享。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "登录失败。请重试。",
     "networkError": "网络错误。请重试。",
     "accessDeniedByUser": "用户拒绝了访问",
-    "codeExpired": "代码已过期"
+    "codeExpired": "代码已过期",
+    "tooManySignInAttempts": "登录尝试次数过多。请稍等片刻再试。"
   },
   "models": {
     "dataCollected": "收集的数据",

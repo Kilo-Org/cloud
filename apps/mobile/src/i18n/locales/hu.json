@@ -24,7 +24,10 @@
     "required": "kötelező",
     "error": "hiba: {{error}}",
     "back": "Vissza",
-    "somethingWentWrong": "Valami hiba történt"
+    "somethingWentWrong": "Valami hiba történt",
+    "couldNotOpen": "Nem sikerült megnyitni a(z) {{label}} elemet",
+    "link": "hivatkozás",
+    "takingLonger": "Ez tovább tart a vártnál. Bezárhatja, és később újra ellenőrizheti."
   },
   "language": {
     "title": "Nyelv",
@@ -576,6 +579,12 @@
       "commentPosted": "Megjegyzés közzétéve",
       "reviewSubmitted": "Ellenőrzés elküldve",
       "autoMergeEnabled": "Automatikus összevonás engedélyezve"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ez a megjegyzés nem küldhető el. Lehet, hogy a kijelölt sor megváltozott, vagy a PR frissült.",
+      "reviewNotSubmitted": "Ez az ellenőrzés ebben a formában nem küldhető el. Lehet, hogy a PR megváltozott, vagy nem ellenőrizheti a saját pull requestjét.",
+      "couldNotPostComment": "Nem sikerült közzétenni a megjegyzést.",
+      "couldNotSubmitReview": "Nem sikerült elküldeni az ellenőrzést. Ellenőrizze a kapcsolatot, és próbálja újra."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "A fájl üres",
       "classificationTooLarge": "A fájlok mérete legfeljebb 20 MB lehet",
       "classificationUnreadable": "Nem sikerült beolvasni ezt a fájlt",
-      "announceUploaded": "Csatolmány feltöltve"
+      "announceUploaded": "Csatolmány feltöltve",
+      "cantUpload": "Ezt a fájlt nem lehet feltölteni.",
+      "networkError": "Hálózati hiba",
+      "uploadFailed": "A feltöltés nem sikerült",
+      "failedToUploadFile": "Nem sikerült feltölteni a fájlt: {{reason}}",
+      "nothingToPaste": "Nincs mit beilleszteni"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Csillogás",
       "strongArm": "Erős kar",
       "talisman": "Talizmán"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Ez a példány nem fogadhat fájlokat."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Nincs döntés",
       "noResult": "Nincs eredmény"
     },
-    "eyebrow": "Kód-ellenőrző"
+    "eyebrow": "Kód-ellenőrző",
+    "updateFailed": "Nem sikerült frissíteni az ellenőrzőt",
+    "configSaveFailed": "Nem sikerült menteni az ellenőrzési beállításokat"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Meglévő kijavítások sorba állítva",
       "analysisComplete": "Az elemzés befejeződött",
       "syncComplete": "A szinkronizálás befejeződött"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "A biztonsági szolgáltatás nincs konfigurálva. Az újraküldés addig nem sikerülhet, amíg ez meg nincs javítva.",
+      "syncMayNotHaveCompleted": "Lehet, hogy egy szinkronizálás nem fejeződött be. Az egyeztetéshez próbálja újra, vagy hagyja figyelmen kívül.",
+      "syncInProgress": "Egy biztonsági szinkronizálás már folyamatban van. Kérjük, próbálja újra.",
+      "dismissalInProgress": "Ez az elutasítás már folyamatban van. Kérjük, próbálja újra.",
+      "couldNotReadPendingSyncs": "Nem sikerült beolvasni a függőben lévő szinkronizálásokat. Próbálja újra."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Ez az eszköz nem tud offline átírni. A felvételedet a(z) {{provider}} kapja meg szöveggé alakításhoz. A Kilo nem tárolja a hangot.",
     "allow": "Engedélyezés",
     "start": "Hangbevitel indítása",
-    "stop": "Hangbevitel leállítása"
+    "stop": "Hangbevitel leállítása",
+    "restricted": "A hangbevitel korlátozott ezen az eszközön.",
+    "micRequired": "A hangbevitelhez mikrofonhozzáférés szükséges.",
+    "micOff": "A mikrofonhozzáférés ki van kapcsolva. A hangbevitel használatához engedélyezze a Beállításokban.",
+    "micOffTitle": "A mikrofonhozzáférés ki van kapcsolva",
+    "noSpeech": "Nem észleltünk beszédet. A mikrofon megérintésével próbálja újra.",
+    "needsConnection": "A hangbevitelhez jelenleg kapcsolat szükséges. Próbálja újra.",
+    "busy": "A hangbevitel foglalt. Próbálja újra.",
+    "stopped": "A hangbevitel leállt. A mikrofon megérintésével próbálja újra.",
+    "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
+    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez."
   },
   "share": {
     "title": "Megosztás a Kilo-val",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Ez a Kilo Pass a weben van kezelve.",
     "legalDisclosure": "A Kilo Pass automatikusan megújuló havi előfizetés. A fizetés az Apple ID-hoz kerül felszámításra a vásárlás megerősítésekor. Az előfizetés minden hónapban automatikusan megújul a megjelenített áron, hacsak nem mondja le legalább 24 órával az aktuális időszak vége előtt. Kezelje vagy mondja le bármikor az App Store fiókbeállításaiban.",
     "legalPrivacyPolicy": "Adatvédelmi irányelvek",
-    "legalTermsOfUse": "Felhasználási feltételek (EULA)"
+    "legalTermsOfUse": "Felhasználási feltételek (EULA)",
+    "purchaseNotLinked": "Ez az App Store-vásárlás nincs hozzárendelve a Kilo-fiókjához. Győződjön meg róla, hogy azzal az Apple ID-val van bejelentkezve, amellyel a vásárlás történt, majd próbálja újra.",
+    "purchaseDifferentAccount": "Ez az App Store-vásárlás nincs hozzárendelve a Kilo-fiókjához. Jelentkezzen be a vásárláshoz használt Apple-fiókkal, majd próbálja újra.",
+    "restoreFailed": "Nem sikerült visszaállítani a vásárlásokat. Próbálja újra.",
+    "purchaseFailed": "Nem sikerült befejezni a vásárlást.",
+    "purchaseStartFailed": "Nem sikerült elindítani az App Store-vásárlást."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Nyitva",
       "statusPaid": "Kifizetve",
       "statusVoid": "Érvénytelen",
-      "title": "Számlák"
+      "title": "Számlák",
+      "downloadFailed": "Nem sikerült letölteni a számlát. Ellenőrizze a kapcsolatot, és próbálja újra.",
+      "sharingUnavailable": "A megosztás nem érhető el ezen az eszközön."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "A bejelentkezés nem sikerült. Kérjük, próbálja újra.",
     "networkError": "Hálózati hiba. Kérjük, próbálja újra.",
     "accessDeniedByUser": "A hozzáférést a felhasználó megtagadta",
-    "codeExpired": "A kód lejárt"
+    "codeExpired": "A kód lejárt",
+    "tooManySignInAttempts": "Túl sok bejelentkezési kísérlet. Kérjük, várjon, és próbálja újra."
   },
   "models": {
     "dataCollected": "Gyűjtött adatok",

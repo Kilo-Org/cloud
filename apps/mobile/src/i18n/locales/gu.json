@@ -24,7 +24,10 @@
     "required": "જરૂરી",
     "error": "ભૂલ: {{error}}",
     "back": "પાછળ",
-    "somethingWentWrong": "કંઈક ખોટું થયું"
+    "somethingWentWrong": "કંઈક ખોટું થયું",
+    "couldNotOpen": "{{label}} ખોલી શકાયું નહીં",
+    "link": "લિંક",
+    "takingLonger": "આ અપેક્ષા કરતાં વધુ સમય લઈ રહ્યું છે. તમે આ બંધ કરી શકો છો અને ફરી ચકાસી શકો છો."
   },
   "language": {
     "title": "ભાષા",
@@ -576,6 +579,12 @@
       "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
       "reviewSubmitted": "સમીક્ષા સબમિટ થઈ",
       "autoMergeEnabled": "ઓટો-મર્જ સક્ષમ થયું"
+    },
+    "mutationError": {
+      "commentNotPosted": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. પસંદ કરેલી લીટી બદલાઈ હોઈ શકે છે, અથવા PR અપડેટ થયું હોઈ શકે છે.",
+      "reviewNotSubmitted": "આ સમીક્ષા જેમ છે તેમ સબમિટ કરી શકાતી નથી. PR બદલાયું હોઈ શકે છે, અથવા તમે તમારી પોતાની પુલ રિક્વેસ્ટની સમીક્ષા કરી શકતા નથી.",
+      "couldNotPostComment": "ટિપ્પણી પોસ્ટ કરી શકાઈ નહીં.",
+      "couldNotSubmitReview": "સમીક્ષા સબમિટ કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "ફાઇલ ખાલી છે",
       "classificationTooLarge": "ફાઇલો 20 MB કે તેથી નાની હોવી જોઈએ",
       "classificationUnreadable": "આ ફાઇલ વાંચી શકાઈ નહીં",
-      "announceUploaded": "જોડાણ અપલોડ થયું"
+      "announceUploaded": "જોડાણ અપલોડ થયું",
+      "cantUpload": "આ ફાઇલ અપલોડ કરી શકાતી નથી.",
+      "networkError": "નેટવર્ક ભૂલ",
+      "uploadFailed": "અપલોડ નિષ્ફળ",
+      "failedToUploadFile": "ફાઇલ અપલોડ કરવામાં નિષ્ફળ: {{reason}}",
+      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "ચમક",
       "strongArm": "મજબૂત હાથ",
       "talisman": "તાવીજ"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "આ ઇન્સ્ટન્સ ફાઇલો મેળવી શકતું નથી."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "કોઈ નિર્ણય નથી",
       "noResult": "કોઈ પરિણામ નથી"
     },
-    "eyebrow": "કોડ સમીક્ષક"
+    "eyebrow": "કોડ સમીક્ષક",
+    "updateFailed": "સમીક્ષક અપડેટ કરવામાં નિષ્ફળ",
+    "configSaveFailed": "સમીક્ષા કોન્ફિગ સાચવવામાં નિષ્ફળ"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "હાલની સુધારણાઓ કતારમાં મૂકાઈ",
       "analysisComplete": "વિશ્લેષણ પૂર્ણ",
       "syncComplete": "સિંક પૂર્ણ"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "સુરક્ષા સેવા ગોઠવેલી નથી. આ સુધારાય ત્યાં સુધી ફરી સબમિટ કરવું સફળ થઈ શકશે નહીં.",
+      "syncMayNotHaveCompleted": "સિંક પૂર્ણ થયું ન હોઈ શકે. તેને સંતુલિત કરવા ફરી પ્રયત્ન કરો, અથવા કાઢી નાખો.",
+      "syncInProgress": "સુરક્ષા સિંક પહેલેથી ચાલુ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
+      "dismissalInProgress": "આ ખારિજ કરવાની પ્રક્રિયા પહેલેથી ચાલુ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
+      "couldNotReadPendingSyncs": "બાકી સિંક વાંચી શકાયા નહીં. ફરી પ્રયત્ન કરો."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "આ ડિવાઇસ ઑફલાઇન ટ્રાન્સક્રાઇબ કરી શકતું નથી. તમારી રેકોર્ડિંગ તેને ટેક્સ્ટમાં ફેરવવા માટે {{provider}} ને મોકલવામાં આવે છે. Kilo ઑડિઓ સંગ્રહિત કરતું નથી.",
     "allow": "મંજૂરી આપો",
     "start": "વૉઇસ ઇનપુટ શરૂ કરો",
-    "stop": "વૉઇસ ઇનપુટ બંધ કરો"
+    "stop": "વૉઇસ ઇનપુટ બંધ કરો",
+    "restricted": "આ ઉપકરણ પર વૉઇસ ઇનપુટ પ્રતિબંધિત છે.",
+    "micRequired": "વૉઇસ ઇનપુટ માટે માઇક્રોફોન પ્રવેશ જરૂરી છે.",
+    "micOff": "માઇક્રોફોન પ્રવેશ બંધ છે. વૉઇસ ઇનપુટ વાપરવા તેને સેટિંગ્સમાં સક્ષમ કરો.",
+    "micOffTitle": "માઇક્રોફોન પ્રવેશ બંધ છે",
+    "noSpeech": "કોઈ સ્પીચ મળી નથી. ફરી પ્રયત્ન કરવા માઇક્રોફોન ટેપ કરો.",
+    "needsConnection": "વૉઇસ ઇનપુટને હમણાં કનેક્શનની જરૂર છે. ફરી પ્રયત્ન કરો.",
+    "busy": "વૉઇસ ઇનપુટ વ્યસ્ત છે. ફરી પ્રયત્ન કરો.",
+    "stopped": "વૉઇસ ઇનપુટ બંધ થયું. ફરી પ્રયત્ન કરવા માઇક્રોફોન ટેપ કરો.",
+    "unavailableDevice": "આ ઉપકરણ પર વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
+    "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી."
   },
   "share": {
     "title": "Kilo પર શેર કરો",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "આ Kilo Pass વેબ પર મેનેજ થાય છે.",
     "legalDisclosure": "Kilo Pass એ આપમેળે રિન્યુ થતું માસિક સબ્સ્ક્રિપ્શન છે. ખરીદીની પુષ્ટિ પર તમારા Apple ID પર ચુકવણી કરવામાં આવે છે. જ્યાં સુધી વર્તમાન સમયગાળાના અંતના 24 કલાક પહેલાં રદ ન કરવામાં આવે ત્યાં સુધી સબ્સ્ક્રિપ્શન દર મહિને દર્શાવેલ કિંમતે આપમેળે રિન્યુ થાય છે. તમારી App Store એકાઉન્ટ સેટિંગ્સમાં ગમે ત્યારે મેનેજ કરો અથવા રદ કરો.",
     "legalPrivacyPolicy": "ગોપનીયતા નીતિ",
-    "legalTermsOfUse": "ઉપયોગની શરતો (EULA)"
+    "legalTermsOfUse": "ઉપયોગની શરતો (EULA)",
+    "purchaseNotLinked": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે લિંક થયેલી નથી. ખાતરી કરો કે તમે ખરીદી કરનાર Apple ID પર સાઇન ઇન છો, પછી ફરી પ્રયત્ન કરો.",
+    "purchaseDifferentAccount": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે લિંક થયેલી નથી. ખરીદી માટે વપરાયેલા Apple એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયત્ન કરો.",
+    "restoreFailed": "ખરીદીઓ પુનઃસ્થાપિત કરવામાં નિષ્ફળ. ફરી પ્રયત્ન કરો.",
+    "purchaseFailed": "ખરીદી પૂર્ણ કરવામાં નિષ્ફળ.",
+    "purchaseStartFailed": "App Store ખરીદી શરૂ કરવામાં નિષ્ફળ."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "ખુલ્લું",
       "statusPaid": "ચૂકવેલ",
       "statusVoid": "રદ",
-      "title": "ઇનવોઇસ"
+      "title": "ઇનવોઇસ",
+      "downloadFailed": "ઇનવોઇસ ડાઉનલોડ કરી શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "sharingUnavailable": "આ ઉપકરણ પર શેરિંગ ઉપલબ્ધ નથી."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "સાઇન-ઇન નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
     "networkError": "નેટવર્ક ભૂલ. કૃપા કરીને ફરી પ્રયાસ કરો.",
     "accessDeniedByUser": "વપરાશકર્તા દ્વારા પ્રવેશ નકારાયો",
-    "codeExpired": "કોડ સમાપ્ત થયો"
+    "codeExpired": "કોડ સમાપ્ત થયો",
+    "tooManySignInAttempts": "ખૂબ બધા સાઇન-ઇન પ્રયાસો. કૃપા કરીને રાહ જુઓ અને ફરી પ્રયત્ન કરો."
   },
   "models": {
     "dataCollected": "એકત્રિત ડેટા",

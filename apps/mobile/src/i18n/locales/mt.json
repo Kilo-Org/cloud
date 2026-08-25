@@ -24,7 +24,10 @@
     "required": "meħtieġ",
     "error": "żball: {{error}}",
     "back": "Lura",
-    "somethingWentWrong": "Ġara xi ħsara"
+    "somethingWentWrong": "Ġara xi ħsara",
+    "couldNotOpen": "Ma setax jinfetaħ {{label}}",
+    "link": "link",
+    "takingLonger": "Dan qed jieħu aktar żmien milli mistenni. Tista' tagħlaq dan u tiċċekkja għal darb'oħra."
   },
   "language": {
     "title": "Lingwa",
@@ -597,6 +600,12 @@
       "commentPosted": "Il-kument ittpoġġa",
       "reviewSubmitted": "Ir-reviżjoni ntbagħtet",
       "autoMergeEnabled": "L-auto-merge ġie attivat"
+    },
+    "mutationError": {
+      "commentNotPosted": "Dan il-kument ma jistax jitpoġġa. Il-linja magħżula setgħet inbidlet, jew il-PR seta' ġie aġġornat.",
+      "reviewNotSubmitted": "Din ir-reviżjoni ma tistax tintbagħat kif inhi. Il-PR seta' nbidel, jew ma tistax tirrevedi l-pull request tiegħek stess.",
+      "couldNotPostComment": "Ma setax jitpoġġa kument.",
+      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
     }
   },
   "notifications": {
@@ -735,7 +744,12 @@
       "classificationEmpty": "Il-fajl huwa vojt",
       "classificationTooLarge": "Il-fajls iridu jkunu 20 MB jew iżgħar",
       "classificationUnreadable": "Ma setax jinqara dan il-fajl",
-      "announceUploaded": "L-attachment tela'"
+      "announceUploaded": "L-attachment tela'",
+      "cantUpload": "Dan il-fajl ma jistax jittella'.",
+      "networkError": "Żball tan-netwerk",
+      "uploadFailed": "L-upload fallejt",
+      "failedToUploadFile": "Ma rnexxiliex ttella' l-fajl: {{reason}}",
+      "nothingToPaste": "Xejn x'tippejstja"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1199,7 +1213,8 @@
       "sparkles": "Tleqqijiet",
       "strongArm": "Driegħ b'saħħtu",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Din l-istanza ma tistax tirċievi fajls."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1386,7 +1401,9 @@
       "noDecision": "L-ebda deċiżjoni",
       "noResult": "L-ebda riżultat"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Ma setax jiġi aġġornat ir-reviżur",
+    "configSaveFailed": "Ma setgħetx tiġi ssejvjata l-konfigurazzjoni tar-reviżjoni"
   },
   "securityAgent": {
     "filter": {
@@ -1814,6 +1831,13 @@
       "remediationsQueued": "Ir-rimedji eżistenti fil-kju",
       "analysisComplete": "L-analiżi kompluta",
       "syncComplete": "Is-sinkronizzazzjoni kompluta"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Is-servizz tas-sigurtà mhuwiex ikkonfigurat. L-erġa' sottomissjoni ma tistax tirnexxi sakemm dan jitranġa.",
+      "syncMayNotHaveCompleted": "Jista' jkun li sinkronizzazzjoni ma tlestietx. Erġa' pprova biex tirrikonċiljaha, jew warrabha.",
+      "syncInProgress": "Sinkronizzazzjoni tas-sigurtà diġà għaddejja. Jekk jogħġbok erġa' pprova.",
+      "dismissalInProgress": "Dan it-twarrib diġà qed isir. Jekk jogħġbok erġa' pprova.",
+      "couldNotReadPendingSyncs": "Ma setgħux jinqraw is-sinkronizzazzjonijiet pendenti. Erġa' pprova."
     }
   },
   "agents": {
@@ -2525,7 +2549,17 @@
     "onlineMessage": "Dan it-tagħmir ma jistax jittraskrivi offline. Ir-reġistrazzjoni tiegħek tintbagħat lil {{provider}} biex tittrasforma fi test. Kilo ma jaħżinx l-awdjo.",
     "allow": "Ippermetti",
     "start": "Ibda d-dħul bil-vuċi",
-    "stop": "Waqqaf id-dħul bil-vuċi"
+    "stop": "Waqqaf id-dħul bil-vuċi",
+    "restricted": "Id-dħul bil-vuċi huwa ristrett fuq dan it-tagħmir.",
+    "micRequired": "L-aċċess għall-mikrofonu huwa meħtieġ għad-dħul bil-vuċi.",
+    "micOff": "L-aċċess għall-mikrofonu huwa mitfi. Attivah fis-Settings biex tuża d-dħul bil-vuċi.",
+    "micOffTitle": "L-aċċess għall-mikrofonu huwa mitfi",
+    "noSpeech": "L-ebda diskors ma nstab. Tektek il-mikrofonu biex terġa' tipprova.",
+    "needsConnection": "Id-dħul bil-vuċi jeħtieġ konnessjoni bħalissa. Erġa' pprova.",
+    "busy": "Id-dħul bil-vuċi huwa okkupat. Erġa' pprova.",
+    "stopped": "Id-dħul bil-vuċi waqaf. Tektek il-mikrofonu biex terġa' tipprova.",
+    "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan it-tagħmir.",
+    "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal din il-lingwa tal-apparat."
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -2603,7 +2637,12 @@
     "webManagementDescription": "Dan il-Kilo Pass jitmexxa fuq il-web.",
     "legalDisclosure": "Kilo Pass huwa abbonament mensili li jiġġedded awtomatikament. Il-ħlas jitħallas mill-Apple ID tiegħek fil-konferma tax-xiri. L-abbonamenti jiġġeddu awtomatikament kull xahar bil-prezz muri sakemm ma jitħassrux mill-inqas 24 siegħa qabel it-tmiem tal-perjodu attwali. Immaniġġja jew ikkanċella fi kwalunkwe ħin fis-settings tal-kont tal-App Store tiegħek.",
     "legalPrivacyPolicy": "Politika tal-Privatezza",
-    "legalTermsOfUse": "Termini tal-Użu (EULA)"
+    "legalTermsOfUse": "Termini tal-Użu (EULA)",
+    "purchaseNotLinked": "Dan ix-xiri mill-App Store mhuwiex marbut mal-kont ta' Kilo tiegħek. Kun żgur li inti idħolt fl-Apple ID li għamel ix-xiri, imbagħad erġa' pprova.",
+    "purchaseDifferentAccount": "Dan ix-xiri mill-App Store mhuwiex marbut mal-kont ta' Kilo tiegħek. Idħol fil-kont tal-Apple użat għax-xiri, imbagħad erġa' pprova.",
+    "restoreFailed": "Ma setgħux jiġu restawrati x-xirjiet. Erġa' pprova.",
+    "purchaseFailed": "Ma setax jitlesta x-xiri.",
+    "purchaseStartFailed": "Ma setax jibda x-xiri mill-App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2736,7 +2775,9 @@
       "statusOpen": "Miftuħ",
       "statusPaid": "Imħallas",
       "statusVoid": "Battal",
-      "title": "Fatturi"
+      "title": "Fatturi",
+      "downloadFailed": "Ma setgħetx titniżżel il-fattura. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "sharingUnavailable": "Il-qsim mhux disponibbli fuq dan it-tagħmir."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2859,7 +2900,8 @@
     "signInFailed": "Id-dħul fallejt. Jekk jogħġbok erġa' pprova.",
     "networkError": "Żball tan-netwerk. Jekk jogħġbok erġa' pprova.",
     "accessDeniedByUser": "L-aċċess ġie miċħud mill-utent",
-    "codeExpired": "Il-kodiċi skada"
+    "codeExpired": "Il-kodiċi skada",
+    "tooManySignInAttempts": "Wisq tentattivi ta' dħul. Jekk jogħġbok stenna u erġa' pprova."
   },
   "models": {
     "dataCollected": "Dejta miġbura",

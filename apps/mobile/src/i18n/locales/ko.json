@@ -24,7 +24,10 @@
     "notNow": "나중에",
     "continue": "계속",
     "back": "뒤로",
-    "somethingWentWrong": "문제가 발생했습니다"
+    "somethingWentWrong": "문제가 발생했습니다",
+    "couldNotOpen": "{{label}}을(를) 열 수 없습니다",
+    "link": "링크",
+    "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다."
   },
   "language": {
     "title": "언어",
@@ -283,7 +286,12 @@
       "classificationEmpty": "파일이 비어 있습니다",
       "classificationTooLarge": "파일은 20 MB 이하여야 합니다",
       "classificationUnreadable": "이 파일을 읽을 수 없습니다",
-      "announceUploaded": "첨부 파일이 업로드되었습니다"
+      "announceUploaded": "첨부 파일이 업로드되었습니다",
+      "cantUpload": "이 파일은 업로드할 수 없습니다.",
+      "networkError": "네트워크 오류",
+      "uploadFailed": "업로드 실패",
+      "failedToUploadFile": "파일을 업로드하지 못했습니다: {{reason}}",
+      "nothingToPaste": "붙여넣을 내용이 없습니다"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "반짝임",
       "strongArm": "강한 팔",
       "talisman": "부적"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "이 인스턴스는 파일을 받을 수 없습니다."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "리뷰 메모리",
       "reviewStyle": "검토 스타일",
       "set": "설정"
-    }
+    },
+    "updateFailed": "리뷰어를 업데이트하지 못했습니다",
+    "configSaveFailed": "리뷰 구성을 저장하지 못했습니다"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "기존 수정이 대기열에 추가되었습니다",
       "analysisComplete": "분석 완료",
       "syncComplete": "동기화 완료"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "보안 서비스가 구성되지 않았습니다. 이 문제가 해결될 때까지 다시 제출할 수 없습니다.",
+      "syncMayNotHaveCompleted": "동기화가 완료되지 않았을 수 있습니다. 다시 시도하여 조정하거나 버리세요.",
+      "syncInProgress": "보안 동기화가 이미 진행 중입니다. 다시 시도하세요.",
+      "dismissalInProgress": "이 해제 작업이 이미 진행 중입니다. 다시 시도하세요.",
+      "couldNotReadPendingSyncs": "대기 중인 동기화를 읽을 수 없습니다. 다시 시도하세요."
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "음성이 온라인에서 처리됩니다",
     "staysOff": "온라인 전사를 허용할 때까지 음성 입력은 꺼져 있습니다.",
     "start": "음성 입력 시작",
-    "stop": "음성 입력 중지"
+    "stop": "음성 입력 중지",
+    "restricted": "이 기기에서 음성 입력이 제한되어 있습니다.",
+    "micRequired": "음성 입력에는 마이크 접근 권한이 필요합니다.",
+    "micOff": "마이크 접근이 꺼져 있습니다. 음성 입력을 사용하려면 설정에서 켜세요.",
+    "micOffTitle": "마이크 접근이 꺼져 있습니다",
+    "noSpeech": "음성이 감지되지 않았습니다. 마이크를 탭하여 다시 시도하세요.",
+    "needsConnection": "음성 입력에는 지금 연결이 필요합니다. 다시 시도하세요.",
+    "busy": "음성 입력이 사용 중입니다. 다시 시도하세요.",
+    "stopped": "음성 입력이 중지되었습니다. 마이크를 탭하여 다시 시도하세요.",
+    "unavailableDevice": "이 기기에서는 음성 입력을 사용할 수 없습니다.",
+    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다."
   },
   "share": {
     "title": "Kilo로 공유",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "이 Kilo Pass는 웹에서 관리됩니다.",
     "legalDisclosure": "Kilo Pass는 자동 갱신되는 월간 구독입니다. 결제는 구매 확인 시 Apple ID로 청구됩니다. 구독은 현재 기간 종료 24시간 전까지 취소하지 않으면 표시된 가격으로 매월 자동 갱신됩니다. App Store 계정 설정에서 언제든지 관리하거나 취소할 수 있습니다.",
     "legalPrivacyPolicy": "개인정보 처리방침",
-    "legalTermsOfUse": "이용 약관 (EULA)"
+    "legalTermsOfUse": "이용 약관 (EULA)",
+    "purchaseNotLinked": "이 App Store 구매는 Kilo 계정에 연결되어 있지 않습니다. 구매한 Apple ID로 로그인되어 있는지 확인한 후 다시 시도하세요.",
+    "purchaseDifferentAccount": "이 App Store 구매는 Kilo 계정에 연결되어 있지 않습니다. 구매에 사용한 Apple 계정으로 로그인한 후 다시 시도하세요.",
+    "restoreFailed": "구매를 복원하지 못했습니다. 다시 시도하세요.",
+    "purchaseFailed": "구매를 완료하지 못했습니다.",
+    "purchaseStartFailed": "App Store 구매를 시작하지 못했습니다."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "댓글이 게시되었습니다",
       "reviewSubmitted": "리뷰가 제출되었습니다",
       "autoMergeEnabled": "자동 병합이 켜졌습니다"
+    },
+    "mutationError": {
+      "commentNotPosted": "이 댓글은 게시할 수 없습니다. 선택한 줄이 변경되었거나 PR이 업데이트되었을 수 있습니다.",
+      "reviewNotSubmitted": "이 리뷰는 그대로 제출할 수 없습니다. PR이 변경되었거나 자신의 풀 리퀘스트를 리뷰할 수 없습니다.",
+      "couldNotPostComment": "댓글을 게시할 수 없습니다.",
+      "couldNotSubmitReview": "리뷰를 제출할 수 없습니다. 연결을 확인하고 다시 시도하세요."
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "송장",
       "statusPaid": "결제 완료",
       "statusOpen": "미결제",
-      "statusVoid": "무효"
+      "statusVoid": "무효",
+      "downloadFailed": "송장을 다운로드할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+      "sharingUnavailable": "이 기기에서는 공유를 사용할 수 없습니다."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "로그인에 실패했습니다. 다시 시도해 주세요.",
     "networkError": "네트워크 오류. 다시 시도해 주세요.",
     "accessDeniedByUser": "사용자가 액세스를 거부했습니다",
-    "codeExpired": "코드가 만료되었습니다"
+    "codeExpired": "코드가 만료되었습니다",
+    "tooManySignInAttempts": "로그인 시도가 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
   },
   "models": {
     "dataCollected": "수집된 데이터",

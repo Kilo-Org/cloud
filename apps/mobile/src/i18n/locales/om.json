@@ -24,7 +24,10 @@
     "required": "barbaachisaa",
     "error": "dogoggora: {{error}}",
     "back": "Gara duuba",
-    "somethingWentWrong": "Wanti dogoggoraa ta'e jira"
+    "somethingWentWrong": "Wanti dogoggoraa ta'e jira",
+    "couldNotOpen": "{{label}} banuu hin dandeenye",
+    "link": "liinkii",
+    "takingLonger": "Kun yeroo eeggamaa irraa dheeraa jira. Cuftee deebi'ee ilaaluu dandeessa."
   },
   "language": {
     "title": "Afaan",
@@ -576,6 +579,12 @@
       "commentPosted": "Yaadni maxxanfameera",
       "reviewSubmitted": "Ilalloon dhiheeffameera",
       "autoMergeEnabled": "Auto-merge dandeesameera"
+    },
+    "mutationError": {
+      "commentNotPosted": "Yaadni kun maxxanfamuu hin danda'u. Sirriin filatame jijjirameera ta'a, ykn PR haaromameera ta'a.",
+      "reviewNotSubmitted": "Ilalloon kun akkuma jirutti dhiheeffamuu hin danda'u. PR jijjirameera ta'a, ykn pull request ofii kee ilaaluu hin dandeessu.",
+      "couldNotPostComment": "Yaada maxxansuu hin dandeenye.",
+      "couldNotSubmitReview": "Ilalloo dhiheessuu hin dandeenye. Walqabii kee ilaaliitii irra deebi'ii yaali."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Faayilli duwwaa dha",
       "classificationTooLarge": "Faayilootni 20 MB ykn sanaa gadii ta'uu qabu",
       "classificationUnreadable": "Faayilii kana dubbisuu hin dandeenye",
-      "announceUploaded": "Attachment ol fe'ameera"
+      "announceUploaded": "Attachment ol fe'ameera",
+      "cantUpload": "Faayiliin kun ol fe'uun hin danda'amu.",
+      "networkError": "Dogoggorri network",
+      "uploadFailed": "Ol fe'uun hin milkoofne",
+      "failedToUploadFile": "Faayilii ol fe'uu dadhabe: {{reason}}",
+      "nothingToPaste": "Maxxansuuf wanti hin jiru"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Sparfala",
       "strongArm": "Harka cimaa",
       "talisman": "Taalismaanii"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Tuuramni kun faayiloota fudhachuu hin danda'u."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Murtoo hin jiru",
       "noResult": "Bu'aa hin jiru"
     },
-    "eyebrow": "Sakatta'a Koodii"
+    "eyebrow": "Sakatta'a Koodii",
+    "updateFailed": "Ilaaltuu haaromsuu dadhabe.",
+    "configSaveFailed": "Qindaa'ina ilalloo kuusuu dadhabe."
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Furamoonni jiran tarreeffamaniiru",
       "analysisComplete": "Anaaliziin xumurameera",
       "syncComplete": "Walitti qabamni xumurameera"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Tajaajilli nageenyaa hin qindaa'ine. Kana furuu dura deebi'ee dhiheessuun milkaa'uu hin danda'u.",
+      "syncMayNotHaveCompleted": "Walitti qabamni xumuramuu hin qaba ta'a. Irra deebi'ii furi, ykn gati.",
+      "syncInProgress": "Walitti qabamni nageenyaa duraanuu hojii irraa jira. Irra deebi'ii yaali.",
+      "dismissalInProgress": "Dhiifamni kun duraanuu hojii irraa jira. Irra deebi'ii yaali.",
+      "couldNotReadPendingSyncs": "Walitti qabamoota eegachaa jiran dubbisuu hin dandeenye. Irra deebi'ii yaali."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Gadgetiin kuni offline galmeessuu hin danda'u. Galmee kee barruuf gara {{provider}} ergama. Kilo sagalee hin kuusu.",
     "allow": "Hayyami",
     "start": "Sagalee galchuu jalqabi",
-    "stop": "Sagalee galchuu dhaabi"
+    "stop": "Sagalee galchuu dhaabi",
+    "restricted": "Galchuun sagalee meeshaa kana irratti dhowwameera.",
+    "micRequired": "Maayikirofoonii itti fufuun sagalee galchuuf barbaachisa.",
+    "micOff": "Itti fufuun maayikirofoonii cufameera. Sagalee galchuuf Settings keessatti dandeesi.",
+    "micOffTitle": "Itti fufuun maayikirofoonii cufameera",
+    "noSpeech": "Sagaleen hin argamne. Irra deebi'uuf maayikirofoonii tuqi.",
+    "needsConnection": "Galchuun sagalee amma walqabii barbaada. Irra deebi'ii yaali.",
+    "busy": "Galchuun sagalee qabanaa jira. Irra deebi'ii yaali.",
+    "stopped": "Galchuun sagalee dhaabbateera. Irra deebi'uuf maayikirofoonii tuqi.",
+    "unavailableDevice": "Galchuun sagalee meeshaa kana irratti hin jiru.",
+    "unavailableLanguage": "Galchuun sagalee afaan meeshaa kanaaf hin jiru."
   },
   "share": {
     "title": "Kilo wajjin qoodi",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Kilo Pass kun weeb irratti bulchama.",
     "legalDisclosure": "Kilo Pass ji'aan haaromsu subscription dha. Kaffaltiin Apple ID kee irratti yeroo bitachuu mirkaneeffamu ni itti baafama. Subscription'n ji'a ji'aan gatii mul'atuun ni haaroma, yoo yeroo dhumaa dura sa'aatii 24 dura hin haaromsine malee. Yeroo kamillee App Store account keessaa bulchi ykn haqi.",
     "legalPrivacyPolicy": "Imaammata Iccitii",
-    "legalTermsOfUse": "Caaccuu Itti Fayyadamaa (EULA)"
+    "legalTermsOfUse": "Caaccuu Itti Fayyadamaa (EULA)",
+    "purchaseNotLinked": "Bittaan App Store kana herrega Kilo kee waliin hin walqabamne. Apple ID bittaa kana hojjetu waliin seenuu mirkaneeffadhu, ergasii ammas yaali.",
+    "purchaseDifferentAccount": "Bittaan App Store kana herrega Kilo kee waliin hin walqabamne. Apple Account bittaa kanaaf fayyadame waliin seenii, ergasii ammas yaali.",
+    "restoreFailed": "Bittaa deebisuu dadhabe. Irra deebi'ii yaali.",
+    "purchaseFailed": "Bittaa xumuruu dadhabe.",
+    "purchaseStartFailed": "Bittaa App Store jalqabuu dadhabe."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Banaa",
       "statusPaid": "Kaffalameera",
       "statusVoid": "Bara kana hin fayyadanne",
-      "title": "Invoices"
+      "title": "Invoices",
+      "downloadFailed": "Invoice gadi baasuu hin dandeenye. Walqabii kee ilaaliitii irra deebi'ii yaali.",
+      "sharingUnavailable": "Qooduun meeshaa kana irratti hin jiru."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Seeniin hin milkoofne. Irra deebi'ii yaali.",
     "networkError": "Dogoggorri network jira. Irra deebi'ii yaali.",
     "accessDeniedByUser": "Dheedhumaan fayyadamaadhaan dhowatame",
-    "codeExpired": "Koodiin xumurame"
+    "codeExpired": "Koodiin xumurame",
+    "tooManySignInAttempts": "Yaallii seenii baay'ee godhame. Yeroo xiqqoo eegiitii irra deebi'ii yaali."
   },
   "models": {
     "dataCollected": "Daataan walitti qabame",

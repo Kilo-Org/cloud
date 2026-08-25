@@ -24,7 +24,10 @@
     "required": "kuyadingeka",
     "error": "iphutha: {{error}}",
     "back": "Emuva",
-    "somethingWentWrong": "Kukhona okungahambanga kahle"
+    "somethingWentWrong": "Kukhona okungahambanga kahle",
+    "couldNotOpen": "Asikwazanga ukuvula {{label}}",
+    "link": "isixhumanisi",
+    "takingLonger": "Lokhu kuthatha isikhathi eside kunalokho okulindelekile. Ungakwazi ukuvala bese ubheka futhi."
   },
   "language": {
     "title": "Ulimi",
@@ -576,6 +579,12 @@
       "commentPosted": "Amazwana athunyelwe",
       "reviewSubmitted": "Ukubuyekeza kuthunyelwe",
       "autoMergeEnabled": "I-auto-merge ivuliwe"
+    },
+    "mutationError": {
+      "commentNotPosted": "Lamazwana awakwazi ukuthunyelwa. Umugqa okhethiwe kungenzeka ushintshile, noma i-PR kungenzeka ibuyekezwe.",
+      "reviewNotSubmitted": "Lokhu kubuyekeza akukwazi ukuthunyelwa njengoba kunjalo. I-PR kungenzeka ishintshile, noma awukwazi ukubuyekeza isicelo sakho sokudonsa.",
+      "couldNotPostComment": "Asikwazanga ukuthumela amazwana.",
+      "couldNotSubmitReview": "Asikwazanga ukuthumela ukubuyekeza. Hlola ukuxhumana kwakho bese uzama futhi."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Ifayela alinalutho",
       "classificationTooLarge": "Amafayela kumele abe ngu-20 MB noma ngaphansi",
       "classificationUnreadable": "Asikwazanga ukufunda leli fayela",
-      "announceUploaded": "Okunamathiselwe kulayishiwe"
+      "announceUploaded": "Okunamathiselwe kulayishiwe",
+      "cantUpload": "Leli fayela alikwazi ukulayishwa.",
+      "networkError": "Iphutha lenethiwekhi",
+      "uploadFailed": "Ukulayisha kwehlulekile",
+      "failedToUploadFile": "Kwehlulekile ukulayisha ifayela: {{reason}}",
+      "nothingToPaste": "Akukho okunamathiselwa"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Izintaba zezinkanyezi",
       "strongArm": "Ingalo enamandla",
       "talisman": "Ithalimane"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Lesi simo asikwazi ukwamukela amafayela."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Asikho isinqumo",
       "noResult": "Awukho umphumela"
     },
-    "eyebrow": "I-Code Reviewer"
+    "eyebrow": "I-Code Reviewer",
+    "updateFailed": "Kwehlulekile ukubuyekeza umbuyekezi",
+    "configSaveFailed": "Kwehlulekile ukulondoloza ukucushwa kokubuyekeza"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Ukulungisa okukhona kumisiwe",
       "analysisComplete": "Ukuhlaziywa kuphelele",
       "syncComplete": "Ukuvumelanisa kuphelele"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Isevisi yokuphepha ayilungisiwe. Ukuphinda kuthunyelwe akukwazi ukuphumelela kuze kube lokhu kulungisiwe.",
+      "syncMayNotHaveCompleted": "Ukuvumelanisa kungenzeka kungaqedwanga. Zama futhi ukuze kuvumelaniswe, noma ulahle.",
+      "syncInProgress": "Ukuvumelanisa kokuphepha sekuqhubeka. Sicela uzame futhi.",
+      "dismissalInProgress": "Ukulahla sekuqhubeka. Sicela uzame futhi.",
+      "couldNotReadPendingSyncs": "Asikwazanga ukufunda ukuvumelanisa okulindile. Zama futhi."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Le divayisi ayikwazi ukubhala izwi ngaphandle kwe-inthanethi. Ukurekhoda kwakho kuthunyelwa ku-{{provider}} ukuze kuphendulwe kube umbhalo. I-Kilo ayigcini i-audio.",
     "allow": "Vumela",
     "start": "Qala ukufaka ngezwi",
-    "stop": "Misa ukufaka ngezwi"
+    "stop": "Misa ukufaka ngezwi",
+    "restricted": "Ukufaka ngezwi kuvinjelwe kule divayisi.",
+    "micRequired": "Ukufinyelela kwemakrofoni kuyadingeka ukuze ufake ngezwi.",
+    "micOff": "Ukufinyelela kwemakrofoni kuvaliwe. Kuvule ku-Izilungiselelo ukuze usebenzise ukufaka ngezwi.",
+    "micOffTitle": "Ukufinyelela kwemakrofoni kuvaliwe",
+    "noSpeech": "Akukho nkulumo etholiwe. Thepha imakrofoni ukuze uzame futhi.",
+    "needsConnection": "Ukufaka ngezwi kudinga ukuxhumana manje. Zama futhi.",
+    "busy": "Ukufaka ngezwi kumatasatasa. Zama futhi.",
+    "stopped": "Ukufaka ngezwi kumisiwe. Thepha imakrofoni ukuze uzame futhi.",
+    "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
+    "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi."
   },
   "share": {
     "title": "Yabelana nge-Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Le Kilo Pass ilawulwa kuwebhu.",
     "legalDisclosure": "I-Kilo Pass iwukubhalisela kwanyanga ngalinye okuzivuselelayo ngokuzenzakalelayo. Inkokhelo ikhokhiswa ku-Apple ID yakho lapho kuqinisekiswa ukuthenga. Ukubhalisela kuzivuselela ngokuzenzakalelayo nyanga zonke ngentengo ebonisiwe ngaphandle uma kukhanselwe okungenani amahora angu-24 ngaphambi kokuphela kwesikhathi samanje. Lawula noma ukhansela noma nini kuzilungiselelo zekhawunti yakho ye-App Store.",
     "legalPrivacyPolicy": "Inqubomgomo Yobumfihlo",
-    "legalTermsOfUse": "Imigomo Yokusetshenziswa (EULA)"
+    "legalTermsOfUse": "Imigomo Yokusetshenziswa (EULA)",
+    "purchaseNotLinked": "Lokhu kuthengwa kwe-App Store akuxhunyiwe ku-akhawunti yakho ye-Kilo. Qinisekisa ukuthi ungenile nge-Apple ID eyenza lokhu kuthenga, bese uzama futhi.",
+    "purchaseDifferentAccount": "Lokhu kuthengwa kwe-App Store akuxhunyiwe ku-akhawunti yakho ye-Kilo. Ngena nge-Apple Account esetshenziselwe ukuthenga, bese uzama futhi.",
+    "restoreFailed": "Kwehlulekile ukubuyisela okuthengiwe. Zama futhi.",
+    "purchaseFailed": "Kwehlulekile ukuqeda ukuthenga.",
+    "purchaseStartFailed": "Kwehlulekile ukuqala ukuthenga kwe-App Store."
   },
   "consent": {
     "kilo": "I-Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Vulekile",
       "statusPaid": "Ikhokhiwe",
       "statusVoid": "Ayisebenzi",
-      "title": "Ama-invoyisi"
+      "title": "Ama-invoyisi",
+      "downloadFailed": "Asikwazanga ukulanda i-invoyisi. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "sharingUnavailable": "Ukwabelana akutholakali kule divayisi."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Ukungena kwehlulekile. Sicela uzame futhi.",
     "networkError": "Iphutha lenethiwekhi. Sicela uzame futhi.",
     "accessDeniedByUser": "Ukufinyelela kunqatshiwe ngumsebenzisi",
-    "codeExpired": "Ikhodi iphelelwe yisikhathi"
+    "codeExpired": "Ikhodi iphelelwe yisikhathi",
+    "tooManySignInAttempts": "Imizamo eminingi kakhulu yokungena. Sicela ulinde bese uzama futhi."
   },
   "models": {
     "dataCollected": "Idatha eqoqiwe",

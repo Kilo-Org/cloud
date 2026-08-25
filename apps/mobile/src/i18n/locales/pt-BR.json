@@ -24,7 +24,10 @@
     "notNow": "Agora não",
     "continue": "Continuar",
     "back": "Voltar",
-    "somethingWentWrong": "Algo deu errado"
+    "somethingWentWrong": "Algo deu errado",
+    "couldNotOpen": "Não foi possível abrir {{label}}",
+    "link": "link",
+    "takingLonger": "Isso está demorando mais que o esperado. Você pode fechar isto e verificar novamente."
   },
   "language": {
     "title": "Idioma",
@@ -269,7 +272,12 @@
       "classificationEmpty": "O arquivo está vazio",
       "classificationTooLarge": "Os arquivos devem ter no máximo 20 MB",
       "classificationUnreadable": "Não foi possível ler este arquivo",
-      "announceUploaded": "Anexo enviado"
+      "announceUploaded": "Anexo enviado",
+      "cantUpload": "Este arquivo não pode ser enviado.",
+      "networkError": "Erro de rede",
+      "uploadFailed": "Falha no envio",
+      "failedToUploadFile": "Falha ao enviar o arquivo: {{reason}}",
+      "nothingToPaste": "Nada para colar"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -729,7 +737,8 @@
       "sparkles": "Brilhos",
       "strongArm": "Braço forte",
       "talisman": "Talismã"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Esta instância não pode receber arquivos."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -916,7 +925,9 @@
       "reviewMemory": "Memória de revisão",
       "reviewStyle": "Estilo de revisão",
       "set": "Definir"
-    }
+    },
+    "updateFailed": "Falha ao atualizar o revisor",
+    "configSaveFailed": "Falha ao salvar a configuração de revisão"
   },
   "securityAgent": {
     "filter": {
@@ -1340,6 +1351,13 @@
       "remediationsQueued": "Remediações existentes na fila",
       "analysisComplete": "Análise concluída",
       "syncComplete": "Sincronização concluída"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "O serviço de segurança não está configurado. O reenvio não pode ter sucesso até que isto seja corrigido.",
+      "syncMayNotHaveCompleted": "Uma sincronização pode não ter sido concluída. Tente novamente para reconciliá-la, ou descarte-a.",
+      "syncInProgress": "Uma sincronização de segurança já está em andamento. Tente novamente.",
+      "dismissalInProgress": "Esta dispensa já está em andamento. Tente novamente.",
+      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tente novamente."
     }
   },
   "agents": {
@@ -2051,7 +2069,17 @@
     "onlineTitle": "A fala é processada online",
     "staysOff": "A fala permanece desativada até você permitir a transcrição online.",
     "start": "Iniciar entrada de voz",
-    "stop": "Parar entrada de voz"
+    "stop": "Parar entrada de voz",
+    "restricted": "A entrada de voz é restrita neste dispositivo.",
+    "micRequired": "O acesso ao microfone é necessário para a entrada de voz.",
+    "micOff": "O acesso ao microfone está desativado. Ative-o em Ajustes para usar a entrada de voz.",
+    "micOffTitle": "O acesso ao microfone está desativado",
+    "noSpeech": "Nenhuma fala detectada. Toque no microfone para tentar novamente.",
+    "needsConnection": "A entrada de voz precisa de uma conexão agora. Tente novamente.",
+    "busy": "A entrada de voz está ocupada. Tente novamente.",
+    "stopped": "A entrada de voz foi interrompida. Toque no microfone para tentar novamente.",
+    "unavailableDevice": "A entrada de voz não está disponível neste dispositivo.",
+    "unavailableLanguage": "A entrada de voz não está disponível para o idioma deste dispositivo."
   },
   "share": {
     "title": "Compartilhar no Kilo",
@@ -2129,7 +2157,12 @@
     "webManagementDescription": "Este Kilo Pass é gerenciado na web.",
     "legalDisclosure": "O Kilo Pass é uma assinatura mensal com renovação automática. O pagamento é cobrado na sua Apple ID na confirmação da compra. As assinaturas são renovadas automaticamente todos os meses pelo preço exibido, a menos que sejam canceladas pelo menos 24 horas antes do fim do período atual. Gerencie ou cancele a qualquer momento nas configurações da sua conta na App Store.",
     "legalPrivacyPolicy": "Política de Privacidade",
-    "legalTermsOfUse": "Termos de Uso (EULA)"
+    "legalTermsOfUse": "Termos de Uso (EULA)",
+    "purchaseNotLinked": "Esta compra da App Store não está vinculada à sua conta Kilo. Verifique se você está conectado ao Apple ID que fez a compra e tente novamente.",
+    "purchaseDifferentAccount": "Esta compra da App Store não está vinculada à sua conta Kilo. Entre na Apple Account usada na compra e tente novamente.",
+    "restoreFailed": "Falha ao restaurar as compras. Tente novamente.",
+    "purchaseFailed": "Falha ao concluir a compra.",
+    "purchaseStartFailed": "Falha ao iniciar a compra na App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2650,6 +2683,12 @@
       "commentPosted": "Comentário publicado",
       "reviewSubmitted": "Revisão enviada",
       "autoMergeEnabled": "Merge automático ativado"
+    },
+    "mutationError": {
+      "commentNotPosted": "Este comentário não pode ser publicado. A linha selecionada pode ter mudado, ou o PR pode ter sido atualizado.",
+      "reviewNotSubmitted": "Esta revisão não pode ser enviada como está. O PR pode ter mudado, ou você não pode revisar seu próprio pull request.",
+      "couldNotPostComment": "Não foi possível publicar o comentário.",
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifique sua conexão e tente novamente."
     }
   },
   "organization": {
@@ -2696,7 +2735,9 @@
       "title": "Faturas",
       "statusPaid": "Pago",
       "statusOpen": "Em aberto",
-      "statusVoid": "Cancelada"
+      "statusVoid": "Cancelada",
+      "downloadFailed": "Não foi possível baixar a fatura. Verifique sua conexão e tente novamente.",
+      "sharingUnavailable": "O compartilhamento não está disponível neste dispositivo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nome@empresa.com",
@@ -2821,7 +2862,8 @@
     "signInFailed": "Falha na entrada. Tente novamente.",
     "networkError": "Erro de rede. Tente novamente.",
     "accessDeniedByUser": "Acesso negado pelo usuário",
-    "codeExpired": "Código expirado"
+    "codeExpired": "Código expirado",
+    "tooManySignInAttempts": "Muitas tentativas de login. Aguarde e tente novamente."
   },
   "models": {
     "dataCollected": "Dados coletados",

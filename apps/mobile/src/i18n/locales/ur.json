@@ -24,7 +24,10 @@
     "required": "مطلوبہ",
     "error": "خرابی: {{error}}",
     "back": "واپس",
-    "somethingWentWrong": "کچھ غلط ہو گیا"
+    "somethingWentWrong": "کچھ غلط ہو گیا",
+    "couldNotOpen": "{{label}} نہیں کھول سکے",
+    "link": "لنک",
+    "takingLonger": "اس میں توقع سے زیادہ وقت لگ رہا ہے۔ آپ اسے بند کر کے دوبارہ چیک کر سکتے ہیں۔"
   },
   "language": {
     "title": "زبان",
@@ -576,6 +579,12 @@
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
       "reviewSubmitted": "جائزہ جمع ہو گیا",
       "autoMergeEnabled": "آٹو-مرج فعال ہو گیا"
+    },
+    "mutationError": {
+      "commentNotPosted": "یہ تبصرہ پوسٹ نہیں کیا جا سکتا۔ منتخب لائن بدل گئی ہو سکتی ہے، یا PR اپ ڈیٹ ہو گیا ہو سکتا ہے۔",
+      "reviewNotSubmitted": "یہ جائزہ اسی طرح جمع نہیں کیا جا سکتا۔ PR بدل گیا ہو سکتا ہے، یا آپ اپنی خود کی پل ریکویسٹ کا جائزہ نہیں لے سکتے۔",
+      "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
+      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "فائل خالی ہے",
       "classificationTooLarge": "فائلیں 20 MB یا اس سے چھوٹی ہونی چاہئیں",
       "classificationUnreadable": "یہ فائل پڑھی نہیں جا سکی",
-      "announceUploaded": "منسلکہ اپ لوڈ ہو گیا"
+      "announceUploaded": "منسلکہ اپ لوڈ ہو گیا",
+      "cantUpload": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔",
+      "networkError": "نیٹ ورک کی خرابی",
+      "uploadFailed": "اپ لوڈ ناکام",
+      "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}",
+      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "چمک",
       "strongArm": "مضبوط بازو",
       "talisman": "تعویذ"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "یہ انسٹنس فائلیں وصول نہیں کر سکتی۔"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "کوئی فیصلہ نہیں",
       "noResult": "کوئی نتیجہ نہیں"
     },
-    "eyebrow": "کوڈ ریویور"
+    "eyebrow": "کوڈ ریویور",
+    "updateFailed": "ریویور اپ ڈیٹ نہیں ہو سکا",
+    "configSaveFailed": "جائزہ کنفیگریشن محفوظ نہیں ہو سکی"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "موجودہ اصلاحات قطار میں شامل کر دی گئیں",
       "analysisComplete": "تجزیہ مکمل ہو گیا",
       "syncComplete": "مطابقت مکمل ہو گئی"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "سیکورٹی سروس کنفیگر نہیں ہے۔ جب تک یہ ٹھیک نہیں ہوتا دوبارہ جمع کرنا کامیاب نہیں ہو سکتا۔",
+      "syncMayNotHaveCompleted": "مطابقت مکمل نہیں ہوئی ہو سکتی۔ اسے ہم آہنگ کرنے کے لیے دوبارہ کوشش کریں، یا خارج کر دیں۔",
+      "syncInProgress": "ایک سیکورٹی مطابقت پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "dismissalInProgress": "یہ خارج کرنا پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "couldNotReadPendingSyncs": "زیر التوا مطابقت پڑھی نہیں جا سکی۔ دوبارہ کوشش کریں۔"
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "یہ ڈیوائس آف لائن ٹرانسکرائب نہیں کر سکتی۔ آپ کی ریکارڈنگ {{provider}} کو متن میں تبدیل کرنے کے لیے بھیجی جاتی ہے۔ Kilo آڈیو ذخیرہ نہیں کرتا۔",
     "allow": "اجازت دیں",
     "start": "وائس انپٹ شروع کریں",
-    "stop": "وائس انپٹ روکیں"
+    "stop": "وائس انپٹ روکیں",
+    "restricted": "اس ڈیوائس پر وائس انپٹ محدود ہے۔",
+    "micRequired": "وائس انپٹ کے لیے مائیکروفون تک رسائی درکار ہے۔",
+    "micOff": "مائیکروفون تک رسائی بند ہے۔ وائس انپٹ استعمال کرنے کے لیے اسے ترتیبات میں فعال کریں۔",
+    "micOffTitle": "مائیکروفون تک رسائی بند ہے",
+    "noSpeech": "کوئی گفتار نہیں ملی۔ دوبارہ کوشش کرنے کے لیے مائیکروفون پر ٹیپ کریں۔",
+    "needsConnection": "وائس انپٹ کو ابھی کنکشن درکار ہے۔ دوبارہ کوشش کریں۔",
+    "busy": "وائس انپٹ مصروف ہے۔ دوبارہ کوشش کریں۔",
+    "stopped": "وائس انپٹ رک گیا۔ دوبارہ کوشش کرنے کے لیے مائیکروفون پر ٹیپ کریں۔",
+    "unavailableDevice": "وائس انپٹ اس ڈیوائس پر دستیاب نہیں ہے۔",
+    "unavailableLanguage": "وائس انپٹ اس ڈیوائس کی زبان کے لیے دستیاب نہیں ہے۔"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "یہ Kilo Pass ویب پر منظم کیا جاتا ہے۔",
     "legalDisclosure": "Kilo Pass خودکار تجدید کے ساتھ ماہانہ سبسکرپشن ہے۔ ادائیگی خریداری کی تصدیق پر آپ کے Apple ID سے لی جاتی ہے۔ سبسکرپشنز ہر ماہ دکھائی گئی قیمت پر خود بخود تجدید ہوتی ہیں جب تک کہ موجودہ مدت ختم ہونے سے کم از کم 24 گھنٹے پہلے منسوخ نہ کی جائیں۔ اپنی App Store اکاؤنٹ کی ترتیبات میں کسی بھی وقت منظم یا منسوخ کریں۔",
     "legalPrivacyPolicy": "رازداری کی پالیسی",
-    "legalTermsOfUse": "استعمال کی شرائط (EULA)"
+    "legalTermsOfUse": "استعمال کی شرائط (EULA)",
+    "purchaseNotLinked": "یہ App Store خریداری آپ کے Kilo اکاؤنٹ سے منسلک نہیں ہے۔ اس بات کو یقینی بنائیں کہ آپ اس Apple ID سے سائن ان ہیں جس نے خریداری کی تھی، پھر دوبارہ کوشش کریں۔",
+    "purchaseDifferentAccount": "یہ App Store خریداری آپ کے Kilo اکاؤنٹ سے منسلک نہیں ہے۔ خریداری کے لیے استعمال شدہ Apple اکاؤنٹ میں سائن ان کریں، پھر دوبارہ کوشش کریں۔",
+    "restoreFailed": "خریداریاں بحال نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+    "purchaseFailed": "خریداری مکمل نہیں ہو سکی۔",
+    "purchaseStartFailed": "App Store خریداری شروع نہیں ہو سکی۔"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "کھلا",
       "statusPaid": "ادا شدہ",
       "statusVoid": "باطل",
-      "title": "انوائسز"
+      "title": "انوائسز",
+      "downloadFailed": "انوائس ڈاؤن لوڈ نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "sharingUnavailable": "اس ڈیوائس پر شیئرنگ دستیاب نہیں ہے۔"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "سائن ان ناکام رہا۔ براہ کرم دوبارہ کوشش کریں۔",
     "networkError": "نیٹ ورک کی خرابی۔ براہ کرم دوبارہ کوشش کریں۔",
     "accessDeniedByUser": "صارف نے رسائی مسترد کر دی",
-    "codeExpired": "کوڈ کی میعاد ختم ہو گئی"
+    "codeExpired": "کوڈ کی میعاد ختم ہو گئی",
+    "tooManySignInAttempts": "سائن ان کی بہت زیادہ کوششیں۔ براہ کرم انتظار کریں اور دوبارہ کوشش کریں۔"
   },
   "models": {
     "dataCollected": "جمع کردہ ڈیٹا",

@@ -6,6 +6,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   type ConfigPatch,
@@ -190,7 +191,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
         // resolved mutation — throwing routes it to onError (toast) instead
         // of letting callers' onSuccess fire haptics/navigation as if it worked.
         if (!result.success) {
-          throw new Error('Failed to update reviewer');
+          throw new Error(i18n.t('codeReviewer.updateFailed'));
         }
         return result;
       }),
@@ -337,7 +338,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         // resolve — otherwise onSuccess callers close sheets/navigate away as
         // if the save worked.
         if (!result.success) {
-          throw new Error('Failed to save review config');
+          throw new Error(i18n.t('codeReviewer.configSaveFailed'));
         }
         if (platform === 'gitlab') {
           queryClient.setQueryData<boolean>(

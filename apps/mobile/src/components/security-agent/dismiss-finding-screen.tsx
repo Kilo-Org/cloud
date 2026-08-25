@@ -15,7 +15,7 @@ import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import {
   isSecurityConfigurationError,
   isSecuritySyncRetryable,
-  SECURITY_CONFIGURATION_COPY,
+  securityConfigurationCopy,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
@@ -110,7 +110,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             reason,
             comment,
             lastError: isSecurityConfigurationError(error)
-              ? SECURITY_CONFIGURATION_COPY
+              ? securityConfigurationCopy()
               : error.message,
             retryable: isSecuritySyncRetryable(error),
           });
@@ -268,7 +268,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         {dismissFinding.isError && (
           <Text className="text-sm text-destructive">
             {isSecurityConfigurationError(dismissFinding.error)
-              ? SECURITY_CONFIGURATION_COPY
+              ? securityConfigurationCopy()
               : dismissFinding.error.message}
           </Text>
         )}

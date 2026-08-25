@@ -24,7 +24,10 @@
     "notNow": "稍後再說",
     "continue": "繼續",
     "back": "返回",
-    "somethingWentWrong": "發生錯誤"
+    "somethingWentWrong": "發生錯誤",
+    "couldNotOpen": "無法開啟 {{label}}",
+    "link": "連結",
+    "takingLonger": "此操作耗時比預期更久。您可以關閉此畫面，稍後再檢查。"
   },
   "language": {
     "title": "語言",
@@ -283,7 +286,12 @@
       "classificationEmpty": "檔案為空",
       "classificationTooLarge": "檔案必須為 20 MB 或更小",
       "classificationUnreadable": "無法讀取此檔案",
-      "announceUploaded": "附件已上傳"
+      "announceUploaded": "附件已上傳",
+      "cantUpload": "此檔案無法上傳。",
+      "networkError": "網路錯誤",
+      "uploadFailed": "上傳失敗",
+      "failedToUploadFile": "上傳檔案失敗：{{reason}}",
+      "nothingToPaste": "沒有可貼上的內容"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "星光",
       "strongArm": "強壯手臂",
       "talisman": "護身符"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "此執行個體無法接收檔案。"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "審查記憶",
       "reviewStyle": "審查風格",
       "set": "已設定"
-    }
+    },
+    "updateFailed": "更新審查員失敗",
+    "configSaveFailed": "儲存審查設定失敗"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "現有修復已排入佇列",
       "analysisComplete": "分析完成",
       "syncComplete": "同步完成"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "安全性服務尚未設定。在此修正之前，重新提交無法成功。",
+      "syncMayNotHaveCompleted": "同步可能尚未完成。重試以協調，或捨棄。",
+      "syncInProgress": "安全性同步已在進行中。請再試一次。",
+      "dismissalInProgress": "此忽略動作已在進行中。請再試一次。",
+      "couldNotReadPendingSyncs": "無法讀取待處理的同步。請再試一次。"
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "語音會在線上處理",
     "staysOff": "在您允許線上轉錄之前，語音會保持關閉。",
     "start": "開始語音輸入",
-    "stop": "停止語音輸入"
+    "stop": "停止語音輸入",
+    "restricted": "此裝置上的語音輸入受到限制。",
+    "micRequired": "語音輸入需要麥克風存取權限。",
+    "micOff": "麥克風存取已關閉。請在設定中啟用，以使用語音輸入。",
+    "micOffTitle": "麥克風存取已關閉",
+    "noSpeech": "未偵測到語音。點按麥克風圖示再試一次。",
+    "needsConnection": "語音輸入目前需要連線。請再試一次。",
+    "busy": "語音輸入忙碌中。請再試一次。",
+    "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
+    "unavailableDevice": "此裝置上無法使用語音輸入。",
+    "unavailableLanguage": "此裝置語言無法使用語音輸入。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "此 Kilo Pass 是在網頁上管理的。",
     "legalDisclosure": "Kilo Pass 是自動續訂的每月訂閱。款項會在購買確認時從您的 Apple ID 扣款。除非在目前週期結束前至少 24 小時取消，否則訂閱會以顯示的價格每月自動續訂。您可以隨時在 App Store 帳戶設定中管理或取消。",
     "legalPrivacyPolicy": "隱私權政策",
-    "legalTermsOfUse": "使用條款 (EULA)"
+    "legalTermsOfUse": "使用條款 (EULA)",
+    "purchaseNotLinked": "此 App Store 購買未連結至您的 Kilo 帳戶。請確認您已登入進行購買的 Apple ID，然後再試一次。",
+    "purchaseDifferentAccount": "此 App Store 購買未連結至您的 Kilo 帳戶。請登入用於購買的 Apple 帳戶，然後再試一次。",
+    "restoreFailed": "恢復購買失敗。請再試一次。",
+    "purchaseFailed": "無法完成購買。",
+    "purchaseStartFailed": "無法開始 App Store 購買。"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "留言已發布",
       "reviewSubmitted": "審查已提交",
       "autoMergeEnabled": "自動合併已啟用"
+    },
+    "mutationError": {
+      "commentNotPosted": "此留言無法發布。選取的行可能已變更，或 PR 可能已更新。",
+      "reviewNotSubmitted": "此審查無法原樣提交。PR 可能已變更，或您無法審查自己的拉取請求。",
+      "couldNotPostComment": "無法發布留言。",
+      "couldNotSubmitReview": "無法提交審查。請檢查連線後再試一次。"
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "發票",
       "statusPaid": "已付款",
       "statusOpen": "未付款",
-      "statusVoid": "已作廢"
+      "statusVoid": "已作廢",
+      "downloadFailed": "無法下載發票。請檢查連線後再試一次。",
+      "sharingUnavailable": "此裝置上無法使用分享。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "登入失敗。請再試一次。",
     "networkError": "網路錯誤。請再試一次。",
     "accessDeniedByUser": "使用者拒絕存取",
-    "codeExpired": "代碼已過期"
+    "codeExpired": "代碼已過期",
+    "tooManySignInAttempts": "登入嘗試次數過多。請稍候再試。"
   },
   "models": {
     "dataCollected": "收集的資料",

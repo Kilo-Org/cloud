@@ -24,7 +24,10 @@
     "required": "privaloma",
     "error": "klaida: {{error}}",
     "back": "Atgal",
-    "somethingWentWrong": "Kažkas nepavyko"
+    "somethingWentWrong": "Kažkas nepavyko",
+    "couldNotOpen": "Nepavyko atidaryti {{label}}",
+    "link": "nuoroda",
+    "takingLonger": "Tai trunka ilgiau, nei tikėtasi. Galite tai uždaryti ir patikrinti vėliau."
   },
   "language": {
     "title": "Kalba",
@@ -590,6 +593,12 @@
       "commentPosted": "Komentaras paskelbtas",
       "reviewSubmitted": "Peržiūra pateikta",
       "autoMergeEnabled": "Automatinis sujungimas įjungtas"
+    },
+    "mutationError": {
+      "commentNotPosted": "Šio komentaro paskelbti negalima. Pasirinkta eilutė galėjo pasikeisti arba PR galėjo būti atnaujintas.",
+      "reviewNotSubmitted": "Šios peržiūros negalima pateikti tokios, kokia ji yra. PR galėjo pasikeisti arba negalite peržiūrėti savo pull request.",
+      "couldNotPostComment": "Nepavyko paskelbti komentaro.",
+      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrinkite ryšį ir bandykite dar kartą."
     }
   },
   "notifications": {
@@ -728,7 +737,12 @@
       "classificationEmpty": "Failas tuščias",
       "classificationTooLarge": "Failai turi būti 20 MB arba mažesni",
       "classificationUnreadable": "Nepavyko perskaityti šio failo",
-      "announceUploaded": "Priedas įkeltas"
+      "announceUploaded": "Priedas įkeltas",
+      "cantUpload": "Šis failas negali būti įkeltas.",
+      "networkError": "Tinklo klaida",
+      "uploadFailed": "Įkelti nepavyko",
+      "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}",
+      "nothingToPaste": "Nėra ko įklijuoti"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1190,7 +1204,8 @@
       "sparkles": "Žiežirbos",
       "strongArm": "Stipri ranka",
       "talisman": "Talismanas"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Šis egzempliorius negali gauti failų."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1377,7 +1392,9 @@
       "noDecision": "Nėra sprendimo",
       "noResult": "Nėra rezultato"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Nepavyko atnaujinti recenzento",
+    "configSaveFailed": "Nepavyko išsaugoti peržiūros konfigūracijos"
   },
   "securityAgent": {
     "filter": {
@@ -1803,6 +1820,13 @@
       "remediationsQueued": "Esami taisymai įrašyti į eilę",
       "analysisComplete": "Analizė užbaigta",
       "syncComplete": "Sinchronizavimas užbaigtas"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Saugos paslauga nesukonfigūruota. Pakartotinis pateikimas negalės pavykti, kol tai nebus ištaisyta.",
+      "syncMayNotHaveCompleted": "Sinchronizavimas gali būti nesibaigęs. Bandykite dar kartą, kad jį suderintumėte, arba atmeskite.",
+      "syncInProgress": "Saugos sinchronizavimas jau vyksta. Bandykite dar kartą.",
+      "dismissalInProgress": "Šis atmetimas jau vyksta. Bandykite dar kartą.",
+      "couldNotReadPendingSyncs": "Nepavyko perskaityti laukiančių sinchronizavimų. Bandykite dar kartą."
     }
   },
   "agents": {
@@ -2507,7 +2531,17 @@
     "onlineMessage": "Šis įrenginys negali transkribuoti neprisijungęs. Jūsų įrašas siunčiamas {{provider}}, kad jis būtų paverstas tekstu. Kilo nesaugo garso.",
     "allow": "Leisti",
     "start": "Pradėti balso įvestį",
-    "stop": "Sustabdyti balso įvestį"
+    "stop": "Sustabdyti balso įvestį",
+    "restricted": "Balso įvestis šiame įrenginyje apribota.",
+    "micRequired": "Balso įvesčiai reikalinga prieiga prie mikrofono.",
+    "micOff": "Prieiga prie mikrofono išjungta. Įjunkite ją nustatymuose, kad naudotumėte balso įvestį.",
+    "micOffTitle": "Prieiga prie mikrofono išjungta",
+    "noSpeech": "Kalbos neaptikta. Bakstelėkite mikrofoną, kad bandytumėte dar kartą.",
+    "needsConnection": "Balso įvesčiai dabar reikalingas ryšys. Bandykite dar kartą.",
+    "busy": "Balso įvestis užimta. Bandykite dar kartą.",
+    "stopped": "Balso įvestis sustabdyta. Bakstelėkite mikrofoną, kad bandytumėte dar kartą.",
+    "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
+    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos."
   },
   "share": {
     "title": "Dalintis į Kilo",
@@ -2585,7 +2619,12 @@
     "webManagementDescription": "Šis „Kilo Pass“ tvarkomas internete.",
     "legalDisclosure": "„Kilo Pass“ yra automatiškai atnaujinama mėnesinė prenumerata. Mokėjimas nuskaitomas iš jūsų „Apple ID“ patvirtinus pirkimą. Prenumeratos atnaujinamos automatiškai kiekvieną mėnesį nurodyta kaina, nebent atšauksite ne vėliau kaip likus 24 valandoms iki einamojo laikotarpio pabaigos. Tvarkykite arba atšaukite bet kada „App Store“ paskyros nustatymuose.",
     "legalPrivacyPolicy": "Privatumo politika",
-    "legalTermsOfUse": "Naudojimo sąlygos (EULA)"
+    "legalTermsOfUse": "Naudojimo sąlygos (EULA)",
+    "purchaseNotLinked": "Šis App Store pirkinys nesusietas su jūsų Kilo paskyra. Įsitikinkite, kad prisijungę prie Apple ID, kuriuo atliktas pirkinys, tada bandykite dar kartą.",
+    "purchaseDifferentAccount": "Šis App Store pirkinys nesusietas su jūsų Kilo paskyra. Prisijunkite prie Apple paskyros, naudotos pirkinį atlikti, tada bandykite dar kartą.",
+    "restoreFailed": "Nepavyko atkurti pirkinių. Bandykite dar kartą.",
+    "purchaseFailed": "Nepavyko užbaigti pirkinio.",
+    "purchaseStartFailed": "Nepavyko pradėti App Store pirkinio."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2718,7 +2757,9 @@
       "statusOpen": "Atidaryta",
       "statusPaid": "Apmokėta",
       "statusVoid": "Negaliojanti",
-      "title": "Sąskaitos"
+      "title": "Sąskaitos",
+      "downloadFailed": "Nepavyko atsisiųsti sąskaitos. Patikrinkite ryšį ir bandykite dar kartą.",
+      "sharingUnavailable": "Bendrinimas šiame įrenginyje nepasiekiamas."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2840,7 +2881,8 @@
     "signInFailed": "Prisijungti nepavyko. Bandykite dar kartą.",
     "networkError": "Tinklo klaida. Bandykite dar kartą.",
     "accessDeniedByUser": "Vartotojas atmetė prieigą",
-    "codeExpired": "Kodo galiojimas baigėsi"
+    "codeExpired": "Kodo galiojimas baigėsi",
+    "tooManySignInAttempts": "Per daug prisijungimo bandymų. Palaukite ir bandykite dar kartą."
   },
   "models": {
     "dataCollected": "Surinkti duomenys",

@@ -170,6 +170,11 @@ function isCopyExpression(node: ESTree.Expression): boolean {
   if (node.type === 'LogicalExpression' && (node.operator === '||' || node.operator === '??')) {
     return isCopyExpression(node.left) || isCopyExpression(node.right);
   }
+  // `error ? 'Something went wrong' : ''`: the user reads the branch when the
+  // condition holds, so either branch is copy.
+  if (node.type === 'ConditionalExpression') {
+    return isCopyExpression(node.consequent) || isCopyExpression(node.alternate);
+  }
   return false;
 }
 

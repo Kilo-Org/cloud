@@ -24,7 +24,10 @@
     "required": "diperlukan",
     "error": "ralat: {{error}}",
     "back": "Kembali",
-    "somethingWentWrong": "Ada sesuatu yang tidak kena"
+    "somethingWentWrong": "Ada sesuatu yang tidak kena",
+    "couldNotOpen": "Tidak dapat membuka {{label}}",
+    "link": "pautan",
+    "takingLonger": "Ini mengambil masa lebih lama daripada jangkaan. Anda boleh menutup ini dan menyemak semula."
   },
   "language": {
     "title": "Bahasa",
@@ -392,7 +395,7 @@
         "thumbsUp": "Ibu jari ke atas",
         "thumbsDown": "Ibu jari ke bawah",
         "laugh": "Ketawa",
-        "hooray": "Hooray",
+        "hooray": "Hore",
         "confused": "Keliru",
         "heart": "Hati",
         "rocket": "Roket",
@@ -576,6 +579,12 @@
       "commentPosted": "Komen disiarkan",
       "reviewSubmitted": "Semakan dihantar",
       "autoMergeEnabled": "Auto-gabung didayakan"
+    },
+    "mutationError": {
+      "commentNotPosted": "Komen ini tidak boleh disiarkan. Baris yang dipilih mungkin telah berubah, atau PR mungkin telah dikemas kini.",
+      "reviewNotSubmitted": "Semakan ini tidak boleh dihantar seadanya. PR mungkin telah berubah, atau anda tidak boleh menyemak permintaan tarik anda sendiri.",
+      "couldNotPostComment": "Tidak dapat menyiarkan komen.",
+      "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Fail kosong",
       "classificationTooLarge": "Fail mesti 20 MB atau lebih kecil",
       "classificationUnreadable": "Tidak dapat membaca fail ini",
-      "announceUploaded": "Lampiran dimuat naik"
+      "announceUploaded": "Lampiran dimuat naik",
+      "cantUpload": "Fail ini tidak boleh dimuat naik.",
+      "networkError": "Ralat rangkaian",
+      "uploadFailed": "Muat naik gagal",
+      "failedToUploadFile": "Gagal memuat naik fail: {{reason}}",
+      "nothingToPaste": "Tiada apa untuk ditampal"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Berkilau",
       "strongArm": "Lengan kuat",
       "talisman": "Azimat"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Instance ini tidak boleh menerima fail."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Tiada keputusan",
       "noResult": "Tiada hasil"
     },
-    "eyebrow": "Semakan Kod"
+    "eyebrow": "Semakan Kod",
+    "updateFailed": "Gagal mengemas kini penyemak",
+    "configSaveFailed": "Gagal menyimpan konfigurasi semakan"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Pemulihan sedia ada dijadualkan",
       "analysisComplete": "Analisis selesai",
       "syncComplete": "Penyegerakan selesai"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Perkhidmatan keselamatan tidak dikonfigurasikan. Penghantaran semula tidak boleh berjaya sehingga ini dibaiki.",
+      "syncMayNotHaveCompleted": "Penyegerakan mungkin belum selesai. Cuba semula untuk menyelaraskannya, atau buang.",
+      "syncInProgress": "Penyegerakan keselamatan sedang berjalan. Sila cuba lagi.",
+      "dismissalInProgress": "Pembuangan ini sedang berjalan. Sila cuba lagi.",
+      "couldNotReadPendingSyncs": "Tidak dapat membaca penyegerakan yang belum selesai. Cuba lagi."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Peranti ini tidak boleh mentranskripsikan di luar talian. Rakaman anda dihantar ke {{provider}} untuk menukarnya kepada teks. Kilo tidak menyimpan audio tersebut.",
     "allow": "Benarkan",
     "start": "Mula input suara",
-    "stop": "Henti input suara"
+    "stop": "Henti input suara",
+    "restricted": "Input suara disekat pada peranti ini.",
+    "micRequired": "Akses mikrofon diperlukan untuk input suara.",
+    "micOff": "Akses mikrofon dimatikan. Dayakan dalam Tetapan untuk menggunakan input suara.",
+    "micOffTitle": "Akses mikrofon dimatikan",
+    "noSpeech": "Tiada pertuturan dikesan. Ketik mikrofon untuk mencuba lagi.",
+    "needsConnection": "Input suara memerlukan sambungan sekarang. Cuba lagi.",
+    "busy": "Input suara sibuk. Cuba lagi.",
+    "stopped": "Input suara dihentikan. Ketik mikrofon untuk mencuba lagi.",
+    "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
+    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini."
   },
   "share": {
     "title": "Kongsi ke Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Kilo Pass ini diuruskan di web.",
     "legalDisclosure": "Kilo Pass ialah langganan bulanan auto-boleh diperbaharui. Bayaran dicaj ke Apple ID anda semasa pengesahan pembelian. Langganan diperbaharui secara automatik setiap bulan pada harga yang dipaparkan melainkan dibatalkan sekurang-kurangnya 24 jam sebelum tamat tempoh semasa. Urus atau batalkan pada bila-bila masa dalam tetapan akaun App Store anda.",
     "legalPrivacyPolicy": "Dasar Privasi",
-    "legalTermsOfUse": "Terma Penggunaan (EULA)"
+    "legalTermsOfUse": "Terma Penggunaan (EULA)",
+    "purchaseNotLinked": "Pembelian App Store ini tidak dipautkan ke akaun Kilo anda. Pastikan anda log masuk ke Apple ID yang membuat pembelian, kemudian cuba lagi.",
+    "purchaseDifferentAccount": "Pembelian App Store ini tidak dipautkan ke akaun Kilo anda. Log masuk ke Akaun Apple yang digunakan untuk pembelian, kemudian cuba lagi.",
+    "restoreFailed": "Gagal memulihkan pembelian. Cuba lagi.",
+    "purchaseFailed": "Gagal menyiapkan pembelian.",
+    "purchaseStartFailed": "Gagal memulakan pembelian App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Terbuka",
       "statusPaid": "Berbayar",
       "statusVoid": "Batal",
-      "title": "Invois"
+      "title": "Invois",
+      "downloadFailed": "Tidak dapat memuat turun invois. Semak sambungan anda dan cuba lagi.",
+      "sharingUnavailable": "Perkongsian tidak tersedia pada peranti ini."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nama@syarikat.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Log masuk gagal. Sila cuba lagi.",
     "networkError": "Ralat rangkaian. Sila cuba lagi.",
     "accessDeniedByUser": "Akses dinafikan oleh pengguna",
-    "codeExpired": "Kod tamat tempoh"
+    "codeExpired": "Kod tamat tempoh",
+    "tooManySignInAttempts": "Terlalu banyak percubaan log masuk. Sila tunggu dan cuba lagi."
   },
   "models": {
     "dataCollected": "Data dikumpul",

@@ -1,10 +1,10 @@
+import { i18n } from '@/i18n';
+
 import { type VoiceInputFeedback, type VoiceInputStatus } from './voice-input-state';
 
 export type VoiceInputFeedbackPresentation =
-  | { kind: 'alert'; title: 'Microphone access is off'; message: string }
+  | { kind: 'alert'; title: string; message: string }
   | { kind: 'toast'; message: string };
-
-const ALERT_TITLE = 'Microphone access is off' as const;
 
 /**
  * Pure projection of a `VoiceInputFeedback` into the surface that should
@@ -20,7 +20,7 @@ export function resolveVoiceInputFeedbackPresentation(
   feedback: VoiceInputFeedback
 ): VoiceInputFeedbackPresentation {
   if (feedback.action === 'open-settings') {
-    return { kind: 'alert', title: ALERT_TITLE, message: feedback.message };
+    return { kind: 'alert', title: i18n.t('voiceInput.micOffTitle'), message: feedback.message };
   }
   return { kind: 'toast', message: feedback.message };
 }

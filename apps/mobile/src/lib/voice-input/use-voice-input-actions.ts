@@ -57,7 +57,7 @@ async function fireHaptic(style: Haptics.ImpactFeedbackStyle): Promise<void> {
 
 function announceVoiceInputListening(): void {
   void fireHaptic(Haptics.ImpactFeedbackStyle.Light);
-  AccessibilityInfo.announceForAccessibility('Listening');
+  AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.listening'));
 }
 
 export function runVoiceInputListeningFeedback(
@@ -73,8 +73,8 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
   const presentation = resolveVoiceInputFeedbackPresentation(feedback);
   if (presentation.kind === 'alert') {
     Alert.alert(presentation.title, presentation.message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+      { text: i18n.t('common.cancel'), style: 'cancel' },
+      { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
     ]);
     return;
   }

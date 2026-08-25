@@ -24,7 +24,10 @@
     "required": "ይፈለጋል",
     "error": "ስህተት: {{error}}",
     "back": "ተመለስ",
-    "somethingWentWrong": "አንድ ችግር ተከስቷል"
+    "somethingWentWrong": "አንድ ችግር ተከስቷል",
+    "couldNotOpen": "{{label}}ን መክፈት አልተቻለም",
+    "link": "አገናኝ",
+    "takingLonger": "ይህ ከተጠበቀው በላይ ጊዜ ይወስዳል። ይህን ዝግተው እንደገና መፈተሽ ይችላሉ።"
   },
   "language": {
     "title": "ቋንቋ",
@@ -576,6 +579,12 @@
       "commentPosted": "አስተያየት ተለጥፏል",
       "reviewSubmitted": "ግምገማ ቀርቧል",
       "autoMergeEnabled": "ራስ-ሰር ውህደት ነቅቷል"
+    },
+    "mutationError": {
+      "commentNotPosted": "ይህ አስተያየት ሊለጠፍ አይችልም። የተመረጠው መስመር ተለውጦ ሊሆን ይችላል፣ ወይም PR ተዘምኗል።",
+      "reviewNotSubmitted": "ይህ ግምገማ እንዳለ ሊቀርብ አይችልም። PR ተለውጦ ሊሆን ይችላል፣ ወይም የራስዎን የጎተራ ጥያቄ መገምገም አይችሉም።",
+      "couldNotPostComment": "አስተያየት መለጠፍ አልተቻለም።",
+      "couldNotSubmitReview": "ግምገማውን ማስገባት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "ፋይሉ ባዶ ነው",
       "classificationTooLarge": "ፋይሎች 20 MB ወይም ከዚያ ያነሱ መሆን አለባቸው",
       "classificationUnreadable": "ይህን ፋይል ማንበብ አልተቻለም",
-      "announceUploaded": "ዓባሪ ተጭኗል"
+      "announceUploaded": "ዓባሪ ተጭኗል",
+      "cantUpload": "ይህ ፋይል መጫን አይቻልም።",
+      "networkError": "የአውታረ መረብ ስህተት",
+      "uploadFailed": "መጫን አልተሳካም",
+      "failedToUploadFile": "ፋይሉን መጫን አልተሳካም: {{reason}}",
+      "nothingToPaste": "የሚለጠፍ ነገር የለም"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}፣ {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "ብልጭታዎች",
       "strongArm": "ጠንካራ ክንድ",
       "talisman": "ታሊስማን"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "ይህ አጋጣሚ ፋይሎች መቀበል አይችልም።"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "ምንም ውሳኔ",
       "noResult": "ምንም ውጤት"
     },
-    "eyebrow": "የኮድ ገምጋሚ"
+    "eyebrow": "የኮድ ገምጋሚ",
+    "updateFailed": "ገምጋሚውን ማዘመን አልተሳካም",
+    "configSaveFailed": "የግምገማ ውቅርን ማስቀመጥ አልተሳካም"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "ነባር ማስተካከያዎች በወረፋ ላይ ናቸው",
       "analysisComplete": "ትንታኔ ተጠናቋል",
       "syncComplete": "ማመሳሰል ተጠናቋል"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "የደህንነት አገልግሎት አልተዋቀረም። ይህ እስካልተስተካከለ ድረስ እንደገና ማስገባት ሊሳካ አይችልም።",
+      "syncMayNotHaveCompleted": "ማመሳሰል ያልተጠናቀቀ ሊሆን ይችላል። ለማስታረቅ እንደገና ይሞክሩ፣ ወይም ያስወግዱት።",
+      "syncInProgress": "የደህንነት ማመሳሰል ቀድሞውኑ በሂደት ላይ ነው። እባክዎ እንደገና ይሞክሩ።",
+      "dismissalInProgress": "ይህ ማስወገድ ቀድሞውኑ በሂደት ላይ ነው። እባክዎ እንደገና ይሞክሩ።",
+      "couldNotReadPendingSyncs": "በመጠባበቅ ላይ ያሉ ማመሳሰሎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።"
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "ይህ መሣሪያ ከመስመር ውጭ መገልበጥ አይችልም። ቅጂዎ ወደ ጽሑፍ ለመቀየር ወደ {{provider}} ይላካል። Kilo ድምጹን አያከማችም።",
     "allow": "ይፍቀዱ",
     "start": "የድምፅ ግብዓት ይጀምሩ",
-    "stop": "የድምፅ ግብዓት ያቁሙ"
+    "stop": "የድምፅ ግብዓት ያቁሙ",
+    "restricted": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ የተገደበ ነው።",
+    "micRequired": "ለድምፅ ግብዓት የማይክሮፎን መዳረሻ ያስፈልጋል።",
+    "micOff": "የማይክሮፎን መዳረሻ ጠፍቷል። የድምፅ ግብዓት ለመጠቀም በቅንብሮች ውስጥ ያንቁት።",
+    "micOffTitle": "የማይክሮፎን መዳረሻ ጠፍቷል",
+    "noSpeech": "ምንም ንግግር አልተገኘም። እንደገና ለመሞከር ማይክሮፎኑን ይንኩ።",
+    "needsConnection": "የድምፅ ግብዓት አሁን ግንኙነት ይፈልጋል። እንደገና ይሞክሩ።",
+    "busy": "የድምፅ ግብዓት ስራ ላይ ነው። እንደገና ይሞክሩ።",
+    "stopped": "የድምፅ ግብዓት ቆሟል። እንደገና ለመሞከር ማይክሮፎኑን ይንኩ።",
+    "unavailableDevice": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ አይገኝም።",
+    "unavailableLanguage": "የድምፅ ግብዓት ለዚህ የመሣሪያ ቋንቋ አይገኝም።"
   },
   "share": {
     "title": "ወደ Kilo ያጋሩ",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "ይህ Kilo Pass በድር ላይ የሚተዳደር ነው።",
     "legalDisclosure": "Kilo Pass በራስ-ሰር የሚታደስ ወርሃዊ ምዝገባ ነው። ክፍያው ግዢውን ሲያረጋግጡ በApple ID ዎ ላይ ይጠየቃል። ምዝገባዎች ከወቅቱ ጊዜ ማብቂያ ቢያንስ 24 ሰዓታት በፊት ካልተሰረዙ በስተቀር በየወሩ በተጠቀሰው ዋጋ በራስ-ሰር ይታደሳሉ። በApp Store መለያ ቅንብሮችዎ ውስጥ በማንኛውም ጊዜ ያስተዳድሩ ወይም ይሰርዙ።",
     "legalPrivacyPolicy": "የግላዊነት ፖሊሲ",
-    "legalTermsOfUse": "የአጠቃቀም ውሎች (EULA)"
+    "legalTermsOfUse": "የአጠቃቀም ውሎች (EULA)",
+    "purchaseNotLinked": "ይህ የApp Store ግዢ ከKilo መለያዎ ጋር አልተገናኘም። ግዢውን ባደረገው Apple ID መግባትዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+    "purchaseDifferentAccount": "ይህ የApp Store ግዢ ከKilo መለያዎ ጋር አልተገናኘም። ለግዢው ወደተጠቀመው የApple መለያ ይግቡ፣ ከዚያ እንደገና ይሞክሩ።",
+    "restoreFailed": "ግዢዎችን መመለስ አልተሳካም። እንደገና ይሞክሩ።",
+    "purchaseFailed": "ግዢውን ማጠናቀቅ አልተሳካም።",
+    "purchaseStartFailed": "የApp Store ግዢን መጀመር አልተሳካም።"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "ክፍት",
       "statusPaid": "የተከፈለ",
       "statusVoid": "ልክ ያልሆነ",
-      "title": "ደረሰኞች"
+      "title": "ደረሰኞች",
+      "downloadFailed": "ደረሰኙን ማውረድ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+      "sharingUnavailable": "በዚህ መሣሪያ ላይ ማጋራት አይገኝም።"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "መግባቱ አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
     "networkError": "የአውታረ መረብ ስህተት። እባክዎ እንደገና ይሞክሩ።",
     "accessDeniedByUser": "በተጠቃሚው መዳረሻ ተከልክሏል",
-    "codeExpired": "ኮዱ ጊዜው አልፏል"
+    "codeExpired": "ኮዱ ጊዜው አልፏል",
+    "tooManySignInAttempts": "በጣም ብዙ የመግቢያ ሙከራዎች። እባክዎ ይጠብቁ እና እንደገና ይሞክሩ።"
   },
   "models": {
     "dataCollected": "የተሰበሰበ መረጃ",

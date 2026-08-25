@@ -151,8 +151,8 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   isSecurityConfigurationError: (error: unknown) =>
     error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
-  SECURITY_CONFIGURATION_COPY: CONFIGURATION_COPY,
-  SECURITY_SYNC_RECONCILE_COPY: RECONCILE_COPY,
+  securityConfigurationCopy: () => CONFIGURATION_COPY,
+  securitySyncReconcileCopy: () => RECONCILE_COPY,
   isSecuritySyncRetryable: (error: unknown) => {
     const message = error instanceof Error ? error.message : '';
     return !(

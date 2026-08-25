@@ -24,7 +24,10 @@
     "required": "obrigatório",
     "error": "erro: {{error}}",
     "back": "Voltar",
-    "somethingWentWrong": "Algo correu mal"
+    "somethingWentWrong": "Algo correu mal",
+    "couldNotOpen": "Não foi possível abrir {{label}}",
+    "link": "link",
+    "takingLonger": "Isto está a demorar mais do que o esperado. Pode fechar isto e verificar novamente."
   },
   "language": {
     "title": "Idioma",
@@ -583,6 +586,12 @@
       "commentPosted": "Comentário publicado",
       "reviewSubmitted": "Revisão submetida",
       "autoMergeEnabled": "Fusão automática ativada"
+    },
+    "mutationError": {
+      "commentNotPosted": "Este comentário não pode ser publicado. A linha selecionada pode ter mudado, ou o PR pode ter sido atualizado.",
+      "reviewNotSubmitted": "Esta revisão não pode ser submetida como está. O PR pode ter mudado, ou não pode rever o seu próprio pull request.",
+      "couldNotPostComment": "Não foi possível publicar o comentário.",
+      "couldNotSubmitReview": "Não foi possível submeter a revisão. Verifique a sua ligação e tente novamente."
     }
   },
   "notifications": {
@@ -721,7 +730,12 @@
       "classificationEmpty": "O ficheiro está vazio",
       "classificationTooLarge": "Os ficheiros devem ter no máximo 20 MB",
       "classificationUnreadable": "Não foi possível ler este ficheiro",
-      "announceUploaded": "Anexo carregado"
+      "announceUploaded": "Anexo carregado",
+      "cantUpload": "Este ficheiro não pode ser carregado.",
+      "networkError": "Erro de rede",
+      "uploadFailed": "Falha no carregamento",
+      "failedToUploadFile": "Falha ao carregar o ficheiro: {{reason}}",
+      "nothingToPaste": "Nada para colar"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1181,7 +1195,8 @@
       "sparkles": "Brilhos",
       "strongArm": "Braço forte",
       "talisman": "Talismã"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Esta instância não pode receber ficheiros."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1368,7 +1383,9 @@
       "noDecision": "Sem decisão",
       "noResult": "Sem resultado"
     },
-    "eyebrow": "Revisor de Código"
+    "eyebrow": "Revisor de Código",
+    "updateFailed": "Falha ao atualizar o revisor",
+    "configSaveFailed": "Falha ao guardar a configuração de revisão"
   },
   "securityAgent": {
     "filter": {
@@ -1792,6 +1809,13 @@
       "remediationsQueued": "Remediações existentes em fila",
       "analysisComplete": "Análise concluída",
       "syncComplete": "Sincronização concluída"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "O serviço de segurança não está configurado. O reenvio não pode ter sucesso até isto ser corrigido.",
+      "syncMayNotHaveCompleted": "Uma sincronização pode não ter sido concluída. Tente novamente para reconciliá-la, ou descarte-a.",
+      "syncInProgress": "Já está em curso uma sincronização de segurança. Tente novamente.",
+      "dismissalInProgress": "Esta dispensa já está em curso. Tente novamente.",
+      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tente novamente."
     }
   },
   "agents": {
@@ -2489,7 +2513,17 @@
     "onlineMessage": "Este dispositivo não consegue transcrever offline. A sua gravação é enviada para {{provider}} para a transformar em texto. O Kilo não armazena o áudio.",
     "allow": "Permitir",
     "start": "Iniciar entrada de voz",
-    "stop": "Parar entrada de voz"
+    "stop": "Parar entrada de voz",
+    "restricted": "A entrada de voz está restrita neste dispositivo.",
+    "micRequired": "O acesso ao microfone é necessário para a entrada de voz.",
+    "micOff": "O acesso ao microfone está desligado. Ative-o nas Definições para usar a entrada de voz.",
+    "micOffTitle": "O acesso ao microfone está desligado",
+    "noSpeech": "Nenhuma fala detetada. Toque no microfone para tentar novamente.",
+    "needsConnection": "A entrada de voz precisa de uma ligação neste momento. Tente novamente.",
+    "busy": "A entrada de voz está ocupada. Tente novamente.",
+    "stopped": "A entrada de voz foi interrompida. Toque no microfone para tentar novamente.",
+    "unavailableDevice": "A entrada de voz não está disponível neste dispositivo.",
+    "unavailableLanguage": "A entrada de voz não está disponível para o idioma deste dispositivo."
   },
   "share": {
     "title": "Partilhar no Kilo",
@@ -2567,7 +2601,12 @@
     "webManagementDescription": "Este Kilo Pass é gerido na web.",
     "legalDisclosure": "O Kilo Pass é uma subscrição mensal renovável automaticamente. O pagamento é cobrado no seu Apple ID na confirmação da compra. As subscrições renovam-se automaticamente todos os meses pelo preço indicado, exceto se forem canceladas pelo menos 24 horas antes do fim do período atual. Faça a gestão ou cancele a qualquer momento nas definições da sua conta da App Store.",
     "legalPrivacyPolicy": "Política de Privacidade",
-    "legalTermsOfUse": "Termos de Utilização (EULA)"
+    "legalTermsOfUse": "Termos de Utilização (EULA)",
+    "purchaseNotLinked": "Esta compra da App Store não está ligada à sua conta Kilo. Certifique-se de que iniciou sessão no Apple ID que efetuou a compra e tente novamente.",
+    "purchaseDifferentAccount": "Esta compra da App Store não está ligada à sua conta Kilo. Inicie sessão na Apple Account utilizada na compra e tente novamente.",
+    "restoreFailed": "Falha ao restaurar as compras. Tente novamente.",
+    "purchaseFailed": "Falha ao concluir a compra.",
+    "purchaseStartFailed": "Falha ao iniciar a compra na App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2700,7 +2739,9 @@
       "statusOpen": "Aberta",
       "statusPaid": "Paga",
       "statusVoid": "Anulada",
-      "title": "Faturas"
+      "title": "Faturas",
+      "downloadFailed": "Não foi possível transferir a fatura. Verifique a sua ligação e tente novamente.",
+      "sharingUnavailable": "A partilha não está disponível neste dispositivo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nome@empresa.com",
@@ -2821,7 +2862,8 @@
     "signInFailed": "O início de sessão falhou. Tente novamente.",
     "networkError": "Erro de rede. Tente novamente.",
     "accessDeniedByUser": "Acesso negado pelo utilizador",
-    "codeExpired": "Código expirado"
+    "codeExpired": "Código expirado",
+    "tooManySignInAttempts": "Demasiadas tentativas de início de sessão. Aguarde e tente novamente."
   },
   "models": {
     "dataCollected": "Dados recolhidos",

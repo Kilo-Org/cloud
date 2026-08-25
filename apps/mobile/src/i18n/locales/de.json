@@ -24,7 +24,10 @@
     "notNow": "Nicht jetzt",
     "continue": "Weiter",
     "back": "Zurück",
-    "somethingWentWrong": "Etwas ist schiefgelaufen"
+    "somethingWentWrong": "Etwas ist schiefgelaufen",
+    "couldNotOpen": "{{label}} konnte nicht geöffnet werden",
+    "link": "Link",
+    "takingLonger": "Dies dauert länger als erwartet. Du kannst dies schließen und später erneut prüfen."
   },
   "language": {
     "title": "Sprache",
@@ -283,7 +286,12 @@
       "classificationEmpty": "Die Datei ist leer",
       "classificationTooLarge": "Dateien dürfen höchstens 20 MB groß sein",
       "classificationUnreadable": "Diese Datei konnte nicht gelesen werden",
-      "announceUploaded": "Anhang hochgeladen"
+      "announceUploaded": "Anhang hochgeladen",
+      "cantUpload": "Diese Datei kann nicht hochgeladen werden.",
+      "networkError": "Netzwerkfehler",
+      "uploadFailed": "Hochladen fehlgeschlagen",
+      "failedToUploadFile": "Datei konnte nicht hochgeladen werden: {{reason}}",
+      "nothingToPaste": "Nichts einzufügen"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "Glitzer",
       "strongArm": "Starker Arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Diese Instanz kann keine Dateien empfangen."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "Review-Speicher",
       "reviewStyle": "Review-Stil",
       "set": "Gesetzt"
-    }
+    },
+    "updateFailed": "Reviewer konnte nicht aktualisiert werden",
+    "configSaveFailed": "Review-Konfiguration konnte nicht gespeichert werden"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "Bestehende Behebungen eingereiht",
       "analysisComplete": "Analyse abgeschlossen",
       "syncComplete": "Synchronisierung abgeschlossen"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Der Sicherheitsdienst ist nicht konfiguriert. Erneutes Senden kann nicht gelingen, bis dies behoben ist.",
+      "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie, um sie abzugleichen, oder verwerfe sie.",
+      "syncInProgress": "Eine Sicherheitssynchronisierung läuft bereits. Bitte versuche es erneut.",
+      "dismissalInProgress": "Diese Verwerfung ist bereits im Gange. Bitte versuche es erneut.",
+      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut."
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "Sprache wird online verarbeitet",
     "staysOff": "Sprache bleibt aus, bis du die Online-Transkription erlaubst.",
     "start": "Spracheingabe starten",
-    "stop": "Spracheingabe stoppen"
+    "stop": "Spracheingabe stoppen",
+    "restricted": "Spracheingabe ist auf diesem Gerät eingeschränkt.",
+    "micRequired": "Für die Spracheingabe ist Mikrofonzugriff erforderlich.",
+    "micOff": "Mikrofonzugriff ist deaktiviert. Aktiviere ihn in den Einstellungen, um die Spracheingabe zu verwenden.",
+    "micOffTitle": "Mikrofonzugriff ist deaktiviert",
+    "noSpeech": "Keine Sprache erkannt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
+    "needsConnection": "Spracheingabe benötigt gerade eine Verbindung. Versuche es erneut.",
+    "busy": "Spracheingabe ist beschäftigt. Versuche es erneut.",
+    "stopped": "Die Spracheingabe wurde gestoppt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
+    "unavailableDevice": "Spracheingabe ist auf diesem Gerät nicht verfügbar.",
+    "unavailableLanguage": "Spracheingabe ist für diese Gerätesprache nicht verfügbar."
   },
   "share": {
     "title": "An Kilo teilen",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "Dieser Kilo Pass wird im Web verwaltet.",
     "legalDisclosure": "Kilo Pass ist ein automatisch verlängerbares Monatsabonnement. Die Zahlung wird bei Kaufbestätigung deiner Apple-ID belastet. Abonnements verlängern sich automatisch jeden Monat zum angezeigten Preis, sofern sie nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums gekündigt werden. Jederzeit in deinen App-Store-Kontoeinstellungen verwalten oder kündigen.",
     "legalPrivacyPolicy": "Datenschutzrichtlinie",
-    "legalTermsOfUse": "Nutzungsbedingungen (EULA)"
+    "legalTermsOfUse": "Nutzungsbedingungen (EULA)",
+    "purchaseNotLinked": "Dieser App-Store-Kauf ist nicht mit deinem Kilo-Konto verknüpft. Stelle sicher, dass du mit der Apple-ID angemeldet bist, mit der der Kauf getätigt wurde, und versuche es erneut.",
+    "purchaseDifferentAccount": "Dieser App-Store-Kauf ist nicht mit deinem Kilo-Konto verknüpft. Melde dich mit dem Apple-Konto an, mit dem der Kauf getätigt wurde, und versuche es erneut.",
+    "restoreFailed": "Käufe konnten nicht wiederhergestellt werden. Versuche es erneut.",
+    "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden.",
+    "purchaseStartFailed": "Der App-Store-Kauf konnte nicht gestartet werden."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "Kommentar veröffentlicht",
       "reviewSubmitted": "Review eingereicht",
       "autoMergeEnabled": "Auto-Merge aktiviert"
+    },
+    "mutationError": {
+      "commentNotPosted": "Dieser Kommentar kann nicht veröffentlicht werden. Die ausgewählte Zeile könnte sich geändert haben, oder der PR wurde aktualisiert.",
+      "reviewNotSubmitted": "Dieses Review kann nicht gesendet werden. Der PR könnte sich geändert haben, oder du kannst deinen eigenen Pull Request nicht prüfen.",
+      "couldNotPostComment": "Kommentar konnte nicht veröffentlicht werden.",
+      "couldNotSubmitReview": "Review konnte nicht gesendet werden. Prüfe deine Verbindung und versuche es erneut."
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "Rechnungen",
       "statusPaid": "Bezahlt",
       "statusOpen": "Offen",
-      "statusVoid": "Ungültig"
+      "statusVoid": "Ungültig",
+      "downloadFailed": "Rechnung konnte nicht heruntergeladen werden. Prüfe deine Verbindung und versuche es erneut.",
+      "sharingUnavailable": "Teilen ist auf diesem Gerät nicht verfügbar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@firma.de",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
     "networkError": "Netzwerkfehler. Bitte versuche es erneut.",
     "accessDeniedByUser": "Zugriff vom Nutzer verweigert",
-    "codeExpired": "Der Code ist abgelaufen"
+    "codeExpired": "Der Code ist abgelaufen",
+    "tooManySignInAttempts": "Zu viele Anmeldeversuche. Bitte warte und versuche es erneut."
   },
   "models": {
     "dataCollected": "Erfasste Daten",

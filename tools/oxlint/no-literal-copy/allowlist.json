@@ -1,5 +1,5 @@
 {
   "files": [],
-  "values": [],
+  "values": ["KiloClaw"],
   "constants": ["BYOK_MODEL_LABEL", "KILO_PASS_TITLE", "MESSAGE_TEXT_MAX_CHARS", "URL_PLACEHOLDER"]
 }

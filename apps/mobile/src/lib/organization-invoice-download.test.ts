@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   getInvoiceDownloadErrorMessage,
   getInvoicePdfFilename,
-  INVOICE_DOWNLOAD_FAILED_MESSAGE,
-  INVOICE_SHARING_UNAVAILABLE_MESSAGE,
+  invoiceDownloadFailedMessage,
+  invoiceSharingUnavailableMessage,
   selectInvoiceDownloadErrorMessage,
   selectInvoiceRowState,
 } from '@/lib/organization-invoice-download';
@@ -53,33 +53,33 @@ describe('selectInvoiceRowState', () => {
 describe('selectInvoiceDownloadErrorMessage', () => {
   it('maps download-failed to a retryable download message with no CTA', () => {
     expect(selectInvoiceDownloadErrorMessage('download-failed')).toBe(
-      INVOICE_DOWNLOAD_FAILED_MESSAGE
+      invoiceDownloadFailedMessage()
     );
     // Retry is by tapping the row again; the toast itself has no action CTA.
-    expect(INVOICE_DOWNLOAD_FAILED_MESSAGE.toLowerCase()).toContain('try again');
+    expect(invoiceDownloadFailedMessage().toLowerCase()).toContain('try again');
   });
 
   it('maps sharing-unavailable to a distinct terminal message with no retry CTA', () => {
     expect(selectInvoiceDownloadErrorMessage('sharing-unavailable')).toBe(
-      INVOICE_SHARING_UNAVAILABLE_MESSAGE
+      invoiceSharingUnavailableMessage()
     );
-    expect(INVOICE_SHARING_UNAVAILABLE_MESSAGE.toLowerCase()).toContain('not available');
-    expect(INVOICE_SHARING_UNAVAILABLE_MESSAGE.toLowerCase()).not.toContain('try again');
+    expect(invoiceSharingUnavailableMessage().toLowerCase()).toContain('not available');
+    expect(invoiceSharingUnavailableMessage().toLowerCase()).not.toContain('try again');
   });
 });
 
 describe('getInvoiceDownloadErrorMessage', () => {
   it('reads the discriminable reason from ShareRemoteFileError', () => {
     expect(getInvoiceDownloadErrorMessage(new ShareRemoteFileError('sharing-unavailable'))).toBe(
-      INVOICE_SHARING_UNAVAILABLE_MESSAGE
+      invoiceSharingUnavailableMessage()
     );
     expect(getInvoiceDownloadErrorMessage(new ShareRemoteFileError('download-failed'))).toBe(
-      INVOICE_DOWNLOAD_FAILED_MESSAGE
+      invoiceDownloadFailedMessage()
     );
   });
 
   it('falls back to the download message for unknown errors', () => {
-    expect(getInvoiceDownloadErrorMessage(new Error('boom'))).toBe(INVOICE_DOWNLOAD_FAILED_MESSAGE);
+    expect(getInvoiceDownloadErrorMessage(new Error('boom'))).toBe(invoiceDownloadFailedMessage());
   });
 });
 

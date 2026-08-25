@@ -24,7 +24,10 @@
     "notNow": "Nanti saja",
     "continue": "Lanjutkan",
     "back": "Kembali",
-    "somethingWentWrong": "Terjadi kesalahan"
+    "somethingWentWrong": "Terjadi kesalahan",
+    "couldNotOpen": "Tidak dapat membuka {{label}}",
+    "link": "tautan",
+    "takingLonger": "Ini memakan waktu lebih lama dari yang diperkirakan. Anda dapat menutupnya dan memeriksa kembali."
   },
   "language": {
     "title": "Bahasa",
@@ -283,7 +286,12 @@
       "classificationEmpty": "File kosong",
       "classificationTooLarge": "File harus berukuran 20 MB atau lebih kecil",
       "classificationUnreadable": "Tidak dapat membaca file ini",
-      "announceUploaded": "Lampiran diunggah"
+      "announceUploaded": "Lampiran diunggah",
+      "cantUpload": "File ini tidak dapat diunggah.",
+      "networkError": "Kesalahan jaringan",
+      "uploadFailed": "Unggahan gagal",
+      "failedToUploadFile": "Gagal mengunggah file: {{reason}}",
+      "nothingToPaste": "Tidak ada yang bisa ditempel"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "Kilauan",
       "strongArm": "Lengan kuat",
       "talisman": "Jimat"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Instans ini tidak dapat menerima file."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "Memori tinjauan",
       "reviewStyle": "Gaya tinjauan",
       "set": "Atur"
-    }
+    },
+    "updateFailed": "Gagal memperbarui peninjau",
+    "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "Remediasi yang ada diantrekan",
       "analysisComplete": "Analisis selesai",
       "syncComplete": "Sinkronisasi selesai"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Layanan keamanan tidak dikonfigurasi. Pengiriman ulang tidak akan berhasil sampai diperbaiki.",
+      "syncMayNotHaveCompleted": "Sinkronisasi mungkin belum selesai. Coba lagi untuk mendamaikannya, atau buang.",
+      "syncInProgress": "Sinkronisasi keamanan sedang berlangsung. Silakan coba lagi.",
+      "dismissalInProgress": "Pengabaian ini sedang berlangsung. Silakan coba lagi.",
+      "couldNotReadPendingSyncs": "Tidak dapat membaca sinkronisasi yang tertunda. Coba lagi."
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "Ucapan diproses secara online",
     "staysOff": "Ucapan tetap nonaktif hingga Anda mengizinkan transkripsi online.",
     "start": "Mulai masukan suara",
-    "stop": "Hentikan masukan suara"
+    "stop": "Hentikan masukan suara",
+    "restricted": "Masukan suara dibatasi di perangkat ini.",
+    "micRequired": "Akses mikrofon diperlukan untuk masukan suara.",
+    "micOff": "Akses mikrofon nonaktif. Aktifkan di Pengaturan untuk menggunakan masukan suara.",
+    "micOffTitle": "Akses mikrofon nonaktif",
+    "noSpeech": "Tidak ada ucapan yang terdeteksi. Ketuk mikrofon untuk mencoba lagi.",
+    "needsConnection": "Masukan suara memerlukan koneksi saat ini. Coba lagi.",
+    "busy": "Masukan suara sedang sibuk. Coba lagi.",
+    "stopped": "Masukan suara berhenti. Ketuk mikrofon untuk mencoba lagi.",
+    "unavailableDevice": "Masukan suara tidak tersedia di perangkat ini.",
+    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini."
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "Kilo Pass ini dikelola di web.",
     "legalDisclosure": "Kilo Pass adalah langganan bulanan yang dapat diperbarui otomatis. Pembayaran dibebankan ke Apple ID Anda saat konfirmasi pembelian. Langganan diperbarui otomatis setiap bulan dengan harga yang ditampilkan kecuali dibatalkan minimal 24 jam sebelum akhir periode berjalan. Kelola atau batalkan kapan saja di pengaturan akun App Store Anda.",
     "legalPrivacyPolicy": "Kebijakan Privasi",
-    "legalTermsOfUse": "Ketentuan Penggunaan (EULA)"
+    "legalTermsOfUse": "Ketentuan Penggunaan (EULA)",
+    "purchaseNotLinked": "Pembelian App Store ini tidak tertaut ke akun Kilo Anda. Pastikan Anda masuk dengan Apple ID yang melakukan pembelian, lalu coba lagi.",
+    "purchaseDifferentAccount": "Pembelian App Store ini tidak tertaut ke akun Kilo Anda. Masuk dengan Akun Apple yang digunakan untuk pembelian, lalu coba lagi.",
+    "restoreFailed": "Gagal memulihkan pembelian. Coba lagi.",
+    "purchaseFailed": "Gagal menyelesaikan pembelian.",
+    "purchaseStartFailed": "Gagal memulai pembelian App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "Komentar terkirim",
       "reviewSubmitted": "Tinjauan terkirim",
       "autoMergeEnabled": "Gabung otomatis diaktifkan"
+    },
+    "mutationError": {
+      "commentNotPosted": "Komentar ini tidak dapat dikirim. Baris yang dipilih mungkin telah berubah, atau PR mungkin telah diperbarui.",
+      "reviewNotSubmitted": "Tinjauan ini tidak dapat dikirim apa adanya. PR mungkin telah berubah, atau Anda tidak dapat meninjau pull request Anda sendiri.",
+      "couldNotPostComment": "Tidak dapat mengirim komentar.",
+      "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksi Anda dan coba lagi."
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "Faktur",
       "statusPaid": "Lunas",
       "statusOpen": "Terbuka",
-      "statusVoid": "Batal"
+      "statusVoid": "Batal",
+      "downloadFailed": "Tidak dapat mengunduh faktur. Periksa koneksi Anda dan coba lagi.",
+      "sharingUnavailable": "Berbagi tidak tersedia di perangkat ini."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Gagal masuk. Silakan coba lagi.",
     "networkError": "Kesalahan jaringan. Silakan coba lagi.",
     "accessDeniedByUser": "Akses ditolak oleh pengguna",
-    "codeExpired": "Kode kedaluwarsa"
+    "codeExpired": "Kode kedaluwarsa",
+    "tooManySignInAttempts": "Terlalu banyak upaya masuk. Silakan tunggu dan coba lagi."
   },
   "models": {
     "dataCollected": "Data yang dikumpulkan",

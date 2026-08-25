@@ -24,7 +24,10 @@
     "notNow": "ليس الآن",
     "continue": "متابعة",
     "back": "رجوع",
-    "somethingWentWrong": "حدث خطأ ما"
+    "somethingWentWrong": "حدث خطأ ما",
+    "couldNotOpen": "تعذّر فتح {{label}}",
+    "link": "رابط",
+    "takingLonger": "يستغرق هذا وقتًا أطول من المتوقع. يمكنك إغلاق هذا والتحقق مرة أخرى."
   },
   "language": {
     "title": "اللغة",
@@ -283,7 +286,12 @@
       "classificationEmpty": "الملف فارغ",
       "classificationTooLarge": "يجب أن يكون حجم الملفات 20 MB أو أقل",
       "classificationUnreadable": "تعذّرت قراءة هذا الملف",
-      "announceUploaded": "تم رفع المرفق"
+      "announceUploaded": "تم رفع المرفق",
+      "cantUpload": "لا يمكن رفع هذا الملف.",
+      "networkError": "خطأ في الشبكة",
+      "uploadFailed": "فشل الرفع",
+      "failedToUploadFile": "فشل رفع الملف: {{reason}}",
+      "nothingToPaste": "لا يوجد شيء للصق"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -749,7 +757,8 @@
       "sparkles": "بريق",
       "strongArm": "ذراع قوية",
       "talisman": "طلسم"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "لا يمكن لهذا المثيل استقبال الملفات."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -936,7 +945,9 @@
       "reviewMemory": "ذاكرة المراجعة",
       "reviewStyle": "أسلوب المراجعة",
       "set": "تم التعيين"
-    }
+    },
+    "updateFailed": "فشل تحديث المراجع",
+    "configSaveFailed": "فشل حفظ إعداد المراجعة"
   },
   "securityAgent": {
     "filter": {
@@ -1366,6 +1377,13 @@
       "remediationsQueued": "توجد إصلاحات حالية في قائمة الانتظار",
       "analysisComplete": "اكتمل التحليل",
       "syncComplete": "اكتملت المزامنة"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "خدمة الأمان غير مهيأة. لا يمكن أن تنجح إعادة الإرسال حتى يتم إصلاح هذا.",
+      "syncMayNotHaveCompleted": "ربما لم تكتمل المزامنة. أعد المحاولة لتسويتها، أو تجاهلها.",
+      "syncInProgress": "مزامنة الأمان قيد التقدم بالفعل. يرجى المحاولة مرة أخرى.",
+      "dismissalInProgress": "هذا الرفض قيد التقدم بالفعل. يرجى المحاولة مرة أخرى.",
+      "couldNotReadPendingSyncs": "تعذّرت قراءة المزامنات المعلقة. حاول مرة أخرى."
     }
   },
   "agents": {
@@ -2084,7 +2102,17 @@
     "onlineTitle": "تتم معالجة الكلام عبر الإنترنت",
     "staysOff": "يبقى الكلام متوقفًا حتى تسمح بالنسخ الصوتي عبر الإنترنت.",
     "start": "بدء الإدخال الصوتي",
-    "stop": "إيقاف الإدخال الصوتي"
+    "stop": "إيقاف الإدخال الصوتي",
+    "restricted": "الإدخال الصوتي مقيد على هذا الجهاز.",
+    "micRequired": "يلزم الوصول إلى الميكروفون للإدخال الصوتي.",
+    "micOff": "الوصول إلى الميكروفون متوقف. فعّله في الإعدادات لاستخدام الإدخال الصوتي.",
+    "micOffTitle": "الوصول إلى الميكروفون متوقف",
+    "noSpeech": "لم يتم اكتشاف أي كلام. اضغط على الميكروفون للمحاولة مرة أخرى.",
+    "needsConnection": "يحتاج الإدخال الصوتي إلى اتصال الآن. حاول مرة أخرى.",
+    "busy": "الإدخال الصوتي مشغول. حاول مرة أخرى.",
+    "stopped": "توقف الإدخال الصوتي. اضغط على الميكروفون للمحاولة مرة أخرى.",
+    "unavailableDevice": "الإدخال الصوتي غير متاح على هذا الجهاز.",
+    "unavailableLanguage": "الإدخال الصوتي غير متاح للغة الجهاز هذه."
   },
   "share": {
     "title": "مشاركة إلى Kilo",
@@ -2162,7 +2190,12 @@
     "webManagementDescription": "تتم إدارة Kilo Pass هذا على الويب.",
     "legalDisclosure": "Kilo Pass اشتراك شهري متجدد تلقائيًا. يتم خصم الدفعة من Apple ID الخاص بك عند تأكيد الشراء. تتجدد الاشتراكات تلقائيًا كل شهر بالسعر المعروض ما لم يتم الإلغاء قبل 24 ساعة على الأقل من نهاية الفترة الحالية. يمكنك الإدارة أو الإلغاء في أي وقت من إعدادات حسابك في App Store.",
     "legalPrivacyPolicy": "سياسة الخصوصية",
-    "legalTermsOfUse": "شروط الاستخدام (EULA)"
+    "legalTermsOfUse": "شروط الاستخدام (EULA)",
+    "purchaseNotLinked": "عملية الشراء هذه من App Store غير مرتبطة بحساب Kilo الخاص بك. تأكد من تسجيل الدخول إلى Apple ID الذي أجرى عملية الشراء، ثم حاول مرة أخرى.",
+    "purchaseDifferentAccount": "عملية الشراء هذه من App Store غير مرتبطة بحساب Kilo الخاص بك. سجّل الدخول إلى حساب Apple المستخدم للشراء، ثم حاول مرة أخرى.",
+    "restoreFailed": "فشل استعادة المشتريات. حاول مرة أخرى.",
+    "purchaseFailed": "فشل إكمال عملية الشراء.",
+    "purchaseStartFailed": "فشل بدء عملية شراء من App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2704,6 +2737,12 @@
       "commentPosted": "تم نشر التعليق",
       "reviewSubmitted": "تم تقديم المراجعة",
       "autoMergeEnabled": "تم تفعيل الدمج التلقائي"
+    },
+    "mutationError": {
+      "commentNotPosted": "لا يمكن نشر هذا التعليق. ربما تغيّر السطر المحدد، أو تم تحديث PR.",
+      "reviewNotSubmitted": "لا يمكن إرسال هذه المراجعة كما هي. ربما تغيّر PR، أو لا يمكنك مراجعة طلب السحب الخاص بك.",
+      "couldNotPostComment": "تعذّر نشر التعليق.",
+      "couldNotSubmitReview": "تعذّر إرسال المراجعة. تحقق من اتصالك وحاول مرة أخرى."
     }
   },
   "organization": {
@@ -2750,7 +2789,9 @@
       "title": "الفواتير",
       "statusPaid": "مدفوع",
       "statusOpen": "مفتوح",
-      "statusVoid": "ملغى"
+      "statusVoid": "ملغى",
+      "downloadFailed": "تعذّر تنزيل الفاتورة. تحقق من اتصالك وحاول مرة أخرى.",
+      "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2878,7 +2919,8 @@
     "signInFailed": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
     "networkError": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
     "accessDeniedByUser": "تم رفض الوصول بواسطة المستخدم",
-    "codeExpired": "انتهت صلاحية الرمز"
+    "codeExpired": "انتهت صلاحية الرمز",
+    "tooManySignInAttempts": "محاولات تسجيل دخول كثيرة جدًا. يرجى الانتظار والمحاولة مرة أخرى."
   },
   "models": {
     "dataCollected": "البيانات التي تم جمعها",

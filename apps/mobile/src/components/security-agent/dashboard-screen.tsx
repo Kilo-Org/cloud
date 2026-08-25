@@ -36,8 +36,8 @@ import {
 import {
   isSecurityConfigurationError,
   isSecuritySyncRetryable,
-  SECURITY_CONFIGURATION_COPY,
-  SECURITY_SYNC_RECONCILE_COPY,
+  securityConfigurationCopy,
+  securitySyncReconcileCopy,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
@@ -330,7 +330,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         {triggerSync.isError ? (
           <Text className="text-xs text-destructive">
             {isSecurityConfigurationError(triggerSync.error)
-              ? SECURITY_CONFIGURATION_COPY
+              ? securityConfigurationCopy()
               : triggerSync.error.message}
           </Text>
         ) : null}
@@ -352,7 +352,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         {reconcileRows.map(row => (
           <SecurityCommandRetryCard
             key={row.fingerprint}
-            lastError={SECURITY_SYNC_RECONCILE_COPY}
+            lastError={securitySyncReconcileCopy()}
             retryable
             onRetry={() => {
               const input = row.input as { repoFullName?: string };

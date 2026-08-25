@@ -24,7 +24,10 @@
     "required": "obvezno",
     "error": "napaka: {{error}}",
     "back": "Nazaj",
-    "somethingWentWrong": "Nekaj je šlo narobe"
+    "somethingWentWrong": "Nekaj je šlo narobe",
+    "couldNotOpen": "{{label}} ni bilo mogoče odpreti",
+    "link": "povezava",
+    "takingLonger": "To traja dlje, kot je bilo pričakovano. To lahko zaprete in preverite znova."
   },
   "language": {
     "title": "Jezik",
@@ -590,6 +593,12 @@
       "commentPosted": "Komentar objavljen",
       "reviewSubmitted": "Pregled oddan",
       "autoMergeEnabled": "Samodejno združevanje omogočeno"
+    },
+    "mutationError": {
+      "commentNotPosted": "Tega komentarja ni mogoče objaviti. Izbrana vrstica se je morda spremenila ali pa je bil PR posodobljen.",
+      "reviewNotSubmitted": "Tega pregleda ni mogoče oddati, kot je. PR se je morda spremenil ali pa svojega lastnega pull requesta ne morete pregledati.",
+      "couldNotPostComment": "Komentarja ni bilo mogoče objaviti.",
+      "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preverite povezavo in poskusite znova."
     }
   },
   "notifications": {
@@ -728,7 +737,12 @@
       "classificationEmpty": "Datoteka je prazna",
       "classificationTooLarge": "Datoteke morajo biti velike 20 MB ali manj",
       "classificationUnreadable": "Te datoteke ni bilo mogoče prebrati",
-      "announceUploaded": "Priloga naložena"
+      "announceUploaded": "Priloga naložena",
+      "cantUpload": "Te datoteke ni mogoče naložiti.",
+      "networkError": "Napaka v omrežju",
+      "uploadFailed": "Nalaganje ni uspelo",
+      "failedToUploadFile": "Nalaganje datoteke ni uspelo: {{reason}}",
+      "nothingToPaste": "Ničesar ni za prilepiti"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1190,7 +1204,8 @@
       "sparkles": "Iskrice",
       "strongArm": "Močna roka",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Ta primerek ne more prejemati datotek."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1377,7 +1392,9 @@
       "noDecision": "Ni odločitve",
       "noResult": "Ni rezultata"
     },
-    "eyebrow": "Pregledovalnik kode"
+    "eyebrow": "Pregledovalnik kode",
+    "updateFailed": "Pregledovalca ni bilo mogoče posodobiti",
+    "configSaveFailed": "Konfiguracije pregleda ni bilo mogoče shraniti"
   },
   "securityAgent": {
     "filter": {
@@ -1803,6 +1820,13 @@
       "remediationsQueued": "Obstoječe odprave v čakalni vrsti",
       "analysisComplete": "Analiza končana",
       "syncComplete": "Sinhronizacija končana"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Varnostna storitev ni konfigurirana. Ponovno oddajanje ne more uspeti, dokler to ni odpravljeno.",
+      "syncMayNotHaveCompleted": "Sinhronizacija se morda ni dokončala. Poskusite znova, da jo uskladite, ali zavrzite.",
+      "syncInProgress": "Varnostna sinhronizacija že poteka. Poskusite znova.",
+      "dismissalInProgress": "Ta zavrnitev že poteka. Poskusite znova.",
+      "couldNotReadPendingSyncs": "Čakajočih sinhronizacij ni bilo mogoče prebrati. Poskusite znova."
     }
   },
   "agents": {
@@ -2507,7 +2531,17 @@
     "onlineMessage": "Ta naprava ne more prepisovati brez povezave. Tvoj posnetek se pošlje {{provider}}-ju, da ga pretvori v besedilo. Kilo ne shranjuje zvoka.",
     "allow": "Dovoli",
     "start": "Začni glasovni vnos",
-    "stop": "Ustavi glasovni vnos"
+    "stop": "Ustavi glasovni vnos",
+    "restricted": "Glasovni vnos je na tej napravi omejen.",
+    "micRequired": "Za glasovni vnos je potreben dostop do mikrofona.",
+    "micOff": "Dostop do mikrofona je izklopljen. Omogočite ga v nastavitvah za uporabo glasovnega vnosa.",
+    "micOffTitle": "Dostop do mikrofona je izklopljen",
+    "noSpeech": "Govora ni zaznati. Dotaknite se mikrofona za ponovni poskus.",
+    "needsConnection": "Glasovni vnos trenutno potrebuje povezavo. Poskusite znova.",
+    "busy": "Glasovni vnos je zaseden. Poskusite znova.",
+    "stopped": "Glasovni vnos je bil ustavljen. Dotaknite se mikrofona za ponovni poskus.",
+    "unavailableDevice": "Glasovni vnos na tej napravi ni na voljo.",
+    "unavailableLanguage": "Glasovni vnos ni na voljo za ta jezik naprave."
   },
   "share": {
     "title": "Deli s Kilo",
@@ -2585,7 +2619,12 @@
     "webManagementDescription": "Ta Kilo Pass se upravlja na spletu.",
     "legalDisclosure": "Kilo Pass je samodejno obnovljiva mesečna naročnina. Plačilo se bremeni vaš Apple ID ob potrditvi nakupa. Naročnine se samodejno obnovijo vsak mesec po prikazani ceni, razen če jih prekličete vsaj 24 ur pred koncem trenutnega obdobja. Upravljajte ali prekličite kadar koli v nastavitvah računa v App Store.",
     "legalPrivacyPolicy": "Politika zasebnosti",
-    "legalTermsOfUse": "Pogoji uporabe (EULA)"
+    "legalTermsOfUse": "Pogoji uporabe (EULA)",
+    "purchaseNotLinked": "Ta nakup v App Store ni povezan z vašim Kilo računom. Prepričajte se, da ste prijavljeni v Apple ID, s katerim je bil nakup opravljen, nato poskusite znova.",
+    "purchaseDifferentAccount": "Ta nakup v App Store ni povezan z vašim Kilo računom. Prijavite se v Apple račun, s katerim je bil nakup opravljen, nato poskusite znova.",
+    "restoreFailed": "Obnovitev nakupov ni uspela. Poskusite znova.",
+    "purchaseFailed": "Nakupa ni bilo mogoče dokončati.",
+    "purchaseStartFailed": "Nakupa v App Store ni bilo mogoče začeti."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2718,7 +2757,9 @@
       "statusOpen": "Odprto",
       "statusPaid": "Plačano",
       "statusVoid": "Nično",
-      "title": "Računi"
+      "title": "Računi",
+      "downloadFailed": "Računa ni bilo mogoče prenesti. Preverite povezavo in poskusite znova.",
+      "sharingUnavailable": "Deljenje na tej napravi ni na voljo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ime@podjetje.com",
@@ -2840,7 +2881,8 @@
     "signInFailed": "Prijava ni uspela. Poskusite znova.",
     "networkError": "Napaka v omrežju. Poskusite znova.",
     "accessDeniedByUser": "Uporabnik je zavrnil dostop",
-    "codeExpired": "Koda je potekla"
+    "codeExpired": "Koda je potekla",
+    "tooManySignInAttempts": "Preveč poskusov prijave. Počakajte in poskusite znova."
   },
   "models": {
     "dataCollected": "Zbrani podatki",

@@ -24,7 +24,10 @@
     "required": "kinakailangan",
     "error": "error: {{error}}",
     "back": "Bumalik",
-    "somethingWentWrong": "May nangyaring mali"
+    "somethingWentWrong": "May nangyaring mali",
+    "couldNotOpen": "Hindi mabuksan ang {{label}}",
+    "link": "link",
+    "takingLonger": "Mas tumatagal ito kaysa sa inaasahan. Maaari mong isara ito at tingnan muli."
   },
   "language": {
     "title": "Wika",
@@ -294,7 +297,7 @@
         "failingChecksDetail": "Pumapalpak ang mga kinakailangang status check.",
         "unstableTitle": "May mga check na pumapalpak",
         "unstableDetail": "Pumapalpak ang mga hindi kinakailangang check. Hindi nila haharangin ang merge.",
-        "draftTitle": "Draft pull request",
+        "draftTitle": "Draft na pull request",
         "draftDetail": "Markahan ang pull request bilang handa para sa review bago mag-merge.",
         "behindTitle": "Luma na ang branch",
         "behindDetailUpdatable": "I-update ang branch mula sa base, o mag-rebase, bago mag-merge.",
@@ -400,7 +403,7 @@
       },
       "anchor": {
         "fileCommentOnPath": "File comment sa {{path}}",
-        "fileComment": "File comment",
+        "fileComment": "Komento sa file",
         "outdatedOnPathLines": "Luma na sa {{path}} {{lines}}",
         "outdatedOnLines": "Luma na sa {{lines}}",
         "outdatedOnPath": "Luma na sa {{path}}"
@@ -576,6 +579,12 @@
       "commentPosted": "Na-post ang komento",
       "reviewSubmitted": "Na-submit ang review",
       "autoMergeEnabled": "Naka-enable ang auto-merge"
+    },
+    "mutationError": {
+      "commentNotPosted": "Hindi maipost ang komentong ito. Maaaring nagbago ang napiling linya, o na-update na ang PR.",
+      "reviewNotSubmitted": "Hindi maisumite ang review na ito nang ganito. Maaaring nagbago ang PR, o hindi mo maaaring i-review ang sarili mong pull request.",
+      "couldNotPostComment": "Hindi maipost ang komento.",
+      "couldNotSubmitReview": "Hindi maisumite ang review. Suriin ang iyong koneksyon at subukan muli."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Walang laman ang file",
       "classificationTooLarge": "Dapat 20 MB o mas maliit ang mga file",
       "classificationUnreadable": "Hindi mabasa ang file na ito",
-      "announceUploaded": "Na-upload ang attachment"
+      "announceUploaded": "Na-upload ang attachment",
+      "cantUpload": "Hindi ma-upload ang file na ito.",
+      "networkError": "Error sa network",
+      "uploadFailed": "Nabigo ang pag-upload",
+      "failedToUploadFile": "Nabigong i-upload ang file: {{reason}}",
+      "nothingToPaste": "Walang maipa-paste"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Sparkles",
       "strongArm": "Malakas na braso",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Hindi makakatanggap ng mga file ang instance na ito."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Walang desisyon",
       "noResult": "Walang resulta"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Nabigong i-update ang reviewer",
+    "configSaveFailed": "Nabigong i-save ang config ng review"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Na-queue ang mga umiiral na remediation",
       "analysisComplete": "Kumpleto ang analysis",
       "syncComplete": "Kumpleto ang sync"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Hindi naka-configure ang security service. Hindi magtatagumpay ang pag-resubmit hangga't hindi ito naaayos.",
+      "syncMayNotHaveCompleted": "Maaaring hindi natapos ang isang sync. I-retry para i-reconcile ito, o i-discard.",
+      "syncInProgress": "May security sync na nagpapatuloy. Pakisubukan muli.",
+      "dismissalInProgress": "Nagpapatuloy na ang dismissal na ito. Pakisubukan muli.",
+      "couldNotReadPendingSyncs": "Hindi mabasa ang mga pending sync. Subukan muli."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Hindi ma-transcribe ng device na ito nang offline. Ipinapadala ang iyong recording sa {{provider}} para gawing text. Hindi iniimbak ng Kilo ang audio.",
     "allow": "Payagan",
     "start": "Simulan ang voice input",
-    "stop": "Itigil ang voice input"
+    "stop": "Itigil ang voice input",
+    "restricted": "Pinaghihigpitan ang voice input sa device na ito.",
+    "micRequired": "Kinakailangan ang access sa mikropono para sa voice input.",
+    "micOff": "Naka-off ang access sa mikropono. I-enable ito sa Settings para magamit ang voice input.",
+    "micOffTitle": "Naka-off ang access sa mikropono",
+    "noSpeech": "Walang narinig na pagsasalita. Tap ang mikropono para subukan muli.",
+    "needsConnection": "Kailangan ng koneksyon ang voice input ngayon. Subukan muli.",
+    "busy": "Abala ang voice input. Subukan muli.",
+    "stopped": "Huminto ang voice input. Tap ang mikropono para subukan muli.",
+    "unavailableDevice": "Hindi available ang voice input sa device na ito.",
+    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device."
   },
   "share": {
     "title": "I-share sa Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Pinamamahalaan sa web ang Kilo Pass na ito.",
     "legalDisclosure": "Ang Kilo Pass ay isang auto-renewable na buwanang subscription. Babayaran ang bayad sa iyong Apple ID kapag nakumpirma ang pagbili. Awtomatikong nire-renew ang mga subscription bawat buwan sa ipinapakitang presyo maliban kung kinansela nang hindi bababa sa 24 na oras bago matapos ang kasalukuyang panahon. Pamahalaan o kanselahin anumang oras sa iyong mga setting ng App Store account.",
     "legalPrivacyPolicy": "Patakaran sa Privacy",
-    "legalTermsOfUse": "Mga Tuntunin ng Paggamit (EULA)"
+    "legalTermsOfUse": "Mga Tuntunin ng Paggamit (EULA)",
+    "purchaseNotLinked": "Hindi naka-link ang pagbiling ito sa App Store sa iyong Kilo account. Siguraduhing naka-sign in ka sa Apple ID na bumili, pagkatapos subukan muli.",
+    "purchaseDifferentAccount": "Hindi naka-link ang pagbiling ito sa App Store sa iyong Kilo account. Mag-sign in sa Apple Account na ginamit sa pagbili, pagkatapos subukan muli.",
+    "restoreFailed": "Nabigong i-restore ang mga pagbili. Subukan muli.",
+    "purchaseFailed": "Nabigong kumpletuhin ang pagbili.",
+    "purchaseStartFailed": "Nabigong simulan ang pagbili sa App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Bukas",
       "statusPaid": "Bayad",
       "statusVoid": "Wasto",
-      "title": "Mga invoice"
+      "title": "Mga invoice",
+      "downloadFailed": "Hindi ma-download ang invoice. Suriin ang iyong koneksyon at subukan muli.",
+      "sharingUnavailable": "Hindi available ang pag-share sa device na ito."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Nabigo ang sign in. Pakisubukan muli.",
     "networkError": "Error sa network. Pakisubukan muli.",
     "accessDeniedByUser": "Tinanggihan ng user ang access",
-    "codeExpired": "Nag-expire ang code"
+    "codeExpired": "Nag-expire ang code",
+    "tooManySignInAttempts": "Masyadong maraming pagtatangkang mag-sign in. Pakihintay at subukan muli."
   },
   "models": {
     "dataCollected": "Kinokolektang data",

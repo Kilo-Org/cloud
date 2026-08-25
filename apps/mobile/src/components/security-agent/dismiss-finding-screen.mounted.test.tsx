@@ -85,7 +85,7 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   isSecurityConfigurationError: (error: unknown) =>
     error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
-  SECURITY_CONFIGURATION_COPY: CONFIGURATION_COPY,
+  securityConfigurationCopy: () => CONFIGURATION_COPY,
   isSecuritySyncRetryable: (error: unknown) => {
     const message = error instanceof Error ? error.message : '';
     return !(

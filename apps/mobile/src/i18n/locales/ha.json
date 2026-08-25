@@ -24,7 +24,10 @@
     "required": "ana buƙata",
     "error": "kuskure: {{error}}",
     "back": "Baya",
-    "somethingWentWrong": "Wani abu ya ɓace"
+    "somethingWentWrong": "Wani abu ya ɓace",
+    "couldNotOpen": "Ba a iya buɗe {{label}} ba",
+    "link": "hanya",
+    "takingLonger": "Wannan yana ɗaukan lokaci fiye da yadda ake tsammani. Za ka iya rufe wannan ka sake duba."
   },
   "language": {
     "title": "Harshe",
@@ -576,6 +579,12 @@
       "commentPosted": "An buga tsokaci",
       "reviewSubmitted": "An ƙaddamar da bita",
       "autoMergeEnabled": "An kunna auto-merge"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ba za a iya buga wannan tsokaci ba. Wataƙila layin da aka zaɓa ya canza, ko kuma an sabunta PR.",
+      "reviewNotSubmitted": "Ba za a iya ƙaddamar da wannan bita ba yadda take. Wataƙila PR ya canza, ko kuma ba za ka iya bitar buƙatar janka ba.",
+      "couldNotPostComment": "Ba a iya buga tsokaci ba.",
+      "couldNotSubmitReview": "Ba a iya ƙaddamar da bita ba. Duba haɗinka ka sake gwadawa."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Fayil ɗin babu kome",
       "classificationTooLarge": "Fayiloli dole su kasance 20 MB ko ƙasa",
       "classificationUnreadable": "An kasa karanta wannan fayil",
-      "announceUploaded": "An ɗora abin da aka haɗa"
+      "announceUploaded": "An ɗora abin da aka haɗa",
+      "cantUpload": "Ba za a iya ɗora wannan fayil ba.",
+      "networkError": "Kuskuren hanyar sadarwa",
+      "uploadFailed": "Ɗorawa ya gaza",
+      "failedToUploadFile": "An kasa ɗora fayil: {{reason}}",
+      "nothingToPaste": "Babu abin da za a manna"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Ɓangarori",
       "strongArm": "Hannu mai ƙarfi",
       "talisman": "Layya"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Wannan instance ba zai iya karɓar fayiloli ba."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Babu shawara",
       "noResult": "Babu sakamako"
     },
-    "eyebrow": "Mai Bitar Lambar"
+    "eyebrow": "Mai Bitar Lambar",
+    "updateFailed": "An kasa sabunta mai bita",
+    "configSaveFailed": "An kasa ajiye saitin bita"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "An jera gyare-gyaren da ke akwai",
       "analysisComplete": "Nazari ya cika",
       "syncComplete": "Daidaitawa ta cika"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Ba a saita sabis ɗin tsaro ba. Sake ƙaddamarwa ba zai yi nasara ba har sai an gyara wannan.",
+      "syncMayNotHaveCompleted": "Wataƙila daidaitawa bai cika ba. Sake gwadawa don daidaita shi, ko watsar.",
+      "syncInProgress": "Daidaitawar tsaro tana ci gaba. Don Allah sake gwadawa.",
+      "dismissalInProgress": "Wannan watsarwa tana ci gaba. Don Allah sake gwadawa.",
+      "couldNotReadPendingSyncs": "Ba a iya karanta daidaitawar da ke jira ba. Sake gwadawa."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Wannan na'urar ba za ta iya rubuta magana ba tare da haɗi ba. Ana aika rikodin ka zuwa {{provider}} don a mayar da shi rubutu. Kilo ba ya adana sautin.",
     "allow": "Ba da izini",
     "start": "Fara shigar da murya",
-    "stop": "Dakatar da shigar da murya"
+    "stop": "Dakatar da shigar da murya",
+    "restricted": "Shigar da murya an ƙuntata shi akan wannan na'ura.",
+    "micRequired": "Ana buƙatar damar makirufo don shigar da murya.",
+    "micOff": "Damar makirufo a kashe. Kunna shi a cikin Saituna don amfani da shigar da murya.",
+    "micOffTitle": "Damar makirufo a kashe",
+    "noSpeech": "Ba a gano magana ba. Danna makirufo don sake gwadawa.",
+    "needsConnection": "Shigar da murya tana buƙatar haɗi a yanzu. Sake gwadawa.",
+    "busy": "Shigar da murya tana aiki. Sake gwadawa.",
+    "stopped": "Shigar da murya ta tsaya. Danna makirufo don sake gwadawa.",
+    "unavailableDevice": "Shigar da murya ba ta samuwa akan wannan na'ura.",
+    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura."
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Wannan Kilo Pass ana sarrafa shi a yanar gizo.",
     "legalDisclosure": "Kilo Pass biyan kuɗi ne na wata-wata wanda ke sabunta kansa. Ana cajin biyan kuɗi ga Apple ID ɗinka a lokacin tabbatar da siyayya. Biyan kuɗi yana sabuntawa kowace wata a farashin da aka nuna sai dai idan an soke shi aƙalla sa'o'i 24 kafin ƙarshen lokaci na yanzu. Sarrafa ko soke a kowane lokaci a saitunan asusunka na App Store.",
     "legalPrivacyPolicy": "Manufofin Sirri",
-    "legalTermsOfUse": "Sharuɗɗan Amfani (EULA)"
+    "legalTermsOfUse": "Sharuɗɗan Amfani (EULA)",
+    "purchaseNotLinked": "Wannan sayayyar App Store ba a haɗa ta da asusunka na Kilo ba. Tabbatar an shiga da Apple ID ɗin da ya yi sayayyar, sannan sake gwadawa.",
+    "purchaseDifferentAccount": "Wannan sayayyar App Store ba a haɗa ta da asusunka na Kilo ba. Shiga da Apple Account ɗin da aka yi amfani da shi don sayayyar, sannan sake gwadawa.",
+    "restoreFailed": "An kasa maido da sayayya. Sake gwadawa.",
+    "purchaseFailed": "An kasa kammala sayayya.",
+    "purchaseStartFailed": "An kasa fara sayayyar App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Buɗe",
       "statusPaid": "An biya",
       "statusVoid": "Rasa inganci",
-      "title": "Daftaruwa"
+      "title": "Daftaruwa",
+      "downloadFailed": "An kasa sauke daftari. Duba haɗinka ka sake gwadawa.",
+      "sharingUnavailable": "Raba ba ya samuwa akan wannan na'ura."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Shiga ya gaza. Don Allah sake gwadawa.",
     "networkError": "Kuskuren hanyar sadarwa. Don Allah sake gwadawa.",
     "accessDeniedByUser": "Mai amfani ya ƙi samun damar",
-    "codeExpired": "Lambar ta ƙare"
+    "codeExpired": "Lambar ta ƙare",
+    "tooManySignInAttempts": "Ƙoƙarin shiga ya yi yawa. Don Allah jira ka sake gwadawa."
   },
   "models": {
     "dataCollected": "Bayanan da aka tattara",

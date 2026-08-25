@@ -24,10 +24,9 @@ function chineseScriptFor(tag: string): SupportedLanguage | undefined {
 }
 
 /**
- * Resolve the supported language for a device locale list. Mirrors
- * `resolveVoiceInputLanguageTag`: for each device tag in preference order,
- * map Chinese scripts, then exact match, then same-language fallback. An
- * empty list or no match resolves to `en`.
+ * Resolve the supported language for a device locale list. For each device
+ * tag in preference order, map Chinese scripts, then exact match, then
+ * same-language fallback. An empty list or no match resolves to `en`.
  */
 export function resolveLanguageTag(
   locales: readonly { languageTag?: string }[]

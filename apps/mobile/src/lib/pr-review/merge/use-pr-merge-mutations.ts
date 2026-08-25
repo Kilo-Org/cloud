@@ -109,7 +109,9 @@ export function useMergePullRequestMutation(ref: PrRef) {
       // (which renders that text) has no live region of its own.
       const gate = gateMergeResult(result);
       const message =
-        gate.kind === 'partial' ? `Merged. Couldn't delete the branch: ${gate.reason}` : 'Merged';
+        gate.kind === 'partial'
+          ? i18n.t('prReview.merge.partialSuccessBanner.accessibility', { reason: gate.reason })
+          : i18n.t('prReview.merge.partialSuccessBanner.title');
       announceForA11y(message);
     },
     onError: (error: { message: string }) => {

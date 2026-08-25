@@ -24,7 +24,10 @@
     "required": "shart",
     "error": "xato: {{error}}",
     "back": "Orqaga",
-    "somethingWentWrong": "Nimadir noto'g'ri ketdi"
+    "somethingWentWrong": "Nimadir noto'g'ri ketdi",
+    "couldNotOpen": "{{label}}ni ochib bo'lmadi",
+    "link": "havola",
+    "takingLonger": "Bu kutilganidan ko'proq vaqt olmoqda. Buni yopib, qayta tekshirishingiz mumkin."
   },
   "language": {
     "title": "Til",
@@ -576,6 +579,12 @@
       "commentPosted": "Izoh joylashtirildi",
       "reviewSubmitted": "Sharh yuborildi",
       "autoMergeEnabled": "Avtomatik birlashtirish yoqildi"
+    },
+    "mutationError": {
+      "commentNotPosted": "Bu izohni joylashtirib bo'lmaydi. Tanlangan qator o'zgargan yoki PR yangilangan bo'lishi mumkin.",
+      "reviewNotSubmitted": "Bu sharhni xuddi shunday yuborib bo'lmaydi. PR o'zgargan bo'lishi mumkin yoki siz o'z pull requestingizni ko'rib chiqa olmaysiz.",
+      "couldNotPostComment": "Izoh joylashtirib bo'lmadi.",
+      "couldNotSubmitReview": "Sharhni yuborib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Fayl bo'sh",
       "classificationTooLarge": "Fayllar 20 MB yoki undan kichik bo'lishi kerak",
       "classificationUnreadable": "Bu faylni o'qib bo'lmadi",
-      "announceUploaded": "Biriktirma yuklandi"
+      "announceUploaded": "Biriktirma yuklandi",
+      "cantUpload": "Bu faylni yuklab bo'lmaydi.",
+      "networkError": "Tarmoq xatosi",
+      "uploadFailed": "Yuklash amalga oshmadi",
+      "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}",
+      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Yaltiroqlar",
       "strongArm": "Kuchli qo'l",
       "talisman": "Tumor"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Bu instansiya fayllarni qabul qila olmaydi."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Qaror yo'q",
       "noResult": "Natija yo'q"
     },
-    "eyebrow": "Kod ko'rib chiquvchisi"
+    "eyebrow": "Kod ko'rib chiquvchisi",
+    "updateFailed": "Sharhlovchini yangilab bo'lmadi",
+    "configSaveFailed": "Sharh konfiguratsiyasini saqlab bo'lmadi"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Mavjud tuzatishlar navbatga qo'yildi",
       "analysisComplete": "Tahlil yakunlandi",
       "syncComplete": "Sinxronlash yakunlandi"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Xavfsizlik xizmati sozlanmagan. Bu tuzatilmaguncha qayta yuborish muvaffaqiyatli bo'lolmaydi.",
+      "syncMayNotHaveCompleted": "Sinxronlash yakunlanmagan bo'lishi mumkin. Uni moslashtirish uchun qayta urinib ko'ring yoki bekor qiling.",
+      "syncInProgress": "Xavfsizlik sinxronlashuvi allaqachon davom etmoqda. Iltimos, qayta urinib ko'ring.",
+      "dismissalInProgress": "Bu rad etish allaqachon davom etmoqda. Iltimos, qayta urinib ko'ring.",
+      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashuvlarni o'qib bo'lmadi. Qayta urinib ko'ring."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Bu qurilma oflayn transkripsiya qila olmaydi. Yozuvingiz uni matnga aylantirish uchun {{provider}} ga yuboriladi. Kilo audioni saqlamaydi.",
     "allow": "Ruxsat berish",
     "start": "Ovozli kiritishni boshlash",
-    "stop": "Ovozli kiritishni to‘xtatish"
+    "stop": "Ovozli kiritishni to‘xtatish",
+    "restricted": "Bu qurilmada ovozli kiritish cheklangan.",
+    "micRequired": "Ovozli kiritish uchun mikrofonga kirish talab qilinadi.",
+    "micOff": "Mikrofonga kirish o'chirilgan. Ovozli kiritishdan foydalanish uchun uni Sozlamalarda yoqing.",
+    "micOffTitle": "Mikrofonga kirish o'chirilgan",
+    "noSpeech": "Nutq aniqlanmadi. Qayta urinish uchun mikrofonni bosing.",
+    "needsConnection": "Ovozli kiritish hozirda ulanishni talab qiladi. Qayta urinib ko'ring.",
+    "busy": "Ovozli kiritish band. Qayta urinib ko'ring.",
+    "stopped": "Ovozli kiritish to'xtatildi. Qayta urinish uchun mikrofonni bosing.",
+    "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
+    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas."
   },
   "share": {
     "title": "Kiloga ulashish",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Bu Kilo Pass veb-saytda boshqariladi.",
     "legalDisclosure": "Kilo Pass avtomatik yangilanadigan oylik obuna hisoblanadi. To‘lov xaridni tasdiqlashda Apple ID hisobingizdan undiriladi. Obunalar har oy ko‘rsatilgan narxda avtomatik yangilanadi, agar joriy davr tugashidan kamida 24 soat oldin bekor qilinmasa. Istiagan paytda App Store hisob sozlamalaringizda boshqaring yoki bekor qiling.",
     "legalPrivacyPolicy": "Maxfiylik siyosati",
-    "legalTermsOfUse": "Foydalanish shartlari (EULA)"
+    "legalTermsOfUse": "Foydalanish shartlari (EULA)",
+    "purchaseNotLinked": "Bu App Store xaridi Kilo hisobingizga bog'lanmagan. Xaridni amalga oshirgan Apple ID bilan tizimga kirganingizga ishonch hosil qiling va qayta urinib ko'ring.",
+    "purchaseDifferentAccount": "Bu App Store xaridi Kilo hisobingizga bog'lanmagan. Xarid uchun ishlatilgan Apple hisobiga kiring va qayta urinib ko'ring.",
+    "restoreFailed": "Xaridlarni tiklab bo'lmadi. Qayta urinib ko'ring.",
+    "purchaseFailed": "Xaridni yakunlab bo'lmadi.",
+    "purchaseStartFailed": "App Store xaridini boshlab bo'lmadi."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Ochiq",
       "statusPaid": "To'langan",
       "statusVoid": "Bekor qilingan",
-      "title": "Fakturalar"
+      "title": "Fakturalar",
+      "downloadFailed": "Hisob-fakturani yuklab bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
+      "sharingUnavailable": "Bu qurilmada ulashish mavjud emas."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Kirish amalga oshmadi. Iltimos, qayta urinib ko'ring.",
     "networkError": "Tarmoq xatosi. Iltimos, qayta urinib ko'ring.",
     "accessDeniedByUser": "Foydalanuvchi tomonidan kirish rad etildi",
-    "codeExpired": "Kodning muddati tugadi"
+    "codeExpired": "Kodning muddati tugadi",
+    "tooManySignInAttempts": "Kirish urinishlari juda ko'p. Iltimos, kuting va qayta urinib ko'ring."
   },
   "models": {
     "dataCollected": "Yig‘ilgan ma’lumotlar",

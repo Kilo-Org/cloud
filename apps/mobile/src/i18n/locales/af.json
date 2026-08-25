@@ -24,7 +24,10 @@
     "required": "vereis",
     "error": "fout: {{error}}",
     "back": "Terug",
-    "somethingWentWrong": "Iets het verkeerd geloop"
+    "somethingWentWrong": "Iets het verkeerd geloop",
+    "couldNotOpen": "Kon nie {{label}} oopmaak nie",
+    "link": "skakel",
+    "takingLonger": "Dit neem langer as verwag. Jy kan dit toemaak en weer nagaan."
   },
   "language": {
     "title": "Taal",
@@ -576,6 +579,12 @@
       "commentPosted": "Kommentaar geplaas",
       "reviewSubmitted": "Resensie ingedien",
       "autoMergeEnabled": "Outo-merge geaktiveer"
+    },
+    "mutationError": {
+      "commentNotPosted": "Hierdie kommentaar kan nie geplaas word nie. Die gekose lyn het dalk verander, of die PR is dalk bygewerk.",
+      "reviewNotSubmitted": "Hierdie resensie kan nie soos dit is ingedien word nie. Die PR het dalk verander, of jy kan nie jou eie trekversoek resenseer nie.",
+      "couldNotPostComment": "Kon nie kommentaar plaas nie.",
+      "couldNotSubmitReview": "Kon nie resensie indien nie. Kontroleer jou verbinding en probeer weer."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Lêer is leeg",
       "classificationTooLarge": "Lêers moet 20 MB of kleiner wees",
       "classificationUnreadable": "Kon nie hierdie lêer lees nie",
-      "announceUploaded": "Aanhegsel opgelaai"
+      "announceUploaded": "Aanhegsel opgelaai",
+      "cantUpload": "Hierdie lêer kan nie opgelaai word nie.",
+      "networkError": "Netwerkfout",
+      "uploadFailed": "Oplaai het misluk",
+      "failedToUploadFile": "Kon lêer nie oplaai nie: {{reason}}",
+      "nothingToPaste": "Niks om te plak nie"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Vonke",
       "strongArm": "Sterk arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Hierdie instansie kan nie lêers ontvang nie."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Geen besluit",
       "noResult": "Geen resultaat"
     },
-    "eyebrow": "Kode-hersiener"
+    "eyebrow": "Kode-hersiener",
+    "updateFailed": "Kon nie resenseerder bywerk nie",
+    "configSaveFailed": "Kon nie resensiekonfigurasie stoor nie"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Bestaande regstellings in die tou",
       "analysisComplete": "Analise voltooi",
       "syncComplete": "Sinchronisasie voltooi"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Veiligheidsdiens is nie gekonfigureer nie. Herindiening kan nie slaag totdat dit reggestel is nie.",
+      "syncMayNotHaveCompleted": "'n Sinkronisasie het dalk nie voltooi nie. Probeer weer om dit te versoen, of gooi dit weg.",
+      "syncInProgress": "'n Veiligheidsinkronisasie is reeds aan die gang. Probeer asseblief weer.",
+      "dismissalInProgress": "Hierdie van-die-hand-maak is reeds aan die gang. Probeer asseblief weer.",
+      "couldNotReadPendingSyncs": "Kon nie hangende sinkronisasies lees nie. Probeer weer."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Hierdie toestel kan nie vanlyn transkribeer nie. Jou opname word na {{provider}} gestuur om dit in teks te verander. Kilo stoor nie die klank nie.",
     "allow": "Laat toe",
     "start": "Begin steminvoer",
-    "stop": "Stop steminvoer"
+    "stop": "Stop steminvoer",
+    "restricted": "Steminvoer is op hierdie toestel beperk.",
+    "micRequired": "Mikrofoontoegang word vir steminvoer vereis.",
+    "micOff": "Mikrofoontoegang is af. Aktiveer dit in Instellings om steminvoer te gebruik.",
+    "micOffTitle": "Mikrofoontoegang is af",
+    "noSpeech": "Geen spraak bespeur nie. Tik die mikrofoon om weer te probeer.",
+    "needsConnection": "Steminvoer benodig tans 'n verbinding. Probeer weer.",
+    "busy": "Steminvoer is besig. Probeer weer.",
+    "stopped": "Steminvoer het gestop. Tik die mikrofoon om weer te probeer.",
+    "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
+    "unavailableLanguage": "Steminvoer is nie vir hierdie toesteltaal beskikbaar nie."
   },
   "share": {
     "title": "Deel na Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Hierdie Kilo Pass word op die web bestuur.",
     "legalDisclosure": "Kilo Pass is 'n outomaties-hernubare maandelikse intekening. Betaling word by bevestiging van aankoop van jou Apple ID gehef. Intekeninge hernu elke maand outomaties teen die prys wat vertoon word, tensy dit minstens 24 uur voor die einde van die huidige tydperk gekanselleer word. Bestuur of kanselleer enige tyd in jou App Store-rekeninginstellings.",
     "legalPrivacyPolicy": "Privaatheidsbeleid",
-    "legalTermsOfUse": "Gebruiksvoorwaardes (EULA)"
+    "legalTermsOfUse": "Gebruiksvoorwaardes (EULA)",
+    "purchaseNotLinked": "Hierdie App Store-aankoop is nie aan jou Kilo-rekening gekoppel nie. Maak seker jy is aangemeld by die Apple ID wat die aankoop gemaak het, en probeer dan weer.",
+    "purchaseDifferentAccount": "Hierdie App Store-aankoop is nie aan jou Kilo-rekening gekoppel nie. Teken in by die Apple-rekening wat vir die aankoop gebruik is, en probeer dan weer.",
+    "restoreFailed": "Kon nie aankope herstel nie. Probeer weer.",
+    "purchaseFailed": "Kon nie aankoop voltooi nie.",
+    "purchaseStartFailed": "Kon nie App Store-aankoop begin nie."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Oop",
       "statusPaid": "Betaal",
       "statusVoid": "Ongeldig",
-      "title": "Fakture"
+      "title": "Fakture",
+      "downloadFailed": "Kon nie faktuur aflaai nie. Kontroleer jou verbinding en probeer weer.",
+      "sharingUnavailable": "Deling is nie op hierdie toestel beskikbaar nie."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Aanmelding het misluk. Probeer asseblief weer.",
     "networkError": "Netwerkfout. Probeer asseblief weer.",
     "accessDeniedByUser": "Toegang deur gebruiker geweier",
-    "codeExpired": "Kode verval"
+    "codeExpired": "Kode verval",
+    "tooManySignInAttempts": "Te veel aanmeldpogings. Wag asseblief en probeer weer."
   },
   "models": {
     "dataCollected": "Data ingesamel",

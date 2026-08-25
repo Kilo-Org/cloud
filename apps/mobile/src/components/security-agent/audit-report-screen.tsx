@@ -146,7 +146,7 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
           <View key={event.id} className="gap-0.5">
             <Text className="text-sm">{event.label}</Text>
             <Text variant="muted" className="text-xs">
-              {formatDate(parseTimestamp(event.occurredAt), i18n.language)} ·{' '}
+              {formatDate(parseTimestamp(event.occurredAt), i18n.language, { timeZone: 'UTC' })} ·{' '}
               {event.actor.displayName}
             </Text>
           </View>

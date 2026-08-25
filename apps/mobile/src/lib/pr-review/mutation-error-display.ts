@@ -9,6 +9,7 @@
 // have committed, so the user must verify the PR instead of being shown the
 // generic retryable copy.
 
+import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   isPrOperationAmbiguous,
@@ -25,14 +26,6 @@ type MutationErrorDisplay = {
   kind: MutationErrorDisplayKind;
   message: string;
 };
-
-const COMPOSER_BAD_REQUEST =
-  "This comment can't be posted. The selected line may have changed, or the PR may have been updated.";
-const SUBMIT_BAD_REQUEST =
-  "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.";
-const COMPOSER_RETRYABLE_FALLBACK = 'Could not post comment.';
-const SUBMIT_RETRYABLE = 'Could not submit review. Check your connection and try again.';
-const RECONNECT_MESSAGE = 'GitHub connection expired.';
 
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
@@ -62,19 +55,22 @@ export function mutationErrorDisplay(
   if (classification.kind === 'bad-request') {
     return {
       kind: 'bad-request',
-      message: surface === 'composer' ? COMPOSER_BAD_REQUEST : SUBMIT_BAD_REQUEST,
+      message:
+        surface === 'composer'
+          ? i18n.t('prReview.mutationError.commentNotPosted')
+          : i18n.t('prReview.mutationError.reviewNotSubmitted'),
     };
   }
   if (classification.kind === 'reconnect') {
-    return { kind: 'reconnect', message: RECONNECT_MESSAGE };
+    return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
   }
   if (surface === 'submit') {
-    return { kind: 'retryable', message: SUBMIT_RETRYABLE };
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
   const message =
     rawError instanceof Error && rawError.message.length > 0
       ? rawError.message
-      : COMPOSER_RETRYABLE_FALLBACK;
+      : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }
 

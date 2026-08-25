@@ -24,7 +24,10 @@
     "required": "kërkohet",
     "error": "gabim: {{error}}",
     "back": "Prapa",
-    "somethingWentWrong": "Diçka shkoi keq"
+    "somethingWentWrong": "Diçka shkoi keq",
+    "couldNotOpen": "Nuk u arrit të hapej {{label}}",
+    "link": "lidhja",
+    "takingLonger": "Kjo po zgjat më shumë se sa pritej. Mund ta mbyllni dhe ta kontrolloni përsëri."
   },
   "language": {
     "title": "Gjuha",
@@ -576,6 +579,12 @@
       "commentPosted": "Komenti u postua",
       "reviewSubmitted": "Rishikimi u dërgua",
       "autoMergeEnabled": "Shkrirja automatike u aktivizua"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ky koment nuk mund të postohet. Rreshti i përzgjedhur mund të ketë ndryshuar, ose PR mund të jetë përditësuar.",
+      "reviewNotSubmitted": "Ky rishikim nuk mund të dërgohet siç është. PR mund të ketë ndryshuar, ose nuk mund ta rishikoni kërkesën tuaj të tërheqjes.",
+      "couldNotPostComment": "Nuk u arrit të postohej komenti.",
+      "couldNotSubmitReview": "Nuk u arrit të dërgohej rishikimi. Kontrolloni lidhjen dhe provoni përsëri."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Skedari është bosh",
       "classificationTooLarge": "Skedarët duhet të jenë 20 MB ose më të vegjël",
       "classificationUnreadable": "Nuk u arrit të lexohej ky skedar",
-      "announceUploaded": "Bashkangjitja u ngarkua"
+      "announceUploaded": "Bashkangjitja u ngarkua",
+      "cantUpload": "Ky skedar nuk mund të ngarkohet.",
+      "networkError": "Gabim rrjeti",
+      "uploadFailed": "Ngarkimi dështoi",
+      "failedToUploadFile": "Ngarkimi i skedarit dështoi: {{reason}}",
+      "nothingToPaste": "Asgjë për të ngjitur"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Shkëndijat",
       "strongArm": "Krahu i fortë",
       "talisman": "Talismani"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Kjo instancë nuk mund të marrë skedarë."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Asnjë vendim",
       "noResult": "Asnjë rezultat"
     },
-    "eyebrow": "Shqyrtuesi i Kodit"
+    "eyebrow": "Shqyrtuesi i Kodit",
+    "updateFailed": "Nuk u arrit të përditësohej rishikuesi",
+    "configSaveFailed": "Nuk u arrit të ruhej konfigurimi i rishikimit"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Riparimet ekzistuese në radhë",
       "analysisComplete": "Analiza e përfunduar",
       "syncComplete": "Sinkronizimi i përfunduar"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Shërbimi i sigurisë nuk është i konfiguruar. Ridërgimi nuk mund të ketë sukses derisa kjo të rregullohet.",
+      "syncMayNotHaveCompleted": "Sinkronizimi mund të mos ketë përfunduar. Riprovoni për ta rakorduar, ose hidheni poshtë.",
+      "syncInProgress": "Një sinkronizim sigurie është tashmë në proces. Provo përsëri.",
+      "dismissalInProgress": "Kjo hedhje poshtë është tashmë në proces. Provo përsëri.",
+      "couldNotReadPendingSyncs": "Nuk u arrit të lexoheshin sinkronizimet në pritje. Provo përsëri."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Kjo pajisje nuk mund të transkriptojë jashtë linje. Regjistrimi juaj dërgohet te {{provider}} për ta kthyer në tekst. Kilo nuk e ruan audion.",
     "allow": "Lejo",
     "start": "Fillo futjen me zë",
-    "stop": "Ndalo futjen me zë"
+    "stop": "Ndalo futjen me zë",
+    "restricted": "Futja me zë është e kufizuar në këtë pajisje.",
+    "micRequired": "Për futjen me zë kërkohet qasje te mikrofoni.",
+    "micOff": "Qasja te mikrofoni është e fikur. Aktivizojeni te Cilësimet për të përdorur futjen me zë.",
+    "micOffTitle": "Qasja te mikrofoni është e fikur",
+    "noSpeech": "Nuk u zbulua asnjë fjalim. Prekni mikrofonin për të provuar përsëri.",
+    "needsConnection": "Futja me zë tani ka nevojë për lidhje. Provo përsëri.",
+    "busy": "Futja me zë është e zënë. Provo përsëri.",
+    "stopped": "Futja me zë u ndal. Prekni mikrofonin për të provuar përsëri.",
+    "unavailableDevice": "Futja me zë nuk është e disponueshme në këtë pajisje.",
+    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje."
   },
   "share": {
     "title": "Ndaj te Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Ky Kilo Pass menaxhohet në ueb.",
     "legalDisclosure": "Kilo Pass është një abonim mujor me rinovim automatik. Pagesa i ngarkohet Apple ID-së suaj në konfirmim të blerjes. Abonimet rinovohen automatikisht çdo muaj me çmimin e treguar, përveç nëse anulohen të paktën 24 orë para përfundimit të periudhës aktuale. Menaxhojeni ose anuloni në çdo kohë te cilësimet e llogarisë suaj në App Store.",
     "legalPrivacyPolicy": "Politika e privatësisë",
-    "legalTermsOfUse": "Kushtet e përdorimit (EULA)"
+    "legalTermsOfUse": "Kushtet e përdorimit (EULA)",
+    "purchaseNotLinked": "Kjo blerje në App Store nuk është e lidhur me llogarinë tuaj Kilo. Sigurohuni që jeni regjistruar me Apple ID që bëri blerjen, pastaj provoni përsëri.",
+    "purchaseDifferentAccount": "Kjo blerje në App Store nuk është e lidhur me llogarinë tuaj Kilo. Hyni me Apple Account të përdorur për blerjen, pastaj provoni përsëri.",
+    "restoreFailed": "Rivendosja e blerjeve dështoi. Provo përsëri.",
+    "purchaseFailed": "Nuk u arrit të përfundohej blerja.",
+    "purchaseStartFailed": "Nuk u arrit të fillohej blerja në App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "E hapur",
       "statusPaid": "E paguar",
       "statusVoid": "E pavlefshme",
-      "title": "Faturat"
+      "title": "Faturat",
+      "downloadFailed": "Fatura nuk mund të shkarkohej. Kontrolloni lidhjen dhe provoni përsëri.",
+      "sharingUnavailable": "Ndarja nuk është e disponueshme në këtë pajisje."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Hyrja dështoi. Provo përsëri.",
     "networkError": "Gabim rrjeti. Provo përsëri.",
     "accessDeniedByUser": "Qasja u refuzua nga përdoruesi",
-    "codeExpired": "Kodi skadoi"
+    "codeExpired": "Kodi skadoi",
+    "tooManySignInAttempts": "Shumë përpjekje hyrjeje. Prisni dhe provoni përsëri."
   },
   "models": {
     "dataCollected": "Të dhënat e mbledhura",

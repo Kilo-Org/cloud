@@ -24,7 +24,10 @@
     "required": "اړین",
     "error": "تېروتنه: {{error}}",
     "back": "شاته",
-    "somethingWentWrong": "یو څه غلط شول"
+    "somethingWentWrong": "یو څه غلط شول",
+    "couldNotOpen": "{{label}} پرانیستل کیدی نشو",
+    "link": "لینک",
+    "takingLonger": "دا له تمې ډیر وخت نیسي. تاسو کولی شئ دا وتړئ او بیا یې وګورئ."
   },
   "language": {
     "title": "ژبه",
@@ -576,6 +579,12 @@
       "commentPosted": "تبصره خپره شوه",
       "reviewSubmitted": "بیاکتنه وسپارل شوه",
       "autoMergeEnabled": "اتومات یوځای کول فعال شو"
+    },
+    "mutationError": {
+      "commentNotPosted": "دا تبصره نشي خپرېدلای. غوره شوې کرښه ممکن بدله شوې وي، یا PR تازه شوی وي.",
+      "reviewNotSubmitted": "دا بیاکتنه لکه څنګه چې ده نشي سپارل کېدلای. PR ممکن بدل شوی وي، یا تاسو نشئ کولای خپل پل ریکویسټ بیاکتنه کړئ.",
+      "couldNotPostComment": "تبصره نشوه خپرېدلای.",
+      "couldNotSubmitReview": "بیاکتنه نشوه سپارل کېدلای. خپل اړیکه وګورئ او بیا هڅه وکړئ."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "فایل خالي دی",
       "classificationTooLarge": "فایلونه باید 20 MB یا کوچني وي",
       "classificationUnreadable": "دا فایل لوستل کیدی نشو",
-      "announceUploaded": "نښلول شوی فایل پورته شو"
+      "announceUploaded": "نښلول شوی فایل پورته شو",
+      "cantUpload": "دا فایل نه شي پورته کېدلای.",
+      "networkError": "د شبکې تېروتنه",
+      "uploadFailed": "پورته کول ناکام شول",
+      "failedToUploadFile": "د فایل پورته کول ناکام شول: {{reason}}",
+      "nothingToPaste": "د پیسټ کولو لپاره څه نشته"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "بلیکي",
       "strongArm": "قوي لاس",
       "talisman": "طلسم"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "دا بیلګه فایلونه نه شي ترلاسه کولای."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "هېڅ پریکړه",
       "noResult": "هېڅ پایله"
     },
-    "eyebrow": "کوډ بیاکتونکی"
+    "eyebrow": "کوډ بیاکتونکی",
+    "updateFailed": "بیاکتونکی تازه کول ناکام شول",
+    "configSaveFailed": "د بیاکتنې ترتیب خوندي کول ناکام شول"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "موجوده اصلاحات په صف کې ودرول شول",
       "analysisComplete": "تحلیل بشپړ شو",
       "syncComplete": "ترکیب بشپړ شو"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "د امنیت خدمت نه دی ترتیب شوی. تر هغه چې دا سم نه شي، بیا سپارل بریالي کیدی نشي.",
+      "syncMayNotHaveCompleted": "ترکیب ممکن بشپړ شوی نه وي. د سمون لپاره بیا هڅه وکړئ، یا یې رد کړئ.",
+      "syncInProgress": "د امنیت ترکیب دمخه روان دی. مهرباني وکړئ بیا هڅه وکړئ.",
+      "dismissalInProgress": "دا له پامه غورځول دمخه روان دی. مهرباني وکړئ بیا هڅه وکړئ.",
+      "couldNotReadPendingSyncs": "انتظاري ترکیبونه نه شول لوستل کېدلای. بیا هڅه وکړئ."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "دا وسیله آفلاین نه شي لیکلای. ستاسو ثبت د متن بدلولو لپاره {{provider}} ته لیږل کېږي. Kilo آډیو نه ذخیره کوي.",
     "allow": "اجازه ورکړئ",
     "start": "د غږ معلومات پیل کړئ",
-    "stop": "د غږ معلومات ودرولئ"
+    "stop": "د غږ معلومات ودرولئ",
+    "restricted": "په دې وسیله د غږ معلومات محدود دی.",
+    "micRequired": "د غږ معلوماتو لپاره مایکروفون ته لاسرسی اړین دی.",
+    "micOff": "د مایکروفون لاسرسی بند دی. د غږ معلوماتو کارولو لپاره یې په تنظیماتو کې فعال کړئ.",
+    "micOffTitle": "د مایکروفون لاسرسی بند دی",
+    "noSpeech": "هیڅ خبره ونه موندل شوه. د بیا هڅې لپاره مایکروفون ټک کړئ.",
+    "needsConnection": "د غږ معلومات اوسمهال اړیکې ته اړتیا لري. بیا هڅه وکړئ.",
+    "busy": "د غږ معلومات بوخت دی. بیا هڅه وکړئ.",
+    "stopped": "د غږ معلومات ودرول شو. د بیا هڅې لپاره مایکروفون ټک کړئ.",
+    "unavailableDevice": "د غږ معلومات په دې وسیله شتون نلري.",
+    "unavailableLanguage": "د غږ معلومات د دې وسیلې ژبې لپاره شتون نلري."
   },
   "share": {
     "title": "Kilo ته شریک کړئ",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "دا Kilo Pass په ویب کې اداره کیږي.",
     "legalDisclosure": "Kilo Pass یو خودکار تازه کېدونکی میاشتنی ګډون دی. پیسې ستاسو Apple ID ته د پیرود د تایید په وخت کې اخیستل کیږي. ګډونونه هر میاشت په ښودل شوي نرخ باندې په اتوماتیک ډول نوي کیږي، پرته له دې چې د اوسنۍ مودې له پای ته رسېدو ۲۴ ساعته مخکې لغوه شي. هر وخت د خپل App Store حساب تنظیماتو کې اداره یا لغوه کړئ.",
     "legalPrivacyPolicy": "د محرمیت پالیسي",
-    "legalTermsOfUse": "د استعمال شرایط (EULA)"
+    "legalTermsOfUse": "د استعمال شرایط (EULA)",
+    "purchaseNotLinked": "دا د App Store پیرود ستاسو د Kilo حساب سره تړلی نه دی. ډاډ ترلاسه کړئ چې تاسو په هغه Apple ID کې ننوتلي یاست چې پیرود یې کړی، بیا هڅه وکړئ.",
+    "purchaseDifferentAccount": "دا د App Store پیرود ستاسو د Kilo حساب سره تړلی نه دی. د پیرود لپاره کارول شوي Apple Account ته ننوځئ، بیا هڅه وکړئ.",
+    "restoreFailed": "پیرودونه بیرته راوړل ناکام شول. بیا هڅه وکړئ.",
+    "purchaseFailed": "پیرود بشپړول ناکام شول.",
+    "purchaseStartFailed": "د App Store پیرود پیل کول ناکام شول."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "خلاص",
       "statusPaid": "ورکړل شوی",
       "statusVoid": "باطل",
-      "title": "بیلونه"
+      "title": "بیلونه",
+      "downloadFailed": "بیل ډاونلوډ نه شو. خپل اړیکه وګورئ او بیا هڅه وکړئ.",
+      "sharingUnavailable": "شریکول په دې وسیله شتون نلري."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "ننوتل ناکام شول. مهرباني وکړئ بیا هڅه وکړئ.",
     "networkError": "د شبکې تېروتنه. مهرباني وکړئ بیا هڅه وکړئ.",
     "accessDeniedByUser": "د کارن لخوا لاسرسی رد شو",
-    "codeExpired": "کوډ پای ته رسیدلی"
+    "codeExpired": "کوډ پای ته رسیدلی",
+    "tooManySignInAttempts": "د ننوتلو ډېرې هڅې وشوې. مهرباني وکړئ انتظار وکړئ او بیا هڅه وکړئ."
   },
   "models": {
     "dataCollected": "ټول شوي معلومات",

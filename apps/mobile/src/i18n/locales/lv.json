@@ -24,7 +24,10 @@
     "required": "obligāts",
     "error": "kļūda: {{error}}",
     "back": "Atpakaļ",
-    "somethingWentWrong": "Kaut kas nogāja greizi"
+    "somethingWentWrong": "Kaut kas nogāja greizi",
+    "couldNotOpen": "Neizdevās atvērt {{label}}",
+    "link": "saite",
+    "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Varat to aizvērt un pārbaudīt vēlreiz."
   },
   "language": {
     "title": "Valoda",
@@ -583,6 +586,12 @@
       "commentPosted": "Komentārs publicēts",
       "reviewSubmitted": "Pārskats iesniegts",
       "autoMergeEnabled": "Automātiskā apvienošana iespējota"
+    },
+    "mutationError": {
+      "commentNotPosted": "Šo komentāru nevar publicēt. Atlasītā rinda, iespējams, ir mainījusies, vai PR ir atjaunināts.",
+      "reviewNotSubmitted": "Šo pārskatu nevar iesniegt tādu, kāds tas ir. PR, iespējams, ir mainījies, vai arī jūs nevarat pārskatīt savu pull request.",
+      "couldNotPostComment": "Neizdevās publicēt komentāru.",
+      "couldNotSubmitReview": "Neizdevās iesniegt pārskatu. Pārbaudiet savienojumu un mēģiniet vēlreiz."
     }
   },
   "notifications": {
@@ -721,7 +730,12 @@
       "classificationEmpty": "Fails ir tukšs",
       "classificationTooLarge": "Failiem jābūt 20 MB vai mazākiem",
       "classificationUnreadable": "Neizdevās nolasīt šo failu",
-      "announceUploaded": "Pielikums augšupielādēts"
+      "announceUploaded": "Pielikums augšupielādēts",
+      "cantUpload": "Šo failu nevar augšupielādēt.",
+      "networkError": "Tīkla kļūda",
+      "uploadFailed": "Augšupielāde neizdevās",
+      "failedToUploadFile": "Neizdevās augšupielādēt failu: {{reason}}",
+      "nothingToPaste": "Nav ko ielīmēt"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1181,7 +1195,8 @@
       "sparkles": "Dzirksteles",
       "strongArm": "Spēcīga roka",
       "talisman": "Talismans"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Šī instance nevar saņemt failus."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1368,7 +1383,9 @@
       "noDecision": "Nav lēmuma",
       "noResult": "Nav rezultāta"
     },
-    "eyebrow": "Koda pārskatītājs"
+    "eyebrow": "Koda pārskatītājs",
+    "updateFailed": "Neizdevās atjaunināt pārskatītāju",
+    "configSaveFailed": "Neizdevās saglabāt pārskata konfigurāciju"
   },
   "securityAgent": {
     "filter": {
@@ -1792,6 +1809,13 @@
       "remediationsQueued": "Esošie labojumi ievietoti rindā",
       "analysisComplete": "Analīze pabeigta",
       "syncComplete": "Sinhronizācija pabeigta"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Drošības pakalpojums nav konfigurēts. Atkārtota iesniegšana nevar izdoties, kamēr tas nav novērsts.",
+      "syncMayNotHaveCompleted": "Sinhronizācija, iespējams, nav pabeigta. Mēģiniet vēlreiz, lai to saskaņotu, vai atmetiet.",
+      "syncInProgress": "Drošības sinhronizācija jau notiek. Lūdzu, mēģiniet vēlreiz.",
+      "dismissalInProgress": "Šī noraidīšana jau notiek. Lūdzu, mēģiniet vēlreiz.",
+      "couldNotReadPendingSyncs": "Neizdevās nolasīt gaidītās sinhronizācijas. Mēģiniet vēlreiz."
     }
   },
   "agents": {
@@ -2489,7 +2513,17 @@
     "onlineMessage": "Šī ierīce nevar transkribēt bezsaistē. Tavs ieraksts tiek nosūtīts {{provider}}, lai to pārvērstu tekstā. Kilo neglabā audio.",
     "allow": "Atļaut",
     "start": "Sākt balss ievadi",
-    "stop": "Apturēt balss ievadi"
+    "stop": "Apturēt balss ievadi",
+    "restricted": "Balss ievade šajā ierīcē ir ierobežota.",
+    "micRequired": "Balss ievadei ir nepieciešama mikrofona piekļuve.",
+    "micOff": "Mikrofona piekļuve ir izslēgta. Iespējojiet to iestatījumos, lai izmantotu balss ievadi.",
+    "micOffTitle": "Mikrofona piekļuve ir izslēgta",
+    "noSpeech": "Netika uztverta runa. Pieskarieties mikrofonam, lai mēģinātu vēlreiz.",
+    "needsConnection": "Balss ievadei pašlaik ir nepieciešams savienojums. Mēģiniet vēlreiz.",
+    "busy": "Balss ievade ir aizņemta. Mēģiniet vēlreiz.",
+    "stopped": "Balss ievade tika apturēta. Pieskarieties mikrofonam, lai mēģinātu vēlreiz.",
+    "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
+    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai."
   },
   "share": {
     "title": "Kopīgot Kilo",
@@ -2567,7 +2601,12 @@
     "webManagementDescription": "Šis Kilo Pass tiek pārvaldīts tīmeklī.",
     "legalDisclosure": "Kilo Pass ir automātiski atjaunojams mēneša abonements. Maksājums tiek iekasēts no jūsu Apple ID pirkuma apstiprināšanas brīdī. Abonements katru mēnesi atjaunojas automātiski par norādīto cenu, ja vien tas netiek atcelts vismaz 24 stundas pirms pašreizējā perioda beigām. Pārvaldiet vai atceliet to jebkurā laikā sava App Store konta iestatījumos.",
     "legalPrivacyPolicy": "Privātuma politika",
-    "legalTermsOfUse": "Lietošanas noteikumi (EULA)"
+    "legalTermsOfUse": "Lietošanas noteikumi (EULA)",
+    "purchaseNotLinked": "Šis App Store pirkums nav saistīts ar jūsu Kilo kontu. Pārliecinieties, ka esat pierakstījies ar Apple ID, kas veica pirkumu, un mēģiniet vēlreiz.",
+    "purchaseDifferentAccount": "Šis App Store pirkums nav saistīts ar jūsu Kilo kontu. Pierakstieties ar Apple kontu, kas tika izmantots pirkumam, un mēģiniet vēlreiz.",
+    "restoreFailed": "Neizdevās atjaunot pirkumus. Mēģiniet vēlreiz.",
+    "purchaseFailed": "Neizdevās pabeigt pirkumu.",
+    "purchaseStartFailed": "Neizdevās sākt App Store pirkumu."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2700,7 +2739,9 @@
       "statusOpen": "Atvērts",
       "statusPaid": "Apmaksāts",
       "statusVoid": "Anulēts",
-      "title": "Rēķini"
+      "title": "Rēķini",
+      "downloadFailed": "Neizdevās lejupielādēt rēķinu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+      "sharingUnavailable": "Kopīgošana šajā ierīcē nav pieejama."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2821,7 +2862,8 @@
     "signInFailed": "Pierakstīšanās neizdevās. Lūdzu, mēģiniet vēlreiz.",
     "networkError": "Tīkla kļūda. Lūdzu, mēģiniet vēlreiz.",
     "accessDeniedByUser": "Lietotājs liedza piekļuvi",
-    "codeExpired": "Kods ir beidzies"
+    "codeExpired": "Kods ir beidzies",
+    "tooManySignInAttempts": "Pārāk daudz pierakstīšanās mēģinājumu. Lūdzu, uzgaidiet un mēģiniet vēlreiz."
   },
   "models": {
     "dataCollected": "Apkopotie dati",

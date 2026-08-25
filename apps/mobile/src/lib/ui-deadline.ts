@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 const noopDeadlineRejection = (_error: Error) => undefined;
 
 export async function withUiDeadline<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
@@ -6,9 +8,7 @@ export async function withUiDeadline<T>(operation: Promise<T>, timeoutMs: number
     rejectDeadline = reject;
   });
   const timeoutId = setTimeout(() => {
-    rejectDeadline(
-      new Error('This is taking longer than expected. You can close this and check again.')
-    );
+    rejectDeadline(new Error(i18n.t('common.takingLonger')));
   }, timeoutMs);
 
   try {

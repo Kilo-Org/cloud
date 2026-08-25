@@ -24,7 +24,10 @@
     "required": "áskilið",
     "error": "villa: {{error}}",
     "back": "Til baka",
-    "somethingWentWrong": "Eitthvað fór úrskeiðis"
+    "somethingWentWrong": "Eitthvað fór úrskeiðis",
+    "couldNotOpen": "Gat ekki opnað {{label}}",
+    "link": "tengill",
+    "takingLonger": "Þetta tekur lengri tíma en gert var ráð fyrir. Þú getur lokað þessu og athugað aftur."
   },
   "language": {
     "title": "Tungumál",
@@ -576,6 +579,12 @@
       "commentPosted": "Athugasemd birt",
       "reviewSubmitted": "Úttekt send",
       "autoMergeEnabled": "Sjálfvirk sameining virkjuð"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ekki er hægt að birta þessa athugasemd. Valda línan kann að hafa breyst, eða PR-inn kann að hafa verið uppfærður.",
+      "reviewNotSubmitted": "Ekki er hægt að senda þessa úttekt eins og hún er. PR-inn kann að hafa breyst, eða þú getur ekki yfirfarið þinn eigin pull request.",
+      "couldNotPostComment": "Gat ekki birt athugasemd.",
+      "couldNotSubmitReview": "Gat ekki sent úttekt. Athugaðu tenginguna og reyndu aftur."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Skráin er tóm",
       "classificationTooLarge": "Skrár verða að vera 20 MB eða minni",
       "classificationUnreadable": "Gat ekki lesið þessa skrá",
-      "announceUploaded": "Viðhengi hlaðið upp"
+      "announceUploaded": "Viðhengi hlaðið upp",
+      "cantUpload": "Ekki er hægt að hlaða þessari skrá upp.",
+      "networkError": "Netvilla",
+      "uploadFailed": "Upphleðsla mistókst",
+      "failedToUploadFile": "Ekki tókst að hlaða upp skrá: {{reason}}",
+      "nothingToPaste": "Ekkert til að líma"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Glitra",
       "strongArm": "Sterkur handleggur",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Þetta tilvik getur ekki tekið við skrám."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Engin ákvörðun",
       "noResult": "Engin niðurstaða"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Mistókst að uppfæra rýnir",
+    "configSaveFailed": "Mistókst að vista úttektarstillingar"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Núverandi úrbætur settar í biðröð",
       "analysisComplete": "Greining lokið",
       "syncComplete": "Samstilling lokið"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Öryggisþjónusta er ekki stillt. Endursending getur ekki tekist fyrr en þetta er lagað.",
+      "syncMayNotHaveCompleted": "Samstilling kann að ekki hafa klárast. Endurtaktu til að sætta hana, eða fargaðu.",
+      "syncInProgress": "Öryggissamstilling er þegar í gangi. Reyndu aftur.",
+      "dismissalInProgress": "Þessi frávísun er þegar í gangi. Reyndu aftur.",
+      "couldNotReadPendingSyncs": "Gat ekki lesið biðsamstillingar. Reyndu aftur."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Þetta tæki getur ekki umritað án nettengingar. Upptakan þín er send til {{provider}} til að breyta henni í texta. Kilo geymir ekki hljóðið.",
     "allow": "Leyfa",
     "start": "Byrja raddinnslátt",
-    "stop": "Stöðva raddinnslátt"
+    "stop": "Stöðva raddinnslátt",
+    "restricted": "Raddinnsláttur er takmarkaður á þessu tæki.",
+    "micRequired": "Aðgangur að hljóðnema er nauðsynlegur fyrir raddinnslátt.",
+    "micOff": "Aðgangur að hljóðnema er óvirkur. Virkjaðu hann í Stillingum til að nota raddinnslátt.",
+    "micOffTitle": "Aðgangur að hljóðnema er óvirkur",
+    "noSpeech": "Engin rödd greindist. Bankaðu á hljóðnemann til að reyna aftur.",
+    "needsConnection": "Raddinnsláttur þarfnast nettengingar núna. Reyndu aftur.",
+    "busy": "Raddinnsláttur er upptekinn. Reyndu aftur.",
+    "stopped": "Raddinnsláttur stöðvaðist. Bankaðu á hljóðnemann til að reyna aftur.",
+    "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
+    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið."
   },
   "share": {
     "title": "Deila í Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Þetta Kilo Pass er meðhöndlað á vefnum.",
     "legalDisclosure": "Kilo Pass er sjálfvirkt endurnýjanleg mánaðaráskrift. Greiðsla er innheimt á Apple ID þinn við staðfestingu kaupa. Áskriftir endurnýjast sjálfkrafa mánaðarlega á sýnandi verði nema sagt sé upp að minnsta kosti 24 klukkustundum fyrir lok gildistímabilsins. Hafa umsjón með eða hætta við hvenær sem er í stillingum App Store reikningsins þíns.",
     "legalPrivacyPolicy": "Persónuverndarstefna",
-    "legalTermsOfUse": "Notendaskilmálar (EULA)"
+    "legalTermsOfUse": "Notendaskilmálar (EULA)",
+    "purchaseNotLinked": "Þessi App Store-kaup eru ekki tengd Kilo-reikningnum þínum. Gakktu úr skugga um að þú sért skráð(ur) inn á Apple ID-ið sem gerði kaupin, og reyndu svo aftur.",
+    "purchaseDifferentAccount": "Þessi App Store-kaup eru ekki tengd Kilo-reikningnum þínum. Skráðu þig inn á Apple-reikninginn sem notaður var við kaupin, og reyndu svo aftur.",
+    "restoreFailed": "Mistókst að endurheimta kaup. Reyndu aftur.",
+    "purchaseFailed": "Mistókst að ljúka kaupum.",
+    "purchaseStartFailed": "Mistókst að hefja App Store-kaup."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Opin",
       "statusPaid": "Greitt",
       "statusVoid": "Ógilt",
-      "title": "Reikningar"
+      "title": "Reikningar",
+      "downloadFailed": "Gat ekki hlaðið niður reikningi. Athugaðu tenginguna og reyndu aftur.",
+      "sharingUnavailable": "Deiling er ekki tiltæk á þessu tæki."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Innskráning mistókst. Reyndu aftur.",
     "networkError": "Netvilla. Reyndu aftur.",
     "accessDeniedByUser": "Notandi hafnaði aðgangi",
-    "codeExpired": "Kóði er útrunninn"
+    "codeExpired": "Kóði er útrunninn",
+    "tooManySignInAttempts": "Of margar innskráningartilraunir. Bíddu og reyndu aftur."
   },
   "models": {
     "dataCollected": "Upplýsingar safnaðar",

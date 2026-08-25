@@ -24,7 +24,10 @@
     "notNow": "Niet nu",
     "continue": "Doorgaan",
     "back": "Terug",
-    "somethingWentWrong": "Er is iets misgegaan"
+    "somethingWentWrong": "Er is iets misgegaan",
+    "couldNotOpen": "Kon {{label}} niet openen",
+    "link": "link",
+    "takingLonger": "Dit duurt langer dan verwacht. Je kunt dit sluiten en later opnieuw controleren."
   },
   "language": {
     "title": "Taal",
@@ -283,7 +286,12 @@
       "classificationEmpty": "Bestand is leeg",
       "classificationTooLarge": "Bestanden moeten 20 MB of kleiner zijn",
       "classificationUnreadable": "Kon dit bestand niet lezen",
-      "announceUploaded": "Bijlage geüpload"
+      "announceUploaded": "Bijlage geüpload",
+      "cantUpload": "Dit bestand kan niet worden geüpload.",
+      "networkError": "Netwerkfout",
+      "uploadFailed": "Uploaden mislukt",
+      "failedToUploadFile": "Bestand uploaden mislukt: {{reason}}",
+      "nothingToPaste": "Niets om te plakken"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "Sprankels",
       "strongArm": "Sterke arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Deze instantie kan geen bestanden ontvangen."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "Reviewgeheugen",
       "reviewStyle": "Beoordelingsstijl",
       "set": "Ingesteld"
-    }
+    },
+    "updateFailed": "Reviewer bijwerken mislukt",
+    "configSaveFailed": "Reviewconfig opslaan mislukt"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "Bestaande herstelacties in de wachtrij",
       "analysisComplete": "Analyse voltooid",
       "syncComplete": "Synchronisatie voltooid"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Beveiligingsservice is niet geconfigureerd. Opnieuw indienen kan niet slagen tot dit is opgelost.",
+      "syncMayNotHaveCompleted": "Een synchronisatie is mogelijk niet voltooid. Probeer opnieuw om deze af te stemmen, of gooi deze weg.",
+      "syncInProgress": "Een beveiligingssynchronisatie is al bezig. Probeer het opnieuw.",
+      "dismissalInProgress": "Deze afwijzing is al bezig. Probeer het opnieuw.",
+      "couldNotReadPendingSyncs": "Openstaande synchronisaties konden niet worden gelezen. Probeer het opnieuw."
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "Spraak wordt online verwerkt",
     "staysOff": "Spraak blijft uit totdat je online transcriptie toestaat.",
     "start": "Start spraakinvoer",
-    "stop": "Stop spraakinvoer"
+    "stop": "Stop spraakinvoer",
+    "restricted": "Spraakinvoer is beperkt op dit apparaat.",
+    "micRequired": "Microfoontoegang is vereist voor spraakinvoer.",
+    "micOff": "Microfoontoegang staat uit. Schakel het in Instellingen in om spraakinvoer te gebruiken.",
+    "micOffTitle": "Microfoontoegang staat uit",
+    "noSpeech": "Geen spraak gedetecteerd. Tik op de microfoon om opnieuw te proberen.",
+    "needsConnection": "Spraakinvoer heeft nu een verbinding nodig. Probeer het opnieuw.",
+    "busy": "Spraakinvoer is bezet. Probeer het opnieuw.",
+    "stopped": "Spraakinvoer gestopt. Tik op de microfoon om opnieuw te proberen.",
+    "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
+    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat."
   },
   "share": {
     "title": "Delen naar Kilo",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "Deze Kilo Pass wordt op het web beheerd.",
     "legalDisclosure": "Kilo Pass is een maandelijks abonnement dat automatisch wordt verlengd. De betaling wordt bij bevestiging van de aankoop in rekening gebracht op je Apple ID. Abonnementen worden elke maand automatisch verlengd voor de weergegeven prijs, tenzij je ten minste 24 uur voor het einde van de huidige periode opzegt. Beheer of annuleer op elk moment in de accountinstellingen van de App Store.",
     "legalPrivacyPolicy": "Privacybeleid",
-    "legalTermsOfUse": "Gebruiksvoorwaarden (EULA)"
+    "legalTermsOfUse": "Gebruiksvoorwaarden (EULA)",
+    "purchaseNotLinked": "Deze App Store-aankoop is niet gekoppeld aan je Kilo-account. Controleer of je bent aangemeld met het Apple ID waarmee de aankoop is gedaan, en probeer het opnieuw.",
+    "purchaseDifferentAccount": "Deze App Store-aankoop is niet gekoppeld aan je Kilo-account. Meld je aan met het Apple-account dat voor de aankoop is gebruikt, en probeer het opnieuw.",
+    "restoreFailed": "Aankopen herstellen mislukt. Probeer het opnieuw.",
+    "purchaseFailed": "Aankoop voltooien mislukt.",
+    "purchaseStartFailed": "App Store-aankoop starten mislukt."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "Opmerking geplaatst",
       "reviewSubmitted": "Review verzonden",
       "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
+    },
+    "mutationError": {
+      "commentNotPosted": "Deze opmerking kan niet worden geplaatst. De geselecteerde regel is mogelijk gewijzigd, of de PR is mogelijk bijgewerkt.",
+      "reviewNotSubmitted": "Deze review kan niet zo worden ingediend. De PR is mogelijk gewijzigd, of je kunt je eigen pull-aanvraag niet beoordelen.",
+      "couldNotPostComment": "Opmerking kon niet worden geplaatst.",
+      "couldNotSubmitReview": "Review kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw."
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "Facturen",
       "statusPaid": "Betaald",
       "statusOpen": "Open",
-      "statusVoid": "Ongegrond"
+      "statusVoid": "Ongegrond",
+      "downloadFailed": "Factuur kon niet worden gedownload. Controleer je verbinding en probeer het opnieuw.",
+      "sharingUnavailable": "Delen is niet beschikbaar op dit apparaat."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Aanmelden is mislukt. Probeer het opnieuw.",
     "networkError": "Netwerkfout. Probeer het opnieuw.",
     "accessDeniedByUser": "Toegang geweigerd door gebruiker",
-    "codeExpired": "Code verlopen"
+    "codeExpired": "Code verlopen",
+    "tooManySignInAttempts": "Te veel aanmeldpogingen. Wacht even en probeer het opnieuw."
   },
   "models": {
     "dataCollected": "Verzamelde gegevens",

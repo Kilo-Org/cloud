@@ -24,7 +24,10 @@
     "required": "gofynnol",
     "error": "gwall: {{error}}",
     "back": "Yn ôl",
-    "somethingWentWrong": "Aeth rhywbeth o'i le"
+    "somethingWentWrong": "Aeth rhywbeth o'i le",
+    "couldNotOpen": "Ni ellid agor {{label}}",
+    "link": "dolen",
+    "takingLonger": "Mae hyn yn cymryd yn hirach na'r disgwyl. Gallwch gau hwn a gwirio eto."
   },
   "language": {
     "title": "Iaith",
@@ -604,6 +607,12 @@
       "commentPosted": "Sylw wedi'i bostio",
       "reviewSubmitted": "Adolygiad wedi'i gyflwyno",
       "autoMergeEnabled": "Cyfuno awtomatig wedi'i alluogi"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ni ellir postio'r sylw hwn. Efallai fod y llinell a ddewiswyd wedi newid, neu fod y PR wedi'i ddiweddaru.",
+      "reviewNotSubmitted": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai fod y PR wedi newid, neu ni allwch adolygu eich cais tynnu eich hun.",
+      "couldNotPostComment": "Ni ellid postio'r sylw.",
+      "couldNotSubmitReview": "Ni ellid cyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhoi cynnig arall arni."
     }
   },
   "notifications": {
@@ -742,7 +751,12 @@
       "classificationEmpty": "Mae'r ffeil yn wag",
       "classificationTooLarge": "Rhaid i ffeiliau fod yn 20 MB neu lai",
       "classificationUnreadable": "Ni ellid darllen y ffeil hon",
-      "announceUploaded": "Atodiad wedi'i uwchlwytho"
+      "announceUploaded": "Atodiad wedi'i uwchlwytho",
+      "cantUpload": "Ni ellir uwchlwytho'r ffeil hon.",
+      "networkError": "Gwall rhwydwaith",
+      "uploadFailed": "Methodd yr uwchlwythiad",
+      "failedToUploadFile": "Methwyd uwchlwytho'r ffeil: {{reason}}",
+      "nothingToPaste": "Dim byd i'w ludo"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1208,7 +1222,8 @@
       "sparkles": "Sgleinion",
       "strongArm": "Braich gref",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Ni all yr enghraifft hon dderbyn ffeiliau."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1395,7 +1410,9 @@
       "noDecision": "Dim penderfyniad",
       "noResult": "Dim canlyniad"
     },
-    "eyebrow": "Adolygydd Cod"
+    "eyebrow": "Adolygydd Cod",
+    "updateFailed": "Methodd diweddaru'r adolygydd",
+    "configSaveFailed": "Methodd cadw cyfluniad yr adolygiad"
   },
   "securityAgent": {
     "filter": {
@@ -1825,6 +1842,13 @@
       "remediationsQueued": "Unioniadau presennol yn y ciw",
       "analysisComplete": "Dadansoddiad wedi'i gwblhau",
       "syncComplete": "Cydamseriad wedi'i gwblhau"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Nid yw'r gwasanaeth diogelwch wedi'i ffurfweddu. Ni all ailddanfoniad lwyddo nes i hwn gael ei drwsio.",
+      "syncMayNotHaveCompleted": "Efallai na chwblhawyd cysoniad. Ceisiwch eto i'w gysoni, neu taflwch ef.",
+      "syncInProgress": "Mae cysoniad diogelwch eisoes ar y gweill. Rhowch gynnig arall arni.",
+      "dismissalInProgress": "Mae'r gwrthodiad hwn eisoes ar y gweill. Rhowch gynnig arall arni.",
+      "couldNotReadPendingSyncs": "Ni ellid darllen cysoniadau ar y gweill. Rhowch gynnig arall arni."
     }
   },
   "agents": {
@@ -2543,7 +2567,17 @@
     "onlineMessage": "Ni all y ddyfais hon drawsgrifio all-lein. Anfonir eich recordiad at {{provider}} i'w droi'n destun. Nid yw Kilo yn storio'r sain.",
     "allow": "Caniatáu",
     "start": "Cychwyn mewnbwn llais",
-    "stop": "Stopio mewnbwn llais"
+    "stop": "Stopio mewnbwn llais",
+    "restricted": "Mae mewnbwn llais yn gyfyngedig ar y ddyfais hon.",
+    "micRequired": "Mae angen mynediad at y meic ar gyfer mewnbwn llais.",
+    "micOff": "Mae mynediad at y meic wedi'i ddiffodd. Galluwch ef yn Gosodiadau i ddefnyddio mewnbwn llais.",
+    "micOffTitle": "Mae mynediad at y meic wedi'i ddiffodd",
+    "noSpeech": "Ni chanfuwyd unrhyw leferydd. Tapiwch y meic i roi cynnig arall arni.",
+    "needsConnection": "Mae mewnbwn llais angen cysylltiad ar hyn o bryd. Rhowch gynnig arall arni.",
+    "busy": "Mae mewnbwn llais yn brysur. Rhowch gynnig arall arni.",
+    "stopped": "Stopiodd mewnbwn llais. Tapiwch y meic i roi cynnig arall arni.",
+    "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
+    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon."
   },
   "share": {
     "title": "Rhannu i Kilo",
@@ -2621,7 +2655,12 @@
     "webManagementDescription": "Mae'r Kilo Pass hwn yn cael ei reoli ar y we.",
     "legalDisclosure": "Tanysgrifiad misol sy'n adnewyddu'n awtomatig yw Kilo Pass. Codir y taliad i'ch Apple ID ar gadarnhad o'r pryniant. Mae tanysgrifiadau'n adnewyddu'n awtomatig bob mis am y pris a ddangosir oni bai eich bod yn canslo o leiaf 24 awr cyn diwedd y cyfnod cyfredol. Rheolwch neu ganslwch unrhyw bryd yng ngosodiadau cyfrif eich App Store.",
     "legalPrivacyPolicy": "Polisi Preifatrwydd",
-    "legalTermsOfUse": "Telerau Defnyddio (EULA)"
+    "legalTermsOfUse": "Telerau Defnyddio (EULA)",
+    "purchaseNotLinked": "Nid yw'r pryniant App Store hwn wedi'i gysylltu â'ch cyfrif Kilo. Sicrhewch eich bod wedi mewngofnodi i'r Apple ID a wnaeth y pryniant, yna rhowch gynnig arall arni.",
+    "purchaseDifferentAccount": "Nid yw'r pryniant App Store hwn wedi'i gysylltu â'ch cyfrif Kilo. Mewngofnodwch i'r Apple Account a ddefnyddiwyd ar gyfer y pryniant, yna rhowch gynnig arall arni.",
+    "restoreFailed": "Methodd adfer pryniannau. Rhowch gynnig arall arni.",
+    "purchaseFailed": "Methodd cwblhau'r pryniant.",
+    "purchaseStartFailed": "Methodd cychwyn pryniant App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2754,7 +2793,9 @@
       "statusOpen": "Ar agor",
       "statusPaid": "Wedi'i thalu",
       "statusVoid": "Gwag",
-      "title": "Anfonebau"
+      "title": "Anfonebau",
+      "downloadFailed": "Ni ellid lawrlwytho'r anfoneb. Gwiriwch eich cysylltiad a rhoi cynnig arall arni.",
+      "sharingUnavailable": "Nid yw rhannu ar gael ar y ddyfais hon."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2878,7 +2919,8 @@
     "signInFailed": "Methodd mewngofnodi. Rhowch gynnig eto.",
     "networkError": "Gwall rhwydwaith. Rhowch gynnig eto.",
     "accessDeniedByUser": "Mynediad wedi'i wrthod gan y defnyddiwr",
-    "codeExpired": "Cod wedi dod i ben"
+    "codeExpired": "Cod wedi dod i ben",
+    "tooManySignInAttempts": "Gormod o geisiadau mewngofnodi. Arhoswch a rhowch gynnig arall arni."
   },
   "models": {
     "dataCollected": "Data a gasglwyd",

@@ -12,26 +12,37 @@ function scriptSubtag(tag: string): string | undefined {
     .find(part => part.length === 4);
 }
 
-const CHINESE_REGION_SCRIPTS = new Map([
-  ['tw', 'hant'],
-  ['hk', 'hant'],
-  ['mo', 'hant'],
-  ['cn', 'hans'],
-  ['sg', 'hans'],
+// Region-implied script, keyed `<language>-<region>`. Chinese is handled by
+// its own rule below, which needs no region list.
+const REGION_SCRIPTS = new Map([
+  ['sr-rs', 'cyrl'],
+  ['sr-ba', 'cyrl'],
+  ['sr-me', 'cyrl'],
+  ['sr-xk', 'cyrl'],
+  ['pa-pk', 'arab'],
+  ['pa-in', 'guru'],
+  ['az-ir', 'arab'],
+  ['az-az', 'latn'],
+  ['uz-af', 'arab'],
+  ['uz-uz', 'latn'],
 ]);
 
-/** Script of a tag. Chinese region tags imply a script, so map those too. */
+/** Script of a tag. When the tag lacks a script subtag, a region implies one. */
 function scriptOf(tag: string): string | undefined {
   const script = scriptSubtag(tag);
   if (script) {
     return script;
   }
   const parts = normalizeLocale(tag).split('-');
-  if (parts[0] !== 'zh') {
-    return undefined;
+  const [language] = parts;
+  if (language === 'zh') {
+    const traditional = parts
+      .slice(1)
+      .some(subtag => subtag === 'hant' || subtag === 'tw' || subtag === 'hk' || subtag === 'mo');
+    return traditional ? 'hant' : 'hans';
   }
   const region = parts.slice(1).find(part => part.length === 2);
-  return region ? CHINESE_REGION_SCRIPTS.get(region) : undefined;
+  return region ? REGION_SCRIPTS.get(`${language}-${region}`) : undefined;
 }
 
 /**

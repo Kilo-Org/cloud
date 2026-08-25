@@ -24,7 +24,10 @@
     "required": "required",
     "error": "error: {{error}}",
     "back": "Back",
-    "somethingWentWrong": "Something went wrong"
+    "somethingWentWrong": "Something went wrong",
+    "couldNotOpen": "Could not open {{label}}",
+    "link": "link",
+    "takingLonger": "This is taking longer than expected. You can close this and check again."
   },
   "language": {
     "title": "Language",
@@ -576,6 +579,12 @@
       "commentPosted": "Comment posted",
       "reviewSubmitted": "Review submitted",
       "autoMergeEnabled": "Auto-merge enabled"
+    },
+    "mutationError": {
+      "commentNotPosted": "This comment can't be posted. The selected line may have changed, or the PR may have been updated.",
+      "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
+      "couldNotPostComment": "Could not post comment.",
+      "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "File is empty",
       "classificationTooLarge": "Files must be 20 MB or smaller",
       "classificationUnreadable": "Couldn't read this file",
-      "announceUploaded": "Attachment uploaded"
+      "announceUploaded": "Attachment uploaded",
+      "cantUpload": "This file can't be uploaded.",
+      "networkError": "Network error",
+      "uploadFailed": "Upload failed",
+      "failedToUploadFile": "Failed to upload file: {{reason}}",
+      "nothingToPaste": "Nothing to paste"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Sparkles",
       "strongArm": "Strong arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "This instance cannot receive files."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "No decision",
       "noResult": "No result"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Failed to update reviewer",
+    "configSaveFailed": "Failed to save review config"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Existing remediations queued",
       "analysisComplete": "Analysis complete",
       "syncComplete": "Sync complete"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Security service is not configured. Resubmitting cannot succeed until this is fixed.",
+      "syncMayNotHaveCompleted": "A sync may not have completed. Retry to reconcile it, or discard.",
+      "syncInProgress": "A security sync is already in progress. Please try again.",
+      "dismissalInProgress": "This dismissal is already in progress. Please try again.",
+      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
     "allow": "Allow",
     "start": "Start voice input",
-    "stop": "Stop voice input"
+    "stop": "Stop voice input",
+    "restricted": "Voice input is restricted on this device.",
+    "micRequired": "Microphone access is required for voice input.",
+    "micOff": "Microphone access is off. Enable it in Settings to use voice input.",
+    "micOffTitle": "Microphone access is off",
+    "noSpeech": "No speech detected. Tap the microphone to try again.",
+    "needsConnection": "Voice input needs a connection right now. Try again.",
+    "busy": "Voice input is busy. Try again.",
+    "stopped": "Voice input stopped. Tap the microphone to try again.",
+    "unavailableDevice": "Voice input isn't available on this device.",
+    "unavailableLanguage": "Voice input isn't available for this device language."
   },
   "share": {
     "title": "Share to Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "This Kilo Pass is managed on the web.",
     "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
     "legalPrivacyPolicy": "Privacy Policy",
-    "legalTermsOfUse": "Terms of Use (EULA)"
+    "legalTermsOfUse": "Terms of Use (EULA)",
+    "purchaseNotLinked": "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.",
+    "purchaseDifferentAccount": "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.",
+    "restoreFailed": "Failed to restore purchases. Try again.",
+    "purchaseFailed": "Failed to complete purchase.",
+    "purchaseStartFailed": "Failed to start App Store purchase."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Open",
       "statusPaid": "Paid",
       "statusVoid": "Void",
-      "title": "Invoices"
+      "title": "Invoices",
+      "downloadFailed": "Couldn't download invoice. Check your connection and try again.",
+      "sharingUnavailable": "Sharing is not available on this device."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Sign-in failed. Please try again.",
     "networkError": "Network error. Please try again.",
     "accessDeniedByUser": "Access denied by user",
-    "codeExpired": "Code expired"
+    "codeExpired": "Code expired",
+    "tooManySignInAttempts": "Too many sign-in attempts. Please wait and try again."
   },
   "models": {
     "dataCollected": "Data collected",

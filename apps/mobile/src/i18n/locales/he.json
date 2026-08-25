@@ -24,7 +24,10 @@
     "notNow": "לא עכשיו",
     "continue": "המשך",
     "back": "חזרה",
-    "somethingWentWrong": "משהו השתבש"
+    "somethingWentWrong": "משהו השתבש",
+    "couldNotOpen": "לא ניתן לפתוח את {{label}}",
+    "link": "קישור",
+    "takingLonger": "זה לוקח יותר זמן מהצפוי. תוכל לסגור את זה ולבדוק שוב."
   },
   "language": {
     "title": "שפה",
@@ -283,7 +286,12 @@
       "classificationEmpty": "הקובץ ריק",
       "classificationTooLarge": "קבצים חייבים להיות 20 MB או קטן יותר",
       "classificationUnreadable": "לא ניתן היה לקרוא את הקובץ הזה",
-      "announceUploaded": "הקובץ המצורף הועלה"
+      "announceUploaded": "הקובץ המצורף הועלה",
+      "cantUpload": "לא ניתן להעלות את הקובץ הזה.",
+      "networkError": "שגיאת רשת",
+      "uploadFailed": "ההעלאה נכשלה",
+      "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}",
+      "nothingToPaste": "אין מה להדביק"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -743,7 +751,8 @@
       "sparkles": "ניצוצות",
       "strongArm": "זרוע חזקה",
       "talisman": "קמע"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "מופע זה אינו יכול לקבל קבצים."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -930,7 +939,9 @@
       "reviewMemory": "זיכרון סקירה",
       "reviewStyle": "סגנון סקירה",
       "set": "הוגדר"
-    }
+    },
+    "updateFailed": "עדכון הסוקר נכשל",
+    "configSaveFailed": "שמירת הגדרת הסקירה נכשלה"
   },
   "securityAgent": {
     "filter": {
@@ -1354,6 +1365,13 @@
       "remediationsQueued": "תיקונים קיימים הועמדו בתור",
       "analysisComplete": "הניתוח הושלם",
       "syncComplete": "הסנכרון הושלם"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "שירות האבטחה אינו מוגדר. הגשה חוזרת לא תוכל להצליח עד שהדבר יתוקן.",
+      "syncMayNotHaveCompleted": "ייתכן שסנכרון לא הושלם. נסה שוב כדי ליישב אותו, או דחה.",
+      "syncInProgress": "סנכרון אבטחה כבר מתבצע. נסה שוב.",
+      "dismissalInProgress": "הדחייה הזו כבר מתבצעת. נסה שוב.",
+      "couldNotReadPendingSyncs": "לא ניתן היה לקרוא סנכרונים ממתינים. נסה שוב."
     }
   },
   "agents": {
@@ -2051,7 +2069,17 @@
     "onlineTitle": "הדיבור מעובד באופן מקוון",
     "staysOff": "הדיבור נשאר כבוי עד שתאפשר תמלול מקוון.",
     "start": "התחל קלט קולי",
-    "stop": "עצור קלט קולי"
+    "stop": "עצור קלט קולי",
+    "restricted": "קלט קולי מוגבל במכשיר זה.",
+    "micRequired": "נדרשת גישה למיקרופון עבור קלט קולי.",
+    "micOff": "גישת המיקרופון כבויה. הפעל אותה בהגדרות כדי להשתמש בקלט קולי.",
+    "micOffTitle": "גישת המיקרופון כבויה",
+    "noSpeech": "לא זוהה דיבור. הקש על המיקרופון כדי לנסות שוב.",
+    "needsConnection": "קלט קולי דורש חיבור כרגע. נסה שוב.",
+    "busy": "קלט קולי עסוק. נסה שוב.",
+    "stopped": "קלט קולי הופסק. הקש על המיקרופון כדי לנסות שוב.",
+    "unavailableDevice": "קלט קולי אינו זמין במכשיר זה.",
+    "unavailableLanguage": "קלט קולי אינו זמין עבור שפת המכשיר הזו."
   },
   "share": {
     "title": "שתף ל-Kilo",
@@ -2129,7 +2157,12 @@
     "webManagementDescription": "Kilo Pass זה מנוהל באינטרנט.",
     "legalDisclosure": "Kilo Pass הוא מנוי חודשי שמתחדש אוטומטית. התשלום נגבה מחשבון Apple שלך בעת אישור הרכישה. המנוי מתחדש אוטומטית בכל חודש במחיר המוצג, אלא אם תבטל לפחות 24 שעות לפני סוף התקופה הנוכחית. נהל או בטל בכל עת בהגדרות חשבון App Store שלך.",
     "legalPrivacyPolicy": "מדיניות פרטיות",
-    "legalTermsOfUse": "תנאי שימוש (EULA)"
+    "legalTermsOfUse": "תנאי שימוש (EULA)",
+    "purchaseNotLinked": "רכישה זו ב-App Store אינה מקושרת לחשבון Kilo שלך. ודא שאתה מחובר ל-Apple ID שביצע את הרכישה, ולאחר מכן נסה שוב.",
+    "purchaseDifferentAccount": "רכישה זו ב-App Store אינה מקושרת לחשבון Kilo שלך. היכנס לחשבון Apple שבו נעשה שימוש לרכישה, ולאחר מכן נסה שוב.",
+    "restoreFailed": "שחזור הרכישות נכשל. נסה שוב.",
+    "purchaseFailed": "השלמת הרכישה נכשלה.",
+    "purchaseStartFailed": "התחלת הרכישה ב-App Store נכשלה."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2650,6 +2683,12 @@
       "commentPosted": "התגובה פורסמה",
       "reviewSubmitted": "הסקירה נשלחה",
       "autoMergeEnabled": "מיזוג אוטומטי הופעל"
+    },
+    "mutationError": {
+      "commentNotPosted": "לא ניתן לפרסם תגובה זו. ייתכן שהשורה שנבחרה השתנתה, או שה-PR עודכן.",
+      "reviewNotSubmitted": "לא ניתן לשלוח סקירה זו כפי שהיא. ייתכן שה-PR השתנה, או שאינך יכול לסקור בקשת משיכה משלך.",
+      "couldNotPostComment": "לא ניתן היה לפרסם תגובה.",
+      "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב."
     }
   },
   "organization": {
@@ -2696,7 +2735,9 @@
       "title": "חשבוניות",
       "statusPaid": "שולם",
       "statusOpen": "פתוח",
-      "statusVoid": "מבוטל"
+      "statusVoid": "מבוטל",
+      "downloadFailed": "לא ניתן היה להוריד את החשבונית. בדוק את החיבור ונסה שוב.",
+      "sharingUnavailable": "שיתוף אינו זמין במכשיר זה."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2821,7 +2862,8 @@
     "signInFailed": "הכניסה נכשלה. נסה שוב.",
     "networkError": "שגיאת רשת. נסה שוב.",
     "accessDeniedByUser": "הגישה נדחתה על ידי המשתמש",
-    "codeExpired": "הקוד פג"
+    "codeExpired": "הקוד פג",
+    "tooManySignInAttempts": "יותר מדי ניסיונות כניסה. אנא המתן ונסה שוב."
   },
   "models": {
     "dataCollected": "נתונים שנאספו",

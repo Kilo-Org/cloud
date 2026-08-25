@@ -24,7 +24,10 @@
     "required": "vacibdir",
     "error": "xəta: {{error}}",
     "back": "Geri",
-    "somethingWentWrong": "Nəsə səhv getdi"
+    "somethingWentWrong": "Nəsə səhv getdi",
+    "couldNotOpen": "{{label}} açıla bilmədi",
+    "link": "link",
+    "takingLonger": "Bu, gözləniləndən daha uzun çəkir. Bunu bağlayıb yenidən yoxlaya bilərsiniz."
   },
   "language": {
     "title": "Dil",
@@ -576,6 +579,12 @@
       "commentPosted": "Şərh yerləşdirildi",
       "reviewSubmitted": "İcmal təqdim edildi",
       "autoMergeEnabled": "Avtomatik-merge aktiv edildi"
+    },
+    "mutationError": {
+      "commentNotPosted": "Bu şərh yerləşdirilə bilməz. Seçilmiş sətir dəyişmiş ola bilər və ya PR yenilənmiş ola bilər.",
+      "reviewNotSubmitted": "Bu icmal olduğu kimi təqdim edilə bilməz. PR dəyişmiş ola bilər və ya öz pull request'inizi icmal edə bilməzsiniz.",
+      "couldNotPostComment": "Şərh yerləşdirilə bilmədi.",
+      "couldNotSubmitReview": "İcmal təqdim edilə bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Fayl boşdur",
       "classificationTooLarge": "Fayllar 20 MB və ya daha kiçik olmalıdır",
       "classificationUnreadable": "Bu fayl oxuna bilmədi",
-      "announceUploaded": "Əlavə yükləndi"
+      "announceUploaded": "Əlavə yükləndi",
+      "cantUpload": "Bu fayl yüklənə bilməz.",
+      "networkError": "Şəbəkə xətası",
+      "uploadFailed": "Yükləmə uğursuz oldu",
+      "failedToUploadFile": "Fayl yüklənə bilmədi: {{reason}}",
+      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Parıltılar",
       "strongArm": "Güclü qol",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Bu nümunə fayl qəbul edə bilmir."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Qərar yoxdur",
       "noResult": "Nəticə yoxdur"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "İcmalçı yenilənə bilmədi",
+    "configSaveFailed": "İcmal konfiqurasiyası saxlanıla bilmədi"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Mövcud düzəlişlər növbədədir",
       "analysisComplete": "Təhlil tamamlandı",
       "syncComplete": "Sinxronizasiya tamamlandı"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Təhlükəsizlik xidməti konfiqurasiya olunmayıb. Bu düzəldilənə qədər yenidən təqdim etmək uğur qazana bilməz.",
+      "syncMayNotHaveCompleted": "Sinxronlaşdırma tamamlanmamış ola bilər. Onu uzlaşdırmaq üçün yenidən cəhd edin və ya ləğv edin.",
+      "syncInProgress": "Təhlükəsizlik sinxronlaşdırması artıq davam edir. Zəhmət olmasa yenidən cəhd edin.",
+      "dismissalInProgress": "Bu rədd artıq davam edir. Zəhmət olmasa yenidən cəhd edin.",
+      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmalar oxuna bilmədi. Yenidən cəhd edin."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Bu cihaz oflayn transkripsiya edə bilmir. Yazınız mətnə çevrilmək üçün {{provider}}-a göndərilir. Kilo audio faylı saxlamır.",
     "allow": "İcazə ver",
     "start": "Səs girişini başlat",
-    "stop": "Səs girişini dayandır"
+    "stop": "Səs girişini dayandır",
+    "restricted": "Səs girişi bu cihazda məhdudlaşdırılıb.",
+    "micRequired": "Səs girişi üçün mikrofona giriş tələb olunur.",
+    "micOff": "Mikrofona giriş söndürülüb. Səs girişindən istifadə etmək üçün Parametrlərdə aktivləşdirin.",
+    "micOffTitle": "Mikrofona giriş söndürülüb",
+    "noSpeech": "Nitq aşkar edilmədi. Yenidən cəhd etmək üçün mikrofona toxunun.",
+    "needsConnection": "Səs girişi indi bağlantı tələb edir. Yenidən cəhd edin.",
+    "busy": "Səs girişi məşğuldur. Yenidən cəhd edin.",
+    "stopped": "Səs girişi dayandı. Yenidən cəhd etmək üçün mikrofona toxunun.",
+    "unavailableDevice": "Səs girişi bu cihazda mövcud deyil.",
+    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil."
   },
   "share": {
     "title": "Kilo-ya paylaş",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Bu Kilo Pass vebdə idarə olunur.",
     "legalDisclosure": "Kilo Pass avtomatik yenilənən aylıq abunədir. Ödəniş alışın təsdiqində Apple ID-nizdən çıxılır. Abunəliklər cari dövrün sonuna ən azı 24 saat qalmış ləğv edilmədiyi halda hər ay göstərilən qiymətlə avtomatik yenilənir. İstənilən vaxt App Store hesabınızın parametrlərində idarə edin və ya ləğv edin.",
     "legalPrivacyPolicy": "Məxfilik Siyasəti",
-    "legalTermsOfUse": "İstifadə Şərtləri (EULA)"
+    "legalTermsOfUse": "İstifadə Şərtləri (EULA)",
+    "purchaseNotLinked": "Bu App Store alışı Kilo hesabınıza bağlı deyil. Alışı edən Apple ID ilə daxil olduğunuza əmin olun, sonra yenidən cəhd edin.",
+    "purchaseDifferentAccount": "Bu App Store alışı Kilo hesabınıza bağlı deyil. Alış üçün istifadə edilmiş Apple Hesabına daxil olun, sonra yenidən cəhd edin.",
+    "restoreFailed": "Alışlar bərpa edilə bilmədi. Yenidən cəhd edin.",
+    "purchaseFailed": "Alış tamamlana bilmədi.",
+    "purchaseStartFailed": "App Store alışı başladıla bilmədi."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Açıq",
       "statusPaid": "Ödənilib",
       "statusVoid": "Etibarsız",
-      "title": "Fakturalar"
+      "title": "Fakturalar",
+      "downloadFailed": "Faktura endirilə bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+      "sharingUnavailable": "Paylaşım bu cihazda mövcud deyil."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Daxil olma uğursuz oldu. Zəhmət olmasa yenidən cəhd edin.",
     "networkError": "Şəbəkə xətası. Zəhmət olmasa yenidən cəhd edin.",
     "accessDeniedByUser": "İstifadəçi tərəfindən giriş rədd edildi",
-    "codeExpired": "Kodun müddəti bitdi"
+    "codeExpired": "Kodun müddəti bitdi",
+    "tooManySignInAttempts": "Çox sayda giriş cəhdi. Zəhmət olmasa gözləyin və yenidən cəhd edin."
   },
   "models": {
     "dataCollected": "Toplanan məlumatlar",

@@ -2,6 +2,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { Linking } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 type ExternalLinkOptions = {
   label?: string;
   retryOnError?: boolean;
@@ -24,12 +26,12 @@ async function openUrl(url: string) {
 
 export async function openExternalUrl(
   url: string,
-  { label = 'link', retryOnError = false }: ExternalLinkOptions = {}
+  { label = i18n.t('common.link'), retryOnError = false }: ExternalLinkOptions = {}
 ) {
   try {
     await openUrl(url);
   } catch {
-    const message = `Could not open ${label}`;
+    const message = i18n.t('common.couldNotOpen', { label });
     if (!retryOnError) {
       toast.error(message);
       return;
@@ -37,7 +39,7 @@ export async function openExternalUrl(
 
     toast.error(message, {
       action: {
-        label: 'Try again',
+        label: i18n.t('common.tryAgain'),
         onClick: () => {
           void openExternalUrl(url, { label, retryOnError: true });
         },

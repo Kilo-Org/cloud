@@ -24,7 +24,10 @@
     "required": "achọrọ",
     "error": "njehie: {{error}}",
     "back": "Azu",
-    "somethingWentWrong": "Ihe mere adịghị mma"
+    "somethingWentWrong": "Ihe mere adịghị mma",
+    "couldNotOpen": "Enweghị ike imepe {{label}}",
+    "link": "njikọ",
+    "takingLonger": "Nke a na-ewe ogologo oge karịa ka a tụrụ anya. Ị nwere ike mechie ya ma lelee ọzọ."
   },
   "language": {
     "title": "Asụsụ",
@@ -576,6 +579,12 @@
       "commentPosted": "Biputere nkọwa",
       "reviewSubmitted": "Nyefere nyocha",
       "autoMergeEnabled": "Akwadoro njikọta akpaghị aka"
+    },
+    "mutationError": {
+      "commentNotPosted": "Enweghị ike ibipụta nkọwa a. Ahịrị ahọpụtara nwere ike ịgbanwela, ma ọ bụ PR nwere ike ịbụ na emelitere ya.",
+      "reviewNotSubmitted": "Enweghị ike ịnyefe nyocha a dịka ọ dị. PR nwere ike ịgbanwela, ma ọ bụ ị nweghị ike ịnyocha arịrịọ dọrọ nke gị.",
+      "couldNotPostComment": "Enweghị ike ibipụta nkọwa.",
+      "couldNotSubmitReview": "Enweghị ike ịnyefe nyocha. Lelee njikọ gị ma nwaa ọzọ."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Faịlụ tọgbọrọ chakoo",
       "classificationTooLarge": "Faịlụ ga-abụ 20 MB ma ọ bụ obere",
       "classificationUnreadable": "Enweghị ike ịgụ faịlụ a",
-      "announceUploaded": "Ebugola ihe jikọtara"
+      "announceUploaded": "Ebugola ihe jikọtara",
+      "cantUpload": "Enweghị ike ibutu faịlụ a.",
+      "networkError": "Njehie netwọk",
+      "uploadFailed": "Ibugote dara",
+      "failedToUploadFile": "Enweghị ike ibutu faịlụ: {{reason}}",
+      "nothingToPaste": "Ọ dịghị ihe a ga-amado"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Ihe na-egbuke egbuke",
       "strongArm": "Ogwe aka siri ike",
       "talisman": "Ihe nsọ"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Ihe ọmụmụ a enweghị ike ịnata faịlụ."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Enweghị mkpebi",
       "noResult": "Enweghị nsonaazụ"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Emeliteghị onye nyocha",
+    "configSaveFailed": "Echekwaghị nhazi nyocha"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Ndozi dị adị kwụ n'ahịrị",
       "analysisComplete": "Nyocha gwụchara",
       "syncComplete": "Nsomi gwụchara"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Emeghị nhazi ọrụ nchebe. Nzigharị enweghị ike ịga nke ọma ruo mgbe edoziri nke a.",
+      "syncMayNotHaveCompleted": "Nsomi nwere ike ịbụ na emechabeghị. Nwaa ọzọ iji mezie ya, ma ọ bụ tụfuo ya.",
+      "syncInProgress": "Nsomi nchebe na-aga n'ihu ugbu a. Biko nwaa ọzọ.",
+      "dismissalInProgress": "Ịmechi a na-aga n'ihu ugbu a. Biko nwaa ọzọ.",
+      "couldNotReadPendingSyncs": "Enweghị ike ịgụ nsomi ndị na-echere. Nwaa ọzọ."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Ngwaọrụ a enweghị ike idegharị n'ọfụma. A na-eziga ndekọ gị na {{provider}} ka ọ gbanwee ya ka ọ bụrụ ederede. Kilo anaghị echekwa ụda ahụ.",
     "allow": "Kwe",
     "start": "Malite ntinye olu",
-    "stop": "Kwụsị ntinye olu"
+    "stop": "Kwụsị ntinye olu",
+    "restricted": "A na-amachi ntinye olu na ngwaọrụ a.",
+    "micRequired": "Achọrọ ohere igwe okwu maka ntinye olu.",
+    "micOff": "Ohere igwe okwu apụwo. Gbanye ya na Ntọala iji jiri ntinye olu.",
+    "micOffTitle": "Ohere igwe okwu apụwo",
+    "noSpeech": "A hụghị okwu. Pịa igwe okwu ka ị nwaa ọzọ.",
+    "needsConnection": "Ntinye olu chọrọ njikọ ugbu a. Nwaa ọzọ.",
+    "busy": "Ntinye olu na-arụ ọrụ. Nwaa ọzọ.",
+    "stopped": "Ntinye olu kwụsịrị. Pịa igwe okwu ka ị nwaa ọzọ.",
+    "unavailableDevice": "Ntinye olu adịghị na ngwaọrụ a.",
+    "unavailableLanguage": "Ntinye olu adịghị maka asụsụ ngwaọrụ a."
   },
   "share": {
     "title": "Kekọrịta na Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "A Kilo Pass a na-ejikwa na webụ.",
     "legalDisclosure": "Kilo Pass bụ ndenye aha kwa ọnwa nke na-emegharị onwe ya. A na-ana ụgwọ na Apple ID gị mgbe ị kwadoro ịzụta. Ndenye aha na-emegharị kwa ọnwa na ọnụahịa egosiri belụsọ na ị kagburu ya ọ dịkarịa ala awa 24 tupu njedebe nke oge ugbu a. Jikwaa ma ọ bụ kagbuo ya mgbe ọ bụla na ntọala akaụntụ App Store gị.",
     "legalPrivacyPolicy": "Amụma Nzuzo",
-    "legalTermsOfUse": "Ụkpụrụ Ojiji (EULA)"
+    "legalTermsOfUse": "Ụkpụrụ Ojiji (EULA)",
+    "purchaseNotLinked": "Ịzụrụ App Store a ejikọghị na akaụntụ Kilo gị. Gbaa mbọ hụ na ị banyere na Apple ID nke zụrụ ya, wee nwaa ọzọ.",
+    "purchaseDifferentAccount": "Ịzụrụ App Store a ejikọghị na akaụntụ Kilo gị. Banye na Akaụntụ Apple e ji zụọ ya, wee nwaa ọzọ.",
+    "restoreFailed": "Ịweghachite azụrụ dara. Nwaa ọzọ.",
+    "purchaseFailed": "Ịmecha azụrụ dara.",
+    "purchaseStartFailed": "Ịmalite azụrụ App Store dara."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Mepee",
       "statusPaid": "Akwụrụ",
       "statusVoid": "Efefuo",
-      "title": "Invoices"
+      "title": "Invoices",
+      "downloadFailed": "Enweghị ike ibudata akwụkwọ ọnụahịa. Lelee njikọ gị ma nwaa ọzọ.",
+      "sharingUnavailable": "Nkesa adịghị na ngwaọrụ a."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Nbanye dara. Biko nwaa ọzọ.",
     "networkError": "Njehie netwọk. Biko nwaa ọzọ.",
     "accessDeniedByUser": "Onye ọrụ jụrụ ohere",
-    "codeExpired": "Koodu emebiwo"
+    "codeExpired": "Koodu emebiwo",
+    "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."
   },
   "models": {
     "dataCollected": "Data anakọtara",

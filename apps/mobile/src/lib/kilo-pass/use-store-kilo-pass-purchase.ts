@@ -5,6 +5,7 @@ import { ErrorCode, type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
 import { type AppStoreKiloPassProduct } from './store-products';
 
 const userCancelledPurchaseErrorSchema = z.object({
@@ -21,14 +22,9 @@ const errorMessageSchema = z.object({
 
 const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
   'App Store purchase account token does not match the signed-in user.';
-const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
-  "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
 const APP_STORE_SUBSCRIPTION_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
   'The Kilo Pass on this Apple Account belongs to a different Kilo account.';
-const APP_STORE_PURCHASE_NOT_LINKED_USER_MESSAGE =
-  "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.";
 const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
-const RESTORE_PURCHASES_ERROR_MESSAGE = 'Failed to restore purchases. Try again.';
 
 export type AppStoreKiloPassPurchaseActionsDeps = {
   // The real implementations (expo-iap's mutateAsync, the tRPC mutation) each
@@ -154,8 +150,8 @@ export function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string
   if (message === APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE) {
     return APP_STORE_SUBSCRIPTION_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE;
   }
-  if (message === APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE) {
-    return APP_STORE_PURCHASE_NOT_LINKED_USER_MESSAGE;
+  if (message === i18n.t('kiloPass.purchaseNotLinked')) {
+    return i18n.t('kiloPass.purchaseDifferentAccount');
   }
 
   return message;
@@ -201,7 +197,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       await deps.finishTransaction({ purchase, isConsumable: false });
       return { completed: true };
     } catch (error) {
-      const message = getKiloPassPurchaseErrorMessage(error, 'Failed to complete purchase.');
+      const message = getKiloPassPurchaseErrorMessage(error, i18n.t('kiloPass.purchaseFailed'));
       return { completed: false, errorMessage: message };
     }
   }
@@ -298,7 +294,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       } catch (error) {
         const message = getKiloPassPurchaseErrorMessage(
           error,
-          'Failed to start App Store purchase.'
+          i18n.t('kiloPass.purchaseStartFailed')
         );
         if (message) {
           deps.showError(message);
@@ -315,7 +311,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         const availablePurchases = await deps.getAvailablePurchases();
         const enabledAppleProductIds = await getEnabledAppleProductIdsForRestore();
         if (enabledAppleProductIds.length === 0) {
-          deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE);
+          deps.showError(i18n.t('kiloPass.restoreFailed'));
           return 'failed';
         }
 
@@ -332,7 +328,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         });
         return completedPurchases.length > 0 ? 'restored' : 'failed';
       } catch {
-        deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE);
+        deps.showError(i18n.t('kiloPass.restoreFailed'));
         return 'failed';
       }
     },

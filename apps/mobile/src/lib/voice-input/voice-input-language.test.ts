@@ -88,6 +88,22 @@ describe('pickSupportedVoiceInputLanguageTag', () => {
     expect(pickSupportedVoiceInputLanguageTag(['zh-HK'], ['zh-CN', 'zh-TW'])).toBe('zh-TW');
   });
 
+  it('maps the Simplified region zh-MY onto the Simplified script', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-MY'], ['zh-TW', 'zh-CN'])).toBe('zh-CN');
+  });
+
+  it('maps the Serbian RS region onto Cyrillic', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['sr-RS'], ['sr-Latn', 'sr-Cyrl'])).toBe('sr-Cyrl');
+  });
+
+  it('maps the Punjabi PK region onto the Arabic script', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['pa-PK'], ['pa-Guru', 'pa-Arab'])).toBe('pa-Arab');
+  });
+
+  it('maps the Azerbaijani IR region onto the Arabic script', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['az-IR'], ['az-Latn', 'az-Arab'])).toBe('az-Arab');
+  });
+
   it('keeps the old behavior for a non-Chinese tag', () => {
     expect(pickSupportedVoiceInputLanguageTag(['de-AT'], ['de-DE', 'de-CH'])).toBe('de-DE');
   });

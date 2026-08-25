@@ -7,6 +7,8 @@
  * importing from one place.
  */
 
+import { i18n } from '@/i18n';
+
 import { type AgentAttachmentExtension, type AgentAttachmentMime } from './constants';
 
 type AgentAttachmentKind = 'image' | 'document';
@@ -85,29 +87,29 @@ export function classifyUploadFailure(error: unknown) {
   const dataMessage = (error as { data?: { code?: string; message?: string } } | null)?.data
     ?.message;
   if (code === 'BAD_REQUEST' || code === 'FORBIDDEN' || code === 'UNPROCESSABLE_CONTENT') {
-    return { retryable: false, reason: dataMessage ?? "This file can't be uploaded." };
+    return { retryable: false, reason: dataMessage ?? i18n.t('chat.attachment.cantUpload') };
   }
   if (code === 'UNAUTHORIZED' || code === 'NOT_FOUND') {
-    return { retryable: false, reason: dataMessage ?? "This file can't be uploaded." };
+    return { retryable: false, reason: dataMessage ?? i18n.t('chat.attachment.cantUpload') };
   }
   if (error instanceof TypeError) {
-    return { retryable: true, reason: 'Network error' };
+    return { retryable: true, reason: i18n.t('chat.attachment.networkError') };
   }
   if (error instanceof Error) {
     if (/abort|cancel|expir/i.test(error.message)) {
-      return { retryable: true, reason: 'Upload failed' };
+      return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     if (/status (408|429|5\d\d)/.test(error.message)) {
-      return { retryable: true, reason: 'Upload failed' };
+      return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     if (/status \d{3}/.test(error.message)) {
       // Any other HTTP error (4xx other than the terminal codes above,
       // 5xx, etc.) is retryable — the plan pins PUT failures as retryable.
-      return { retryable: true, reason: 'Upload failed' };
+      return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
-    return { retryable: true, reason: 'Upload failed' };
+    return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
   }
-  return { retryable: true, reason: 'Upload failed' };
+  return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
 }
 
 /**

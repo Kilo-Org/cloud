@@ -1,7 +1,9 @@
+import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type SharePayload } from '@/lib/share-payload';
 
-export const REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST = 'This instance cannot receive files.';
+export const remoteSpawnFilesNotSupportedToast = () =>
+  i18n.t('kiloclaw.remoteSpawnFilesNotSupported');
 
 export function resolveRemoteSpawnAdmission(input: {
   instance: InstancePickerInstance;
@@ -12,7 +14,7 @@ export function resolveRemoteSpawnAdmission(input: {
     return { allowed: true };
   }
   if (payload.files.length > 0 && instance.capabilities?.attachments !== true) {
-    return { allowed: false, toast: REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST };
+    return { allowed: false, toast: remoteSpawnFilesNotSupportedToast() };
   }
 
   return { allowed: true };

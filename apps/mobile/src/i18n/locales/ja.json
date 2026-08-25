@@ -24,7 +24,10 @@
     "notNow": "後で",
     "continue": "続行",
     "back": "戻る",
-    "somethingWentWrong": "問題が発生しました"
+    "somethingWentWrong": "問題が発生しました",
+    "couldNotOpen": "{{label}}を開けませんでした",
+    "link": "リンク",
+    "takingLonger": "通常より時間がかかっています。閉じて、後でもう一度確認してください。"
   },
   "language": {
     "title": "言語",
@@ -283,7 +286,12 @@
       "classificationEmpty": "ファイルが空です",
       "classificationTooLarge": "ファイルは20 MB以下である必要があります",
       "classificationUnreadable": "このファイルを読み取れませんでした",
-      "announceUploaded": "添付ファイルをアップロードしました"
+      "announceUploaded": "添付ファイルをアップロードしました",
+      "cantUpload": "このファイルはアップロードできません。",
+      "networkError": "ネットワークエラー",
+      "uploadFailed": "アップロードに失敗しました",
+      "failedToUploadFile": "ファイルのアップロードに失敗しました: {{reason}}",
+      "nothingToPaste": "貼り付けるものはありません"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}、{{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "スパークル",
       "strongArm": "ストロングアーム",
       "talisman": "タリスマン"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "このインスタンスはファイルを受信できません。"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "レビューメモリ",
       "reviewStyle": "レビュースタイル",
       "set": "設定"
-    }
+    },
+    "updateFailed": "レビュアーを更新できませんでした",
+    "configSaveFailed": "レビュー設定を保存できませんでした"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "既存の修復をキューに入れました",
       "analysisComplete": "分析が完了しました",
       "syncComplete": "同期が完了しました"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "セキュリティサービスが設定されていません。修正されるまで再送信は成功しません。",
+      "syncMayNotHaveCompleted": "同期が完了していない可能性があります。再試行して調整するか、破棄してください。",
+      "syncInProgress": "セキュリティ同期はすでに進行中です。もう一度お試しください。",
+      "dismissalInProgress": "この却下はすでに進行中です。もう一度お試しください。",
+      "couldNotReadPendingSyncs": "保留中の同期を読み取れませんでした。もう一度お試しください。"
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "音声はオンラインで処理されます",
     "staysOff": "オンライン文字起こしを許可するまで、音声はオフのままです。",
     "start": "音声入力を開始",
-    "stop": "音声入力を停止"
+    "stop": "音声入力を停止",
+    "restricted": "このデバイスでは音声入力が制限されています。",
+    "micRequired": "音声入力にはマイクへのアクセスが必要です。",
+    "micOff": "マイクへのアクセスがオフです。音声入力を使うには設定で有効にしてください。",
+    "micOffTitle": "マイクへのアクセスがオフです",
+    "noSpeech": "音声が検出されませんでした。マイクをタップして、もう一度お試しください。",
+    "needsConnection": "音声入力には接続が必要です。もう一度お試しください。",
+    "busy": "音声入力は処理中です。もう一度お試しください。",
+    "stopped": "音声入力が停止しました。マイクをタップして、もう一度お試しください。",
+    "unavailableDevice": "このデバイスでは音声入力は利用できません。",
+    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "この Kilo Pass は Web で管理されています。",
     "legalDisclosure": "Kilo Pass は自動更新の月額サブスクリプションです。購入の確認時に、お支払いは Apple ID に請求されます。サブスクリプションは、現在の期間終了の 24 時間前までに解約しない限り、表示された価格で毎月自動更新されます。App Store のアカウント設定でいつでも管理または解約できます。",
     "legalPrivacyPolicy": "プライバシーポリシー",
-    "legalTermsOfUse": "利用規約 (EULA)"
+    "legalTermsOfUse": "利用規約 (EULA)",
+    "purchaseNotLinked": "このApp Store購入はKiloアカウントにリンクされていません。購入に使用したApple IDでサインインしていることを確認してから、もう一度お試しください。",
+    "purchaseDifferentAccount": "このApp Store購入はKiloアカウントにリンクされていません。購入に使用したApple Accountにサインインして、もう一度お試しください。",
+    "restoreFailed": "購入の復元に失敗しました。もう一度お試しください。",
+    "purchaseFailed": "購入を完了できませんでした。",
+    "purchaseStartFailed": "App Storeでの購入を開始できませんでした。"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "コメントを投稿しました",
       "reviewSubmitted": "レビューを送信しました",
       "autoMergeEnabled": "自動マージを有効にしました"
+    },
+    "mutationError": {
+      "commentNotPosted": "このコメントは投稿できません。選択した行が変更されたか、PRが更新された可能性があります。",
+      "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが変更されたか、自分のプルリクエストはレビューできない可能性があります。",
+      "couldNotPostComment": "コメントを投稿できませんでした。",
+      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "請求書",
       "statusPaid": "支払い済み",
       "statusOpen": "未払い",
-      "statusVoid": "無効"
+      "statusVoid": "無効",
+      "downloadFailed": "請求書をダウンロードできませんでした。接続を確認して、もう一度お試しください。",
+      "sharingUnavailable": "このデバイスでは共有は利用できません。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "サインインに失敗しました。もう一度お試しください。",
     "networkError": "ネットワークエラーが発生しました。もう一度お試しください。",
     "accessDeniedByUser": "ユーザーによってアクセスが拒否されました",
-    "codeExpired": "コードの有効期限が切れました"
+    "codeExpired": "コードの有効期限が切れました",
+    "tooManySignInAttempts": "サインイン試行回数が多すぎます。しばらく待ってから、もう一度お試しください。"
   },
   "models": {
     "dataCollected": "収集されるデータ",

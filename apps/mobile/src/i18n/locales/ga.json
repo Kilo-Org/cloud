@@ -24,7 +24,10 @@
     "required": "riachtanach",
     "error": "earráid: {{error}}",
     "back": "Ar ais",
-    "somethingWentWrong": "Chuaigh rud éigin mícheart"
+    "somethingWentWrong": "Chuaigh rud éigin mícheart",
+    "couldNotOpen": "Níorbh fhéidir {{label}} a oscailt",
+    "link": "nasc",
+    "takingLonger": "Tá sé seo ag tógáil níos faide ná mar a bhíothas ag súil leis. Is féidir leat é seo a dhúnadh agus seiceáil arís."
   },
   "language": {
     "title": "Teanga",
@@ -597,6 +600,12 @@
       "commentPosted": "Trácht foilsithe",
       "reviewSubmitted": "Athbhreithniú curtha isteach",
       "autoMergeEnabled": "Uath-chumasc cumasaithe"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ní féidir an trácht seo a phostáil. B'fhéidir gur athraíodh an líne roghnaithe, nó b'fhéidir gur nuashonraíodh an PR.",
+      "reviewNotSubmitted": "Ní féidir an t-athbhreithniú seo a sheoladh mar atá sé. B'fhéidir gur athraíodh an PR, nó ní féidir leat do iarratas tarraingthe féin a athbhreithniú.",
+      "couldNotPostComment": "Níorbh fhéidir an trácht a phostáil.",
+      "couldNotSubmitReview": "Níorbh fhéidir an t-athbhreithniú a sheoladh. Seiceáil do nasc agus bain triail as arís."
     }
   },
   "notifications": {
@@ -735,7 +744,12 @@
       "classificationEmpty": "Tá an comhad folamh",
       "classificationTooLarge": "Caithfidh comhaid a bheith 20 MB nó níos lú",
       "classificationUnreadable": "Níorbh fhéidir an comhad seo a léamh",
-      "announceUploaded": "Uaslódáladh an ceangaltán"
+      "announceUploaded": "Uaslódáladh an ceangaltán",
+      "cantUpload": "Ní féidir an comhad seo a uaslódáil.",
+      "networkError": "Earráid líonra",
+      "uploadFailed": "Theip ar an uaslódáil",
+      "failedToUploadFile": "Theip ar an gcomhad a uaslódáil: {{reason}}",
+      "nothingToPaste": "Níl aon rud le greamú"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1199,7 +1213,8 @@
       "sparkles": "Scintillí",
       "strongArm": "Lámh láidir",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Ní féidir leis an gcás seo comhaid a fháil."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1386,7 +1401,9 @@
       "noDecision": "Níl aon chinneadh",
       "noResult": "Níl aon toradh"
     },
-    "eyebrow": "Athbhreithneoir Cóid"
+    "eyebrow": "Athbhreithneoir Cóid",
+    "updateFailed": "Theip ar an athbhreithneoir a nuashonrú",
+    "configSaveFailed": "Theip ar chumraíocht an athbhreithnithe a shábháil"
   },
   "securityAgent": {
     "filter": {
@@ -1814,6 +1831,13 @@
       "remediationsQueued": "Feabhsuithe atá ann cheana i scuaine",
       "analysisComplete": "Anailís críochnaithe",
       "syncComplete": "Sioncrónú críochnaithe"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Níl an tseirbhís slándála cumraithe. Ní féidir le hathsheoladh éirí go dtí go gceartaítear é seo.",
+      "syncMayNotHaveCompleted": "B'fhéidir nach bhfuil sioncronú críochnaithe. Déan arís é chun é a réiteach, nó caith uait é.",
+      "syncInProgress": "Tá sioncronú slándála ar siúl cheana. Bain triail as arís le do thoil.",
+      "dismissalInProgress": "Tá an díbhe seo ar siúl cheana. Bain triail as arís le do thoil.",
+      "couldNotReadPendingSyncs": "Níorbh fhéidir sioncronuithe ar feitheamh a léamh. Bain triail as arís."
     }
   },
   "agents": {
@@ -2525,7 +2549,17 @@
     "onlineMessage": "Ní féidir leis an ngléas seo tras-scríobh as líne. Seoltar do thaifeadadh chuig {{provider}} le tiontú ina théacs. Ní stórálann Kilo an fhuaim.",
     "allow": "Ceadaigh",
     "start": "Tosaigh ionchur gutha",
-    "stop": "Stadaigh ionchur gutha"
+    "stop": "Stadaigh ionchur gutha",
+    "restricted": "Tá ionchur gutha srianta ar an ngléas seo.",
+    "micRequired": "Teastaíonn rochtain ar mhicreafón le haghaidh ionchur gutha.",
+    "micOff": "Tá rochtain ar mhicreafón as. Cumasaigh í sna Socruithe chun ionchur gutha a úsáid.",
+    "micOffTitle": "Tá rochtain ar mhicreafón as",
+    "noSpeech": "Níor braitheadh aon urlabhra. Tapáil an micreafón chun triail arís a bhaint.",
+    "needsConnection": "Teastaíonn nasc ón ionchur gutha faoi láthair. Bain triail as arís.",
+    "busy": "Tá an t-ionchur gutha gnóthach. Bain triail as arís.",
+    "stopped": "Stop an t-ionchur gutha. Tapáil an micreafón chun triail arís a bhaint.",
+    "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
+    "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga gléis seo."
   },
   "share": {
     "title": "Roinn le Kilo",
@@ -2603,7 +2637,12 @@
     "webManagementDescription": "Tá an Kilo Pass seo bainistithe ar an ngréasán.",
     "legalDisclosure": "Is síntiús míosúil uath-fhionnuaire é Kilo Pass. Gearrtar an táille ar do Apple ID ag deimhniú an cheannaigh. Déanann síntiúis athnuachan go huathoibríoch gach mí ar an bpraghas a thaispeántar mura gcuirtear ceal orthu 24 uair an chloig ar a laghad roimh dheireadh na tréimhse reatha. Bainistigh nó cuir ceal orthu am ar bith i do shocruithe cuntais App Store.",
     "legalPrivacyPolicy": "Beartas Príobháideachta",
-    "legalTermsOfUse": "Téarmaí Úsáide (EULA)"
+    "legalTermsOfUse": "Téarmaí Úsáide (EULA)",
+    "purchaseNotLinked": "Níl an ceannach App Store seo nasctha le do chuntas Kilo. Déan cinnte go bhfuil tú sínithe isteach leis an Apple ID a rinne an ceannach, ansin bain triail as arís.",
+    "purchaseDifferentAccount": "Níl an ceannach App Store seo nasctha le do chuntas Kilo. Sínigh isteach leis an Apple Account a úsáideadh don cheannach, ansin bain triail as arís.",
+    "restoreFailed": "Theip ar na ceannacháin a chur ar ais. Bain triail as arís.",
+    "purchaseFailed": "Theip ar an gceannach a chríochnú.",
+    "purchaseStartFailed": "Theip ar cheannach App Store a thosú."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2736,7 +2775,9 @@
       "statusOpen": "Ar oscailt",
       "statusPaid": "Íoctha",
       "statusVoid": "Neamhní",
-      "title": "Sonraisc"
+      "title": "Sonraisc",
+      "downloadFailed": "Níorbh fhéidir an tsonrasc a íoslódáil. Seiceáil do nasc agus bain triail as arís.",
+      "sharingUnavailable": "Níl roinnt ar fáil ar an ngléas seo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2859,7 +2900,8 @@
     "signInFailed": "Theip ar an síniú isteach. Bain triail as arís le do thoil.",
     "networkError": "Earráid líonra. Bain triail as arís le do thoil.",
     "accessDeniedByUser": "Rochtain diúltaithe ag an úsáideoir",
-    "codeExpired": "Cód imithe in éag"
+    "codeExpired": "Cód imithe in éag",
+    "tooManySignInAttempts": "An iomarca iarrachtaí sínithe isteach. Fan agus bain triail as arís le do thoil."
   },
   "models": {
     "dataCollected": "Sonraí bailithe",

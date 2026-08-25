@@ -118,7 +118,6 @@ vi.mock('@/lib/kilo-pass/navigation', () => ({
 
 vi.mock('@/lib/kilo-pass/subscription-page-copy', () => ({
   formatKiloPassTierDescription: () => 'description',
-  KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION: '',
 }));
 
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({

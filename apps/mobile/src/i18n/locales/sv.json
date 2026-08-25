@@ -24,7 +24,10 @@
     "required": "obligatorisk",
     "error": "fel: {{error}}",
     "back": "Tillbaka",
-    "somethingWentWrong": "Något gick fel"
+    "somethingWentWrong": "Något gick fel",
+    "couldNotOpen": "Kunde inte öppna {{label}}",
+    "link": "länk",
+    "takingLonger": "Detta tar längre tid än väntat. Du kan stänga det här och kontrollera igen."
   },
   "language": {
     "title": "Språk",
@@ -576,6 +579,12 @@
       "commentPosted": "Kommentar publicerad",
       "reviewSubmitted": "Granskning skickad",
       "autoMergeEnabled": "Automatisk sammanslagning aktiverad"
+    },
+    "mutationError": {
+      "commentNotPosted": "Den här kommentaren kan inte postas. Den markerade raden kan ha ändrats, eller så kan PR:en ha uppdaterats.",
+      "reviewNotSubmitted": "Den här granskningen kan inte skickas som den är. PR:en kan ha ändrats, eller så kan du inte granska din egen pull request.",
+      "couldNotPostComment": "Kunde inte posta kommentaren.",
+      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Filen är tom",
       "classificationTooLarge": "Filer måste vara 20 MB eller mindre",
       "classificationUnreadable": "Kunde inte läsa den här filen",
-      "announceUploaded": "Bifogad fil uppladdad"
+      "announceUploaded": "Bifogad fil uppladdad",
+      "cantUpload": "Den här filen kan inte laddas upp.",
+      "networkError": "Nätverksfel",
+      "uploadFailed": "Uppladdningen misslyckades",
+      "failedToUploadFile": "Det gick inte att ladda upp filen: {{reason}}",
+      "nothingToPaste": "Ingenting att klistra in"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Glitter",
       "strongArm": "Stark arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Den här instansen kan inte ta emot filer."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Inget beslut",
       "noResult": "Inget resultat"
     },
-    "eyebrow": "Kodgranskare"
+    "eyebrow": "Kodgranskare",
+    "updateFailed": "Det gick inte att uppdatera granskaren",
+    "configSaveFailed": "Det gick inte att spara granskningskonfigurationen"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Befintliga åtgärder köade",
       "analysisComplete": "Analysen klar",
       "syncComplete": "Synkningen klar"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Säkerhetstjänsten är inte konfigurerad. Att skicka igen kan inte lyckas förrän detta är åtgärdat.",
+      "syncMayNotHaveCompleted": "En synkronisering kanske inte har slutförts. Försök igen för att stämma av, eller kassera.",
+      "syncInProgress": "En säkerhetssynkronisering pågår redan. Försök igen.",
+      "dismissalInProgress": "Den här avskrivningen pågår redan. Försök igen.",
+      "couldNotReadPendingSyncs": "Kunde inte läsa väntande synkroniseringar. Försök igen."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Den här enheten kan inte transkribera offline. Din inspelning skickas till {{provider}} för att omvandlas till text. Kilo lagrar inte ljudet.",
     "allow": "Tillåt",
     "start": "Starta röstinmatning",
-    "stop": "Stoppa röstinmatning"
+    "stop": "Stoppa röstinmatning",
+    "restricted": "Röstinmatning är begränsad på den här enheten.",
+    "micRequired": "Mikrofonåtkomst krävs för röstinmatning.",
+    "micOff": "Mikrofonåtkomst är avstängd. Aktivera den i Inställningar för att använda röstinmatning.",
+    "micOffTitle": "Mikrofonåtkomst är avstängd",
+    "noSpeech": "Inget tal upptäcktes. Tryck på mikrofonen för att försöka igen.",
+    "needsConnection": "Röstinmatning kräver en anslutning just nu. Försök igen.",
+    "busy": "Röstinmatningen är upptagen. Försök igen.",
+    "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
+    "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
+    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk."
   },
   "share": {
     "title": "Dela till Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Detta Kilo Pass hanteras på webben.",
     "legalDisclosure": "Kilo Pass är en automatiskt förnybar månadsprenumeration. Betalning dras från ditt Apple-ID vid köpsbekräftelse. Prenumerationen förnyas automatiskt varje månad till det pris som visas om den inte avbryts minst 24 timmar före slutet av den aktuella perioden. Hantera eller avbryt när som helst i dina App Store-kontoinställningar.",
     "legalPrivacyPolicy": "Integritetspolicy",
-    "legalTermsOfUse": "Användarvillkor (EULA)"
+    "legalTermsOfUse": "Användarvillkor (EULA)",
+    "purchaseNotLinked": "Det här App Store-köpet är inte kopplat till ditt Kilo-konto. Se till att du är inloggad på det Apple-ID som gjorde köpet och försök sedan igen.",
+    "purchaseDifferentAccount": "Det här App Store-köpet är inte kopplat till ditt Kilo-konto. Logga in på det Apple-konto som användes för köpet och försök sedan igen.",
+    "restoreFailed": "Det gick inte att återställa köpen. Försök igen.",
+    "purchaseFailed": "Det gick inte att slutföra köpet.",
+    "purchaseStartFailed": "Det gick inte att starta App Store-köpet."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Öppen",
       "statusPaid": "Betald",
       "statusVoid": "Ogiltig",
-      "title": "Fakturor"
+      "title": "Fakturor",
+      "downloadFailed": "Det gick inte att ladda ner fakturan. Kontrollera anslutningen och försök igen.",
+      "sharingUnavailable": "Delning är inte tillgänglig på den här enheten."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Inloggningen misslyckades. Försök igen.",
     "networkError": "Nätverksfel. Försök igen.",
     "accessDeniedByUser": "Åtkomst nekad av användaren",
-    "codeExpired": "Koden har upphört att gälla"
+    "codeExpired": "Koden har upphört att gälla",
+    "tooManySignInAttempts": "För många inloggningsförsök. Vänta ett tag och försök igen."
   },
   "models": {
     "dataCollected": "Data samlas in",

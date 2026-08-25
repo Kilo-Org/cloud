@@ -24,7 +24,10 @@
     "required": "obavezno",
     "error": "greška: {{error}}",
     "back": "Natrag",
-    "somethingWentWrong": "Nešto je pošlo po zlu"
+    "somethingWentWrong": "Nešto je pošlo po zlu",
+    "couldNotOpen": "Nije moguće otvoriti {{label}}",
+    "link": "poveznica",
+    "takingLonger": "Ovo traje duže nego što se očekivalo. Možete ovo zatvoriti i ponovno provjeriti."
   },
   "language": {
     "title": "Jezik",
@@ -583,6 +586,12 @@
       "commentPosted": "Komentar objavljen",
       "reviewSubmitted": "Recenzija poslana",
       "autoMergeEnabled": "Automatsko spajanje omogućeno"
+    },
+    "mutationError": {
+      "commentNotPosted": "Ovaj komentar ne može se objaviti. Odabrani redak možda se promijenio ili je PR ažuriran.",
+      "reviewNotSubmitted": "Ova recenzija ne može se poslati u ovom obliku. PR se možda promijenio ili ne možete recenzirati vlastiti pull request.",
+      "couldNotPostComment": "Nije moguće objaviti komentar.",
+      "couldNotSubmitReview": "Nije moguće poslati recenziju. Provjerite svoju vezu i pokušajte ponovno."
     }
   },
   "notifications": {
@@ -721,7 +730,12 @@
       "classificationEmpty": "Datoteka je prazna",
       "classificationTooLarge": "Datoteke moraju biti veličine 20 MB ili manje",
       "classificationUnreadable": "Nije moguće pročitati ovu datoteku",
-      "announceUploaded": "Privitak učitan"
+      "announceUploaded": "Privitak učitan",
+      "cantUpload": "Ova datoteka ne može se učitati.",
+      "networkError": "Greška mreže",
+      "uploadFailed": "Učitavanje nije uspjelo",
+      "failedToUploadFile": "Nije moguće učitati datoteku: {{reason}}",
+      "nothingToPaste": "Nema što zalijepiti"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1181,7 +1195,8 @@
       "sparkles": "Iskrice",
       "strongArm": "Snažna ruka",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Ova instanca ne može primati datoteke."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1368,7 +1383,9 @@
       "noDecision": "Nema odluke",
       "noResult": "Nema rezultata"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Nije moguće ažurirati preglednika kôda",
+    "configSaveFailed": "Nije moguće spremiti konfiguraciju recenzije"
   },
   "securityAgent": {
     "filter": {
@@ -1792,6 +1809,13 @@
       "remediationsQueued": "Postojeće sanacije u redu čekanja",
       "analysisComplete": "Analiza dovršena",
       "syncComplete": "Sinkronizacija dovršena"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Sigurnosna usluga nije konfigurirana. Ponovno slanje ne može uspjeti dok se to ne popravi.",
+      "syncMayNotHaveCompleted": "Sinkronizacija možda nije dovršena. Pokušajte ponovno kako biste je uskladili ili je odbacite.",
+      "syncInProgress": "Sigurnosna sinkronizacija već je u tijeku. Pokušajte ponovno.",
+      "dismissalInProgress": "Ovo odbacivanje već je u tijeku. Pokušajte ponovno.",
+      "couldNotReadPendingSyncs": "Nije moguće pročitati čekajuće sinkronizacije. Pokušajte ponovno."
     }
   },
   "agents": {
@@ -2489,7 +2513,17 @@
     "onlineMessage": "Ovaj uređaj ne može transkribirati izvan mreže. Vaš se snimak šalje {{provider}}u da bi se pretvorio u tekst. Kilo ne pohranjuje audio.",
     "allow": "Dopusti",
     "start": "Pokreni glasovni unos",
-    "stop": "Zaustavi glasovni unos"
+    "stop": "Zaustavi glasovni unos",
+    "restricted": "Glasovni unos ograničen je na ovom uređaju.",
+    "micRequired": "Za glasovni unos potreban je pristup mikrofonu.",
+    "micOff": "Pristup mikrofonu je isključen. Omogućite ga u Postavkama za korištenje glasovnog unosa.",
+    "micOffTitle": "Pristup mikrofonu je isključen",
+    "noSpeech": "Glas nije prepoznat. Dodirnite mikrofon za ponovni pokušaj.",
+    "needsConnection": "Glasovni unos trenutačno zahtijeva vezu. Pokušajte ponovno.",
+    "busy": "Glasovni unos je zauzet. Pokušajte ponovno.",
+    "stopped": "Glasovni unos je zaustavljen. Dodirnite mikrofon za ponovni pokušaj.",
+    "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
+    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja."
   },
   "share": {
     "title": "Podijeli u Kilo",
@@ -2567,7 +2601,12 @@
     "webManagementDescription": "Ovim Kilo Passom upravlja se na webu.",
     "legalDisclosure": "Kilo Pass je mjesečna pretplata s automatskim obnavljanjem. Plaćanje se naplaćuje s vašeg Apple ID-a pri potvrdi kupnje. Pretplate se automatski obnavljaju svakog mjeseca po prikazanoj cijeni osim ako ne otkažete najmanje 24 sata prije kraja tekućeg razdoblja. Upravljajte ili otkažite u bilo kojem trenutku u postavkama svog App Store računa.",
     "legalPrivacyPolicy": "Politika privatnosti",
-    "legalTermsOfUse": "Uvjeti korištenja (EULA)"
+    "legalTermsOfUse": "Uvjeti korištenja (EULA)",
+    "purchaseNotLinked": "Ova kupnja iz App Storea nije povezana s vašim Kilo računom. Provjerite jeste li prijavljeni s Apple ID-om kojim je kupnja izvršena, a zatim pokušajte ponovno.",
+    "purchaseDifferentAccount": "Ova kupnja iz App Storea nije povezana s vašim Kilo računom. Prijavite se s Apple računom korištenim za kupnju, a zatim pokušajte ponovno.",
+    "restoreFailed": "Nije moguće vratiti kupnje. Pokušajte ponovno.",
+    "purchaseFailed": "Nije moguće dovršiti kupnju.",
+    "purchaseStartFailed": "Nije moguće pokrenuti kupnju u App Storeu."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2700,7 +2739,9 @@
       "statusOpen": "Otvoreno",
       "statusPaid": "Plaćeno",
       "statusVoid": "Poništeno",
-      "title": "Računi"
+      "title": "Računi",
+      "downloadFailed": "Nije moguće preuzeti račun. Provjerite svoju vezu i pokušajte ponovno.",
+      "sharingUnavailable": "Dijeljenje nije dostupno na ovom uređaju."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2821,7 +2862,8 @@
     "signInFailed": "Prijava nije uspjela. Pokušajte ponovno.",
     "networkError": "Greška mreže. Pokušajte ponovno.",
     "accessDeniedByUser": "Pristup je odbio korisnik",
-    "codeExpired": "Kôd je istekao"
+    "codeExpired": "Kôd je istekao",
+    "tooManySignInAttempts": "Previše pokušaja prijave. Pričekajte i pokušajte ponovno."
   },
   "models": {
     "dataCollected": "Prikupljeni podaci",

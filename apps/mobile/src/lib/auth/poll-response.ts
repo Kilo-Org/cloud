@@ -30,11 +30,11 @@ export function classifyPollResponse(httpStatus: number): PollOutcome {
   }
   // Any other 4xx (400, 401, ...) is not something retrying will fix — and
   // 1xx/3xx are statuses this endpoint never returns, so treat them the same.
-  return { status: 'error', message: 'Sign-in failed. Please try again.' };
+  return { status: 'error', message: i18n.t('authErrors.signInFailed') };
 }
 
 /** Extract the user-facing message from a device-auth start 429 JSON body. */
 export function getDeviceAuth429Message(body: { error?: string } | undefined): string {
-  const fallback = 'Too many sign-in attempts. Please wait and try again.';
+  const fallback = i18n.t('authErrors.tooManySignInAttempts');
   return body?.error ?? fallback;
 }

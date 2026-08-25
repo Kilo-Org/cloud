@@ -24,7 +24,10 @@
     "notNow": "Để sau",
     "continue": "Tiếp tục",
     "back": "Quay lại",
-    "somethingWentWrong": "Đã xảy ra lỗi"
+    "somethingWentWrong": "Đã xảy ra lỗi",
+    "couldNotOpen": "Không thể mở {{label}}",
+    "link": "liên kết",
+    "takingLonger": "Việc này lâu hơn dự kiến. Bạn có thể đóng lại và kiểm tra lại."
   },
   "language": {
     "title": "Ngôn ngữ",
@@ -283,7 +286,12 @@
       "classificationEmpty": "Tệp trống",
       "classificationTooLarge": "Tệp phải từ 20 MB trở xuống",
       "classificationUnreadable": "Không thể đọc tệp này",
-      "announceUploaded": "Đã tải tệp đính kèm lên"
+      "announceUploaded": "Đã tải tệp đính kèm lên",
+      "cantUpload": "Không thể tải tệp này lên.",
+      "networkError": "Lỗi mạng",
+      "uploadFailed": "Tải lên thất bại",
+      "failedToUploadFile": "Không thể tải tệp lên: {{reason}}",
+      "nothingToPaste": "Không có gì để dán"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -741,7 +749,8 @@
       "sparkles": "Lấp lánh",
       "strongArm": "Cánh tay mạnh mẽ",
       "talisman": "Bùa hộ mệnh"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Phiên bản này không thể nhận tệp."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -928,7 +937,9 @@
       "reviewMemory": "Bộ nhớ đánh giá",
       "reviewStyle": "Phong cách xem xét",
       "set": "Đặt"
-    }
+    },
+    "updateFailed": "Không thể cập nhật người xem xét",
+    "configSaveFailed": "Không thể lưu cấu hình đánh giá"
   },
   "securityAgent": {
     "filter": {
@@ -1350,6 +1361,13 @@
       "remediationsQueued": "Các bản khắc phục hiện có đã được xếp hàng",
       "analysisComplete": "Đã hoàn tất phân tích",
       "syncComplete": "Đã hoàn tất đồng bộ"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Dịch vụ bảo mật chưa được cấu hình. Việc gửi lại không thể thành công cho đến khi sự cố này được khắc phục.",
+      "syncMayNotHaveCompleted": "Việc đồng bộ có thể chưa hoàn tất. Thử lại để đối soát hoặc hủy bỏ.",
+      "syncInProgress": "Đã có đồng bộ bảo mật đang diễn ra. Vui lòng thử lại.",
+      "dismissalInProgress": "Việc bỏ qua này đang được xử lý. Vui lòng thử lại.",
+      "couldNotReadPendingSyncs": "Không thể đọc các lần đồng bộ đang chờ. Thử lại."
     }
   },
   "agents": {
@@ -2040,7 +2058,17 @@
     "onlineTitle": "Giọng nói được xử lý trực tuyến",
     "staysOff": "Giọng nói vẫn tắt cho đến khi bạn cho phép chuyển giọng nói thành văn bản trực tuyến.",
     "start": "Bắt đầu nhập giọng nói",
-    "stop": "Dừng nhập giọng nói"
+    "stop": "Dừng nhập giọng nói",
+    "restricted": "Tính năng nhập giọng nói bị hạn chế trên thiết bị này.",
+    "micRequired": "Cần quyền truy cập micro để nhập giọng nói.",
+    "micOff": "Quyền truy cập micro đang tắt. Bật trong Cài đặt để sử dụng tính năng nhập giọng nói.",
+    "micOffTitle": "Quyền truy cập micro đang tắt",
+    "noSpeech": "Không phát hiện giọng nói. Chạm vào micro để thử lại.",
+    "needsConnection": "Nhập giọng nói cần có kết nối ngay lúc này. Thử lại.",
+    "busy": "Nhập giọng nói đang bận. Thử lại.",
+    "stopped": "Đã dừng nhập giọng nói. Chạm vào micro để thử lại.",
+    "unavailableDevice": "Không thể nhập giọng nói trên thiết bị này.",
+    "unavailableLanguage": "Không thể nhập giọng nói bằng ngôn ngữ của thiết bị này."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -2118,7 +2146,12 @@
     "webManagementDescription": "Kilo Pass này được quản lý trên web.",
     "legalDisclosure": "Kilo Pass là gói đăng ký hàng tháng tự gia hạn. Khoản thanh toán được tính vào Apple ID của bạn khi xác nhận mua. Gói đăng ký tự động gia hạn mỗi tháng theo giá đã hiển thị trừ khi bạn hủy ít nhất 24 giờ trước khi kết thúc kỳ hiện tại. Quản lý hoặc hủy bất kỳ lúc nào trong cài đặt tài khoản App Store.",
     "legalPrivacyPolicy": "Chính sách quyền riêng tư",
-    "legalTermsOfUse": "Điều khoản sử dụng (EULA)"
+    "legalTermsOfUse": "Điều khoản sử dụng (EULA)",
+    "purchaseNotLinked": "Giao dịch mua App Store này chưa được liên kết với tài khoản Kilo của bạn. Hãy đảm bảo bạn đã đăng nhập bằng Apple ID đã thực hiện giao dịch mua, sau đó thử lại.",
+    "purchaseDifferentAccount": "Giao dịch mua App Store này chưa được liên kết với tài khoản Kilo của bạn. Hãy đăng nhập bằng Tài khoản Apple đã dùng cho giao dịch mua, sau đó thử lại.",
+    "restoreFailed": "Không thể khôi phục giao dịch mua. Thử lại.",
+    "purchaseFailed": "Không thể hoàn tất giao dịch mua.",
+    "purchaseStartFailed": "Không thể bắt đầu giao dịch mua trên App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2632,6 +2665,12 @@
       "commentPosted": "Đã đăng bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
       "autoMergeEnabled": "Đã bật tự động hợp nhất"
+    },
+    "mutationError": {
+      "commentNotPosted": "Không thể đăng bình luận này. Dòng đã chọn có thể đã thay đổi hoặc PR có thể đã được cập nhật.",
+      "reviewNotSubmitted": "Không thể gửi đánh giá này như hiện tại. PR có thể đã thay đổi hoặc bạn không thể đánh giá yêu cầu hợp nhất của chính mình.",
+      "couldNotPostComment": "Không thể đăng bình luận.",
+      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
     }
   },
   "organization": {
@@ -2678,7 +2717,9 @@
       "title": "Hóa đơn",
       "statusPaid": "Đã thanh toán",
       "statusOpen": "Đang mở",
-      "statusVoid": "Vô hiệu"
+      "statusVoid": "Vô hiệu",
+      "downloadFailed": "Không thể tải hóa đơn. Kiểm tra kết nối và thử lại.",
+      "sharingUnavailable": "Không thể chia sẻ trên thiết bị này."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Đăng nhập thất bại. Vui lòng thử lại.",
     "networkError": "Lỗi mạng. Vui lòng thử lại.",
     "accessDeniedByUser": "Người dùng từ chối truy cập",
-    "codeExpired": "Mã đã hết hạn"
+    "codeExpired": "Mã đã hết hạn",
+    "tooManySignInAttempts": "Quá nhiều lần đăng nhập. Vui lòng đợi và thử lại."
   },
   "models": {
     "dataCollected": "Dữ liệu đã thu thập",

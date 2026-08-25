@@ -24,7 +24,10 @@
     "required": "obligatori",
     "error": "error: {{error}}",
     "back": "Enrere",
-    "somethingWentWrong": "Alguna cosa ha fallat"
+    "somethingWentWrong": "Alguna cosa ha fallat",
+    "couldNotOpen": "No s'ha pogut obrir {{label}}",
+    "link": "enllaç",
+    "takingLonger": "Això triga més del que s'esperava. Pots tancar-ho i tornar-ho a comprovar."
   },
   "language": {
     "title": "Idioma",
@@ -583,6 +586,12 @@
       "commentPosted": "Comentari publicat",
       "reviewSubmitted": "Revisió enviada",
       "autoMergeEnabled": "Fusió automàtica activada"
+    },
+    "mutationError": {
+      "commentNotPosted": "Aquest comentari no es pot publicar. Pot ser que la línia seleccionada hagi canviat, o que la PR s'hagi actualitzat.",
+      "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat, o no pots revisar la teva pròpia pull request.",
+      "couldNotPostComment": "No s'ha pogut publicar el comentari.",
+      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
     }
   },
   "notifications": {
@@ -721,7 +730,12 @@
       "classificationEmpty": "El fitxer és buit",
       "classificationTooLarge": "Els fitxers han de ser de 20 MB o menys",
       "classificationUnreadable": "No s'ha pogut llegir aquest fitxer",
-      "announceUploaded": "Adjunt penjat"
+      "announceUploaded": "Adjunt penjat",
+      "cantUpload": "Aquest fitxer no es pot pujar.",
+      "networkError": "Error de xarxa",
+      "uploadFailed": "La pujada ha fallat",
+      "failedToUploadFile": "No s'ha pogut pujar el fitxer: {{reason}}",
+      "nothingToPaste": "Res per enganxar"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1181,7 +1195,8 @@
       "sparkles": "Espurnes",
       "strongArm": "Braç fort",
       "talisman": "Talismà"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Aquesta instància no pot rebre fitxers."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1368,7 +1383,9 @@
       "noDecision": "Cap decisió",
       "noResult": "Cap resultat"
     },
-    "eyebrow": "Revisor de codi"
+    "eyebrow": "Revisor de codi",
+    "updateFailed": "No s'ha pogut actualitzar el revisor",
+    "configSaveFailed": "No s'ha pogut desar la configuració de la revisió"
   },
   "securityAgent": {
     "filter": {
@@ -1792,6 +1809,13 @@
       "remediationsQueued": "S'han posat les correccions existents a la cua",
       "analysisComplete": "Anàlisi completada",
       "syncComplete": "Sincronització completada"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "El servei de seguretat no està configurat. Tornar a enviar no pot tenir èxit fins que això es resolgui.",
+      "syncMayNotHaveCompleted": "Pot ser que una sincronització no s'hagi completat. Torna-ho a provar per reconciliar-la, o descarta-la.",
+      "syncInProgress": "Una sincronització de seguretat ja està en curs. Torna-ho a provar.",
+      "dismissalInProgress": "Aquest descartament ja està en curs. Torna-ho a provar.",
+      "couldNotReadPendingSyncs": "No s'han pogut llegir les sincronitzacions pendents. Torna-ho a provar."
     }
   },
   "agents": {
@@ -2489,7 +2513,17 @@
     "onlineMessage": "Aquest dispositiu no pot transcriure sense connexió. El teu enregistrament s'envia a {{provider}} per convertir-lo en text. Kilo no emmagatzema l'àudio.",
     "allow": "Permet",
     "start": "Inicia l'entrada de veu",
-    "stop": "Atura l'entrada de veu"
+    "stop": "Atura l'entrada de veu",
+    "restricted": "L'entrada de veu està restringida en aquest dispositiu.",
+    "micRequired": "Cal accés al micròfon per a l'entrada de veu.",
+    "micOff": "L'accés al micròfon està desactivat. Activa'l a la configuració per utilitzar l'entrada de veu.",
+    "micOffTitle": "L'accés al micròfon està desactivat",
+    "noSpeech": "No s'ha detectat cap veu. Toca el micròfon per tornar-ho a provar.",
+    "needsConnection": "L'entrada de veu necessita connexió ara mateix. Torna-ho a provar.",
+    "busy": "L'entrada de veu està ocupada. Torna-ho a provar.",
+    "stopped": "L'entrada de veu s'ha aturat. Toca el micròfon per tornar-ho a provar.",
+    "unavailableDevice": "L'entrada de veu no està disponible en aquest dispositiu.",
+    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu."
   },
   "share": {
     "title": "Comparteix a Kilo",
@@ -2567,7 +2601,12 @@
     "webManagementDescription": "Aquest Kilo Pass es gestiona al web.",
     "legalDisclosure": "Kilo Pass és una subscripció mensual de renovació automàtica. El pagament es carrega al vostre Apple ID en confirmar la compra. Les subscripcions es renoven automàticament cada mes al preu mostrat tret que es cancel·lin com a mínim 24 hores abans del final del període actual. Gestioneu-les o cancel·leu-les en qualsevol moment a la configuració del compte de l'App Store.",
     "legalPrivacyPolicy": "Política de privadesa",
-    "legalTermsOfUse": "Condicions d'ús (EULA)"
+    "legalTermsOfUse": "Condicions d'ús (EULA)",
+    "purchaseNotLinked": "Aquesta compra d'App Store no està vinculada al teu compte de Kilo. Assegura't que has iniciat la sessió amb l'Apple ID que va fer la compra, i torna-ho a provar.",
+    "purchaseDifferentAccount": "Aquesta compra d'App Store no està vinculada al teu compte de Kilo. Inicia la sessió amb el compte d'Apple que es va utilitzar per a la compra, i torna-ho a provar.",
+    "restoreFailed": "No s'han pogut restaurar les compres. Torna-ho a provar.",
+    "purchaseFailed": "No s'ha pogut completar la compra.",
+    "purchaseStartFailed": "No s'ha pogut iniciar la compra a l'App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2700,7 +2739,9 @@
       "statusOpen": "Oberta",
       "statusPaid": "Pagada",
       "statusVoid": "Anul·lada",
-      "title": "Factures"
+      "title": "Factures",
+      "downloadFailed": "No s'ha pogut descarregar la factura. Comprova la connexió i torna-ho a provar.",
+      "sharingUnavailable": "La compartició no està disponible en aquest dispositiu."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2821,7 +2862,8 @@
     "signInFailed": "L'inici de sessió ha fallat. Torna-ho a provar.",
     "networkError": "Error de xarxa. Torna-ho a provar.",
     "accessDeniedByUser": "Accés denegat per l'usuari",
-    "codeExpired": "El codi ha caducat"
+    "codeExpired": "El codi ha caducat",
+    "tooManySignInAttempts": "Massa intents d'inici de sessió. Espera i torna-ho a provar."
   },
   "models": {
     "dataCollected": "Dades recollides",

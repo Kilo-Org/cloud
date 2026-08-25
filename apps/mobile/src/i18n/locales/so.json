@@ -24,7 +24,10 @@
     "required": "loo baahan yahay",
     "error": "khalad: {{error}}",
     "back": "Dib",
-    "somethingWentWrong": "Waxbaa khaldamay"
+    "somethingWentWrong": "Waxbaa khaldamay",
+    "couldNotOpen": "{{label}} lama furi karin",
+    "link": "xiriirka",
+    "takingLonger": "Tani way ka dheer tahay intii la fileyn. Waad xiri kartaa oo mar kale hubin kartaa."
   },
   "language": {
     "title": "Luuqad",
@@ -392,7 +395,7 @@
         "thumbsUp": "Suul kor",
         "thumbsDown": "Suul hoos",
         "laugh": "Qosol",
-        "hooray": "Hooray",
+        "hooray": "Hurey",
         "confused": "Jahwareer",
         "heart": "Qalbi",
         "rocket": "Raket",
@@ -576,6 +579,12 @@
       "commentPosted": "Faallada waa la dajiyay",
       "reviewSubmitted": "Dib-u-eegista waa la gudbiyay",
       "autoMergeEnabled": "Auto-merge waa la furay"
+    },
+    "mutationError": {
+      "commentNotPosted": "Faalladan lama dajin karo. Waxaa laga yaabaa in xariiqda la doortay isbeddesho, ama PR-ka la cusbooneysiiyo.",
+      "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. PR-ka ayaa laga yaabaa inuu isbeddelo, ama ma dib u eegi kartid pull request-kaaga.",
+      "couldNotPostComment": "Faallada lama dajin karin.",
+      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Faylku waa madhan",
       "classificationTooLarge": "Faylasha waa inay ahaadaan 20 MB ama ka yar",
       "classificationUnreadable": "Faylkan lama aqrin karin",
-      "announceUploaded": "Lifaaqda waa la soo geliyay"
+      "announceUploaded": "Lifaaqda waa la soo geliyay",
+      "cantUpload": "Faylkan lama soo gudbin karo.",
+      "networkError": "Khalad shabakadeed",
+      "uploadFailed": "Soo gudbintu way fashilantay",
+      "failedToUploadFile": "Soo gudbinta faylka way fashilantay: {{reason}}",
+      "nothingToPaste": "Waxba ma jiraan wax la dhajiyo"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Dhalaal",
       "strongArm": "Gacan adag",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Astaantani ma heli karto faylasha."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Ma jiro go'aan",
       "noResult": "Ma jiro natiijo"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Dib-u-eegaha lama cusboonaysiin karin",
+    "configSaveFailed": "Dejinta dib-u-eegista lama kaydin karin"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Wax ka saarista jirta ayaa safka ku jirta",
       "analysisComplete": "Falanqaynta waa la dhammeeyay",
       "syncComplete": "Sync-ka waa la dhammeeyay"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Adeegga ammaanka lama habayn. Dib u gudbinta ma guulaysan karto ilaa tan la hagaajiyo.",
+      "syncMayNotHaveCompleted": "Isku-xirku laga yaabaa inuusan dhammaystirin. Mar kale isku day si aad u isku xirto, ama iska daa.",
+      "syncInProgress": "Isku-xirka ammaanka horeyba wuu socdaa. Fadlan mar kale isku day.",
+      "dismissalInProgress": "Isku-xirkaan horeyba wuu socdaa. Fadlan mar kale isku day.",
+      "couldNotReadPendingSyncs": "Isku-xirka sugaya lama akhriyi karin. Mar kale isku day."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Aaladdani ma qori karto marka aad xiriir la' tahay. Duubistaada waxaa loo diraa {{provider}} si loo beddelo qoraal. Kilo ma kaydin doono maqalka.",
     "allow": "Oggolow",
     "start": "Bilow codka gelinta",
-    "stop": "Jooji codka gelinta"
+    "stop": "Jooji codka gelinta",
+    "restricted": "Gelinta codka waa laga xayiray aaladdan.",
+    "micRequired": "Gelitaanka makarafoonka ayaa loo baahan yahay gelinta codka.",
+    "micOff": "Gelitaanka makarafoonka waa daman. Ku daar Dejinta si aad u isticmaasho gelinta codka.",
+    "micOffTitle": "Gelitaanka makarafoonka waa daman",
+    "noSpeech": "Hadallo lama ogaan. Taabo makarafoonka si aad mar kale isku daydo.",
+    "needsConnection": "Gelinta codka hadda waxay u baahan tahay xiriir. Mar kale isku day.",
+    "busy": "Gelinta codka waa mashquul. Mar kale isku day.",
+    "stopped": "Gelinta codku way joogsatay. Taabo makarafoonka si aad mar kale isku daydo.",
+    "unavailableDevice": "Gelinta codka aaladdan kuma heli karto.",
+    "unavailableLanguage": "Gelinta codka looma heli karo luqaddan aaladda."
   },
   "share": {
     "title": "Wadaag Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Kilo Pass-kan waxaa lagu maareeyaa shabakadda.",
     "legalDisclosure": "Kilo Pass waa diiwaangelin bil-ah oo is-keeneysa si toos ah. Lacagta waxaa laga qaadaa Apple ID-gaaga markaad xaqiijiso iibsashada. Diiwaangelintu waxay si toos ah u cusbooneysa bil kasta qiimaha la muujiyey ilaa aadan baajin ugu yaraan 24 saacadood ka hor dhamaadka xilli-gii xaafada. Ku maareyso ama baaji wakhti kasta ee goobaha xisaabta App Store.",
     "legalPrivacyPolicy": "Siyaasadda Asturnaanta",
-    "legalTermsOfUse": "Shuruudaha Isticmaalka (EULA)"
+    "legalTermsOfUse": "Shuruudaha Isticmaalka (EULA)",
+    "purchaseNotLinked": "Iibsashadan App Store kuma xirna akoontigaaga Kilo. Hubi inaad ku soo gashay Apple ID-ga iibsashada sameeyay, ka dibna mar kale isku day.",
+    "purchaseDifferentAccount": "Iibsashadan App Store kuma xirna akoontigaaga Kilo. Ku soo gal Apple Account-ka loo adeegsaday iibsashada, ka dibna mar kale isku day.",
+    "restoreFailed": "Soo celinta iibsashada way fashilantay. Mar kale isku day.",
+    "purchaseFailed": "Iibsashada lama dhammayn karin.",
+    "purchaseStartFailed": "Bilowga iibsashada App Store waa fashilmay."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Furan",
       "statusPaid": "La bixiyay",
       "statusVoid": "Baadil",
-      "title": "Invoices"
+      "title": "Invoices",
+      "downloadFailed": "Invoice-ka lama soo dejin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "sharingUnavailable": "Wadaagista aaladdan laguma heli karo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Soo galista way fashilantay. Fadlan mar kale isku day.",
     "networkError": "Khalad shabakadeed. Fadlan mar kale isku day.",
     "accessDeniedByUser": "Gelitaanka isticmaaluhu wuu diiday",
-    "codeExpired": "Koodhku wuu dhacay"
+    "codeExpired": "Koodhku wuu dhacay",
+    "tooManySignInAttempts": "Isku-dayo soo-gal oo aad u badan. Fadlan sug oo mar kale isku day."
   },
   "models": {
     "dataCollected": "Xog la ururiyay",

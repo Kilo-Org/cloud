@@ -24,7 +24,10 @@
     "required": "beharrezkoa",
     "error": "errorea: {{error}}",
     "back": "Atzera",
-    "somethingWentWrong": "Zerbait gaizki joan da"
+    "somethingWentWrong": "Zerbait gaizki joan da",
+    "couldNotOpen": "Ezin da {{label}} ireki",
+    "link": "esteka",
+    "takingLonger": "Espero baino gehiago ari da hartzen. Itxi ezazu eta berriro egiaztatu dezakezu."
   },
   "language": {
     "title": "Hizkuntza",
@@ -576,6 +579,12 @@
       "commentPosted": "Iruzkina argitaratuta",
       "reviewSubmitted": "Berrikuspena bidalita",
       "autoMergeEnabled": "Auto-batzea gaituta"
+    },
+    "mutationError": {
+      "commentNotPosted": "Iruzkin hau ezin da argitaratu. Baliteke hautatutako lerroa aldatu izana edo PR-a eguneratu izana.",
+      "reviewNotSubmitted": "Berrikuspen hau ezin da bidali hala dagoen bezala. Baliteke PR-a aldatu izana, edo zure pull request bera ezin duzu berrikusi.",
+      "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
+      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Fitxategia hutsik dago",
       "classificationTooLarge": "Fitxategiak 20 MB edo txikiagoak izan behar dira",
       "classificationUnreadable": "Ezin izan da fitxategi hau irakurri",
-      "announceUploaded": "Eranskina igo da"
+      "announceUploaded": "Eranskina igo da",
+      "cantUpload": "Fitxategi hau ezin da igo.",
+      "networkError": "Sare-errorea",
+      "uploadFailed": "Igoerak huts egin du",
+      "failedToUploadFile": "Fitxategia igotzeak huts egin du: {{reason}}",
+      "nothingToPaste": "Ez dago ezer itsatsitzeko"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Distirak",
       "strongArm": "Beso indartsua",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Instantzia honek ezin du fitxategirik jaso."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Ez dago erabakirik",
       "noResult": "Ez dago emaitzarik"
     },
-    "eyebrow": "Kode-berrikuslea"
+    "eyebrow": "Kode-berrikuslea",
+    "updateFailed": "Ezin izan da berrikuslea eguneratu",
+    "configSaveFailed": "Ezin izan da berrikuspenaren konfigurazioa gorde"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Lehendik dauden konponketak ilaratu dira",
       "analysisComplete": "Analisia osatuta",
       "syncComplete": "Sinkronizazioa osatuta"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Segurtasun-zerbitzua ez dago konfiguratuta. Berriro bidaltzeak ez du arrakastarik izango hau konpondu arte.",
+      "syncMayNotHaveCompleted": "Baliteke sinkronizazioa ez amaitzea. Saiatu berriro lerrokatzeko, edo baztertu.",
+      "syncInProgress": "Segurtasun-sinkronizazio bat jada martxan dago. Saiatu berriro.",
+      "dismissalInProgress": "Baztertze hau jada martxan dago. Saiatu berriro.",
+      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Gailu honek ezin du lineaz kanpo transkribatu. Zure grabaketa {{provider}}ra bidaltzen da testu bihurtzeko. Kilo ez du audioa gordetzen.",
     "allow": "Baimendu",
     "start": "Hasi ahots-sarrera",
-    "stop": "Gelditu ahots-sarrera"
+    "stop": "Gelditu ahots-sarrera",
+    "restricted": "Ahots-sarrera mugatuta dago gailu honetan.",
+    "micRequired": "Mikrofonoaren sarbidea beharrezkoa da ahots-sarrerarako.",
+    "micOff": "Mikrofonoaren sarbidea itzalita dago. Gaitu ezazu Ezarpenetan ahots-sarrera erabiltzeko.",
+    "micOffTitle": "Mikrofonoaren sarbidea itzalita dago",
+    "noSpeech": "Ez da hizketarik detektatu. Sakatu mikrofonoa berriro saiatzeko.",
+    "needsConnection": "Ahots-sarrerak konexioa behar du oraintxe. Saiatu berriro.",
+    "busy": "Ahots-sarrera lanpetuta dago. Saiatu berriro.",
+    "stopped": "Ahots-sarrera gelditu da. Sakatu mikrofonoa berriro saiatzeko.",
+    "unavailableDevice": "Ahots-sarrera ez dago eskuragarri gailu honetan.",
+    "unavailableLanguage": "Ahots-sarrera ez dago eskuragarri gailu honen hizkuntzarako."
   },
   "share": {
     "title": "Partekatu Kilo-n",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Kilo Pass hau webgunean kudeatzen da.",
     "legalDisclosure": "Kilo Pass hilero automatikoki berritzen den harpidetza da. Erosketa baieztatzen denean, ordainketa zure Apple ID-ra kobratzen da. Harpidetzak automatikoki berritzen dira hilero agertzen den prezioan, uneko aldia amaitu baino 24 ordu lehenago gutxienez ezeztatu ezean. Kudeatu edo ezeztatu edonoiz zure App Store kontuaren ezarpenetan.",
     "legalPrivacyPolicy": "Pribatutasun-politika",
-    "legalTermsOfUse": "Erabilera-baldintzak (EULA)"
+    "legalTermsOfUse": "Erabilera-baldintzak (EULA)",
+    "purchaseNotLinked": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Ziurtatu erosketaren jabe den Apple IDrekin saioa hasi duzula, eta saiatu berriro.",
+    "purchaseDifferentAccount": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Hasi saioa erosketarako erabilitako Apple kontuarekin, eta saiatu berriro.",
+    "restoreFailed": "Ezin dira erosketa berreskuratu. Saiatu berriro.",
+    "purchaseFailed": "Ezin izan da erosketa amaitu.",
+    "purchaseStartFailed": "Ezin izan da App Store-ko erosketa hasi."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Irekituta",
       "statusPaid": "Ordainduta",
       "statusVoid": "Ballogabea",
-      "title": "Fakturak"
+      "title": "Fakturak",
+      "downloadFailed": "Ezin izan da faktura deskargatu. Egiaztatu konexioa eta saiatu berriro.",
+      "sharingUnavailable": "Partekatzea ez dago eskuragarri gailu honetan."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Saioa hasteak huts egin du. Saiatu berriro.",
     "networkError": "Sare-errorea. Saiatu berriro.",
     "accessDeniedByUser": "Erabiltzaileak sarbidea ukatu du",
-    "codeExpired": "Kodea iraungi da"
+    "codeExpired": "Kodea iraungi da",
+    "tooManySignInAttempts": "Sarbide-saiakera gehiegi. Itxaron eta saiatu berriro."
   },
   "models": {
     "dataCollected": "Bildutako datuak",

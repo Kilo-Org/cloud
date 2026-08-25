@@ -24,7 +24,10 @@
     "required": "ilaina",
     "error": "diso: {{error}}",
     "back": "Hiverina",
-    "somethingWentWrong": "Nisy olana"
+    "somethingWentWrong": "Nisy olana",
+    "couldNotOpen": "Tsy afaka nanokatra {{label}}",
+    "link": "rohy",
+    "takingLonger": "Mitarika ela kokoa noho ny andrasana ity. Azonao akatona ity ary jereo indray."
   },
   "language": {
     "title": "Fiteny",
@@ -294,7 +297,7 @@
         "failingChecksDetail": "Tsy mandalo ny fanamarinana sata ilaina.",
         "unstableTitle": "Misy fanamarinana tsy mandalo",
         "unstableDetail": "Tsy mandalo ny fanamarinana tsy voatery. Tsy hanakana ny fampirina izy ireo.",
-        "draftTitle": "Draft pull request",
+        "draftTitle": "Pull request drafta",
         "draftDetail": "Mariho ny pull request ho vonona hofandrinihana alohan'ny hampirina.",
         "behindTitle": "Lany daty ny sampana",
         "behindDetailUpdatable": "Havaozy avy amin'ny base ny sampana, na ataovy rebase, alohan'ny hampirina.",
@@ -576,6 +579,12 @@
       "commentPosted": "Navoaka ny hevitra",
       "reviewSubmitted": "Nalefa ny fandinihana",
       "autoMergeEnabled": "Alefa ny auto-merge"
+    },
+    "mutationError": {
+      "commentNotPosted": "Tsy azo hapetraka ity hevitra ity. Mety niova ny andalana voafidy, na nohavaozina ny PR.",
+      "reviewNotSubmitted": "Tsy azo alefa araka izao ity fandinihana ity. Mety niova ny PR, na tsy afaka mandinika ny pull request anao manokana ianao.",
+      "couldNotPostComment": "Tsy afaka nametraka hevitra.",
+      "couldNotSubmitReview": "Tsy afaka nandefa ny fandinihana. Jereo ny fifandraisanao ary andramana indray."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Foana ny rakitra",
       "classificationTooLarge": "Tsy maintsy 20 MB na latsaka ny rakitra",
       "classificationUnreadable": "Tsy afaka namaky ity rakitra ity",
-      "announceUploaded": "Nampiakarina ny rakitra"
+      "announceUploaded": "Nampiakarina ny rakitra",
+      "cantUpload": "Tsy azo alefa ity rakitra ity.",
+      "networkError": "Hadisoan'ny tambajotra",
+      "uploadFailed": "Tsy nahomby ny fampiakarana",
+      "failedToUploadFile": "Tsy nahomby ny fampiakarana ny rakitra: {{reason}}",
+      "nothingToPaste": "Tsy misy hamenoina"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Tselatra kely",
       "strongArm": "Sandry matanjaka",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Tsy afaka mandray rakitra ity instance ity."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Tsy misy fanapahan-kevitra",
       "noResult": "Tsy misy valiny"
     },
-    "eyebrow": "Mpandinika Code"
+    "eyebrow": "Mpandinika Code",
+    "updateFailed": "Tsy nahomby ny fanavaozana ny mpandinika",
+    "configSaveFailed": "Tsy nahomby ny famonjena ny fikiran'ny fandinihana"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Milahatra ny fanarenana efa misy",
       "analysisComplete": "Vita ny famakafakana",
       "syncComplete": "Vita ny sync"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Tsy voarafitra ny serivisy fiarovana. Tsy hahomby ny fandefasana indray mandra-pandaminana izany.",
+      "syncMayNotHaveCompleted": "Mety tsy vita ny sincro. Andramana indray mba hampifanarahana azy, na ariano.",
+      "syncInProgress": "Efa misy sincro fiarovana mandeha. Andramana indray azafady.",
+      "dismissalInProgress": "Efa mandeha ny fanesorana ity. Andramana indray azafady.",
+      "couldNotReadPendingSyncs": "Tsy afaka namaky ny sincro miandry. Andramana indray."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Tsy afaka mandika offline ity fitaovana ity. Alefa any amin'ny {{provider}} ny rakitsoratrao mba hahazoana lahatsoratra. Tsy voatahirin'i Kilo ny audio.",
     "allow": "Avelao",
     "start": "Atombohy ny fidirana amin'ny feo",
-    "stop": "Ajanony ny fidirana amin'ny feo"
+    "stop": "Ajanony ny fidirana amin'ny feo",
+    "restricted": "Voafetra ny fidirana amin'ny feo amin'ity fitaovana ity.",
+    "micRequired": "Ilaina ny fidirana amin'ny mikrô ho an'ny fidirana amin'ny feo.",
+    "micOff": "Mihidy ny fidirana amin'ny mikrô. Alefaso ao amin'ny Settings mba hampiasana ny fidirana amin'ny feo.",
+    "micOffTitle": "Mihidy ny fidirana amin'ny mikrô",
+    "noSpeech": "Tsy nisy kabary hita. Tsindrio ny mikrô mba andramana indray.",
+    "needsConnection": "Mila fifandraisana izao ny fidirana amin'ny feo. Andramana indray.",
+    "busy": "Saika miasa ny fidirana amin'ny feo. Andramana indray.",
+    "stopped": "Nijanona ny fidirana amin'ny feo. Tsindrio ny mikrô mba andramana indray.",
+    "unavailableDevice": "Tsy misy ny fidirana amin'ny feo amin'ity fitaovana ity.",
+    "unavailableLanguage": "Tsy misy ny fidirana amin'ny feo ho an'ny fitenin'ity fitaovana ity."
   },
   "share": {
     "title": "Zarao amin'ny Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Io Kilo Pass io dia tantanina amin'ny tranonkala.",
     "legalDisclosure": "Kilo Pass dia famandrihana isam-bolana azo havaozina ho azy. Alaina amin'ny Apple ID anao ny fandoavam-bola rehefa hamafisina ny fividianana. Havaozina ho azy ny famandrihana isam-bolana amin'ny vidiny aseho raha tsy foanana 24 ora farafahakeliny alohan'ny fiafaran'ny fe-potoana ankehitriny. Tantano na foano isaky ny te ianao amin'ny fikandrana kaonty App Store anao.",
     "legalPrivacyPolicy": "Politika momba ny fiainana manokana",
-    "legalTermsOfUse": "Fepetran'ny fampiasana (EULA)"
+    "legalTermsOfUse": "Fepetran'ny fampiasana (EULA)",
+    "purchaseNotLinked": "Tsy mifandray amin'ny kaonty Kilo anao ity fividianana App Store ity. Ataovy azo antoka fa niditra tamin'ny Apple ID nanao ny fividianana ianao, ary andramana indray.",
+    "purchaseDifferentAccount": "Tsy mifandray amin'ny kaonty Kilo anao ity fividianana App Store ity. Midira amin'ny Apple Account nampiasaina tamin'ny fividianana, ary andramana indray.",
+    "restoreFailed": "Tsy nahomby ny famerenana ny fividianana. Andramana indray.",
+    "purchaseFailed": "Tsy nahomby ny famitana ny fividianana.",
+    "purchaseStartFailed": "Tsy nahomby ny fanombohana ny fividianana App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Misokatra",
       "statusPaid": "Voaloa",
       "statusVoid": "Nofoana",
-      "title": "Faktiora"
+      "title": "Faktiora",
+      "downloadFailed": "Tsy afaka nampidina ny faktiora. Jereo ny fifandraisanao ary andramana indray.",
+      "sharingUnavailable": "Tsy misy ny fifampizarana amin'ity fitaovana ity."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Tsy nahomby ny fidirana. Andramo indray azafady.",
     "networkError": "Hadisoan'ny tambajotra. Andramo indray azafady.",
     "accessDeniedByUser": "Nolavin'ny mpampiasa ny fidirana",
-    "codeExpired": "Lany daty ny kaody"
+    "codeExpired": "Lany daty ny kaody",
+    "tooManySignInAttempts": "Betsaka loatra ny andrana fidirana. Miandrasa kely ary andramana indray azafady."
   },
   "models": {
     "dataCollected": "Angona voaangona",

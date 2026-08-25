@@ -24,7 +24,10 @@
     "required": "الزامی",
     "error": "خطا: {{error}}",
     "back": "بازگشت",
-    "somethingWentWrong": "مشکلی پیش آمد"
+    "somethingWentWrong": "مشکلی پیش آمد",
+    "couldNotOpen": "باز کردن {{label}} ممکن نشد",
+    "link": "پیوند",
+    "takingLonger": "این کار بیش از حد انتظار طول می‌کشد. می‌توانید این را ببندید و دوباره بررسی کنید."
   },
   "language": {
     "title": "زبان",
@@ -576,6 +579,12 @@
       "commentPosted": "نظر ارسال شد",
       "reviewSubmitted": "بازبینی ارسال شد",
       "autoMergeEnabled": "ادغام خودکار فعال شد"
+    },
+    "mutationError": {
+      "commentNotPosted": "این نظر قابل ارسال نیست. ممکن است خط انتخاب‌شده تغییر کرده باشد یا PR به‌روزرسانی شده باشد.",
+      "reviewNotSubmitted": "این بازبینی در وضعیت فعلی قابل ارسال نیست. ممکن است PR تغییر کرده باشد یا نتوانید درخواست pull خودتان را بازبینی کنید.",
+      "couldNotPostComment": "ارسال نظر ممکن نشد.",
+      "couldNotSubmitReview": "ارسال بازبینی ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "فایل خالی است",
       "classificationTooLarge": "فایل‌ها باید 20 MB یا کوچک‌تر باشند",
       "classificationUnreadable": "خواندن این فایل ممکن نشد",
-      "announceUploaded": "پیوست بارگذاری شد"
+      "announceUploaded": "پیوست بارگذاری شد",
+      "cantUpload": "این فایل قابل بارگذاری نیست.",
+      "networkError": "خطای شبکه",
+      "uploadFailed": "بارگذاری ناموفق بود",
+      "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}",
+      "nothingToPaste": "چیزی برای جای‌گذاری نیست"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "جرقه‌ها",
       "strongArm": "بازوی قوی",
       "talisman": "طلسم"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "این نمونه نمی‌تواند فایل دریافت کند."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "بدون تصمیم",
       "noResult": "بدون نتیجه"
     },
-    "eyebrow": "بررسی‌کننده کد"
+    "eyebrow": "بررسی‌کننده کد",
+    "updateFailed": "به‌روزرسانی بازبین ممکن نشد",
+    "configSaveFailed": "ذخیرهٔ پیکربندی بازبینی ممکن نشد"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "اصلاح‌های موجود در صف قرار گرفتند",
       "analysisComplete": "تحلیل کامل شد",
       "syncComplete": "همگام‌سازی کامل شد"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "سرویس امنیت پیکربندی نشده است. ارسال مجدد تا رفع این مشکل موفق نمی‌شود.",
+      "syncMayNotHaveCompleted": "ممکن است همگام‌سازی کامل نشده باشد. برای هماهنگ کردن آن دوباره تلاش کنید یا آن را دور بیندازید.",
+      "syncInProgress": "یک همگام‌سازی امنیتی در حال انجام است. لطفاً دوباره تلاش کنید.",
+      "dismissalInProgress": "این رد در حال انجام است. لطفاً دوباره تلاش کنید.",
+      "couldNotReadPendingSyncs": "خواندن همگام‌سازی‌های در انتظار ممکن نشد. دوباره تلاش کنید."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "این دستگاه نمی‌تواند آفلاین رونویسی کند. ضبط شما برای تبدیل به متن به {{provider}} ارسال می‌شود. Kilo صدا را ذخیره نمی‌کند.",
     "allow": "مجاز",
     "start": "شروع ورودی صوتی",
-    "stop": "توقف ورودی صوتی"
+    "stop": "توقف ورودی صوتی",
+    "restricted": "ورودی صوتی در این دستگاه محدود شده است.",
+    "micRequired": "برای ورودی صوتی، دسترسی به میکروفون لازم است.",
+    "micOff": "دسترسی به میکروفون خاموش است. برای استفاده از ورودی صوتی، آن را در تنظیمات روشن کنید.",
+    "micOffTitle": "دسترسی به میکروفون خاموش است",
+    "noSpeech": "گفتاری تشخیص داده نشد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
+    "needsConnection": "ورودی صوتی در حال حاضر به اتصال نیاز دارد. دوباره تلاش کنید.",
+    "busy": "ورودی صوتی مشغول است. دوباره تلاش کنید.",
+    "stopped": "ورودی صوتی متوقف شد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
+    "unavailableDevice": "ورودی صوتی در این دستگاه در دسترس نیست.",
+    "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست."
   },
   "share": {
     "title": "اشتراک در Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "این Kilo Pass در وب مدیریت میشود.",
     "legalDisclosure": "Kilo Pass یک اشتراک ماهانه با تمدید خودکار است. پرداخت در تأیید خرید از Apple ID شما کسر میشود. اشتراکها هر ماه بهصورت خودکار با قیمت نشاندادهشده تمدید میشوند، مگر اینکه حداقل ۲۴ ساعت قبل از پایان دوره فعلی لغو شوند. هر زمان میتوانید در تنظیمات حساب App Store خود آن را مدیریت یا لغو کنید.",
     "legalPrivacyPolicy": "خطمشی حریم خصوصی",
-    "legalTermsOfUse": "شرایط استفاده (EULA)"
+    "legalTermsOfUse": "شرایط استفاده (EULA)",
+    "purchaseNotLinked": "این خرید App Store به حساب Kilo شما متصل نیست. مطمئن شوید با Apple ID چی که خرید با آن انجام شده وارد شده‌اید، سپس دوباره تلاش کنید.",
+    "purchaseDifferentAccount": "این خرید App Store به حساب Kilo شما متصل نیست. با Apple Account مورد استفاده برای خرید وارد شوید، سپس دوباره تلاش کنید.",
+    "restoreFailed": "بازیابی خریدها ممکن نشد. دوباره تلاش کنید.",
+    "purchaseFailed": "تکمیل خرید ممکن نشد.",
+    "purchaseStartFailed": "شروع خرید App Store ممکن نشد."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "باز",
       "statusPaid": "پرداخت شده",
       "statusVoid": "باطل",
-      "title": "فاکتورها"
+      "title": "فاکتورها",
+      "downloadFailed": "دانلود فاکتور ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "sharingUnavailable": "اشتراک‌گذاری در این دستگاه در دسترس نیست."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
     "networkError": "خطای شبکه. لطفاً دوباره تلاش کنید.",
     "accessDeniedByUser": "دسترسی توسط کاربر رد شد",
-    "codeExpired": "کد منقضی شد"
+    "codeExpired": "کد منقضی شد",
+    "tooManySignInAttempts": "تعداد تلاش‌های ورود زیاد است. لطفاً صبر کنید و دوباره تلاش کنید."
   },
   "models": {
     "dataCollected": "دادههای جمعآوریشده",

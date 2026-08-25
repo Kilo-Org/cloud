@@ -24,7 +24,10 @@
     "required": "nõutav",
     "error": "viga: {{error}}",
     "back": "Tagasi",
-    "somethingWentWrong": "Midagi läks valesti"
+    "somethingWentWrong": "Midagi läks valesti",
+    "couldNotOpen": "Ei õnnestunud {{label}} avada",
+    "link": "link",
+    "takingLonger": "See võtab oodatust kauem aega. Sa võid selle sulgeda ja hiljem uuesti vaadata."
   },
   "language": {
     "title": "Keel",
@@ -576,6 +579,12 @@
       "commentPosted": "Kommentaar on postitatud",
       "reviewSubmitted": "Ülevaade on esitatud",
       "autoMergeEnabled": "Automaatne ühendamine on lubatud"
+    },
+    "mutationError": {
+      "commentNotPosted": "Seda kommentaari ei saa postitada. Valitud rida võis muutuda või PR-i värskendati.",
+      "reviewNotSubmitted": "Seda ülevaadet ei saa sellisel kujul esitada. PR võis muutuda või ei saa sa oma pull request'i üle vaadata.",
+      "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
+      "couldNotSubmitReview": "Ülevaate esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Fail on tühi",
       "classificationTooLarge": "Failid peavad olema 20 MB või väiksemad",
       "classificationUnreadable": "Seda faili ei õnnestunud lugeda",
-      "announceUploaded": "Manus on üles laaditud"
+      "announceUploaded": "Manus on üles laaditud",
+      "cantUpload": "Seda faili ei saa üles laadida.",
+      "networkError": "Võrguviga",
+      "uploadFailed": "Üleslaadimine ebaõnnestus",
+      "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}",
+      "nothingToPaste": "Pole midagi kleepida"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Sädelejad",
       "strongArm": "Tugev käsi",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "See instants ei saa faile vastu võtta."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Otsust pole",
       "noResult": "Tulemust pole"
     },
-    "eyebrow": "Koodiülevaataja"
+    "eyebrow": "Koodiülevaataja",
+    "updateFailed": "Ülevaataja uuendamine ebaõnnestus",
+    "configSaveFailed": "Ülevaate konfiguratsiooni salvestamine ebaõnnestus"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Olemasolevad parandused pandi järjekorda",
       "analysisComplete": "Analüüs on lõppenud",
       "syncComplete": "Sünkroonimine on lõppenud"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Turbeteenus pole seadistatud. Uuesti esitamine ei saa õnnestuda, kuni see on parandatud.",
+      "syncMayNotHaveCompleted": "Sünkroonimine ei pruukinud lõppeda. Proovi seda kooskõlla viimiseks uuesti või jäta kõrvale.",
+      "syncInProgress": "Turbesünkroonimine on juba käimas. Proovi uuesti.",
+      "dismissalInProgress": "See kõrvalejätmine on juba käimas. Proovi uuesti.",
+      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "See seade ei suuda veebiväliselt transkribeerida. Tekstiks muutmiseks saadetakse sinu salvestus {{provider}}-le. Kilo ei salvesta heli.",
     "allow": "Luba",
     "start": "Alusta häälsisestust",
-    "stop": "Lõpeta häälsisestus"
+    "stop": "Lõpeta häälsisestus",
+    "restricted": "Häälsisestus on sellel seadmel piiratud.",
+    "micRequired": "Häälsisestuseks on vajalik mikrofoni juurdepääs.",
+    "micOff": "Mikrofoni juurdepääs on välja lülitatud. Häälsisestuse kasutamiseks lülita see seadetes sisse.",
+    "micOffTitle": "Mikrofoni juurdepääs on välja lülitatud",
+    "noSpeech": "Kõnet ei tuvastatud. Uuesti proovimiseks puuduta mikrofoni.",
+    "needsConnection": "Häälsisestus vajab praegu ühendust. Proovi uuesti.",
+    "busy": "Häälsisestus on hõivatud. Proovi uuesti.",
+    "stopped": "Häälsisestus peatus. Uuesti proovimiseks puuduta mikrofoni.",
+    "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
+    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval."
   },
   "share": {
     "title": "Jaga Kilosse",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Seda Kilo Passi hallatakse veebis.",
     "legalDisclosure": "Kilo Pass on automaatselt uuenev igakuine tellimus. Makse võetakse sinu Apple ID-lt ostu kinnitamisel. Tellimus uueneb iga kuu automaatselt näidatud hinnaga, kui sa seda ei tühista vähemalt 24 tundi enne jooksva perioodi lõppu. Halda või tühista tellimust igal ajal oma App Store konto seadetes.",
     "legalPrivacyPolicy": "Privaatsuspoliitika",
-    "legalTermsOfUse": "Kasutustingimused (EULA)"
+    "legalTermsOfUse": "Kasutustingimused (EULA)",
+    "purchaseNotLinked": "See App Store'i ost pole sinu Kilo kontoga seotud. Veendu, et oled sisse logitud selle Apple ID-ga, millega ost tehti, ja proovi uuesti.",
+    "purchaseDifferentAccount": "See App Store'i ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Apple kontoga ja proovi uuesti.",
+    "restoreFailed": "Ostude taastamine ebaõnnestus. Proovi uuesti.",
+    "purchaseFailed": "Ostu lõpetamine ebaõnnestus.",
+    "purchaseStartFailed": "App Store'i ostu alustamine ebaõnnestus."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Avatud",
       "statusPaid": "Makstud",
       "statusVoid": "Tühistatud",
-      "title": "Arved"
+      "title": "Arved",
+      "downloadFailed": "Arve allalaadimine ei õnnestunud. Kontrolli ühendust ja proovi uuesti.",
+      "sharingUnavailable": "Jagamine pole sellel seadmel saadaval."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Sisselogimine ebaõnnestus. Proovi uuesti.",
     "networkError": "Võrguviga. Proovi uuesti.",
     "accessDeniedByUser": "Kasutaja keelas juurdepääsu",
-    "codeExpired": "Kood on aegunud"
+    "codeExpired": "Kood on aegunud",
+    "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."
   },
   "models": {
     "dataCollected": "Kogutud andmed",

@@ -84,7 +84,6 @@ describe('chat link actions', () => {
     await performChatLinkAction('open', 'https://kilo.ai/docs?source=chat#links');
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://kilo.ai/docs?source=chat#links', {
-      label: 'link',
       retryOnError: true,
     });
   });

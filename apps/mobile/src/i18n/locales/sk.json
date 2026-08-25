@@ -24,7 +24,10 @@
     "required": "povinné",
     "error": "chyba: {{error}}",
     "back": "Späť",
-    "somethingWentWrong": "Niečo sa pokazilo"
+    "somethingWentWrong": "Niečo sa pokazilo",
+    "couldNotOpen": "{{label}} sa nepodarilo otvoriť",
+    "link": "odkaz",
+    "takingLonger": "Toto trvá dlhšie, ako sa očakávalo. Môžete to zavrieť a skontrolovať znova."
   },
   "language": {
     "title": "Jazyk",
@@ -590,6 +593,12 @@
       "commentPosted": "Komentár uverejnený",
       "reviewSubmitted": "Kontrola odoslaná",
       "autoMergeEnabled": "Automatické zlúčenie povolené"
+    },
+    "mutationError": {
+      "commentNotPosted": "Tento komentár sa nedá odoslať. Vybraný riadok sa mohol zmeniť alebo mohol byť PR aktualizovaný.",
+      "reviewNotSubmitted": "Túto kontrolu nemožno odoslať v tejto podobe. PR sa mohol zmeniť alebo nemôžete kontrolovať vlastný pull request.",
+      "couldNotPostComment": "Komentár sa nepodarilo odoslať.",
+      "couldNotSubmitReview": "Kontrolu sa nepodarilo odoslať. Skontrolujte pripojenie a skúste to znova."
     }
   },
   "notifications": {
@@ -728,7 +737,12 @@
       "classificationEmpty": "Súbor je prázdny",
       "classificationTooLarge": "Súbory musia mať 20 MB alebo menej",
       "classificationUnreadable": "Tento súbor sa nepodarilo prečítať",
-      "announceUploaded": "Príloha nahraná"
+      "announceUploaded": "Príloha nahraná",
+      "cantUpload": "Tento súbor sa nedá nahrať.",
+      "networkError": "Chyba siete",
+      "uploadFailed": "Nahrávanie zlyhalo",
+      "failedToUploadFile": "Súbor sa nepodarilo nahrať: {{reason}}",
+      "nothingToPaste": "Nie je čo vložiť"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1190,7 +1204,8 @@
       "sparkles": "Iskry",
       "strongArm": "Silné rameno",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Táto inštancia nemôže prijímať súbory."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1377,7 +1392,9 @@
       "noDecision": "Bez rozhodnutia",
       "noResult": "Bez výsledku"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Kontrolóra sa nepodarilo aktualizovať",
+    "configSaveFailed": "Konfiguráciu kontroly sa nepodarilo uložiť"
   },
   "securityAgent": {
     "filter": {
@@ -1803,6 +1820,13 @@
       "remediationsQueued": "Existujúce nápravy boli zaradené do frontu",
       "analysisComplete": "Analýza dokončená",
       "syncComplete": "Synchronizácia dokončená"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Bezpečnostná služba nie je nakonfigurovaná. Opätovné odoslanie nemôže uspieť, kým sa to neopraví.",
+      "syncMayNotHaveCompleted": "Synchronizácia sa možno nedokončila. Zopakujte ju na zosúladenie alebo ju zahoďte.",
+      "syncInProgress": "Synchronizácia zabezpečenia už prebieha. Skúste to znova.",
+      "dismissalInProgress": "Toto odmietnutie už prebieha. Skúste to znova.",
+      "couldNotReadPendingSyncs": "Čakajúce synchronizácie sa nepodarilo prečítať. Skúste to znova."
     }
   },
   "agents": {
@@ -2507,7 +2531,17 @@
     "onlineMessage": "Toto zariadenie nedokáže prepisovať offline. Vaša nahrávka sa odošle do {{provider}}, aby sa premenila na text. Kilo neukladá zvuk.",
     "allow": "Povoliť",
     "start": "Spustiť hlasový vstup",
-    "stop": "Zastaviť hlasový vstup"
+    "stop": "Zastaviť hlasový vstup",
+    "restricted": "Hlasový vstup je na tomto zariadení obmedzený.",
+    "micRequired": "Pre hlasový vstup je potrebný prístup k mikrofónu.",
+    "micOff": "Prístup k mikrofónu je vypnutý. Povoľte ho v Nastaveniach, aby ste mohli používať hlasový vstup.",
+    "micOffTitle": "Prístup k mikrofónu je vypnutý",
+    "noSpeech": "Nezistila sa žiadna reč. Klepnutím na mikrofón to skúste znova.",
+    "needsConnection": "Hlasový vstup práve teraz potrebuje pripojenie. Skúste to znova.",
+    "busy": "Hlasový vstup je zaneprázdnený. Skúste to znova.",
+    "stopped": "Hlasový vstup sa zastavil. Klepnutím na mikrofón to skúste znova.",
+    "unavailableDevice": "Hlasový vstup nie je na tomto zariadení dostupný.",
+    "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk tohto zariadenia."
   },
   "share": {
     "title": "Zdieľať do Kilo",
@@ -2585,7 +2619,12 @@
     "webManagementDescription": "Tento Kilo Pass sa spravuje na webe.",
     "legalDisclosure": "Kilo Pass je mesačné predplatné s automatickým obnovením. Platba sa účtuje na vaše Apple ID pri potvrdení nákupu. Predplatné sa automaticky obnovuje každý mesiac za zobrazenú cenu, pokiaľ ho nezrušíte najmenej 24 hodín pred koncom aktuálneho obdobia. Spravujte alebo zrušte ho kedykoľvek v nastaveniach svojho účtu App Store.",
     "legalPrivacyPolicy": "Zásady ochrany osobných údajov",
-    "legalTermsOfUse": "Podmienky používania (EULA)"
+    "legalTermsOfUse": "Podmienky používania (EULA)",
+    "purchaseNotLinked": "Tento nákup v App Store nie je prepojený s vaším účtom Kilo. Uistite sa, že ste prihlásení do Apple ID, cez ktoré bol nákup uskutočnený, a skúste to znova.",
+    "purchaseDifferentAccount": "Tento nákup v App Store nie je prepojený s vaším účtom Kilo. Prihláste sa do Apple Account použitého na nákup a skúste to znova.",
+    "restoreFailed": "Obnovenie nákupov zlyhalo. Skúste to znova.",
+    "purchaseFailed": "Nákup sa nepodarilo dokončiť.",
+    "purchaseStartFailed": "Nákup v App Store sa nepodarilo spustiť."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2718,7 +2757,9 @@
       "statusOpen": "Otvorená",
       "statusPaid": "Zaplatená",
       "statusVoid": "Neplatná",
-      "title": "Faktúry"
+      "title": "Faktúry",
+      "downloadFailed": "Faktúru sa nepodarilo stiahnuť. Skontrolujte pripojenie a skúste to znova.",
+      "sharingUnavailable": "Zdieľanie nie je na tomto zariadení dostupné."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2840,7 +2881,8 @@
     "signInFailed": "Prihlásenie zlyhalo. Skúste to znova.",
     "networkError": "Chyba siete. Skúste to znova.",
     "accessDeniedByUser": "Prístup zamietnutý používateľom",
-    "codeExpired": "Kód vypršal"
+    "codeExpired": "Kód vypršal",
+    "tooManySignInAttempts": "Príliš veľa pokusov o prihlásenie. Počkajte a skúste to znova."
   },
   "models": {
     "dataCollected": "Zhromaždené údaje",

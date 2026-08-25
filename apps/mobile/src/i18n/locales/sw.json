@@ -24,7 +24,10 @@
     "required": "inahitajika",
     "error": "hitilafu: {{error}}",
     "back": "Rudi",
-    "somethingWentWrong": "Jambo fulani lilitokea"
+    "somethingWentWrong": "Jambo fulani lilitokea",
+    "couldNotOpen": "Imeshindwa kufungua {{label}}",
+    "link": "kiungo",
+    "takingLonger": "Hii inachukua muda mrefu kuliko ilivyotarajiwa. Unaweza kuifunga na kuangalia tena."
   },
   "language": {
     "title": "Lugha",
@@ -576,6 +579,12 @@
       "commentPosted": "Maoni yamewasilishwa",
       "reviewSubmitted": "Ukaguzi umewasilishwa",
       "autoMergeEnabled": "Muunganisho wa kiotomatiki umewashwa"
+    },
+    "mutationError": {
+      "commentNotPosted": "Maoni haya hayawezi kuchapishwa. Mstari uliochaguliwa huenda umebadilika, au PR huenda imesasishwa.",
+      "reviewNotSubmitted": "Ukaguzi huu hauwezi kuwasilishwa kama ulivyo. PR huenda imebadilika, au huwezi kukagua pull request yako mwenyewe.",
+      "couldNotPostComment": "Imeshindwa kuchapisha maoni.",
+      "couldNotSubmitReview": "Imeshindwa kuwasilisha ukaguzi. Angalia muunganisho wako na ujaribu tena."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Faili ni tupu",
       "classificationTooLarge": "Faili lazima ziwe 20 MB au chini",
       "classificationUnreadable": "Imeshindwa kusoma faili hili",
-      "announceUploaded": "Kiambatisho kimepakiwa"
+      "announceUploaded": "Kiambatisho kimepakiwa",
+      "cantUpload": "Faili hili haliwezi kupakiwa.",
+      "networkError": "Hitilafu ya mtandao",
+      "uploadFailed": "Kupakia kumeshindwa",
+      "failedToUploadFile": "Imeshindwa kupakia faili: {{reason}}",
+      "nothingToPaste": "Hakuna cha kubandika"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Vimeta",
       "strongArm": "Mkono wenye nguvu",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Tukio hili haliwezi kupokea faili."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Hakuna uamuzi",
       "noResult": "Hakuna matokeo"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Imeshindwa kusasisha mkaguzi",
+    "configSaveFailed": "Imeshindwa kuhifadhi usanidi wa ukaguzi"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Urekebishaji uliopo umepangwa",
       "analysisComplete": "Uchambuzi umekamilika",
       "syncComplete": "Usawazishaji umekamilika"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Huduma ya usalama haijasanidiwa. Kuwasilisha tena hakutafaulu hadi hili lirekebishwe.",
+      "syncMayNotHaveCompleted": "Usawazishaji huenda haujakamilika. Jaribu tena kuusuluhisha, au uitupilie mbali.",
+      "syncInProgress": "Usawazishaji wa usalama tayari unaendelea. Tafadhali jaribu tena.",
+      "dismissalInProgress": "Kufuta huku tayari kunaendelea. Tafadhali jaribu tena.",
+      "couldNotReadPendingSyncs": "Imeshindwa kusoma usawazishaji unaosubiri. Jaribu tena."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Kifaa hiki hakiwezi kuandika hotuba nje ya mtandao. Rekodi yako inatumwa kwa {{provider}} ili ibadilishwe kuwa maandishi. Kilo haihifadhi sauti.",
     "allow": "Ruhusu",
     "start": "Anzisha ingizo la sauti",
-    "stop": "Acha ingizo la sauti"
+    "stop": "Acha ingizo la sauti",
+    "restricted": "Ingizo la sauti limezuiwa kwenye kifaa hiki.",
+    "micRequired": "Ufikiaji wa kipaza sauti unahitajika kwa ingizo la sauti.",
+    "micOff": "Ufikiaji wa kipaza sauti umezimwa. Uwashe katika Mipangilio ili utumie ingizo la sauti.",
+    "micOffTitle": "Ufikiaji wa kipaza sauti umezimwa",
+    "noSpeech": "Hakuna maneno yaliyogunduliwa. Gusa kipaza sauti kujaribu tena.",
+    "needsConnection": "Ingizo la sauti linahitaji muunganisho sasa hivi. Jaribu tena.",
+    "busy": "Ingizo la sauti linashughulika. Jaribu tena.",
+    "stopped": "Ingizo la sauti limesimama. Gusa kipaza sauti kujaribu tena.",
+    "unavailableDevice": "Ingizo la sauti halipatikani kwenye kifaa hiki.",
+    "unavailableLanguage": "Ingizo la sauti halipatikani kwa lugha hii ya kifaa."
   },
   "share": {
     "title": "Shiriki kwa Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Kilo Pass hii inasimamiwa kwenye wavuti.",
     "legalDisclosure": "Kilo Pass ni usajili wa kila mwezi unaofanywa upya kiotomatiki. Malipo yanakatwa kwenye Apple ID yako unapothibitisha ununuzi. Usajili unafanywa upya kiotomatiki kila mwezi kwa bei inayoonyeshwa isipokuwa umeghairi angalau saa 24 kabla ya mwisho wa kipindi cha sasa. Simamia au ghairi wakati wowote katika mipangilio ya akaunti yako ya App Store.",
     "legalPrivacyPolicy": "Sera ya Faragha",
-    "legalTermsOfUse": "Masharti ya Matumizi (EULA)"
+    "legalTermsOfUse": "Masharti ya Matumizi (EULA)",
+    "purchaseNotLinked": "Ununuzi huu wa App Store haujaunganishwa na akaunti yako ya Kilo. Hakikisha umeingia na Apple ID iliyofanya ununuzi, kisha ujaribu tena.",
+    "purchaseDifferentAccount": "Ununuzi huu wa App Store haujaunganishwa na akaunti yako ya Kilo. Ingia na Akaunti ya Apple iliyotumika kwa ununuzi, kisha ujaribu tena.",
+    "restoreFailed": "Imeshindwa kurejesha ununuzi. Jaribu tena.",
+    "purchaseFailed": "Imeshindwa kukamilisha ununuzi.",
+    "purchaseStartFailed": "Imeshindwa kuanza ununuzi wa App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Funguliwa",
       "statusPaid": "Imelipwa",
       "statusVoid": "Batilika",
-      "title": "Ankara"
+      "title": "Ankara",
+      "downloadFailed": "Imeshindwa kupakua ankara. Angalia muunganisho wako na ujaribu tena.",
+      "sharingUnavailable": "Kushiriki hakupatikani kwenye kifaa hiki."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Kuingia kumeshindwa. Tafadhali jaribu tena.",
     "networkError": "Hitilafu ya mtandao. Tafadhali jaribu tena.",
     "accessDeniedByUser": "Ufikiaji umekataliwa na mtumiaji",
-    "codeExpired": "Msimbo umeisha muda"
+    "codeExpired": "Msimbo umeisha muda",
+    "tooManySignInAttempts": "Jaribio nyingi za kuingia. Tafadhali subiri kisha ujaribu tena."
   },
   "models": {
     "dataCollected": "Data iliyokusanywa",

@@ -24,7 +24,10 @@
     "required": "påkrevd",
     "error": "feil: {{error}}",
     "back": "Tilbake",
-    "somethingWentWrong": "Noe gikk galt"
+    "somethingWentWrong": "Noe gikk galt",
+    "couldNotOpen": "Kunne ikke åpne {{label}}",
+    "link": "lenke",
+    "takingLonger": "Dette tar lengre tid enn forventet. Du kan lukke dette og sjekke igjen."
   },
   "language": {
     "title": "Språk",
@@ -576,6 +579,12 @@
       "commentPosted": "Kommentar lagt ut",
       "reviewSubmitted": "Anmeldelse sendt inn",
       "autoMergeEnabled": "Automatisk fletting aktivert"
+    },
+    "mutationError": {
+      "commentNotPosted": "Denne kommentaren kan ikke publiseres. Den valgte linjen kan ha endret seg, eller PR-en kan ha blitt oppdatert.",
+      "reviewNotSubmitted": "Denne anmeldelsen kan ikke sendes inn som den er. PR-en kan ha endret seg, eller du kan ikke anmelde din egen pull request.",
+      "couldNotPostComment": "Kunne ikke publisere kommentaren.",
+      "couldNotSubmitReview": "Kunne ikke sende inn anmeldelsen. Sjekk tilkoblingen og prøv igjen."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Filen er tom",
       "classificationTooLarge": "Filer må være 20 MB eller mindre",
       "classificationUnreadable": "Kunne ikke lese denne filen",
-      "announceUploaded": "Vedlegg lastet opp"
+      "announceUploaded": "Vedlegg lastet opp",
+      "cantUpload": "Denne filen kan ikke lastes opp.",
+      "networkError": "Nettverksfeil",
+      "uploadFailed": "Opplasting mislyktes",
+      "failedToUploadFile": "Kunne ikke laste opp filen: {{reason}}",
+      "nothingToPaste": "Ingenting å lime inn"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Gnister",
       "strongArm": "Sterk arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Denne forekomsten kan ikke motta filer."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Ingen avgjørelse",
       "noResult": "Ingen resultat"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Kunne ikke oppdatere anmelderen",
+    "configSaveFailed": "Kunne ikke lagre anmeldelseskonfigurasjonen"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Eksisterende utbedringer satt i kø",
       "analysisComplete": "Analysen er fullført",
       "syncComplete": "Synkroniseringen er fullført"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Sikkerhetstjenesten er ikke konfigurert. Ny innsending kan ikke lykkes før dette er fikset.",
+      "syncMayNotHaveCompleted": "En synkronisering er kanskje ikke fullført. Prøv igjen for å avstemme, eller forkast.",
+      "syncInProgress": "En sikkerhetssynkronisering pågår allerede. Prøv igjen.",
+      "dismissalInProgress": "Denne avvisningen pågår allerede. Prøv igjen.",
+      "couldNotReadPendingSyncs": "Kunne ikke lese ventende synkroniseringer. Prøv igjen."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Denne enheten kan ikke transkribere offline. Opptaket ditt sendes til {{provider}} for å gjøre det om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
     "start": "Start taleinntasting",
-    "stop": "Stopp taleinntasting"
+    "stop": "Stopp taleinntasting",
+    "restricted": "Taleinntasting er begrenset på denne enheten.",
+    "micRequired": "Mikrofontilgang kreves for taleinntasting.",
+    "micOff": "Mikrofontilgang er av. Aktiver den i Innstillinger for å bruke taleinntasting.",
+    "micOffTitle": "Mikrofontilgang er av",
+    "noSpeech": "Ingen tale oppdaget. Trykk på mikrofonen for å prøve igjen.",
+    "needsConnection": "Taleinntasting trenger en tilkobling akkurat nå. Prøv igjen.",
+    "busy": "Taleinntasting er opptatt. Prøv igjen.",
+    "stopped": "Taleinntasting stoppet. Trykk på mikrofonen for å prøve igjen.",
+    "unavailableDevice": "Taleinntasting er ikke tilgjengelig på denne enheten.",
+    "unavailableLanguage": "Taleinntasting er ikke tilgjengelig for dette enhetsspråket."
   },
   "share": {
     "title": "Del til Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Denne Kilo Pass-en administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et automatisk fornybart månedsabonnement. Betaling belastes Apple-ID-en din ved bekreftelse av kjøpet. Abonnementet fornyes automatisk hver måned til prisen som vises, med mindre det kanselleres minst 24 timer før slutten av gjeldende periode. Administrer eller kanseller når som helst i App Store-kontoinnstillingene.",
     "legalPrivacyPolicy": "Personvernpolicy",
-    "legalTermsOfUse": "Bruksvilkår (EULA)"
+    "legalTermsOfUse": "Bruksvilkår (EULA)",
+    "purchaseNotLinked": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Kontroller at du er logget på Apple-ID-en som gjorde kjøpet, og prøv igjen.",
+    "purchaseDifferentAccount": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Logg på Apple-kontoen som ble brukt for kjøpet, og prøv igjen.",
+    "restoreFailed": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
+    "purchaseFailed": "Kunne ikke fullføre kjøpet.",
+    "purchaseStartFailed": "Kunne ikke starte App Store-kjøpet."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Åpen",
       "statusPaid": "Betalt",
       "statusVoid": "Ugyldig",
-      "title": "Fakturaer"
+      "title": "Fakturaer",
+      "downloadFailed": "Kunne ikke laste ned fakturaen. Sjekk tilkoblingen og prøv igjen.",
+      "sharingUnavailable": "Deling er ikke tilgjengelig på denne enheten."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Påloggingen mislyktes. Prøv igjen.",
     "networkError": "Nettverksfeil. Prøv igjen.",
     "accessDeniedByUser": "Tilgang nektet av brukeren",
-    "codeExpired": "Koden er utløpt"
+    "codeExpired": "Koden er utløpt",
+    "tooManySignInAttempts": "For mange påloggingsforsøk. Vent og prøv igjen."
   },
   "models": {
     "dataCollected": "Data samlet inn",

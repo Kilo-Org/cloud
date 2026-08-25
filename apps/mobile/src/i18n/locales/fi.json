@@ -24,7 +24,10 @@
     "required": "pakollinen",
     "error": "virhe: {{error}}",
     "back": "Takaisin",
-    "somethingWentWrong": "Jokin meni pieleen"
+    "somethingWentWrong": "Jokin meni pieleen",
+    "couldNotOpen": "Ei voitu avata {{label}}",
+    "link": "linkki",
+    "takingLonger": "Tämä kestää odotettua kauemmin. Voit sulkea tämän ja tarkistaa myöhemmin."
   },
   "language": {
     "title": "Kieli",
@@ -576,6 +579,12 @@
       "commentPosted": "Kommentti lähetetty",
       "reviewSubmitted": "Arviointi lähetetty",
       "autoMergeEnabled": "Automaattinen yhdistäminen käytössä"
+    },
+    "mutationError": {
+      "commentNotPosted": "Tätä kommenttia ei voi julkaista. Valittu rivi on saattanut muuttua tai PR on saatettu päivittää.",
+      "reviewNotSubmitted": "Tätä arviointia ei voi lähettää sellaisenaan. PR on saatettu muuttaa, tai et voi arvioida omaa pull requestiasi.",
+      "couldNotPostComment": "Kommenttia ei voitu lähettää.",
+      "couldNotSubmitReview": "Arviointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Tiedosto on tyhjä",
       "classificationTooLarge": "Tiedostojen on oltava enintään 20 MB",
       "classificationUnreadable": "Tätä tiedostoa ei voitu lukea",
-      "announceUploaded": "Liite lähetetty"
+      "announceUploaded": "Liite lähetetty",
+      "cantUpload": "Tätä tiedostoa ei voi ladata.",
+      "networkError": "Verkkovirhe",
+      "uploadFailed": "Lataus epäonnistui",
+      "failedToUploadFile": "Tiedoston lataaminen epäonnistui: {{reason}}",
+      "nothingToPaste": "Ei mitään liitettävää"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Kipinät",
       "strongArm": "Vahva käsivarsi",
       "talisman": "Talismaani"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Tämä instanssi ei voi vastaanottaa tiedostoja."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Ei päätöstä",
       "noResult": "Ei tulosta"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Arvioijan päivittäminen epäonnistui",
+    "configSaveFailed": "Arvioinnin konfiguraation tallentaminen epäonnistui"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Olemassa olevat korjaustoimenpiteet jonossa",
       "analysisComplete": "Analyysi valmis",
       "syncComplete": "Synkronointi valmis"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Tietoturvapalvelua ei ole määritetty. Uudelleenlähetys ei voi onnistua ennen kuin tämä on korjattu.",
+      "syncMayNotHaveCompleted": "Synkronointi ei välttämättä ole valmistunut. Yritä uudelleen yhtenäistääksesi se tai hylkää se.",
+      "syncInProgress": "Tietoturvasynkronointi on jo käynnissä. Yritä uudelleen.",
+      "dismissalInProgress": "Tämä hylkäys on jo käynnissä. Yritä uudelleen.",
+      "couldNotReadPendingSyncs": "Odottavia synkronointeja ei voitu lukea. Yritä uudelleen."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Tämä laite ei voi transkriboida offline-tilassa. Tallenteesi lähetetään palveluun {{provider}} tekstiksi muuttamista varten. Kilo ei tallenna ääntä.",
     "allow": "Salli",
     "start": "Aloita puheentunnistus",
-    "stop": "Lopeta puheentunnistus"
+    "stop": "Lopeta puheentunnistus",
+    "restricted": "Puheentunnistus on rajoitettu tässä laitteessa.",
+    "micRequired": "Mikrofonin käyttöoikeus vaaditaan puheentunnistusta varten.",
+    "micOff": "Mikrofonin käyttöoikeus on pois päältä. Ota se käyttöön Asetuksista käyttääksesi puheentunnistusta.",
+    "micOffTitle": "Mikrofonin käyttöoikeus on pois päältä",
+    "noSpeech": "Puhetta ei tunnistettu. Napauta mikrofonia yrittääksesi uudelleen.",
+    "needsConnection": "Puheentunnistus tarvitsee yhteyden juuri nyt. Yritä uudelleen.",
+    "busy": "Puheentunnistus on varattu. Yritä uudelleen.",
+    "stopped": "Puheentunnistus pysähtyi. Napauta mikrofonia yrittääksesi uudelleen.",
+    "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
+    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle."
   },
   "share": {
     "title": "Jaa Kiloon",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Tätä Kilo Pass -tilausta hallinnoidaan verkossa.",
     "legalDisclosure": "Kilo Pass on automaattisesti uusiutuva kuukausitilaus. Maksu veloitetaan Apple ID:stäsi oston vahvistuksen yhteydessä. Tilaus uusiutuu automaattisesti joka kuukausi näytettyyn hintaan, ellei sitä peruuteta vähintään 24 tuntia ennen nykyisen jakson päättymistä. Hallinnoi tai peruuta milloin tahansa App Store -tilin asetuksissa.",
     "legalPrivacyPolicy": "Tietosuojakäytäntö",
-    "legalTermsOfUse": "Käyttöehdot (EULA)"
+    "legalTermsOfUse": "Käyttöehdot (EULA)",
+    "purchaseNotLinked": "Tämä App Store -osto ei ole liitetty Kilo-tiliisi. Varmista, että olet kirjautunut Apple ID:llä, jolla osto tehtiin, ja yritä uudelleen.",
+    "purchaseDifferentAccount": "Tämä App Store -osto ei ole liitetty Kilo-tiliisi. Kirjaudu ostokseen käytetyllä Apple-tilillä ja yritä uudelleen.",
+    "restoreFailed": "Ostosten palauttaminen epäonnistui. Yritä uudelleen.",
+    "purchaseFailed": "Oston viimeistely epäonnistui.",
+    "purchaseStartFailed": "App Store -oston aloittaminen epäonnistui."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Avoin",
       "statusPaid": "Maksettu",
       "statusVoid": "Mitätöity",
-      "title": "Laskut"
+      "title": "Laskut",
+      "downloadFailed": "Laskua ei voitu ladata. Tarkista yhteys ja yritä uudelleen.",
+      "sharingUnavailable": "Jakaminen ei ole käytettävissä tässä laitteessa."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Kirjautuminen epäonnistui. Yritä uudelleen.",
     "networkError": "Verkkovirhe. Yritä uudelleen.",
     "accessDeniedByUser": "Käyttäjä eväsi pääsyn",
-    "codeExpired": "Koodi vanhentui"
+    "codeExpired": "Koodi vanhentui",
+    "tooManySignInAttempts": "Liian monta kirjautumisyritystä. Odota hetki ja yritä uudelleen."
   },
   "models": {
     "dataCollected": "Kerätyt tiedot",

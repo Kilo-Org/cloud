@@ -87,8 +87,10 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
     sizeText: formatFileSize(size, i18n.language),
     progressText,
     message,
-    accessibilityLabel:
-      message !== null ? `${filename}, ${message}` : `${filename}, ${progressText}`,
+    accessibilityLabel: i18n.t('chat.attachmentPreview.accessibility', {
+      filename,
+      status: message ?? progressText,
+    }),
     showRetry: isRetryable,
     showRemove: true,
   };

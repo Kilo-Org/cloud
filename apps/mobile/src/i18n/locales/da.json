@@ -24,7 +24,10 @@
     "required": "påkrævet",
     "error": "fejl: {{error}}",
     "back": "Tilbage",
-    "somethingWentWrong": "Noget gik galt"
+    "somethingWentWrong": "Noget gik galt",
+    "couldNotOpen": "Kunne ikke åbne {{label}}",
+    "link": "link",
+    "takingLonger": "Dette tager længere tid end forventet. Du kan lukke dette og tjekke igen."
   },
   "language": {
     "title": "Sprog",
@@ -576,6 +579,12 @@
       "commentPosted": "Kommentar sendt",
       "reviewSubmitted": "Anmeldelse indsendt",
       "autoMergeEnabled": "Automatisk fletning aktiveret"
+    },
+    "mutationError": {
+      "commentNotPosted": "Denne kommentar kan ikke sendes. Den valgte linje kan have ændret sig, eller PR'en kan være blevet opdateret.",
+      "reviewNotSubmitted": "Denne anmeldelse kan ikke sendes, som den er. PR'en kan have ændret sig, eller du kan ikke anmelde din egen pull request.",
+      "couldNotPostComment": "Kunne ikke sende kommentaren.",
+      "couldNotSubmitReview": "Kunne ikke sende anmeldelsen. Tjek din forbindelse og prøv igen."
     }
   },
   "notifications": {
@@ -714,7 +723,12 @@
       "classificationEmpty": "Filen er tom",
       "classificationTooLarge": "Filer skal være på 20 MB eller mindre",
       "classificationUnreadable": "Kunne ikke læse denne fil",
-      "announceUploaded": "Vedhæftning uploadet"
+      "announceUploaded": "Vedhæftning uploadet",
+      "cantUpload": "Denne fil kan ikke uploades.",
+      "networkError": "Netværksfejl",
+      "uploadFailed": "Upload mislykkedes",
+      "failedToUploadFile": "Kunne ikke uploade fil: {{reason}}",
+      "nothingToPaste": "Intet at indsætte"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1172,7 +1186,8 @@
       "sparkles": "Gnister",
       "strongArm": "Stærk arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Denne instance kan ikke modtage filer."
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1359,7 +1374,9 @@
       "noDecision": "Ingen beslutning",
       "noResult": "Intet resultat"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Kunne ikke opdatere Code Reviewer",
+    "configSaveFailed": "Kunne ikke gemme gennemgangskonfigurationen"
   },
   "securityAgent": {
     "filter": {
@@ -1781,6 +1798,13 @@
       "remediationsQueued": "Eksisterende afhjælpninger sat i kø",
       "analysisComplete": "Analyse fuldført",
       "syncComplete": "Synkronisering fuldført"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Sikkerhedstjenesten er ikke konfigureret. Genindsendelse kan ikke lykkes, før dette er rettet.",
+      "syncMayNotHaveCompleted": "En synkronisering er måske ikke blevet fuldført. Prøv igen for at afstemme den, eller kassér den.",
+      "syncInProgress": "En sikkerhedssynkronisering er allerede i gang. Prøv venligst igen.",
+      "dismissalInProgress": "Denne afvisning er allerede i gang. Prøv venligst igen.",
+      "couldNotReadPendingSyncs": "Kunne ikke læse ventende synkroniseringer. Prøv igen."
     }
   },
   "agents": {
@@ -2471,7 +2495,17 @@
     "onlineMessage": "Denne enhed kan ikke transskribere offline. Din optagelse sendes til {{provider}} for at blive konverteret til tekst. Kilo gemmer ikke lyden.",
     "allow": "Tillad",
     "start": "Start taleinput",
-    "stop": "Stop taleinput"
+    "stop": "Stop taleinput",
+    "restricted": "Taleinput er begrænset på denne enhed.",
+    "micRequired": "Mikrofonadgang er påkrævet for taleinput.",
+    "micOff": "Mikrofonadgang er slået fra. Slå den til i Indstillinger for at bruge taleinput.",
+    "micOffTitle": "Mikrofonadgang er slået fra",
+    "noSpeech": "Ingen tale registreret. Tryk på mikrofonen for at prøve igen.",
+    "needsConnection": "Taleinput kræver en forbindelse lige nu. Prøv igen.",
+    "busy": "Taleinput er optaget. Prøv igen.",
+    "stopped": "Taleinput stoppede. Tryk på mikrofonen for at prøve igen.",
+    "unavailableDevice": "Taleinput er ikke tilgængeligt på denne enhed.",
+    "unavailableLanguage": "Taleinput er ikke tilgængeligt for dette enhedssprog."
   },
   "share": {
     "title": "Del til Kilo",
@@ -2549,7 +2583,12 @@
     "webManagementDescription": "Denne Kilo Pass administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et automatisk fornyeligt månedligt abonnement. Betaling opkræves på din Apple ID ved bekræftelse af købet. Abonnementer fornyes automatisk hver måned til den viste pris, medmindre de annulleres mindst 24 timer før udløbet af den aktuelle periode. Administrér eller annullér når som helst i dine App Store-kontoindstillinger.",
     "legalPrivacyPolicy": "Fortrolighedspolitik",
-    "legalTermsOfUse": "Vilkår for brug (EULA)"
+    "legalTermsOfUse": "Vilkår for brug (EULA)",
+    "purchaseNotLinked": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Sørg for, at du er logget ind på den Apple ID, der foretog købet, og prøv igen.",
+    "purchaseDifferentAccount": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Log ind på den Apple-konto, der blev brugt til købet, og prøv igen.",
+    "restoreFailed": "Kunne ikke gendanne køb. Prøv igen.",
+    "purchaseFailed": "Kunne ikke fuldføre købet.",
+    "purchaseStartFailed": "Kunne ikke starte App Store-købet."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2682,7 +2721,9 @@
       "statusOpen": "Åben",
       "statusPaid": "Betalt",
       "statusVoid": "Annulleret",
-      "title": "Fakturaer"
+      "title": "Fakturaer",
+      "downloadFailed": "Kunne ikke downloade fakturaen. Tjek din forbindelse og prøv igen.",
+      "sharingUnavailable": "Deling er ikke tilgængelig på denne enhed."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "navn@virksomhed.dk",
@@ -2802,7 +2843,8 @@
     "signInFailed": "Login mislykkedes. Prøv igen.",
     "networkError": "Netværksfejl. Prøv igen.",
     "accessDeniedByUser": "Adgang afvist af bruger",
-    "codeExpired": "Koden er udløbet"
+    "codeExpired": "Koden er udløbet",
+    "tooManySignInAttempts": "For mange login-forsøg. Vent og prøv igen."
   },
   "models": {
     "dataCollected": "Indsamlede data",

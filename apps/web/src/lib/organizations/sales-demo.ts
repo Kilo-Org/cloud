@@ -10,6 +10,7 @@ import {
   organization_memberships,
   organization_user_usage,
   organizations,
+  sales_demo_spend_ledger,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
@@ -221,6 +222,19 @@ export async function restoreSalesDemoOrganization(args: {
   }
 
   const ownerId = org.created_by_kilo_user_id;
+
+  // The deletes below destroy the org's usage and credit rows, so record the
+  // discarded spend first. `microdollars_used` is the org counter that the LLM,
+  // Exa, and compute charge paths all increment.
+  const spentMicrodollars = Number(org.microdollars_used);
+  if (spentMicrodollars > 0) {
+    await txn.insert(sales_demo_spend_ledger).values({
+      organization_id: organizationId,
+      owner_kilo_user_id: ownerId,
+      period_start: org.settings.sales_demo_last_reset_at ?? org.created_at,
+      microdollars_used: spentMicrodollars,
+    });
+  }
 
   await txn.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, organizationId));
   await txn.delete(exa_usage_log).where(eq(exa_usage_log.organization_id, organizationId));

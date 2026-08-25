@@ -1,6 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Platform } from 'react-native';
 
 import { truncateUtf8, utf8ByteLength } from './utf8-utils';
 
@@ -80,9 +79,7 @@ export async function shareMaterializedRemoteFile(
 ): Promise<void> {
   try {
     await shareFile(file.uri);
-    if (Platform.OS !== 'android') {
-      file.delete();
-    }
+    file.delete();
   } catch (error) {
     file.delete();
     throw error;

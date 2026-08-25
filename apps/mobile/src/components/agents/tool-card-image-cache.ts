@@ -176,6 +176,26 @@ export function useToolCardImageUri(partId: string): string | undefined {
   return urisByPartId.get(partId);
 }
 
+/**
+ * Delete the on-disk cache directory (if present) and reset the in-memory
+ * maps for sign-out or account switch. Best-effort: a delete failure never
+ * throws and never blocks the teardown.
+ */
+export function clearToolCardImageCache(): void {
+  try {
+    const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
+    if (directory.exists) {
+      directory.delete();
+    }
+  } catch {
+    // Best-effort cache hygiene; ignore delete failures.
+  }
+  inFlightOrDone.clear();
+  urisByPartId.clear();
+  cacheDirectory = undefined;
+  emitChange();
+}
+
 /** Test-only: clear in-memory state between cases. */
 export function __resetToolCardImageCacheForTests(): void {
   inFlightOrDone.clear();

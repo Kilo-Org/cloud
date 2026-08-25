@@ -209,6 +209,9 @@ export function useNewSessionCreator({
         } catch {
           // The session exists; a host callback failure must not skip navigation.
         }
+        // The uploads now live on the server: drop the composer's local cache
+        // copies so owned temp files never outlive the session handoff.
+        attachments.reset();
         // Contained on its own so a rejected haptics call still navigates.
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -3,6 +3,7 @@ import { cacheDirectory, copyAsync, deleteAsync } from 'expo-file-system/legacy'
 import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { registerTempFile } from '@/lib/temp-file-registry';
 
 export type ShareId = string;
 
@@ -142,6 +143,7 @@ async function defaultCopyToCache(args: { from: string; fileName: string }): Pro
   const safeName = args.fileName.replaceAll(/[/\\]/g, '_') || 'shared-file';
   const destination = `${root}share-${Crypto.randomUUID()}-${safeName}`;
   await copyAsync({ from: args.from, to: destination });
+  registerTempFile(destination);
   return destination;
 }
 

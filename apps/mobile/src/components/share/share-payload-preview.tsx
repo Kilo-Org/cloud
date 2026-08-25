@@ -41,6 +41,7 @@ function PreviewImages({ files }: { files: readonly AcceptedShareFile[] }) {
           className="h-16 w-16 rounded-md bg-muted"
           contentFit="cover"
           transition={0}
+          cachePolicy="memory"
           accessibilityLabel={file.name}
         />
       ))}

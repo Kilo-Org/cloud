@@ -4,6 +4,7 @@ import {
   __resetToolCardImageCacheForTests,
   cacheToolAttachment,
   cacheToolCardImage,
+  clearToolCardImageCache,
   extensionForImageMime,
   extensionForMime,
   getToolCardImageUri,
@@ -22,10 +23,13 @@ const fileInstances: FileInstance[] = [];
 
 const expoFileSystemMock = vi.hoisted(() => {
   const directoryCreate = vi.fn();
+  const directoryDelete = vi.fn();
   const Directory = vi.fn(function DirectoryMock(_base: unknown, name: string) {
     return {
       name,
       create: directoryCreate,
+      exists: true,
+      delete: directoryDelete,
     };
   });
   const File = vi.fn(function FileMock(directory: { name?: string }, filename: string) {
@@ -44,6 +48,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     File,
     Paths: { cache: 'file:///cache' },
     directoryCreate,
+    directoryDelete,
   };
 });
 
@@ -320,5 +325,40 @@ describe('useToolCardImageUri', () => {
     expect(getToolCardImageUri('missing')).toBeUndefined();
     cacheToolCardImage('part-hook', 'image/png', 'data:image/png;base64,AAA');
     expect(getToolCardImageUri('part-hook')).toBe('file:///cache/tool-card-images/part-hook.png');
+  });
+});
+
+describe('clearToolCardImageCache', () => {
+  it('deletes the cache directory and resets in-memory state', () => {
+    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,AAA');
+    expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
+
+    clearToolCardImageCache();
+
+    expect(expoFileSystemMock.directoryDelete).toHaveBeenCalledTimes(1);
+    expect(getToolCardImageUri('part-1')).toBeUndefined();
+    // The dedupe set reset, so the same part id can be cached again.
+    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,BBB');
+    expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
+    expect(fileInstances).toHaveLength(2);
+  });
+
+  it('skips delete when the directory does not exist', () => {
+    expoFileSystemMock.Directory.mockImplementationOnce(function DirectoryMissing(
+      _base: unknown,
+      name: string
+    ) {
+      return {
+        name,
+        create: expoFileSystemMock.directoryCreate,
+        exists: false,
+        delete: expoFileSystemMock.directoryDelete,
+      };
+    });
+
+    expect(() => {
+      clearToolCardImageCache();
+    }).not.toThrow();
+    expect(expoFileSystemMock.directoryDelete).not.toHaveBeenCalled();
   });
 });

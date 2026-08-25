@@ -32,7 +32,7 @@ import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
@@ -107,6 +107,8 @@ import { applySentryContext, setSentryContext } from '@/lib/sentry-context';
 import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { reapTempFiles } from '@/lib/temp-file-registry';
 
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -861,6 +863,21 @@ function RootLayout() {
 
   useEffect(() => {
     const subscription = setupNotificationResponseHandler();
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Reap expired temp files when the app returns to the foreground, deferred
+  // past the current interaction frame so a navigation never waits on it.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        scheduleCacheMaintenance(() => {
+          reapTempFiles();
+        });
+      }
+    });
     return () => {
       subscription.remove();
     };

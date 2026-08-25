@@ -118,7 +118,7 @@ describe('shareMaterializedRemoteFile', () => {
     expect(deleted).toEqual(['file:///cache/org-invoices/a.pdf']);
   });
 
-  it('keeps the temp file after a successful Android share', async () => {
+  it('deletes the temp file after a successful Android share', async () => {
     reactNativeMock.Platform.OS = 'android';
     const deleted: string[] = [];
     await shareMaterializedRemoteFile(
@@ -132,7 +132,7 @@ describe('shareMaterializedRemoteFile', () => {
         await Promise.resolve();
       }
     );
-    expect(deleted).toEqual([]);
+    expect(deleted).toEqual(['file:///cache/org-invoices/a.pdf']);
   });
 
   it('deletes the temp file after share failures', async () => {

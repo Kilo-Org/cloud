@@ -167,6 +167,7 @@ export function ImageViewerModal({
                 <Animated.View className="h-full w-full" style={imageStyle}>
                   <Image
                     source={{ uri }}
+                    cachePolicy="memory"
                     className="h-full w-full"
                     contentFit="contain"
                     onError={() => {

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetFilePartCacheForTests,
   cacheFilePart,
+  clearFilePartCache,
   clearFilePartResolveFailed,
   getFilePartCacheEntry,
   isUsableFilePartUrl,
@@ -25,10 +26,13 @@ const fileInstances: FileInstance[] = [];
 
 const expoFileSystemMock = vi.hoisted(() => {
   const directoryCreate = vi.fn();
+  const directoryDelete = vi.fn();
   const Directory = vi.fn(function DirectoryMock(_base: unknown, name: string) {
     return {
       name,
       create: directoryCreate,
+      exists: true,
+      delete: directoryDelete,
     };
   });
   const File = vi.fn(function FileMock(_directory: { name?: string }, filename: string) {
@@ -45,6 +49,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     File,
     Paths: { cache: 'file:///cache' },
     directoryCreate,
+    directoryDelete,
   };
 });
 
@@ -415,5 +420,42 @@ describe('useFilePartCache', () => {
     expect(getFilePartCacheEntry('missing')).toBeUndefined();
     cacheFilePart('part-hook', { url: 'https://example.com/a.png', mime: 'image/png' });
     expect(getFilePartCacheEntry('part-hook')?.url).toBe('https://example.com/a.png');
+  });
+});
+
+describe('clearFilePartCache', () => {
+  it('deletes the cache directory and resets in-memory entries', () => {
+    cacheFilePart('part-clear', {
+      url: 'data:application/pdf;base64,QUJD',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+    expect(getFilePartCacheEntry('part-clear')?.url).toBe(
+      'file:///cache/session-file-parts/part-clear-report.pdf'
+    );
+
+    clearFilePartCache();
+
+    expect(expoFileSystemMock.directoryDelete).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-clear')).toBeUndefined();
+  });
+
+  it('skips delete when the directory does not exist', () => {
+    expoFileSystemMock.Directory.mockImplementationOnce(function DirectoryMissing(
+      _base: unknown,
+      name: string
+    ) {
+      return {
+        name,
+        create: expoFileSystemMock.directoryCreate,
+        exists: false,
+        delete: expoFileSystemMock.directoryDelete,
+      };
+    });
+
+    expect(() => {
+      clearFilePartCache();
+    }).not.toThrow();
+    expect(expoFileSystemMock.directoryDelete).not.toHaveBeenCalled();
   });
 });

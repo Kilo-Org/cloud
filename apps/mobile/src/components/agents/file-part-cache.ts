@@ -175,6 +175,24 @@ export function isUsableFilePartUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
 
+/**
+ * Delete the on-disk cache directory (if present) and reset the in-memory
+ * map for sign-out or account switch. Best-effort: a delete failure never
+ * throws and never blocks the teardown.
+ */
+export function clearFilePartCache(): void {
+  try {
+    const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
+    if (directory.exists) {
+      directory.delete();
+    }
+  } catch {
+    // Best-effort cache hygiene; ignore delete failures.
+  }
+  entriesByPartId.clear();
+  emitChange();
+}
+
 /** Test-only: clear in-memory state between cases. */
 export function __resetFilePartCacheForTests(): void {
   entriesByPartId.clear();

@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopierat till urklipp",
     "couldNotCopyToClipboard": "Kunde inte kopiera till urklipp",
     "required": "obligatorisk",
-    "error": "fel: {{error}}"
+    "error": "fel: {{error}}",
+    "back": "Tillbaka",
+    "somethingWentWrong": "Något gick fel"
   },
   "language": {
     "title": "Språk",
@@ -280,7 +282,36 @@
         "body": "Kunde inte ta bort grenen: {{reason}}",
         "accessibility": "Sammanfogad. Kunde inte ta bort grenen: {{reason}}"
       },
-      "loadFailedTitle": "Kunde inte läsa in sammanslagningsalternativen"
+      "loadFailedTitle": "Kunde inte läsa in sammanslagningsalternativen",
+      "blocked": {
+        "unknownStateTitle": "GitHub har inte rapporterat någon sammanförbarhetsstatus",
+        "unknownStateDetail": "Försök uppdatera översikten om en liten stund.",
+        "conflictsTitle": "Sammanslagningskonflikter",
+        "conflictsDetail": "Lös sammanslagningskonflikterna på den här grenen innan du slår samman.",
+        "requiredReviewsTitle": "Obligatoriska granskningar saknas",
+        "requiredReviewsDetail": "Godkännanden från de obligatoriska granskarna saknas eller väntar.",
+        "failingChecksTitle": "Obligatoriska kontroller misslyckas",
+        "failingChecksDetail": "Obligatoriska statuskontroller misslyckas.",
+        "unstableTitle": "Vissa kontroller misslyckas",
+        "unstableDetail": "Icke-obligatoriska kontroller misslyckas. De blockerar inte sammanslagningen.",
+        "draftTitle": "Utkast till pull request",
+        "draftDetail": "Markera pull requesten som redo för granskning innan du slår samman.",
+        "behindTitle": "Grenen är inaktuell",
+        "behindDetailUpdatable": "Uppdatera grenen från basen, eller rebasa, innan du slår samman.",
+        "behindDetail": "Head-grenen ligger efter basen. Rebasa eller uppdatera grenen innan du slår samman.",
+        "notMergeableTitle": "Den här pull requesten kan inte slås samman ännu",
+        "notMergeableDetail": "GitHub rapporterade en {{state}} sammanförbarhetsstatus."
+      },
+      "methodLabels": {
+        "merge": "Skapa en sammanslagningscommit",
+        "squash": "Squasha och slå samman",
+        "rebase": "Rebasa och slå samman"
+      },
+      "methodDescriptions": {
+        "merge": "Kombinera alla commits från den här grenen i basgrenen med en sammanslagningscommit.",
+        "squash": "Kombinera alla commits från den här grenen till en enda commit på basgrenen.",
+        "rebase": "Spela upp alla commits från den här grenen på basgrenen utan en sammanslagningscommit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Diskussionstråd {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} fler rader ovanför",
       "termsAcceptRequired": "Du måste godkänna användarvillkoren för att posta.",
       "termsOutdatedCopy": "Användarvillkoren har ändrats. Öppna den här skärmen igen för att godkänna den senaste versionen.",
-      "termsCheckRetryCopy": "Kunde inte kontrollera användarvillkoren. Kontrollera anslutningen och försök igen."
+      "termsCheckRetryCopy": "Kunde inte kontrollera användarvillkoren. Kontrollera anslutningen och försök igen.",
+      "reactions": {
+        "thumbsUp": "Tummen upp",
+        "thumbsDown": "Tummen ner",
+        "laugh": "Skratt",
+        "hooray": "Hurra",
+        "confused": "Förvirrad",
+        "heart": "Hjärta",
+        "rocket": "Raket",
+        "eyes": "Ögon"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Filkommentar på {{path}}",
+        "fileComment": "Filkommentar",
+        "outdatedOnPathLines": "Föråldrad på {{path}} {{lines}}",
+        "outdatedOnLines": "Föråldrad på {{lines}}",
+        "outdatedOnPath": "Föråldrad på {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Kunde inte öppna GitHub Apps inställningar",
     "installKiloGitHubApp": "Installera Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Visar de första {{limit}} av {{total}} ändrade filer — GitHub API-begränsning"
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt",
-    "linkPasteNotAPullRequest": "Inte en GitHub-pull request-länk"
+    "linkPasteNotAPullRequest": "Inte en GitHub-pull request-länk",
+    "announce": {
+      "commentPosted": "Kommentar publicerad",
+      "reviewSubmitted": "Granskning skickad",
+      "autoMergeEnabled": "Automatisk sammanslagning aktiverad"
+    }
   },
   "notifications": {
     "title": "Aviseringar",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} överskrider bifogningsgränsen på {{limit}}.",
       "unreadable": "Kunde inte läsa {{filename}}.",
       "pastedImage": "den inklistrade bilden",
-      "defaultName": "Bifogad fil"
+      "defaultName": "Bifogad fil",
+      "classificationDenied": "Körbara filer kan inte bifogas",
+      "classificationEmpty": "Filen är tom",
+      "classificationTooLarge": "Filer måste vara 20 MB eller mindre",
+      "classificationUnreadable": "Kunde inte läsa den här filen",
+      "announceUploaded": "Bifogad fil uppladdad"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "STARTAR",
       "stopped": "STOPPAD",
       "stopping": "STOPPAR",
-      "unknown": "OKÄND"
+      "unknown": "OKÄND",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "En köad åtgärd kunde inte längre spåras. Uppdatera för att se det senaste läget.",
     "initialSyncAdmissionFailed": "Security Agent aktiverades, men den första synkningen kunde inte köas. Synka igen.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Findingen har redan avskrivits",
+      "findingDismissed": "Findingen avskriven",
+      "noRemediationsQueued": "Inga befintliga findingar i kön",
+      "remediationsQueued": "Befintliga åtgärder köade",
+      "analysisComplete": "Analysen klar",
+      "syncComplete": "Synkningen klar"
+    }
   },
   "agents": {
     "activeNow": "Aktiv nu",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
-      "couldNotOpenMessage": "Vi kunde inte starta GitHub App-konfigurationen. Försök igen."
+      "couldNotOpenMessage": "Vi kunde inte starta GitHub App-konfigurationen. Försök igen.",
+      "installedTitle": "GitHub App installerad",
+      "installedMessage": "Dina arkiv är nu anslutna.",
+      "pendingTitle": "Väntar på administratörens godkännande",
+      "pendingMessage": "En organisationsadministratör måste godkänna installationsförfrågan.",
+      "accountMismatchTitle": "Kontot stämmer inte",
+      "accountMismatchMessage": "Den här anslutningen startades från Kilo App med inloggning som ett annat konto. Logga in på webben med det kontot, eller börja om från appen.",
+      "cannotCompleteTitle": "Det går inte att slutföra installationen",
+      "notAdminMessage": "Endast en GitHub-administratör för det kontot kan ansluta det. Be en organisationsadministratör att installera Kilo.",
+      "alreadyClaimedMessage": "Den GitHub-installationen är redan ansluten till ett annat Kilo-konto. Koppla från den där först.",
+      "didNotCompleteTitle": "Installationen slutfördes inte",
+      "didNotCompleteMessage": "GitHub App-installationen slutfördes inte. Försök igen från appen."
     },
     "sessionExited": "Session avslutades",
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-postleverans är tillfälligt otillgängligt. Försök igen senare.",
     "admissionRequired": "Din enhet kan inte verifieras. Använd \"$t(login.moreSignInOptions)\" för att logga in på en annan enhet eller via webben.",
     "default": "Något gick fel. Försök igen.",
-    "retryableAdmission": "Vi kunde inte verifiera den här enheten. Kontrollera anslutningen och försök igen."
+    "retryableAdmission": "Vi kunde inte verifiera den här enheten. Kontrollera anslutningen och försök igen.",
+    "startSignInFailed": "Det gick inte att starta inloggningen. Försök igen.",
+    "couldNotOpenBrowser": "Kunde inte öppna webbläsaren. Försök igen.",
+    "signInTimedOut": "Inloggningen överskred tidsgränsen. Försök igen.",
+    "signInFailed": "Inloggningen misslyckades. Försök igen.",
+    "networkError": "Nätverksfel. Försök igen.",
+    "accessDeniedByUser": "Åtkomst nekad av användaren",
+    "codeExpired": "Koden har upphört att gälla"
   },
   "models": {
     "dataCollected": "Data samlas in",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Kunde inte uppdatera favoriter"
   }
 }

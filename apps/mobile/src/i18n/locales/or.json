@@ -22,7 +22,9 @@
     "copiedToClipboard": "କ୍ଲିପବୋର୍ଡରେ କପି ହେଲା",
     "couldNotCopyToClipboard": "କ୍ଲିପବୋର୍ଡରେ କପି କରାଯାଇ ପାରିଲା ନାହିଁ",
     "required": "ଆବଶ୍ୟକ",
-    "error": "ତ୍ରୁଟି: {{error}}"
+    "error": "ତ୍ରୁଟି: {{error}}",
+    "back": "ପଛକୁ",
+    "somethingWentWrong": "କିଛି ଭୁଲ ହେଲା"
   },
   "language": {
     "title": "ଭାଷା",
@@ -280,7 +282,36 @@
         "body": "ଶାଖା ବିଲୋପ କରାଯାଇ ପାରିଲା ନାହିଁ: {{reason}}",
         "accessibility": "ମର୍ଜ୍ ହେଲା। ଶାଖା ବିଲୋପ କରାଯାଇ ପାରିଲା ନାହିଁ: {{reason}}"
       },
-      "loadFailedTitle": "ମର୍ଜ୍ ବିକଳ୍ପ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ"
+      "loadFailedTitle": "ମର୍ଜ୍ ବିକଳ୍ପ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
+      "blocked": {
+        "unknownStateTitle": "GitHub ଏକ ମର୍ଜଯୋଗ୍ୟ ସ୍ଥିତି ରିପୋର୍ଟ କରିନାହିଁ",
+        "unknownStateDetail": "ଏକ ମୁହୂର୍ତ୍ତ ପରେ ଓଭରଭ୍ୟୁ ରିଫ୍ରେସ୍ କରିବାକୁ ଚେଷ୍ଟା କରନ୍ତୁ।",
+        "conflictsTitle": "ମର୍ଜ୍ ବିବାଦ",
+        "conflictsDetail": "ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ ଏହି ଶାଖାରେ ମର୍ଜ୍ ବିବାଦ ସମାଧାନ କରନ୍ତୁ।",
+        "requiredReviewsTitle": "ଆବଶ୍ୟକ ରିଭ୍ୟୁଗୁଡ଼ିକ ଅନୁପସ୍ଥିତ",
+        "requiredReviewsDetail": "ଆବଶ୍ୟକ ରିଭ୍ୟୁୟରଙ୍କ ଅନୁମୋଦନଗୁଡ଼ିକ ଅନୁପସ୍ଥିତ କିମ୍ବା ବାକି ଅଛି।",
+        "failingChecksTitle": "ବିଫଳ ହେଉଥିବା ଆବଶ୍ୟକ ଯାଞ୍ଚ",
+        "failingChecksDetail": "ଆବଶ୍ୟକ ସ୍ଥିତି ଯାଞ୍ଚଗୁଡ଼ିକ ବିଫଳ ହେଉଛି।",
+        "unstableTitle": "କିଛି ଯାଞ୍ଚ ବିଫଳ ହେଉଛି",
+        "unstableDetail": "ଅନାବଶ୍ୟକ ଯାଞ୍ଚଗୁଡ଼ିକ ବିଫଳ ହେଉଛି। ସେଗୁଡ଼ିକ ମର୍ଜ୍ ଅବରୋଧ କରିବ ନାହିଁ।",
+        "draftTitle": "ଡ୍ରାଫ୍ଟ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+        "draftDetail": "ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟକୁ ରିଭ୍ୟୁ ପାଇଁ ପ୍ରସ୍ତୁତ ଭାବେ ଚିହ୍ନିତ କରନ୍ତୁ।",
+        "behindTitle": "ଶାଖା ପୁରୁଣା ହୋଇଯାଇଛି",
+        "behindDetailUpdatable": "ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ ବେସ୍ ରୁ ଶାଖା ଅପଡେଟ୍ କରନ୍ତୁ, କିମ୍ବା ରିବେସ୍ କରନ୍ତୁ।",
+        "behindDetail": "ହେଡ୍ ଶାଖା ବେସ୍ ର ପଛରେ ଅଛି। ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ ଶାଖା ରିବେସ୍ କିମ୍ବା ଅପଡେଟ୍ କରନ୍ତୁ।",
+        "notMergeableTitle": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଏପର୍ଯ୍ୟନ୍ତ ମର୍ଜଯୋଗ୍ୟ ନୁହେଁ",
+        "notMergeableDetail": "GitHub ଏକ {{state}} ମର୍ଜଯୋଗ୍ୟ ସ୍ଥିତି ରିପୋର୍ଟ କରିଛି।"
+      },
+      "methodLabels": {
+        "merge": "ଏକ ମର୍ଜ୍ କମିଟ୍ ସୃଷ୍ଟି କରନ୍ତୁ",
+        "squash": "ସ୍କ୍ୱାସ୍ ଏବଂ ମର୍ଜ୍ କରନ୍ତୁ",
+        "rebase": "ରିବେସ୍ ଏବଂ ମର୍ଜ୍ କରନ୍ତୁ"
+      },
+      "methodDescriptions": {
+        "merge": "ଏକ ମର୍ଜ୍ କମିଟ୍ ସହିତ ଏହି ଶାଖାର ସମସ୍ତ କମିଟ୍ କୁ ବେସ୍ ଶାଖାରେ ମିଶାନ୍ତୁ।",
+        "squash": "ଏହି ଶାଖାର ସମସ୍ତ କମିଟ୍ କୁ ବେସ୍ ଶାଖାରେ ଏକ ଏକକ କମିଟ୍ ରେ ମିଶାନ୍ତୁ।",
+        "rebase": "ମର୍ଜ୍ କମିଟ୍ ବିନା ଏହି ଶାଖାର ସମସ୍ତ କମିଟ୍ କୁ ବେସ୍ ଶାଖାରେ ପୁଣି ପ୍ରୟୋଗ କରନ୍ତୁ।"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ଆଲୋଚନା ଥ୍ରେଡ୍ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "... {{displayCount}} ଅଧିକ ଧାଡ଼ି ଉପରେ",
       "termsAcceptRequired": "ପୋଷ୍ଟ କରିବାକୁ ଆପଣଙ୍କୁ ସେବା ସର୍ତ୍ତାବଳୀ ଗ୍ରହଣ କରିବାକୁ ହେବ।",
       "termsOutdatedCopy": "ସେବା ସର୍ତ୍ତାବଳୀ ପରିବର୍ତ୍ତନ ହେଲା। ସର୍ବନତମ ସଂସ୍କରଣ ଗ୍ରହଣ କରିବାକୁ ଏହି ସ୍କ୍ରିନ୍ ପୁନଃଖୋଲନ୍ତୁ।",
-      "termsCheckRetryCopy": "ସେବା ସର୍ତ୍ତାବଳୀ ଯାଞ୍ଚ କରାଯାଇ ପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "termsCheckRetryCopy": "ସେବା ସର୍ତ୍ତାବଳୀ ଯାଞ୍ଚ କରାଯାଇ ପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "reactions": {
+        "thumbsUp": "ଥମ୍ସ ଅପ୍",
+        "thumbsDown": "ଥମ୍ସ ଡାଉନ୍",
+        "laugh": "ହସ",
+        "hooray": "ହୁରେ",
+        "confused": "ଦ୍ୱନ୍ଦ୍ୱରେ",
+        "heart": "ହୃଦୟ",
+        "rocket": "ରକେଟ୍",
+        "eyes": "ଆଖି"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} ରେ ଫାଇଲ୍ ମନ୍ତବ୍ୟ",
+        "fileComment": "ଫାଇଲ୍ ମନ୍ତବ୍ୟ",
+        "outdatedOnPathLines": "{{path}} {{lines}} ରେ ଅପ୍ରଚଳିତ",
+        "outdatedOnLines": "{{lines}} ରେ ଅପ୍ରଚଳିତ",
+        "outdatedOnPath": "{{path}} ରେ ଅପ୍ରଚଳିତ"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍ ସେଟିଂସ୍ ଖୋଲାଯାଇ ପାରିଲା ନାହିଁ",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
@@ -523,7 +571,12 @@
       "truncationBanner": "ମୋଟ {{total}} ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ପରିବର୍ତ୍ତିତ ଫାଇଲ ଦେଖାଯାଉଛି — GitHub API ସୀମା"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପ୍ବୋର୍ଡ ଖାଲି ଅଛି",
-    "linkPasteNotAPullRequest": "ଏହା GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ"
+    "linkPasteNotAPullRequest": "ଏହା GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
+    "announce": {
+      "commentPosted": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା",
+      "reviewSubmitted": "ରିଭ୍ୟୁ ଦାଖଲ ହେଲା",
+      "autoMergeEnabled": "ସ୍ୱୟଂ-ମର୍ଜ୍ ସକ୍ଷମ ହେଲା"
+    }
   },
   "notifications": {
     "title": "ବିଜ୍ଞପ୍ତି",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} ସଂଲଗ୍ନକାରୀ ସୀମା ଅତିକ୍ରମ କରେ।",
       "unreadable": "{{filename}} ପଢ଼ାଯାଇ ପାରିଲା ନାହିଁ।",
       "pastedImage": "ପେଷ୍ଟ ହୋଇଥିବା ଚିତ୍ର",
-      "defaultName": "ସଂଲଗ୍ନକାରୀ"
+      "defaultName": "ସଂଲଗ୍ନକାରୀ",
+      "classificationDenied": "ନିର୍ବାହଯୋଗ୍ୟ ଫାଇଲ୍ ସଂଲଗ୍ନ କରାଯାଇପାରିବ ନାହିଁ",
+      "classificationEmpty": "ଫାଇଲ୍ ଖାଲି ଅଛି",
+      "classificationTooLarge": "ଫାଇଲ୍ 20 MB କିମ୍ବା ତା'ଠାରୁ ଛୋଟ ହେବା ଆବଶ୍ୟକ",
+      "classificationUnreadable": "ଏହି ଫାଇଲ୍ ପଢ଼ାଯାଇ ପାରିଲା ନାହିଁ",
+      "announceUploaded": "ସଂଲଗ୍ନକାରୀ ଅପଲୋଡ୍ ହେଲା"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ଆରମ୍ଭ ହେଉଛି",
       "stopped": "ବନ୍ଦ",
       "stopping": "ବନ୍ଦ ହେଉଛି",
-      "unknown": "ଅଜଣା"
+      "unknown": "ଅଜଣା",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "ଏକ ଧାଡ଼ିରେ ଥିବା କାର୍ଯ୍ୟକୁ ଆଉ ଟ୍ରାକ୍ କରାଯାଇପାରିଲା ନାହିଁ। ସର୍ବନିମ୍ନ ସ୍ଥିତି ଦେଖିବାକୁ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
     "initialSyncAdmissionFailed": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ସକ୍ଷମ ହୋଇଥିଲା, କିନ୍ତୁ ପ୍ରାରମ୍ଭିକ ସିଙ୍କ୍ ଧାଡ଼ିରେ ରଖାଯାଇପାରିଲା ନାହିଁ। ପୁନଃ ସିଙ୍କ୍ କରନ୍ତୁ।",
-    "title": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ"
+    "title": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ",
+    "commands": {
+      "findingAlreadyDismissed": "ଫଳାଫଳ ଆଗରୁ ଖାରଜ ହୋଇଛି",
+      "findingDismissed": "ଫଳାଫଳ ଖାରଜ ହେଲା",
+      "noRemediationsQueued": "କୌଣସି ବିଦ୍ୟମାନ ଫଳାଫଳ ଧାଡ଼ିରେ ନାହିଁ",
+      "remediationsQueued": "ବିଦ୍ୟମାନ ଉପଶମନ ଧାଡ଼ିରେ ରଖାଗଲା",
+      "analysisComplete": "ବିଶ୍ଳେଷଣ ସମାପ୍ତ",
+      "syncComplete": "ସିଙ୍କ୍ ସମାପ୍ତ"
+    }
   },
   "agents": {
     "activeNow": "ବର୍ତ୍ତମାନ ସକ୍ରିୟ",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ",
-      "couldNotOpenMessage": "GitHub ଆପ୍ ସେଟଅପ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।"
+      "couldNotOpenMessage": "GitHub ଆପ୍ ସେଟଅପ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
+      "installedTitle": "GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ ହେଲା",
+      "installedMessage": "ଆପଣଙ୍କ ରିପୋଜିଟୋରୀଗୁଡ଼ିକ ଏବେ ସଂଯୋଗ ହୋଇଛି।",
+      "pendingTitle": "ଆଡମିନ୍ ଅନୁମୋଦନ ଅପେକ୍ଷା",
+      "pendingMessage": "ସଂଗଠନ ଆଡମିନ୍ ଇନଷ୍ଟଲ୍ ଅନୁରୋଧ ଅନୁମୋଦନ କରିବା ଆବଶ୍ୟକ।",
+      "accountMismatchTitle": "ଆକାଉଣ୍ଟ୍ ଅମେଳ",
+      "accountMismatchMessage": "ଏହି ସଂଯୋଗ ଏକ ଭିନ୍ନ ଆକାଉଣ୍ଟ୍ ସହିତ ସାଇନ୍ ଇନ୍ ହୋଇଥିବା Kilo ଆପ୍ ରୁ ଆରମ୍ଭ ହୋଇଥିଲା। ସେହି ଆକାଉଣ୍ଟ୍ ସହିତ ୱେବ୍ ରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, କିମ୍ବା ଆପ୍ ରୁ ପୁଣି ଆରମ୍ଭ କରନ୍ତୁ।",
+      "cannotCompleteTitle": "ଇନଷ୍ଟଲ୍ ସମ୍ପନ୍ନ କରାଯାଇପାରିବ ନାହିଁ",
+      "notAdminMessage": "କେବଳ ସେହି ଆକାଉଣ୍ଟ୍ ର GitHub ଆଡମିନ୍ ଏହାକୁ ସଂଯୋଗ କରିପାରିବ। Kilo ଇନଷ୍ଟଲ୍ କରିବାକୁ ଏକ ସଂଗଠନ ଆଡମିନ୍କୁ କୁହନ୍ତୁ।",
+      "alreadyClaimedMessage": "ସେହି GitHub ଇନଷ୍ଟଲ୍ ଆଗରୁ ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟ୍ ସହିତ ସଂଯୋଗ ହୋଇଛି। ପ୍ରଥମେ ସେଠାରେ ଏହାକୁ ବିଚ୍ଛିନ୍ନ କରନ୍ତୁ।",
+      "didNotCompleteTitle": "ଇନଷ୍ଟଲ୍ ସମ୍ପନ୍ନ ହେଲା ନାହିଁ",
+      "didNotCompleteMessage": "GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ ସମ୍ପନ୍ନ ହେଲା ନାହିଁ। ଆପ୍ ରୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "sessionExited": "ସେସନ୍ ବାହାରିଛି",
     "remoteSpawnRetryable": "ଇନ୍‌ସ୍ଟାନ୍ସରେ ପହଞ୍ଚି ପାରିଲୁ ନାହିଁ — ଏହା ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଥାଇପାରେ।",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ଇମେଲ୍ ବିତରଣ ସାମୟିକ ଭାବରେ ଅନୁପଲବ୍ଧ। ଦୟାକରି ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "admissionRequired": "ଆପଣଙ୍କ ଡିଭାଇସ୍ ଯାଞ୍ଚ କରାଯାଇପାରିବ ନାହିଁ। ଅନ୍ୟ ଡିଭାଇସ୍ କିମ୍ବା ୱେବ୍ ମାଧ୍ୟମରେ ସାଇନ୍ ଇନ୍ କରିବାକୁ '$t(login.moreSignInOptions)' ବ୍ୟବହାର କରନ୍ତୁ।",
     "default": "କିଛି ଭୁଲ୍ ଘଟିଛି। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "retryableAdmission": "ଆମେ ଏହି ଡିଭାଇସ୍ ଯାଞ୍ଚ କରିପାରିଲୁ ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "retryableAdmission": "ଆମେ ଏହି ଡିଭାଇସ୍ ଯାଞ୍ଚ କରିପାରିଲୁ ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "startSignInFailed": "ସାଇନ୍ ଇନ୍ ଆରମ୍ଭ ବିଫଳ ହେଲା। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "couldNotOpenBrowser": "ବ୍ରାଉଜର୍ ଖୋଲାଯାଇ ପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "signInTimedOut": "ସାଇନ୍ ଇନ୍ ସମୟ ଶେଷ ହେଲା। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "signInFailed": "ସାଇନ୍ ଇନ୍ ବିଫଳ ହେଲା। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "networkError": "ନେଟୱର୍କ ତ୍ରୁଟି। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "accessDeniedByUser": "ବ୍ୟବହାରକାରୀଙ୍କ ଦ୍ୱାରା ଆକ୍ସେସ୍ ଅସ୍ୱୀକୃତ",
+    "codeExpired": "କୋଡ୍ ଅବଧି ଶେଷ ହେଲା"
   },
   "models": {
     "dataCollected": "ସଂଗୃହୀତ ଡାଟା",
-    "free": "ମାଗଣା"
+    "free": "ମାଗଣା",
+    "couldNotUpdateFavorites": "ପସନ୍ଦଗୁଡ଼ିକ ଅଦ୍ୟତନ କରାଯାଇ ପାରିଲା ନାହିଁ"
   }
 }

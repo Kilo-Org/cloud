@@ -22,7 +22,9 @@
     "required": "مطلوب",
     "error": "خطأ: {{error}}",
     "notNow": "ليس الآن",
-    "continue": "متابعة"
+    "continue": "متابعة",
+    "back": "رجوع",
+    "somethingWentWrong": "حدث خطأ ما"
   },
   "language": {
     "title": "اللغة",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} يتجاوز حد المرفقات البالغ {{limit}}.",
       "unreadable": "تعذر قراءة {{filename}}.",
       "pastedImage": "الصورة الملصقة",
-      "defaultName": "مرفق"
+      "defaultName": "مرفق",
+      "classificationDenied": "لا يمكن إرفاق الملفات القابلة للتنفيذ",
+      "classificationEmpty": "الملف فارغ",
+      "classificationTooLarge": "يجب أن يكون حجم الملفات 20 MB أو أقل",
+      "classificationUnreadable": "تعذّرت قراءة هذا الملف",
+      "announceUploaded": "تم رفع المرفق"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -702,7 +709,8 @@
       "starting": "جارٍ البدء",
       "stopped": "متوقف",
       "stopping": "جارٍ الإيقاف",
-      "unknown": "غير معروف"
+      "unknown": "غير معروف",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram وDiscord وSlack",
@@ -1350,7 +1358,15 @@
     },
     "title": "وكيل الأمان",
     "initialSyncAdmissionFailed": "تم تفعيل وكيل الأمان، لكن تعذّرت جدولة المزامنة الأولية. قم بالمزامنة مرة أخرى.",
-    "queuedActionUntracked": "تعذّر تتبع إجراء في قائمة الانتظار. حدّث لرؤية أحدث حالة."
+    "queuedActionUntracked": "تعذّر تتبع إجراء في قائمة الانتظار. حدّث لرؤية أحدث حالة.",
+    "commands": {
+      "findingAlreadyDismissed": "تم تجاهل النتيجة بالفعل",
+      "findingDismissed": "تم تجاهل النتيجة",
+      "noRemediationsQueued": "لا توجد نتائج حالية في قائمة الانتظار",
+      "remediationsQueued": "توجد إصلاحات حالية في قائمة الانتظار",
+      "analysisComplete": "اكتمل التحليل",
+      "syncComplete": "اكتملت المزامنة"
+    }
   },
   "agents": {
     "activeNow": "نشط الآن",
@@ -1406,7 +1422,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
-      "couldNotOpenTitle": "تعذّر فتح GitHub"
+      "couldNotOpenTitle": "تعذّر فتح GitHub",
+      "installedTitle": "تم تثبيت تطبيق GitHub",
+      "installedMessage": "تم الآن ربط مستودعاتك.",
+      "pendingTitle": "في انتظار موافقة المسؤول",
+      "pendingMessage": "يجب أن يوافق مسؤول المؤسسة على طلب التثبيت.",
+      "accountMismatchTitle": "عدم تطابق الحساب",
+      "accountMismatchMessage": "بدأ هذا الاتصال من تطبيق Kilo بتسجيل دخول من حساب مختلف. سجّل الدخول إلى الويب بهذا الحساب، أو ابدأ من جديد من التطبيق.",
+      "cannotCompleteTitle": "تعذّر إكمال التثبيت",
+      "notAdminMessage": "يمكن لمسؤول GitHub الخاص بذلك الحساب فقط ربطه. اطلب من مسؤول المؤسسة تثبيت Kilo.",
+      "alreadyClaimedMessage": "هذا التثبيت لـ GitHub مرتبط بالفعل بحساب Kilo آخر. افصله هناك أولًا.",
+      "didNotCompleteTitle": "لم يكتمل التثبيت",
+      "didNotCompleteMessage": "لم يكتمل تثبيت تطبيق GitHub. حاول مرة أخرى من التطبيق."
     },
     "sessionExited": "انتهت الجلسة",
     "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
@@ -2359,7 +2386,24 @@
       "reaction_zero": "لا تفاعلات",
       "reaction_two": "تفاعلان",
       "reaction_few": "تفاعلات",
-      "reaction_many": "تفاعلًا"
+      "reaction_many": "تفاعلًا",
+      "reactions": {
+        "thumbsUp": "إعجاب",
+        "thumbsDown": "عدم إعجاب",
+        "laugh": "ضحك",
+        "hooray": "تهليل",
+        "confused": "حائر",
+        "heart": "قلب",
+        "rocket": "صاروخ",
+        "eyes": "عيون"
+      },
+      "anchor": {
+        "fileCommentOnPath": "تعليق على الملف في {{path}}",
+        "fileComment": "تعليق على الملف",
+        "outdatedOnPathLines": "قديم في {{path}} {{lines}}",
+        "outdatedOnLines": "قديم في {{lines}}",
+        "outdatedOnPath": "قديم في {{path}}"
+      }
     },
     "entry": {
       "clearLink": "مسح رابط طلب السحب",
@@ -2524,7 +2568,36 @@
         "closed": "طلب السحب هذا مغلق"
       },
       "updateBranch": "تحديث الفرع",
-      "updateBranchFromBase": "تحديث الفرع من الأساس"
+      "updateBranchFromBase": "تحديث الفرع من الأساس",
+      "blocked": {
+        "unknownStateTitle": "لم تُبلغ GitHub عن حالة قابلة للدمج",
+        "unknownStateDetail": "حاول تحديث النظرة العامة بعد قليل.",
+        "conflictsTitle": "تضاربات الدمج",
+        "conflictsDetail": "حُل تضاربات الدمج في هذا الفرع قبل الدمج.",
+        "requiredReviewsTitle": "المراجعات المطلوبة مفقودة",
+        "requiredReviewsDetail": "موافقات المراجعين المطلوبين مفقودة أو معلّقة.",
+        "failingChecksTitle": "فشل الفحوصات المطلوبة",
+        "failingChecksDetail": "فحوصات الحالة المطلوبة تفشل.",
+        "unstableTitle": "بعض الفحوصات تفشل",
+        "unstableDetail": "الفحوصات غير المطلوبة تفشل. لن تمنع الدمج.",
+        "draftTitle": "طلب سحب مسودة",
+        "draftDetail": "علّم طلب السحب كجاهز للمراجعة قبل الدمج.",
+        "behindTitle": "الفرع غير محدّث",
+        "behindDetailUpdatable": "حدّث الفرع من الأساس، أو أعد التأسيس، قبل الدمج.",
+        "behindDetail": "فرع الرأس متأخر عن الأساس. أعد التأسيس أو حدّث الفرع قبل الدمج.",
+        "notMergeableTitle": "طلب السحب هذا غير قابل للدمج بعد",
+        "notMergeableDetail": "أبلغت GitHub عن حالة دمج {{state}}."
+      },
+      "methodLabels": {
+        "merge": "إنشاء commit دمج",
+        "squash": "الدمج مع الضغط",
+        "rebase": "الدمج مع إعادة التأسيس"
+      },
+      "methodDescriptions": {
+        "merge": "ادمج جميع الـ commits من هذا الفرع في الفرع الأساسي مع commit دمج.",
+        "squash": "ادمج جميع الـ commits من هذا الفرع في commit واحد في الفرع الأساسي.",
+        "rebase": "أعد تطبيق جميع الـ commits من هذا الفرع على الفرع الأساسي دون commit دمج."
+      }
     },
     "noDescriptionProvided": "لم يتم تقديم وصف.",
     "noFilesChanged": "لم تتغير أي ملفات",
@@ -2626,7 +2699,12 @@
       "tapToComment": "{{label}}، اضغط للتعليق"
     },
     "linkPasteClipboardEmpty": "الحافظة فارغة",
-    "linkPasteNotAPullRequest": "ليس رابط طلب سحب على GitHub"
+    "linkPasteNotAPullRequest": "ليس رابط طلب سحب على GitHub",
+    "announce": {
+      "commentPosted": "تم نشر التعليق",
+      "reviewSubmitted": "تم تقديم المراجعة",
+      "autoMergeEnabled": "تم تفعيل الدمج التلقائي"
+    }
   },
   "organization": {
     "boundary": {
@@ -2793,10 +2871,18 @@
     "emailDeliveryFailed": "تسليم البريد الإلكتروني غير متاح مؤقتًا. يرجى المحاولة لاحقًا.",
     "admissionRequired": "لا يمكن التحقق من جهازك. استخدم \"$t(login.moreSignInOptions)\" لتسجيل الدخول على جهاز آخر أو عبر الويب.",
     "default": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
-    "retryableAdmission": "تعذّر التحقق من هذا الجهاز. تحقق من اتصالك وحاول مرة أخرى."
+    "retryableAdmission": "تعذّر التحقق من هذا الجهاز. تحقق من اتصالك وحاول مرة أخرى.",
+    "startSignInFailed": "تعذّر بدء تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+    "couldNotOpenBrowser": "تعذّر فتح المتصفح. يرجى المحاولة مرة أخرى.",
+    "signInTimedOut": "انتهت مهلة تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+    "signInFailed": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+    "networkError": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
+    "accessDeniedByUser": "تم رفض الوصول بواسطة المستخدم",
+    "codeExpired": "انتهت صلاحية الرمز"
   },
   "models": {
     "dataCollected": "البيانات التي تم جمعها",
-    "free": "مجاني"
+    "free": "مجاني",
+    "couldNotUpdateFavorites": "تعذّر تحديث المفضلة"
   }
 }

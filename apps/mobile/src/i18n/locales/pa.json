@@ -22,7 +22,9 @@
     "copiedToClipboard": "ਕਲਿੱਪਬੋਰਡ ਵਿੱਚ ਕਾਪੀ ਕੀਤਾ ਗਿਆ",
     "couldNotCopyToClipboard": "ਕਲਿੱਪਬੋਰਡ ਵਿੱਚ ਕਾਪੀ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "required": "ਲੋੜੀਂਦਾ",
-    "error": "ਗਲਤੀ: {{error}}"
+    "error": "ਗਲਤੀ: {{error}}",
+    "back": "ਵਾਪਸ",
+    "somethingWentWrong": "ਕੁਝ ਗਲਤ ਹੋ ਗਿਆ"
   },
   "language": {
     "title": "ਭਾਸ਼ਾ",
@@ -280,7 +282,36 @@
         "body": "ਬ੍ਰਾਂਚ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ: {{reason}}",
         "accessibility": "ਮਰਜ ਹੋਈ। ਬ੍ਰਾਂਚ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ: {{reason}}"
       },
-      "loadFailedTitle": "ਮਰਜ ਵਿਕਲਪ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ"
+      "loadFailedTitle": "ਮਰਜ ਵਿਕਲਪ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
+      "blocked": {
+        "unknownStateTitle": "GitHub ਨੇ ਮਰਜ ਯੋਗ ਸਥਿਤੀ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੀ",
+        "unknownStateDetail": "ਥੋੜ੍ਹੀ ਦੇਰ ਵਿੱਚ ਓਵਰਵਿਊ ਨੂੰ ਰੀਫ੍ਰੈਸ਼ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "conflictsTitle": "ਮਰਜ ਟਕਰਾਅ",
+        "conflictsDetail": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਇਸ ਬ੍ਰਾਂਚ 'ਤੇ ਮਰਜ ਟਕਰਾਅ ਹੱਲ ਕਰੋ।",
+        "requiredReviewsTitle": "ਲੋੜੀਂਦੇ ਰਿਵਿਊ ਗੁੰਮ ਹਨ",
+        "requiredReviewsDetail": "ਲੋੜੀਂਦੇ ਰਿਵਿਊ ਕਰਨ ਵਾਲਿਆਂ ਦੀਆਂ ਮਨਜ਼ੂਰੀਆਂ ਗੁੰਮ ਹਨ ਜਾਂ ਲੰਬਿਤ ਹਨ।",
+        "failingChecksTitle": "ਅਸਫਲ ਲੋੜੀਂਦੇ ਚੈੱਕ",
+        "failingChecksDetail": "ਲੋੜੀਂਦੇ ਸਟੇਟਸ ਚੈੱਕ ਅਸਫਲ ਹੋ ਰਹੇ ਹਨ।",
+        "unstableTitle": "ਕੁਝ ਚੈੱਕ ਅਸਫਲ ਹੋ ਰਹੇ ਹਨ",
+        "unstableDetail": "ਗੈਰ-ਲੋੜੀਂਦੇ ਚੈੱਕ ਅਸਫਲ ਹੋ ਰਹੇ ਹਨ। ਉਹ ਮਰਜ ਨੂੰ ਨਹੀਂ ਰੋਕਣਗੇ।",
+        "draftTitle": "ਡਰਾਫਟ ਪੁੱਲ ਰਿਕਵੈਸਟ",
+        "draftDetail": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਰਿਵਿਊ ਲਈ ਤਿਆਰ ਵਜੋਂ ਚਿੰਨ੍ਹਿਤ ਕਰੋ।",
+        "behindTitle": "ਬ੍ਰਾਂਚ ਪੁਰਾਣੀ ਹੈ",
+        "behindDetailUpdatable": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬ੍ਰਾਂਚ ਨੂੰ ਬੇਸ ਤੋਂ ਅੱਪਡੇਟ ਕਰੋ, ਜਾਂ ਰੀਬੇਸ ਕਰੋ।",
+        "behindDetail": "head ਬ੍ਰਾਂਚ ਬੇਸ ਤੋਂ ਪਿੱਛੇ ਹੈ। ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬ੍ਰਾਂਚ ਨੂੰ ਰੀਬੇਸ ਜਾਂ ਅੱਪਡੇਟ ਕਰੋ।",
+        "notMergeableTitle": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਅਜੇ ਮਰਜ ਯੋਗ ਨਹੀਂ ਹੈ",
+        "notMergeableDetail": "GitHub ਨੇ {{state}} ਮਰਜ ਯੋਗ ਸਥਿਤੀ ਦੀ ਰਿਪੋਰਟ ਕੀਤੀ।"
+      },
+      "methodLabels": {
+        "merge": "ਮਰਜ ਕਮਿਟ ਬਣਾਓ",
+        "squash": "ਸਕੁਐਸ਼ ਕਰਕੇ ਮਰਜ ਕਰੋ",
+        "rebase": "ਰੀਬੇਸ ਕਰਕੇ ਮਰਜ ਕਰੋ"
+      },
+      "methodDescriptions": {
+        "merge": "ਇਸ ਬ੍ਰਾਂਚ ਦੇ ਸਾਰੇ ਕਮਿਟਾਂ ਨੂੰ ਮਰਜ ਕਮਿਟ ਨਾਲ ਬੇਸ ਬ੍ਰਾਂਚ ਵਿੱਚ ਜੋੜੋ।",
+        "squash": "ਇਸ ਬ੍ਰਾਂਚ ਦੇ ਸਾਰੇ ਕਮਿਟਾਂ ਨੂੰ ਬੇਸ ਬ੍ਰਾਂਚ 'ਤੇ ਇੱਕ ਸਿੰਗਲ ਕਮਿਟ ਵਿੱਚ ਜੋੜੋ।",
+        "rebase": "ਇਸ ਬ੍ਰਾਂਚ ਦੇ ਸਾਰੇ ਕਮਿਟਾਂ ਨੂੰ ਮਰਜ ਕਮਿਟ ਤੋਂ ਬਿਨਾਂ ਬੇਸ ਬ੍ਰਾਂਚ 'ਤੇ ਦੁਬਾਰਾ ਚਲਾਓ।"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ਚਰਚਾ ਥ੍ਰੈਡ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ",
       "termsAcceptRequired": "ਪੋਸਟ ਕਰਨ ਲਈ ਤੁਹਾਨੂੰ ਸੇਵਾ ਦੇ ਨਿਯਮ ਸਵੀਕਾਰ ਕਰਨੇ ਚਾਹੀਦੇ ਹਨ।",
       "termsOutdatedCopy": "ਸੇਵਾ ਦੇ ਨਿਯਮ ਬਦਲ ਗਏ ਹਨ। ਨਵਾਂ ਸੰਸਕਰਣ ਸਵੀਕਾਰ ਕਰਨ ਲਈ ਇਹ ਸਕ੍ਰੀਨ ਦੁਬਾਰਾ ਖੋਲ੍ਹੋ।",
-      "termsCheckRetryCopy": "ਸੇਵਾ ਦੇ ਨਿਯਮ ਚੈੱਕ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "termsCheckRetryCopy": "ਸੇਵਾ ਦੇ ਨਿਯਮ ਚੈੱਕ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "reactions": {
+        "thumbsUp": "ਅੰਗੂਠਾ ਉੱਪਰ",
+        "thumbsDown": "ਅੰਗੂਠਾ ਹੇਠਾਂ",
+        "laugh": "ਹਾਸਾ",
+        "hooray": "ਹੁਰ੍ਰਾ",
+        "confused": "ਉਲਝਣ ਵਿੱਚ",
+        "heart": "ਦਿਲ",
+        "rocket": "ਰਾਕੇਟ",
+        "eyes": "ਅੱਖਾਂ"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} 'ਤੇ ਫਾਈਲ ਟਿੱਪਣੀ",
+        "fileComment": "ਫਾਈਲ ਟਿੱਪਣੀ",
+        "outdatedOnPathLines": "{{path}} {{lines}} 'ਤੇ ਪੁਰਾਣਾ",
+        "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
+        "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -523,7 +571,12 @@
       "truncationBanner": "ਕੁੱਲ {{total}} ਬਦਲੀਆਂ ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੇ {{limit}} ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ — GitHub API ਸੀਮਾ"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ",
-    "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਸਟ ਲਿੰਕ ਨਹੀਂ ਹੈ"
+    "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਸਟ ਲਿੰਕ ਨਹੀਂ ਹੈ",
+    "announce": {
+      "commentPosted": "ਟਿੱਪਣੀ ਪੋਸਟ ਹੋ ਗਈ",
+      "reviewSubmitted": "ਰਿਵਿਊ ਜਮ੍ਹਾਂ ਹੋ ਗਿਆ",
+      "autoMergeEnabled": "ਆਟੋ-ਮਰਜ ਸਮਰੱਥ ਹੋ ਗਿਆ"
+    }
   },
   "notifications": {
     "title": "ਸੂਚਨਾਵਾਂ",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} ਅਟੈਚਮੈਂਟ ਸੀਮਾ ਤੋਂ ਵੱਧ ਗਈ।",
       "unreadable": "{{filename}} ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "pastedImage": "ਪੇਸਟ ਕੀਤਾ ਚਿੱਤਰ",
-      "defaultName": "ਅਟੈਚਮੈਂਟ"
+      "defaultName": "ਅਟੈਚਮੈਂਟ",
+      "classificationDenied": "ਚਲਾਉਣ ਯੋਗ ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕਦੀਆਂ",
+      "classificationEmpty": "ਫਾਈਲ ਖਾਲੀ ਹੈ",
+      "classificationTooLarge": "ਫਾਈਲਾਂ 20 MB ਜਾਂ ਇਸ ਤੋਂ ਛੋਟੀਆਂ ਹੋਣੀਆਂ ਚਾਹੀਦੀਆਂ ਹਨ",
+      "classificationUnreadable": "ਇਹ ਫਾਈਲ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ",
+      "announceUploaded": "ਅਟੈਚਮੈਂਟ ਅੱਪਲੋਡ ਹੋ ਗਿਆ"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ਸ਼ੁਰੂ ਹੋ ਰਿਹਾ ਹੈ",
       "stopped": "ਰੁਕਿਆ ਹੋਇਆ",
       "stopping": "ਰੋਕਿਆ ਜਾ ਰਿਹਾ ਹੈ",
-      "unknown": "ਅਣਜਾਣ"
+      "unknown": "ਅਣਜਾਣ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "ਇੱਕ ਕਤਾਰਬੱਧ ਕਾਰਵਾਈ ਨੂੰ ਹੁਣ ਟ੍ਰੈਕ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਨਵੀਨਤਮ ਸਥਿਤੀ ਦੇਖਣ ਲਈ ਰਿਫਰੈਸ਼ ਕਰੋ।",
     "initialSyncAdmissionFailed": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ, ਪਰ ਸ਼ੁਰੂਆਤੀ ਸਿੰਕ ਕਤਾਰ ਵਿੱਚ ਨਹੀਂ ਲਗਾਇਆ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
-    "title": "ਸੁਰੱਖਿਆ ਏਜੰਟ"
+    "title": "ਸੁਰੱਖਿਆ ਏਜੰਟ",
+    "commands": {
+      "findingAlreadyDismissed": "ਖੋਜ ਪਹਿਲਾਂ ਹੀ ਖਾਰਜ ਹੋ ਚੁੱਕੀ ਹੈ",
+      "findingDismissed": "ਖੋਜ ਖਾਰਜ ਹੋ ਗਈ",
+      "noRemediationsQueued": "ਕੋਈ ਮੌਜੂਦਾ ਖੋਜ ਕਤਾਰ ਵਿੱਚ ਨਹੀਂ ਹੈ",
+      "remediationsQueued": "ਮੌਜੂਦਾ ਉਪਚਾਰ ਕਤਾਰ ਵਿੱਚ ਹਨ",
+      "analysisComplete": "ਵਿਸ਼ਲੇਸ਼ਣ ਪੂਰਾ ਹੋ ਗਿਆ",
+      "syncComplete": "ਸਿੰਕ ਪੂਰਾ ਹੋ ਗਿਆ"
+    }
   },
   "agents": {
     "activeNow": "ਹੁਣ ਕਿਰਿਆਸ਼ੀਲ",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
-      "couldNotOpenMessage": "ਅਸੀਂ GitHub ਐਪ ਸੈੱਟਅੱਪ ਸ਼ੁਰੂ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "couldNotOpenMessage": "ਅਸੀਂ GitHub ਐਪ ਸੈੱਟਅੱਪ ਸ਼ੁਰੂ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "installedTitle": "GitHub ਐਪ ਸਥਾਪਿਤ ਹੋ ਗਿਆ",
+      "installedMessage": "ਤੁਹਾਡੀਆਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਹੁਣ ਕਨੈਕਟ ਹਨ।",
+      "pendingTitle": "ਪ੍ਰਸ਼ਾਸਕ ਮਨਜ਼ੂਰੀ ਦੀ ਉਡੀਕ ਵਿੱਚ",
+      "pendingMessage": "ਸੰਸਥਾ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ ਸਥਾਪਨਾ ਬੇਨਤੀ ਮਨਜ਼ੂਰ ਕਰਨੀ ਚਾਹੀਦੀ ਹੈ।",
+      "accountMismatchTitle": "ਖਾਤਾ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
+      "accountMismatchMessage": "ਇਹ ਕਨੈਕਸ਼ਨ Kilo ਐਪ ਤੋਂ ਕਿਸੇ ਵੱਖਰੇ ਖਾਤੇ ਵਜੋਂ ਸਾਈਨ ਇਨ ਹੋ ਕੇ ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ ਸੀ। ਉਸ ਖਾਤੇ ਨਾਲ ਵੈੱਬ 'ਤੇ ਸਾਈਨ ਇਨ ਕਰੋ, ਜਾਂ ਐਪ ਤੋਂ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
+      "cannotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ",
+      "notAdminMessage": "ਸਿਰਫ਼ ਉਸ ਖਾਤੇ ਦਾ GitHub ਪ੍ਰਸ਼ਾਸਕ ਹੀ ਇਸਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦਾ ਹੈ। Kilo ਸਥਾਪਤ ਕਰਨ ਲਈ ਸੰਸਥਾ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ ਪੁੱਛੋ।",
+      "alreadyClaimedMessage": "ਉਹ GitHub ਸਥਾਪਨਾ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਕਨੈਕਟ ਹੈ। ਪਹਿਲਾਂ ਉੱਥੇ ਇਸਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰੋ।",
+      "didNotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ",
+      "didNotCompleteMessage": "GitHub ਐਪ ਦੀ ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਐਪ ਤੋਂ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "sessionExited": "ਸੈਸ਼ਨ ਬੰਦ ਹੋਇਆ",
     "remoteSpawnRetryable": "ਇੰਸਟੈਂਸ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ — ਇਹ ਡਿਸਕਨੈਕਟ ਹੋ ਸਕਦਾ ਹੈ।",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ਈਮੇਲ ਡਿਲੀਵਰੀ ਫਿਲਹਾਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
     "admissionRequired": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ 'ਤੇ ਜਾਂ ਵੈੱਬ ਰਾਹੀਂ ਸਾਈਨ-ਇਨ ਕਰਨ ਲਈ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "default": "ਕੁਝ ਗਲਤ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
-    "retryableAdmission": "ਅਸੀਂ ਇਸ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।"
+    "retryableAdmission": "ਅਸੀਂ ਇਸ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
+    "startSignInFailed": "ਸਾਈਨ ਇਨ ਸ਼ੁਰੂ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "couldNotOpenBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "signInTimedOut": "ਸਾਈਨ ਇਨ ਦਾ ਸਮਾਂ ਪੂਰਾ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "signInFailed": "ਸਾਈਨ ਇਨ ਅਸਫਲ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "networkError": "ਨੈੱਟਵਰਕ ਗਲਤੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "accessDeniedByUser": "ਉਪਭੋਗੀ ਦੁਆਰਾ ਪਹੁੰਚ ਤੋਂ ਇਨਕਾਰ",
+    "codeExpired": "ਕੋਡ ਮਿਆਦ ਪੁੱਗ ਗਿਆ"
   },
   "models": {
     "dataCollected": "ਇਕੱਠਾ ਕੀਤਾ ਗਿਆ ਡੇਟਾ",
-    "free": "ਮੁਫਤ"
+    "free": "ਮੁਫਤ",
+    "couldNotUpdateFavorites": "ਪਸੰਦੀਦਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ"
   }
 }

@@ -22,7 +22,9 @@
     "copiedToClipboard": "Buferga nusxalandi",
     "couldNotCopyToClipboard": "Buferga nusxalab bo'lmadi",
     "required": "shart",
-    "error": "xato: {{error}}"
+    "error": "xato: {{error}}",
+    "back": "Orqaga",
+    "somethingWentWrong": "Nimadir noto'g'ri ketdi"
   },
   "language": {
     "title": "Til",
@@ -280,7 +282,36 @@
         "body": "Filialni o'chirib bo'lmadi: {{reason}}",
         "accessibility": "Birlashtirildi. Filialni o'chirib bo'lmadi: {{reason}}"
       },
-      "loadFailedTitle": "Birlashtirish imkoniyatlarini yuklab bo'lmadi"
+      "loadFailedTitle": "Birlashtirish imkoniyatlarini yuklab bo'lmadi",
+      "blocked": {
+        "unknownStateTitle": "GitHub birlashtirish imkoniyati haqida xabar bermagan",
+        "unknownStateDetail": "Birozdan so'ng umumiy ko'rinishni yangilab ko'ring.",
+        "conflictsTitle": "Birlashtirish ziddiyatlari",
+        "conflictsDetail": "Birlashtirishdan oldin bu filialdagi ziddiyatlarni hal qiling.",
+        "requiredReviewsTitle": "Kerakli sharhlar yo'q",
+        "requiredReviewsDetail": "Kerakli sharhlovchilarning tasdiqlari yo'q yoki kutilmoqda.",
+        "failingChecksTitle": "Kerakli tekshiruvlar muvaffaqiyatsiz",
+        "failingChecksDetail": "Kerakli holat tekshiruvlari muvaffaqiyatsiz tugamoqda.",
+        "unstableTitle": "Ba'zi tekshiruvlar muvaffaqiyatsiz",
+        "unstableDetail": "Kerakli bo'lmagan tekshiruvlar muvaffaqiyatsiz. Ular birlashtirishni bloklamaydi.",
+        "draftTitle": "Qoralama pull request",
+        "draftDetail": "Birlashtirishdan oldin pull requestni sharhga tayyor deb belgilang.",
+        "behindTitle": "Filial eskirgan",
+        "behindDetailUpdatable": "Birlashtirishdan oldin filialni bazadan yangilang yoki rebase qiling.",
+        "behindDetail": "Bosh filial bazadan orqada. Birlashtirishdan oldin filialni rebase qiling yoki yangilang.",
+        "notMergeableTitle": "Bu pull requestni hali birlashtirib bo'lmaydi",
+        "notMergeableDetail": "GitHub {{state}} birlashtirish imkoniyati holatini bildirdi."
+      },
+      "methodLabels": {
+        "merge": "Birlashtirish commiti yaratish",
+        "squash": "Siqish va birlashtirish",
+        "rebase": "Rebase va birlashtirish"
+      },
+      "methodDescriptions": {
+        "merge": "Bu filialdagi barcha commitlarni birlashtirish commiti bilan asosiy filialga birlashtiring.",
+        "squash": "Bu filialdagi barcha commitlarni asosiy filialda bitta commitga birlashtiring.",
+        "rebase": "Bu filialdagi barcha commitlarni birlashtirish commitisiz asosiy filialga qayta yozing."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Munozara mavzusi {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… yuqorida yana {{displayCount}} qator",
       "termsAcceptRequired": "Post qoldirish uchun Xizmat shartlarini qabul qilishingiz kerak.",
       "termsOutdatedCopy": "Xizmat shartlari o'zgardi. Eng so'nggi versiyani qabul qilish uchun bu ekranni qayta oching.",
-      "termsCheckRetryCopy": "Xizmat shartlarini tekshirib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring."
+      "termsCheckRetryCopy": "Xizmat shartlarini tekshirib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
+      "reactions": {
+        "thumbsUp": "Bosh barmoq",
+        "thumbsDown": "Bosh barmoq pastga",
+        "laugh": "Kulgi",
+        "hooray": "Xurra",
+        "confused": "Chalg'igan",
+        "heart": "Yurak",
+        "rocket": "Raketa",
+        "eyes": "Ko'zlar"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} dagi fayl izohi",
+        "fileComment": "Fayl izohi",
+        "outdatedOnPathLines": "{{path}} {{lines}} da eskirgan",
+        "outdatedOnLines": "{{lines}} da eskirgan",
+        "outdatedOnPath": "{{path}} da eskirgan"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo'lmadi",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -523,7 +571,12 @@
       "truncationBanner": "Jami {{total}} ta o'zgartirilgan fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — GitHub API chegarasi"
     },
     "linkPasteClipboardEmpty": "Vaqtinchalik xotira bo‘sh",
-    "linkPasteNotAPullRequest": "Bu GitHub pull request havolasi emas"
+    "linkPasteNotAPullRequest": "Bu GitHub pull request havolasi emas",
+    "announce": {
+      "commentPosted": "Izoh joylashtirildi",
+      "reviewSubmitted": "Sharh yuborildi",
+      "autoMergeEnabled": "Avtomatik birlashtirish yoqildi"
+    }
   },
   "notifications": {
     "title": "Bildirishnomalar",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} biriktirma chegarasidan oshadi.",
       "unreadable": "{{filename}} ni o'qib bo'lmadi.",
       "pastedImage": "joylashtirilgan rasm",
-      "defaultName": "Biriktirma"
+      "defaultName": "Biriktirma",
+      "classificationDenied": "Bajariladigan fayllarni biriktirib bo'lmaydi",
+      "classificationEmpty": "Fayl bo'sh",
+      "classificationTooLarge": "Fayllar 20 MB yoki undan kichik bo'lishi kerak",
+      "classificationUnreadable": "Bu faylni o'qib bo'lmadi",
+      "announceUploaded": "Biriktirma yuklandi"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "IShGA TUSHIRILMOQDA",
       "stopped": "TO'XTATILGAN",
       "stopping": "TO'XTATILMOQDA",
-      "unknown": "NOMA'LUM"
+      "unknown": "NOMA'LUM",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Navbatdagi harakatni kuzatib bo'lmadi. Eng so'nggi holatni ko'rish uchun yangilang.",
     "initialSyncAdmissionFailed": "Security Agent yoqildi, lekin dastlabki sinxronlashni navbatga qo'yib bo'lmadi. Qayta sinxronlang.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Topilma allaqachon rad etilgan",
+      "findingDismissed": "Topilma rad etildi",
+      "noRemediationsQueued": "Mavjud topilmalar navbatga qo'yilmagan",
+      "remediationsQueued": "Mavjud tuzatishlar navbatga qo'yildi",
+      "analysisComplete": "Tahlil yakunlandi",
+      "syncComplete": "Sinxronlash yakunlandi"
+    }
   },
   "agents": {
     "activeNow": "Hozir faol",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'ni ochib bo'lmadi",
-      "couldNotOpenMessage": "GitHub App sozlamasini boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "couldNotOpenMessage": "GitHub App sozlamasini boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "installedTitle": "GitHub ilovasi o'rnatildi",
+      "installedMessage": "Omborlaringiz endi ulangan.",
+      "pendingTitle": "Administrator tasdig'i kutilmoqda",
+      "pendingMessage": "Tashkilot administratori o'rnatish so'rovini tasdiqlashi kerak.",
+      "accountMismatchTitle": "Hisob mos kelmaydi",
+      "accountMismatchMessage": "Bu ulanish boshqa hisob bilan kirilgan Kilo ilovasidan boshlangan. Vebga shu hisob bilan kiring yoki ilovadan qayta boshlang.",
+      "cannotCompleteTitle": "O'rnatishni yakunlab bo'lmaydi",
+      "notAdminMessage": "Bu hisobni faqat GitHub administratori ulay oladi. Tashkilot administratoridan Kiloni o'rnatishni so'rang.",
+      "alreadyClaimedMessage": "Bu GitHub o'rnatish allaqachon boshqa Kilo hisobiga ulangan. Avval uni u yerda uzib qo'ying.",
+      "didNotCompleteTitle": "O'rnatish yakunlanmadi",
+      "didNotCompleteMessage": "GitHub ilovasini o'rnatish yakunlanmadi. Ilovadan qayta urinib ko'ring."
     },
     "sessionExited": "Sessiya tugadi",
     "remoteSpawnRetryable": "Ishlab chiquvchi muhitga yetib bo‘lmadi — u uzilgan bo‘lishi mumkin.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Elektron pochta yetkazish vaqtincha ishlamayapti. Iltimos, keyinroq qayta urinib ko‘ring.",
     "admissionRequired": "Qurilmangizni tekshirib bo‘lmadi. Boshqa qurilmada yoki veb-sayt orqali kirish uchun '$t(login.moreSignInOptions)' dan foydalaning.",
     "default": "Biror narsa xato ketdi. Iltimos, qayta urinib ko‘ring.",
-    "retryableAdmission": "Bu qurilmani tekshira olmadik. Ulanishingizni tekshiring va qayta urinib ko‘ring."
+    "retryableAdmission": "Bu qurilmani tekshira olmadik. Ulanishingizni tekshiring va qayta urinib ko‘ring.",
+    "startSignInFailed": "Kirishni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
+    "couldNotOpenBrowser": "Brauzerni ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
+    "signInTimedOut": "Kirish muddati tugadi. Iltimos, qayta urinib ko'ring.",
+    "signInFailed": "Kirish amalga oshmadi. Iltimos, qayta urinib ko'ring.",
+    "networkError": "Tarmoq xatosi. Iltimos, qayta urinib ko'ring.",
+    "accessDeniedByUser": "Foydalanuvchi tomonidan kirish rad etildi",
+    "codeExpired": "Kodning muddati tugadi"
   },
   "models": {
     "dataCollected": "Yig‘ilgan ma’lumotlar",
-    "free": "Bepul"
+    "free": "Bepul",
+    "couldNotUpdateFavorites": "Sevimlilarni yangilab bo'lmadi"
   }
 }

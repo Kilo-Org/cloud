@@ -22,7 +22,9 @@
     "required": "обязательно",
     "error": "ошибка: {{error}}",
     "notNow": "Не сейчас",
-    "continue": "Продолжить"
+    "continue": "Продолжить",
+    "back": "Назад",
+    "somethingWentWrong": "Что-то пошло не так"
   },
   "language": {
     "title": "Язык",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} превышает лимит вложения {{limit}}.",
       "unreadable": "Не удалось прочитать {{filename}}.",
       "pastedImage": "вставленное изображение",
-      "defaultName": "Вложение"
+      "defaultName": "Вложение",
+      "classificationDenied": "Исполняемые файлы нельзя прикреплять",
+      "classificationEmpty": "Файл пуст",
+      "classificationTooLarge": "Файлы должны быть не больше 20 MB",
+      "classificationUnreadable": "Не удалось прочитать этот файл",
+      "announceUploaded": "Вложение загружено"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -698,7 +705,8 @@
       "starting": "ЗАПУСК",
       "stopped": "ОСТАНОВЛЕН",
       "stopping": "ОСТАНОВКА",
-      "unknown": "НЕИЗВЕСТНО"
+      "unknown": "НЕИЗВЕСТНО",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1342,7 +1350,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent включен, но начальную синхронизацию не удалось поставить в очередь. Синхронизируйте снова.",
-    "queuedActionUntracked": "Действие в очереди больше нельзя отслеживать. Обновите, чтобы увидеть актуальное состояние."
+    "queuedActionUntracked": "Действие в очереди больше нельзя отслеживать. Обновите, чтобы увидеть актуальное состояние.",
+    "commands": {
+      "findingAlreadyDismissed": "Находка уже отклонена",
+      "findingDismissed": "Находка отклонена",
+      "noRemediationsQueued": "Существующие находки не поставлены в очередь",
+      "remediationsQueued": "Существующие исправления поставлены в очередь",
+      "analysisComplete": "Анализ завершен",
+      "syncComplete": "Синхронизация завершена"
+    }
   },
   "agents": {
     "activeNow": "Активен сейчас",
@@ -1394,7 +1410,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не удалось начать настройку GitHub App. Попробуйте снова.",
-      "couldNotOpenTitle": "Не удалось открыть GitHub"
+      "couldNotOpenTitle": "Не удалось открыть GitHub",
+      "installedTitle": "GitHub App установлено",
+      "installedMessage": "Ваши репозитории теперь подключены.",
+      "pendingTitle": "Ожидается одобрение администратора",
+      "pendingMessage": "Администратор организации должен одобрить запрос на установку.",
+      "accountMismatchTitle": "Несовпадение аккаунта",
+      "accountMismatchMessage": "Это подключение было начато из приложения Kilo, в котором выполнен вход под другим аккаунтом. Войдите в веб-версию под этим аккаунтом или начните заново из приложения.",
+      "cannotCompleteTitle": "Не удалось завершить установку",
+      "notAdminMessage": "Подключить его может только GitHub-администратор этого аккаунта. Попросите администратора организации установить Kilo.",
+      "alreadyClaimedMessage": "Эта установка GitHub уже подключена к другому аккаунту Kilo. Сначала отключите её там.",
+      "didNotCompleteTitle": "Установка не завершилась",
+      "didNotCompleteMessage": "Установка GitHub App не была завершена. Попробуйте снова из приложения."
     },
     "sessionExited": "Сеанс завершён",
     "remoteSpawnRetryable": "Не удалось подключиться к экземпляру — возможно, он отключился.",
@@ -2333,7 +2360,24 @@
       "comment_few": "{{displayCount}} комментария",
       "comment_many": "{{displayCount}} комментариев",
       "reaction_few": "реакции",
-      "reaction_many": "реакций"
+      "reaction_many": "реакций",
+      "reactions": {
+        "thumbsUp": "Палец вверх",
+        "thumbsDown": "Палец вниз",
+        "laugh": "Смех",
+        "hooray": "Ура",
+        "confused": "Недоумение",
+        "heart": "Сердце",
+        "rocket": "Ракета",
+        "eyes": "Глаза"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Комментарий к файлу в {{path}}",
+        "fileComment": "Комментарий к файлу",
+        "outdatedOnPathLines": "Устарело в {{path}} {{lines}}",
+        "outdatedOnLines": "Устарело в {{lines}}",
+        "outdatedOnPath": "Устарело в {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Очистить ссылку на pull request",
@@ -2494,7 +2538,36 @@
         "closed": "Этот pull request закрыт"
       },
       "updateBranch": "Обновить ветку",
-      "updateBranchFromBase": "Обновить ветку из базовой"
+      "updateBranchFromBase": "Обновить ветку из базовой",
+      "blocked": {
+        "unknownStateTitle": "GitHub не сообщил о состоянии слияния",
+        "unknownStateDetail": "Попробуйте через мгновение обновить обзор.",
+        "conflictsTitle": "Конфликты слияния",
+        "conflictsDetail": "Разрешите конфликты слияния в этой ветке перед слиянием.",
+        "requiredReviewsTitle": "Отсутствуют обязательные проверки",
+        "requiredReviewsDetail": "Одобрения от обязательных проверяющих отсутствуют или ожидаются.",
+        "failingChecksTitle": "Обязательные проверки не проходят",
+        "failingChecksDetail": "Обязательные проверки статуса не проходят.",
+        "unstableTitle": "Некоторые проверки не проходят",
+        "unstableDetail": "Необязательные проверки не проходят. Они не заблокируют слияние.",
+        "draftTitle": "Черновик pull request",
+        "draftDetail": "Перед слиянием отметьте pull request как готовый к проверке.",
+        "behindTitle": "Ветка устарела",
+        "behindDetailUpdatable": "Перед слиянием обновите ветку из базовой или сделайте rebase.",
+        "behindDetail": "Ветка head отстаёт от базовой. Перед слиянием сделайте rebase или обновите ветку.",
+        "notMergeableTitle": "Этот pull request пока нельзя слить",
+        "notMergeableDetail": "GitHub сообщил о состоянии слияния: {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Создать commit слияния",
+        "squash": "Squash и слияние",
+        "rebase": "Rebase и слияние"
+      },
+      "methodDescriptions": {
+        "merge": "Объедините все коммиты из этой ветки в базовую ветку с commit слияния.",
+        "squash": "Объедините все коммиты из этой ветки в один коммит в базовой ветке.",
+        "rebase": "Воспроизведите все коммиты из этой ветки в базовой ветке без commit слияния."
+      }
     },
     "noDescriptionProvided": "Описание не предоставлено.",
     "noFilesChanged": "Нет измененных файлов",
@@ -2590,7 +2663,12 @@
       "truncationBanner": "Показаны первые {{limit}} из {{total}} изменённых файлов — лимит API GitHub"
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст",
-    "linkPasteNotAPullRequest": "Это не ссылка на pull request GitHub"
+    "linkPasteNotAPullRequest": "Это не ссылка на pull request GitHub",
+    "announce": {
+      "commentPosted": "Комментарий опубликован",
+      "reviewSubmitted": "Проверка отправлена",
+      "autoMergeEnabled": "Автослияние включено"
+    }
   },
   "organization": {
     "boundary": {
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "Доставка писем временно недоступна. Повторите попытку позже.",
     "admissionRequired": "Не удалось проверить ваше устройство. Используйте «$t(login.moreSignInOptions)», чтобы войти с другого устройства или через веб-версию.",
     "default": "Что-то пошло не так. Попробуйте ещё раз.",
-    "retryableAdmission": "Не удалось проверить это устройство. Проверьте подключение и попробуйте снова."
+    "retryableAdmission": "Не удалось проверить это устройство. Проверьте подключение и попробуйте снова.",
+    "startSignInFailed": "Не удалось начать вход. Попробуйте снова.",
+    "couldNotOpenBrowser": "Не удалось открыть браузер. Попробуйте снова.",
+    "signInTimedOut": "Время входа истекло. Попробуйте снова.",
+    "signInFailed": "Вход не удался. Попробуйте снова.",
+    "networkError": "Ошибка сети. Попробуйте снова.",
+    "accessDeniedByUser": "Доступ отклонен пользователем",
+    "codeExpired": "Срок действия кода истек"
   },
   "models": {
     "dataCollected": "Собранные данные",
-    "free": "Бесплатно"
+    "free": "Бесплатно",
+    "couldNotUpdateFavorites": "Не удалось обновить избранное"
   }
 }

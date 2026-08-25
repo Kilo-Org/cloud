@@ -22,7 +22,9 @@
     "required": "obligatoire",
     "error": "erreur : {{error}}",
     "notNow": "Pas maintenant",
-    "continue": "Continuer"
+    "continue": "Continuer",
+    "back": "Retour",
+    "somethingWentWrong": "Une erreur s'est produite"
   },
   "language": {
     "title": "Langue",
@@ -262,7 +264,12 @@
       "sizeRejection": "{{filename}} dépasse la limite de {{limit}} pour les pièces jointes.",
       "unreadable": "Impossible de lire {{filename}}.",
       "pastedImage": "l'image collée",
-      "defaultName": "Pièce jointe"
+      "defaultName": "Pièce jointe",
+      "classificationDenied": "Impossible de joindre des fichiers exécutables",
+      "classificationEmpty": "Le fichier est vide",
+      "classificationTooLarge": "Les fichiers doivent faire 20 MB ou moins",
+      "classificationUnreadable": "Impossible de lire ce fichier",
+      "announceUploaded": "Pièce jointe ajoutée"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -682,7 +689,8 @@
       "starting": "DÉMARRAGE",
       "stopped": "ARRÊTÉ",
       "stopping": "ARRÊT",
-      "unknown": "INCONNU"
+      "unknown": "INCONNU",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1324,7 +1332,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent a été activé, mais la synchronisation initiale n'a pas pu être mise en file d'attente. Synchronisez à nouveau.",
-    "queuedActionUntracked": "Une action en file d'attente ne peut plus être suivie. Actualisez pour voir l'état le plus récent."
+    "queuedActionUntracked": "Une action en file d'attente ne peut plus être suivie. Actualisez pour voir l'état le plus récent.",
+    "commands": {
+      "findingAlreadyDismissed": "Résultat déjà ignoré",
+      "findingDismissed": "Résultat ignoré",
+      "noRemediationsQueued": "Aucun résultat existant mis en file d'attente",
+      "remediationsQueued": "Remédiations existantes mises en file d'attente",
+      "analysisComplete": "Analyse terminée",
+      "syncComplete": "Synchronisation terminée"
+    }
   },
   "agentChat": {
     "session": {
@@ -2174,7 +2190,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de démarrer la configuration de la GitHub App. Veuillez réessayer.",
-      "couldNotOpenTitle": "Impossible d'ouvrir GitHub"
+      "couldNotOpenTitle": "Impossible d'ouvrir GitHub",
+      "installedTitle": "GitHub App installée",
+      "installedMessage": "Vos dépôts sont maintenant connectés.",
+      "pendingTitle": "En attente de l'approbation de l'administrateur",
+      "pendingMessage": "Un administrateur d'organisation doit approuver la demande d'installation.",
+      "accountMismatchTitle": "Incohérence de compte",
+      "accountMismatchMessage": "Cette connexion a été démarrée depuis l'app Kilo connectée avec un autre compte. Connectez-vous sur le Web avec ce compte, ou recommencez depuis l'app.",
+      "cannotCompleteTitle": "Impossible de terminer l'installation",
+      "notAdminMessage": "Seul un administrateur GitHub de ce compte peut le connecter. Demandez à un administrateur d'organisation d'installer Kilo.",
+      "alreadyClaimedMessage": "Cette installation GitHub est déjà connectée à un autre compte Kilo. Déconnectez-la là-bas d'abord.",
+      "didNotCompleteTitle": "Installation non terminée",
+      "didNotCompleteMessage": "L'installation de la GitHub App n'a pas été terminée. Réessayez depuis l'app."
     },
     "sessionExited": "Session terminée",
     "remoteSpawnRetryable": "Impossible d'atteindre l'instance — elle s'est peut-être déconnectée.",
@@ -2320,7 +2347,24 @@
       "termsCheckRetryCopy": "Impossible de vérifier les Conditions d'utilisation. Vérifiez votre connexion et réessayez.",
       "termsOutdatedCopy": "Les Conditions d'utilisation ont changé. Rouvrez cet écran pour accepter la dernière version.",
       "comment_many": "{{displayCount}} commentaires",
-      "reaction_many": "réactions"
+      "reaction_many": "réactions",
+      "reactions": {
+        "thumbsUp": "Pouce levé",
+        "thumbsDown": "Pouce baissé",
+        "laugh": "Rire",
+        "hooray": "Hourra",
+        "confused": "Confus",
+        "heart": "Cœur",
+        "rocket": "Fusée",
+        "eyes": "Yeux"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Commentaire de fichier sur {{path}}",
+        "fileComment": "Commentaire de fichier",
+        "outdatedOnPathLines": "Obsolète sur {{path}} {{lines}}",
+        "outdatedOnLines": "Obsolète sur {{lines}}",
+        "outdatedOnPath": "Obsolète sur {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Effacer le lien de la pull request",
@@ -2479,7 +2523,36 @@
         "closed": "Cette pull request est fermée"
       },
       "updateBranch": "Mettre à jour la branche",
-      "updateBranchFromBase": "Mettre à jour la branche depuis la base"
+      "updateBranchFromBase": "Mettre à jour la branche depuis la base",
+      "blocked": {
+        "unknownStateTitle": "GitHub n'a pas signalé l'état de fusion",
+        "unknownStateDetail": "Essayez d'actualiser l'aperçu dans un instant.",
+        "conflictsTitle": "Conflits de fusion",
+        "conflictsDetail": "Résolvez les conflits de fusion sur cette branche avant de fusionner.",
+        "requiredReviewsTitle": "Revues requises manquantes",
+        "requiredReviewsDetail": "Les approbations des réviseurs requis sont manquantes ou en attente.",
+        "failingChecksTitle": "Échec des vérifications requises",
+        "failingChecksDetail": "Les vérifications de statut requises échouent.",
+        "unstableTitle": "Certaines vérifications échouent",
+        "unstableDetail": "Des vérifications non requises échouent. Elles ne bloqueront pas la fusion.",
+        "draftTitle": "Pull request en brouillon",
+        "draftDetail": "Marquez la pull request comme prête pour la revue avant de fusionner.",
+        "behindTitle": "La branche est en retard",
+        "behindDetailUpdatable": "Mettez à jour la branche depuis la base, ou faites un rebase, avant de fusionner.",
+        "behindDetail": "La branche de tête est en retard sur la base. Faites un rebase ou mettez à jour la branche avant de fusionner.",
+        "notMergeableTitle": "Cette pull request ne peut pas encore être fusionnée",
+        "notMergeableDetail": "GitHub a signalé un état de fusion {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Créer un commit de fusion",
+        "squash": "Squash et fusionner",
+        "rebase": "Rebaser et fusionner"
+      },
+      "methodDescriptions": {
+        "merge": "Combinez tous les commits de cette branche dans la branche de base avec un commit de fusion.",
+        "squash": "Combinez tous les commits de cette branche en un seul commit sur la branche de base.",
+        "rebase": "Rejouez tous les commits de cette branche sur la branche de base sans commit de fusion."
+      }
     },
     "noDescriptionProvided": "Aucune description fournie.",
     "noFilesChanged": "Aucun fichier modifié",
@@ -2572,7 +2645,12 @@
       "truncationBanner": "Affichage des {{limit}} premiers fichiers modifiés sur {{total}} — limite de l'API GitHub"
     },
     "linkPasteClipboardEmpty": "Le presse-papiers est vide",
-    "linkPasteNotAPullRequest": "Ce n'est pas un lien de pull request GitHub"
+    "linkPasteNotAPullRequest": "Ce n'est pas un lien de pull request GitHub",
+    "announce": {
+      "commentPosted": "Commentaire publié",
+      "reviewSubmitted": "Revue soumise",
+      "autoMergeEnabled": "Fusion automatique activée"
+    }
   },
   "organization": {
     "boundary": {
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "La livraison des e-mails est temporairement indisponible. Veuillez réessayer plus tard.",
     "admissionRequired": "Impossible de vérifier votre appareil. Utilisez « $t(login.moreSignInOptions) » pour vous connecter sur un autre appareil ou via le web.",
     "default": "Une erreur est survenue. Veuillez réessayer.",
-    "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez."
+    "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez.",
+    "startSignInFailed": "Échec du démarrage de la connexion. Veuillez réessayer.",
+    "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",
+    "signInTimedOut": "Connexion expirée. Veuillez réessayer.",
+    "signInFailed": "Échec de la connexion. Veuillez réessayer.",
+    "networkError": "Erreur réseau. Veuillez réessayer.",
+    "accessDeniedByUser": "Accès refusé par l'utilisateur",
+    "codeExpired": "Code expiré"
   },
   "models": {
     "dataCollected": "Données collectées",
-    "free": "Gratuit"
+    "free": "Gratuit",
+    "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris"
   }
 }

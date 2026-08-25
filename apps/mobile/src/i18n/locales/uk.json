@@ -22,7 +22,9 @@
     "required": "обов'язково",
     "error": "помилка: {{error}}",
     "notNow": "Не зараз",
-    "continue": "Продовжити"
+    "continue": "Продовжити",
+    "back": "Назад",
+    "somethingWentWrong": "Щось пішло не так"
   },
   "language": {
     "title": "Мова",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} перевищує ліміт вкладення {{limit}}.",
       "unreadable": "Не вдалося прочитати {{filename}}.",
       "pastedImage": "вставлене зображення",
-      "defaultName": "Вкладення"
+      "defaultName": "Вкладення",
+      "classificationDenied": "Виконувані файли не можна прикріплювати",
+      "classificationEmpty": "Файл порожній",
+      "classificationTooLarge": "Файли мають бути не більше 20 MB",
+      "classificationUnreadable": "Не вдалося прочитати цей файл",
+      "announceUploaded": "Вкладення завантажено"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -698,7 +705,8 @@
       "starting": "ЗАПУСК",
       "stopped": "ЗУПИНЕНО",
       "stopping": "ЗУПИНЕННЯ",
-      "unknown": "НЕВІДОМО"
+      "unknown": "НЕВІДОМО",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1342,7 +1350,15 @@
     },
     "title": "Агент безпеки",
     "initialSyncAdmissionFailed": "Агент безпеки увімкнено, але початкову синхронізацію не вдалося поставити в чергу. Синхронізуйте ще раз.",
-    "queuedActionUntracked": "Дію в черзі більше не можна відстежити. Оновіть, щоб побачити останній стан."
+    "queuedActionUntracked": "Дію в черзі більше не можна відстежити. Оновіть, щоб побачити останній стан.",
+    "commands": {
+      "findingAlreadyDismissed": "Знахідку вже відхилено",
+      "findingDismissed": "Знахідку відхилено",
+      "noRemediationsQueued": "Наявних знахідок у черзі немає",
+      "remediationsQueued": "Наявні усунення поставлено в чергу",
+      "analysisComplete": "Аналіз завершено",
+      "syncComplete": "Синхронізацію завершено"
+    }
   },
   "agents": {
     "activeNow": "Активні зараз",
@@ -1394,7 +1410,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не вдалося розпочати налаштування застосунку GitHub. Спробуйте ще раз.",
-      "couldNotOpenTitle": "Не вдалося відкрити GitHub"
+      "couldNotOpenTitle": "Не вдалося відкрити GitHub",
+      "installedTitle": "Застосунок GitHub установлено",
+      "installedMessage": "Ваші репозиторії тепер підключено.",
+      "pendingTitle": "Очікується схвалення адміністратора",
+      "pendingMessage": "Адміністратор організації має схвалити запит на встановлення.",
+      "accountMismatchTitle": "Невідповідність облікового запису",
+      "accountMismatchMessage": "Це підключення було розпочато із застосунку Kilo, у якому ви ввійшли під іншим обліковим записом. Увійдіть у вебверсію під цим обліковим записом або почніть спочатку із застосунку.",
+      "cannotCompleteTitle": "Не вдалося завершити встановлення",
+      "notAdminMessage": "Підключити цей обліковий запис може лише GitHub-адміністратор. Попросіть адміністратора організації встановити Kilo.",
+      "alreadyClaimedMessage": "Це встановлення GitHub уже підключено до іншого облікового запису Kilo. Спочатку відключіть його там.",
+      "didNotCompleteTitle": "Встановлення не завершено",
+      "didNotCompleteMessage": "Встановлення застосунку GitHub не завершено. Спробуйте ще раз із застосунку."
     },
     "sessionExited": "Сесію завершено",
     "remoteSpawnRetryable": "Не вдалося з’єднатися з екземпляром — можливо, його відключено.",
@@ -2333,7 +2360,24 @@
       "comment_few": "{{displayCount}} коментарі",
       "comment_many": "{{displayCount}} коментарів",
       "reaction_few": "реакції",
-      "reaction_many": "реакцій"
+      "reaction_many": "реакцій",
+      "reactions": {
+        "thumbsUp": "Великий палець угору",
+        "thumbsDown": "Великий палець униз",
+        "laugh": "Сміх",
+        "hooray": "Ура",
+        "confused": "Збентежений",
+        "heart": "Серце",
+        "rocket": "Ракета",
+        "eyes": "Очі"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Коментар до файлу {{path}}",
+        "fileComment": "Коментар до файлу",
+        "outdatedOnPathLines": "Застаріле на {{path}} {{lines}}",
+        "outdatedOnLines": "Застаріле на {{lines}}",
+        "outdatedOnPath": "Застаріле на {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Очистити посилання на pull request",
@@ -2494,7 +2538,36 @@
         "closed": "Цей pull request закрито"
       },
       "updateBranch": "Оновити гілку",
-      "updateBranchFromBase": "Оновити гілку з базової"
+      "updateBranchFromBase": "Оновити гілку з базової",
+      "blocked": {
+        "unknownStateTitle": "GitHub не повідомив про можливість злиття",
+        "unknownStateDetail": "Спробуйте оновити огляд за мить.",
+        "conflictsTitle": "Конфлікти злиття",
+        "conflictsDetail": "Розв'яжіть конфлікти злиття в цій гілці перед злиттям.",
+        "requiredReviewsTitle": "Бракує обов'язкових перевірок",
+        "requiredReviewsDetail": "Схвалення від обов'язкових перевіряльників відсутні або очікують.",
+        "failingChecksTitle": "Обов'язкові перевірки не проходять",
+        "failingChecksDetail": "Обов'язкові перевірки статусу не проходять.",
+        "unstableTitle": "Деякі перевірки не проходять",
+        "unstableDetail": "Необов'язкові перевірки не проходять. Вони не заблокують злиття.",
+        "draftTitle": "Чернетка pull request",
+        "draftDetail": "Позначте pull request як готовий до перевірки перед злиттям.",
+        "behindTitle": "Гілка застаріла",
+        "behindDetailUpdatable": "Оновіть гілку з базової або зробіть rebase перед злиттям.",
+        "behindDetail": "Гілка head відстає від базової. Зробіть rebase або оновіть гілку перед злиттям.",
+        "notMergeableTitle": "Цей pull request ще не можна злити",
+        "notMergeableDetail": "GitHub повідомив статус можливості злиття: {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Створити commit злиття",
+        "squash": "Сквошити та злити",
+        "rebase": "Зробити rebase та злити"
+      },
+      "methodDescriptions": {
+        "merge": "Об'єднує всі коміти з цієї гілки в базову гілку за допомогою коміту злиття.",
+        "squash": "Об'єднує всі коміти з цієї гілки в один коміт на базовій гілці.",
+        "rebase": "Відтворює всі коміти з цієї гілки на базовій гілці без коміту злиття."
+      }
     },
     "noDescriptionProvided": "Опис не надано.",
     "noFilesChanged": "Файли не змінювалися",
@@ -2590,7 +2663,12 @@
       "truncationBanner": "Показано перші {{limit}} зі {{total}} змінених файлів — обмеження GitHub API"
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній",
-    "linkPasteNotAPullRequest": "Це не посилання на pull request GitHub"
+    "linkPasteNotAPullRequest": "Це не посилання на pull request GitHub",
+    "announce": {
+      "commentPosted": "Коментар опубліковано",
+      "reviewSubmitted": "Перевірку надіслано",
+      "autoMergeEnabled": "Автоматичне злиття увімкнено"
+    }
   },
   "organization": {
     "boundary": {
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "Доставка листів тимчасово недоступна. Повторіть спробу пізніше.",
     "admissionRequired": "Не вдалося підтвердити ваш пристрій. Скористайтеся пунктом «$t(login.moreSignInOptions)», щоб увійти на іншому пристрої або через вебверсію.",
     "default": "Щось пішло не так. Спробуйте ще раз.",
-    "retryableAdmission": "Не вдалося підтвердити цей пристрій. Перевірте з’єднання та спробуйте ще раз."
+    "retryableAdmission": "Не вдалося підтвердити цей пристрій. Перевірте з’єднання та спробуйте ще раз.",
+    "startSignInFailed": "Не вдалося розпочати вхід. Спробуйте ще раз.",
+    "couldNotOpenBrowser": "Не вдалося відкрити браузер. Спробуйте ще раз.",
+    "signInTimedOut": "Час входу минув. Спробуйте ще раз.",
+    "signInFailed": "Вхід не вдався. Спробуйте ще раз.",
+    "networkError": "Помилка мережі. Спробуйте ще раз.",
+    "accessDeniedByUser": "Користувач відмовив у доступі",
+    "codeExpired": "Термін дії коду минув"
   },
   "models": {
     "dataCollected": "Зібрані дані",
-    "free": "Безкоштовно"
+    "free": "Безкоштовно",
+    "couldNotUpdateFavorites": "Не вдалося оновити обрані"
   }
 }

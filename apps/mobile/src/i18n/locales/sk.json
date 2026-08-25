@@ -22,7 +22,9 @@
     "copiedToClipboard": "Skopírované do schránky",
     "couldNotCopyToClipboard": "Kopírovanie do schránky sa nepodarilo",
     "required": "povinné",
-    "error": "chyba: {{error}}"
+    "error": "chyba: {{error}}",
+    "back": "Späť",
+    "somethingWentWrong": "Niečo sa pokazilo"
   },
   "language": {
     "title": "Jazyk",
@@ -284,7 +286,36 @@
         "body": "Vetvu sa nepodarilo vymazať: {{reason}}",
         "accessibility": "Zlúčené. Vetvu sa nepodarilo vymazať: {{reason}}"
       },
-      "loadFailedTitle": "Možnosti zlúčenia sa nepodarilo načítať"
+      "loadFailedTitle": "Možnosti zlúčenia sa nepodarilo načítať",
+      "blocked": {
+        "unknownStateTitle": "GitHub neoznámil stav možnosti zlúčenia",
+        "unknownStateDetail": "Skúste o chvíľu obnoviť prehľad.",
+        "conflictsTitle": "Konflikty zlúčenia",
+        "conflictsDetail": "Pred zlúčením vyriešte konflikty zlúčenia v tejto vetve.",
+        "requiredReviewsTitle": "Chýbajú požadované kontroly",
+        "requiredReviewsDetail": "Schválenia od požadovaných kontrolórov chýbajú alebo čakajú.",
+        "failingChecksTitle": "Zlyhávajú povinné kontroly",
+        "failingChecksDetail": "Povinné kontroly stavu zlyhávajú.",
+        "unstableTitle": "Niektoré kontroly zlyhávajú",
+        "unstableDetail": "Nepovinné kontroly zlyhávajú. Nezablokujú zlúčenie.",
+        "draftTitle": "Koncept pull request",
+        "draftDetail": "Pred zlúčením označte pull request ako pripravený na kontrolu.",
+        "behindTitle": "Vetva je zastaraná",
+        "behindDetailUpdatable": "Pred zlúčením aktualizujte vetvu zo základnej alebo urobte rebase.",
+        "behindDetail": "Vetva head zaostáva za základnou. Pred zlúčením vetvu rebasujte alebo aktualizujte.",
+        "notMergeableTitle": "Tento pull request sa ešte nedá zlúčiť",
+        "notMergeableDetail": "GitHub oznámil stav zlúčenia {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Vytvoriť commit zlúčenia",
+        "squash": "Squash a zlúčiť",
+        "rebase": "Rebase a zlúčiť"
+      },
+      "methodDescriptions": {
+        "merge": "Spojte všetky commity z tejto vetvy do základnej vetvy s commitom zlúčenia.",
+        "squash": "Spojte všetky commity z tejto vetvy do jedného commitu v základnej vetve.",
+        "rebase": "Prehrajte všetky commity z tejto vetvy do základnej vetvy bez commitu zlúčenia."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Diskusné vlákno {{anchorLabel}}",
@@ -364,7 +395,24 @@
       "comment_few": "{{displayCount}} komentáre",
       "comment_many": "{{displayCount}} komentárov",
       "reaction_few": "reakcie",
-      "reaction_many": "reakcií"
+      "reaction_many": "reakcií",
+      "reactions": {
+        "thumbsUp": "Palec hore",
+        "thumbsDown": "Palec dole",
+        "laugh": "Smiech",
+        "hooray": "Hurá",
+        "confused": "Zmätený",
+        "heart": "Srdce",
+        "rocket": "Raketa",
+        "eyes": "Oči"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komentár k súboru v {{path}}",
+        "fileComment": "Komentár k súboru",
+        "outdatedOnPathLines": "Zastarané v {{path}} {{lines}}",
+        "outdatedOnLines": "Zastarané v {{lines}}",
+        "outdatedOnPath": "Zastarané v {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nastavenia aplikácie GitHub App sa nepodarilo otvoriť",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo GitHub App",
@@ -537,7 +585,12 @@
       "truncationBanner": "Zobrazuje sa prvých {{limit}} z {{total}} zmenených súborov — limit GitHub API"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna",
-    "linkPasteNotAPullRequest": "Nie je to odkaz na GitHub pull request"
+    "linkPasteNotAPullRequest": "Nie je to odkaz na GitHub pull request",
+    "announce": {
+      "commentPosted": "Komentár uverejnený",
+      "reviewSubmitted": "Kontrola odoslaná",
+      "autoMergeEnabled": "Automatické zlúčenie povolené"
+    }
   },
   "notifications": {
     "title": "Upozornenia",
@@ -670,7 +723,12 @@
       "sizeRejection": "{{filename}} prekračuje limit prílohy {{limit}}.",
       "unreadable": "{{filename}} sa nepodarilo prečítať.",
       "pastedImage": "vložený obrázok",
-      "defaultName": "Príloha"
+      "defaultName": "Príloha",
+      "classificationDenied": "Spustiteľné súbory nemožno priložiť",
+      "classificationEmpty": "Súbor je prázdny",
+      "classificationTooLarge": "Súbory musia mať 20 MB alebo menej",
+      "classificationUnreadable": "Tento súbor sa nepodarilo prečítať",
+      "announceUploaded": "Príloha nahraná"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1045,7 +1103,8 @@
       "starting": "SPÚŠŤA SA",
       "stopped": "ZASTAVENÉ",
       "stopping": "ZASTAVUJE SA",
-      "unknown": "NEZNÁME"
+      "unknown": "NEZNÁME",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1736,7 +1795,15 @@
     },
     "queuedActionUntracked": "Zaradenú akciu už nebolo možné sledovať. Obnovte, aby ste videli najnovší stav.",
     "initialSyncAdmissionFailed": "Security Agent bol povolený, ale prvotnú synchronizáciu nebolo možné zaradiť. Synchronizujte znova.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Nález už bol odmietnutý",
+      "findingDismissed": "Nález odmietnutý",
+      "noRemediationsQueued": "Žiadne existujúce nálezy neboli zaradené do frontu",
+      "remediationsQueued": "Existujúce nápravy boli zaradené do frontu",
+      "analysisComplete": "Analýza dokončená",
+      "syncComplete": "Synchronizácia dokončená"
+    }
   },
   "agents": {
     "activeNow": "Práve aktívny",
@@ -1788,7 +1855,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub sa nepodarilo otvoriť",
-      "couldNotOpenMessage": "Nepodarilo sa spustiť nastavenie aplikácie GitHub App. Skúste to znova."
+      "couldNotOpenMessage": "Nepodarilo sa spustiť nastavenie aplikácie GitHub App. Skúste to znova.",
+      "installedTitle": "Aplikácia GitHub App nainštalovaná",
+      "installedMessage": "Vaše repozitáre sú teraz pripojené.",
+      "pendingTitle": "Čaká sa na schválenie správcu",
+      "pendingMessage": "Žiadosť o inštaláciu musí schváliť správca organizácie.",
+      "accountMismatchTitle": "Nesúlad účtu",
+      "accountMismatchMessage": "Toto pripojenie bolo začaté z aplikácie Kilo, v ktorej ste prihlásení pod iným účtom. Prihláste sa do webovej verzie týmto účtom alebo začnite znova z aplikácie.",
+      "cannotCompleteTitle": "Inštaláciu nemožno dokončiť",
+      "notAdminMessage": "Pripojiť ho môže iba GitHub správca daného účtu. Požiadajte správcu organizácie, aby nainštaloval Kilo.",
+      "alreadyClaimedMessage": "Táto inštalácia GitHub je už pripojená k inému účtu Kilo. Najprv ju tam odpojte.",
+      "didNotCompleteTitle": "Inštalácia sa nedokončila",
+      "didNotCompleteMessage": "Inštalácia aplikácie GitHub App sa nedokončila. Skúste to znova z aplikácie."
     },
     "sessionExited": "Relácia sa ukončila",
     "remoteSpawnRetryable": "Nedá sa dosiahnuť inštancia — možno sa odpojila.",
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "Doručenie e-mailu je momentálne nedostupné. Skúste to neskôr.",
     "admissionRequired": "Vaše zariadenie sa nedá overiť. Použite „$t(login.moreSignInOptions)“ na prihlásenie na inom zariadení alebo cez web.",
     "default": "Niečo sa pokazilo. Skúste to znova.",
-    "retryableAdmission": "Nepodarilo sa nám overiť toto zariadenie. Skontrolujte pripojenie a skúste to znova."
+    "retryableAdmission": "Nepodarilo sa nám overiť toto zariadenie. Skontrolujte pripojenie a skúste to znova.",
+    "startSignInFailed": "Prihlásenie sa nepodarilo spustiť. Skúste to znova.",
+    "couldNotOpenBrowser": "Prehliadač sa nepodarilo otvoriť. Skúste to znova.",
+    "signInTimedOut": "Prihlásenie vypršalo. Skúste to znova.",
+    "signInFailed": "Prihlásenie zlyhalo. Skúste to znova.",
+    "networkError": "Chyba siete. Skúste to znova.",
+    "accessDeniedByUser": "Prístup zamietnutý používateľom",
+    "codeExpired": "Kód vypršal"
   },
   "models": {
     "dataCollected": "Zhromaždené údaje",
-    "free": "Zadarmo"
+    "free": "Zadarmo",
+    "couldNotUpdateFavorites": "Obľúbené sa nepodarilo aktualizovať"
   }
 }

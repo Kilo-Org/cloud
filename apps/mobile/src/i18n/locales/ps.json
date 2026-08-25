@@ -22,7 +22,9 @@
     "copiedToClipboard": "کلپبورډ ته کاپي شو",
     "couldNotCopyToClipboard": "کلپبورډ ته کاپي کیدی نشو",
     "required": "اړین",
-    "error": "تېروتنه: {{error}}"
+    "error": "تېروتنه: {{error}}",
+    "back": "شاته",
+    "somethingWentWrong": "یو څه غلط شول"
   },
   "language": {
     "title": "ژبه",
@@ -280,7 +282,36 @@
         "body": "څانګه ړنګه کیدی نشوه: {{reason}}",
         "accessibility": "یوځای شو. څانګه ړنګه کیدی نشوه: {{reason}}"
       },
-      "loadFailedTitle": "د یوځای کولو انتخابونه بار کیدی نشو"
+      "loadFailedTitle": "د یوځای کولو انتخابونه بار کیدی نشو",
+      "blocked": {
+        "unknownStateTitle": "GitHub د یوځای کولو وړتیا حالت راپور نه دی کړی",
+        "unknownStateDetail": "یوه شیبه وروسته عمومي کتنه تازه کولو هڅه وکړئ.",
+        "conflictsTitle": "د یوځای کولو شخړې",
+        "conflictsDetail": "له یوځای کولو مخکې په دې څانګه کې د یوځای کولو شخړې حل کړئ.",
+        "requiredReviewsTitle": "اړینې بیاکتنې نشته",
+        "requiredReviewsDetail": "د اړینو بیاکتونکو تصویبونه نشته یا په انتظار کې دي.",
+        "failingChecksTitle": "ناکام اړین چیکونه",
+        "failingChecksDetail": "اړین د وضعیت چیکونه ناکام دي.",
+        "unstableTitle": "ځینې چیکونه ناکام دي",
+        "unstableDetail": "غیر اړین چیکونه ناکام دي. دوی به یوځای کول ونه بندوي.",
+        "draftTitle": "د پل ریکویسټ مسوده",
+        "draftDetail": "له یوځای کولو مخکې پل ریکویسټ د بیاکتنې لپاره چمتو په نښه کړئ.",
+        "behindTitle": "څانګه زوړه ده",
+        "behindDetailUpdatable": "له یوځای کولو مخکې څانګه له اساس څخه تازه کړئ، یا rebase وکړئ.",
+        "behindDetail": "د سر څانګه د اساس څخه وروسته ده. له یوځای کولو مخکې rebase وکړئ یا څانګه تازه کړئ.",
+        "notMergeableTitle": "دا پل ریکویسټ تر اوسه یوځای کیدی نشي",
+        "notMergeableDetail": "GitHub د یوځای کولو وړتیا حالت راپور کړ: {{state}}."
+      },
+      "methodLabels": {
+        "merge": "د یوځای کولو کمټ جوړ کړئ",
+        "squash": "squash او یوځای کول",
+        "rebase": "rebase او یوځای کول"
+      },
+      "methodDescriptions": {
+        "merge": "د یوځای کولو کمټ سره د دې څانګې ټول کمټونه په اساس څانګه کې یوځای کړئ.",
+        "squash": "د دې څانګې ټول کمټونه په اساس څانګه کې په یو واحد کمټ کې یوځای کړئ.",
+        "rebase": "د یوځای کولو کمټ پرته د دې څانګې ټول کمټونه په اساس څانګه کې بیا پلي کړئ."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "د بحث تار {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… پورته {{displayCount}} نور کرښې",
       "termsAcceptRequired": "د خپرولو لپاره باید د خدمت شرایط ومنئ.",
       "termsOutdatedCopy": "د خدمت شرایط بدل شول. د وروستۍ نسخې منلو لپاره دا سکرین بیا پرانیزئ.",
-      "termsCheckRetryCopy": "د خدمت شرایط معاینه کیدی نشول. خپل اړیکه وګورئ او بیا هڅه وکړئ."
+      "termsCheckRetryCopy": "د خدمت شرایط معاینه کیدی نشول. خپل اړیکه وګورئ او بیا هڅه وکړئ.",
+      "reactions": {
+        "thumbsUp": "ګوته پورته",
+        "thumbsDown": "ګوته ښکته",
+        "laugh": "خندا",
+        "hooray": "هورا",
+        "confused": "ګډوډ",
+        "heart": "زړه",
+        "rocket": "راکټ",
+        "eyes": "سترګې"
+      },
+      "anchor": {
+        "fileCommentOnPath": "په {{path}} کې د فایل تبصره",
+        "fileComment": "د فایل تبصره",
+        "outdatedOnPathLines": "په {{path}} {{lines}} کې زوړ",
+        "outdatedOnLines": "په {{lines}} کې زوړ",
+        "outdatedOnPath": "په {{path}} کې زوړ"
+      }
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپلیکیشن تنظیمات پرانیستل کیدی نشو",
     "installKiloGitHubApp": "د کلیو GitHub اپلیکیشن نصب کړئ",
@@ -523,7 +571,12 @@
       "truncationBanner": "د {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کیږي — د GitHub API حد"
     },
     "linkPasteClipboardEmpty": "کلیپبورډ خالي دی",
-    "linkPasteNotAPullRequest": "دا د GitHub pull request لینک نه دی"
+    "linkPasteNotAPullRequest": "دا د GitHub pull request لینک نه دی",
+    "announce": {
+      "commentPosted": "تبصره خپره شوه",
+      "reviewSubmitted": "بیاکتنه وسپارل شوه",
+      "autoMergeEnabled": "اتومات یوځای کول فعال شو"
+    }
   },
   "notifications": {
     "title": "خبرتیاوې",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} د {{limit}} نښلولو حد څخه ډیر دی.",
       "unreadable": "{{filename}} لوستل کیدی نشو.",
       "pastedImage": "پیسټ شوی انځور",
-      "defaultName": "نښلول شوی فایل"
+      "defaultName": "نښلول شوی فایل",
+      "classificationDenied": "د اجرا وړ فایلونه نښلول کیدی نشي",
+      "classificationEmpty": "فایل خالي دی",
+      "classificationTooLarge": "فایلونه باید 20 MB یا کوچني وي",
+      "classificationUnreadable": "دا فایل لوستل کیدی نشو",
+      "announceUploaded": "نښلول شوی فایل پورته شو"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "پیلېدل",
       "stopped": "بندېدل",
       "stopping": "بندول",
-      "unknown": "نامعلوم"
+      "unknown": "نامعلوم",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "یو صف کې موجود اقدام نور تعقیب کیدی نشي. د وروستي حالت لیدو لپاره تازه کړئ.",
     "initialSyncAdmissionFailed": "د امنیت استازی فعال شو، خو لومړنی ترکیب په صف کې واچول نشو. بیا ترکیب کړئ.",
-    "title": "امنیت استازی"
+    "title": "امنیت استازی",
+    "commands": {
+      "findingAlreadyDismissed": "موندنه دمخه له پامه غورځول شوې",
+      "findingDismissed": "موندنه له پامه وغورځول شوه",
+      "noRemediationsQueued": "هیڅ موجوده موندنه په صف کې نشته",
+      "remediationsQueued": "موجوده اصلاحات په صف کې ودرول شول",
+      "analysisComplete": "تحلیل بشپړ شو",
+      "syncComplete": "ترکیب بشپړ شو"
+    }
   },
   "agents": {
     "activeNow": "اوس فعال",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub پرانیستل نشو",
-      "couldNotOpenMessage": "موږ د GitHub اپ ترتیب پیل کړی نشو. مهرباني وکړئ بیا هڅه وکړئ."
+      "couldNotOpenMessage": "موږ د GitHub اپ ترتیب پیل کړی نشو. مهرباني وکړئ بیا هڅه وکړئ.",
+      "installedTitle": "د GitHub اپ نصب شو",
+      "installedMessage": "ستاسو ذخیرې اوس وصل شوې دي.",
+      "pendingTitle": "د مدیر د تصویب په تمه",
+      "pendingMessage": "د سازمان یو مدیر باید د نصب غوښتنه تصویب کړي.",
+      "accountMismatchTitle": "د حساب ناانډولي",
+      "accountMismatchMessage": "دا اړیکه د Kilo اپ څخه پیل شوې وه چې په بل حساب کې ننوتلې وه. په ویب کې له هغه حساب سره ننوتل وکړئ، یا له اپ څخه بیا پیل وکړئ.",
+      "cannotCompleteTitle": "نصب بشپړ کیدی نشي",
+      "notAdminMessage": "یوازې د هغه حساب GitHub مدیر کولی شي دا وصل کړي. له یو سازمان مدیر څخه وغواړئ چې Kilo نصب کړي.",
+      "alreadyClaimedMessage": "دا د GitHub نصب دمخه د بل Kilo حساب سره وصل دی. لومړی هلته یې جلا کړئ.",
+      "didNotCompleteTitle": "نصب بشپړ نه شو",
+      "didNotCompleteMessage": "د GitHub اپ نصب بشپړ نه شو. له اپ څخه بیا هڅه وکړئ."
     },
     "sessionExited": "ناسته پای ته ورسېده",
     "remoteSpawnRetryable": "انسټنس ته رسېدل ممکن نه وو — کېدای شي قطع شوی وي.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "د برېښنالیک رسولو په لنډمهاله توګه شتون نلري. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
     "admissionRequired": "ستاسو وسیله تصدیق کېدلای نه شي. د بلې وسیلې یا ویب له لارې د ننوتلو لپاره '$t(login.moreSignInOptions)' وکاروئ.",
     "default": "یو څه غلط شول. مهرباني وکړئ بیا هڅه وکړئ.",
-    "retryableAdmission": "موږ ونه شو کولای دا وسیله تصدیق کړو. خپله اړیکه وګورئ او بیا هڅه وکړئ."
+    "retryableAdmission": "موږ ونه شو کولای دا وسیله تصدیق کړو. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "startSignInFailed": "د ننوتلو پیل ناکام شو. مهرباني وکړئ بیا هڅه وکړئ.",
+    "couldNotOpenBrowser": "براوزر خلاصول کیدی نشو. مهرباني وکړئ بیا هڅه وکړئ.",
+    "signInTimedOut": "د ننوتلو وخت ختم شو. مهرباني وکړئ بیا هڅه وکړئ.",
+    "signInFailed": "ننوتل ناکام شول. مهرباني وکړئ بیا هڅه وکړئ.",
+    "networkError": "د شبکې تېروتنه. مهرباني وکړئ بیا هڅه وکړئ.",
+    "accessDeniedByUser": "د کارن لخوا لاسرسی رد شو",
+    "codeExpired": "کوډ پای ته رسیدلی"
   },
   "models": {
     "dataCollected": "ټول شوي معلومات",
-    "free": "وړیا"
+    "free": "وړیا",
+    "couldNotUpdateFavorites": "غوره شوي تازه کول ممکن نه وو"
   }
 }

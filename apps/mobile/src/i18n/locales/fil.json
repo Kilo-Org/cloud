@@ -22,7 +22,9 @@
     "copiedToClipboard": "Nakopya sa clipboard",
     "couldNotCopyToClipboard": "Hindi makopya sa clipboard",
     "required": "kinakailangan",
-    "error": "error: {{error}}"
+    "error": "error: {{error}}",
+    "back": "Bumalik",
+    "somethingWentWrong": "May nangyaring mali"
   },
   "language": {
     "title": "Wika",
@@ -280,7 +282,36 @@
         "body": "Hindi ma-delete ang branch: {{reason}}",
         "accessibility": "Na-merge. Hindi ma-delete ang branch: {{reason}}"
       },
-      "loadFailedTitle": "Hindi ma-load ang mga opsyon sa pag-merge"
+      "loadFailedTitle": "Hindi ma-load ang mga opsyon sa pag-merge",
+      "blocked": {
+        "unknownStateTitle": "Hindi pa nag-uulat ang GitHub ng mergeable state",
+        "unknownStateDetail": "Subukang i-refresh ang overview makalipas ang ilang sandali.",
+        "conflictsTitle": "Mga merge conflict",
+        "conflictsDetail": "I-resolve ang mga merge conflict sa branch na ito bago mag-merge.",
+        "requiredReviewsTitle": "Kulang ang mga kinakailangang review",
+        "requiredReviewsDetail": "Kulang o nakabinbin ang mga approval mula sa mga kinakailangang reviewer.",
+        "failingChecksTitle": "Pumapalpak ang mga kinakailangang check",
+        "failingChecksDetail": "Pumapalpak ang mga kinakailangang status check.",
+        "unstableTitle": "May mga check na pumapalpak",
+        "unstableDetail": "Pumapalpak ang mga hindi kinakailangang check. Hindi nila haharangin ang merge.",
+        "draftTitle": "Draft pull request",
+        "draftDetail": "Markahan ang pull request bilang handa para sa review bago mag-merge.",
+        "behindTitle": "Luma na ang branch",
+        "behindDetailUpdatable": "I-update ang branch mula sa base, o mag-rebase, bago mag-merge.",
+        "behindDetail": "Nasa likod ng base ang head branch. Mag-rebase o i-update ang branch bago mag-merge.",
+        "notMergeableTitle": "Hindi pa maaaring i-merge ang pull request na ito",
+        "notMergeableDetail": "Nag-ulat ang GitHub ng {{state}} mergeable state."
+      },
+      "methodLabels": {
+        "merge": "Gumawa ng merge commit",
+        "squash": "Squash at i-merge",
+        "rebase": "Rebase at i-merge"
+      },
+      "methodDescriptions": {
+        "merge": "Pagsamahin ang lahat ng commit mula sa branch na ito papunta sa base branch na may merge commit.",
+        "squash": "Pagsamahin ang lahat ng commit mula sa branch na ito sa isang commit sa base branch.",
+        "rebase": "I-replay ang lahat ng commit mula sa branch na ito papunta sa base branch nang walang merge commit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Discussion thread {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} pang linya sa itaas",
       "termsAcceptRequired": "Dapat tanggapin mo ang Mga Tuntunin ng Serbisyo para mag-post.",
       "termsOutdatedCopy": "Nagbago ang Mga Tuntunin ng Serbisyo. Buksan muli ang screen na ito para tanggapin ang pinakabagong bersyon.",
-      "termsCheckRetryCopy": "Hindi ma-check ang Mga Tuntunin ng Serbisyo. Suriin ang iyong koneksyon at subukan muli."
+      "termsCheckRetryCopy": "Hindi ma-check ang Mga Tuntunin ng Serbisyo. Suriin ang iyong koneksyon at subukan muli.",
+      "reactions": {
+        "thumbsUp": "Hinlalaki pataas",
+        "thumbsDown": "Hinlalaki pababa",
+        "laugh": "Tawa",
+        "hooray": "Hurray",
+        "confused": "Nalilito",
+        "heart": "Puso",
+        "rocket": "Rocket",
+        "eyes": "Mga mata"
+      },
+      "anchor": {
+        "fileCommentOnPath": "File comment sa {{path}}",
+        "fileComment": "File comment",
+        "outdatedOnPathLines": "Luma na sa {{path}} {{lines}}",
+        "outdatedOnLines": "Luma na sa {{lines}}",
+        "outdatedOnPath": "Luma na sa {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Ipinapakita ang unang {{limit}} sa {{total}} binagong file — limitasyon sa API ng GitHub"
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard",
-    "linkPasteNotAPullRequest": "Hindi link ng GitHub pull request"
+    "linkPasteNotAPullRequest": "Hindi link ng GitHub pull request",
+    "announce": {
+      "commentPosted": "Na-post ang komento",
+      "reviewSubmitted": "Na-submit ang review",
+      "autoMergeEnabled": "Naka-enable ang auto-merge"
+    }
   },
   "notifications": {
     "title": "Mga Notipikasyon",
@@ -656,7 +709,12 @@
       "sizeRejection": "Ang {{filename}} ay lumalampas sa {{limit}} na limitasyon sa attachment.",
       "unreadable": "Hindi mabasa ang {{filename}}.",
       "pastedImage": "ang na-paste na image",
-      "defaultName": "Attachment"
+      "defaultName": "Attachment",
+      "classificationDenied": "Hindi maaaring i-attach ang mga executable file",
+      "classificationEmpty": "Walang laman ang file",
+      "classificationTooLarge": "Dapat 20 MB o mas maliit ang mga file",
+      "classificationUnreadable": "Hindi mabasa ang file na ito",
+      "announceUploaded": "Na-upload ang attachment"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "SINISIMULA",
       "stopped": "HININTO",
       "stopping": "HINIHINTO",
-      "unknown": "HINDI ALAM"
+      "unknown": "HINDI ALAM",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Hindi na ma-trace ang isang naka-pila na aksyon. I-refresh para makita ang pinakabagong estado.",
     "initialSyncAdmissionFailed": "Pinagana ang Security Agent, ngunit hindi ma-queue ang paunang sync. I-sync muli.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Na-dismiss na ang finding",
+      "findingDismissed": "Na-dismiss ang finding",
+      "noRemediationsQueued": "Walang naka-queue na umiiral na finding",
+      "remediationsQueued": "Na-queue ang mga umiiral na remediation",
+      "analysisComplete": "Kumpleto ang analysis",
+      "syncComplete": "Kumpleto ang sync"
+    }
   },
   "agents": {
     "activeNow": "Aktibo ngayon",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
-      "couldNotOpenMessage": "Hindi namin masimulan ang setup ng GitHub App. Pakisubukang muli."
+      "couldNotOpenMessage": "Hindi namin masimulan ang setup ng GitHub App. Pakisubukang muli.",
+      "installedTitle": "Na-install ang GitHub App",
+      "installedMessage": "Konektado na ang iyong mga repository.",
+      "pendingTitle": "Naghihintay ng approval ng admin",
+      "pendingMessage": "Dapat aprubahan ng organization admin ang installation request.",
+      "accountMismatchTitle": "Hindi tugma ang account",
+      "accountMismatchMessage": "Ang koneksyon na ito ay sinimulan mula sa Kilo App na naka-sign in bilang ibang account. Mag-sign in sa web gamit ang account na iyon, o magsimula muli mula sa app.",
+      "cannotCompleteTitle": "Hindi makumpleto ang installation",
+      "notAdminMessage": "Ang GitHub admin lang ng account na iyon ang makakakonekta nito. Hilingin sa organization admin na i-install ang Kilo.",
+      "alreadyClaimedMessage": "Ang GitHub installation na iyon ay konektado na sa ibang Kilo account. I-disconnect muna ito doon.",
+      "didNotCompleteTitle": "Hindi natapos ang installation",
+      "didNotCompleteMessage": "Hindi natapos ang installation ng GitHub App. Subukan muli mula sa app."
     },
     "sessionExited": "Lumabas sa session",
     "remoteSpawnRetryable": "Hindi maabot ang instance — maaaring nadiskonekta ito.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Pansamantalang hindi available ang paghahatid ng email. Mangyaring subukan muli mamaya.",
     "admissionRequired": "Hindi ma-verify ang iyong device. Gamitin ang '$t(login.moreSignInOptions)' para mag-sign in sa ibang device o sa pamamagitan ng web.",
     "default": "May nangyaring mali. Mangyaring subukan muli.",
-    "retryableAdmission": "Hindi namin ma-verify ang device na ito. Suriin ang iyong koneksyon at subukan muli."
+    "retryableAdmission": "Hindi namin ma-verify ang device na ito. Suriin ang iyong koneksyon at subukan muli.",
+    "startSignInFailed": "Hindi makapagsimula ng sign in. Pakisubukan muli.",
+    "couldNotOpenBrowser": "Hindi mabuksan ang browser. Pakisubukan muli.",
+    "signInTimedOut": "Nag-time out ang sign in. Pakisubukan muli.",
+    "signInFailed": "Nabigo ang sign in. Pakisubukan muli.",
+    "networkError": "Error sa network. Pakisubukan muli.",
+    "accessDeniedByUser": "Tinanggihan ng user ang access",
+    "codeExpired": "Nag-expire ang code"
   },
   "models": {
     "dataCollected": "Kinokolektang data",
-    "free": "Libre"
+    "free": "Libre",
+    "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito"
   }
 }

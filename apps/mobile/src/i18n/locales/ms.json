@@ -22,7 +22,9 @@
     "copiedToClipboard": "Disalin ke papan keratan",
     "couldNotCopyToClipboard": "Tidak dapat menyalin ke papan keratan",
     "required": "diperlukan",
-    "error": "ralat: {{error}}"
+    "error": "ralat: {{error}}",
+    "back": "Kembali",
+    "somethingWentWrong": "Ada sesuatu yang tidak kena"
   },
   "language": {
     "title": "Bahasa",
@@ -280,7 +282,36 @@
         "body": "Tidak dapat memadam cabang: {{reason}}",
         "accessibility": "Digabung. Tidak dapat memadam cabang: {{reason}}"
       },
-      "loadFailedTitle": "Tidak dapat memuatkan pilihan gabung"
+      "loadFailedTitle": "Tidak dapat memuatkan pilihan gabung",
+      "blocked": {
+        "unknownStateTitle": "GitHub belum melaporkan keadaan boleh gabung",
+        "unknownStateDetail": "Cuba muat semula gambaran keseluruhan sebentar lagi.",
+        "conflictsTitle": "Konflik gabung",
+        "conflictsDetail": "Selesaikan konflik gabung pada cabang ini sebelum menggabung.",
+        "requiredReviewsTitle": "Semakan yang diperlukan tiada",
+        "requiredReviewsDetail": "Kelulusan daripada penyemak yang diperlukan tiada atau belum selesai.",
+        "failingChecksTitle": "Semakan diperlukan gagal",
+        "failingChecksDetail": "Semakan status yang diperlukan sedang gagal.",
+        "unstableTitle": "Sebilangan semakan sedang gagal",
+        "unstableDetail": "Semakan yang tidak diperlukan sedang gagal. Ia tidak akan menyekat gabung.",
+        "draftTitle": "Permintaan tarik draf",
+        "draftDetail": "Tandakan permintaan tarik sebagai sedia untuk semakan sebelum menggabung.",
+        "behindTitle": "Cabang sudah lapuk",
+        "behindDetailUpdatable": "Kemas kini cabang daripada asas, atau rebase, sebelum menggabung.",
+        "behindDetail": "Cabang kepala berada di belakang asas. Rebase atau kemas kini cabang sebelum menggabung.",
+        "notMergeableTitle": "Permintaan tarik ini belum boleh digabung",
+        "notMergeableDetail": "GitHub melaporkan keadaan boleh gabung {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Cipta komit gabung",
+        "squash": "Squash dan gabung",
+        "rebase": "Rebase dan gabung"
+      },
+      "methodDescriptions": {
+        "merge": "Gabungkan semua komit daripada cabang ini ke dalam cabang asas dengan komit gabung.",
+        "squash": "Gabungkan semua komit daripada cabang ini menjadi satu komit pada cabang asas.",
+        "rebase": "Mainkan semula semua komit daripada cabang ini pada cabang asas tanpa komit gabung."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Benang perbincangan {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} lagi baris di atas",
       "termsAcceptRequired": "Anda mesti menerima Terma Perkhidmatan untuk menyiarkan.",
       "termsOutdatedCopy": "Terma Perkhidmatan telah berubah. Buka semula skrin ini untuk menerima versi terkini.",
-      "termsCheckRetryCopy": "Tidak dapat menyemak Terma Perkhidmatan. Semak sambungan anda dan cuba lagi."
+      "termsCheckRetryCopy": "Tidak dapat menyemak Terma Perkhidmatan. Semak sambungan anda dan cuba lagi.",
+      "reactions": {
+        "thumbsUp": "Ibu jari ke atas",
+        "thumbsDown": "Ibu jari ke bawah",
+        "laugh": "Ketawa",
+        "hooray": "Hooray",
+        "confused": "Keliru",
+        "heart": "Hati",
+        "rocket": "Roket",
+        "eyes": "Mata"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komen fail pada {{path}}",
+        "fileComment": "Komen fail",
+        "outdatedOnPathLines": "Usang pada {{path}} {{lines}}",
+        "outdatedOnLines": "Usang pada {{lines}}",
+        "outdatedOnPath": "Usang pada {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka tetapan Apl GitHub",
     "installKiloGitHubApp": "Pasang Apl GitHub Kilo",
@@ -523,7 +571,12 @@
       "truncationBanner": "Menunjukkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub"
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong",
-    "linkPasteNotAPullRequest": "Bukan pautan permintaan tarik GitHub"
+    "linkPasteNotAPullRequest": "Bukan pautan permintaan tarik GitHub",
+    "announce": {
+      "commentPosted": "Komen disiarkan",
+      "reviewSubmitted": "Semakan dihantar",
+      "autoMergeEnabled": "Auto-gabung didayakan"
+    }
   },
   "notifications": {
     "title": "Pemberitahuan",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} melebihi had lampiran {{limit}}.",
       "unreadable": "Tidak dapat membaca {{filename}}.",
       "pastedImage": "imej yang ditampal",
-      "defaultName": "Lampiran"
+      "defaultName": "Lampiran",
+      "classificationDenied": "Fail boleh laksana tidak boleh dilampirkan",
+      "classificationEmpty": "Fail kosong",
+      "classificationTooLarge": "Fail mesti 20 MB atau lebih kecil",
+      "classificationUnreadable": "Tidak dapat membaca fail ini",
+      "announceUploaded": "Lampiran dimuat naik"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "MEMULAKAN",
       "stopped": "DIHENTIKAN",
       "stopping": "MENGHENTIKAN",
-      "unknown": "TIDAK DIKETAHUI"
+      "unknown": "TIDAK DIKETAHUI",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Tindakan beratur tidak lagi dapat dijejaki. Segarkan untuk melihat keadaan terkini.",
     "initialSyncAdmissionFailed": "Security Agent didayakan, tetapi penyegerakan awal tidak dapat dijadualkan. Segerakkan lagi.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Penemuan sudah dibuang",
+      "findingDismissed": "Penemuan dibuang",
+      "noRemediationsQueued": "Tiada penemuan sedia ada dalam baris gilir",
+      "remediationsQueued": "Pemulihan sedia ada dijadualkan",
+      "analysisComplete": "Analisis selesai",
+      "syncComplete": "Penyegerakan selesai"
+    }
   },
   "agents": {
     "activeNow": "Aktif sekarang",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",
-      "couldNotOpenMessage": "Kami tidak dapat memulakan persediaan GitHub App. Sila cuba lagi."
+      "couldNotOpenMessage": "Kami tidak dapat memulakan persediaan GitHub App. Sila cuba lagi.",
+      "installedTitle": "Apl GitHub dipasang",
+      "installedMessage": "Repositori anda kini disambungkan.",
+      "pendingTitle": "Menunggu kelulusan pentadbir",
+      "pendingMessage": "Pentadbir organisasi mesti meluluskan permintaan pemasangan.",
+      "accountMismatchTitle": "Akaun tidak sepadan",
+      "accountMismatchMessage": "Sambungan ini dimulakan daripada Apl Kilo yang log masuk sebagai akaun berbeza. Log masuk ke web dengan akaun itu, atau mula semula daripada apl.",
+      "cannotCompleteTitle": "Tidak dapat melengkapkan pemasangan",
+      "notAdminMessage": "Hanya pentadbir GitHub bagi akaun itu boleh menyambungkannya. Minta pentadbir organisasi memasang Kilo.",
+      "alreadyClaimedMessage": "Pemasangan GitHub itu sudah disambungkan ke akaun Kilo lain. Putuskan sambungannya di sana dahulu.",
+      "didNotCompleteTitle": "Pemasangan tidak selesai",
+      "didNotCompleteMessage": "Pemasangan Apl GitHub tidak selesai. Cuba lagi daripada apl."
     },
     "sessionExited": "Sesi keluar",
     "remoteSpawnRetryable": "Tidak dapat mencapai instance — ia mungkin telah terputus sambungan.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Penghantaran emel tidak tersedia buat sementara waktu. Sila cuba lagi kemudian.",
     "admissionRequired": "Peranti anda tidak dapat disahkan. Gunakan '$t(login.moreSignInOptions)' untuk log masuk pada peranti lain atau melalui web.",
     "default": "Sesuatu tidak kena. Sila cuba lagi.",
-    "retryableAdmission": "Kami tidak dapat mengesahkan peranti ini. Semak sambungan anda dan cuba lagi."
+    "retryableAdmission": "Kami tidak dapat mengesahkan peranti ini. Semak sambungan anda dan cuba lagi.",
+    "startSignInFailed": "Gagal memulakan log masuk. Sila cuba lagi.",
+    "couldNotOpenBrowser": "Tidak dapat membuka penyemak imbas. Sila cuba lagi.",
+    "signInTimedOut": "Log masuk tamat masa. Sila cuba lagi.",
+    "signInFailed": "Log masuk gagal. Sila cuba lagi.",
+    "networkError": "Ralat rangkaian. Sila cuba lagi.",
+    "accessDeniedByUser": "Akses dinafikan oleh pengguna",
+    "codeExpired": "Kod tamat tempoh"
   },
   "models": {
     "dataCollected": "Data dikumpul",
-    "free": "Percuma"
+    "free": "Percuma",
+    "couldNotUpdateFavorites": "Tidak dapat mengemas kini kegemaran"
   }
 }

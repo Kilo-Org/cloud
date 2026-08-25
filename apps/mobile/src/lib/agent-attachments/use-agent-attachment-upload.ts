@@ -265,7 +265,7 @@ export function useAgentAttachmentUpload(
           // `announceForA11y` swallows native failures, so it can never enter
           // the upload catch and turn success into a failure toast.
           if (isMountedRef.current) {
-            announceForA11y('Attachment uploaded');
+            announceForA11y(i18n.t('chat.attachment.announceUploaded'));
           }
           return { id: attachment.id, failed: false, remoteFilename, remoteKey };
         } catch (error) {

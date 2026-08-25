@@ -22,7 +22,9 @@
     "copiedToClipboard": "Ikkupjat fil-clipboard",
     "couldNotCopyToClipboard": "Ma setax jikkopja fil-clipboard",
     "required": "meħtieġ",
-    "error": "żball: {{error}}"
+    "error": "żball: {{error}}",
+    "back": "Lura",
+    "somethingWentWrong": "Ġara xi ħsara"
   },
   "language": {
     "title": "Lingwa",
@@ -286,7 +288,36 @@
         "body": "Ma setgħetx titħassar il-fergħa: {{reason}}",
         "accessibility": "Ffuż. Ma setgħetx titħassar il-fergħa: {{reason}}"
       },
-      "loadFailedTitle": "Ma setgħux jitgħabbew l-għażliet tal-merge"
+      "loadFailedTitle": "Ma setgħux jitgħabbew l-għażliet tal-merge",
+      "blocked": {
+        "unknownStateTitle": "GitHub għadu ma rrapportax jekk jistax jiffuż",
+        "unknownStateDetail": "Ipprova aġġorna l-ħarsa ġenerali fi ftit mumenti.",
+        "conflictsTitle": "Kunflitti ta' merge",
+        "conflictsDetail": "Issolvi l-kunflitti ta' merge fuq din il-fergħa qabel ma tiffuż.",
+        "requiredReviewsTitle": "Ir-reviżjonijiet meħtieġa neqsin",
+        "requiredReviewsDetail": "L-approvazzjonijiet mir-reviżuri meħtieġa neqsin jew pendenti.",
+        "failingChecksTitle": "Kontrolli meħtieġa li qed ifallu",
+        "failingChecksDetail": "Il-kontrolli tal-istatus meħtieġa qed ifallu.",
+        "unstableTitle": "Xi kontrolli qed ifallu",
+        "unstableDetail": "Kontrolli mhux meħtieġa qed ifallu. Huma mhux se jimblokkaw il-merge.",
+        "draftTitle": "Abbozz ta' pull request",
+        "draftDetail": "Immarka l-pull request bħala lest għar-reviżjoni qabel ma tiffuż.",
+        "behindTitle": "Il-fergħa hija skaduta",
+        "behindDetailUpdatable": "Aġġorna l-fergħa mill-bażi, jew agħmel rebase, qabel ma tiffuż.",
+        "behindDetail": "Il-fergħa tar-ras hija lura mill-bażi. Agħmel rebase jew aġġorna l-fergħa qabel ma tiffuż.",
+        "notMergeableTitle": "Dan il-pull request għadu ma jistax jiffuż",
+        "notMergeableDetail": "GitHub irrapporta li l-istat tal-merge huwa {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Oħloq commit tal-merge",
+        "squash": "Squash u iffuż",
+        "rebase": "Rebase u iffuż"
+      },
+      "methodDescriptions": {
+        "merge": "Għaqqad il-commits kollha minn din il-fergħa fil-fergħa bażi b'commit tal-merge.",
+        "squash": "Għaqqad il-commits kollha minn din il-fergħa fi commit wieħed fuq il-fergħa bażi.",
+        "rebase": "Irrepeti l-commits kollha minn din il-fergħa fuq il-fergħa bażi mingħajr commit tal-merge."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Thread ta' diskussjoni {{anchorLabel}}",
@@ -368,7 +399,24 @@
       "comment_many": "{{displayCount}} kumment",
       "reaction_two": "reazzjonijiet",
       "reaction_few": "reazzjonijiet",
-      "reaction_many": "reazzjoni"
+      "reaction_many": "reazzjoni",
+      "reactions": {
+        "thumbsUp": "Saba' 'l fuq",
+        "thumbsDown": "Saba' 'l isfel",
+        "laugh": "Daħk",
+        "hooray": "Ura",
+        "confused": "Konfuż",
+        "heart": "Qalb",
+        "rocket": "Rokit",
+        "eyes": "Għajnejn"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Kument dwar il-fajl fuq {{path}}",
+        "fileComment": "Kument dwar il-fajl",
+        "outdatedOnPathLines": "Skadut fuq {{path}} {{lines}}",
+        "outdatedOnLines": "Skadut fuq {{lines}}",
+        "outdatedOnPath": "Skadut fuq {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Ma setgħux jinfetħu s-settings tal-GitHub App",
     "installKiloGitHubApp": "Installa l-Kilo GitHub App",
@@ -544,7 +592,12 @@
       "truncationBanner": "Qed juri l-ewwel {{limit}} minn {{total}} fajls mibdula — il-limitu tal-API ta' GitHub"
     },
     "linkPasteClipboardEmpty": "L-appostru huwa vojt",
-    "linkPasteNotAPullRequest": "Mhux link ta' pull request ta' GitHub"
+    "linkPasteNotAPullRequest": "Mhux link ta' pull request ta' GitHub",
+    "announce": {
+      "commentPosted": "Il-kument ittpoġġa",
+      "reviewSubmitted": "Ir-reviżjoni ntbagħtet",
+      "autoMergeEnabled": "L-auto-merge ġie attivat"
+    }
   },
   "notifications": {
     "title": "Notifiki",
@@ -677,7 +730,12 @@
       "sizeRejection": "{{filename}} jaqbeż il-limitu tal-attachment ta' {{limit}}.",
       "unreadable": "Ma setax jinqara {{filename}}.",
       "pastedImage": "l-immaġni mwaħħla",
-      "defaultName": "Attachment"
+      "defaultName": "Attachment",
+      "classificationDenied": "Il-fajls eżekutibbli ma jistgħux jitwaħħlu",
+      "classificationEmpty": "Il-fajl huwa vojt",
+      "classificationTooLarge": "Il-fajls iridu jkunu 20 MB jew iżgħar",
+      "classificationUnreadable": "Ma setax jinqara dan il-fajl",
+      "announceUploaded": "L-attachment tela'"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1053,7 +1111,8 @@
       "starting": "QED JIBDA",
       "stopped": "MISTOQQA",
       "stopping": "QED JIEGAF",
-      "unknown": "MHUX MAGĦRUF"
+      "unknown": "MHUX MAGĦRUF",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1747,7 +1806,15 @@
     },
     "queuedActionUntracked": "Azzjoni fil-kju ma setgħetx tibqa' tiġi traċċata. Aġġorna biex tara l-aħħar stat.",
     "initialSyncAdmissionFailed": "Is-Security Agent ġie attivat, iżda s-sinkronizzazzjoni inizjali ma setgħetx titqiegħed fil-kju. Erġa' sinkronizza.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Is-sejba diġà twarrbet",
+      "findingDismissed": "Is-sejba twarrbet",
+      "noRemediationsQueued": "L-ebda sejbiet eżistenti fil-kju",
+      "remediationsQueued": "Ir-rimedji eżistenti fil-kju",
+      "analysisComplete": "L-analiżi kompluta",
+      "syncComplete": "Is-sinkronizzazzjoni kompluta"
+    }
   },
   "agents": {
     "activeNow": "Attiv issa",
@@ -1801,7 +1868,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ma setax jinfetaħ GitHub",
-      "couldNotOpenMessage": "Ma stajniex nibdew l-issettjar tal-GitHub App. Jekk jogħġbok erġa' pprova."
+      "couldNotOpenMessage": "Ma stajniex nibdew l-issettjar tal-GitHub App. Jekk jogħġbok erġa' pprova.",
+      "installedTitle": "L-App ta' GitHub ġiet installata",
+      "installedMessage": "Ir-repożitorji tiegħek issa huma konnessi.",
+      "pendingTitle": "Qed tistenna l-approvazzjoni tal-admin",
+      "pendingMessage": "Admin tal-organizzazzjoni għandu japprova t-talba għall-installazzjoni.",
+      "accountMismatchTitle": "Diskrepanza tal-kont",
+      "accountMismatchMessage": "Din il-konnessjoni bdiet mill-App Kilo b'kont differenti. Idħol fil-web b'dak il-kont, jew ibda mill-ġdid mill-app.",
+      "cannotCompleteTitle": "Ma tistax titlesta l-installazzjoni",
+      "notAdminMessage": "Biss admin tal-GitHub ta' dak il-kont jista' jikkonnettjah. Itlob lil admin tal-organizzazzjoni biex jinstalla Kilo.",
+      "alreadyClaimedMessage": "Dik l-installazzjoni ta' GitHub diġà hija konnessa ma' kont ieħor ta' Kilo. Skonnettjaha hemm l-ewwel.",
+      "didNotCompleteTitle": "L-installazzjoni ma tlestietx",
+      "didNotCompleteMessage": "L-installazzjoni tal-App GitHub ma tlestietx. Erġa' pprova mill-app."
     },
     "sessionExited": "Is-sessjoni spiċċat",
     "remoteSpawnRetryable": "Ma stajniex nilħqu l-istanza — jista' jkun li skonnettjat.",
@@ -2774,10 +2852,18 @@
     "emailDeliveryFailed": "Il-kunsinna tal-email mhix disponibbli bħalissa. Jekk jogħġbok erġa' pprova aktar tard.",
     "admissionRequired": "L-apparat tiegħek ma jistax jiġi vverifikat. Uża '$t(login.moreSignInOptions)' dħul' biex tidħol fuq apparat ieħor jew permezz tal-web.",
     "default": "Xi ħaġa marret ħażin. Jekk jogħġbok erġa' pprova.",
-    "retryableAdmission": "Ma stajniex nivverifikaw dan l-apparat. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
+    "retryableAdmission": "Ma stajniex nivverifikaw dan l-apparat. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "startSignInFailed": "Ma setax jibda d-dħul. Jekk jogħġbok erġa' pprova.",
+    "couldNotOpenBrowser": "Ma setax jinfetaħ il-browser. Jekk jogħġbok erġa' pprova.",
+    "signInTimedOut": "Id-dħul skada. Jekk jogħġbok erġa' pprova.",
+    "signInFailed": "Id-dħul fallejt. Jekk jogħġbok erġa' pprova.",
+    "networkError": "Żball tan-netwerk. Jekk jogħġbok erġa' pprova.",
+    "accessDeniedByUser": "L-aċċess ġie miċħud mill-utent",
+    "codeExpired": "Il-kodiċi skada"
   },
   "models": {
     "dataCollected": "Dejta miġbura",
-    "free": "B'xejn"
+    "free": "B'xejn",
+    "couldNotUpdateFavorites": "Ma setgħux jiġu aġġornati l-favoriti"
   }
 }

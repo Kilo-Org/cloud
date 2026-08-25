@@ -22,7 +22,9 @@
     "copiedToClipboard": "Wedi'i gopïo i'r clipfwrdd",
     "couldNotCopyToClipboard": "Ni ellid copïo i'r clipfwrdd",
     "required": "gofynnol",
-    "error": "gwall: {{error}}"
+    "error": "gwall: {{error}}",
+    "back": "Yn ôl",
+    "somethingWentWrong": "Aeth rhywbeth o'i le"
   },
   "language": {
     "title": "Iaith",
@@ -288,7 +290,36 @@
         "body": "Ni ellid dileu'r gangen: {{reason}}",
         "accessibility": "Wedi'i gyfuno. Ni ellid dileu'r gangen: {{reason}}"
       },
-      "loadFailedTitle": "Ni ellid llwytho opsiynau cyfuno"
+      "loadFailedTitle": "Ni ellid llwytho opsiynau cyfuno",
+      "blocked": {
+        "unknownStateTitle": "Nid yw GitHub wedi adrodd cyflwr cyfuno",
+        "unknownStateDetail": "Rhowch gynnig ar adnewyddu'r trosolwg mewn eiliad.",
+        "conflictsTitle": "Gwrthdaro cyfuno",
+        "conflictsDetail": "Datryswch y gwrthdaro cyfuno ar y gangen hon cyn cyfuno.",
+        "requiredReviewsTitle": "Adolygiadau gofynnol ar goll",
+        "requiredReviewsDetail": "Mae cymeradwyaethau gan yr adolygwyr gofynnol ar goll neu ar y gweill.",
+        "failingChecksTitle": "Gwiriadau gofynnol yn methu",
+        "failingChecksDetail": "Mae gwiriadau statws gofynnol yn methu.",
+        "unstableTitle": "Mae rhai gwiriadau yn methu",
+        "unstableDetail": "Mae gwiriadau heb fod yn ofynnol yn methu. Ni fyddant yn blocio'r cyfuniad.",
+        "draftTitle": "Cais tynnu drafft",
+        "draftDetail": "Marciwch y cais tynnu fel yn barod i'w adolygu cyn cyfuno.",
+        "behindTitle": "Mae'r gangen yn hen ffasiwn",
+        "behindDetailUpdatable": "Diweddarwch y gangen o'r sylfaen, neu ailsefyllwch, cyn cyfuno.",
+        "behindDetail": "Mae'r gangen ben ar ei hôl hi o'r sylfaen. Ailsefyllwch neu diweddarwch y gangen cyn cyfuno.",
+        "notMergeableTitle": "Nid yw'r cais tynnu hwn yn gyfunol eto",
+        "notMergeableDetail": "Adroddodd GitHub gyflwr cyfuno {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Creu ymrwymiad cyfuno",
+        "squash": "Gwasgu a chyfuno",
+        "rebase": "Ailsefyll a chyfuno"
+      },
+      "methodDescriptions": {
+        "merge": "Cyfunwch holl ymrwymiadau'r gangen hon i'r gangen sylfaen gydag ymrwymiad cyfuno.",
+        "squash": "Cyfunwch holl ymrwymiadau'r gangen hon yn un ymrwymiad ar y gangen sylfaen.",
+        "rebase": "Ailchwaraewch holl ymrwymiadau'r gangen hon ar y gangen sylfaen heb ymrwymiad cyfuno."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Edafedd trafodaeth {{anchorLabel}}",
@@ -372,7 +403,24 @@
       "reaction_zero": "ymateb",
       "reaction_two": "ymateb",
       "reaction_few": "ymateb",
-      "reaction_many": "ymatebion"
+      "reaction_many": "ymatebion",
+      "reactions": {
+        "thumbsUp": "Bawd i fyny",
+        "thumbsDown": "Bawd i lawr",
+        "laugh": "Chwerthin",
+        "hooray": "Hwre",
+        "confused": "Wedi drysu",
+        "heart": "Calon",
+        "rocket": "Roced",
+        "eyes": "Llygaid"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Sylw ffeil ar {{path}}",
+        "fileComment": "Sylw ffeil",
+        "outdatedOnPathLines": "Hen ffasiwn ar {{path}} {{lines}}",
+        "outdatedOnLines": "Hen ffasiwn ar {{lines}}",
+        "outdatedOnPath": "Hen ffasiwn ar {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Ni ellid agor gosodiadau Ap GitHub",
     "installKiloGitHubApp": "Gosod Ap GitHub Kilo",
@@ -551,7 +599,12 @@
       "truncationBanner": "Yn dangos y {{limit}} cyntaf o {{total}} ffeil a newidiwyd — terfyn API GitHub"
     },
     "linkPasteClipboardEmpty": "Mae'r clipfwrdd yn wag",
-    "linkPasteNotAPullRequest": "Nid dolen GitHub pull request yw hon"
+    "linkPasteNotAPullRequest": "Nid dolen GitHub pull request yw hon",
+    "announce": {
+      "commentPosted": "Sylw wedi'i bostio",
+      "reviewSubmitted": "Adolygiad wedi'i gyflwyno",
+      "autoMergeEnabled": "Cyfuno awtomatig wedi'i alluogi"
+    }
   },
   "notifications": {
     "title": "Hysbysiadau",
@@ -684,7 +737,12 @@
       "sizeRejection": "Mae {{filename}} yn fwy na'r terfyn atodiad {{limit}}.",
       "unreadable": "Ni ellid darllen {{filename}}.",
       "pastedImage": "y ddelwedd wedi'i gludo",
-      "defaultName": "Atodiad"
+      "defaultName": "Atodiad",
+      "classificationDenied": "Ni ellir atodi ffeiliau gweithredadwy",
+      "classificationEmpty": "Mae'r ffeil yn wag",
+      "classificationTooLarge": "Rhaid i ffeiliau fod yn 20 MB neu lai",
+      "classificationUnreadable": "Ni ellid darllen y ffeil hon",
+      "announceUploaded": "Atodiad wedi'i uwchlwytho"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1061,7 +1119,8 @@
       "starting": "YN DECHRAU",
       "stopped": "WEDI STOPIO",
       "stopping": "YN STOPIO",
-      "unknown": "ANHYSBYS"
+      "unknown": "ANHYSBYS",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1758,7 +1817,15 @@
     },
     "queuedActionUntracked": "Ni ellid olrhain cam gweithredu mewn ciw mwyach. Adnewyddwch i weld y cyflwr diweddaraf.",
     "initialSyncAdmissionFailed": "Cafodd Security Agent ei alluogi, ond ni ellid rhoi'r cysoni cychwynnol mewn ciw. Cysoniwch eto.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Canfyddiad eisoes wedi'i ddiystyru",
+      "findingDismissed": "Canfyddiad wedi'i ddiystyru",
+      "noRemediationsQueued": "Dim canfyddiadau presennol yn y ciw",
+      "remediationsQueued": "Unioniadau presennol yn y ciw",
+      "analysisComplete": "Dadansoddiad wedi'i gwblhau",
+      "syncComplete": "Cydamseriad wedi'i gwblhau"
+    }
   },
   "agents": {
     "activeNow": "Yn weithredol nawr",
@@ -1814,7 +1881,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Methwyd agor GitHub",
-      "couldNotOpenMessage": "Ni allem ddechrau gosod yr Ap GitHub. Ceisiwch eto."
+      "couldNotOpenMessage": "Ni allem ddechrau gosod yr Ap GitHub. Ceisiwch eto.",
+      "installedTitle": "Ap GitHub wedi'i osod",
+      "installedMessage": "Mae eich storfeydd wedi'u cysylltu nawr.",
+      "pendingTitle": "Aros am gymeradwyaeth gweinyddwr",
+      "pendingMessage": "Rhaid i weinyddwr sefydliad gymeradwyo'r cais gosod.",
+      "accountMismatchTitle": "Anghyfatebiaeth cyfrif",
+      "accountMismatchMessage": "Cychwynnwyd y cysylltiad hwn o'r Ap Kilo wedi mewngofnodi gyda chyfrif gwahanol. Mewngofnodwch ar y we gyda'r cyfrif hwnnw, neu dechreuwch eto o'r ap.",
+      "cannotCompleteTitle": "Ni ellir cwblhau'r gosodiad",
+      "notAdminMessage": "Dim ond gweinyddwr GitHub y cyfrif hwnnw all ei gysylltu. Gofynnwch i weinyddwr sefydliad osod Kilo.",
+      "alreadyClaimedMessage": "Mae'r gosodiad GitHub hwnnw eisoes wedi'i gysylltu â chyfrif Kilo arall. Datgysylltwch ef yno yn gyntaf.",
+      "didNotCompleteTitle": "Ni chwblhawyd y gosodiad",
+      "didNotCompleteMessage": "Ni chwblhawyd gosodiad yr Ap GitHub. Rhowch gynnig eto o'r ap."
     },
     "sessionExited": "Wedi gadael y sesiwn",
     "remoteSpawnRetryable": "Ni ellid cyrraedd yr enghraifft — efallai iddi ddatgysylltu.",
@@ -2793,10 +2871,18 @@
     "emailDeliveryFailed": "Nid yw cyflenwi e-bost ar gael dros dro. Rhowch gynnig arall arni yn nes ymlaen.",
     "admissionRequired": "Ni ellir gwirio'ch dyfais. Defnyddiwch '$t(login.moreSignInOptions)' i fewngofnodi ar ddyfais arall neu drwy'r we.",
     "default": "Aeth rhywbeth o'i le. Rhowch gynnig arall arni.",
-    "retryableAdmission": "Methwyd â gwirio'r ddyfais hon. Gwiriwch eich cysylltiad a rhowch gynnig arall arni."
+    "retryableAdmission": "Methwyd â gwirio'r ddyfais hon. Gwiriwch eich cysylltiad a rhowch gynnig arall arni.",
+    "startSignInFailed": "Methodd cychwyn mewngofnodi. Rhowch gynnig eto.",
+    "couldNotOpenBrowser": "Ni ellid agor y porwr. Rhowch gynnig eto.",
+    "signInTimedOut": "Aeth y mewngofnodi dros amser. Rhowch gynnig eto.",
+    "signInFailed": "Methodd mewngofnodi. Rhowch gynnig eto.",
+    "networkError": "Gwall rhwydwaith. Rhowch gynnig eto.",
+    "accessDeniedByUser": "Mynediad wedi'i wrthod gan y defnyddiwr",
+    "codeExpired": "Cod wedi dod i ben"
   },
   "models": {
     "dataCollected": "Data a gasglwyd",
-    "free": "Am ddim"
+    "free": "Am ddim",
+    "couldNotUpdateFavorites": "Ni ellid diweddaru ffefrynnau"
   }
 }

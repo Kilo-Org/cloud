@@ -22,7 +22,9 @@
     "copiedToClipboard": "පසුරු පුවරුවට පිටපත් කරන ලදී",
     "couldNotCopyToClipboard": "පසුරු පුවරුවට පිටපත් කිරීමට නොහැකි විය",
     "required": "අවශ්‍යයි",
-    "error": "දෝෂය: {{error}}"
+    "error": "දෝෂය: {{error}}",
+    "back": "ආපසු",
+    "somethingWentWrong": "යම් දෙයක් වැරදී ඇත"
   },
   "language": {
     "title": "භාෂාව",
@@ -280,7 +282,36 @@
         "body": "ශාඛාව මැකීමට නොහැකි විය: {{reason}}",
         "accessibility": "ඒකාබද්ධ කරන ලදී. ශාඛාව මැකීමට නොහැකි විය: {{reason}}"
       },
-      "loadFailedTitle": "ඒකාබද්ධ කිරීමේ විකල්ප පූරණය කිරීමට නොහැකි විය"
+      "loadFailedTitle": "ඒකාබද්ධ කිරීමේ විකල්ප පූරණය කිරීමට නොහැකි විය",
+      "blocked": {
+        "unknownStateTitle": "GitHub ඒකාබද්ධ කිරීමේ හැකියාව වාර්තා කර නොමැත",
+        "unknownStateDetail": "මොහොතකින් දළ විශ්ලේෂණය නැවුම් කිරීමට උත්සාහ කරන්න.",
+        "conflictsTitle": "ඒකාබද්ධ ගැටුම්",
+        "conflictsDetail": "ඒකාබද්ධ කිරීමට පෙර මෙම ශාඛාවේ ඒකාබද්ධ ගැටුම් විසඳන්න.",
+        "requiredReviewsTitle": "අවශ්‍ය සමාලෝචන නොමැත",
+        "requiredReviewsDetail": "අවශ්‍ය සමාලෝචකයන්ගේ අනුමැති නොමැත හෝ බලා සිටී.",
+        "failingChecksTitle": "අසමත් වන අවශ්‍ය පරීක්ෂා",
+        "failingChecksDetail": "අවශ්‍ය තත්ත්ව පරීක්ෂා අසමත් වෙමින් පවතී.",
+        "unstableTitle": "සමහර පරීක්ෂා අසමත් වෙමින් පවතී",
+        "unstableDetail": "අනිවාර්ය නොවන පරීක්ෂා අසමත් වෙමින් පවතී. ඒවා ඒකාබද්ධ කිරීම අවහිර නොකරයි.",
+        "draftTitle": "කෙටුම්පත් pull request",
+        "draftDetail": "ඒකාබද්ධ කිරීමට පෙර pull request එක සමාලෝචනයට සූදානම් ලෙස සලකුණු කරන්න.",
+        "behindTitle": "ශාඛාව යල් පැන ගොස් ඇත",
+        "behindDetailUpdatable": "ඒකාබද්ධ කිරීමට පෙර පාදයෙන් ශාඛාව යාවත්කාලීන කරන්න, නැතහොත් rebase කරන්න.",
+        "behindDetail": "Head ශාඛාව පාදයට වඩා පසුගාමී ය. ඒකාබද්ධ කිරීමට පෙර rebase කරන්න හෝ ශාඛාව යාවත්කාලීන කරන්න.",
+        "notMergeableTitle": "මෙම pull request තවමත් ඒකාබද්ධ කළ නොහැක",
+        "notMergeableDetail": "GitHub {{state}} ඒකාබද්ධ කිරීමේ තත්ත්වයක් වාර්තා කළේය."
+      },
+      "methodLabels": {
+        "merge": "ඒකාබද්ධ commit එකක් සාදන්න",
+        "squash": "Squash කර ඒකාබද්ධ කරන්න",
+        "rebase": "Rebase කර ඒකාබද්ධ කරන්න"
+      },
+      "methodDescriptions": {
+        "merge": "මෙම ශාඛාවේ සියලුම commits ඒකාබද්ධ commit එකක් සමඟ පාද ශාඛාවට ඒකාබද්ධ කරන්න.",
+        "squash": "මෙම ශාඛාවේ සියලුම commits පාද ශාඛාවේ තනි commit එකකට ඒකාබද්ධ කරන්න.",
+        "rebase": "ඒකාබද්ධ commit එකක් නොමැතිව මෙම ශාඛාවේ සියලුම commits පාද ශාඛාවට නැවත ධාවනය කරන්න."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "සාකච්ඡා නූල {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… ඉහළ තව පේළි {{displayCount}} ක්",
       "termsAcceptRequired": "පළ කිරීමට ඔබ සේවා නියමයන් පිළිගත යුතුය.",
       "termsOutdatedCopy": "සේවා නියමයන් වෙනස් විය. නවතම අනුවාදය පිළිගැනීමට මෙම තිරය නැවත විවෘත කරන්න.",
-      "termsCheckRetryCopy": "සේවා නියමයන් පරීක්ෂා කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+      "termsCheckRetryCopy": "සේවා නියමයන් පරීක්ෂා කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "reactions": {
+        "thumbsUp": "මාපටැඟිල්ල උඩට",
+        "thumbsDown": "මාපටැඟිල්ල පහළට",
+        "laugh": "සිනහව",
+        "hooray": "හුරේ",
+        "confused": "ව්‍යාකූල",
+        "heart": "හදවත",
+        "rocket": "රොකට්ටුව",
+        "eyes": "ඇස්"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} හි ගොනු අදහස",
+        "fileComment": "ගොනු අදහස",
+        "outdatedOnPathLines": "{{path}} {{lines}} හි යල් පැන ගිය",
+        "outdatedOnLines": "{{lines}} හි යල් පැන ගිය",
+        "outdatedOnPath": "{{path}} හි යල් පැන ගිය"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub App සැකසුම් විවෘත කිරීමට නොහැකි විය",
     "installKiloGitHubApp": "Kilo GitHub App ස්ථාපනය කරන්න",
@@ -523,7 +571,12 @@
       "truncationBanner": "වෙනස් කළ ගොනු {{total}} අතරින් පළමු {{limit}} පෙන්වයි — GitHub API සීමාව"
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස් ය",
-    "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ"
+    "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ",
+    "announce": {
+      "commentPosted": "අදහස පළ කරන ලදී",
+      "reviewSubmitted": "සමාලෝචනය ඉදිරිපත් කරන ලදී",
+      "autoMergeEnabled": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම සක්‍රීය කර ඇත"
+    }
   },
   "notifications": {
     "title": "දැනුම්දීම්",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} ඇමුණුම් සීමාව ඉක්මවයි.",
       "unreadable": "{{filename}} කියවීමට නොහැකි විය.",
       "pastedImage": "අලවන ලද රූපය",
-      "defaultName": "ඇමුණුම"
+      "defaultName": "ඇමුණුම",
+      "classificationDenied": "ක්‍රියාත්මක කළ හැකි ගොනු ඇමිණිය නොහැක",
+      "classificationEmpty": "ගොනුව හිස් ය",
+      "classificationTooLarge": "ගොනු 20 MB හෝ ඊට අඩු විය යුතුය",
+      "classificationUnreadable": "මෙම ගොනුව කියවීමට නොහැකි විය",
+      "announceUploaded": "ඇමුණුම උඩුගත කරන ලදී"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ආරම්භ වෙමින්",
       "stopped": "නතර කර ඇත",
       "stopping": "නවතිමින්",
-      "unknown": "නොදන්නා"
+      "unknown": "නොදන්නා",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "පෝලිම් කළ ක්රියාවක් තවදුරටත් නිරීක්ෂණය කළ නොහැක. නවතම තත්වය බැලීමට නැවුම් කරන්න.",
     "initialSyncAdmissionFailed": "Security Agent සක්රීය කර ඇත, නමුත් ආරම්භක සමමුහුර්තය පෝලිම් කළ නොහැකි විය. නැවත සමමුහුර්ත කරන්න.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "සොයාගැනීම දැනටමත් ඉවතලා ඇත",
+      "findingDismissed": "සොයාගැනීම ඉවතලා ඇත",
+      "noRemediationsQueued": "පවතින සොයා ගැනීම් පෝලිම් කර නොමැත",
+      "remediationsQueued": "පවතින ප්‍රතිකර්ම පෝලිම් කර ඇත",
+      "analysisComplete": "විශ්ලේෂණය සම්පූර්ණයි",
+      "syncComplete": "සමමුහුර්තය සම්පූර්ණයි"
+    }
   },
   "agents": {
     "activeNow": "දැන් සක්රීයයි",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub විවෘත කළ නොහැක",
-      "couldNotOpenMessage": "GitHub App සැකසුම ආරම්භ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
+      "couldNotOpenMessage": "GitHub App සැකසුම ආරම්භ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "installedTitle": "GitHub App ස්ථාපනය කරන ලදී",
+      "installedMessage": "ඔබේ ගබඩා දැන් සම්බන්ධ කර ඇත.",
+      "pendingTitle": "පරිපාලක අනුමැතිය බලාපොරොත්තුවෙන්",
+      "pendingMessage": "ස්ථාපන ඉල්ලීම අනුමත කළ යුත්තේ ආයතන පරිපාලකයෙකි.",
+      "accountMismatchTitle": "ගිණුම් නොගැලපීම",
+      "accountMismatchMessage": "මෙම සම්බන්ධතාවය ආරම්භ කර ඇත්තේ වෙනත් ගිණුමකින් පුරනය වී ඇති Kilo App එකෙනි. එම ගිණුමෙන් වෙබ් අඩවියට පුරනය වන්න, නැතහොත් යෙදුමෙන් නැවත ආරම්භ කරන්න.",
+      "cannotCompleteTitle": "ස්ථාපනය සම්පූර්ණ කළ නොහැක",
+      "notAdminMessage": "එම ගිණුමේ GitHub පරිපාලකයෙකුට පමණක් එය සම්බන්ධ කළ හැක. Kilo ස්ථාපනය කිරීමට ආයතන පරිපාලකයෙකුගෙන් ඉල්ලන්න.",
+      "alreadyClaimedMessage": "එම GitHub ස්ථාපනය දැනටමත් වෙනත් Kilo ගිණුමකට සම්බන්ධ කර ඇත. පළමුව එය එතැනින් විසන්ධි කරන්න.",
+      "didNotCompleteTitle": "ස්ථාපනය සම්පූර්ණ නොවීය",
+      "didNotCompleteMessage": "GitHub App ස්ථාපනය සම්පූර්ණ නොවීය. යෙදුමෙන් නැවත උත්සාහ කරන්න."
     },
     "sessionExited": "සැසියෙන් ඉවත් විය",
     "remoteSpawnRetryable": "අවස්ථාවට ළඟා විය නොහැකි විය — එය විසන්ධි වන්නට පුළුවන.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ඊමේල් ලබා දීම තාවකාලිකව නොමැත. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
     "admissionRequired": "ඔබේ උපාංගය තහවුරු කළ නොහැක. වෙනත් උපාංගයකින් හෝ වෙබ් අඩවිය හරහා පිවිසීමට '$t(login.moreSignInOptions)' භාවිතා කරන්න.",
     "default": "යම් දෙයක් වැරදී ගියේය. කරුණාකර නැවත උත්සාහ කරන්න.",
-    "retryableAdmission": "මෙම උපාංගය තහවුරු කළ නොහැකි විය. ඔබේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    "retryableAdmission": "මෙම උපාංගය තහවුරු කළ නොහැකි විය. ඔබේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "startSignInFailed": "පිවිසුම ආරම්භ කිරීමට අසමත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "couldNotOpenBrowser": "බ්‍රවුසරය විවෘත කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "signInTimedOut": "පිවිසුම කාලය ඉකුත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "signInFailed": "පිවිසුම අසමත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "networkError": "ජාල දෝෂයකි. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "accessDeniedByUser": "පරිශීලකයා විසින් ප්‍රවේශය ප්‍රතික්ෂේප කරන ලදී",
+    "codeExpired": "කේතය කල් ඉකුත් විය"
   },
   "models": {
     "dataCollected": "එකතු කළ දත්ත",
-    "free": "නොමිලේ"
+    "free": "නොමිලේ",
+    "couldNotUpdateFavorites": "ප්‍රියතමයන් යාවත්කාලීන කිරීමට නොහැකි විය"
   }
 }

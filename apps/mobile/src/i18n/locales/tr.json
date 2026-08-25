@@ -22,7 +22,9 @@
     "required": "zorunlu",
     "error": "hata: {{error}}",
     "notNow": "Şimdi değil",
-    "continue": "Devam et"
+    "continue": "Devam et",
+    "back": "Geri",
+    "somethingWentWrong": "Bir şeyler ters gitti"
   },
   "language": {
     "title": "Dil",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}}, {{limit}} ek sınırını aşıyor.",
       "unreadable": "{{filename}} okunamadı.",
       "pastedImage": "yapıştırılan görsel",
-      "defaultName": "Ek"
+      "defaultName": "Ek",
+      "classificationDenied": "Yürütülebilir dosyalar eklenemez",
+      "classificationEmpty": "Dosya boş",
+      "classificationTooLarge": "Dosyalar 20 MB veya daha küçük olmalı",
+      "classificationUnreadable": "Bu dosya okunamadı",
+      "announceUploaded": "Ek yüklendi"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "BAŞLATILIYOR",
       "stopped": "DURDURULDU",
       "stopping": "DURDURULUYOR",
-      "unknown": "BİLİNMİYOR"
+      "unknown": "BİLİNMİYOR",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent etkinleştirildi ancak ilk eşitleme kuyruğa alınamadı. Tekrar eşitleyin.",
-    "queuedActionUntracked": "Kuyruğa alınmış bir eylem artık izlenemiyor. En son durumu görmek için yenileyin."
+    "queuedActionUntracked": "Kuyruğa alınmış bir eylem artık izlenemiyor. En son durumu görmek için yenileyin.",
+    "commands": {
+      "findingAlreadyDismissed": "Bulgu zaten yok sayıldı",
+      "findingDismissed": "Bulgu yok sayıldı",
+      "noRemediationsQueued": "Sıraya alınmış mevcut bulgu yok",
+      "remediationsQueued": "Mevcut iyileştirmeler kuyruğa alındı",
+      "analysisComplete": "Analiz tamamlandı",
+      "syncComplete": "Senkronizasyon tamamlandı"
+    }
   },
   "agents": {
     "activeNow": "Şu anda etkin",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Uygulaması kurulumu başlatılamadı. Lütfen tekrar deneyin.",
-      "couldNotOpenTitle": "GitHub açılamadı"
+      "couldNotOpenTitle": "GitHub açılamadı",
+      "installedTitle": "GitHub Uygulaması kuruldu",
+      "installedMessage": "Depolarınız artık bağlı.",
+      "pendingTitle": "Yönetici onayı bekleniyor",
+      "pendingMessage": "Bir kuruluş yöneticisinin kurulum isteğini onaylaması gerekir.",
+      "accountMismatchTitle": "Hesap uyuşmazlığı",
+      "accountMismatchMessage": "Bu bağlantı, farklı bir hesapla oturum açılmış Kilo Uygulaması'ndan başlatıldı. O hesapla web'de oturum açın veya uygulamadan yeniden başlatın.",
+      "cannotCompleteTitle": "Kurulum tamamlanamıyor",
+      "notAdminMessage": "Bu hesabı yalnızca hesabın GitHub yöneticisi bağlayabilir. Kilo'yu yüklemesi için kuruluş yöneticinizden isteyin.",
+      "alreadyClaimedMessage": "Bu GitHub kurulumu zaten başka bir Kilo hesabına bağlı. Önce orada bağlantısını kesin.",
+      "didNotCompleteTitle": "Kurulum tamamlanmadı",
+      "didNotCompleteMessage": "GitHub Uygulaması kurulumu tamamlanmadı. Uygulamadan tekrar deneyin."
     },
     "sessionExited": "Oturumdan çıkıldı",
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
@@ -2307,7 +2334,24 @@
       "viewTerms": "Koşulları görüntüle",
       "termsAcceptRequired": "Gönderi yapmak için Hizmet Koşullarını kabul etmelisiniz.",
       "termsCheckRetryCopy": "Hizmet Koşulları kontrol edilemedi. Bağlantınızı kontrol edin ve tekrar deneyin.",
-      "termsOutdatedCopy": "Hizmet Koşulları değişti. En son sürümü kabul etmek için bu ekranı yeniden açın."
+      "termsOutdatedCopy": "Hizmet Koşulları değişti. En son sürümü kabul etmek için bu ekranı yeniden açın.",
+      "reactions": {
+        "thumbsUp": "Başparmak yukarı",
+        "thumbsDown": "Başparmak aşağı",
+        "laugh": "Gülme",
+        "hooray": "Yaşasın",
+        "confused": "Kafası karışık",
+        "heart": "Kalp",
+        "rocket": "Roket",
+        "eyes": "Gözler"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} konumunda dosya yorumu",
+        "fileComment": "Dosya yorumu",
+        "outdatedOnPathLines": "{{path}} {{lines}} konumunda güncel değil",
+        "outdatedOnLines": "{{lines}} konumunda güncel değil",
+        "outdatedOnPath": "{{path}} konumunda güncel değil"
+      }
     },
     "entry": {
       "clearLink": "Çekme isteği bağlantısını temizle",
@@ -2464,7 +2508,36 @@
         "closed": "Bu çekme isteği kapalı"
       },
       "updateBranch": "Dalı güncelle",
-      "updateBranchFromBase": "Dalı temel daldan güncelle"
+      "updateBranchFromBase": "Dalı temel daldan güncelle",
+      "blocked": {
+        "unknownStateTitle": "GitHub birleştirilebilirlik durumu bildirmedi",
+        "unknownStateDetail": "Kısa bir süre sonra genel bakışı yenilemeyi deneyin.",
+        "conflictsTitle": "Birleştirme çakışmaları",
+        "conflictsDetail": "Birleştirmeden önce bu daldaki birleştirme çakışmalarını çözün.",
+        "requiredReviewsTitle": "Gerekli incelemeler eksik",
+        "requiredReviewsDetail": "Gerekli inceleyenlerin onayları eksik veya bekliyor.",
+        "failingChecksTitle": "Başarısız gerekli kontroller",
+        "failingChecksDetail": "Gerekli durum kontrolleri başarısız oluyor.",
+        "unstableTitle": "Bazı kontroller başarısız",
+        "unstableDetail": "Gerekli olmayan kontroller başarısız oluyor. Birleştirmeyi engellemezler.",
+        "draftTitle": "Taslak çekme isteği",
+        "draftDetail": "Birleştirmeden önce çekme isteğini incelemeye hazır olarak işaretleyin.",
+        "behindTitle": "Dal güncel değil",
+        "behindDetailUpdatable": "Birleştirmeden önce dalı temel daldan güncelleyin veya rebase yapın.",
+        "behindDetail": "Baş dal, temel dalın gerisinde. Birleştirmeden önce dalı rebase edin veya güncelleyin.",
+        "notMergeableTitle": "Bu çekme isteği henüz birleştirilebilir değil",
+        "notMergeableDetail": "GitHub {{state}} birleştirilebilirlik durumu bildirdi."
+      },
+      "methodLabels": {
+        "merge": "Birleştirme commit'i oluştur",
+        "squash": "Squash ile birleştir",
+        "rebase": "Rebase ile birleştir"
+      },
+      "methodDescriptions": {
+        "merge": "Bu daldaki tüm commit'leri bir birleştirme commit'iyle temel dala birleştirir.",
+        "squash": "Bu daldaki tüm commit'leri temel dalda tek bir commit'te birleştirir.",
+        "rebase": "Bu daldaki tüm commit'leri bir birleştirme commit'i olmadan temel dalda yeniden uygular."
+      }
     },
     "noDescriptionProvided": "Açıklama sağlanmadı.",
     "noFilesChanged": "Değişen dosya yok",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "Değiştirilen dosyaların ilk {{limit}} tanesi gösteriliyor (toplam {{total}}) — GitHub API sınırı"
     },
     "linkPasteClipboardEmpty": "Pano boş",
-    "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil"
+    "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil",
+    "announce": {
+      "commentPosted": "Yorum gönderildi",
+      "reviewSubmitted": "İnceleme gönderildi",
+      "autoMergeEnabled": "Otomatik birleştirme etkinleştirildi"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-posta teslimatı geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
     "admissionRequired": "Cihazınız doğrulanamıyor. Başka bir cihazda veya web üzerinden oturum açmak için '$t(login.moreSignInOptions)'ni kullanın.",
     "default": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
-    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantınızı kontrol edin ve tekrar deneyin."
+    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantınızı kontrol edin ve tekrar deneyin.",
+    "startSignInFailed": "Oturum açma başlatılamadı. Lütfen tekrar deneyin.",
+    "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar deneyin.",
+    "signInTimedOut": "Oturum açma zaman aşımına uğradı. Lütfen tekrar deneyin.",
+    "signInFailed": "Oturum açma başarısız oldu. Lütfen tekrar deneyin.",
+    "networkError": "Ağ hatası. Lütfen tekrar deneyin.",
+    "accessDeniedByUser": "Kullanıcı erişimi reddetti",
+    "codeExpired": "Kodun süresi doldu"
   },
   "models": {
     "dataCollected": "Toplanan veriler",
-    "free": "Ücretsiz"
+    "free": "Ücretsiz",
+    "couldNotUpdateFavorites": "Sık kullanılanlar güncellenemedi"
   }
 }

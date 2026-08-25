@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 
+import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -147,7 +148,7 @@ export function useEnableAutoMergeMutation(ref: PrRef) {
       onSuccess: () => {
         // Bare success announcement beside the merge sheet's existing
         // auto-merge success effect (haptic + refetch + dismiss).
-        announceForA11y('Auto-merge enabled');
+        announceForA11y(i18n.t('prReview.announce.autoMergeEnabled'));
       },
       onError: (error: { message: string }) => {
         announcingToast.error(error.message);

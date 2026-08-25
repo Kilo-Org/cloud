@@ -22,7 +22,9 @@
     "copiedToClipboard": "დაკოპირდა ბუფერში",
     "couldNotCopyToClipboard": "ბუფერში კოპირება ვერ მოხერხდა",
     "required": "აუცილებელი",
-    "error": "შეცდომა: {{error}}"
+    "error": "შეცდომა: {{error}}",
+    "back": "უკან",
+    "somethingWentWrong": "რაღაც არასწორედ მოხდა"
   },
   "language": {
     "title": "ენა",
@@ -280,7 +282,36 @@
         "body": "განშტოების წაშლა ვერ მოხერხდა: {{reason}}",
         "accessibility": "შერწყმულია. განშტოების წაშლა ვერ მოხერხდა: {{reason}}"
       },
-      "loadFailedTitle": "შერწყმის ვარიანტების ჩატვირთვა ვერ მოხერხდა"
+      "loadFailedTitle": "შერწყმის ვარიანტების ჩატვირთვა ვერ მოხერხდა",
+      "blocked": {
+        "unknownStateTitle": "GitHub-მა არ მოახსენა შერწყმის მზაობის მდგომარეობა",
+        "unknownStateDetail": "სცადეთ მიმოხილვის განახლება მომენტში.",
+        "conflictsTitle": "შერწყმის კონფლიქტები",
+        "conflictsDetail": "მოაგვარეთ შერწყმის კონფლიქტები ამ განშტოებაზე შერწყმამდე.",
+        "requiredReviewsTitle": "აუცილებელი რეცენზიები აკლია",
+        "requiredReviewsDetail": "აუცილებელი რეცენზენტების დამტკიცებები აკლია ან მოლოდინშია.",
+        "failingChecksTitle": "აუცილებელი შემოწმებები მარცხდება",
+        "failingChecksDetail": "აუცილებელი სტატუსის შემოწმებები მარცხდება.",
+        "unstableTitle": "ზოგიერთი შემოწმება მარცხდება",
+        "unstableDetail": "არასაჭირო შემოწმებები მარცხდება. ისინი არ დაბლოკავენ შერწყმას.",
+        "draftTitle": "დრაფტი პულ-რექვესთი",
+        "draftDetail": "მონიშნეთ პულ-რექვესთი მზად რეცენზიისთვის შერწყმამდე.",
+        "behindTitle": "განშტოება მოძველებულია",
+        "behindDetailUpdatable": "განაახლეთ განშტოება საფუძვლიდან, ან გააკეთეთ rebase, შერწყმამდე.",
+        "behindDetail": "head განშტოება საფუძველს ჩამორჩება. გააკეთეთ rebase ან განაახლეთ განშტოება შერწყმამდე.",
+        "notMergeableTitle": "ეს პულ-რექვესთი ჯერ ვერ შეერწყმება",
+        "notMergeableDetail": "GitHub-მა მოახსენა {{state}} შერწყმის მდგომარეობა."
+      },
+      "methodLabels": {
+        "merge": "შერწყმის commit-ის შექმნა",
+        "squash": "Squash და შერწყმა",
+        "rebase": "Rebase და შერწყმა"
+      },
+      "methodDescriptions": {
+        "merge": "გააერთიანეთ ამ განშტოების ყველა commit საბაზო განშტოებაში შერწყმის commit-ით.",
+        "squash": "გააერთიანეთ ამ განშტოების ყველა commit საბაზო განშტოებაზე ერთ commit-ად.",
+        "rebase": "გაიმეორეთ ამ განშტოების ყველა commit საბაზო განშტოებაზე შერწყმის commit-ის გარეშე."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "განხილვის თემა {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… კიდევ {{displayCount}} ხაზი ზემოთ",
       "termsAcceptRequired": "პოსტისთვის უნდა მიიღოთ მომსახურების პირობები.",
       "termsOutdatedCopy": "მომსახურების პირობები შეიცვალა. ხელახლა გახსენით ეს ეკრანი უახლესი ვერსიის მისაღებად.",
-      "termsCheckRetryCopy": "მომსახურების პირობების შემოწმება ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ."
+      "termsCheckRetryCopy": "მომსახურების პირობების შემოწმება ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ.",
+      "reactions": {
+        "thumbsUp": "მოწონება",
+        "thumbsDown": "არ მოწონება",
+        "laugh": "სიცილი",
+        "hooray": "ურა",
+        "confused": "დაბნეული",
+        "heart": "გული",
+        "rocket": "რაკეტა",
+        "eyes": "თვალები"
+      },
+      "anchor": {
+        "fileCommentOnPath": "ფაილის კომენტარი {{path}}-ზე",
+        "fileComment": "ფაილის კომენტარი",
+        "outdatedOnPathLines": "მოძველებულია {{path}} {{lines}}-ზე",
+        "outdatedOnLines": "მოძველებულია {{lines}}-ზე",
+        "outdatedOnPath": "მოძველებულია {{path}}-ზე"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub აპლიკაციის პარამეტრების გახსნა ვერ მოხერხდა",
     "installKiloGitHubApp": "დააინსტალირეთ Kilo GitHub აპლიკაცია",
@@ -523,7 +571,12 @@
       "truncationBanner": "ნაჩვენებია შეცვლილი ფაილების {{total}}-დან პირველი {{limit}} — GitHub API ლიმიტი"
     },
     "linkPasteClipboardEmpty": "ბუფერი ცარიელია",
-    "linkPasteNotAPullRequest": "არ არის GitHub pull request ბმული"
+    "linkPasteNotAPullRequest": "არ არის GitHub pull request ბმული",
+    "announce": {
+      "commentPosted": "კომენტარი გამოქვეყნდა",
+      "reviewSubmitted": "რეცენზია გაგზავნილია",
+      "autoMergeEnabled": "ავტო-შერწყმა ჩართულია"
+    }
   },
   "notifications": {
     "title": "შეტყობინებები",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} აჭარბებს {{limit}} მიმაგრების ლიმიტს.",
       "unreadable": "{{filename}} წაკითხვა ვერ მოხერხდა.",
       "pastedImage": "ჩასმული სურათი",
-      "defaultName": "მიმაგრებული ფაილი"
+      "defaultName": "მიმაგრებული ფაილი",
+      "classificationDenied": "შესრულებადი ფაილების დამატება შეუძლებელია",
+      "classificationEmpty": "ფაილი ცარიელია",
+      "classificationTooLarge": "ფაილები უნდა იყოს 20 MB ან უფრო მცირე",
+      "classificationUnreadable": "ამ ფაილის წაკითხვა ვერ მოხერხდა",
+      "announceUploaded": "დანართი ატვირთულია"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "იწყება",
       "stopped": "შეჩერებულია",
       "stopping": "ჩერდება",
-      "unknown": "უცნობი"
+      "unknown": "უცნობი",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "რიგში შედგენილი მოქმედების თვალყური აღარ შეიძლება. განაახლეთ უახლესი მდგომარეობის სანახავად.",
     "initialSyncAdmissionFailed": "Security Agent ჩართულია, მაგრამ საწყისი სინქრონიზაცია ვერ შედგა რიგში. სინქრონიზაცია კვლავ.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "მონაპოვარი უკვე გაუქმებულია",
+      "findingDismissed": "მონაპოვარი გაუქმდა",
+      "noRemediationsQueued": "არსებული მონაპოვრები რიგში არ არის",
+      "remediationsQueued": "არსებული აღდგენები რიგშია",
+      "analysisComplete": "ანალიზი დასრულებულია",
+      "syncComplete": "სინქრონიზაცია დასრულებულია"
+    }
   },
   "agents": {
     "activeNow": "აქტიურია ახლა",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
-      "couldNotOpenMessage": "GitHub App-ის დაყენების დაწყება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა."
+      "couldNotOpenMessage": "GitHub App-ის დაყენების დაწყება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა.",
+      "installedTitle": "GitHub App დაყენებულია",
+      "installedMessage": "თქვენი რეპოზიტორები ახლა დაკავშირებულია.",
+      "pendingTitle": "ადმინისტრატორის დამტკიცება ელოდება",
+      "pendingMessage": "ორგანიზაციის ადმინისტრატორმა უნდა დაამტკიცოს დაყენების მოთხოვნა.",
+      "accountMismatchTitle": "ანგარიშის შეუსაბამობა",
+      "accountMismatchMessage": "ეს კავშირი დაიწყო Kilo App-იდან, რომელიც შესულია სხვა ანგარიშით. შედით ვებში ამ ანგარიშით, ან თავიდან დაიწყეთ აპიდან.",
+      "cannotCompleteTitle": "დაყენების დასრულება შეუძლებელია",
+      "notAdminMessage": "ამ ანგარიშის დაკავშირება მხოლოდ მის GitHub ადმინისტრატორს შეუძლია. სთხოვეთ ორგანიზაციის ადმინისტრატორს Kilo-ს დაყენება.",
+      "alreadyClaimedMessage": "ეს GitHub დაყენება უკვე დაკავშირებულია სხვა Kilo ანგარიშთან. ჯერ იქ გათიშეთ.",
+      "didNotCompleteTitle": "დაყენება არ დასრულდა",
+      "didNotCompleteMessage": "GitHub App-ის დაყენება არ დასრულდა. სცადეთ ხელახლა აპიდან."
     },
     "sessionExited": "სესია დასრულდა",
     "remoteSpawnRetryable": "ინსტანციასთან დაკავშირება ვერ მოხერხდა — შესაძლოა გათიშული იყოს.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ელფოსტის მიწოდება დროებით მიუწვდომელია. გთხოვთ სცადოთ მოგვიანებით.",
     "admissionRequired": "თქვენი მოწყობილობის შემოწმება შეუძლებელია. გამოიყენეთ '$t(login.moreSignInOptions)' სხვა მოწყობილობით ან ინტერნეტით შესასვლელად.",
     "default": "რაღაც შეცდომა მოხდა. გთხოვთ სცადოთ ხელახლა.",
-    "retryableAdmission": "ამ მოწყობილობის შემოწმება ვერ მოხერხდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა."
+    "retryableAdmission": "ამ მოწყობილობის შემოწმება ვერ მოხერხდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა.",
+    "startSignInFailed": "ავტორიზაციის დაწყება ვერ მოხერხდა. გთხოვთ, სცადოთ ხელახლა.",
+    "couldNotOpenBrowser": "ბრაუზერის გახსნა ვერ მოხერხდა. გთხოვთ, სცადოთ ხელახლა.",
+    "signInTimedOut": "ავტორიზაცია ვადაგასულია. გთხოვთ, სცადოთ ხელახლა.",
+    "signInFailed": "ავტორიზაცია ვერ მოხერხდა. გთხოვთ, სცადოთ ხელახლა.",
+    "networkError": "ქსელის შეცდომა. გთხოვთ, სცადოთ ხელახლა.",
+    "accessDeniedByUser": "წვდომა უარყოფილია მომხმარებლის მიერ",
+    "codeExpired": "კოდი ვადაგასულია"
   },
   "models": {
     "dataCollected": "შეგროვებული მონაცემები",
-    "free": "უფასო"
+    "free": "უფასო",
+    "couldNotUpdateFavorites": "რჩეულების განახლება ვერ მოხერხდა"
   }
 }

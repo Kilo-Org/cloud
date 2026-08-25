@@ -22,7 +22,9 @@
     "copiedToClipboard": "Պատճենվել է սեղմատախտակին",
     "couldNotCopyToClipboard": "Չհաջողվեց պատճենել սեղմատախտակին",
     "required": "պարտադիր",
-    "error": "սխալ: {{error}}"
+    "error": "սխալ: {{error}}",
+    "back": "Հետ",
+    "somethingWentWrong": "Ինչ-որ բան սխալ գնաց"
   },
   "language": {
     "title": "Լեզու",
@@ -280,7 +282,36 @@
         "body": "Չհաջողվեց ջնջել ճյուղը՝ {{reason}}",
         "accessibility": "Միավորված է: Չհաջողվեց ջնջել ճյուղը՝ {{reason}}"
       },
-      "loadFailedTitle": "Չհաջողվեց բեռնել միավորման տարբերակները"
+      "loadFailedTitle": "Չհաջողվեց բեռնել միավորման տարբերակները",
+      "blocked": {
+        "unknownStateTitle": "GitHub-ը չի հաղորդել միավորելիության վիճակ",
+        "unknownStateDetail": "Մի պահ հետո փորձեք թարմացնել ակնարկը:",
+        "conflictsTitle": "Միավորման կոնֆլիկտներ",
+        "conflictsDetail": "Միավորելուց առաջ լուծեք միավորման կոնֆլիկտները այս ճյուղում:",
+        "requiredReviewsTitle": "Պահանջվող վերանայումները բացակայում են",
+        "requiredReviewsDetail": "Պահանջվող վերանայողների հաստատումները բացակայում են կամ սպասում են:",
+        "failingChecksTitle": "Ձախողվող պահանջվող ստուգումներ",
+        "failingChecksDetail": "Պահանջվող կարգավիճակի ստուգումները ձախողվում են:",
+        "unstableTitle": "Որոշ ստուգումներ ձախողվում են",
+        "unstableDetail": "Ոչ պարտադիր ստուգումները ձախողվում են: Դրանք չեն արգելափակի միավորումը:",
+        "draftTitle": "Սևագիր pull request",
+        "draftDetail": "Միավորելուց առաջ նշեք pull request-ը որպես վերանայման պատրաստ:",
+        "behindTitle": "Ճյուղը հնացած է",
+        "behindDetailUpdatable": "Միավորելուց առաջ թարմացրեք ճյուղը բազայինից կամ կատարեք rebase:",
+        "behindDetail": "Գլխավոր ճյուղը հետ է բազայինից: Միավորելուց առաջ կատարեք rebase կամ թարմացրեք ճյուղը:",
+        "notMergeableTitle": "Այս pull request-ը դեռ հնարավոր չէ միավորել",
+        "notMergeableDetail": "GitHub-ը հաղորդել է {{state}} միավորելիության վիճակ:"
+      },
+      "methodLabels": {
+        "merge": "Ստեղծել merge commit",
+        "squash": "Squash և միավորել",
+        "rebase": "Rebase և միավորել"
+      },
+      "methodDescriptions": {
+        "merge": "Միավորեք այս ճյուղի բոլոր commit-ները բազային ճյուղի մեջ merge commit-ով:",
+        "squash": "Միավորեք այս ճյուղի բոլոր commit-ները մեկ commit-ի բազային ճյուղում:",
+        "rebase": "Կրկնեք այս ճյուղի բոլոր commit-ները բազային ճյուղի վրա՝ առանց merge commit-ի:"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Քննարկման թեմա {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} ավելի տող վերևում",
       "termsAcceptRequired": "Գրառելու համար դուք պետք է ընդունեք Ծառայության պայմանները:",
       "termsOutdatedCopy": "Ծառայության պայմանները փոխվել են: Վերաբացեք այս էկրանը՝ վերջին տարբերակն ընդունելու համար:",
-      "termsCheckRetryCopy": "Չհաջողվեց ստուգել Ծառայության պայմանները: Ստուգեք ձեր կապը և կրկին փորձեք:"
+      "termsCheckRetryCopy": "Չհաջողվեց ստուգել Ծառայության պայմանները: Ստուգեք ձեր կապը և կրկին փորձեք:",
+      "reactions": {
+        "thumbsUp": "Բութ մատը վեր",
+        "thumbsDown": "Բութ մատը վար",
+        "laugh": "Ծիծաղ",
+        "hooray": "Ուռա",
+        "confused": "Շփոթված",
+        "heart": "Սիրտ",
+        "rocket": "Հրթիռ",
+        "eyes": "Աչքեր"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Ֆայլի մեկնաբանություն {{path}}-ում",
+        "fileComment": "Ֆայլի մեկնաբանություն",
+        "outdatedOnPathLines": "Հնացած է {{path}} {{lines}}-ում",
+        "outdatedOnLines": "Հնացած է {{lines}}-ում",
+        "outdatedOnPath": "Հնացած է {{path}}-ում"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -523,7 +571,12 @@
       "truncationBanner": "Ցուցադրվում են փոփոխված {{total}} ֆայլերից առաջին {{limit}}-ը — GitHub API-ի սահմանաչափ"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է",
-    "linkPasteNotAPullRequest": "Սա GitHub-ի pull request հղում չէ"
+    "linkPasteNotAPullRequest": "Սա GitHub-ի pull request հղում չէ",
+    "announce": {
+      "commentPosted": "Մեկնաբանությունը տեղադրված է",
+      "reviewSubmitted": "Վերանայումն ուղարկված է",
+      "autoMergeEnabled": "Ավտո-միավորումը միացված է"
+    }
   },
   "notifications": {
     "title": "Ծանուցումներ",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}}-ը գերազանցում է {{limit}} կցորդի սահմանը:",
       "unreadable": "Չհաջողվեց կարդալ {{filename}}-ը:",
       "pastedImage": "տեղադրված պատկերը",
-      "defaultName": "Կցորդ"
+      "defaultName": "Կցորդ",
+      "classificationDenied": "Գործարկվող ֆայլերը հնարավոր չէ կցել",
+      "classificationEmpty": "Ֆայլը դատարկ է",
+      "classificationTooLarge": "Ֆայլերը պետք է լինեն 20 MB կամ ավելի փոքր",
+      "classificationUnreadable": "Չհաջողվեց կարդալ այս ֆայլը",
+      "announceUploaded": "Կցորդը վերբեռնված է"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ՍԿՍՎՈՒՄ Է",
       "stopped": "ԿԱՆԳՆԵՑՎԱԾ Է",
       "stopping": "ԿԱՆԳՆԵՑՎՈՒՄ Է",
-      "unknown": "ԱՆՀԱՅՏ"
+      "unknown": "ԱՆՀԱՅՏ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Հերթագրված գործողությունը այլևս չի կարող հետևվել։ Թարմացրեք՝ վերջին կարգավիճակը տեսնելու համար։",
     "initialSyncAdmissionFailed": "Անվտանգության գործակալը միացված էր, բայց սկզբնական համաժամեցումը չհաջողվեց հերթագրել։ Կրկին համաժամեցրեք։",
-    "title": "Անվտանգության գործակալ"
+    "title": "Անվտանգության գործակալ",
+    "commands": {
+      "findingAlreadyDismissed": "Գտածոն արդեն մերժված է",
+      "findingDismissed": "Գտածոն մերժված է",
+      "noRemediationsQueued": "Հերթագրված առկա գտածոներ չկան",
+      "remediationsQueued": "Առկա շտկումները հերթագրված են",
+      "analysisComplete": "Վերլուծությունն ավարտված է",
+      "syncComplete": "Համաժամեցումն ավարտված է"
+    }
   },
   "agents": {
     "activeNow": "Այժմ ակտիվ",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",
-      "couldNotOpenMessage": "Չհաջողվեց սկսել GitHub App-ի կարգավորումը։ Խնդրում ենք կրկին փորձել։"
+      "couldNotOpenMessage": "Չհաջողվեց սկսել GitHub App-ի կարգավորումը։ Խնդրում ենք կրկին փորձել։",
+      "installedTitle": "GitHub հավելվածը տեղադրված է",
+      "installedMessage": "Ձեր պահոցներն այժմ միացված են:",
+      "pendingTitle": "Սպասվում է ադմինի հաստատում",
+      "pendingMessage": "Կազմակերպության ադմինը պետք է հաստատի տեղադրման հարցումը:",
+      "accountMismatchTitle": "Հաշիվների անհամապատասխանություն",
+      "accountMismatchMessage": "Այս կապը սկսվել է Kilo հավելվածից՝ մուտք գործած մեկ այլ հաշվով: Մուտք գործեք կայք այդ հաշվով, կամ սկսեք նորից հավելվածից:",
+      "cannotCompleteTitle": "Հնարավոր չէ ավարտել տեղադրումը",
+      "notAdminMessage": "Միայն այդ հաշվի GitHub ադմինը կարող է միացնել այն: Խնդրեք կազմակերպության ադմինին տեղադրել Kilo-ն:",
+      "alreadyClaimedMessage": "Այդ GitHub տեղադրումն արդեն միացված է մեկ այլ Kilo հաշվի: Նախ անջատեք այն այնտեղ:",
+      "didNotCompleteTitle": "Տեղադրումը չավարտվեց",
+      "didNotCompleteMessage": "GitHub հավելվածի տեղադրումը չավարտվեց: Կրկին փորձեք հավելվածից:"
     },
     "sessionExited": "Նիստն ավարտվել է",
     "remoteSpawnRetryable": "Չհաջողվեց կապվել օրինակի հետ. հնարավոր է՝ այն անջատվել է:",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Նամակի առաքումը ժամանակավորապես հասանելի չէ: Խնդրում ենք փորձել ավելի ուշ:",
     "admissionRequired": "Ձեր սարքը հնարավոր չէ հաստատել: Օգտագործեք «$t(login.moreSignInOptions)»՝ մուտք գործելու համար մեկ այլ սարքից կամ կայքից:",
     "default": "Ինչ-որ բան սխալ տեղի ունեցավ: Խնդրում ենք փորձել կրկին:",
-    "retryableAdmission": "Մենք չկարողացանք հաստատել այս սարքը: Ստուգեք ձեր կապը և փորձեք կրկին:"
+    "retryableAdmission": "Մենք չկարողացանք հաստատել այս սարքը: Ստուգեք ձեր կապը և փորձեք կրկին:",
+    "startSignInFailed": "Չհաջողվեց սկսել մուտքը: Խնդրում ենք կրկին փորձել:",
+    "couldNotOpenBrowser": "Չհաջողվեց բացել բրաուզերը: Խնդրում ենք կրկին փորձել:",
+    "signInTimedOut": "Մուտքի ժամանակը լրացել է: Խնդրում ենք կրկին փորձել:",
+    "signInFailed": "Մուտքը ձախողվեց: Խնդրում ենք կրկին փորձել:",
+    "networkError": "Ցանցի սխալ: Խնդրում ենք կրկին փորձել:",
+    "accessDeniedByUser": "Մուտքը մերժվել է օգտատիրոջ կողմից",
+    "codeExpired": "Կոդը ժամկետանց է"
   },
   "models": {
     "dataCollected": "Հավաքագրված տվյալներ",
-    "free": "Անվճար"
+    "free": "Անվճար",
+    "couldNotUpdateFavorites": "Չհաջողվեց թարմացնել նախընտրածները"
   }
 }

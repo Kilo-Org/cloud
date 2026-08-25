@@ -22,7 +22,9 @@
     "copiedToClipboard": "Detuola na clipboard",
     "couldNotCopyToClipboard": "Enweghị ike ịdetuo na clipboard",
     "required": "achọrọ",
-    "error": "njehie: {{error}}"
+    "error": "njehie: {{error}}",
+    "back": "Azu",
+    "somethingWentWrong": "Ihe mere adịghị mma"
   },
   "language": {
     "title": "Asụsụ",
@@ -280,7 +282,36 @@
         "body": "Enweghị ike ihichapụ alaka: {{reason}}",
         "accessibility": "Ejikọtara. Enweghị ike ihichapụ alaka: {{reason}}"
       },
-      "loadFailedTitle": "Enweghị ike ibugo nhọrọ njikọta"
+      "loadFailedTitle": "Enweghị ike ibugo nhọrọ njikọta",
+      "blocked": {
+        "unknownStateTitle": "GitHub akabeghị akụkọ ọnọdụ njikọta",
+        "unknownStateDetail": "Nwaa imegharị nchịkọta n'oge na-adịghị anya.",
+        "conflictsTitle": "Esemokwu njikọta",
+        "conflictsDetail": "Dozie esemokwu njikọta na alaka a tupu ijikọta.",
+        "requiredReviewsTitle": "Nyocha achọrọ adịghị",
+        "requiredReviewsDetail": "Nkwenye sitere n'aka ndị nyocha achọrọ adịghị ma ọ bụ na-echere.",
+        "failingChecksTitle": "Nyocha achọrọ dara",
+        "failingChecksDetail": "Nyocha ọnọdụ achọrọ na-ada.",
+        "unstableTitle": "Ụfọdụ nyocha na-ada",
+        "unstableDetail": "Nyocha ndị na-abụghị achọrọ na-ada. Ha agaghị egbochi njikọta.",
+        "draftTitle": "Arịrịọ dọrọ ihe odide",
+        "draftDetail": "Kaa arịrịọ dọrọ a dị njikere maka nyocha tupu ijikọta.",
+        "behindTitle": "Alaka adịla ochie",
+        "behindDetailUpdatable": "Melite alaka site na isi, ma ọ bụ rebase, tupu ijikọta.",
+        "behindDetail": "Alaka ahụ dị n'azụ isi. Rebase ma ọ bụ melite alaka tupu ijikọta.",
+        "notMergeableTitle": "Arịrịọ dọrọ a enweghị ike ijikọta ugbu a",
+        "notMergeableDetail": "GitHub kọrọ ọnọdụ njikọta {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Mepụta commit njikọta",
+        "squash": "Squash ma jikọta",
+        "rebase": "Rebase ma jikọta"
+      },
+      "methodDescriptions": {
+        "merge": "Jikọta commit niile sitere na alaka a n'ime alaka isi na commit njikọta.",
+        "squash": "Jikọta commit niile sitere na alaka a n'ime otu commit na alaka isi.",
+        "rebase": "Meegharịa commit niile sitere na alaka a na alaka isi na-enweghị commit njikọta."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Eriri mkparịta ụka {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} ahịrị ọzọ n'elu",
       "termsAcceptRequired": "Ị ga-anakwere Usoro Ọrụ tupu ị bipute.",
       "termsOutdatedCopy": "Agbanwela Usoro Ọrụ. Mepee enyo a ọzọ ịnakwere ụdị kacha ọhụrụ.",
-      "termsCheckRetryCopy": "Enweghị ike ịlele Usoro Ọrụ. Lelee njikọ gị ma nwaa ọzọ."
+      "termsCheckRetryCopy": "Enweghị ike ịlele Usoro Ọrụ. Lelee njikọ gị ma nwaa ọzọ.",
+      "reactions": {
+        "thumbsUp": "Mkpịsị aka elu",
+        "thumbsDown": "Mkpịsị aka ala",
+        "laugh": "Ọchị",
+        "hooray": "Ịṅụrị ọṅụ",
+        "confused": "Mgbagwoju anya",
+        "heart": "Obi",
+        "rocket": "Rọketị",
+        "eyes": "Anya"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Nkọwa faịlụ na {{path}}",
+        "fileComment": "Nkọwa faịlụ",
+        "outdatedOnPathLines": "Ochie na {{path}} {{lines}}",
+        "outdatedOnLines": "Ochie na {{lines}}",
+        "outdatedOnPath": "Ochie na {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala Ngwa GitHub",
     "installKiloGitHubApp": "Tinye Ngwa Kilo GitHub",
@@ -523,7 +571,12 @@
       "truncationBanner": "Na-egosi nke mbụ {{limit}} n'ime {{total}} faịlụ agbanwere — njedebe API GitHub"
     },
     "linkPasteClipboardEmpty": "Mbadamba ederede tọgbọrọ chakachara",
-    "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ndọta GitHub"
+    "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ndọta GitHub",
+    "announce": {
+      "commentPosted": "Biputere nkọwa",
+      "reviewSubmitted": "Nyefere nyocha",
+      "autoMergeEnabled": "Akwadoro njikọta akpaghị aka"
+    }
   },
   "notifications": {
     "title": "Ọkwa",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} gafere njedebe njikọta {{limit}}.",
       "unreadable": "Enweghị ike ịgụ {{filename}}.",
       "pastedImage": "onyonyo a madoro",
-      "defaultName": "Ihe jikọtara"
+      "defaultName": "Ihe jikọtara",
+      "classificationDenied": "Enweghị ike ijikọ faịlụ ndị e nwere ike ịgba ọsọ",
+      "classificationEmpty": "Faịlụ tọgbọrọ chakoo",
+      "classificationTooLarge": "Faịlụ ga-abụ 20 MB ma ọ bụ obere",
+      "classificationUnreadable": "Enweghị ike ịgụ faịlụ a",
+      "announceUploaded": "Ebugola ihe jikọtara"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "NA-AMALITE",
       "stopped": "KWỤSỊRỊ",
       "stopping": "NA-AKWỤSỊ",
-      "unknown": "AMAGHỊ"
+      "unknown": "AMAGHỊ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Enweghịzi ike ịsoro omume kwụ n'ahịrị. Meegharịa ka ịhụ ọkwa kacha ọhụrụ.",
     "initialSyncAdmissionFailed": "Gbanyere Security Agent, ma enweghị ike ịkwụba nsomi mbụ n'ahịrị. Bugharịa ọzọ.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Ekagbuburu ihe achọpụtara",
+      "findingDismissed": "Ekagburu ihe achọpụtara",
+      "noRemediationsQueued": "Ọ dịghị ihe achọpụtara dị adị kwụ n'ahịrị",
+      "remediationsQueued": "Ndozi dị adị kwụ n'ahịrị",
+      "analysisComplete": "Nyocha gwụchara",
+      "syncComplete": "Nsomi gwụchara"
+    }
   },
   "agents": {
     "activeNow": "Na-arụ ọrụ ugbu a",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Enweghị ike imeghe GitHub",
-      "couldNotOpenMessage": "Anyị enweghị ike ịmalite nhazi GitHub App. Biko nwaa ọzọ."
+      "couldNotOpenMessage": "Anyị enweghị ike ịmalite nhazi GitHub App. Biko nwaa ọzọ.",
+      "installedTitle": "Etinyela Ngwa GitHub",
+      "installedMessage": "Ebe nchekwa gị ejikọtala ugbu a.",
+      "pendingTitle": "Na-eche nkwenye onye nchịkwa",
+      "pendingMessage": "Onye nchịkwa ụlọ ọrụ ga-akwado arịrịọ ntinye.",
+      "accountMismatchTitle": "Akaụntụ ekwekọghị",
+      "accountMismatchMessage": "Malitere njikọ a site na Ngwa Kilo banyere dị ka akaụntụ dị iche. Banye na webụ na akaụntụ ahụ, ma ọ bụ malite ọzọ site na ngwa ahụ.",
+      "cannotCompleteTitle": "Enweghị ike imecha ntinye",
+      "notAdminMessage": "Naanị onye nchịkwa GitHub nke akaụntụ ahụ nwere ike jikọọ ya. Jụọ onye nchịkwa ụlọ ọrụ ka ọ tinye Kilo.",
+      "alreadyClaimedMessage": "Ntinye GitHub ahụ ejikọtalarị akaụntụ Kilo ọzọ. Wepụ njikọ ya ebe ahụ tupu.",
+      "didNotCompleteTitle": "Ntinye agwụchaghị",
+      "didNotCompleteMessage": "Emechaghị ntinye Ngwa GitHub. Nwaa ọzọ site na ngwa."
     },
     "sessionExited": "Oge nnọkọ kwụsịrị",
     "remoteSpawnRetryable": "Enweghị ike iru ebe a na-akpọ — o nwere ike ịkpụpụla.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Nnyefe email adịghị adị ugbu a. Biko nwaa ọzọ ma emechaa.",
     "admissionRequired": "Enweghị ike ịgba mbọ gosipụta ngwaọrụ gị. Jiri '$t(login.moreSignInOptions)' banye na ngwaọrụ ọzọ ma ọ bụ na webụ.",
     "default": "Ihe mere n'ụzọ na-ezighi ezi. Biko nwaa ọzọ.",
-    "retryableAdmission": "Anyị enweghị ike ịgba mbọ gosipụta ngwaọrụ a. Lelee njikọ gị wee nwaa ọzọ."
+    "retryableAdmission": "Anyị enweghị ike ịgba mbọ gosipụta ngwaọrụ a. Lelee njikọ gị wee nwaa ọzọ.",
+    "startSignInFailed": "Enweghị ike ịmalite nbanye. Biko nwaa ọzọ.",
+    "couldNotOpenBrowser": "Enweghị ike imepe ihe nchọgharị. Biko nwaa ọzọ.",
+    "signInTimedOut": "Oge nbanye agwụla. Biko nwaa ọzọ.",
+    "signInFailed": "Nbanye dara. Biko nwaa ọzọ.",
+    "networkError": "Njehie netwọk. Biko nwaa ọzọ.",
+    "accessDeniedByUser": "Onye ọrụ jụrụ ohere",
+    "codeExpired": "Koodu emebiwo"
   },
   "models": {
     "dataCollected": "Data anakọtara",
-    "free": "N'efu"
+    "free": "N'efu",
+    "couldNotUpdateFavorites": "Enweghị ike imelite ọkacha mmasị"
   }
 }

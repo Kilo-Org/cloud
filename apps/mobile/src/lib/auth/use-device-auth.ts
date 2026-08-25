@@ -2,6 +2,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus, Platform } from 'react-native';
 
+import { i18n } from '@/i18n';
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
 import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
@@ -146,7 +147,7 @@ export function useDeviceAuth(): DeviceAuthResult {
       const startTimeout = setTimeout(() => {
         startAbort.abort();
         setState(
-          errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+          errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
         );
       }, START_TIMEOUT_MS);
 
@@ -178,7 +179,7 @@ export function useDeviceAuth(): DeviceAuthResult {
             return;
           }
           setState(
-            errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+            errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
           );
           return;
         }
@@ -186,7 +187,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         const data = parseDeviceAuthCodeResponse(await response.json());
         if (!data) {
           setState(
-            errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+            errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
           );
           return;
         }
@@ -248,7 +249,7 @@ export function useDeviceAuth(): DeviceAuthResult {
           return;
         }
         setState(
-          errorDeviceAuthState(undefined, 'Failed to start sign in. Please try again.', undefined)
+          errorDeviceAuthState(undefined, i18n.t('authErrors.startSignInFailed'), undefined)
         );
         void clearPendingExternalAuth();
       } finally {
@@ -271,7 +272,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState(previous =>
           errorDeviceAuthState(
             previous.code,
-            'Could not open browser. Please try again.',
+            i18n.t('authErrors.couldNotOpenBrowser'),
             previous.verificationUrl
           )
         );

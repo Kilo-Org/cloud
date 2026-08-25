@@ -22,7 +22,9 @@
     "required": "obligatorio",
     "error": "error: {{error}}",
     "notNow": "Ahora no",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "back": "Atrás",
+    "somethingWentWrong": "Algo salió mal"
   },
   "language": {
     "title": "Idioma",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} supera el límite de {{limit}} para archivos adjuntos.",
       "unreadable": "No se pudo leer {{filename}}.",
       "pastedImage": "la imagen pegada",
-      "defaultName": "Adjunto"
+      "defaultName": "Adjunto",
+      "classificationDenied": "No se pueden adjuntar archivos ejecutables",
+      "classificationEmpty": "El archivo está vacío",
+      "classificationTooLarge": "Los archivos deben tener 20 MB o menos",
+      "classificationUnreadable": "No se pudo leer este archivo",
+      "announceUploaded": "Adjunto subido"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -696,7 +703,8 @@
       "starting": "INICIANDO",
       "stopped": "DETENIDO",
       "stopping": "DETENIENDO",
-      "unknown": "DESCONOCIDO"
+      "unknown": "DESCONOCIDO",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1338,7 +1346,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent se activó, pero no se pudo poner en cola la sincronización inicial. Sincroniza de nuevo.",
-    "queuedActionUntracked": "Ya no se pudo rastrear una acción en cola. Actualiza para ver el estado más reciente."
+    "queuedActionUntracked": "Ya no se pudo rastrear una acción en cola. Actualiza para ver el estado más reciente.",
+    "commands": {
+      "findingAlreadyDismissed": "El hallazgo ya está descartado",
+      "findingDismissed": "Hallazgo descartado",
+      "noRemediationsQueued": "No hay hallazgos existentes en cola",
+      "remediationsQueued": "Correcciones existentes en cola",
+      "analysisComplete": "Análisis completado",
+      "syncComplete": "Sincronización completada"
+    }
   },
   "agents": {
     "activeNow": "Activo ahora",
@@ -1388,7 +1404,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "No pudimos iniciar la configuración de la GitHub App. Inténtalo de nuevo.",
-      "couldNotOpenTitle": "No se pudo abrir GitHub"
+      "couldNotOpenTitle": "No se pudo abrir GitHub",
+      "installedTitle": "GitHub App instalada",
+      "installedMessage": "Tus repositorios ahora están conectados.",
+      "pendingTitle": "Pendiente de aprobación del administrador",
+      "pendingMessage": "Un administrador de la organización debe aprobar la solicitud de instalación.",
+      "accountMismatchTitle": "La cuenta no coincide",
+      "accountMismatchMessage": "Esta conexión se inició desde la Kilo App con una sesión iniciada con otra cuenta. Inicia sesión en la web con esa cuenta o vuelve a empezar desde la app.",
+      "cannotCompleteTitle": "No se puede completar la instalación",
+      "notAdminMessage": "Solo un administrador de GitHub de esa cuenta puede conectarla. Pide a un administrador de la organización que instale Kilo.",
+      "alreadyClaimedMessage": "Esa instalación de GitHub ya está conectada a otra cuenta de Kilo. Desconéctala allí primero.",
+      "didNotCompleteTitle": "La instalación no se completó",
+      "didNotCompleteMessage": "La instalación de la GitHub App no se completó. Inténtalo de nuevo desde la app."
     },
     "sessionExited": "La sesión finalizó",
     "remoteSpawnRetryable": "No se pudo conectar con la instancia: es posible que se haya desconectado.",
@@ -2320,7 +2347,24 @@
       "termsCheckRetryCopy": "No se pudieron comprobar los Términos del servicio. Comprueba tu conexión e inténtalo de nuevo.",
       "termsOutdatedCopy": "Los Términos del servicio han cambiado. Vuelve a abrir esta pantalla para aceptar la versión más reciente.",
       "comment_many": "{{displayCount}} comentarios",
-      "reaction_many": "reacciones"
+      "reaction_many": "reacciones",
+      "reactions": {
+        "thumbsUp": "Pulgar arriba",
+        "thumbsDown": "Pulgar abajo",
+        "laugh": "Risa",
+        "hooray": "Hurra",
+        "confused": "Confundido",
+        "heart": "Corazón",
+        "rocket": "Cohete",
+        "eyes": "Ojos"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentario de archivo en {{path}}",
+        "fileComment": "Comentario de archivo",
+        "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
+        "outdatedOnLines": "Desactualizado en {{lines}}",
+        "outdatedOnPath": "Desactualizado en {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Borrar enlace de la pull request",
@@ -2479,7 +2523,36 @@
         "closed": "Esta pull request está cerrada"
       },
       "updateBranch": "Actualizar rama",
-      "updateBranchFromBase": "Actualizar la rama desde la base"
+      "updateBranchFromBase": "Actualizar la rama desde la base",
+      "blocked": {
+        "unknownStateTitle": "GitHub no ha informado de un estado de fusión",
+        "unknownStateDetail": "Intenta actualizar la vista general en un momento.",
+        "conflictsTitle": "Conflictos de fusión",
+        "conflictsDetail": "Resuelve los conflictos de fusión en esta rama antes de fusionar.",
+        "requiredReviewsTitle": "Faltan revisiones necesarias",
+        "requiredReviewsDetail": "Faltan aprobaciones de los revisores necesarios o están pendientes.",
+        "failingChecksTitle": "Fallan verificaciones necesarias",
+        "failingChecksDetail": "Las verificaciones de estado necesarias están fallando.",
+        "unstableTitle": "Fallan algunas verificaciones",
+        "unstableDetail": "Están fallando verificaciones no necesarias. No bloquearán la fusión.",
+        "draftTitle": "Pull request en borrador",
+        "draftDetail": "Marca la pull request como lista para revisión antes de fusionar.",
+        "behindTitle": "La rama está desactualizada",
+        "behindDetailUpdatable": "Actualiza la rama desde la base o haz rebase antes de fusionar.",
+        "behindDetail": "La rama de origen está desactualizada con respecto a la base. Haz rebase o actualiza la rama antes de fusionar.",
+        "notMergeableTitle": "Esta pull request aún no se puede fusionar",
+        "notMergeableDetail": "GitHub informó de un estado de fusión {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Crear un commit de fusión",
+        "squash": "Squash y fusionar",
+        "rebase": "Rebase y fusionar"
+      },
+      "methodDescriptions": {
+        "merge": "Combina todos los commits de esta rama en la rama base con un commit de fusión.",
+        "squash": "Combina todos los commits de esta rama en un único commit en la rama base.",
+        "rebase": "Reproduce todos los commits de esta rama sobre la rama base sin un commit de fusión."
+      }
     },
     "noDescriptionProvided": "No se ha proporcionado ninguna descripción.",
     "noFilesChanged": "No hay archivos modificados",
@@ -2572,7 +2645,12 @@
       "truncationBanner": "Mostrando los primeros {{limit}} de {{total}} archivos modificados — límite de la API de GitHub"
     },
     "linkPasteClipboardEmpty": "El portapapeles está vacío",
-    "linkPasteNotAPullRequest": "No es un enlace de pull request de GitHub"
+    "linkPasteNotAPullRequest": "No es un enlace de pull request de GitHub",
+    "announce": {
+      "commentPosted": "Comentario publicado",
+      "reviewSubmitted": "Revisión enviada",
+      "autoMergeEnabled": "Fusión automática activada"
+    }
   },
   "organization": {
     "boundary": {
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "El envío de correo no está disponible temporalmente. Inténtalo de nuevo más tarde.",
     "admissionRequired": "No se pudo verificar tu dispositivo. Usa '$t(login.moreSignInOptions)' para iniciar sesión en otro dispositivo o a través de la web.",
     "default": "Algo salió mal. Inténtalo de nuevo.",
-    "retryableAdmission": "No pudimos verificar este dispositivo. Revisa tu conexión e inténtalo de nuevo."
+    "retryableAdmission": "No pudimos verificar este dispositivo. Revisa tu conexión e inténtalo de nuevo.",
+    "startSignInFailed": "No se pudo comenzar el inicio de sesión. Inténtalo de nuevo.",
+    "couldNotOpenBrowser": "No se pudo abrir el navegador. Inténtalo de nuevo.",
+    "signInTimedOut": "El inicio de sesión expiró. Inténtalo de nuevo.",
+    "signInFailed": "No se pudo iniciar sesión. Inténtalo de nuevo.",
+    "networkError": "Error de red. Inténtalo de nuevo.",
+    "accessDeniedByUser": "Acceso denegado por el usuario",
+    "codeExpired": "El código ha caducado"
   },
   "models": {
     "dataCollected": "Datos recopilados",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "No se pudieron actualizar los favoritos"
   }
 }

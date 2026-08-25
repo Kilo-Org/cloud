@@ -22,7 +22,9 @@
     "copiedToClipboard": "Vágólapra másolva",
     "couldNotCopyToClipboard": "Nem sikerült a vágólapra másolás",
     "required": "kötelező",
-    "error": "hiba: {{error}}"
+    "error": "hiba: {{error}}",
+    "back": "Vissza",
+    "somethingWentWrong": "Valami hiba történt"
   },
   "language": {
     "title": "Nyelv",
@@ -280,7 +282,36 @@
         "body": "Nem sikerült törölni az ágat: {{reason}}",
         "accessibility": "Összevonva. Nem sikerült törölni az ágat: {{reason}}"
       },
-      "loadFailedTitle": "Nem sikerült betölteni az összevonási lehetőségeket"
+      "loadFailedTitle": "Nem sikerült betölteni az összevonási lehetőségeket",
+      "blocked": {
+        "unknownStateTitle": "A GitHub nem jelentett összevonhatósági állapotot",
+        "unknownStateDetail": "Próbálja meg frissíteni az áttekintést egy pillanat múlva.",
+        "conflictsTitle": "Összevonási konfliktusok",
+        "conflictsDetail": "Az összevonás előtt oldja fel az összevonási konfliktusokat ezen az ágon.",
+        "requiredReviewsTitle": "Hiányoznak a kötelező ellenőrzések",
+        "requiredReviewsDetail": "A kötelező ellenőrzők jóváhagyásai hiányoznak vagy függőben vannak.",
+        "failingChecksTitle": "Sikertelen kötelező ellenőrzések",
+        "failingChecksDetail": "A kötelező állapotellenőrzések sikertelenek.",
+        "unstableTitle": "Egyes ellenőrzések sikertelenek",
+        "unstableDetail": "A nem kötelező ellenőrzések sikertelenek. Nem fogják blokkolni az összevonást.",
+        "draftTitle": "Piszkozat pull request",
+        "draftDetail": "Az összevonás előtt jelölje meg a pull requestet ellenőrzésre készként.",
+        "behindTitle": "Az ág elavult",
+        "behindDetailUpdatable": "Az összevonás előtt frissítse az ágat az alapból, vagy hajtson végre rebase-t.",
+        "behindDetail": "A head ág lemaradt az alap mögött. Az összevonás előtt hajtson végre rebase-t, vagy frissítse az ágat.",
+        "notMergeableTitle": "Ez a pull request még nem vonható össze",
+        "notMergeableDetail": "A GitHub {{state}} összevonhatósági állapotot jelentett."
+      },
+      "methodLabels": {
+        "merge": "Összevonási commit létrehozása",
+        "squash": "Squash és összevonás",
+        "rebase": "Rebase és összevonás"
+      },
+      "methodDescriptions": {
+        "merge": "Az ág összes commitját egyesíti az alapágba egy összevonási committal.",
+        "squash": "Az ág összes commitját egyetlen committá egyesíti az alapágon.",
+        "rebase": "Az ág összes commitját összevonási commit nélkül játssza újra az alapágra."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Beszélgetés-szál: {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} további sor fent",
       "termsAcceptRequired": "A hozzászóláshoz el kell fogadnia a Szolgáltatási feltételeket.",
       "termsOutdatedCopy": "A Szolgáltatási feltételek megváltoztak. Nyissa meg újra ezt a képernyőt a legújabb verzió elfogadásához.",
-      "termsCheckRetryCopy": "Nem sikerült ellenőrizni a Szolgáltatási feltételeket. Ellenőrizze a kapcsolatot, és próbálja újra."
+      "termsCheckRetryCopy": "Nem sikerült ellenőrizni a Szolgáltatási feltételeket. Ellenőrizze a kapcsolatot, és próbálja újra.",
+      "reactions": {
+        "thumbsUp": "Hüvelykujj fel",
+        "thumbsDown": "Hüvelykujj le",
+        "laugh": "Nevetés",
+        "hooray": "Hurrá",
+        "confused": "Összezavarodva",
+        "heart": "Szív",
+        "rocket": "Rakéta",
+        "eyes": "Szemek"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Fájlmegjegyzés itt: {{path}}",
+        "fileComment": "Fájlmegjegyzés",
+        "outdatedOnPathLines": "Elavult itt: {{path}} {{lines}}",
+        "outdatedOnLines": "Elavult itt: {{lines}}",
+        "outdatedOnPath": "Elavult itt: {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub App beállításait",
     "installKiloGitHubApp": "A Kilo GitHub App telepítése",
@@ -523,7 +571,12 @@
       "truncationBanner": "A módosított {{total}} fájl közül az első {{limit}} megjelenítése — GitHub API-korlát"
     },
     "linkPasteClipboardEmpty": "A vágólap üres",
-    "linkPasteNotAPullRequest": "Nem GitHub pull request hivatkozás"
+    "linkPasteNotAPullRequest": "Nem GitHub pull request hivatkozás",
+    "announce": {
+      "commentPosted": "Megjegyzés közzétéve",
+      "reviewSubmitted": "Ellenőrzés elküldve",
+      "autoMergeEnabled": "Automatikus összevonás engedélyezve"
+    }
   },
   "notifications": {
     "title": "Értesítések",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} meghaladja a(z) {{limit}} csatolási korlátot.",
       "unreadable": "Nem sikerült beolvasni a(z) {{filename}} fájlt.",
       "pastedImage": "a beillesztett kép",
-      "defaultName": "Csatolmány"
+      "defaultName": "Csatolmány",
+      "classificationDenied": "Végrehajtható fájlok nem csatolhatók",
+      "classificationEmpty": "A fájl üres",
+      "classificationTooLarge": "A fájlok mérete legfeljebb 20 MB lehet",
+      "classificationUnreadable": "Nem sikerült beolvasni ezt a fájlt",
+      "announceUploaded": "Csatolmány feltöltve"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "INDÍTÁS",
       "stopped": "LEÁLLÍTVA",
       "stopping": "LEÁLLÍTÁS",
-      "unknown": "ISMERETLEN"
+      "unknown": "ISMERETLEN",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Egy sorba állított műveletet már nem lehetett követni. Frissítse a legújabb állapot megtekintéséhez.",
     "initialSyncAdmissionFailed": "A Security Agent engedélyezve lett, de a kezdeti szinkronizálást nem lehetett sorba állítani. Szinkronizáljon újra.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Az észlelés már elutasítva",
+      "findingDismissed": "Észlelés elutasítva",
+      "noRemediationsQueued": "Nincs sorba állított meglévő észlelés",
+      "remediationsQueued": "Meglévő kijavítások sorba állítva",
+      "analysisComplete": "Az elemzés befejeződött",
+      "syncComplete": "A szinkronizálás befejeződött"
+    }
   },
   "agents": {
     "activeNow": "Most aktív",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "A GitHub megnyitása nem sikerült",
-      "couldNotOpenMessage": "Nem sikerült elindítani a GitHub App beállítását. Próbálja újra."
+      "couldNotOpenMessage": "Nem sikerült elindítani a GitHub App beállítását. Próbálja újra.",
+      "installedTitle": "GitHub App telepítve",
+      "installedMessage": "A tárolóid mostantól csatlakoztatva vannak.",
+      "pendingTitle": "Adminisztrátori jóváhagyásra vár",
+      "pendingMessage": "Egy szervezeti adminisztrátornak jóvá kell hagynia a telepítési kérelmet.",
+      "accountMismatchTitle": "Fiók-eltérés",
+      "accountMismatchMessage": "Ezt a kapcsolatot a Kilo App indította, amely más fiókkal van bejelentkezve. Jelentkezzen be a weben ezzel a fiókkal, vagy indítsa újra az alkalmazásból.",
+      "cannotCompleteTitle": "A telepítés nem fejezhető be",
+      "notAdminMessage": "Csak a fiók GitHub-adminisztrátora csatlakoztathatja. Kérje meg egy szervezeti adminisztrátort, hogy telepítse a Kilo alkalmazást.",
+      "alreadyClaimedMessage": "Ez a GitHub-telepítés már egy másik Kilo-fiókhoz van csatlakoztatva. Először válassza le ott.",
+      "didNotCompleteTitle": "A telepítés nem fejeződött be",
+      "didNotCompleteMessage": "A GitHub App telepítése nem fejeződött be. Próbálja újra az alkalmazásból."
     },
     "sessionExited": "A munkamenet kilépett",
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Az e-mail kézbesítés jelenleg nem érhető el. Kérjük, próbálja újra később.",
     "admissionRequired": "Az eszköz nem ellenőrizhető. Használja a „$t(login.moreSignInOptions)” opciót a bejelentkezéshez másik eszközön vagy a weben keresztül.",
     "default": "Valami hiba történt. Kérjük, próbálja újra.",
-    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Ellenőrizze a kapcsolatot, és próbálja újra."
+    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Ellenőrizze a kapcsolatot, és próbálja újra.",
+    "startSignInFailed": "Nem sikerült elindítani a bejelentkezést. Kérjük, próbálja újra.",
+    "couldNotOpenBrowser": "Nem sikerült megnyitni a böngészőt. Kérjük, próbálja újra.",
+    "signInTimedOut": "A bejelentkezés időtúllépés miatt megszakadt. Kérjük, próbálja újra.",
+    "signInFailed": "A bejelentkezés nem sikerült. Kérjük, próbálja újra.",
+    "networkError": "Hálózati hiba. Kérjük, próbálja újra.",
+    "accessDeniedByUser": "A hozzáférést a felhasználó megtagadta",
+    "codeExpired": "A kód lejárt"
   },
   "models": {
     "dataCollected": "Gyűjtött adatok",
-    "free": "Ingyenes"
+    "free": "Ingyenes",
+    "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket"
   }
 }

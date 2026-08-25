@@ -22,7 +22,9 @@
     "required": "wymagane",
     "error": "błąd: {{error}}",
     "notNow": "Nie teraz",
-    "continue": "Kontynuuj"
+    "continue": "Kontynuuj",
+    "back": "Wstecz",
+    "somethingWentWrong": "Coś poszło nie tak"
   },
   "language": {
     "title": "Język",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} przekracza limit załączników wynoszący {{limit}}.",
       "unreadable": "Nie udało się odczytać pliku {{filename}}.",
       "pastedImage": "wklejony obraz",
-      "defaultName": "Załącznik"
+      "defaultName": "Załącznik",
+      "classificationDenied": "Nie można dołączać plików wykonywalnych",
+      "classificationEmpty": "Plik jest pusty",
+      "classificationTooLarge": "Pliki muszą mieć 20 MB lub mniej",
+      "classificationUnreadable": "Nie udało się odczytać tego pliku",
+      "announceUploaded": "Przesłano załącznik"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -698,7 +705,8 @@
       "starting": "URUCHAMIANIE",
       "stopped": "ZATRZYMANA",
       "stopping": "ZATRZYMYWANIE",
-      "unknown": "NIEZNANY"
+      "unknown": "NIEZNANY",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1342,7 +1350,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent został włączony, ale nie udało się dodać początkowej synchronizacji do kolejki. Synchronizuj ponownie.",
-    "queuedActionUntracked": "Nie można już śledzić akcji w kolejce. Odśwież, aby zobaczyć najnowszy stan."
+    "queuedActionUntracked": "Nie można już śledzić akcji w kolejce. Odśwież, aby zobaczyć najnowszy stan.",
+    "commands": {
+      "findingAlreadyDismissed": "Ustalenie zostało już odrzucone",
+      "findingDismissed": "Odrzucono ustalenie",
+      "noRemediationsQueued": "Brak istniejących ustaleń w kolejce",
+      "remediationsQueued": "Istniejące naprawy dodano do kolejki",
+      "analysisComplete": "Analiza zakończona",
+      "syncComplete": "Synchronizacja zakończona"
+    }
   },
   "agents": {
     "activeNow": "Aktywne teraz",
@@ -1394,7 +1410,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
-      "couldNotOpenTitle": "Nie udało się otworzyć GitHub"
+      "couldNotOpenTitle": "Nie udało się otworzyć GitHub",
+      "installedTitle": "Zainstalowano aplikację GitHub",
+      "installedMessage": "Twoje repozytoria są teraz połączone.",
+      "pendingTitle": "Oczekiwanie na zatwierdzenie przez administratora",
+      "pendingMessage": "Administrator organizacji musi zatwierdzić prośbę o instalację.",
+      "accountMismatchTitle": "Niezgodność konta",
+      "accountMismatchMessage": "To połączenie zostało rozpoczęte z aplikacji Kilo zalogowanej na inne konto. Zaloguj się w sieci na to konto lub zacznij ponownie z aplikacji.",
+      "cannotCompleteTitle": "Nie można ukończyć instalacji",
+      "notAdminMessage": "Tylko administrator GitHub tego konta może je połączyć. Poproś administratora organizacji o zainstalowanie Kilo.",
+      "alreadyClaimedMessage": "Ta instalacja GitHub jest już połączona z innym kontem Kilo. Odłącz ją najpierw tam.",
+      "didNotCompleteTitle": "Instalacja nie została ukończona",
+      "didNotCompleteMessage": "Instalacja aplikacji GitHub nie została ukończona. Spróbuj ponownie z aplikacji."
     },
     "sessionExited": "Sesja zakończona",
     "remoteSpawnRetryable": "Nie udało się połączyć z instancją — mogła się rozłączyć.",
@@ -2333,7 +2360,24 @@
       "comment_few": "{{displayCount}} komentarze",
       "comment_many": "{{displayCount}} komentarzy",
       "reaction_few": "reakcje",
-      "reaction_many": "reakcji"
+      "reaction_many": "reakcji",
+      "reactions": {
+        "thumbsUp": "Kciuk w górę",
+        "thumbsDown": "Kciuk w dół",
+        "laugh": "Śmiech",
+        "hooray": "Hurra",
+        "confused": "Zdziwienie",
+        "heart": "Serce",
+        "rocket": "Rakieta",
+        "eyes": "Oczy"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komentarz do pliku na {{path}}",
+        "fileComment": "Komentarz do pliku",
+        "outdatedOnPathLines": "Nieaktualny na {{path}} {{lines}}",
+        "outdatedOnLines": "Nieaktualny na {{lines}}",
+        "outdatedOnPath": "Nieaktualny na {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Wyczyść link pull requesta",
@@ -2494,7 +2538,36 @@
         "closed": "Ten pull request jest zamknięty"
       },
       "updateBranch": "Zaktualizuj gałąź",
-      "updateBranchFromBase": "Zaktualizuj gałąź z gałęzi bazowej"
+      "updateBranchFromBase": "Zaktualizuj gałąź z gałęzi bazowej",
+      "blocked": {
+        "unknownStateTitle": "GitHub nie zgłosił stanu możliwości scalenia",
+        "unknownStateDetail": "Spróbuj za chwilę odświeżyć przegląd.",
+        "conflictsTitle": "Konflikty scalania",
+        "conflictsDetail": "Rozwiąż konflikty scalania na tej gałęzi przed scalaniem.",
+        "requiredReviewsTitle": "Brak wymaganych recenzji",
+        "requiredReviewsDetail": "Brakuje zatwierdzeń wymaganych recenzentów lub są one w toku.",
+        "failingChecksTitle": "Nieudane wymagane kontrole",
+        "failingChecksDetail": "Wymagane kontrole statusu kończą się niepowodzeniem.",
+        "unstableTitle": "Niektóre kontrole kończą się niepowodzeniem",
+        "unstableDetail": "Nieobowiązkowe kontrole kończą się niepowodzeniem. Nie zablokują one scalania.",
+        "draftTitle": "Pull request w wersji roboczej",
+        "draftDetail": "Oznacz pull request jako gotowy do przeglądu przed scalaniem.",
+        "behindTitle": "Gałąź jest nieaktualna",
+        "behindDetailUpdatable": "Zaktualizuj gałąź z gałęzi bazowej lub wykonaj rebase przed scalaniem.",
+        "behindDetail": "Gałąź źródłowa jest za gałęzią bazową. Wykonaj rebase lub zaktualizuj gałąź przed scalaniem.",
+        "notMergeableTitle": "Ten pull request nie jest jeszcze możliwy do scalenia",
+        "notMergeableDetail": "GitHub zgłosił stan możliwości scalenia: {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Utwórz commit scalający",
+        "squash": "Squash i scal",
+        "rebase": "Rebase i scal"
+      },
+      "methodDescriptions": {
+        "merge": "Połącz wszystkie commity z tej gałęzi w gałęzi bazowej za pomocą commita scalającego.",
+        "squash": "Połącz wszystkie commity z tej gałęzi w pojedynczy commit w gałęzi bazowej.",
+        "rebase": "Odtwórz wszystkie commity z tej gałęzi na gałęzi bazowej bez commita scalającego."
+      }
     },
     "noDescriptionProvided": "Nie podano opisu.",
     "noFilesChanged": "Brak zmienionych plików",
@@ -2590,7 +2663,12 @@
       "truncationBanner": "Wyświetlanie pierwszych {{limit}} z {{total}} zmienionych plików — limit API GitHub"
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty",
-    "linkPasteNotAPullRequest": "To nie jest link do pull requesta na GitHub"
+    "linkPasteNotAPullRequest": "To nie jest link do pull requesta na GitHub",
+    "announce": {
+      "commentPosted": "Opublikowano komentarz",
+      "reviewSubmitted": "Przesłano recenzję",
+      "autoMergeEnabled": "Włączono automatyczne scalanie"
+    }
   },
   "organization": {
     "boundary": {
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "Dostarczanie e-maili jest chwilowo niedostępne. Spróbuj ponownie później.",
     "admissionRequired": "Nie można zweryfikować Twojego urządzenia. Użyj „$t(login.moreSignInOptions)”, aby zalogować się na innym urządzeniu lub w sieci.",
     "default": "Coś poszło nie tak. Spróbuj ponownie.",
-    "retryableAdmission": "Nie udało się zweryfikować tego urządzenia. Sprawdź połączenie i spróbuj ponownie."
+    "retryableAdmission": "Nie udało się zweryfikować tego urządzenia. Sprawdź połączenie i spróbuj ponownie.",
+    "startSignInFailed": "Nie udało się rozpocząć logowania. Spróbuj ponownie.",
+    "couldNotOpenBrowser": "Nie udało się otworzyć przeglądarki. Spróbuj ponownie.",
+    "signInTimedOut": "Logowanie przekroczyło limit czasu. Spróbuj ponownie.",
+    "signInFailed": "Logowanie nie powiodło się. Spróbuj ponownie.",
+    "networkError": "Błąd sieci. Spróbuj ponownie.",
+    "accessDeniedByUser": "Dostęp odrzucony przez użytkownika",
+    "codeExpired": "Kod wygasł"
   },
   "models": {
     "dataCollected": "Zebrane dane",
-    "free": "Bezpłatnie"
+    "free": "Bezpłatnie",
+    "couldNotUpdateFavorites": "Nie udało się zaktualizować ulubionych"
   }
 }

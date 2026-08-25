@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { REACTION_EMOJI, REACTION_LABEL } from '@/lib/pr-review/discussion/reaction-pills';
+import { REACTION_EMOJI, reactionLabel } from '@/lib/pr-review/discussion/reaction-pills';
 import {
   REVIEW_REACTION_CONTENTS,
   type ReviewReactionContent,
@@ -101,7 +101,7 @@ export function ReactionPickerSheet({
                 <Pressable
                   key={content}
                   accessibilityRole="button"
-                  accessibilityLabel={REACTION_LABEL[content]}
+                  accessibilityLabel={reactionLabel(content)}
                   className={cn(
                     'h-11 w-11 items-center justify-center rounded-full active:opacity-75',
                     isReacted ? 'bg-accent-soft' : 'bg-muted'

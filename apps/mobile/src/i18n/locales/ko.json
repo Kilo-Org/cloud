@@ -22,7 +22,9 @@
     "required": "필수",
     "error": "오류: {{error}}",
     "notNow": "나중에",
-    "continue": "계속"
+    "continue": "계속",
+    "back": "뒤로",
+    "somethingWentWrong": "문제가 발생했습니다"
   },
   "language": {
     "title": "언어",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}}이(가) 첨부 한도 {{limit}}을(를) 초과합니다.",
       "unreadable": "{{filename}}을(를) 읽을 수 없습니다.",
       "pastedImage": "붙여넣은 이미지",
-      "defaultName": "첨부 파일"
+      "defaultName": "첨부 파일",
+      "classificationDenied": "실행 파일은 첨부할 수 없습니다",
+      "classificationEmpty": "파일이 비어 있습니다",
+      "classificationTooLarge": "파일은 20 MB 이하여야 합니다",
+      "classificationUnreadable": "이 파일을 읽을 수 없습니다",
+      "announceUploaded": "첨부 파일이 업로드되었습니다"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "시작 중",
       "stopped": "중지됨",
       "stopping": "중지 중",
-      "unknown": "알 수 없음"
+      "unknown": "알 수 없음",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent가 활성화되었지만 초기 동기화를 대기열에 추가할 수 없습니다. 다시 동기화하세요.",
-    "queuedActionUntracked": "대기 중인 작업을 더 이상 추적할 수 없습니다. 최신 상태를 보려면 새로고침하세요."
+    "queuedActionUntracked": "대기 중인 작업을 더 이상 추적할 수 없습니다. 최신 상태를 보려면 새로고침하세요.",
+    "commands": {
+      "findingAlreadyDismissed": "발견 사항이 이미 해제되었습니다",
+      "findingDismissed": "발견 사항이 해제되었습니다",
+      "noRemediationsQueued": "기존 발견 사항이 대기열에 없습니다",
+      "remediationsQueued": "기존 수정이 대기열에 추가되었습니다",
+      "analysisComplete": "분석 완료",
+      "syncComplete": "동기화 완료"
+    }
   },
   "agents": {
     "activeNow": "지금 활성 중",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub 앱 설정을 시작할 수 없습니다. 다시 시도하세요.",
-      "couldNotOpenTitle": "GitHub를 열 수 없습니다"
+      "couldNotOpenTitle": "GitHub를 열 수 없습니다",
+      "installedTitle": "GitHub App 설치됨",
+      "installedMessage": "이제 저장소가 연결되었습니다.",
+      "pendingTitle": "관리자 승인 대기 중",
+      "pendingMessage": "조직 관리자가 설치 요청을 승인해야 합니다.",
+      "accountMismatchTitle": "계정 불일치",
+      "accountMismatchMessage": "이 연결은 다른 계정으로 로그인된 Kilo 앱에서 시작되었습니다. 해당 계정으로 웹에 로그인하거나 앱에서 다시 시작하세요.",
+      "cannotCompleteTitle": "설치를 완료할 수 없습니다",
+      "notAdminMessage": "해당 계정의 GitHub 관리자만 연결할 수 있습니다. 조직 관리자에게 Kilo 설치를 요청하세요.",
+      "alreadyClaimedMessage": "해당 GitHub 설치는 이미 다른 Kilo 계정에 연결되어 있습니다. 먼저 거기에서 연결을 해제하세요.",
+      "didNotCompleteTitle": "설치가 완료되지 않았습니다",
+      "didNotCompleteMessage": "GitHub App 설치가 완료되지 않았습니다. 앱에서 다시 시도하세요."
     },
     "sessionExited": "세션이 종료되었습니다",
     "remoteSpawnRetryable": "인스턴스에 연결할 수 없습니다. 연결이 끊어졌을 수 있습니다.",
@@ -2307,7 +2334,24 @@
       "viewTerms": "약관 보기",
       "termsAcceptRequired": "게시하려면 서비스 약관에 동의해야 합니다.",
       "termsCheckRetryCopy": "서비스 약관을 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
-      "termsOutdatedCopy": "서비스 약관이 변경되었습니다. 최신 버전에 동의하려면 이 화면을 다시 여세요."
+      "termsOutdatedCopy": "서비스 약관이 변경되었습니다. 최신 버전에 동의하려면 이 화면을 다시 여세요.",
+      "reactions": {
+        "thumbsUp": "좋아요",
+        "thumbsDown": "싫어요",
+        "laugh": "웃음",
+        "hooray": "만세",
+        "confused": "혼란",
+        "heart": "하트",
+        "rocket": "로켓",
+        "eyes": "눈"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}}의 파일 댓글",
+        "fileComment": "파일 댓글",
+        "outdatedOnPathLines": "{{path}} {{lines}}에 오래됨",
+        "outdatedOnLines": "{{lines}}에 오래됨",
+        "outdatedOnPath": "{{path}}에 오래됨"
+      }
     },
     "entry": {
       "clearLink": "풀 리퀘스트 링크 지우기",
@@ -2464,7 +2508,36 @@
         "closed": "이 풀 리퀘스트는 닫혀 있습니다"
       },
       "updateBranch": "브랜치 업데이트",
-      "updateBranchFromBase": "기본 브랜치에서 브랜치 업데이트"
+      "updateBranchFromBase": "기본 브랜치에서 브랜치 업데이트",
+      "blocked": {
+        "unknownStateTitle": "GitHub가 병합 가능 상태를 보고하지 않았습니다",
+        "unknownStateDetail": "잠시 후 개요를 새로고침해 보세요.",
+        "conflictsTitle": "병합 충돌",
+        "conflictsDetail": "병합 전에 이 브랜치의 병합 충돌을 해결하세요.",
+        "requiredReviewsTitle": "필수 리뷰 부족",
+        "requiredReviewsDetail": "필수 리뷰어의 승인이 없거나 대기 중입니다.",
+        "failingChecksTitle": "실패한 필수 체크",
+        "failingChecksDetail": "필수 상태 체크가 실패하고 있습니다.",
+        "unstableTitle": "일부 체크가 실패하고 있습니다",
+        "unstableDetail": "필수가 아닌 체크가 실패하고 있습니다. 병합을 차단하지는 않습니다.",
+        "draftTitle": "초안 풀 리퀘스트",
+        "draftDetail": "병합 전에 풀 리퀘스트를 리뷰 준비 완료로 표시하세요.",
+        "behindTitle": "브랜치가 최신이 아닙니다",
+        "behindDetailUpdatable": "병합 전에 기본 브랜치에서 브랜치를 업데이트하거나 리베이스하세요.",
+        "behindDetail": "헤드 브랜치가 기본 브랜치보다 뒤에 있습니다. 병합 전에 브랜치를 리베이스하거나 업데이트하세요.",
+        "notMergeableTitle": "이 풀 리퀘스트는 아직 병합할 수 없습니다",
+        "notMergeableDetail": "GitHub가 {{state}} 병합 가능 상태를 보고했습니다."
+      },
+      "methodLabels": {
+        "merge": "병합 커밋 만들기",
+        "squash": "스쿼시 및 병합",
+        "rebase": "리베이스 및 병합"
+      },
+      "methodDescriptions": {
+        "merge": "이 브랜치의 모든 커밋을 병합 커밋으로 기본 브랜치에 결합합니다.",
+        "squash": "이 브랜치의 모든 커밋을 기본 브랜치의 단일 커밋으로 결합합니다.",
+        "rebase": "이 브랜치의 모든 커밋을 병합 커밋 없이 기본 브랜치에 다시 적용합니다."
+      }
     },
     "noDescriptionProvided": "제공된 설명 없음.",
     "noFilesChanged": "변경된 파일 없음",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "변경된 파일 {{total}}개 중 처음 {{limit}}개를 표시 중 — GitHub API 제한"
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다",
-    "linkPasteNotAPullRequest": "GitHub 풀 리퀘스트 링크가 아닙니다"
+    "linkPasteNotAPullRequest": "GitHub 풀 리퀘스트 링크가 아닙니다",
+    "announce": {
+      "commentPosted": "댓글이 게시되었습니다",
+      "reviewSubmitted": "리뷰가 제출되었습니다",
+      "autoMergeEnabled": "자동 병합이 켜졌습니다"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "이메일 전송이 일시적으로 불가능합니다. 잠시 후 다시 시도하세요.",
     "admissionRequired": "기기를 확인할 수 없습니다. '$t(login.moreSignInOptions)'을 사용하여 다른 기기 또는 웹을 통해 로그인하세요.",
     "default": "문제가 발생했습니다. 다시 시도하세요.",
-    "retryableAdmission": "이 기기를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요."
+    "retryableAdmission": "이 기기를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+    "startSignInFailed": "로그인을 시작하지 못했습니다. 다시 시도해 주세요.",
+    "couldNotOpenBrowser": "브라우저를 열 수 없습니다. 다시 시도해 주세요.",
+    "signInTimedOut": "로그인 시간이 초과되었습니다. 다시 시도해 주세요.",
+    "signInFailed": "로그인에 실패했습니다. 다시 시도해 주세요.",
+    "networkError": "네트워크 오류. 다시 시도해 주세요.",
+    "accessDeniedByUser": "사용자가 액세스를 거부했습니다",
+    "codeExpired": "코드가 만료되었습니다"
   },
   "models": {
     "dataCollected": "수집된 데이터",
-    "free": "무료"
+    "free": "무료",
+    "couldNotUpdateFavorites": "즐겨찾기를 업데이트할 수 없습니다"
   }
 }

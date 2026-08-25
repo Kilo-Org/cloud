@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
+import { i18n } from '@/i18n';
 import { API_BASE_URL } from '@/lib/config';
 import { classifyPollResponse } from '@/lib/auth/poll-response';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
@@ -62,7 +63,7 @@ export function startDeviceAuthPoll(params: {
     if (Date.now() - startedAt > POLL_OVERALL_TIMEOUT_MS) {
       cleanup();
       setState(previous =>
-        errorDeviceAuthState(code, 'Sign-in timed out. Please try again.', previous.verificationUrl)
+        errorDeviceAuthState(code, i18n.t('authErrors.signInTimedOut'), previous.verificationUrl)
       );
       return;
     }
@@ -102,7 +103,10 @@ export function startDeviceAuthPoll(params: {
 
       if (parsed && (parsed.status === 'denied' || parsed.status === 'expired')) {
         cleanup();
-        const message = parsed.status === 'denied' ? 'Access denied by user' : 'Code expired';
+        const message =
+          parsed.status === 'denied'
+            ? i18n.t('authErrors.accessDeniedByUser')
+            : i18n.t('authErrors.codeExpired');
         const terminalStatus: 'denied' | 'expired' = parsed.status;
         setState(previous =>
           terminalDeviceAuthState({
@@ -124,11 +128,7 @@ export function startDeviceAuthPoll(params: {
         case 'expired': {
           cleanup();
           setState(previous =>
-            errorDeviceAuthState(
-              code,
-              'Sign-in failed. Please try again.',
-              previous.verificationUrl
-            )
+            errorDeviceAuthState(code, i18n.t('authErrors.signInFailed'), previous.verificationUrl)
           );
           return;
         }
@@ -157,7 +157,7 @@ export function startDeviceAuthPoll(params: {
       }
       cleanup();
       setState(previous =>
-        errorDeviceAuthState(code, 'Network error. Please try again.', previous.verificationUrl)
+        errorDeviceAuthState(code, i18n.t('authErrors.networkError'), previous.verificationUrl)
       );
     }
   };

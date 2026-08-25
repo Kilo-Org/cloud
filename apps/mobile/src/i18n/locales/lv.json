@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopēts starpliktuvē",
     "couldNotCopyToClipboard": "Neizdevās kopēt starpliktuvē",
     "required": "obligāts",
-    "error": "kļūda: {{error}}"
+    "error": "kļūda: {{error}}",
+    "back": "Atpakaļ",
+    "somethingWentWrong": "Kaut kas nogāja greizi"
   },
   "language": {
     "title": "Valoda",
@@ -282,7 +284,36 @@
         "body": "Neizdevās dzēst zaru: {{reason}}",
         "accessibility": "Apvienots. Neizdevās dzēst zaru: {{reason}}"
       },
-      "loadFailedTitle": "Neizdevās ielādēt apvienošanas iespējas"
+      "loadFailedTitle": "Neizdevās ielādēt apvienošanas iespējas",
+      "blocked": {
+        "unknownStateTitle": "GitHub nav norādījis apvienojamības stāvokli",
+        "unknownStateDetail": "Pēc brīža mēģiniet atsvaidzināt pārskatu.",
+        "conflictsTitle": "Apvienošanas konflikti",
+        "conflictsDetail": "Pirms apvienošanas atrisiniet apvienošanas konfliktus šajā zarā.",
+        "requiredReviewsTitle": "Trūkst nepieciešamo pārskatu",
+        "requiredReviewsDetail": "Nepieciešamo pārskatītāju apstiprinājumi trūkst vai gaida.",
+        "failingChecksTitle": "Nepieciešamās pārbaudes neizdodas",
+        "failingChecksDetail": "Nepieciešamās statusa pārbaudes neizdodas.",
+        "unstableTitle": "Dažas pārbaudes neizdodas",
+        "unstableDetail": "Nav obligātās pārbaudes neizdodas. Tās nebloķēs apvienošanu.",
+        "draftTitle": "Melnraksta pull request",
+        "draftDetail": "Pirms apvienošanas atzīmējiet pull request kā gatavu pārskatīšanai.",
+        "behindTitle": "Zars ir novecojis",
+        "behindDetailUpdatable": "Pirms apvienošanas atjauniniet zaru no bāzes vai veiciet rebase.",
+        "behindDetail": "Galvas zars atpaliek no bāzes. Pirms apvienošanas veiciet rebase vai atjauniniet zaru.",
+        "notMergeableTitle": "Šo pull request vēl nevar apvienot",
+        "notMergeableDetail": "GitHub ziņoja par apvienojamības stāvokli {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Izveidot apvienošanas commit",
+        "squash": "Squash un apvienot",
+        "rebase": "Rebase un apvienot"
+      },
+      "methodDescriptions": {
+        "merge": "Apvienojiet visus šī zara commits bāzes zarā ar apvienošanas commit.",
+        "squash": "Apvienojiet visus šī zara commits vienā commit bāzes zarā.",
+        "rebase": "Atkārtojiet visus šī zara commits bāzes zarā bez apvienošanas commit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Diskusijas pavediens {{anchorLabel}}",
@@ -360,7 +391,24 @@
       "termsOutdatedCopy": "Pakalpojuma noteikumi ir mainīti. Atveriet šo ekrānu vēlreiz, lai pieņemtu jaunāko versiju.",
       "termsCheckRetryCopy": "Neizdevās pārbaudīt pakalpojuma noteikumus. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
       "comment_zero": "{{displayCount}} komentāru",
-      "reaction_zero": "reakciju"
+      "reaction_zero": "reakciju",
+      "reactions": {
+        "thumbsUp": "Īkšķis uz augšu",
+        "thumbsDown": "Īkšķis uz leju",
+        "laugh": "Smiekli",
+        "hooray": "Urrā",
+        "confused": "Apjukums",
+        "heart": "Sirds",
+        "rocket": "Raķete",
+        "eyes": "Acis"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Faila komentārs uz {{path}}",
+        "fileComment": "Faila komentārs",
+        "outdatedOnPathLines": "Novecojis uz {{path}} {{lines}}",
+        "outdatedOnLines": "Novecojis uz {{lines}}",
+        "outdatedOnPath": "Novecojis uz {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
@@ -530,7 +578,12 @@
       "truncationBanner": "Tiek rādīti pirmie {{limit}} no {{total}} mainītajiem failiem — GitHub API ierobežojums"
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša",
-    "linkPasteNotAPullRequest": "Nav GitHub pieprasījuma saite"
+    "linkPasteNotAPullRequest": "Nav GitHub pieprasījuma saite",
+    "announce": {
+      "commentPosted": "Komentārs publicēts",
+      "reviewSubmitted": "Pārskats iesniegts",
+      "autoMergeEnabled": "Automātiskā apvienošana iespējota"
+    }
   },
   "notifications": {
     "title": "Paziņojumi",
@@ -663,7 +716,12 @@
       "sizeRejection": "{{filename}} pārsniedz {{limit}} pielikuma ierobežojumu.",
       "unreadable": "Neizdevās nolasīt {{filename}}.",
       "pastedImage": "ielīmētais attēls",
-      "defaultName": "Pielikums"
+      "defaultName": "Pielikums",
+      "classificationDenied": "Izpildāmos failus nevar pievienot",
+      "classificationEmpty": "Fails ir tukšs",
+      "classificationTooLarge": "Failiem jābūt 20 MB vai mazākiem",
+      "classificationUnreadable": "Neizdevās nolasīt šo failu",
+      "announceUploaded": "Pielikums augšupielādēts"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1037,7 +1095,8 @@
       "starting": "SĀK",
       "stopped": "APTURĒTS",
       "stopping": "APTUR",
-      "unknown": "NEZINĀMS"
+      "unknown": "NEZINĀMS",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1725,7 +1784,15 @@
     },
     "queuedActionUntracked": "Ieliktu rindā darbību vairs nevar izsekot. Atsvaidzini, lai redzētu jaunāko stāvokli.",
     "initialSyncAdmissionFailed": "Security Agent tika iespējots, bet sākotnējo sinhronizāciju nevarēja ielikt rindā. Sinhronizē vēlreiz.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Atradums jau ir noraidīts",
+      "findingDismissed": "Atradums noraidīts",
+      "noRemediationsQueued": "Nav rindā esošu atradumu",
+      "remediationsQueued": "Esošie labojumi ievietoti rindā",
+      "analysisComplete": "Analīze pabeigta",
+      "syncComplete": "Sinhronizācija pabeigta"
+    }
   },
   "agents": {
     "activeNow": "Aktīvs tagad",
@@ -1775,7 +1842,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
-      "couldNotOpenMessage": "Neizdevās sākt GitHub App iestatīšanu. Lūdzu, mēģini vēlreiz."
+      "couldNotOpenMessage": "Neizdevās sākt GitHub App iestatīšanu. Lūdzu, mēģini vēlreiz.",
+      "installedTitle": "GitHub App instalēts",
+      "installedMessage": "Jūsu repozitoriji tagad ir savienoti.",
+      "pendingTitle": "Gaida administratora apstiprinājumu",
+      "pendingMessage": "Organizācijas administratoram jāapstiprina instalēšanas pieprasījums.",
+      "accountMismatchTitle": "Kontu nesakritība",
+      "accountMismatchMessage": "Šis savienojums tika sākts no Kilo lietotnes, kas ir pierakstījusies ar citu kontu. Pierakstieties tīmeklī ar šo kontu vai sāciet vēlreiz no lietotnes.",
+      "cannotCompleteTitle": "Nevar pabeigt instalēšanu",
+      "notAdminMessage": "To var savienot tikai šī konta GitHub administrators. Lūdziet organizācijas administratoram instalēt Kilo.",
+      "alreadyClaimedMessage": "Šī GitHub instalācija jau ir savienota ar citu Kilo kontu. Vispirms atvienojiet to tur.",
+      "didNotCompleteTitle": "Instalēšana netika pabeigta",
+      "didNotCompleteMessage": "GitHub App instalēšana netika pabeigta. Mēģiniet vēlreiz no lietotnes."
     },
     "sessionExited": "Sesija beidzās",
     "remoteSpawnRetryable": "Nevarēja sasniegt instanci — tā, iespējams, ir atvienojusies.",
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "E-pasta piegāde īslaicīgi nav pieejama. Lūdzu, mēģiniet vēlāk.",
     "admissionRequired": "Jūsu ierīci nevar verificēt. Izmantojiet “$t(login.moreSignInOptions)”, lai pierakstītos citā ierīcē vai tīmeklī.",
     "default": "Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.",
-    "retryableAdmission": "Nevarējām verificēt šo ierīci. Pārbaudiet savienojumu un mēģiniet vēlreiz."
+    "retryableAdmission": "Nevarējām verificēt šo ierīci. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+    "startSignInFailed": "Neizdevās sākt pierakstīšanos. Lūdzu, mēģiniet vēlreiz.",
+    "couldNotOpenBrowser": "Neizdevās atvērt pārlūku. Lūdzu, mēģiniet vēlreiz.",
+    "signInTimedOut": "Pierakstīšanās termiņš beidzās. Lūdzu, mēģiniet vēlreiz.",
+    "signInFailed": "Pierakstīšanās neizdevās. Lūdzu, mēģiniet vēlreiz.",
+    "networkError": "Tīkla kļūda. Lūdzu, mēģiniet vēlreiz.",
+    "accessDeniedByUser": "Lietotājs liedza piekļuvi",
+    "codeExpired": "Kods ir beidzies"
   },
   "models": {
     "dataCollected": "Apkopotie dati",
-    "free": "Bezmaksas"
+    "free": "Bezmaksas",
+    "couldNotUpdateFavorites": "Neizdevās atjaunināt izlasi"
   }
 }

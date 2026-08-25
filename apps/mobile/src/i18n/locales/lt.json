@@ -22,7 +22,9 @@
     "copiedToClipboard": "Nukopijuota į iškarpinę",
     "couldNotCopyToClipboard": "Nepavyko nukopijuoti į iškarpinę",
     "required": "privaloma",
-    "error": "klaida: {{error}}"
+    "error": "klaida: {{error}}",
+    "back": "Atgal",
+    "somethingWentWrong": "Kažkas nepavyko"
   },
   "language": {
     "title": "Kalba",
@@ -284,7 +286,36 @@
         "body": "Nepavyko ištrinti šakos: {{reason}}",
         "accessibility": "Sujungta. Nepavyko ištrinti šakos: {{reason}}"
       },
-      "loadFailedTitle": "Nepavyko įkelti sujungimo parinkčių"
+      "loadFailedTitle": "Nepavyko įkelti sujungimo parinkčių",
+      "blocked": {
+        "unknownStateTitle": "GitHub nepranešė apie sujungiamumo būseną",
+        "unknownStateDetail": "Po akimirkos bandykite atnaujinti apžvalgą.",
+        "conflictsTitle": "Sujungimo konfliktai",
+        "conflictsDetail": "Prieš sujungdami išspręskite šios šakos sujungimo konfliktus.",
+        "requiredReviewsTitle": "Trūksta reikiamų peržiūrų",
+        "requiredReviewsDetail": "Reikiamų recenzentų patvirtinimų trūksta arba laukiama jų.",
+        "failingChecksTitle": "Nepavykę būtinieji patikrinimai",
+        "failingChecksDetail": "Būtinieji būsenos patikrinimai nepavyksta.",
+        "unstableTitle": "Kai kurie patikrinimai nepavyksta",
+        "unstableDetail": "Nebūtinieji patikrinimai nepavyksta. Jie neblokuos sujungimo.",
+        "draftTitle": "Pull request juodraštis",
+        "draftDetail": "Pažymėkite pull request kaip paruoštą peržiūrai prieš sujungdami.",
+        "behindTitle": "Šaka yra pasenusi",
+        "behindDetailUpdatable": "Prieš sujungdami atnaujinkite šaką iš bazės arba atlikite rebase.",
+        "behindDetail": "Pagrindinė šaka atsilieka nuo bazės. Prieš sujungdami atlikite rebase arba atnaujinkite šaką.",
+        "notMergeableTitle": "Šio pull request dar negalima sujungti",
+        "notMergeableDetail": "GitHub pranešė {{state}} sujungiamumo būseną."
+      },
+      "methodLabels": {
+        "merge": "Sukurti sujungimo įsipareigojimą",
+        "squash": "Squash ir sujungti",
+        "rebase": "Rebase ir sujungti"
+      },
+      "methodDescriptions": {
+        "merge": "Sujunkite visus šios šakos įsipareigojimus į bazinę šaką sujungimo įsipareigojimu.",
+        "squash": "Sujunkite visus šios šakos įsipareigojimus į vieną įsipareigojimą bazinėje šakoje.",
+        "rebase": "Perkelkite visus šios šakos įsipareigojimus į bazinę šaką be sujungimo įsipareigojimo."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Diskusijos gija {{anchorLabel}}",
@@ -364,7 +395,24 @@
       "comment_few": "{{displayCount}} komentarai",
       "comment_many": "{{displayCount}} komentarų",
       "reaction_few": "reakcijos",
-      "reaction_many": "reakcijų"
+      "reaction_many": "reakcijų",
+      "reactions": {
+        "thumbsUp": "Patinka",
+        "thumbsDown": "Nepatinka",
+        "laugh": "Juokas",
+        "hooray": "Valio",
+        "confused": "Sutrikęs",
+        "heart": "Širdis",
+        "rocket": "Raketa",
+        "eyes": "Akys"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Failo komentaras {{path}}",
+        "fileComment": "Failo komentaras",
+        "outdatedOnPathLines": "Pasenęs {{path}} {{lines}}",
+        "outdatedOnLines": "Pasenęs {{lines}}",
+        "outdatedOnPath": "Pasenęs {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programėlės nustatymų",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -537,7 +585,12 @@
       "truncationBanner": "Rodoma pirmi {{limit}} iš {{total}} pakeistų failų — „GitHub“ API limitas"
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia",
-    "linkPasteNotAPullRequest": "Tai ne „GitHub“ pull request nuoroda"
+    "linkPasteNotAPullRequest": "Tai ne „GitHub“ pull request nuoroda",
+    "announce": {
+      "commentPosted": "Komentaras paskelbtas",
+      "reviewSubmitted": "Peržiūra pateikta",
+      "autoMergeEnabled": "Automatinis sujungimas įjungtas"
+    }
   },
   "notifications": {
     "title": "Pranešimai",
@@ -670,7 +723,12 @@
       "sizeRejection": "{{filename}} viršija {{limit}} priedo limitą.",
       "unreadable": "Nepavyko perskaityti {{filename}}.",
       "pastedImage": "įklijuotas vaizdas",
-      "defaultName": "Priedas"
+      "defaultName": "Priedas",
+      "classificationDenied": "Vykdomųjų failų pridėti negalima",
+      "classificationEmpty": "Failas tuščias",
+      "classificationTooLarge": "Failai turi būti 20 MB arba mažesni",
+      "classificationUnreadable": "Nepavyko perskaityti šio failo",
+      "announceUploaded": "Priedas įkeltas"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1045,7 +1103,8 @@
       "starting": "PRADEDAMA",
       "stopped": "SUSTABDYTA",
       "stopping": "STABDOMA",
-      "unknown": "NEŽINOMA"
+      "unknown": "NEŽINOMA",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1736,7 +1795,15 @@
     },
     "queuedActionUntracked": "Įrašyto veiksmo nebegalima sekti. Atnaujinkite, kad pamatytumėte naujausią būseną.",
     "initialSyncAdmissionFailed": "Saugos agentas įjungtas, bet pradinės sinchronizacijos nepavyko įrašyti. Sinchronizuokite iš naujo.",
-    "title": "Saugos agentas"
+    "title": "Saugos agentas",
+    "commands": {
+      "findingAlreadyDismissed": "Radinys jau atmestas",
+      "findingDismissed": "Radinys atmestas",
+      "noRemediationsQueued": "Į eilę neįtraukta esamų radinių",
+      "remediationsQueued": "Esami taisymai įrašyti į eilę",
+      "analysisComplete": "Analizė užbaigta",
+      "syncComplete": "Sinchronizavimas užbaigtas"
+    }
   },
   "agents": {
     "activeNow": "Aktyvus dabar",
@@ -1788,7 +1855,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
-      "couldNotOpenMessage": "Nepavyko pradėti GitHub App sąrankos. Bandykite dar kartą."
+      "couldNotOpenMessage": "Nepavyko pradėti GitHub App sąrankos. Bandykite dar kartą.",
+      "installedTitle": "GitHub programėlė įdiegta",
+      "installedMessage": "Jūsų saugyklos dabar prijungtos.",
+      "pendingTitle": "Laukiama administratoriaus patvirtinimo",
+      "pendingMessage": "Organizacijos administratorius turi patvirtinti diegimo užklausą.",
+      "accountMismatchTitle": "Paskyrų neatitikimas",
+      "accountMismatchMessage": "Šis ryšys buvo pradėtas iš Kilo programėlės, prisijungus kita paskyra. Prisijunkite prie žiniatinklio ta paskyra arba pradėkite iš naujo iš programėlės.",
+      "cannotCompleteTitle": "Nepavyksta užbaigti diegimo",
+      "notAdminMessage": "Tik tos paskyros GitHub administratorius gali ją prijungti. Paprašykite organizacijos administratoriaus įdiegti Kilo.",
+      "alreadyClaimedMessage": "Tas GitHub diegimas jau prijungtas prie kitos Kilo paskyros. Pirmiausia atjunkite jį ten.",
+      "didNotCompleteTitle": "Diegimas nebuvo užbaigtas",
+      "didNotCompleteMessage": "GitHub programėlės diegimas nebuvo užbaigtas. Bandykite dar kartą iš programėlės."
     },
     "sessionExited": "Sesija baigta",
     "remoteSpawnRetryable": "Nepavyko pasiekti egzemplioriaus — jis galėjo atsijungti.",
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "El. laiškų pristatymas laikinai nepasiekiamas. Bandykite dar kartą vėliau.",
     "admissionRequired": "Jūsų įrenginio negalima patikrinti. Naudokite „$t(login.moreSignInOptions)“, kad prisijungtumėte kitame įrenginyje arba internete.",
     "default": "Kažkas nepavyko. Bandykite dar kartą.",
-    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Patikrinkite ryšį ir bandykite dar kartą."
+    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Patikrinkite ryšį ir bandykite dar kartą.",
+    "startSignInFailed": "Nepavyko pradėti prisijungimo. Bandykite dar kartą.",
+    "couldNotOpenBrowser": "Nepavyko atidaryti naršyklės. Bandykite dar kartą.",
+    "signInTimedOut": "Prisijungimo laikas baigėsi. Bandykite dar kartą.",
+    "signInFailed": "Prisijungti nepavyko. Bandykite dar kartą.",
+    "networkError": "Tinklo klaida. Bandykite dar kartą.",
+    "accessDeniedByUser": "Vartotojas atmetė prieigą",
+    "codeExpired": "Kodo galiojimas baigėsi"
   },
   "models": {
     "dataCollected": "Surinkti duomenys",
-    "free": "Nemokama"
+    "free": "Nemokama",
+    "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių"
   }
 }

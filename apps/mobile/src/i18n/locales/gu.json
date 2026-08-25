@@ -22,7 +22,9 @@
     "copiedToClipboard": "ક્લિપબોર્ડ પર કૉપિ થઈ ગયું",
     "couldNotCopyToClipboard": "ક્લિપબોર્ડ પર કૉપિ કરી શકાયું નહીં",
     "required": "જરૂરી",
-    "error": "ભૂલ: {{error}}"
+    "error": "ભૂલ: {{error}}",
+    "back": "પાછળ",
+    "somethingWentWrong": "કંઈક ખોટું થયું"
   },
   "language": {
     "title": "ભાષા",
@@ -280,7 +282,36 @@
         "body": "બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}",
         "accessibility": "મર્જ થયું. બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}"
       },
-      "loadFailedTitle": "મર્જ વિકલ્પો લોડ કરી શકાયાં નહીં"
+      "loadFailedTitle": "મર્જ વિકલ્પો લોડ કરી શકાયાં નહીં",
+      "blocked": {
+        "unknownStateTitle": "GitHub એ મર્જબિલિટી સ્થિતિ જાણ કરી નથી",
+        "unknownStateDetail": "થોડી ક્ષણમાં ઝાંખી તાજી કરવાનો પ્રયાસ કરો.",
+        "conflictsTitle": "મર્જ તકરાર",
+        "conflictsDetail": "મર્જ કરતા પહેલા આ બ્રાન્ચ પરની મર્જ તકરાર ઉકેલો.",
+        "requiredReviewsTitle": "જરૂરી સમીક્ષાઓ ખૂટે છે",
+        "requiredReviewsDetail": "જરૂરી સમીક્ષકો તરફથી મંજૂરીઓ ખૂટે છે અથવા બાકી છે.",
+        "failingChecksTitle": "નિષ્ફળ જતી જરૂરી તપાસો",
+        "failingChecksDetail": "જરૂરી સ્થિતિ તપાસો નિષ્ફળ રહી છે.",
+        "unstableTitle": "કેટલીક તપાસો નિષ્ફળ રહી છે",
+        "unstableDetail": "બિનજરૂરી તપાસો નિષ્ફળ રહી છે. તે મર્જને અવરોધશે નહીં.",
+        "draftTitle": "ડ્રાફ્ટ પુલ રિક્વેસ્ટ",
+        "draftDetail": "મર્જ કરતા પહેલા પુલ રિક્વેસ્ટને સમીક્ષા માટે તૈયાર તરીકે ચિહ્નિત કરો.",
+        "behindTitle": "બ્રાન્ચ જૂની છે",
+        "behindDetailUpdatable": "મર્જ કરતા પહેલા બેઝમાંથી બ્રાન્ચ અપડેટ કરો, અથવા રીબેઝ કરો.",
+        "behindDetail": "હેડ બ્રાન્ચ બેઝ કરતાં પાછળ છે. મર્જ કરતા પહેલા બ્રાન્ચ રીબેઝ કરો અથવા અપડેટ કરો.",
+        "notMergeableTitle": "આ પુલ રિક્વેસ્ટ હજુ મર્જ કરી શકાતી નથી",
+        "notMergeableDetail": "GitHub એ {{state}} મર્જબિલિટી સ્થિતિ જાણ કરી."
+      },
+      "methodLabels": {
+        "merge": "મર્જ કમિટ બનાવો",
+        "squash": "સ્ક્વોશ અને મર્જ",
+        "rebase": "રીબેઝ અને મર્જ"
+      },
+      "methodDescriptions": {
+        "merge": "આ બ્રાન્ચના બધા કમિટ્સને મર્જ કમિટ સાથે બેઝ બ્રાન્ચમાં ભેગા કરો.",
+        "squash": "આ બ્રાન્ચના બધા કમિટ્સને બેઝ બ્રાન્ચ પર એક જ કમિટમાં ભેગા કરો.",
+        "rebase": "આ બ્રાન્ચના બધા કમિટ્સને મર્જ કમિટ વિના બેઝ બ્રાન્ચ પર ફરી ચલાવો."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ચર્ચા થ્રેડ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} વધુ લીટીઓ ઉપર",
       "termsAcceptRequired": "પોસ્ટ કરવા તમારે સેવાની શરતો સ્વીકારવી જોઈએ.",
       "termsOutdatedCopy": "સેવાની શરતો બદલાઈ. નવીનતમ સંસ્કરણ સ્વીકારવા આ સ્ક્રીન ફરી ખોલો.",
-      "termsCheckRetryCopy": "સેવાની શરતો તપાસી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+      "termsCheckRetryCopy": "સેવાની શરતો તપાસી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "reactions": {
+        "thumbsUp": "અંગૂઠો ઉપર",
+        "thumbsDown": "અંગૂઠો નીચે",
+        "laugh": "હાસ્ય",
+        "hooray": "વાહ",
+        "confused": "મૂંઝવણમાં",
+        "heart": "હૃદય",
+        "rocket": "રોકેટ",
+        "eyes": "આંખો"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} પર ફાઇલ ટિપ્પણી",
+        "fileComment": "ફાઇલ ટિપ્પણી",
+        "outdatedOnPathLines": "{{path}} {{lines}} પર જૂનું",
+        "outdatedOnLines": "{{lines}} પર જૂનું",
+        "outdatedOnPath": "{{path}} પર જૂનું"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub એપ સેટિંગ્સ ખોલી શકાઈ નહીં",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
@@ -523,7 +571,12 @@
       "truncationBanner": "બદલાયેલી {{total}} ફાઇલોમાંથી પ્રથમ {{limit}} બતાવી રહ્યાં છીએ — GitHub API મર્યાદા"
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે",
-    "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી"
+    "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી",
+    "announce": {
+      "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
+      "reviewSubmitted": "સમીક્ષા સબમિટ થઈ",
+      "autoMergeEnabled": "ઓટો-મર્જ સક્ષમ થયું"
+    }
   },
   "notifications": {
     "title": "સૂચનાઓ",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} જોડાણ મર્યાદા કરતાં વધી જાય છે.",
       "unreadable": "{{filename}} વાંચી શકાયું નહીં.",
       "pastedImage": "પેસ્ટ કરેલી છબી",
-      "defaultName": "જોડાણ"
+      "defaultName": "જોડાણ",
+      "classificationDenied": "એક્ઝેક્યુટેબલ ફાઇલો જોડી શકાતી નથી",
+      "classificationEmpty": "ફાઇલ ખાલી છે",
+      "classificationTooLarge": "ફાઇલો 20 MB કે તેથી નાની હોવી જોઈએ",
+      "classificationUnreadable": "આ ફાઇલ વાંચી શકાઈ નહીં",
+      "announceUploaded": "જોડાણ અપલોડ થયું"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "શરૂ થઈ રહ્યું છે",
       "stopped": "રોકાયેલ",
       "stopping": "રોકાઈ રહ્યું છે",
-      "unknown": "અજ્ઞાત"
+      "unknown": "અજ્ઞાત",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "કતારમાં મૂકેલ ક્રિયા હવે ટ્રેક કરી શકાતી નથી. નવીનતમ સ્થિતિ જોવા રિફ્રેશ કરો.",
     "initialSyncAdmissionFailed": "સિક્યુરિટી એજન્ટ સક્ષમ થયું, પણ પ્રારંભિક સિંક કતારમાં મૂકી શકાયું નહીં. ફરી સિંક કરો.",
-    "title": "સિક્યુરિટી એજન્ટ"
+    "title": "સિક્યુરિટી એજન્ટ",
+    "commands": {
+      "findingAlreadyDismissed": "શોધ પહેલેથી ખારિજ થઈ ગઈ છે",
+      "findingDismissed": "શોધ ખારિજ થઈ",
+      "noRemediationsQueued": "કોઈ હાલની શોધ કતારમાં નથી",
+      "remediationsQueued": "હાલની સુધારણાઓ કતારમાં મૂકાઈ",
+      "analysisComplete": "વિશ્લેષણ પૂર્ણ",
+      "syncComplete": "સિંક પૂર્ણ"
+    }
   },
   "agents": {
     "activeNow": "હવે સક્રિય",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ખોલી શકાયું નથી",
-      "couldNotOpenMessage": "અમે GitHub App સેટઅપ શરૂ કરી શક્યા નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
+      "couldNotOpenMessage": "અમે GitHub App સેટઅપ શરૂ કરી શક્યા નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+      "installedTitle": "GitHub App ઇન્સ્ટોલ થયું",
+      "installedMessage": "તમારી રિપોઝિટરીઓ હવે કનેક્ટેડ છે.",
+      "pendingTitle": "એડમિન મંજૂરી બાકી છે",
+      "pendingMessage": "સંસ્થાના એડમિને ઇન્સ્ટોલેશન વિનંતીને મંજૂર કરવી જોઈએ.",
+      "accountMismatchTitle": "એકાઉન્ટ મેળ ખાતું નથી",
+      "accountMismatchMessage": "આ કનેક્શન Kilo ઍપમાંથી અલગ એકાઉન્ટ સાથે સાઇન ઇન કરીને શરૂ કરવામાં આવ્યું હતું. તે એકાઉન્ટ સાથે વેબ પર સાઇન ઇન કરો, અથવા ઍપમાંથી ફરી શરૂ કરો.",
+      "cannotCompleteTitle": "ઇન્સ્ટોલેશન પૂર્ણ કરી શકાતું નથી",
+      "notAdminMessage": "માત્ર તે એકાઉન્ટનો GitHub એડમિન જ તેને કનેક્ટ કરી શકે છે. Kilo ઇન્સ્ટોલ કરવા સંસ્થાના એડમિનને કહો.",
+      "alreadyClaimedMessage": "તે GitHub ઇન્સ્ટોલેશન પહેલેથી જ બીજા Kilo એકાઉન્ટ સાથે કનેક્ટેડ છે. પહેલા ત્યાં તેને ડિસ્કનેક્ટ કરો.",
+      "didNotCompleteTitle": "ઇન્સ્ટોલેશન પૂર્ણ થયું નથી",
+      "didNotCompleteMessage": "GitHub App નું ઇન્સ્ટોલેશન પૂર્ણ થયું નથી. ઍપમાંથી ફરી પ્રયાસ કરો."
     },
     "sessionExited": "સત્ર બહાર નીકળ્યું",
     "remoteSpawnRetryable": "ઇન્સ્ટન્સ સુધી પહોંચી શકાયું નહીં — તે ડિસ્કનેક્ટ થયું હોઈ શકે છે.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ઇમેઇલ ડિલિવરી અસ્થાયી રૂપે ઉપલબ્ધ નથી. કૃપા કરીને પછીથી ફરી પ્રયાસ કરો.",
     "admissionRequired": "તમારા ઉપકરણની ચકાસણી થઈ શકતી નથી. બીજા ઉપકરણ પર અથવા વેબ દ્વારા સાઇન ઇન કરવા માટે '$t(login.moreSignInOptions)' વાપરો.",
     "default": "કંઈક ખોટું થયું. કૃપા કરીને ફરી પ્રયાસ કરો.",
-    "retryableAdmission": "અમે આ ઉપકરણ ચકાસી શક્યા નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો."
+    "retryableAdmission": "અમે આ ઉપકરણ ચકાસી શક્યા નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+    "startSignInFailed": "સાઇન ઇન શરૂ કરવામાં નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "couldNotOpenBrowser": "બ્રાઉઝર ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "signInTimedOut": "સાઇન-ઇનનો સમય સમાપ્ત થયો. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "signInFailed": "સાઇન-ઇન નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "networkError": "નેટવર્ક ભૂલ. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "accessDeniedByUser": "વપરાશકર્તા દ્વારા પ્રવેશ નકારાયો",
+    "codeExpired": "કોડ સમાપ્ત થયો"
   },
   "models": {
     "dataCollected": "એકત્રિત ડેટા",
-    "free": "મફત"
+    "free": "મફત",
+    "couldNotUpdateFavorites": "ફેવરિટ અપડેટ કરી શકાયાં નહીં"
   }
 }

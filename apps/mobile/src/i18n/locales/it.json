@@ -22,7 +22,9 @@
     "required": "obbligatorio",
     "error": "errore: {{error}}",
     "notNow": "Non ora",
-    "continue": "Continua"
+    "continue": "Continua",
+    "back": "Indietro",
+    "somethingWentWrong": "Qualcosa è andato storto"
   },
   "language": {
     "title": "Lingua",
@@ -262,7 +264,12 @@
       "sizeRejection": "{{filename}} supera il limite di {{limit}} per gli allegati.",
       "unreadable": "Impossibile leggere {{filename}}.",
       "pastedImage": "l'immagine incollata",
-      "defaultName": "Allegato"
+      "defaultName": "Allegato",
+      "classificationDenied": "I file eseguibili non possono essere allegati",
+      "classificationEmpty": "Il file è vuoto",
+      "classificationTooLarge": "I file devono essere di 20 MB o meno",
+      "classificationUnreadable": "Impossibile leggere questo file",
+      "announceUploaded": "Allegato caricato"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -682,7 +689,8 @@
       "starting": "AVVIO",
       "stopped": "FERMATO",
       "stopping": "ARRESTO",
-      "unknown": "SCONOSCIUTO"
+      "unknown": "SCONOSCIUTO",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1324,7 +1332,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent è stato abilitato, ma la sincronizzazione iniziale non è stata messa in coda. Sincronizza di nuovo.",
-    "queuedActionUntracked": "Un'azione in coda non può più essere monitorata. Aggiorna per vedere lo stato più recente."
+    "queuedActionUntracked": "Un'azione in coda non può più essere monitorata. Aggiorna per vedere lo stato più recente.",
+    "commands": {
+      "findingAlreadyDismissed": "Risultato già ignorato",
+      "findingDismissed": "Risultato ignorato",
+      "noRemediationsQueued": "Nessun risultato esistente in coda",
+      "remediationsQueued": "Remediation esistenti in coda",
+      "analysisComplete": "Analisi completata",
+      "syncComplete": "Sincronizzazione completata"
+    }
   },
   "agents": {
     "activeNow": "Attivo ora",
@@ -1374,7 +1390,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossibile avviare la configurazione della GitHub App. Riprova.",
-      "couldNotOpenTitle": "Impossibile aprire GitHub"
+      "couldNotOpenTitle": "Impossibile aprire GitHub",
+      "installedTitle": "GitHub App installata",
+      "installedMessage": "I tuoi repository ora sono connessi.",
+      "pendingTitle": "In attesa dell'approvazione dell'amministratore",
+      "pendingMessage": "Un amministratore dell'organizzazione deve approvare la richiesta di installazione.",
+      "accountMismatchTitle": "Account non corrispondente",
+      "accountMismatchMessage": "Questa connessione è stata avviata dalla Kilo App con un account diverso. Accedi al web con quell'account oppure ricomincia dall'app.",
+      "cannotCompleteTitle": "Impossibile completare l'installazione",
+      "notAdminMessage": "Solo un amministratore GitHub di quell'account può connetterlo. Chiedi a un amministratore dell'organizzazione di installare Kilo.",
+      "alreadyClaimedMessage": "Quella installazione di GitHub è già collegata a un altro account Kilo. Disconnettila lì per prima.",
+      "didNotCompleteTitle": "Installazione non completata",
+      "didNotCompleteMessage": "L'installazione della GitHub App non è stata completata. Riprova dall'app."
     },
     "sessionExited": "Sessione terminata",
     "remoteSpawnRetryable": "Impossibile raggiungere l'istanza: potrebbe essersi disconnessa.",
@@ -2320,7 +2347,24 @@
       "termsCheckRetryCopy": "Impossibile verificare i Termini di servizio. Controlla la connessione e riprova.",
       "termsOutdatedCopy": "I Termini di servizio sono cambiati. Riapri questa schermata per accettare la versione più recente.",
       "comment_many": "{{displayCount}} commenti",
-      "reaction_many": "reazioni"
+      "reaction_many": "reazioni",
+      "reactions": {
+        "thumbsUp": "Pollice in su",
+        "thumbsDown": "Pollice in giù",
+        "laugh": "Ridere",
+        "hooray": "Evviva",
+        "confused": "Confuso",
+        "heart": "Cuore",
+        "rocket": "Razzo",
+        "eyes": "Occhi"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Commento sul file {{path}}",
+        "fileComment": "Commento sul file",
+        "outdatedOnPathLines": "Obsoleto su {{path}} {{lines}}",
+        "outdatedOnLines": "Obsoleto su {{lines}}",
+        "outdatedOnPath": "Obsoleto su {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Cancella il link della pull request",
@@ -2479,7 +2523,36 @@
         "closed": "Questa pull request è chiusa"
       },
       "updateBranch": "Aggiorna branch",
-      "updateBranchFromBase": "Aggiorna il branch dalla base"
+      "updateBranchFromBase": "Aggiorna il branch dalla base",
+      "blocked": {
+        "unknownStateTitle": "GitHub non ha segnalato lo stato di merge",
+        "unknownStateDetail": "Prova ad aggiornare la panoramica tra un momento.",
+        "conflictsTitle": "Conflitti di merge",
+        "conflictsDetail": "Risolvi i conflitti di merge su questo branch prima di unire.",
+        "requiredReviewsTitle": "Mancano le revisioni richieste",
+        "requiredReviewsDetail": "Mancano o sono in sospeso le approvazioni dei revisori richiesti.",
+        "failingChecksTitle": "Controlli richiesti non riusciti",
+        "failingChecksDetail": "I controlli di stato richiesti stanno fallendo.",
+        "unstableTitle": "Alcuni controlli stanno fallendo",
+        "unstableDetail": "I controlli non richiesti stanno fallendo. Non bloccheranno il merge.",
+        "draftTitle": "Pull request in bozza",
+        "draftDetail": "Contrassegna la pull request come pronta per la revisione prima di unire.",
+        "behindTitle": "Il branch è obsoleto",
+        "behindDetailUpdatable": "Aggiorna il branch dalla base oppure esegui un rebase prima di unire.",
+        "behindDetail": "Il branch di testa è indietro rispetto alla base. Esegui un rebase o aggiorna il branch prima di unire.",
+        "notMergeableTitle": "Questa pull request non è ancora unibile",
+        "notMergeableDetail": "GitHub ha segnalato uno stato di merge {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Crea un commit di merge",
+        "squash": "Squash e merge",
+        "rebase": "Rebase e merge"
+      },
+      "methodDescriptions": {
+        "merge": "Combina tutti i commit di questo branch nel branch di base con un commit di merge.",
+        "squash": "Combina tutti i commit di questo branch in un unico commit sul branch di base.",
+        "rebase": "Ripropone tutti i commit di questo branch sul branch di base senza un commit di merge."
+      }
     },
     "noDescriptionProvided": "Nessuna descrizione fornita.",
     "noFilesChanged": "Nessun file modificato",
@@ -2572,7 +2645,12 @@
       "truncationBanner": "Mostra le prime {{limit}} di {{total}} modifiche ai file — limite API GitHub"
     },
     "linkPasteClipboardEmpty": "Appunti vuoti",
-    "linkPasteNotAPullRequest": "Non è un link a una pull request di GitHub"
+    "linkPasteNotAPullRequest": "Non è un link a una pull request di GitHub",
+    "announce": {
+      "commentPosted": "Commento pubblicato",
+      "reviewSubmitted": "Revisione inviata",
+      "autoMergeEnabled": "Auto-merge attivato"
+    }
   },
   "organization": {
     "boundary": {
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "La consegna dell'email è temporaneamente non disponibile. Riprova più tardi.",
     "admissionRequired": "Impossibile verificare il tuo dispositivo. Usa \"$t(login.moreSignInOptions)\" per accedere da un altro dispositivo o tramite il web.",
     "default": "Qualcosa è andato storto. Riprova.",
-    "retryableAdmission": "Non siamo riusciti a verificare questo dispositivo. Controlla la connessione e riprova."
+    "retryableAdmission": "Non siamo riusciti a verificare questo dispositivo. Controlla la connessione e riprova.",
+    "startSignInFailed": "Impossibile avviare l'accesso. Riprova.",
+    "couldNotOpenBrowser": "Impossibile aprire il browser. Riprova.",
+    "signInTimedOut": "Accesso scaduto. Riprova.",
+    "signInFailed": "Accesso non riuscito. Riprova.",
+    "networkError": "Errore di rete. Riprova.",
+    "accessDeniedByUser": "Accesso negato dall'utente",
+    "codeExpired": "Codice scaduto"
   },
   "models": {
     "dataCollected": "Dati raccolti",
-    "free": "Gratuito"
+    "free": "Gratuito",
+    "couldNotUpdateFavorites": "Impossibile aggiornare i preferiti"
   }
 }

@@ -22,7 +22,9 @@
     "copiedToClipboard": "Imenakiliwa kwenye ubao wa kunakilia",
     "couldNotCopyToClipboard": "Imeshindwa kunakili kwenye ubao wa kunakilia",
     "required": "inahitajika",
-    "error": "hitilafu: {{error}}"
+    "error": "hitilafu: {{error}}",
+    "back": "Rudi",
+    "somethingWentWrong": "Jambo fulani lilitokea"
   },
   "language": {
     "title": "Lugha",
@@ -280,7 +282,36 @@
         "body": "Imeshindwa kufuta tawi: {{reason}}",
         "accessibility": "Imeunganishwa. Imeshindwa kufuta tawi: {{reason}}"
       },
-      "loadFailedTitle": "Imeshindwa kupakia chaguo za kuunganisha"
+      "loadFailedTitle": "Imeshindwa kupakia chaguo za kuunganisha",
+      "blocked": {
+        "unknownStateTitle": "GitHub haijaripoti hali ya kuunganishwa",
+        "unknownStateDetail": "Jaribu kuonyesha upya muhtasari baada ya muda mfupi.",
+        "conflictsTitle": "Migogoro ya kuunganisha",
+        "conflictsDetail": "Suluhisha migogoro ya kuunganisha kwenye tawi hili kabla ya kuunganisha.",
+        "requiredReviewsTitle": "Ukaguzi unaohitajika haupo",
+        "requiredReviewsDetail": "Idhini kutoka kwa wakaguzi wanaohitajika hazipo au zinasubiri.",
+        "failingChecksTitle": "Ukaguzi unaohitajika unashindwa",
+        "failingChecksDetail": "Ukaguzi wa hali unaohitajika unashindwa.",
+        "unstableTitle": "Baadhi ya ukaguzi unashindwa",
+        "unstableDetail": "Ukaguzi usiohitajika unashindwa. Hautazuia kuunganisha.",
+        "draftTitle": "Pull request ya rasimu",
+        "draftDetail": "Weka alama ya pull request kama tayari kwa ukaguzi kabla ya kuunganisha.",
+        "behindTitle": "Tawi limepitwa na wakati",
+        "behindDetailUpdatable": "Sasisha tawi kutoka kwenye msingi, au fanya rebase, kabla ya kuunganisha.",
+        "behindDetail": "Tawi la kichwa liko nyuma ya msingi. Fanya rebase au usasishe tawi kabla ya kuunganisha.",
+        "notMergeableTitle": "Pull request hii bado haiwezi kuunganishwa",
+        "notMergeableDetail": "GitHub iliripoti hali ya {{state}} ya kuunganishwa."
+      },
+      "methodLabels": {
+        "merge": "Unda commit ya kuunganisha",
+        "squash": "Squash na unganisha",
+        "rebase": "Rebase na unganisha"
+      },
+      "methodDescriptions": {
+        "merge": "Unganisha commit zote kutoka tawi hili kwenye tawi la msingi kwa commit ya kuunganisha.",
+        "squash": "Unganisha commit zote kutoka tawi hili kuwa commit moja kwenye tawi la msingi.",
+        "rebase": "Rudia commit zote kutoka tawi hili kwenye tawi la msingi bila commit ya kuunganisha."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Mada ya mazungumzo {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} zaidi mistari hapo juu",
       "termsAcceptRequired": "Lazima ukubali Masharti ya Huduma ili kuchapisha.",
       "termsOutdatedCopy": "Masharti ya Huduma yamebadilika. Fungua upya skrini hii kukubali toleo la hivi karibuni.",
-      "termsCheckRetryCopy": "Imeshindwa kuangalia Masharti ya Huduma. Angalia muunganisho wako na ujaribu tena."
+      "termsCheckRetryCopy": "Imeshindwa kuangalia Masharti ya Huduma. Angalia muunganisho wako na ujaribu tena.",
+      "reactions": {
+        "thumbsUp": "Kidole gumba juu",
+        "thumbsDown": "Kidole gumba chini",
+        "laugh": "Cheka",
+        "hooray": "Sherehe",
+        "confused": "Mchanganyiko",
+        "heart": "Moyo",
+        "rocket": "Roketi",
+        "eyes": "Macho"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Maoni ya faili kwenye {{path}}",
+        "fileComment": "Maoni ya faili",
+        "outdatedOnPathLines": "Imeisha muda kwenye {{path}} {{lines}}",
+        "outdatedOnLines": "Imeisha muda kwenye {{lines}}",
+        "outdatedOnPath": "Imeisha muda kwenye {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Imeshindwa kufungua mipangilio ya GitHub App",
     "installKiloGitHubApp": "Sakinisha Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Inaonyesha {{limit}} za kwanza kati ya {{total}} faili zilizobadilishwa — kikomo cha API ya GitHub"
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu",
-    "linkPasteNotAPullRequest": "Si kiungo cha ombi la kuvuta la GitHub"
+    "linkPasteNotAPullRequest": "Si kiungo cha ombi la kuvuta la GitHub",
+    "announce": {
+      "commentPosted": "Maoni yamewasilishwa",
+      "reviewSubmitted": "Ukaguzi umewasilishwa",
+      "autoMergeEnabled": "Muunganisho wa kiotomatiki umewashwa"
+    }
   },
   "notifications": {
     "title": "Arifa",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} inazidi kikomo cha kiambatisho cha {{limit}}.",
       "unreadable": "Imeshindwa kusoma {{filename}}.",
       "pastedImage": "picha iliyobandikwa",
-      "defaultName": "Kiambatisho"
+      "defaultName": "Kiambatisho",
+      "classificationDenied": "Faili zinazoweza kutekelezwa haziwezi kuambatishwa",
+      "classificationEmpty": "Faili ni tupu",
+      "classificationTooLarge": "Faili lazima ziwe 20 MB au chini",
+      "classificationUnreadable": "Imeshindwa kusoma faili hili",
+      "announceUploaded": "Kiambatisho kimepakiwa"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "INANZIA",
       "stopped": "IMESIMAMA",
       "stopping": "INASIMAMISHA",
-      "unknown": "ISIYOJULIKANA"
+      "unknown": "ISIYOJULIKANA",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Hatua iliyopangwa haikuweza kufuatiliwa tena. Sasisha kuona hali ya hivi karibuni.",
     "initialSyncAdmissionFailed": "Security Agent iliwezeshwa, lakini usawazishaji wa awali haukuweza kupangwa. Sawazisha tena.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Matokeo tayari yamefutwa",
+      "findingDismissed": "Matokeo yamefutwa",
+      "noRemediationsQueued": "Hakuna matokeo yaliyopo yaliyopangwa",
+      "remediationsQueued": "Urekebishaji uliopo umepangwa",
+      "analysisComplete": "Uchambuzi umekamilika",
+      "syncComplete": "Usawazishaji umekamilika"
+    }
   },
   "agents": {
     "activeNow": "Inafanya kazi sasa",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Haikuweza kufungua GitHub",
-      "couldNotOpenMessage": "Hatukuweza kuanza usanidi wa GitHub App. Jaribu tena."
+      "couldNotOpenMessage": "Hatukuweza kuanza usanidi wa GitHub App. Jaribu tena.",
+      "installedTitle": "GitHub App imesakinishwa",
+      "installedMessage": "Hazina zako sasa zimeunganishwa.",
+      "pendingTitle": "Inasubiri idhini ya msimamizi",
+      "pendingMessage": "Msimamizi wa shirika lazima aidhinishe ombi la usakinishaji.",
+      "accountMismatchTitle": "Akaunti hailingani",
+      "accountMismatchMessage": "Muunganisho huu ulianzishwa kutoka Kilo App ukiwa umeingia kama akaunti tofauti. Ingia kwenye wavuti na akaunti hiyo, au anza tena kutoka kwenye programu.",
+      "cannotCompleteTitle": "Haiwezi kukamilisha usakinishaji",
+      "notAdminMessage": "Ni msimamizi wa GitHub wa akaunti hiyo pekee anayeweza kuiunganisha. Muombe msimamizi wa shirika asakinishe Kilo.",
+      "alreadyClaimedMessage": "Usakinishaji huo wa GitHub tayari umeunganishwa na akaunti nyingine ya Kilo. Vunja muunganisho hapo kwanza.",
+      "didNotCompleteTitle": "Usakinishaji haukukamilika",
+      "didNotCompleteMessage": "Usakinishaji wa GitHub App haukukamilika. Jaribu tena kutoka kwenye programu."
     },
     "sessionExited": "Kikao kimetoka",
     "remoteSpawnRetryable": "Hatukuweza kufikia kisa — huenda kimekatika.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Uwasilishaji wa barua pepe haupatikani kwa sasa. Tafadhali jaribu tena baadaye.",
     "admissionRequired": "Kifaa chako hakiwezi kuthibitishwa. Tumia '$t(login.moreSignInOptions)' kuingia kwenye kifaa kingine au kupitia wavuti.",
     "default": "Kitu kimeenda vibaya. Tafadhali jaribu tena.",
-    "retryableAdmission": "Hatukuweza kuthibitisha kifaa hiki. Angalia muunganisho wako kisha ujaribu tena."
+    "retryableAdmission": "Hatukuweza kuthibitisha kifaa hiki. Angalia muunganisho wako kisha ujaribu tena.",
+    "startSignInFailed": "Imeshindwa kuanza kuingia. Tafadhali jaribu tena.",
+    "couldNotOpenBrowser": "Imeshindwa kufungua kivinjari. Tafadhali jaribu tena.",
+    "signInTimedOut": "Muda wa kuingia umekwisha. Tafadhali jaribu tena.",
+    "signInFailed": "Kuingia kumeshindwa. Tafadhali jaribu tena.",
+    "networkError": "Hitilafu ya mtandao. Tafadhali jaribu tena.",
+    "accessDeniedByUser": "Ufikiaji umekataliwa na mtumiaji",
+    "codeExpired": "Msimbo umeisha muda"
   },
   "models": {
     "dataCollected": "Data iliyokusanywa",
-    "free": "Bure"
+    "free": "Bure",
+    "couldNotUpdateFavorites": "Haikuweza kusasisha vipendwa"
   }
 }

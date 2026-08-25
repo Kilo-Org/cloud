@@ -16,7 +16,7 @@ import {
   defaultMergeMethodFor,
   getAllowedMergeMethods,
   type MergeBlockedReasonId,
-  PR_MERGE_LABELS,
+  prMergeLabel,
   type PrOverviewRepoSettings,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
@@ -40,7 +40,7 @@ export type MergeMethodOption = {
 };
 
 export function mergeMethodOptionsFor(repo: PrOverviewRepoSettings): MergeMethodOption[] {
-  return getAllowedMergeMethods(repo).map(value => ({ value, label: PR_MERGE_LABELS[value] }));
+  return getAllowedMergeMethods(repo).map(value => ({ value, label: prMergeLabel(value) }));
 }
 
 export function defaultMergeMethodOptionFor(repo: PrOverviewRepoSettings): AllowedMergeMethod {

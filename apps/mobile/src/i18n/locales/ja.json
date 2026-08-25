@@ -22,7 +22,9 @@
     "required": "必須",
     "error": "エラー: {{error}}",
     "notNow": "後で",
-    "continue": "続行"
+    "continue": "続行",
+    "back": "戻る",
+    "somethingWentWrong": "問題が発生しました"
   },
   "language": {
     "title": "言語",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}}は添付上限の{{limit}}を超えています。",
       "unreadable": "{{filename}}を読み取れませんでした。",
       "pastedImage": "貼り付けた画像",
-      "defaultName": "添付ファイル"
+      "defaultName": "添付ファイル",
+      "classificationDenied": "実行可能ファイルは添付できません",
+      "classificationEmpty": "ファイルが空です",
+      "classificationTooLarge": "ファイルは20 MB以下である必要があります",
+      "classificationUnreadable": "このファイルを読み取れませんでした",
+      "announceUploaded": "添付ファイルをアップロードしました"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}、{{status}}",
@@ -694,7 +701,8 @@
       "starting": "開始中",
       "stopped": "停止済み",
       "stopping": "停止中",
-      "unknown": "不明"
+      "unknown": "不明",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram、Discord、Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agentは有効になりましたが、初回同期をキューに入れられませんでした。もう一度同期してください。",
-    "queuedActionUntracked": "キューに入れたアクションを追跡できなくなりました。更新して最新の状態を確認してください。"
+    "queuedActionUntracked": "キューに入れたアクションを追跡できなくなりました。更新して最新の状態を確認してください。",
+    "commands": {
+      "findingAlreadyDismissed": "所見はすでに却下されています",
+      "findingDismissed": "所見を却下しました",
+      "noRemediationsQueued": "既存の所見はキューに入っていません",
+      "remediationsQueued": "既存の修復をキューに入れました",
+      "analysisComplete": "分析が完了しました",
+      "syncComplete": "同期が完了しました"
+    }
   },
   "agents": {
     "activeNow": "現在アクティブ",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Appのセットアップを開始できませんでした。もう一度お試しください。",
-      "couldNotOpenTitle": "GitHubを開けませんでした"
+      "couldNotOpenTitle": "GitHubを開けませんでした",
+      "installedTitle": "GitHub Appがインストールされました",
+      "installedMessage": "リポジトリが接続されました。",
+      "pendingTitle": "管理者の承認待ち",
+      "pendingMessage": "組織の管理者がインストールリクエストを承認する必要があります。",
+      "accountMismatchTitle": "アカウントの不一致",
+      "accountMismatchMessage": "この接続は、別のアカウントでサインインしたKilo Appから開始されました。そのアカウントでWebにサインインするか、アプリからやり直してください。",
+      "cannotCompleteTitle": "インストールを完了できません",
+      "notAdminMessage": "そのアカウントに接続できるのはGitHub管理者のみです。組織の管理者にKiloのインストールを依頼してください。",
+      "alreadyClaimedMessage": "そのGitHubインストールは別のKiloアカウントにすでに接続されています。先にそちらで切断してください。",
+      "didNotCompleteTitle": "インストールが完了しませんでした",
+      "didNotCompleteMessage": "GitHub Appのインストールが完了しませんでした。アプリからもう一度お試しください。"
     },
     "sessionExited": "セッションが終了しました",
     "remoteSpawnRetryable": "インスタンスに到達できませんでした。接続が切断された可能性があります。",
@@ -2307,7 +2334,24 @@
       "viewTerms": "利用規約を表示",
       "termsAcceptRequired": "投稿するには利用規約に同意する必要があります。",
       "termsCheckRetryCopy": "利用規約を確認できませんでした。接続を確認して、もう一度お試しください。",
-      "termsOutdatedCopy": "利用規約が変更されました。最新版に同意するにはこの画面を開き直してください。"
+      "termsOutdatedCopy": "利用規約が変更されました。最新版に同意するにはこの画面を開き直してください。",
+      "reactions": {
+        "thumbsUp": "いいね",
+        "thumbsDown": "よくないね",
+        "laugh": "笑い",
+        "hooray": "万歳",
+        "confused": "困惑",
+        "heart": "ハート",
+        "rocket": "ロケット",
+        "eyes": "目"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}}のファイルコメント",
+        "fileComment": "ファイルコメント",
+        "outdatedOnPathLines": "{{path}} {{lines}}の古いコメント",
+        "outdatedOnLines": "{{lines}}の古いコメント",
+        "outdatedOnPath": "{{path}}の古いコメント"
+      }
     },
     "entry": {
       "clearLink": "プルリクエストリンクをクリア",
@@ -2464,7 +2508,36 @@
         "closed": "このプルリクエストはクローズされています"
       },
       "updateBranch": "ブランチを更新",
-      "updateBranchFromBase": "ベースからブランチを更新"
+      "updateBranchFromBase": "ベースからブランチを更新",
+      "blocked": {
+        "unknownStateTitle": "GitHubがマージ可能状態を報告していません",
+        "unknownStateDetail": "しばらくしてから概要を更新してみてください。",
+        "conflictsTitle": "マージ競合",
+        "conflictsDetail": "マージする前にこのブランチのマージ競合を解決してください。",
+        "requiredReviewsTitle": "必須レビューがありません",
+        "requiredReviewsDetail": "必須レビュアーからの承認がないか、保留中です。",
+        "failingChecksTitle": "必須チェックが失敗しています",
+        "failingChecksDetail": "必須のステータスチェックが失敗しています。",
+        "unstableTitle": "一部のチェックが失敗しています",
+        "unstableDetail": "必須ではないチェックが失敗しています。マージはブロックされません。",
+        "draftTitle": "ドラフトのプルリクエスト",
+        "draftDetail": "マージする前にプルリクエストをレビュー可能としてマークしてください。",
+        "behindTitle": "ブランチが古くなっています",
+        "behindDetailUpdatable": "マージする前に、ベースからブランチを更新するか、リベースしてください。",
+        "behindDetail": "headブランチがベースより遅れています。マージする前にリベースまたはブランチを更新してください。",
+        "notMergeableTitle": "このプルリクエストはまだマージできません",
+        "notMergeableDetail": "GitHubが{{state}}のマージ可能状態を報告しました。"
+      },
+      "methodLabels": {
+        "merge": "マージコミットを作成",
+        "squash": "スカッシュしてマージ",
+        "rebase": "リベースしてマージ"
+      },
+      "methodDescriptions": {
+        "merge": "このブランチのすべてのコミットをマージコミットとしてベースブランチに統合します。",
+        "squash": "このブランチのすべてのコミットをベースブランチ上の1つのコミットにまとめます。",
+        "rebase": "このブランチのすべてのコミットを、マージコミットなしでベースブランチに適用し直します。"
+      }
     },
     "noDescriptionProvided": "説明はありません。",
     "noFilesChanged": "変更されたファイルはありません",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "変更されたファイル {{total}} 件中、最初の {{limit}} 件を表示中 — GitHub API の制限"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です",
-    "linkPasteNotAPullRequest": "GitHub のプルリクエストリンクではありません"
+    "linkPasteNotAPullRequest": "GitHub のプルリクエストリンクではありません",
+    "announce": {
+      "commentPosted": "コメントを投稿しました",
+      "reviewSubmitted": "レビューを送信しました",
+      "autoMergeEnabled": "自動マージを有効にしました"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "メールの配信が一時的に利用できません。しばらくしてからもう一度お試しください。",
     "admissionRequired": "この端末を確認できません。[$t(login.moreSignInOptions)] を使用して、別の端末または Web からサインインしてください。",
     "default": "問題が発生しました。もう一度お試しください。",
-    "retryableAdmission": "この端末を確認できませんでした。接続を確認して、もう一度お試しください。"
+    "retryableAdmission": "この端末を確認できませんでした。接続を確認して、もう一度お試しください。",
+    "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
+    "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
+    "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",
+    "signInFailed": "サインインに失敗しました。もう一度お試しください。",
+    "networkError": "ネットワークエラーが発生しました。もう一度お試しください。",
+    "accessDeniedByUser": "ユーザーによってアクセスが拒否されました",
+    "codeExpired": "コードの有効期限が切れました"
   },
   "models": {
     "dataCollected": "収集されるデータ",
-    "free": "無料"
+    "free": "無料",
+    "couldNotUpdateFavorites": "お気に入りを更新できませんでした"
   }
 }

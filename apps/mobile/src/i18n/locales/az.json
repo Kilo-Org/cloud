@@ -22,7 +22,9 @@
     "copiedToClipboard": "Buferə kopyalandı",
     "couldNotCopyToClipboard": "Buferə kopyalamaq mümkün olmadı",
     "required": "vacibdir",
-    "error": "xəta: {{error}}"
+    "error": "xəta: {{error}}",
+    "back": "Geri",
+    "somethingWentWrong": "Nəsə səhv getdi"
   },
   "language": {
     "title": "Dil",
@@ -280,7 +282,36 @@
         "body": "Branch silinə bilmədi: {{reason}}",
         "accessibility": "Mergeləndi. Branch silinə bilmədi: {{reason}}"
       },
-      "loadFailedTitle": "Merge seçimləri yüklənə bilmədi"
+      "loadFailedTitle": "Merge seçimləri yüklənə bilmədi",
+      "blocked": {
+        "unknownStateTitle": "GitHub merge edilə bilən vəziyyət bildirməyib",
+        "unknownStateDetail": "Bir az sonra xülasəni yeniləməyə çalışın.",
+        "conflictsTitle": "Merge konfliktləri",
+        "conflictsDetail": "Mergeləmədən əvvəl bu branch'dakı merge konfliktlərini həll edin.",
+        "requiredReviewsTitle": "Tələb olunan icmallar yoxdur",
+        "requiredReviewsDetail": "Tələb olunan icmalçıların təsdiqləri yoxdur və ya gözləyir.",
+        "failingChecksTitle": "Tələb olunan yoxlamalar uğursuzdur",
+        "failingChecksDetail": "Tələb olunan status yoxlamaları uğursuzdur.",
+        "unstableTitle": "Bəzi yoxlamalar uğursuzdur",
+        "unstableDetail": "Tələb olunmayan yoxlamalar uğursuzdur. Onlar mergeni bloklamayacaq.",
+        "draftTitle": "Qaralama pull request",
+        "draftDetail": "Mergeləmədən əvvəl pull request'i icmala hazır kimi qeyd edin.",
+        "behindTitle": "Branch köhnəlib",
+        "behindDetailUpdatable": "Mergeləmədən əvvəl branch'ı əsasdan yeniləyin və ya rebase edin.",
+        "behindDetail": "Head branch əsasdan geridədir. Mergeləmədən əvvəl branch'ı rebase edin və ya yeniləyin.",
+        "notMergeableTitle": "Bu pull request hələ merge edilə bilməz",
+        "notMergeableDetail": "GitHub {{state}} merge edilə bilən vəziyyət bildirdi."
+      },
+      "methodLabels": {
+        "merge": "Merge commit yaradın",
+        "squash": "Squash və merge",
+        "rebase": "Rebase və merge"
+      },
+      "methodDescriptions": {
+        "merge": "Bu branch'dakı bütün commit'ləri merge commit ilə əsas branch'a birləşdirin.",
+        "squash": "Bu branch'dakı bütün commit'ləri əsas branch'da tək commit-ə birləşdirin.",
+        "rebase": "Bu branch'dakı bütün commit'ləri merge commit olmadan əsas branch'a təkrar tətbiq edin."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Müzakirə mövzusu {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… yuxarıda {{displayCount}} sətir daha",
       "termsAcceptRequired": "Yazmaq üçün Xidmət Şərtlərini qəbul etməlisiniz.",
       "termsOutdatedCopy": "Xidmət Şərtləri dəyişdi. Ən son versiyanı qəbul etmək üçün bu ekranı yenidən açın.",
-      "termsCheckRetryCopy": "Xidmət Şərtləri yoxlanıla bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin."
+      "termsCheckRetryCopy": "Xidmət Şərtləri yoxlanıla bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+      "reactions": {
+        "thumbsUp": "Bəyənmə",
+        "thumbsDown": "Bəyənməmə",
+        "laugh": "Gülüş",
+        "hooray": "Alqış",
+        "confused": "Çaşqın",
+        "heart": "Ürək",
+        "rocket": "Raketa",
+        "eyes": "Gözlər"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} üzərində fayl şərhi",
+        "fileComment": "Fayl şərhi",
+        "outdatedOnPathLines": "{{path}} {{lines}} üzərində köhnəlmiş",
+        "outdatedOnLines": "{{lines}} üzərində köhnəlmiş",
+        "outdatedOnPath": "{{path}} üzərində köhnəlmiş"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub App parametrləri açıla bilmədi",
     "installKiloGitHubApp": "Kilo GitHub App'ini quraşdırın",
@@ -523,7 +571,12 @@
       "tapToComment": "{{label}}, şərh üçün toxunun"
     },
     "linkPasteClipboardEmpty": "Panoda heç nə yoxdur",
-    "linkPasteNotAPullRequest": "Bu, GitHub pull request linki deyil"
+    "linkPasteNotAPullRequest": "Bu, GitHub pull request linki deyil",
+    "announce": {
+      "commentPosted": "Şərh yerləşdirildi",
+      "reviewSubmitted": "İcmal təqdim edildi",
+      "autoMergeEnabled": "Avtomatik-merge aktiv edildi"
+    }
   },
   "notifications": {
     "title": "Bildirişlər",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} əlavə limitini keçir.",
       "unreadable": "{{filename}} oxuna bilmədi.",
       "pastedImage": "yapışdırılmış şəkil",
-      "defaultName": "Əlavə"
+      "defaultName": "Əlavə",
+      "classificationDenied": "İcra edilən fayllar əlavə edilə bilməz",
+      "classificationEmpty": "Fayl boşdur",
+      "classificationTooLarge": "Fayllar 20 MB və ya daha kiçik olmalıdır",
+      "classificationUnreadable": "Bu fayl oxuna bilmədi",
+      "announceUploaded": "Əlavə yükləndi"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "BAŞLADILIR",
       "stopped": "DAYANDIRILIB",
       "stopping": "DAYANDIRILIR",
-      "unknown": "NAMƏLUM"
+      "unknown": "NAMƏLUM",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Növbəyə alınmış əməliyyat artıq izlənilə bilmədi. Ən son vəziyyəti görmək üçün yeniləyin.",
     "initialSyncAdmissionFailed": "Security Agent aktivləşdirildi, lakin ilk sinxronlaşdırma növbəyə alına bilmədi. Yenidən sinxronlaşdırın.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Tapıntı artıq rədd edilib",
+      "findingDismissed": "Tapıntı rədd edildi",
+      "noRemediationsQueued": "Növbədə mövcud tapıntı yoxdur",
+      "remediationsQueued": "Mövcud düzəlişlər növbədədir",
+      "analysisComplete": "Təhlil tamamlandı",
+      "syncComplete": "Sinxronizasiya tamamlandı"
+    }
   },
   "agents": {
     "activeNow": "Hal-hazırda aktiv",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
-      "couldNotOpenMessage": "GitHub App quraşdırması başladıla bilmədi. Zəhmət olmasa yenidən cəhd edin."
+      "couldNotOpenMessage": "GitHub App quraşdırması başladıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
+      "installedTitle": "GitHub App'i quraşdırılıb",
+      "installedMessage": "Depolarınız artıq qoşulub.",
+      "pendingTitle": "Admin təsdiqi gözlənilir",
+      "pendingMessage": "Təşkilat admini quraşdırma sorğusunu təsdiqləməlidir.",
+      "accountMismatchTitle": "Hesab uyğunsuzluğu",
+      "accountMismatchMessage": "Bu əlaqə başqa hesabla daxil olunmuş Kilo App'indən başladılıb. Həmin hesabla vebdə daxil olun və ya proqramdan yenidən başlayın.",
+      "cannotCompleteTitle": "Quraşdırma tamamlana bilmir",
+      "notAdminMessage": "Yalnız həmin hesabın GitHub admini onu qoşa bilər. Kilo'nu quraşdırmaq üçün təşkilat admininizdən xahiş edin.",
+      "alreadyClaimedMessage": "Həmin GitHub quraşdırması artıq başqa Kilo hesabına qoşulub. Əvvəlcə orada ayırın.",
+      "didNotCompleteTitle": "Quraşdırma tamamlanmadı",
+      "didNotCompleteMessage": "GitHub App quraşdırması tamamlanmadı. Proqramdan yenidən cəhd edin."
     },
     "sessionExited": "Sessiya başa çatdı",
     "remoteSpawnRetryable": "İnstansa çatmaq mümkün olmadı — o, əlaqəsi kəsilmiş ola bilər.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-poçt çatdırılması müvəqqəti mümkün deyil. Zəhmət olmasa daha sonra yenidən cəhd edin.",
     "admissionRequired": "Cihazınız təsdiqlənə bilmir. Başqa cihazda və ya veb vasitəsilə daxil olmaq üçün '$t(login.moreSignInOptions)'ni istifadə edin.",
     "default": "Nəsə səhv oldu. Zəhmət olmasa yenidən cəhd edin.",
-    "retryableAdmission": "Bu cihazı təsdiqləyə bilmədik. Əlaqənizi yoxlayın və yenidən cəhd edin."
+    "retryableAdmission": "Bu cihazı təsdiqləyə bilmədik. Əlaqənizi yoxlayın və yenidən cəhd edin.",
+    "startSignInFailed": "Daxil olma başladıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
+    "couldNotOpenBrowser": "Brauzer açıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
+    "signInTimedOut": "Daxil olmanın vaxtı bitdi. Zəhmət olmasa yenidən cəhd edin.",
+    "signInFailed": "Daxil olma uğursuz oldu. Zəhmət olmasa yenidən cəhd edin.",
+    "networkError": "Şəbəkə xətası. Zəhmət olmasa yenidən cəhd edin.",
+    "accessDeniedByUser": "İstifadəçi tərəfindən giriş rədd edildi",
+    "codeExpired": "Kodun müddəti bitdi"
   },
   "models": {
     "dataCollected": "Toplanan məlumatlar",
-    "free": "Pulsuz"
+    "free": "Pulsuz",
+    "couldNotUpdateFavorites": "Sevimlilər yenilənə bilmədi"
   }
 }

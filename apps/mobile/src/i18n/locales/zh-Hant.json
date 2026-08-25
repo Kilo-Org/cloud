@@ -22,7 +22,9 @@
     "required": "必填",
     "error": "錯誤：{{error}}",
     "notNow": "稍後再說",
-    "continue": "繼續"
+    "continue": "繼續",
+    "back": "返回",
+    "somethingWentWrong": "發生錯誤"
   },
   "language": {
     "title": "語言",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} 超出 {{limit}} 的附件大小限制。",
       "unreadable": "無法讀取 {{filename}}。",
       "pastedImage": "貼上的圖片",
-      "defaultName": "附件"
+      "defaultName": "附件",
+      "classificationDenied": "無法附加可執行檔",
+      "classificationEmpty": "檔案為空",
+      "classificationTooLarge": "檔案必須為 20 MB 或更小",
+      "classificationUnreadable": "無法讀取此檔案",
+      "announceUploaded": "附件已上傳"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -694,7 +701,8 @@
       "starting": "啟動中",
       "stopped": "已停止",
       "stopping": "停止中",
-      "unknown": "未知"
+      "unknown": "未知",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram、Discord、Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "安全性代理",
     "initialSyncAdmissionFailed": "安全性代理已啟用，但無法將初始同步排入佇列。請再次同步。",
-    "queuedActionUntracked": "已排入佇列的動作無法再追蹤。請重新整理以查看最新狀態。"
+    "queuedActionUntracked": "已排入佇列的動作無法再追蹤。請重新整理以查看最新狀態。",
+    "commands": {
+      "findingAlreadyDismissed": "此發現已忽略",
+      "findingDismissed": "發現已忽略",
+      "noRemediationsQueued": "沒有待排入佇列的現有發現",
+      "remediationsQueued": "現有修復已排入佇列",
+      "analysisComplete": "分析完成",
+      "syncComplete": "同步完成"
+    }
   },
   "agents": {
     "activeNow": "目前使用中",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "無法啟動 GitHub App 設定。請再試一次。",
-      "couldNotOpenTitle": "無法開啟 GitHub"
+      "couldNotOpenTitle": "無法開啟 GitHub",
+      "installedTitle": "GitHub App 已安裝",
+      "installedMessage": "您的存放庫現已連接。",
+      "pendingTitle": "等待管理員核准",
+      "pendingMessage": "組織管理員必須核准此安裝要求。",
+      "accountMismatchTitle": "帳戶不符",
+      "accountMismatchMessage": "此連線是以不同的帳戶從 Kilo App 啟動的。請以該帳戶登入網頁，或從應用程式重新開始。",
+      "cannotCompleteTitle": "無法完成安裝",
+      "notAdminMessage": "只有該帳戶的 GitHub 管理員可以連接它。請要求組織管理員安裝 Kilo。",
+      "alreadyClaimedMessage": "該 GitHub 安裝已連接到另一個 Kilo 帳戶。請先在那裡中斷連線。",
+      "didNotCompleteTitle": "安裝未完成",
+      "didNotCompleteMessage": "GitHub App 安裝未完成。請從應用程式重試。"
     },
     "sessionExited": "工作階段已結束",
     "remoteSpawnRetryable": "無法連線到該執行個體 — 它可能已斷線。",
@@ -2307,7 +2334,24 @@
       "viewTerms": "檢視條款",
       "termsAcceptRequired": "您必須接受服務條款才能發佈。",
       "termsCheckRetryCopy": "無法檢查服務條款。請檢查連線後再試一次。",
-      "termsOutdatedCopy": "服務條款已變更。請重新開啟此畫面以接受最新版本。"
+      "termsOutdatedCopy": "服務條款已變更。請重新開啟此畫面以接受最新版本。",
+      "reactions": {
+        "thumbsUp": "讚",
+        "thumbsDown": "不讚",
+        "laugh": "大笑",
+        "hooray": "歡呼",
+        "confused": "困惑",
+        "heart": "愛心",
+        "rocket": "火箭",
+        "eyes": "眼睛"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} 上的檔案留言",
+        "fileComment": "檔案留言",
+        "outdatedOnPathLines": "{{path}} {{lines}} 已過時",
+        "outdatedOnLines": "{{lines}} 已過時",
+        "outdatedOnPath": "{{path}} 已過時"
+      }
     },
     "entry": {
       "clearLink": "清除拉取請求連結",
@@ -2464,7 +2508,36 @@
         "closed": "此拉取請求已關閉"
       },
       "updateBranch": "更新分支",
-      "updateBranchFromBase": "從基礎分支更新分支"
+      "updateBranchFromBase": "從基礎分支更新分支",
+      "blocked": {
+        "unknownStateTitle": "GitHub 尚未回報可合併狀態",
+        "unknownStateDetail": "請稍後重新整理概覽試試。",
+        "conflictsTitle": "合併衝突",
+        "conflictsDetail": "合併前請先解決此分支上的合併衝突。",
+        "requiredReviewsTitle": "缺少必要審查",
+        "requiredReviewsDetail": "必要審查者的核准缺少或待處理。",
+        "failingChecksTitle": "必要的檢查失敗",
+        "failingChecksDetail": "必要狀態檢查失敗。",
+        "unstableTitle": "部分檢查失敗",
+        "unstableDetail": "非必要檢查失敗。它們不會阻止合併。",
+        "draftTitle": "草稿拉取請求",
+        "draftDetail": "合併前請先將拉取請求標記為可審查。",
+        "behindTitle": "分支已過時",
+        "behindDetailUpdatable": "合併前請先從基礎分支更新分支，或進行變基。",
+        "behindDetail": "head 分支落後於基礎分支。合併前請先變基或更新分支。",
+        "notMergeableTitle": "此拉取請求尚無法合併",
+        "notMergeableDetail": "GitHub 回報為 {{state}} 可合併狀態。"
+      },
+      "methodLabels": {
+        "merge": "建立合併提交",
+        "squash": "壓縮並合併",
+        "rebase": "變基並合併"
+      },
+      "methodDescriptions": {
+        "merge": "將此分支的所有提交與一個合併提交合併到基礎分支。",
+        "squash": "將此分支的所有提交合併為基礎分支上的一個單一提交。",
+        "rebase": "將此分支的所有提交重放到基礎分支上，而不建立合併提交。"
+      }
     },
     "noDescriptionProvided": "未提供說明。",
     "noFilesChanged": "沒有變更的檔案",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "正在顯示前 {{limit}} 個（共 {{total}} 個）已變更檔案 — GitHub API 限制"
     },
     "linkPasteClipboardEmpty": "剪貼簿是空的",
-    "linkPasteNotAPullRequest": "不是 GitHub 提取請求的連結"
+    "linkPasteNotAPullRequest": "不是 GitHub 提取請求的連結",
+    "announce": {
+      "commentPosted": "留言已發布",
+      "reviewSubmitted": "審查已提交",
+      "autoMergeEnabled": "自動合併已啟用"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "電子郵件傳送暫時無法使用。請稍後再試。",
     "admissionRequired": "無法驗證您的裝置。請使用「$t(login.moreSignInOptions)」在其他裝置上或透過網頁登入。",
     "default": "發生錯誤。請再試一次。",
-    "retryableAdmission": "我們無法驗證此裝置。請檢查您的連線，然後再試一次。"
+    "retryableAdmission": "我們無法驗證此裝置。請檢查您的連線，然後再試一次。",
+    "startSignInFailed": "無法開始登入。請再試一次。",
+    "couldNotOpenBrowser": "無法開啟瀏覽器。請再試一次。",
+    "signInTimedOut": "登入逾時。請再試一次。",
+    "signInFailed": "登入失敗。請再試一次。",
+    "networkError": "網路錯誤。請再試一次。",
+    "accessDeniedByUser": "使用者拒絕存取",
+    "codeExpired": "代碼已過期"
   },
   "models": {
     "dataCollected": "收集的資料",
-    "free": "免費"
+    "free": "免費",
+    "couldNotUpdateFavorites": "無法更新我的最愛"
   }
 }

@@ -6,6 +6,8 @@
 // pulling in lucide-react-native (whose ESM build uses `import.meta` in
 // ways the repo's vitest setup doesn't transform).
 
+import { i18n } from '@/i18n';
+
 export type PrMergeMethod = 'merge' | 'squash' | 'rebase';
 type PrReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 
@@ -96,63 +98,75 @@ export function getMergeabilityStatus(args: {
   return 'blocked';
 }
 
-const UNKNOWN_REASON: MergeBlockedReason = {
-  id: 'unknown-state',
-  iconKind: 'unknown-state',
-  severity: 'warn',
-  title: "GitHub hasn't reported a mergeable state",
-  detail: 'Try refreshing the overview in a moment.',
-};
+function unknownReason(): MergeBlockedReason {
+  return {
+    id: 'unknown-state',
+    iconKind: 'unknown-state',
+    severity: 'warn',
+    title: i18n.t('prReview.merge.blocked.unknownStateTitle'),
+    detail: i18n.t('prReview.merge.blocked.unknownStateDetail'),
+  };
+}
 
-const CONFLICTS_REASON: MergeBlockedReason = {
-  id: 'conflicts',
-  iconKind: 'conflicts',
-  severity: 'destructive',
-  title: 'Merge conflicts',
-  detail: 'Resolve the merge conflicts on this branch before merging.',
-};
+function conflictsReason(): MergeBlockedReason {
+  return {
+    id: 'conflicts',
+    iconKind: 'conflicts',
+    severity: 'destructive',
+    title: i18n.t('prReview.merge.blocked.conflictsTitle'),
+    detail: i18n.t('prReview.merge.blocked.conflictsDetail'),
+  };
+}
 
-const REQUIRED_REVIEWS_REASON: MergeBlockedReason = {
-  id: 'required-reviews',
-  iconKind: 'required-reviews',
-  severity: 'warn',
-  title: 'Required reviews missing',
-  detail: 'Approvals from the required reviewers are missing or pending.',
-};
+function requiredReviewsReason(): MergeBlockedReason {
+  return {
+    id: 'required-reviews',
+    iconKind: 'required-reviews',
+    severity: 'warn',
+    title: i18n.t('prReview.merge.blocked.requiredReviewsTitle'),
+    detail: i18n.t('prReview.merge.blocked.requiredReviewsDetail'),
+  };
+}
 
-const FAILING_CHECKS_REASON: MergeBlockedReason = {
-  id: 'failing-checks',
-  iconKind: 'failing-checks',
-  severity: 'destructive',
-  title: 'Failing required checks',
-  detail: 'Required status checks are failing.',
-};
+function failingChecksReason(): MergeBlockedReason {
+  return {
+    id: 'failing-checks',
+    iconKind: 'failing-checks',
+    severity: 'destructive',
+    title: i18n.t('prReview.merge.blocked.failingChecksTitle'),
+    detail: i18n.t('prReview.merge.blocked.failingChecksDetail'),
+  };
+}
 
-const UNSTABLE_REASON: MergeBlockedReason = {
-  id: 'unstable-checks',
-  iconKind: 'unstable-checks',
-  severity: 'info',
-  title: 'Some checks are failing',
-  detail: 'Non-required checks are failing. They will not block the merge.',
-};
+function unstableReason(): MergeBlockedReason {
+  return {
+    id: 'unstable-checks',
+    iconKind: 'unstable-checks',
+    severity: 'info',
+    title: i18n.t('prReview.merge.blocked.unstableTitle'),
+    detail: i18n.t('prReview.merge.blocked.unstableDetail'),
+  };
+}
 
-const DRAFT_REASON: MergeBlockedReason = {
-  id: 'draft',
-  iconKind: 'draft',
-  severity: 'info',
-  title: 'Draft pull request',
-  detail: 'Mark the pull request as ready for review before merging.',
-};
+function draftReason(): MergeBlockedReason {
+  return {
+    id: 'draft',
+    iconKind: 'draft',
+    severity: 'info',
+    title: i18n.t('prReview.merge.blocked.draftTitle'),
+    detail: i18n.t('prReview.merge.blocked.draftDetail'),
+  };
+}
 
 function behindReason(allowUpdateBranch: boolean): MergeBlockedReason {
   return {
     id: 'behind',
     iconKind: 'behind',
     severity: 'warn',
-    title: 'Branch is out of date',
+    title: i18n.t('prReview.merge.blocked.behindTitle'),
     detail: allowUpdateBranch
-      ? 'Update the branch from the base, or rebase, before merging.'
-      : 'The head branch is behind the base. Rebase or update the branch before merging.',
+      ? i18n.t('prReview.merge.blocked.behindDetailUpdatable')
+      : i18n.t('prReview.merge.blocked.behindDetail'),
   };
 }
 
@@ -179,12 +193,12 @@ export function getMergeBlockedReasons(args: MergeBlockedReasonsArgs): MergeBloc
 
   switch (args.mergeableState) {
     case 'dirty': {
-      push(CONFLICTS_REASON);
+      push(conflictsReason());
       break;
     }
     case 'blocked': {
-      push(REQUIRED_REVIEWS_REASON);
-      push(FAILING_CHECKS_REASON);
+      push(requiredReviewsReason());
+      push(failingChecksReason());
       break;
     }
     case 'behind': {
@@ -192,22 +206,22 @@ export function getMergeBlockedReasons(args: MergeBlockedReasonsArgs): MergeBloc
       break;
     }
     case 'unstable': {
-      push(UNSTABLE_REASON);
+      push(unstableReason());
       break;
     }
     case 'draft': {
-      push(DRAFT_REASON);
+      push(draftReason());
       break;
     }
     case 'clean': {
       if (args.mergeable === false) {
-        push(UNKNOWN_REASON);
+        push(unknownReason());
       }
       break;
     }
     case 'unknown':
     case null: {
-      push(UNKNOWN_REASON);
+      push(unknownReason());
       break;
     }
     default: {
@@ -218,18 +232,20 @@ export function getMergeBlockedReasons(args: MergeBlockedReasonsArgs): MergeBloc
         id: 'unknown-state',
         iconKind: 'unknown-state',
         severity: 'warn',
-        title: 'This pull request is not mergeable yet',
-        detail: `GitHub reported a "${args.mergeableState}" mergeable state.`,
+        title: i18n.t('prReview.merge.blocked.notMergeableTitle'),
+        detail: i18n.t('prReview.merge.blocked.notMergeableDetail', {
+          state: args.mergeableState,
+        }),
       });
     }
   }
 
   if (args.reviewDecision === 'REVIEW_REQUIRED' && args.mergeableState !== 'blocked') {
-    push(REQUIRED_REVIEWS_REASON);
+    push(requiredReviewsReason());
   }
 
   if (args.draft && args.mergeableState !== 'draft') {
-    push(DRAFT_REASON);
+    push(draftReason());
   }
 
   return reasons;
@@ -256,17 +272,27 @@ export function getAllowedMergeMethods(repo: PrOverviewRepoSettings): AllowedMer
   return methods;
 }
 
-export const PR_MERGE_LABELS = {
-  merge: 'Create a merge commit',
-  squash: 'Squash and merge',
-  rebase: 'Rebase and merge',
+// Literal keys, never a template: the catalog check scans the source for the
+// keys a lookup passes on, and a computed key is invisible to it.
+const PR_MERGE_LABEL_KEYS = {
+  merge: 'prReview.merge.methodLabels.merge',
+  squash: 'prReview.merge.methodLabels.squash',
+  rebase: 'prReview.merge.methodLabels.rebase',
 } satisfies Record<AllowedMergeMethod, string>;
 
-export const PR_MERGE_DESCRIPTIONS = {
-  merge: 'Combine all commits from this branch into the base branch with a merge commit.',
-  squash: 'Combine all commits from this branch into a single commit on the base branch.',
-  rebase: 'Replay all commits from this branch onto the base branch without a merge commit.',
+const PR_MERGE_DESCRIPTION_KEYS = {
+  merge: 'prReview.merge.methodDescriptions.merge',
+  squash: 'prReview.merge.methodDescriptions.squash',
+  rebase: 'prReview.merge.methodDescriptions.rebase',
 } satisfies Record<AllowedMergeMethod, string>;
+
+export function prMergeLabel(method: AllowedMergeMethod): string {
+  return i18n.t(PR_MERGE_LABEL_KEYS[method]);
+}
+
+export function prMergeDescription(method: AllowedMergeMethod): string {
+  return i18n.t(PR_MERGE_DESCRIPTION_KEYS[method]);
+}
 
 /** The default method the picker selects on first open. */
 export function defaultMergeMethodFor(repo: PrOverviewRepoSettings): AllowedMergeMethod {

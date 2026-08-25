@@ -22,7 +22,9 @@
     "copiedToClipboard": "Gekopieer na knipbord",
     "couldNotCopyToClipboard": "Kon nie na knipbord kopieer nie",
     "required": "vereis",
-    "error": "fout: {{error}}"
+    "error": "fout: {{error}}",
+    "back": "Terug",
+    "somethingWentWrong": "Iets het verkeerd geloop"
   },
   "language": {
     "title": "Taal",
@@ -280,7 +282,36 @@
         "body": "Kon nie die tak skrap nie: {{reason}}",
         "accessibility": "Saamgevoeg. Kon nie die tak skrap nie: {{reason}}"
       },
-      "loadFailedTitle": "Kon nie merge-opsies laai nie"
+      "loadFailedTitle": "Kon nie merge-opsies laai nie",
+      "blocked": {
+        "unknownStateTitle": "GitHub het nog nie 'n mergebare status gerapporteer nie",
+        "unknownStateDetail": "Probeer die oorsig oor 'n oomblik verfris.",
+        "conflictsTitle": "Merge-konflikte",
+        "conflictsDetail": "Los die merge-konflikte op hierdie tak op voordat jy saamvoeg.",
+        "requiredReviewsTitle": "Vereiste resensies ontbreek",
+        "requiredReviewsDetail": "Goedkeurings van die vereiste resenseerders ontbreek of hang uit.",
+        "failingChecksTitle": "Vereiste kontroles misluk",
+        "failingChecksDetail": "Vereiste statuskontroles misluk.",
+        "unstableTitle": "Sommige kontroles misluk",
+        "unstableDetail": "Nie-vereiste kontroles misluk. Hulle sal nie die merge blokkeer nie.",
+        "draftTitle": "Konsep-trekversoek",
+        "draftDetail": "Merk die trekversoek as gereed vir resensie voordat jy saamvoeg.",
+        "behindTitle": "Tak is uitgediend",
+        "behindDetailUpdatable": "Werk die tak vanaf die basis by, of rebase, voordat jy saamvoeg.",
+        "behindDetail": "Die kop-tak is agter die basis. Rebase of werk die tak by voordat jy saamvoeg.",
+        "notMergeableTitle": "Hierdie trekversoek is nog nie mergebaar nie",
+        "notMergeableDetail": "GitHub het 'n {{state}} mergebare status gerapporteer."
+      },
+      "methodLabels": {
+        "merge": "Skep 'n merge-commit",
+        "squash": "Squash en voeg saam",
+        "rebase": "Rebase en voeg saam"
+      },
+      "methodDescriptions": {
+        "merge": "Kombineer al die commits van hierdie tak in die basis-tak met 'n merge-commit.",
+        "squash": "Kombineer al die commits van hierdie tak in 'n enkele commit op die basis-tak.",
+        "rebase": "Speel al die commits van hierdie tak op die basis-tak af sonder 'n merge-commit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Besprekingsdraad {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} meer lyne hierbo",
       "termsAcceptRequired": "Jy moet die Diensbepalings aanvaar om te plaas.",
       "termsOutdatedCopy": "Die Diensbepalings het verander. Maak hierdie skerm weer oop om die nuutste weergawe te aanvaar.",
-      "termsCheckRetryCopy": "Kon nie die Diensbepalings kontroleer nie. Kontroleer jou verbinding en probeer weer."
+      "termsCheckRetryCopy": "Kon nie die Diensbepalings kontroleer nie. Kontroleer jou verbinding en probeer weer.",
+      "reactions": {
+        "thumbsUp": "Duim op",
+        "thumbsDown": "Duim af",
+        "laugh": "Lag",
+        "hooray": "Hoera",
+        "confused": "Verward",
+        "heart": "Hart",
+        "rocket": "Vuurpyl",
+        "eyes": "Oë"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Lêerkommentaar op {{path}}",
+        "fileComment": "Lêerkommentaar",
+        "outdatedOnPathLines": "Uitgediend op {{path}} {{lines}}",
+        "outdatedOnLines": "Uitgediend op {{lines}}",
+        "outdatedOnPath": "Uitgediend op {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Kon nie GitHub-toepinstellings oopmaak nie",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -523,7 +571,12 @@
       "tapToComment": "{{label}}, tik om kommentaar te lewer"
     },
     "linkPasteClipboardEmpty": "Knipbord is leeg",
-    "linkPasteNotAPullRequest": "Nie 'n GitHub-pull-request-skakel nie"
+    "linkPasteNotAPullRequest": "Nie 'n GitHub-pull-request-skakel nie",
+    "announce": {
+      "commentPosted": "Kommentaar geplaas",
+      "reviewSubmitted": "Resensie ingedien",
+      "autoMergeEnabled": "Outo-merge geaktiveer"
+    }
   },
   "notifications": {
     "title": "Kennisgewings",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} oorskry die {{limit}}-aanhegselperk.",
       "unreadable": "Kon nie {{filename}} lees nie.",
       "pastedImage": "die geplakte beeld",
-      "defaultName": "Aanhegsel"
+      "defaultName": "Aanhegsel",
+      "classificationDenied": "Uitvoerbare lêers kan nie aangeheg word nie",
+      "classificationEmpty": "Lêer is leeg",
+      "classificationTooLarge": "Lêers moet 20 MB of kleiner wees",
+      "classificationUnreadable": "Kon nie hierdie lêer lees nie",
+      "announceUploaded": "Aanhegsel opgelaai"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "BEGIN",
       "stopped": "GESTOP",
       "stopping": "BESIG OM TE STOP",
-      "unknown": "ONBEKEND"
+      "unknown": "ONBEKEND",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "'n Aksie in die tou kon nie meer opgespoor word nie. Verfris om die nuutste toestand te sien.",
     "initialSyncAdmissionFailed": "Security Agent is geaktiveer, maar die aanvanklike sinkronisasie kon nie in die tou geplaas word nie. Sinkroniseer weer.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Bevinding is reeds verwerp",
+      "findingDismissed": "Bevinding verwerp",
+      "noRemediationsQueued": "Geen bestaande bevindings in die tou nie",
+      "remediationsQueued": "Bestaande regstellings in die tou",
+      "analysisComplete": "Analise voltooi",
+      "syncComplete": "Sinchronisasie voltooi"
+    }
   },
   "agents": {
     "activeNow": "Nou aktief",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
-      "couldNotOpenMessage": "Ons kon nie die GitHub App-opstelling begin nie. Probeer asseblief weer."
+      "couldNotOpenMessage": "Ons kon nie die GitHub App-opstelling begin nie. Probeer asseblief weer.",
+      "installedTitle": "GitHub-toep geïnstalleer",
+      "installedMessage": "Jou bewaarplekke is nou gekoppel.",
+      "pendingTitle": "Wag op admin-goedkeuring",
+      "pendingMessage": "'n Organisasie-admin moet die installasieversoek goedkeur.",
+      "accountMismatchTitle": "Rekening stem nie ooreen nie",
+      "accountMismatchMessage": "Hierdie verbinding is vanaf die Kilo-toep begin terwyl daar met 'n ander rekening aangemeld is. Meld op die web met daardie rekening aan, of begin weer vanaf die toep.",
+      "cannotCompleteTitle": "Kan installasie nie voltooi nie",
+      "notAdminMessage": "Slegs 'n GitHub-admin van daardie rekening kan dit koppel. Vra 'n organisasie-admin om Kilo te installeer.",
+      "alreadyClaimedMessage": "Daardie GitHub-installasie is reeds aan 'n ander Kilo-rekening gekoppel. Ontkoppel dit eers daar.",
+      "didNotCompleteTitle": "Installasie is nie voltooi nie",
+      "didNotCompleteMessage": "Die GitHub-toepinstallasie is nie voltooi nie. Probeer weer vanuit die toep."
     },
     "sessionExited": "Sessie beëindig",
     "remoteSpawnRetryable": "Kon nie die instansie bereik nie — dit het moontlik ontkoppel.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-poslewering is tydelik onbeskikbaar. Probeer asseblief later weer.",
     "admissionRequired": "Jou toestel kan nie geverifieer word nie. Gebruik '$t(login.moreSignInOptions)' om op 'n ander toestel of via die web aan te meld.",
     "default": "Iets het verkeerd gegaan. Probeer asseblief weer.",
-    "retryableAdmission": "Ons kon nie hierdie toestel verifieer nie. Kontroleer jou verbinding en probeer weer."
+    "retryableAdmission": "Ons kon nie hierdie toestel verifieer nie. Kontroleer jou verbinding en probeer weer.",
+    "startSignInFailed": "Kon nie aanmelding begin nie. Probeer asseblief weer.",
+    "couldNotOpenBrowser": "Kon nie die blaaier oopmaak nie. Probeer asseblief weer.",
+    "signInTimedOut": "Aanmelding se tyd het verstryk. Probeer asseblief weer.",
+    "signInFailed": "Aanmelding het misluk. Probeer asseblief weer.",
+    "networkError": "Netwerkfout. Probeer asseblief weer.",
+    "accessDeniedByUser": "Toegang deur gebruiker geweier",
+    "codeExpired": "Kode verval"
   },
   "models": {
     "dataCollected": "Data ingesamel",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Kon nie gunstelinge bywerk nie"
   }
 }

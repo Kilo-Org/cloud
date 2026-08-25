@@ -22,7 +22,9 @@
     "copiedToClipboard": "Zkopírováno do schránky",
     "couldNotCopyToClipboard": "Nepodařilo se zkopírovat do schránky",
     "required": "povinné",
-    "error": "chyba: {{error}}"
+    "error": "chyba: {{error}}",
+    "back": "Zpět",
+    "somethingWentWrong": "Něco se pokazilo"
   },
   "language": {
     "title": "Jazyk",
@@ -284,7 +286,36 @@
         "body": "Větev se nepodařilo smazat: {{reason}}",
         "accessibility": "Sloučeno. Větev se nepodařilo smazat: {{reason}}"
       },
-      "loadFailedTitle": "Nepodařilo se načíst možnosti sloučení"
+      "loadFailedTitle": "Nepodařilo se načíst možnosti sloučení",
+      "blocked": {
+        "unknownStateTitle": "GitHub nehlásí stav sloučení",
+        "unknownStateDetail": "Zkuste za chvíli obnovit přehled.",
+        "conflictsTitle": "Konflikty sloučení",
+        "conflictsDetail": "Před sloučením vyřešte konflikty v této větvi.",
+        "requiredReviewsTitle": "Chybí požadované recenze",
+        "requiredReviewsDetail": "Schválení od požadovaných recenzentů chybí nebo čekají.",
+        "failingChecksTitle": "Selhávají požadované kontroly",
+        "failingChecksDetail": "Požadované stavové kontroly selhávají.",
+        "unstableTitle": "Některé kontroly selhávají",
+        "unstableDetail": "Nepožadované kontroly selhávají. Nezablokují sloučení.",
+        "draftTitle": "Návrh pull requestu",
+        "draftDetail": "Před sloučením označte pull request jako připravený k recenzi.",
+        "behindTitle": "Větev je zastaralá",
+        "behindDetailUpdatable": "Před sloučením aktualizujte větev ze základní větve nebo proveďte rebase.",
+        "behindDetail": "Hlava větve zaostává za základní větví. Před sloučením proveďte rebase nebo aktualizujte větev.",
+        "notMergeableTitle": "Tento pull request zatím není sloučitelný",
+        "notMergeableDetail": "GitHub nahlásil stav sloučení {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Vytvořit slučovací commit",
+        "squash": "Squash a sloučit",
+        "rebase": "Rebase a sloučit"
+      },
+      "methodDescriptions": {
+        "merge": "Sloučí všechny commity z této větve do základní větve pomocí slučovacího commitu.",
+        "squash": "Sloučí všechny commity z této větve do jediného commitu na základní větvi.",
+        "rebase": "Přehraje všechny commity z této větve na základní větev bez slučovacího commitu."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Vlákno diskuse {{anchorLabel}}",
@@ -364,7 +395,24 @@
       "comment_few": "{{displayCount}} komentáře",
       "comment_many": "{{displayCount}} komentářů",
       "reaction_few": "reakce",
-      "reaction_many": "reakcí"
+      "reaction_many": "reakcí",
+      "reactions": {
+        "thumbsUp": "Palec nahoru",
+        "thumbsDown": "Palec dolů",
+        "laugh": "Smích",
+        "hooray": "Hurá",
+        "confused": "Zmatený",
+        "heart": "Srdce",
+        "rocket": "Raketa",
+        "eyes": "Oči"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komentář k souboru na {{path}}",
+        "fileComment": "Komentář k souboru",
+        "outdatedOnPathLines": "Zastaralé na {{path}} {{lines}}",
+        "outdatedOnLines": "Zastaralé na {{lines}}",
+        "outdatedOnPath": "Zastaralé na {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nastavení GitHub App se nepodařilo otevřít",
     "installKiloGitHubApp": "Nainstalovat Kilo GitHub App",
@@ -537,7 +585,12 @@
       "tapToComment": "{{label}}, klepnutím okomentujete"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná",
-    "linkPasteNotAPullRequest": "Toto není odkaz na pull request v GitHubu"
+    "linkPasteNotAPullRequest": "Toto není odkaz na pull request v GitHubu",
+    "announce": {
+      "commentPosted": "Komentář odeslán",
+      "reviewSubmitted": "Recenze odeslána",
+      "autoMergeEnabled": "Automatické sloučení povoleno"
+    }
   },
   "notifications": {
     "title": "Oznámení",
@@ -670,7 +723,12 @@
       "sizeRejection": "{{filename}} překračuje limit příloh {{limit}}.",
       "unreadable": "{{filename}} se nepodařilo přečíst.",
       "pastedImage": "vložený obrázek",
-      "defaultName": "Příloha"
+      "defaultName": "Příloha",
+      "classificationDenied": "Spustitelné soubory nelze připojit",
+      "classificationEmpty": "Soubor je prázdný",
+      "classificationTooLarge": "Soubory musí mít 20 MB nebo méně",
+      "classificationUnreadable": "Tento soubor se nepodařilo přečíst",
+      "announceUploaded": "Příloha nahrána"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1045,7 +1103,8 @@
       "starting": "SPOUŠTÍ SE",
       "stopped": "ZASTAVENO",
       "stopping": "ZASTAVUJE SE",
-      "unknown": "NEZNÁMÝ"
+      "unknown": "NEZNÁMÝ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1736,7 +1795,15 @@
     },
     "queuedActionUntracked": "Zařazenou akci již nebylo možné sledovat. Obnovte pro zobrazení nejnovějšího stavu.",
     "initialSyncAdmissionFailed": "Security Agent byl povolen, ale počáteční synchronizaci nebylo možné zařadit. Synchronizujte znovu.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Nález byl již odložen",
+      "findingDismissed": "Nález odložen",
+      "noRemediationsQueued": "Žádné stávající nálezy ve frontě",
+      "remediationsQueued": "Stávající nápravy jsou ve frontě",
+      "analysisComplete": "Analýza dokončena",
+      "syncComplete": "Synchronizace dokončena"
+    }
   },
   "agents": {
     "activeNow": "Nyní aktivní",
@@ -1788,7 +1855,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
-      "couldNotOpenMessage": "Nemohli jsme spustit nastavení aplikace GitHub. Zkuste to znovu."
+      "couldNotOpenMessage": "Nemohli jsme spustit nastavení aplikace GitHub. Zkuste to znovu.",
+      "installedTitle": "GitHub App nainstalována",
+      "installedMessage": "Vaše úložiště jsou nyní připojena.",
+      "pendingTitle": "Čeká se na schválení správcem",
+      "pendingMessage": "Žádost o instalaci musí schválit správce organizace.",
+      "accountMismatchTitle": "Nesoulad účtů",
+      "accountMismatchMessage": "Toto připojení bylo zahájeno z aplikace Kilo přihlášené pod jiným účtem. Přihlaste se na webu tímto účtem, nebo začněte znovu z aplikace.",
+      "cannotCompleteTitle": "Instalaci nelze dokončit",
+      "notAdminMessage": "Tento účet může připojit pouze správce GitHubu. Požádejte správce organizace o instalaci Kilo.",
+      "alreadyClaimedMessage": "Tato instalace GitHubu je již připojena k jinému účtu Kilo. Nejprve ji tam odpojte.",
+      "didNotCompleteTitle": "Instalace nebyla dokončena",
+      "didNotCompleteMessage": "Instalace GitHub App nebyla dokončena. Zkuste to znovu z aplikace."
     },
     "sessionExited": "Relace ukončena",
     "remoteSpawnRetryable": "Instanci se nepodařilo dosáhnout — mohla se odpojit.",
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "Doručování e-mailů je dočasně nedostupné. Zkuste to prosím později.",
     "admissionRequired": "Vaše zařízení nelze ověřit. Pomocí „$t(login.moreSignInOptions)“ se přihlaste na jiném zařízení nebo přes web.",
     "default": "Došlo k chybě. Zkuste to prosím znovu.",
-    "retryableAdmission": "Zařízení se nám nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu."
+    "retryableAdmission": "Zařízení se nám nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu.",
+    "startSignInFailed": "Přihlášení se nepodařilo spustit. Zkuste to prosím znovu.",
+    "couldNotOpenBrowser": "Prohlížeč se nepodařilo otevřít. Zkuste to prosím znovu.",
+    "signInTimedOut": "Přihlášení vypršelo. Zkuste to prosím znovu.",
+    "signInFailed": "Přihlášení se nezdařilo. Zkuste to prosím znovu.",
+    "networkError": "Chyba sítě. Zkuste to prosím znovu.",
+    "accessDeniedByUser": "Přístup zamítnut uživatelem",
+    "codeExpired": "Kód vypršel"
   },
   "models": {
     "dataCollected": "Shromažďovaná data",
-    "free": "Zdarma"
+    "free": "Zdarma",
+    "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat"
   }
 }

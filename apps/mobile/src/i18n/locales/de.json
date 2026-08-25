@@ -22,7 +22,9 @@
     "required": "erforderlich",
     "error": "Fehler: {{error}}",
     "notNow": "Nicht jetzt",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "back": "Zurück",
+    "somethingWentWrong": "Etwas ist schiefgelaufen"
   },
   "language": {
     "title": "Sprache",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} überschreitet das Anhang-Limit von {{limit}}.",
       "unreadable": "{{filename}} konnte nicht gelesen werden.",
       "pastedImage": "das eingefügte Bild",
-      "defaultName": "Anhang"
+      "defaultName": "Anhang",
+      "classificationDenied": "Ausführbare Dateien können nicht angehängt werden",
+      "classificationEmpty": "Die Datei ist leer",
+      "classificationTooLarge": "Dateien dürfen höchstens 20 MB groß sein",
+      "classificationUnreadable": "Diese Datei konnte nicht gelesen werden",
+      "announceUploaded": "Anhang hochgeladen"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "WIRD GESTARTET",
       "stopped": "GESTOPPT",
       "stopping": "WIRD GESTOPPT",
-      "unknown": "UNBEKANNT"
+      "unknown": "UNBEKANNT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent wurde aktiviert, aber die erste Synchronisierung konnte nicht eingereiht werden. Synchronisiere erneut.",
-    "queuedActionUntracked": "Eine eingereihte Aktion konnte nicht mehr verfolgt werden. Aktualisiere, um den neuesten Status zu sehen."
+    "queuedActionUntracked": "Eine eingereihte Aktion konnte nicht mehr verfolgt werden. Aktualisiere, um den neuesten Status zu sehen.",
+    "commands": {
+      "findingAlreadyDismissed": "Finding bereits verworfen",
+      "findingDismissed": "Finding verworfen",
+      "noRemediationsQueued": "Keine bestehenden Findings in der Warteschlange",
+      "remediationsQueued": "Bestehende Behebungen eingereiht",
+      "analysisComplete": "Analyse abgeschlossen",
+      "syncComplete": "Synchronisierung abgeschlossen"
+    }
   },
   "agents": {
     "activeNow": "Jetzt aktiv",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Das Setup der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
-      "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden"
+      "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden",
+      "installedTitle": "GitHub App installiert",
+      "installedMessage": "Deine Repositories sind jetzt verbunden.",
+      "pendingTitle": "Genehmigung durch Admin ausstehend",
+      "pendingMessage": "Ein Organisationsadministrator muss die Installationsanfrage genehmigen.",
+      "accountMismatchTitle": "Konten stimmen nicht überein",
+      "accountMismatchMessage": "Diese Verbindung wurde aus der Kilo App heraus gestartet, während ein anderes Konto angemeldet war. Melde dich im Web mit diesem Konto an oder starte erneut aus der App.",
+      "cannotCompleteTitle": "Installation kann nicht abgeschlossen werden",
+      "notAdminMessage": "Nur ein GitHub-Admin dieses Kontos kann es verbinden. Bitte einen Organisationsadministrator, Kilo zu installieren.",
+      "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
+      "didNotCompleteTitle": "Installation wurde nicht abgeschlossen",
+      "didNotCompleteMessage": "Die Installation der GitHub App wurde nicht abgeschlossen. Versuche es erneut aus der App."
     },
     "sessionExited": "Sitzung beendet",
     "remoteSpawnRetryable": "Die Instanz konnte nicht erreicht werden – sie wurde möglicherweise getrennt.",
@@ -2307,7 +2334,24 @@
       "viewTerms": "Bedingungen ansehen",
       "termsAcceptRequired": "Du musst die Nutzungsbedingungen akzeptieren, um zu posten.",
       "termsCheckRetryCopy": "Die Nutzungsbedingungen konnten nicht geprüft werden. Prüfe deine Verbindung und versuche es erneut.",
-      "termsOutdatedCopy": "Die Nutzungsbedingungen haben sich geändert. Öffne diesen Bildschirm erneut, um die neueste Version zu akzeptieren."
+      "termsOutdatedCopy": "Die Nutzungsbedingungen haben sich geändert. Öffne diesen Bildschirm erneut, um die neueste Version zu akzeptieren.",
+      "reactions": {
+        "thumbsUp": "Daumen hoch",
+        "thumbsDown": "Daumen runter",
+        "laugh": "Lachen",
+        "hooray": "Hurra",
+        "confused": "Verwirrt",
+        "heart": "Herz",
+        "rocket": "Rakete",
+        "eyes": "Augen"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Dateikommentar zu {{path}}",
+        "fileComment": "Dateikommentar",
+        "outdatedOnPathLines": "Veraltet auf {{path}} {{lines}}",
+        "outdatedOnLines": "Veraltet auf {{lines}}",
+        "outdatedOnPath": "Veraltet auf {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Pull-Request-Link löschen",
@@ -2464,7 +2508,36 @@
         "closed": "Dieser Pull Request ist geschlossen"
       },
       "updateBranch": "Branch aktualisieren",
-      "updateBranchFromBase": "Branch vom Basis-Branch aktualisieren"
+      "updateBranchFromBase": "Branch vom Basis-Branch aktualisieren",
+      "blocked": {
+        "unknownStateTitle": "GitHub hat keinen Merge-Status gemeldet",
+        "unknownStateDetail": "Versuche gleich, die Übersicht zu aktualisieren.",
+        "conflictsTitle": "Merge-Konflikte",
+        "conflictsDetail": "Löse die Merge-Konflikte auf diesem Branch, bevor du zusammenführst.",
+        "requiredReviewsTitle": "Erforderliche Reviews fehlen",
+        "requiredReviewsDetail": "Genehmigungen der erforderlichen Reviewer fehlen oder stehen aus.",
+        "failingChecksTitle": "Erforderliche Checks schlagen fehl",
+        "failingChecksDetail": "Erforderliche Status-Checks schlagen fehl.",
+        "unstableTitle": "Einige Checks schlagen fehl",
+        "unstableDetail": "Nicht erforderliche Checks schlagen fehl. Sie blockieren den Merge nicht.",
+        "draftTitle": "Pull Request als Entwurf",
+        "draftDetail": "Markiere den Pull Request als für Review bereit, bevor du zusammenführst.",
+        "behindTitle": "Branch ist nicht mehr aktuell",
+        "behindDetailUpdatable": "Aktualisiere den Branch vom Basis-Branch aus oder führe ein Rebase durch, bevor du zusammenführst.",
+        "behindDetail": "Der Branch ist gegenüber dem Basis-Branch nicht mehr aktuell. Führe ein Rebase durch oder aktualisiere den Branch, bevor du zusammenführst.",
+        "notMergeableTitle": "Dieser Pull Request kann noch nicht zusammengeführt werden",
+        "notMergeableDetail": "GitHub hat einen {{state}}-Merge-Status gemeldet."
+      },
+      "methodLabels": {
+        "merge": "Merge-Commit erstellen",
+        "squash": "Squash und zusammenführen",
+        "rebase": "Rebase und zusammenführen"
+      },
+      "methodDescriptions": {
+        "merge": "Fasse alle Commits dieses Branchs mit einem Merge-Commit im Basis-Branch zusammen.",
+        "squash": "Fasse alle Commits dieses Branchs zu einem einzigen Commit im Basis-Branch zusammen.",
+        "rebase": "Übertrage alle Commits dieses Branchs ohne Merge-Commit auf den Basis-Branch."
+      }
     },
     "noDescriptionProvided": "Keine Beschreibung vorhanden.",
     "noFilesChanged": "Keine Dateien geändert",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "Zeigt die ersten {{limit}} von {{total}} geänderten Dateien — GitHub-API-Limit"
     },
     "linkPasteClipboardEmpty": "Zwischenablage ist leer",
-    "linkPasteNotAPullRequest": "Kein GitHub-Pull-Request-Link"
+    "linkPasteNotAPullRequest": "Kein GitHub-Pull-Request-Link",
+    "announce": {
+      "commentPosted": "Kommentar veröffentlicht",
+      "reviewSubmitted": "Review eingereicht",
+      "autoMergeEnabled": "Auto-Merge aktiviert"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Nutze „$t(login.moreSignInOptions)“, um dich auf einem anderen Gerät oder über das Web anzumelden.",
     "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Überprüfe deine Verbindung und versuche es erneut."
+    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Überprüfe deine Verbindung und versuche es erneut.",
+    "startSignInFailed": "Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
+    "signInTimedOut": "Die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
+    "signInFailed": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "networkError": "Netzwerkfehler. Bitte versuche es erneut.",
+    "accessDeniedByUser": "Zugriff vom Nutzer verweigert",
+    "codeExpired": "Der Code ist abgelaufen"
   },
   "models": {
     "dataCollected": "Erfasste Daten",
-    "free": "Kostenlos"
+    "free": "Kostenlos",
+    "couldNotUpdateFavorites": "Favoriten konnten nicht aktualisiert werden"
   }
 }

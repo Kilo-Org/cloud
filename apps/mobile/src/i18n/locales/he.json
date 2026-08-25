@@ -22,7 +22,9 @@
     "required": "חובה",
     "error": "שגיאה: {{error}}",
     "notNow": "לא עכשיו",
-    "continue": "המשך"
+    "continue": "המשך",
+    "back": "חזרה",
+    "somethingWentWrong": "משהו השתבש"
   },
   "language": {
     "title": "שפה",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} חורג ממגבלת הצירוף של {{limit}}.",
       "unreadable": "לא ניתן היה לקרוא את {{filename}}.",
       "pastedImage": "התמונה שהודבקה",
-      "defaultName": "קובץ מצורף"
+      "defaultName": "קובץ מצורף",
+      "classificationDenied": "לא ניתן לצרף קבצי הפעלה",
+      "classificationEmpty": "הקובץ ריק",
+      "classificationTooLarge": "קבצים חייבים להיות 20 MB או קטן יותר",
+      "classificationUnreadable": "לא ניתן היה לקרוא את הקובץ הזה",
+      "announceUploaded": "הקובץ המצורף הועלה"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -696,7 +703,8 @@
       "starting": "מתחיל",
       "stopped": "עצור",
       "stopping": "עוצר",
-      "unknown": "לא ידוע"
+      "unknown": "לא ידוע",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1338,7 +1346,15 @@
     },
     "title": "סוכן אבטחה",
     "initialSyncAdmissionFailed": "סוכן האבטחה הופעל, אך לא ניתן היה להעמיד את הסינכרון הראשוני בתור. סנכרן שוב.",
-    "queuedActionUntracked": "לא ניתן עוד לעקוב אחר פעולה שהועמדה בתור. רענן כדי לראות את המצב העדכני."
+    "queuedActionUntracked": "לא ניתן עוד לעקוב אחר פעולה שהועמדה בתור. רענן כדי לראות את המצב העדכני.",
+    "commands": {
+      "findingAlreadyDismissed": "הממצא כבר נדחה",
+      "findingDismissed": "הממצא נדחה",
+      "noRemediationsQueued": "לא הועמדו ממצאים קיימים בתור",
+      "remediationsQueued": "תיקונים קיימים הועמדו בתור",
+      "analysisComplete": "הניתוח הושלם",
+      "syncComplete": "הסנכרון הושלם"
+    }
   },
   "agents": {
     "activeNow": "פעיל כעת",
@@ -1388,7 +1404,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
-      "couldNotOpenTitle": "לא ניתן היה לפתוח את GitHub"
+      "couldNotOpenTitle": "לא ניתן היה לפתוח את GitHub",
+      "installedTitle": "אפליקציית GitHub הותקנה",
+      "installedMessage": "המאגרים שלך מחוברים כעת.",
+      "pendingTitle": "ממתין לאישור מנהל",
+      "pendingMessage": "מנהל הארגון חייב לאשר את בקשת ההתקנה.",
+      "accountMismatchTitle": "החשבון אינו תואם",
+      "accountMismatchMessage": "החיבור הזה הותחל מאפליקציית Kilo עם התחברות לחשבון אחר. היכנס לאתר עם החשבון הזה, או התחל שוב מהאפליקציה.",
+      "cannotCompleteTitle": "לא ניתן להשלים את ההתקנה",
+      "notAdminMessage": "רק מנהל GitHub של החשבון הזה יכול לחבר אותו. בקש ממנהל הארגון להתקין את Kilo.",
+      "alreadyClaimedMessage": "התקנת GitHub הזו כבר מחוברת לחשבון Kilo אחר. נתק אותה שם קודם.",
+      "didNotCompleteTitle": "ההתקנה לא הושלמה",
+      "didNotCompleteMessage": "התקנת אפליקציית GitHub לא הושלמה. נסה שוב מהאפליקציה."
     },
     "sessionExited": "היציאה מהסשן הושלמה",
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
@@ -2320,7 +2347,24 @@
       "termsCheckRetryCopy": "לא ניתן היה לבדוק את תנאי השירות. בדוק את החיבור ונסה שוב.",
       "termsOutdatedCopy": "תנאי השירות השתנו. פתח מחדש את המסך הזה כדי לאשר את הגרסה האחרונה.",
       "comment_two": "{{displayCount}} תגובות",
-      "reaction_two": "תגובות"
+      "reaction_two": "תגובות",
+      "reactions": {
+        "thumbsUp": "אגודל למעלה",
+        "thumbsDown": "אגודל למטה",
+        "laugh": "צחוק",
+        "hooray": "הידד",
+        "confused": "מבולבל",
+        "heart": "לב",
+        "rocket": "רקטה",
+        "eyes": "עיניים"
+      },
+      "anchor": {
+        "fileCommentOnPath": "הערת קובץ על {{path}}",
+        "fileComment": "הערת קובץ",
+        "outdatedOnPathLines": "מיושן על {{path}} {{lines}}",
+        "outdatedOnLines": "מיושן על {{lines}}",
+        "outdatedOnPath": "מיושן על {{path}}"
+      }
     },
     "entry": {
       "clearLink": "נקה קישור בקשת משיכה",
@@ -2479,7 +2523,36 @@
         "closed": "בקשת המשיכה הזו סגורה"
       },
       "updateBranch": "עדכן ענף",
-      "updateBranchFromBase": "עדכן ענף מהבסיס"
+      "updateBranchFromBase": "עדכן ענף מהבסיס",
+      "blocked": {
+        "unknownStateTitle": "GitHub לא דיווח על מצב מיזוג",
+        "unknownStateDetail": "נסה לרענן את הסקירה הכללית בעוד רגע.",
+        "conflictsTitle": "קונפליקטים במיזוג",
+        "conflictsDetail": "פתור את קונפליקטי המיזוג בענף הזה לפני המיזוג.",
+        "requiredReviewsTitle": "חסרות סקירות נדרשות",
+        "requiredReviewsDetail": "אישורים מהסוקרים הנדרשים חסרים או בהמתנה.",
+        "failingChecksTitle": "בדיקות נדרשות נכשלות",
+        "failingChecksDetail": "בדיקות הסטטוס הנדרשות נכשלות.",
+        "unstableTitle": "חלק מהבדיקות נכשלות",
+        "unstableDetail": "בדיקות שאינן נדרשות נכשלות. הן לא יחסמו את המיזוג.",
+        "draftTitle": "בקשת משיכה בטיוטה",
+        "draftDetail": "סמן את בקשת המשיכה כמוכנה לסקירה לפני המיזוג.",
+        "behindTitle": "הענף אינו מעודכן",
+        "behindDetailUpdatable": "עדכן את הענף מהבסיס, או בצע rebase, לפני המיזוג.",
+        "behindDetail": "ענף הראש נמצא מאחורי הבסיס. בצע rebase או עדכן את הענף לפני המיזוג.",
+        "notMergeableTitle": "לא ניתן למזג את בקשת המשיכה הזו עדיין",
+        "notMergeableDetail": "GitHub דיווח על מצב מיזוג {{state}}."
+      },
+      "methodLabels": {
+        "merge": "צור commit מיזוג",
+        "squash": "Squash ומזג",
+        "rebase": "Rebase ומזג"
+      },
+      "methodDescriptions": {
+        "merge": "שלב את כל ה-commits מהענף הזה לענף הבסיס עם commit מיזוג.",
+        "squash": "שלב את כל ה-commits מהענף הזה ל-commit יחיד על ענף הבסיס.",
+        "rebase": "הרץ מחדש את כל ה-commits מהענף הזה על ענף הבסיס, ללא commit מיזוג."
+      }
     },
     "noDescriptionProvided": "לא סופק תיאור.",
     "noFilesChanged": "אין קבצים שהשתנו",
@@ -2572,7 +2645,12 @@
       "truncationBanner": "מציג את {{limit}} הראשונים מתוך {{total}} קבצים ששונו — מגבלת API של GitHub"
     },
     "linkPasteClipboardEmpty": "הלוח ריק",
-    "linkPasteNotAPullRequest": "לא קישור לבקשת משיכה ב-GitHub"
+    "linkPasteNotAPullRequest": "לא קישור לבקשת משיכה ב-GitHub",
+    "announce": {
+      "commentPosted": "התגובה פורסמה",
+      "reviewSubmitted": "הסקירה נשלחה",
+      "autoMergeEnabled": "מיזוג אוטומטי הופעל"
+    }
   },
   "organization": {
     "boundary": {
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "שליחת הדוא\"ל אינה זמינה זמנית. נסה שוב מאוחר יותר.",
     "admissionRequired": "לא ניתן לאמת את המכשיר שלך. השתמש ב'$t(login.moreSignInOptions)' כדי להתחבר במכשיר אחר או דרך האינטרנט.",
     "default": "משהו השתבש. נסה שוב.",
-    "retryableAdmission": "לא ניתן היה לאמת מכשיר זה. בדוק את החיבור ונסה שוב."
+    "retryableAdmission": "לא ניתן היה לאמת מכשיר זה. בדוק את החיבור ונסה שוב.",
+    "startSignInFailed": "התחלת הכניסה נכשלה. נסה שוב.",
+    "couldNotOpenBrowser": "לא ניתן היה לפתוח את הדפדפן. נסה שוב.",
+    "signInTimedOut": "הכניסה פגה. נסה שוב.",
+    "signInFailed": "הכניסה נכשלה. נסה שוב.",
+    "networkError": "שגיאת רשת. נסה שוב.",
+    "accessDeniedByUser": "הגישה נדחתה על ידי המשתמש",
+    "codeExpired": "הקוד פג"
   },
   "models": {
     "dataCollected": "נתונים שנאספו",
-    "free": "חינם"
+    "free": "חינם",
+    "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים"
   }
 }

@@ -22,7 +22,9 @@
     "required": "bắt buộc",
     "error": "lỗi: {{error}}",
     "notNow": "Để sau",
-    "continue": "Tiếp tục"
+    "continue": "Tiếp tục",
+    "back": "Quay lại",
+    "somethingWentWrong": "Đã xảy ra lỗi"
   },
   "language": {
     "title": "Ngôn ngữ",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} vượt quá giới hạn đính kèm {{limit}}.",
       "unreadable": "Không đọc được {{filename}}.",
       "pastedImage": "hình ảnh đã dán",
-      "defaultName": "Tệp đính kèm"
+      "defaultName": "Tệp đính kèm",
+      "classificationDenied": "Không thể đính kèm tệp thực thi",
+      "classificationEmpty": "Tệp trống",
+      "classificationTooLarge": "Tệp phải từ 20 MB trở xuống",
+      "classificationUnreadable": "Không thể đọc tệp này",
+      "announceUploaded": "Đã tải tệp đính kèm lên"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "ĐANG BẮT ĐẦU",
       "stopped": "ĐÃ DỪNG",
       "stopping": "ĐANG DỪNG",
-      "unknown": "KHÔNG XÁC ĐỊNH"
+      "unknown": "KHÔNG XÁC ĐỊNH",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent đã được bật, nhưng không thể xếp hàng đồng bộ ban đầu. Đồng bộ lại.",
-    "queuedActionUntracked": "Không thể theo dõi một hành động đã xếp hàng nữa. Làm mới để xem trạng thái mới nhất."
+    "queuedActionUntracked": "Không thể theo dõi một hành động đã xếp hàng nữa. Làm mới để xem trạng thái mới nhất.",
+    "commands": {
+      "findingAlreadyDismissed": "Phát hiện đã được bỏ qua",
+      "findingDismissed": "Đã bỏ qua phát hiện",
+      "noRemediationsQueued": "Không có phát hiện hiện có nào được xếp hàng",
+      "remediationsQueued": "Các bản khắc phục hiện có đã được xếp hàng",
+      "analysisComplete": "Đã hoàn tất phân tích",
+      "syncComplete": "Đã hoàn tất đồng bộ"
+    }
   },
   "agents": {
     "activeNow": "Đang hoạt động",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
-      "couldNotOpenTitle": "Không thể mở GitHub"
+      "couldNotOpenTitle": "Không thể mở GitHub",
+      "installedTitle": "Đã cài đặt Ứng dụng GitHub",
+      "installedMessage": "Các kho lưu trữ của bạn đã được kết nối.",
+      "pendingTitle": "Đang chờ quản trị viên phê duyệt",
+      "pendingMessage": "Quản trị viên tổ chức phải phê duyệt yêu cầu cài đặt.",
+      "accountMismatchTitle": "Không khớp tài khoản",
+      "accountMismatchMessage": "Kết nối này được bắt đầu từ Ứng dụng Kilo đăng nhập bằng một tài khoản khác. Hãy đăng nhập vào web bằng tài khoản đó hoặc bắt đầu lại từ ứng dụng.",
+      "cannotCompleteTitle": "Không thể hoàn tất cài đặt",
+      "notAdminMessage": "Chỉ quản trị viên GitHub của tài khoản đó mới có thể kết nối. Hãy nhờ quản trị viên tổ chức cài đặt Kilo.",
+      "alreadyClaimedMessage": "Bản cài đặt GitHub đó đã được kết nối với tài khoản Kilo khác. Hãy ngắt kết nối ở đó trước.",
+      "didNotCompleteTitle": "Cài đặt chưa hoàn tất",
+      "didNotCompleteMessage": "Việc cài đặt Ứng dụng GitHub chưa hoàn tất. Hãy thử lại từ ứng dụng."
     },
     "sessionExited": "Phiên đã thoát",
     "remoteSpawnRetryable": "Không thể kết nối tới phiên bản — có thể nó đã ngắt kết nối.",
@@ -2307,7 +2334,24 @@
       "viewTerms": "Xem điều khoản",
       "termsAcceptRequired": "Bạn phải chấp nhận Điều khoản dịch vụ để đăng.",
       "termsCheckRetryCopy": "Không thể kiểm tra Điều khoản dịch vụ. Kiểm tra kết nối và thử lại.",
-      "termsOutdatedCopy": "Điều khoản dịch vụ đã thay đổi. Mở lại màn hình này để chấp nhận phiên bản mới nhất."
+      "termsOutdatedCopy": "Điều khoản dịch vụ đã thay đổi. Mở lại màn hình này để chấp nhận phiên bản mới nhất.",
+      "reactions": {
+        "thumbsUp": "Thích",
+        "thumbsDown": "Không thích",
+        "laugh": "Cười",
+        "hooray": "Hoan hô",
+        "confused": "Bối rối",
+        "heart": "Tim",
+        "rocket": "Tên lửa",
+        "eyes": "Đôi mắt"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Bình luận tệp trên {{path}}",
+        "fileComment": "Bình luận tệp",
+        "outdatedOnPathLines": "Đã lỗi thời trên {{path}} {{lines}}",
+        "outdatedOnLines": "Đã lỗi thời trên {{lines}}",
+        "outdatedOnPath": "Đã lỗi thời trên {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Xóa liên kết yêu cầu hợp nhất",
@@ -2464,7 +2508,36 @@
         "closed": "Yêu cầu hợp nhất này đã đóng"
       },
       "updateBranch": "Cập nhật nhánh",
-      "updateBranchFromBase": "Cập nhật nhánh từ nhánh gốc"
+      "updateBranchFromBase": "Cập nhật nhánh từ nhánh gốc",
+      "blocked": {
+        "unknownStateTitle": "GitHub chưa báo cáo trạng thái có thể hợp nhất",
+        "unknownStateDetail": "Hãy thử làm mới phần Tổng quan trong giây lát.",
+        "conflictsTitle": "Xung đột hợp nhất",
+        "conflictsDetail": "Hãy giải quyết xung đột hợp nhất trên nhánh này trước khi hợp nhất.",
+        "requiredReviewsTitle": "Thiếu các đánh giá bắt buộc",
+        "requiredReviewsDetail": "Sự phê duyệt từ các người đánh giá bắt buộc đang thiếu hoặc đang chờ.",
+        "failingChecksTitle": "Các kiểm tra bắt buộc đang thất bại",
+        "failingChecksDetail": "Các kiểm tra trạng thái bắt buộc đang thất bại.",
+        "unstableTitle": "Một số kiểm tra đang thất bại",
+        "unstableDetail": "Các kiểm tra không bắt buộc đang thất bại. Chúng sẽ không chặn việc hợp nhất.",
+        "draftTitle": "Yêu cầu hợp nhất nháp",
+        "draftDetail": "Hãy đánh dấu yêu cầu hợp nhất là sẵn sàng để đánh giá trước khi hợp nhất.",
+        "behindTitle": "Nhánh đã lỗi thời",
+        "behindDetailUpdatable": "Hãy cập nhật nhánh từ nhánh gốc hoặc rebase trước khi hợp nhất.",
+        "behindDetail": "Nhánh head đang tụt hậu so với nhánh gốc. Hãy rebase hoặc cập nhật nhánh trước khi hợp nhất.",
+        "notMergeableTitle": "Yêu cầu hợp nhất này chưa thể hợp nhất",
+        "notMergeableDetail": "GitHub đã báo cáo trạng thái hợp nhất là {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Tạo một commit hợp nhất",
+        "squash": "Squash và hợp nhất",
+        "rebase": "Rebase và hợp nhất"
+      },
+      "methodDescriptions": {
+        "merge": "Gộp tất cả commit từ nhánh này vào nhánh gốc bằng một commit hợp nhất.",
+        "squash": "Gộp tất cả commit từ nhánh này thành một commit duy nhất trên nhánh gốc.",
+        "rebase": "Phát lại tất cả commit từ nhánh này lên nhánh gốc mà không có commit hợp nhất."
+      }
     },
     "noDescriptionProvided": "Không có mô tả nào được cung cấp.",
     "noFilesChanged": "Không có tệp nào thay đổi",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "Hiển thị {{limit}} tệp đã thay đổi đầu tiên trong tổng số {{total}} — giới hạn API của GitHub"
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống",
-    "linkPasteNotAPullRequest": "Không phải là liên kết yêu cầu kéo GitHub"
+    "linkPasteNotAPullRequest": "Không phải là liên kết yêu cầu kéo GitHub",
+    "announce": {
+      "commentPosted": "Đã đăng bình luận",
+      "reviewSubmitted": "Đã gửi đánh giá",
+      "autoMergeEnabled": "Đã bật tự động hợp nhất"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Việc gửi email tạm thời không khả dụng. Vui lòng thử lại sau.",
     "admissionRequired": "Không thể xác minh thiết bị của bạn. Dùng '$t(login.moreSignInOptions)' để đăng nhập trên thiết bị khác hoặc qua web.",
     "default": "Đã xảy ra sự cố. Vui lòng thử lại.",
-    "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại."
+    "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại.",
+    "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
+    "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
+    "signInTimedOut": "Đăng nhập đã hết thời gian. Vui lòng thử lại.",
+    "signInFailed": "Đăng nhập thất bại. Vui lòng thử lại.",
+    "networkError": "Lỗi mạng. Vui lòng thử lại.",
+    "accessDeniedByUser": "Người dùng từ chối truy cập",
+    "codeExpired": "Mã đã hết hạn"
   },
   "models": {
     "dataCollected": "Dữ liệu đã thu thập",
-    "free": "Miễn phí"
+    "free": "Miễn phí",
+    "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích"
   }
 }

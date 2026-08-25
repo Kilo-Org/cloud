@@ -22,7 +22,9 @@
     "copiedToClipboard": "Copiado ao portapapeis",
     "couldNotCopyToClipboard": "Non se puido copiar ao portapapeis",
     "required": "obrigatorio",
-    "error": "erro: {{error}}"
+    "error": "erro: {{error}}",
+    "back": "Atrás",
+    "somethingWentWrong": "Algo fallou"
   },
   "language": {
     "title": "Idioma",
@@ -280,7 +282,36 @@
         "body": "Non se puido eliminar a rama: {{reason}}",
         "accessibility": "Fusionado. Non se puido eliminar a rama: {{reason}}"
       },
-      "loadFailedTitle": "Non se puideron cargar as opcións de fusión"
+      "loadFailedTitle": "Non se puideron cargar as opcións de fusión",
+      "blocked": {
+        "unknownStateTitle": "GitHub non informou dun estado de fusión",
+        "unknownStateDetail": "Proba a actualizar a vista xeral nun momento.",
+        "conflictsTitle": "Conflitos de fusión",
+        "conflictsDetail": "Resolve os conflitos de fusión desta rama antes de fusionar.",
+        "requiredReviewsTitle": "Faltan revisións requiridas",
+        "requiredReviewsDetail": "As aprobacións dos revisores requiridos faltan ou están pendentes.",
+        "failingChecksTitle": "Comprobacións requiridas con fallos",
+        "failingChecksDetail": "As comprobacións de estado requiridas están fallando.",
+        "unstableTitle": "Algunhas comprobacións están fallando",
+        "unstableDetail": "As comprobacións non requiridas están fallando. Non bloquearán a fusión.",
+        "draftTitle": "Pull request en borrador",
+        "draftDetail": "Marca a pull request como lista para revisar antes de fusionar.",
+        "behindTitle": "A rama está desactualizada",
+        "behindDetailUpdatable": "Actualiza a rama desde a base, ou fai un rebase, antes de fusionar.",
+        "behindDetail": "A rama de head vai por detrás da base. Fai un rebase ou actualiza a rama antes de fusionar.",
+        "notMergeableTitle": "Este pull request aínda non se pode fusionar",
+        "notMergeableDetail": "GitHub informou dun estado de fusión {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Crear un commit de fusión",
+        "squash": "Squash e fusionar",
+        "rebase": "Rebase e fusionar"
+      },
+      "methodDescriptions": {
+        "merge": "Combina todos os commits desta rama na rama base cun commit de fusión.",
+        "squash": "Combina todos os commits desta rama nun único commit na rama base.",
+        "rebase": "Reproduce todos os commits desta rama sobre a rama base sen un commit de fusión."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Fío de discusión {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} liñas máis arriba",
       "termsAcceptRequired": "Debes aceptar os Termos do servizo para publicar.",
       "termsOutdatedCopy": "Os Termos do servizo cambiaron. Volve abrir esta pantalla para aceptar a última versión.",
-      "termsCheckRetryCopy": "Non se puido comprobar os Termos do servizo. Comproba a túa conexión e proba de novo."
+      "termsCheckRetryCopy": "Non se puido comprobar os Termos do servizo. Comproba a túa conexión e proba de novo.",
+      "reactions": {
+        "thumbsUp": "Polgar cara arriba",
+        "thumbsDown": "Polgar cara abaixo",
+        "laugh": "Risa",
+        "hooray": "Hurra",
+        "confused": "Confuso",
+        "heart": "Corazón",
+        "rocket": "Foguete",
+        "eyes": "Ollos"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentario de arquivo en {{path}}",
+        "fileComment": "Comentario de arquivo",
+        "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
+        "outdatedOnLines": "Desactualizado en {{lines}}",
+        "outdatedOnPath": "Desactualizado en {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Non se puideron abrir os axustes da GitHub App",
     "installKiloGitHubApp": "Instalar a Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Mostrando os primeiros {{limit}} de {{total}} ficheiros modificados — límite da API de GitHub"
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro",
-    "linkPasteNotAPullRequest": "Non é unha ligazón de solicitude de cambios de GitHub"
+    "linkPasteNotAPullRequest": "Non é unha ligazón de solicitude de cambios de GitHub",
+    "announce": {
+      "commentPosted": "Comentario publicado",
+      "reviewSubmitted": "Revisión enviada",
+      "autoMergeEnabled": "Fusión automática activada"
+    }
   },
   "notifications": {
     "title": "Notificacións",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} supera o límite de {{limit}} anexo.",
       "unreadable": "Non se puido ler {{filename}}.",
       "pastedImage": "a imaxe pegada",
-      "defaultName": "Anexo"
+      "defaultName": "Anexo",
+      "classificationDenied": "Non se poden anexar arquivos executables",
+      "classificationEmpty": "O arquivo está baleiro",
+      "classificationTooLarge": "Os arquivos deben ter 20 MB ou menos",
+      "classificationUnreadable": "Non se puido ler este arquivo",
+      "announceUploaded": "Anexo engadido"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "INICIANDO",
       "stopped": "DETIDO",
       "stopping": "PARANDO",
-      "unknown": "DESCOÑECIDO"
+      "unknown": "DESCOÑECIDO",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Xa non se puido rastrexar unha acción na cola. Actualiza para ver o estado máis recente.",
     "initialSyncAdmissionFailed": "Activouse Security Agent, pero non se puido encolar a sincronización inicial. Sincroniza de novo.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Achado xa descartado",
+      "findingDismissed": "Achado descartado",
+      "noRemediationsQueued": "Non hai achados existentes na cola",
+      "remediationsQueued": "Remediacións existentes engadidas á cola",
+      "analysisComplete": "Análise completada",
+      "syncComplete": "Sincronización completada"
+    }
   },
   "agents": {
     "activeNow": "Activo agora",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
-      "couldNotOpenMessage": "Non se puido iniciar a configuración da app de GitHub. Téntao de novo."
+      "couldNotOpenMessage": "Non se puido iniciar a configuración da app de GitHub. Téntao de novo.",
+      "installedTitle": "App de GitHub instalada",
+      "installedMessage": "Os teus repositorios están agora conectados.",
+      "pendingTitle": "Á espera da aprobación do administrador",
+      "pendingMessage": "Un administrador da organización debe aprobar a solicitude de instalación.",
+      "accountMismatchTitle": "A conta non coincide",
+      "accountMismatchMessage": "Esta conexión iniciouse desde a app de Kilo coa sesión iniciada cunha conta diferente. Inicia sesión na web con esa conta ou volve comezar desde a app.",
+      "cannotCompleteTitle": "Non se pode completar a instalación",
+      "notAdminMessage": "Só un administrador de GitHub desa conta pode conectala. Pide a un administrador da organización que instale Kilo.",
+      "alreadyClaimedMessage": "Esa instalación de GitHub xa está conectada a outra conta de Kilo. Desconéctaa alí primeiro.",
+      "didNotCompleteTitle": "A instalación non se completou",
+      "didNotCompleteMessage": "A instalación da GitHub App non se completou. Téntao de novo desde a app."
     },
     "sessionExited": "A sesión saíu",
     "remoteSpawnRetryable": "Non se puido alcanzar a instancia; é posible que se desconectase.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "A entrega do correo non está dispoñible temporalmente. Tenta de novo máis tarde.",
     "admissionRequired": "Non se pode verificar o teu dispositivo. Usa \"$t(login.moreSignInOptions)\" para iniciar sesión noutro dispositivo ou a través da web.",
     "default": "Algo saíu mal. Tenta de novo.",
-    "retryableAdmission": "Non puidemos verificar este dispositivo. Comproba a túa conexión e tenta de novo."
+    "retryableAdmission": "Non puidemos verificar este dispositivo. Comproba a túa conexión e tenta de novo.",
+    "startSignInFailed": "Non se puido iniciar sesión. Proba de novo.",
+    "couldNotOpenBrowser": "Non se puido abrir o navegador. Proba de novo.",
+    "signInTimedOut": "O inicio de sesión expirou. Proba de novo.",
+    "signInFailed": "O inicio de sesión fallou. Proba de novo.",
+    "networkError": "Erro de rede. Proba de novo.",
+    "accessDeniedByUser": "Acceso denegado polo usuario",
+    "codeExpired": "Código caducado"
   },
   "models": {
     "dataCollected": "Datos recollidos",
-    "free": "Grátis"
+    "free": "Grátis",
+    "couldNotUpdateFavorites": "Non se puideron actualizar os favoritos"
   }
 }

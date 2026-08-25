@@ -22,7 +22,9 @@
     "copiedToClipboard": "Копирано во таблата",
     "couldNotCopyToClipboard": "Не можеше да се копира во таблата",
     "required": "задолжително",
-    "error": "грешка: {{error}}"
+    "error": "грешка: {{error}}",
+    "back": "Назад",
+    "somethingWentWrong": "Нешто тргна наопаку"
   },
   "language": {
     "title": "Јазик",
@@ -280,7 +282,36 @@
         "body": "Не можеше да се избрише гранката: {{reason}}",
         "accessibility": "Споено. Не можеше да се избрише гранката: {{reason}}"
       },
-      "loadFailedTitle": "Не можеше да се вчитаат опциите за спојување"
+      "loadFailedTitle": "Не можеше да се вчитаат опциите за спојување",
+      "blocked": {
+        "unknownStateTitle": "GitHub не пријави состојба на можност за спојување",
+        "unknownStateDetail": "Обидете се да го освежите прегледот по момент.",
+        "conflictsTitle": "Конфликти при спојување",
+        "conflictsDetail": "Решете ги конфликтите при спојување на оваа гранка пред спојувањето.",
+        "requiredReviewsTitle": "Недостигаат потребните прегледи",
+        "requiredReviewsDetail": "Одобренијата од потребните рецензенти недостигаат или чекаат.",
+        "failingChecksTitle": "Потребните проверки не поминуваат",
+        "failingChecksDetail": "Потребните проверки на статусот не поминуваат.",
+        "unstableTitle": "Некои проверки не поминуваат",
+        "unstableDetail": "Проверките што не се потребни не поминуваат. Тие нема да го блокираат спојувањето.",
+        "draftTitle": "Нацрт барање за повлекување",
+        "draftDetail": "Обележете го барањето за повлекување како подготвено за преглед пред спојувањето.",
+        "behindTitle": "Гранката е застарена",
+        "behindDetailUpdatable": "Ажурирајте ја гранката од основната, или направете ребаз, пред спојувањето.",
+        "behindDetail": "Главната гранка е зад основната. Направете ребаз или ажурирајте ја гранката пред спојувањето.",
+        "notMergeableTitle": "Ова барање за повлекување сè уште не може да се спои",
+        "notMergeableDetail": "GitHub пријави состојба на можност за спојување {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Создај commit за спојување",
+        "squash": "Скваш и спој",
+        "rebase": "Ребаз и спој"
+      },
+      "methodDescriptions": {
+        "merge": "Спојте ги сите commits од оваа гранка во основната гранка со commit за спојување.",
+        "squash": "Спојте ги сите commits од оваа гранка во еден commit на основната гранка.",
+        "rebase": "Повторно применете ги сите commits од оваа гранка на основната гранка без commit за спојување."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Дискусиска нишка {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} повеќе линии погоре",
       "termsAcceptRequired": "Мора да ги прифатите Условите на користење за да објавувате.",
       "termsOutdatedCopy": "Условите на користење се променија. Отворете го овој екран повторно за да ја прифатите најновата верзија.",
-      "termsCheckRetryCopy": "Не можеше да се проверат Условите на користење. Проверете ја вашата врска и обидете се повторно."
+      "termsCheckRetryCopy": "Не можеше да се проверат Условите на користење. Проверете ја вашата врска и обидете се повторно.",
+      "reactions": {
+        "thumbsUp": "Палец нагоре",
+        "thumbsDown": "Палец надолу",
+        "laugh": "Смеа",
+        "hooray": "Ура",
+        "confused": "Збунет",
+        "heart": "Срце",
+        "rocket": "Ракета",
+        "eyes": "Очи"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Коментар на датотека на {{path}}",
+        "fileComment": "Коментар на датотека",
+        "outdatedOnPathLines": "Застарено на {{path}} {{lines}}",
+        "outdatedOnLines": "Застарено на {{lines}}",
+        "outdatedOnPath": "Застарено на {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Не можеше да се отворат поставките на GitHub App",
     "installKiloGitHubApp": "Инсталирај го Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Прикажува првите {{limit}} од {{total}} изменети датотеки — GitHub API лимит"
     },
     "linkPasteClipboardEmpty": "Таблата со клипборд е празна",
-    "linkPasteNotAPullRequest": "Ова не е линк до GitHub pull request"
+    "linkPasteNotAPullRequest": "Ова не е линк до GitHub pull request",
+    "announce": {
+      "commentPosted": "Коментарот е објавен",
+      "reviewSubmitted": "Прегледот е испратен",
+      "autoMergeEnabled": "Автоматското спојување е овозможено"
+    }
   },
   "notifications": {
     "title": "Известувања",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} ја надминува границата на прилогот од {{limit}}.",
       "unreadable": "Не можеше да се прочита {{filename}}.",
       "pastedImage": "залепената слика",
-      "defaultName": "Прилог"
+      "defaultName": "Прилог",
+      "classificationDenied": "Извршните датотеки не можат да се прикачат",
+      "classificationEmpty": "Датотеката е празна",
+      "classificationTooLarge": "Датотеките мора да бидат 20 MB или помали",
+      "classificationUnreadable": "Не можеше да се прочита оваа датотека",
+      "announceUploaded": "Прилогот е прикачен"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "СЕ ЗАПОЧНУВА",
       "stopped": "ЗАПРЕН",
       "stopping": "СЕ ЗАПИРА",
-      "unknown": "НЕПОЗНАТО"
+      "unknown": "НЕПОЗНАТО",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Акцијата во ред повеќе не можеше да се следи. Освежи за да го видиш најновиот статус.",
     "initialSyncAdmissionFailed": "Безбедносниот агент беше овозможен, но првичната синхронизација не можеше да се стави во ред. Синхронизирај повторно.",
-    "title": "Безбедносен агент"
+    "title": "Безбедносен агент",
+    "commands": {
+      "findingAlreadyDismissed": "Наодот е веќе отфрлен",
+      "findingDismissed": "Наодот е отфрлен",
+      "noRemediationsQueued": "Нема ставени наоди во ред",
+      "remediationsQueued": "Постоечките санации се ставени во ред",
+      "analysisComplete": "Анализата е завршена",
+      "syncComplete": "Синхронизацијата е завршена"
+    }
   },
   "agents": {
     "activeNow": "Активно сега",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не можеше да се отвори GitHub",
-      "couldNotOpenMessage": "Не можевме да го започнеме поставувањето на GitHub App. Обиди се повторно."
+      "couldNotOpenMessage": "Не можевме да го започнеме поставувањето на GitHub App. Обиди се повторно.",
+      "installedTitle": "GitHub App е инсталиран",
+      "installedMessage": "Вашите складишта сега се поврзани.",
+      "pendingTitle": "Се чека одобрување од администратор",
+      "pendingMessage": "Администратор на организацијата мора да го одобри барањето за инсталација.",
+      "accountMismatchTitle": "Неусогласена сметка",
+      "accountMismatchMessage": "Оваа врска е започната од Kilo App најавена со друга сметка. Најавете се на веб со таа сметка, или започнете повторно од апликацијата.",
+      "cannotCompleteTitle": "Не може да се заврши инсталацијата",
+      "notAdminMessage": "Само GitHub администратор на таа сметка може да ја поврзе. Побарајте од администратор на организацијата да го инсталира Kilo.",
+      "alreadyClaimedMessage": "Таа GitHub инсталација е веќе поврзана со друга Kilo сметка. Прво исклучете ја таму.",
+      "didNotCompleteTitle": "Инсталацијата не е завршена",
+      "didNotCompleteMessage": "Инсталацијата на GitHub App не е завршена. Обидете се повторно од апликацијата."
     },
     "sessionExited": "Сесијата е затворена",
     "remoteSpawnRetryable": "Не можеше да се пристапи до инстанцата — можеби се исклучи.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Испораката на е-пошта е привремено недостапна. Обидете се повторно подоцна.",
     "admissionRequired": "Вашиот уред не може да се потврди. Користете „$t(login.moreSignInOptions)“ за да се најавите на друг уред или преку веб.",
     "default": "Нешто тргна наопаку. Обидете се повторно.",
-    "retryableAdmission": "Не можевме да го потврдиме овој уред. Проверете ја вашата врска и обидете се повторно."
+    "retryableAdmission": "Не можевме да го потврдиме овој уред. Проверете ја вашата врска и обидете се повторно.",
+    "startSignInFailed": "Не успеа започнувањето на најавата. Обидете се повторно.",
+    "couldNotOpenBrowser": "Не можеше да се отвори прелистувачот. Обидете се повторно.",
+    "signInTimedOut": "Истече времето за најава. Обидете се повторно.",
+    "signInFailed": "Најавата не успеа. Обидете се повторно.",
+    "networkError": "Грешка во мрежата. Обидете се повторно.",
+    "accessDeniedByUser": "Пристапот е одбиен од корисникот",
+    "codeExpired": "Кодот истече"
   },
   "models": {
     "dataCollected": "Собрани податоци",
-    "free": "Бесплатно"
+    "free": "Бесплатно",
+    "couldNotUpdateFavorites": "Не успеа ажурирањето на омилените"
   }
 }

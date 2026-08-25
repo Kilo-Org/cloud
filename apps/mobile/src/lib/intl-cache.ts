@@ -80,6 +80,7 @@ function ensureListFormat(locale: string): void {
 
 function ensureRelativeTimeFormat(locale: string): void {
   const language = localeDataLanguage(locale);
+  ensureNumberFormat(locale);
   if (!usesRelativeTimePolyfill && shouldPolyfillRelativeTimeFormat(language)) {
     require('@formatjs/intl-relativetimeformat/polyfill-force.js');
     usesRelativeTimePolyfill = true;
@@ -191,9 +192,14 @@ export function segmenter(locale: string, options: Intl.SegmenterOptions): Intl.
 }
 
 export function prewarmIntl(locale: string): void {
-  numberFormat(locale, {});
-  listFormat(locale, { type: 'conjunction' });
-  relativeTimeFormat(locale, { numeric: 'auto' });
-  durationFormat(locale, { style: 'short' });
-  segmenter(locale, { granularity: 'grapheme' });
+  try {
+    numberFormat(locale, {});
+    listFormat(locale, { type: 'conjunction' });
+    relativeTimeFormat(locale, { numeric: 'auto' });
+    durationFormat(locale, { style: 'short' });
+    segmenter(locale, { granularity: 'grapheme' });
+  } catch {
+    // A prewarm is only a cache fill. Every formatter is built again on demand
+    // at the real call site, so a failure must not block the app.
+  }
 }

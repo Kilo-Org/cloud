@@ -1,28 +1,6 @@
 import { getLocales } from 'expo-localization';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
-/**
- * Resolve the BCP-47 language tag for voice recognition from the device's
- * locale list. The helper is defensive because runtime behavior can diverge
- * from the package's static typing: `getLocales()` may return an empty
- * array, or the first locale may be missing a tag, so every path falls back
- * to `en-US`. The parameter shape is intentionally structural so the caller
- * can pass `expo-localization`'s `Locale[]` without a type assertion.
- */
-export function resolveVoiceInputLanguageTag(locales: readonly { languageTag?: string }[]): string {
-  const first = locales[0];
-  if (!first) {
-    return 'en-US';
-  }
-
-  const tag = first.languageTag;
-  if (!tag || tag.length === 0) {
-    return 'en-US';
-  }
-
-  return tag;
-}
-
 function normalizeLocale(tag: string): string {
   return tag.toLowerCase().replaceAll('_', '-');
 }
@@ -32,6 +10,28 @@ function scriptSubtag(tag: string): string | undefined {
     .split('-')
     .slice(1)
     .find(part => part.length === 4);
+}
+
+const CHINESE_REGION_SCRIPTS = new Map([
+  ['tw', 'hant'],
+  ['hk', 'hant'],
+  ['mo', 'hant'],
+  ['cn', 'hans'],
+  ['sg', 'hans'],
+]);
+
+/** Script of a tag. Chinese region tags imply a script, so map those too. */
+function scriptOf(tag: string): string | undefined {
+  const script = scriptSubtag(tag);
+  if (script) {
+    return script;
+  }
+  const parts = normalizeLocale(tag).split('-');
+  if (parts[0] !== 'zh') {
+    return undefined;
+  }
+  const region = parts.slice(1).find(part => part.length === 2);
+  return region ? CHINESE_REGION_SCRIPTS.get(region) : undefined;
 }
 
 /**
@@ -74,9 +74,9 @@ export function pickSupportedVoiceInputLanguageTag(
       const [deviceLang] = deviceTag.split('-');
       const sameLang = normalized.filter(([n]) => n.split('-')[0] === deviceLang);
       if (sameLang.length > 0) {
-        const deviceScript = scriptSubtag(deviceTag);
+        const deviceScript = scriptOf(deviceTag);
         const sameScript = deviceScript
-          ? sameLang.find(([n]) => scriptSubtag(n) === deviceScript)
+          ? sameLang.find(([n]) => scriptOf(n) === deviceScript)
           : undefined;
         if (sameScript) {
           return sameScript[1];
@@ -140,7 +140,7 @@ export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Pr
   const matchingDeviceTags = deviceTags.filter(
     tag => normalizeLocale(tag).split('-')[0] === language
   );
-  const preferredTags = scriptSubtag(appLanguage)
+  const preferredTags = scriptOf(appLanguage)
     ? [appLanguage, ...matchingDeviceTags]
     : [...matchingDeviceTags, appLanguage];
 

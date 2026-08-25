@@ -22,7 +22,9 @@
     "copiedToClipboard": "ወደ ቅንጥብ ሰሌዳ ተቀድቷል",
     "couldNotCopyToClipboard": "ወደ ቅንጥብ ሰሌዳ መቅዳት አልተቻለም",
     "required": "ይፈለጋል",
-    "error": "ስህተት: {{error}}"
+    "error": "ስህተት: {{error}}",
+    "back": "ተመለስ",
+    "somethingWentWrong": "አንድ ችግር ተከስቷል"
   },
   "language": {
     "title": "ቋንቋ",
@@ -280,7 +282,36 @@
         "body": "ቅርንጫፉን መሰረዝ አልተቻለም: {{reason}}",
         "accessibility": "ተዋህዷል። ቅርንጫፉን መሰረዝ አልተቻለም: {{reason}}"
       },
-      "loadFailedTitle": "የውህደት አማራጮችን መጫን አልተቻለም"
+      "loadFailedTitle": "የውህደት አማራጮችን መጫን አልተቻለም",
+      "blocked": {
+        "unknownStateTitle": "GitHub ሊዋሃድ የሚችል ሁኔታ አላሳወቀም",
+        "unknownStateDetail": "ከጥቂት ቆይታ በኋላ አጠቃላይ እይታውን ለማደስ ይሞክሩ።",
+        "conflictsTitle": "የውህደት ግጭቶች",
+        "conflictsDetail": "ከማዋሃድ በፊት በዚህ ቅርንጫፍ ላይ ያሉትን የውህደት ግጭቶች ይፍቱ።",
+        "requiredReviewsTitle": "የሚፈለጉ ግምገማዎች የሉም",
+        "requiredReviewsDetail": "ከተፈለጉት ገምጋሚዎች የተሰጡ ማጽደቆች የሉም ወይም በመጠባበቅ ላይ ናቸው።",
+        "failingChecksTitle": "የሚፈለጉ ቼኮች ወድቀዋል",
+        "failingChecksDetail": "የሚፈለጉ የሁኔታ ቼኮች እየወደቁ ናቸው።",
+        "unstableTitle": "አንዳንድ ቼኮች እየወደቁ ናቸው",
+        "unstableDetail": "ያልተፈለጉ ቼኮች እየወደቁ ናቸው። ውህደቱን አይከለክሉም።",
+        "draftTitle": "ረቂቅ የጎተራ ጥያቄ",
+        "draftDetail": "ከማዋሃድ በፊት የጎተራ ጥያቄውን ለግምገማ ዝግጁ ምልክት ያድርጉ።",
+        "behindTitle": "ቅርንጫፉ ያረጀ ነው",
+        "behindDetailUpdatable": "ከማዋሃድ በፊት ቅርንጫፉን ከመሠረቱ ያዘምኑ፣ ወይም ዳግም-ሥር ያድርጉ።",
+        "behindDetail": "የራስ ቅርንጫፉ ከመሠረቱ ኋላ ነው። ከማዋሃድ በፊት ቅርንጫፉን ዳግም-ሥር ያድርጉ ወይም ያዘምኑ።",
+        "notMergeableTitle": "ይህ የጎተራ ጥያቄ እስካሁን ሊዋሃድ አይችልም",
+        "notMergeableDetail": "GitHub የ{{state}} የመዋሃድ አቅም ሁኔታ ዘግቧል።"
+      },
+      "methodLabels": {
+        "merge": "የውህደት መግባት ፍጠር",
+        "squash": "ጨምቅ እና አዋህድ",
+        "rebase": "ዳግም-ሥር አድርግ እና አዋህድ"
+      },
+      "methodDescriptions": {
+        "merge": "ከዚህ ቅርንጫፍ ያሉትን ሁሉንም መግባቶች በውህደት መግባት ወደ መሠረት ቅርንጫፉ ያጣምሩ።",
+        "squash": "ከዚህ ቅርንጫፍ ያሉትን ሁሉንም መግባቶች በመሠረት ቅርንጫፉ ላይ ወደ አንድ ነጠላ መግባት ያጣምሩ።",
+        "rebase": "ከዚህ ቅርንጫፍ ያሉትን ሁሉንም መግባቶች ያለ ውህደት መግባት ወደ መሠረት ቅርንጫፉ እንደገና ያስኬዱ።"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "የውይይት ክር {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "... {{displayCount}} ተጨማሪ መስመሮች ከላይ",
       "termsAcceptRequired": "ለመለጠፍ የአገልግሎት ውሎችን መቀበል አለብዎት።",
       "termsOutdatedCopy": "የአገልግሎት ውሎች ተለውጠዋል። አዲሱን ስሪት ለመቀበል ይህን ስክሪን እንደገና ክፈት።",
-      "termsCheckRetryCopy": "የአገልግሎት ውሎችን መፈተሽ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
+      "termsCheckRetryCopy": "የአገልግሎት ውሎችን መፈተሽ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+      "reactions": {
+        "thumbsUp": "አውራ ጣት ወደላይ",
+        "thumbsDown": "አውራ ጣት ወደታች",
+        "laugh": "ሳቅ",
+        "hooray": "ሆሬ",
+        "confused": "ግራ የተጋባ",
+        "heart": "ልብ",
+        "rocket": "ሮኬት",
+        "eyes": "ዓይኖች"
+      },
+      "anchor": {
+        "fileCommentOnPath": "በ{{path}} ላይ የፋይል አስተያየት",
+        "fileComment": "የፋይል አስተያየት",
+        "outdatedOnPathLines": "በ{{path}} {{lines}} ላይ ያረጀ",
+        "outdatedOnLines": "በ{{lines}} ላይ ያረጀ",
+        "outdatedOnPath": "በ{{path}} ላይ ያረጀ"
+      }
     },
     "couldNotOpenGitHubAppSettings": "የGitHub መተግበሪያ ቅንብሮችን መክፈት አልተቻለም",
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
@@ -523,7 +571,12 @@
       "tapToComment": "{{label}}፣ አስተያየት ለመስጠት ይንኩ"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው",
-    "linkPasteNotAPullRequest": "የGitHub ፑል እንደጠየቀ አገናኝ አይደለም"
+    "linkPasteNotAPullRequest": "የGitHub ፑል እንደጠየቀ አገናኝ አይደለም",
+    "announce": {
+      "commentPosted": "አስተያየት ተለጥፏል",
+      "reviewSubmitted": "ግምገማ ቀርቧል",
+      "autoMergeEnabled": "ራስ-ሰር ውህደት ነቅቷል"
+    }
   },
   "notifications": {
     "title": "ማሳወቂያዎች",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} የ{{limit}} ዓባሪ ገደብ ይበልጣል።",
       "unreadable": "{{filename}} ማንበብ አልተቻለም።",
       "pastedImage": "የተለጠፈው ምስል",
-      "defaultName": "ዓባሪ"
+      "defaultName": "ዓባሪ",
+      "classificationDenied": "የሚሰሩ ፋይሎች ማያያዝ አይቻልም",
+      "classificationEmpty": "ፋይሉ ባዶ ነው",
+      "classificationTooLarge": "ፋይሎች 20 MB ወይም ከዚያ ያነሱ መሆን አለባቸው",
+      "classificationUnreadable": "ይህን ፋይል ማንበብ አልተቻለም",
+      "announceUploaded": "ዓባሪ ተጭኗል"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}፣ {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "በመጀመር ላይ",
       "stopped": "ቆሟል",
       "stopping": "በማቆም ላይ",
-      "unknown": "ያልታወቀ"
+      "unknown": "ያልታወቀ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "የተሰለፈ እርምጃ ከእንግዲህ መከታተል አልተቻለም። የቅርብ ሁኔታን ለማየት ያድሱ።",
     "initialSyncAdmissionFailed": "የደህንነት ወኪሉ ነቅቷል፣ ግን የመጀመሪያው ማመሳሰል መሰለፍ አልተቻለም። እንደገና ያመሳስሉ።",
-    "title": "የደህንነት ወኪል"
+    "title": "የደህንነት ወኪል",
+    "commands": {
+      "findingAlreadyDismissed": "ግኝቱ አስቀድሞ ተወግዷል",
+      "findingDismissed": "ግኝቱ ተወግዷል",
+      "noRemediationsQueued": "ምንም ነባር ግኝቶች በወረፋ ላይ የሉም",
+      "remediationsQueued": "ነባር ማስተካከያዎች በወረፋ ላይ ናቸው",
+      "analysisComplete": "ትንታኔ ተጠናቋል",
+      "syncComplete": "ማመሳሰል ተጠናቋል"
+    }
   },
   "agents": {
     "activeNow": "አሁን ንቁ",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
-      "couldNotOpenMessage": "የGitHub App ማዋቀርን መጀመር አልቻልንም። እባክዎ እንደገና ይሞክሩ።"
+      "couldNotOpenMessage": "የGitHub App ማዋቀርን መጀመር አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
+      "installedTitle": "የGitHub መተግበሪያ ተጭኗል",
+      "installedMessage": "ማከማቻዎችዎ አሁን ተገናኝተዋል።",
+      "pendingTitle": "የአስተዳዳሪ ማጽደቅ በመጠበቅ ላይ",
+      "pendingMessage": "የድርጅት አስተዳዳሪ የመጫን ጥያቄውን ማጽደቅ አለበት።",
+      "accountMismatchTitle": "የመለያ አለመመሳሰል",
+      "accountMismatchMessage": "ይህ ግንኙነት የተጀመረው በተለየ መለያ ከገቡበት የKilo መተግበሪያ ነው። በዚያ መለያ በድረ-ገጹ ይግቡ፣ ወይም ከመተግበሪያው እንደገና ይጀምሩ።",
+      "cannotCompleteTitle": "መጫንን ማጠናቀቅ አልተቻለም",
+      "notAdminMessage": "የዚያ መለያ GitHub አስተዳዳሪ ብቻ ሊያገናኘው ይችላል። Kiloን እንዲጭን የድርጅት አስተዳዳሪን ይጠይቁ።",
+      "alreadyClaimedMessage": "ያ GitHub መጫን አስቀድሞ ከሌላ የKilo መለያ ጋር ተገናኝቷል። በመጀመሪያ እዚያ ያቋርጡት።",
+      "didNotCompleteTitle": "መጫኑ አልተጠናቀቀም",
+      "didNotCompleteMessage": "የGitHub መተግበሪያ መጫን አልተጠናቀቀም። ከመተግበሪያው እንደገና ይሞክሩ።"
     },
     "sessionExited": "ክፍለ ጊዜው ወጥቷል",
     "remoteSpawnRetryable": "እንደገና መድረስ አልተቻለም — ተቋርጦ ሊሆን ይችላል።",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "የኢሜይል ማድረስ ለጊዜው አይገኝም። እባክዎ በኋላ እንደገና ይሞክሩ።",
     "admissionRequired": "መሣሪያዎን ማረጋገጥ አይቻልም። በሌላ መሣሪያ ወይም በድር ለመግባት '$t(login.moreSignInOptions)' ይጠቀሙ።",
     "default": "የሆነ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
-    "retryableAdmission": "ይህን መሣሪያ ማረጋገጥ አልቻልንም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
+    "retryableAdmission": "ይህን መሣሪያ ማረጋገጥ አልቻልንም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+    "startSignInFailed": "መግባትን መጀመር አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
+    "couldNotOpenBrowser": "አሳሹን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+    "signInTimedOut": "የመግቢያ ጊዜ አልቋል። እባክዎ እንደገና ይሞክሩ።",
+    "signInFailed": "መግባቱ አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
+    "networkError": "የአውታረ መረብ ስህተት። እባክዎ እንደገና ይሞክሩ።",
+    "accessDeniedByUser": "በተጠቃሚው መዳረሻ ተከልክሏል",
+    "codeExpired": "ኮዱ ጊዜው አልፏል"
   },
   "models": {
     "dataCollected": "የተሰበሰበ መረጃ",
-    "free": "ነፃ"
+    "free": "ነፃ",
+    "couldNotUpdateFavorites": "ተወዳጆችን ማዘመን አልተቻለም"
   }
 }

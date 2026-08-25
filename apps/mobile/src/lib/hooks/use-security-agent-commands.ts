@@ -157,17 +157,19 @@ export function invalidateSecurityQueryScopes(
 
 function successMessageForCommand(command: SecurityCommand): string {
   if (command.commandType === 'dismiss_finding') {
-    return command.status === 'no_op' ? 'Finding already dismissed' : 'Finding dismissed';
+    return command.status === 'no_op'
+      ? i18n.t('securityAgent.commands.findingAlreadyDismissed')
+      : i18n.t('securityAgent.commands.findingDismissed');
   }
   if (command.commandType === 'apply_auto_remediation') {
     return command.status === 'no_op'
-      ? 'No existing findings queued'
-      : 'Existing remediations queued';
+      ? i18n.t('securityAgent.commands.noRemediationsQueued')
+      : i18n.t('securityAgent.commands.remediationsQueued');
   }
   if (command.commandType === 'start_analysis') {
-    return 'Analysis complete';
+    return i18n.t('securityAgent.commands.analysisComplete');
   }
-  return 'Sync complete';
+  return i18n.t('securityAgent.commands.syncComplete');
 }
 
 // Polls for and reconciles background Security Agent commands (sync,

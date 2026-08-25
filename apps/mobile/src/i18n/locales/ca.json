@@ -22,7 +22,9 @@
     "copiedToClipboard": "Copiat al porta-retalls",
     "couldNotCopyToClipboard": "No s'ha pogut copiar al porta-retalls",
     "required": "obligatori",
-    "error": "error: {{error}}"
+    "error": "error: {{error}}",
+    "back": "Enrere",
+    "somethingWentWrong": "Alguna cosa ha fallat"
   },
   "language": {
     "title": "Idioma",
@@ -282,7 +284,36 @@
         "body": "No s'ha pogut eliminar la branca: {{reason}}",
         "accessibility": "Fusionada. No s'ha pogut eliminar la branca: {{reason}}"
       },
-      "loadFailedTitle": "No s'han pogut carregar les opcions de fusió"
+      "loadFailedTitle": "No s'han pogut carregar les opcions de fusió",
+      "blocked": {
+        "unknownStateTitle": "GitHub no ha informat d'un estat de fusió",
+        "unknownStateDetail": "Torna a actualitzar la visió general d'aquí a una estona.",
+        "conflictsTitle": "Conflictes de fusió",
+        "conflictsDetail": "Resol els conflictes de fusió en aquesta branca abans de fusionar.",
+        "requiredReviewsTitle": "Falten revisions requerides",
+        "requiredReviewsDetail": "Falten o estan pendents les aprovacions dels revisors requerits.",
+        "failingChecksTitle": "Comprovacions requerides fallides",
+        "failingChecksDetail": "Les comprovacions d'estat requerides estan fallant.",
+        "unstableTitle": "Algunes comprovacions estan fallant",
+        "unstableDetail": "Les comprovacions no requerides estan fallant. No bloquejaran la fusió.",
+        "draftTitle": "Pull request esborrany",
+        "draftDetail": "Marca la pull request com a preparada per a la revisió abans de fusionar.",
+        "behindTitle": "La branca està desactualitzada",
+        "behindDetailUpdatable": "Actualitza la branca des de la base, o fes un rebase, abans de fusionar.",
+        "behindDetail": "La branca capçalera va per darrere de la base. Fes un rebase o actualitza la branca abans de fusionar.",
+        "notMergeableTitle": "Aquesta pull request encara no es pot fusionar",
+        "notMergeableDetail": "GitHub ha informat d'un estat de fusió {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Crea un commit de fusió",
+        "squash": "Comprimir i fusionar",
+        "rebase": "Rebase i fusionar"
+      },
+      "methodDescriptions": {
+        "merge": "Combina tots els commits d'aquesta branca a la branca base amb un commit de fusió.",
+        "squash": "Combina tots els commits d'aquesta branca en un únic commit a la branca base.",
+        "rebase": "Reprodueix tots els commits d'aquesta branca sobre la branca base sense un commit de fusió."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Fil de discussió {{anchorLabel}}",
@@ -360,7 +391,24 @@
       "termsOutdatedCopy": "Els Termes del servei han canviat. Torna a obrir aquesta pantalla per acceptar la versió més recent.",
       "termsCheckRetryCopy": "No s'han pogut comprovar els Termes del servei. Comprova la connexió i torna-ho a provar.",
       "comment_many": "{{displayCount}} comentaris",
-      "reaction_many": "reaccions"
+      "reaction_many": "reaccions",
+      "reactions": {
+        "thumbsUp": "Polze amunt",
+        "thumbsDown": "Polze avall",
+        "laugh": "Rialla",
+        "hooray": "Hurra",
+        "confused": "Confós",
+        "heart": "Cor",
+        "rocket": "Coet",
+        "eyes": "Ulls"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentari de fitxer a {{path}}",
+        "fileComment": "Comentari de fitxer",
+        "outdatedOnPathLines": "Desactualitzat a {{path}} {{lines}}",
+        "outdatedOnLines": "Desactualitzat a {{lines}}",
+        "outdatedOnPath": "Desactualitzat a {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'app de GitHub",
     "installKiloGitHubApp": "Instal·la l'app Kilo de GitHub",
@@ -530,7 +578,12 @@
       "tapToComment": "{{label}}, toca per comentar"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit",
-    "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub"
+    "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub",
+    "announce": {
+      "commentPosted": "Comentari publicat",
+      "reviewSubmitted": "Revisió enviada",
+      "autoMergeEnabled": "Fusió automàtica activada"
+    }
   },
   "notifications": {
     "title": "Notificacions",
@@ -663,7 +716,12 @@
       "sizeRejection": "{{filename}} supera el límit d'adjunts de {{limit}}.",
       "unreadable": "No s'ha pogut llegir {{filename}}.",
       "pastedImage": "la imatge enganxada",
-      "defaultName": "Adjunt"
+      "defaultName": "Adjunt",
+      "classificationDenied": "Els fitxers executables no es poden adjuntar",
+      "classificationEmpty": "El fitxer és buit",
+      "classificationTooLarge": "Els fitxers han de ser de 20 MB o menys",
+      "classificationUnreadable": "No s'ha pogut llegir aquest fitxer",
+      "announceUploaded": "Adjunt penjat"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1037,7 +1095,8 @@
       "starting": "INICIANT",
       "stopped": "ATURAT",
       "stopping": "ATURANT",
-      "unknown": "DESCONEGUT"
+      "unknown": "DESCONEGUT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1725,7 +1784,15 @@
     },
     "queuedActionUntracked": "Una acció en cua ja no es podia rastrejar. Actualitza per veure l'estat més recent.",
     "initialSyncAdmissionFailed": "Security Agent s'ha activat, però no s'ha pogut posar en cua la sincronització inicial. Torna a sincronitzar.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "La troballa ja s'ha descartat",
+      "findingDismissed": "Troballa descartada",
+      "noRemediationsQueued": "No hi ha cap troballa existent a la cua",
+      "remediationsQueued": "S'han posat les correccions existents a la cua",
+      "analysisComplete": "Anàlisi completada",
+      "syncComplete": "Sincronització completada"
+    }
   },
   "agents": {
     "activeNow": "Actius ara",
@@ -1775,7 +1842,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
-      "couldNotOpenMessage": "No hem pogut iniciar la configuració de l'aplicació de GitHub. Torna-ho a provar."
+      "couldNotOpenMessage": "No hem pogut iniciar la configuració de l'aplicació de GitHub. Torna-ho a provar.",
+      "installedTitle": "GitHub App instal·lada",
+      "installedMessage": "Els teus repositoris ara estan connectats.",
+      "pendingTitle": "Esperant l'aprovació de l'administrador",
+      "pendingMessage": "Un administrador de l'organització ha d'aprovar la sol·licitud d'instal·lació.",
+      "accountMismatchTitle": "Els comptes no coincideixen",
+      "accountMismatchMessage": "Aquesta connexió es va iniciar des de l'app de Kilo amb la sessió iniciada amb un compte diferent. Inicia la sessió al web amb aquest compte, o torna a començar des de l'app.",
+      "cannotCompleteTitle": "No es pot completar la instal·lació",
+      "notAdminMessage": "Només un administrador de GitHub d'aquest compte pot connectar-lo. Demana a un administrador de l'organització que instal·li Kilo.",
+      "alreadyClaimedMessage": "Aquesta instal·lació de GitHub ja està connectada a un altre compte de Kilo. Primer desconnecta-la allà.",
+      "didNotCompleteTitle": "La instal·lació no es va completar",
+      "didNotCompleteMessage": "La instal·lació de la GitHub App no es va completar. Torna-ho a provar des de l'app."
     },
     "sessionExited": "La sessió ha finalitzat",
     "remoteSpawnRetryable": "No s'ha pogut arribar a la instància: potser s'ha desconnectat.",
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "El lliurament del correu electrònic no està disponible temporalment. Torneu-ho a provar més tard.",
     "admissionRequired": "No es pot verificar el vostre dispositiu. Feu servir \"$t(login.moreSignInOptions)\" per iniciar sessió en un altre dispositiu o mitjançant el web.",
     "default": "S'ha produït un error. Torneu-ho a provar.",
-    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comproveu la connexió i torneu-ho a provar."
+    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comproveu la connexió i torneu-ho a provar.",
+    "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
+    "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
+    "signInTimedOut": "L'inici de sessió ha caducat. Torna-ho a provar.",
+    "signInFailed": "L'inici de sessió ha fallat. Torna-ho a provar.",
+    "networkError": "Error de xarxa. Torna-ho a provar.",
+    "accessDeniedByUser": "Accés denegat per l'usuari",
+    "codeExpired": "El codi ha caducat"
   },
   "models": {
     "dataCollected": "Dades recollides",
-    "free": "Gratuït"
+    "free": "Gratuït",
+    "couldNotUpdateFavorites": "No s'han pogut actualitzar els favorits"
   }
 }

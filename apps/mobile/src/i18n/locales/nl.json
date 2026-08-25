@@ -22,7 +22,9 @@
     "required": "verplicht",
     "error": "fout: {{error}}",
     "notNow": "Niet nu",
-    "continue": "Doorgaan"
+    "continue": "Doorgaan",
+    "back": "Terug",
+    "somethingWentWrong": "Er is iets misgegaan"
   },
   "language": {
     "title": "Taal",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} overschrijdt de bijlagelimiet van {{limit}}.",
       "unreadable": "{{filename}} kon niet worden gelezen.",
       "pastedImage": "de geplakte afbeelding",
-      "defaultName": "Bijlage"
+      "defaultName": "Bijlage",
+      "classificationDenied": "Uitvoerbare bestanden kunnen niet worden bijgevoegd",
+      "classificationEmpty": "Bestand is leeg",
+      "classificationTooLarge": "Bestanden moeten 20 MB of kleiner zijn",
+      "classificationUnreadable": "Kon dit bestand niet lezen",
+      "announceUploaded": "Bijlage geüpload"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "STARTEN",
       "stopped": "GESTOPT",
       "stopping": "STOPPEN",
-      "unknown": "ONBEKEND"
+      "unknown": "ONBEKEND",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent is ingeschakeld, maar de eerste synchronisatie kon niet in de wachtrij worden gezet. Synchroniseer opnieuw.",
-    "queuedActionUntracked": "Een actie in de wachtrij kon niet meer worden gevolgd. Vernieuw om de nieuwste status te zien."
+    "queuedActionUntracked": "Een actie in de wachtrij kon niet meer worden gevolgd. Vernieuw om de nieuwste status te zien.",
+    "commands": {
+      "findingAlreadyDismissed": "Bevinding al afgewezen",
+      "findingDismissed": "Bevinding afgewezen",
+      "noRemediationsQueued": "Geen bestaande bevindingen in de wachtrij",
+      "remediationsQueued": "Bestaande herstelacties in de wachtrij",
+      "analysisComplete": "Analyse voltooid",
+      "syncComplete": "Synchronisatie voltooid"
+    }
   },
   "agents": {
     "activeNow": "Nu actief",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
-      "couldNotOpenTitle": "Kon GitHub niet openen"
+      "couldNotOpenTitle": "Kon GitHub niet openen",
+      "installedTitle": "GitHub App geïnstalleerd",
+      "installedMessage": "Je repositories zijn nu verbonden.",
+      "pendingTitle": "Wachten op goedkeuring van de beheerder",
+      "pendingMessage": "Een organisatiebeheerder moet het installatieverzoek goedkeuren.",
+      "accountMismatchTitle": "Account komt niet overeen",
+      "accountMismatchMessage": "Deze verbinding is gestart vanuit de Kilo App met een ander account. Meld je op het web aan met dat account of start opnieuw vanuit de app.",
+      "cannotCompleteTitle": "Installatie kan niet worden voltooid",
+      "notAdminMessage": "Alleen een GitHub-beheerder van dat account kan de verbinding maken. Vraag een organisatiebeheerder om Kilo te installeren.",
+      "alreadyClaimedMessage": "Die GitHub-installatie is al verbonden met een ander Kilo-account. Verbreek de verbinding daar eerst.",
+      "didNotCompleteTitle": "Installatie niet voltooid",
+      "didNotCompleteMessage": "De installatie van de GitHub App is niet voltooid. Probeer het opnieuw vanuit de app."
     },
     "sessionExited": "Sessie beëindigd",
     "remoteSpawnRetryable": "De instantie is niet bereikbaar — deze is mogelijk verbroken.",
@@ -2307,7 +2334,24 @@
       "viewTerms": "Voorwaarden bekijken",
       "termsAcceptRequired": "Je moet de Servicevoorwaarden accepteren om te plaatsen.",
       "termsCheckRetryCopy": "De Servicevoorwaarden konden niet worden gecontroleerd. Controleer je verbinding en probeer het opnieuw.",
-      "termsOutdatedCopy": "De Servicevoorwaarden zijn gewijzigd. Open dit scherm opnieuw om de nieuwste versie te accepteren."
+      "termsOutdatedCopy": "De Servicevoorwaarden zijn gewijzigd. Open dit scherm opnieuw om de nieuwste versie te accepteren.",
+      "reactions": {
+        "thumbsUp": "Duim omhoog",
+        "thumbsDown": "Duim omlaag",
+        "laugh": "Lachen",
+        "hooray": "Hoera",
+        "confused": "Verward",
+        "heart": "Hart",
+        "rocket": "Raket",
+        "eyes": "Ogen"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Bestandsopmerking op {{path}}",
+        "fileComment": "Bestandsopmerking",
+        "outdatedOnPathLines": "Verouderd op {{path}} {{lines}}",
+        "outdatedOnLines": "Verouderd op {{lines}}",
+        "outdatedOnPath": "Verouderd op {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Pull-aanvraag-link wissen",
@@ -2464,7 +2508,36 @@
         "closed": "Deze pull-aanvraag is gesloten"
       },
       "updateBranch": "Branch bijwerken",
-      "updateBranchFromBase": "Branch bijwerken vanuit de basis"
+      "updateBranchFromBase": "Branch bijwerken vanuit de basis",
+      "blocked": {
+        "unknownStateTitle": "GitHub heeft geen samenvoegbare status gerapporteerd",
+        "unknownStateDetail": "Probeer het overzicht over een moment te vernieuwen.",
+        "conflictsTitle": "Samenvoegconflicten",
+        "conflictsDetail": "Los de samenvoegconflicten op deze branch op voordat je samenvoegt.",
+        "requiredReviewsTitle": "Vereiste reviews ontbreken",
+        "requiredReviewsDetail": "Goedkeuringen van de vereiste reviewers ontbreken of zijn in behandeling.",
+        "failingChecksTitle": "Vereiste checks mislukt",
+        "failingChecksDetail": "Vereiste statuschecks mislukken.",
+        "unstableTitle": "Sommige checks mislukken",
+        "unstableDetail": "Niet-vereiste checks mislukken. Ze blokkeren het samenvoegen niet.",
+        "draftTitle": "Concept-pull-aanvraag",
+        "draftDetail": "Markeer de pull-aanvraag als gereed voor review voordat je samenvoegt.",
+        "behindTitle": "Branch is verouderd",
+        "behindDetailUpdatable": "Werk de branch bij vanaf de basis of rebase voordat je samenvoegt.",
+        "behindDetail": "De head-branch loopt achter op de basis. Rebase of werk de branch bij voordat je samenvoegt.",
+        "notMergeableTitle": "Deze pull-aanvraag kan nog niet worden samengevoegd",
+        "notMergeableDetail": "GitHub meldde een {{state}} samenvoegbare status."
+      },
+      "methodLabels": {
+        "merge": "Maak een merge-commit",
+        "squash": "Squash en merge",
+        "rebase": "Rebase en merge"
+      },
+      "methodDescriptions": {
+        "merge": "Voeg alle commits van deze branch samen in de basisbranch met een merge-commit.",
+        "squash": "Voeg alle commits van deze branch samen in één commit op de basisbranch.",
+        "rebase": "Speel alle commits van deze branch opnieuw af op de basisbranch zonder een merge-commit."
+      }
     },
     "noDescriptionProvided": "Geen beschrijving opgegeven.",
     "noFilesChanged": "Geen bestanden gewijzigd",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "De eerste {{limit}} van {{total}} gewijzigde bestanden worden getoond — GitHub API-limiet"
     },
     "linkPasteClipboardEmpty": "Klembord is leeg",
-    "linkPasteNotAPullRequest": "Geen GitHub pull-requestlink"
+    "linkPasteNotAPullRequest": "Geen GitHub pull-requestlink",
+    "announce": {
+      "commentPosted": "Opmerking geplaatst",
+      "reviewSubmitted": "Review verzonden",
+      "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-mailbezorging is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
     "admissionRequired": "Je apparaat kan niet worden geverifieerd. Gebruik '$t(login.moreSignInOptions)' om aan te melden op een ander apparaat of via het web.",
     "default": "Er is iets misgegaan. Probeer het opnieuw.",
-    "retryableAdmission": "We konden dit apparaat niet verifiëren. Controleer je verbinding en probeer het opnieuw."
+    "retryableAdmission": "We konden dit apparaat niet verifiëren. Controleer je verbinding en probeer het opnieuw.",
+    "startSignInFailed": "Aanmelden starten is mislukt. Probeer het opnieuw.",
+    "couldNotOpenBrowser": "Browser kon niet worden geopend. Probeer het opnieuw.",
+    "signInTimedOut": "Aanmelden is verlopen. Probeer het opnieuw.",
+    "signInFailed": "Aanmelden is mislukt. Probeer het opnieuw.",
+    "networkError": "Netwerkfout. Probeer het opnieuw.",
+    "accessDeniedByUser": "Toegang geweigerd door gebruiker",
+    "codeExpired": "Code verlopen"
   },
   "models": {
     "dataCollected": "Verzamelde gegevens",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Kon favorieten niet bijwerken"
   }
 }

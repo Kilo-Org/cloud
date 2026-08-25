@@ -22,7 +22,9 @@
     "copiedToClipboard": "ကလစ်ဘုတ်သို့ ကူးပြီးပါပြီ",
     "couldNotCopyToClipboard": "ကလစ်ဘုတ်သို့ ကူးမရပါ",
     "required": "လိုအပ်",
-    "error": "အမှား: {{error}}"
+    "error": "အမှား: {{error}}",
+    "back": "နောက်သို့",
+    "somethingWentWrong": "တစ်ခုခု မှားသွားသည်"
   },
   "language": {
     "title": "ဘာသာစကား",
@@ -280,7 +282,36 @@
         "body": "Branch ကို ဖျက်မရပါ: {{reason}}",
         "accessibility": "ပေါင်းစည်းပြီးပါပြီ။ Branch ကို ဖျက်မရပါ: {{reason}}"
       },
-      "loadFailedTitle": "ပေါင်းစည်းမှုရွေးချယ်စရာများကို တင်မရပါ"
+      "loadFailedTitle": "ပေါင်းစည်းမှုရွေးချယ်စရာများကို တင်မရပါ",
+      "blocked": {
+        "unknownStateTitle": "GitHub သည် ပေါင်းစည်းနိုင်သော အခြေအနေ မသတင်းပို့ရသေးပါ",
+        "unknownStateDetail": "ခဏအကြာတွင် ခြုံငုံသုံးသပ်ချက်ကို ပြန်လည်ဆန်းကြည့်ပါ။",
+        "conflictsTitle": "ပေါင်းစည်းမှု ပဋိပက္ခများ",
+        "conflictsDetail": "ပေါင်းစည်းခြင်းမပြုမီ ဤ branch ပေါ်ရှိ ပေါင်းစည်းမှု ပဋိပက္ခများကို ဖြေရှင်းပါ။",
+        "requiredReviewsTitle": "လိုအပ်သော သုံးသပ်မှုများ ပျောက်ဆုံးနေသည်",
+        "requiredReviewsDetail": "လိုအပ်သော သုံးသပ်သူများထံမှ အတည်ပြုချက်များ ပျောက်ဆုံးနေသည် သို့မဟုတ် ဆိုင်းငံ့နေသည်။",
+        "failingChecksTitle": "လိုအပ်သော စစ်ဆေးမှုများ မအောင်မြင်နေ",
+        "failingChecksDetail": "လိုအပ်သော အခြေအနေစစ်ဆေးမှုများ မအောင်မြင်နေပါ။",
+        "unstableTitle": "စစ်ဆေးမှုအချို့ မအောင်မြင်နေ",
+        "unstableDetail": "မလိုအပ်သော စစ်ဆေးမှုများ မအောင်မြင်နေပါ။ ၎င်းတို့သည် ပေါင်းစည်းမှုကို မပိတ်ဆို့ပါ။",
+        "draftTitle": "မူကြမ်း pull request",
+        "draftDetail": "ပေါင်းစည်းခြင်းမပြုမီ pull request ကို သုံးသပ်ရန် အသင့်ဖြစ်သည်ဟု မှတ်သားပါ။",
+        "behindTitle": "Branch သည် ခေတ်နောက်ကျနေသည်",
+        "behindDetailUpdatable": "ပေါင်းစည်းခြင်းမပြုမီ branch ကို base မှ မွမ်းမံပါ သို့မဟုတ် rebase လုပ်ပါ။",
+        "behindDetail": "Head branch သည် base ထက် နောက်ကျနေသည်။ ပေါင်းစည်းခြင်းမပြုမီ branch ကို rebase သို့မဟုတ် မွမ်းမံပါ။",
+        "notMergeableTitle": "ဤ pull request ကို ယခုအချိန်အထိ ပေါင်းစည်း၍မရသေးပါ",
+        "notMergeableDetail": "GitHub သည် {{state}} ပေါင်းစည်းနိုင်သော အခြေအနေကို သတင်းပို့ခဲ့သည်။"
+      },
+      "methodLabels": {
+        "merge": "Merge commit ဖန်တီးပါ",
+        "squash": "Squash ပြီး ပေါင်းစည်းပါ",
+        "rebase": "Rebase ပြီး ပေါင်းစည်းပါ"
+      },
+      "methodDescriptions": {
+        "merge": "ဤ branch မှ commit အားလုံးကို merge commit ဖြင့် base branch သို့ ပေါင်းစည်းပါ။",
+        "squash": "ဤ branch မှ commit အားလုံးကို base branch ပေါ်တွင် commit တစ်ခုတည်းအဖြစ် ပေါင်းစည်းပါ။",
+        "rebase": "ဤ branch မှ commit အားလုံးကို merge commit မပါဘဲ base branch ပေါ်တွင် ပြန်လည်အသုံးချပါ။"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ဆွေးနွေးချက် thread {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "အထက် နောက်ထပ်စာကြောင်း {{displayCount}}",
       "termsAcceptRequired": "တင်ရန် ဝန်ဆောင်မှုစည်းမျဉ်းများကို လက်ခံရပါမည်။",
       "termsOutdatedCopy": "ဝန်ဆောင်မှုစည်းမျဉ်းများ ပြောင်းလဲသွားသည်။ နောက်ဆုံးဗားရှင်းကို လက်ခံရန် ဤစခရင်ကို ပြန်ဖွင့်ပါ။",
-      "termsCheckRetryCopy": "ဝန်ဆောင်မှုစည်းမျဉ်းများကို စစ်ဆေးမရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။"
+      "termsCheckRetryCopy": "ဝန်ဆောင်မှုစည်းမျဉ်းများကို စစ်ဆေးမရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။",
+      "reactions": {
+        "thumbsUp": "လက်မထောင်",
+        "thumbsDown": "လက်မချ",
+        "laugh": "ရယ်မောခြင်း",
+        "hooray": "ဟူးရား",
+        "confused": "စိတ်ရှုပ်ထွေး",
+        "heart": "နှလုံးသား",
+        "rocket": "ဒုံးပျံ",
+        "eyes": "မျက်လုံးများ"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} ရှိ ဖိုင်မှတ်ချက်",
+        "fileComment": "ဖိုင်မှတ်ချက်",
+        "outdatedOnPathLines": "{{path}} {{lines}} တွင် ခေတ်နောက်ကျသော",
+        "outdatedOnLines": "{{lines}} တွင် ခေတ်နောက်ကျသော",
+        "outdatedOnPath": "{{path}} တွင် ခေတ်နောက်ကျသော"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub App ဆက်တင်များကို ဖွင့်မရပါ",
     "installKiloGitHubApp": "Kilo GitHub App ကို ထည့်သွင်းပါ",
@@ -523,7 +571,12 @@
       "truncationBanner": "ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမဆုံး {{limit}} ခုကို ပြသနေသည် — GitHub API ကန့်သတ်ချက်"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ် ဗလာဖြစ်သည်",
-    "linkPasteNotAPullRequest": "GitHub pull request လင့်ခ် မဟုတ်ပါ"
+    "linkPasteNotAPullRequest": "GitHub pull request လင့်ခ် မဟုတ်ပါ",
+    "announce": {
+      "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",
+      "reviewSubmitted": "သုံးသပ်မှု တင်သွင်းပြီးပါပြီ",
+      "autoMergeEnabled": "အလိုအလျောက် ပေါင်းစည်းမှု ဖွင့်ပြီးပါပြီ"
+    }
   },
   "notifications": {
     "title": "အကြောင်းကြားချက်များ",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} သည် {{limit}} တွဲနိုင်သော ကန့်သတ်ချက်ထက် ကျော်လွန်ပါသည်။",
       "unreadable": "{{filename}} ကို ဖတ်မရပါ။",
       "pastedImage": "ကူးထည့်ထားသော ပုံ",
-      "defaultName": "တွဲထားသောဖိုင်"
+      "defaultName": "တွဲထားသောဖိုင်",
+      "classificationDenied": "Executable ဖိုင်များကို ပူးတွဲ၍မရပါ",
+      "classificationEmpty": "ဖိုင် ဗလာဖြစ်သည်",
+      "classificationTooLarge": "ဖိုင်များသည် 20 MB သို့မဟုတ် ထိုထက်နည်းရပါမည်",
+      "classificationUnreadable": "ဤဖိုင်ကို ဖတ်၍မရပါ",
+      "announceUploaded": "တွဲထားသောဖိုင် တင်ပြီးပါပြီ"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "စတင်နေသည်",
       "stopped": "ရပ်တန့်ပြီး",
       "stopping": "ရပ်နေသည်",
-      "unknown": "မသိရှိ"
+      "unknown": "မသိရှိ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "တန်းစီထားသော လုပ်ဆောင်ချက်ကို ခြေရာခံနိုင်တော့မည် မဟုတ်ပါ။ နောက်ဆုံးအခြေအနေကို ကြည့်ရှုရန် ပြန်လည်စတင်ပါ။",
     "initialSyncAdmissionFailed": "Security Agent ကို ဖွင့်ခဲ့သည်၊ သို့သော် ကနဦး ထပ်တူပြုမှုကို တန်းစီနိုင်ခြင်း မရှိခဲ့ပါ။ ထပ်တူပြုပါ။",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "တွေ့ရှိချက်ကို ဖျက်သိမ်းပြီးဖြစ်သည်",
+      "findingDismissed": "တွေ့ရှိချက် ဖျက်သိမ်းပြီးပါပြီ",
+      "noRemediationsQueued": "ရှိပြီးသား တွေ့ရှိချက်များ တန်းစီထားခြင်း မရှိပါ",
+      "remediationsQueued": "ရှိပြီးသား ပြုပြင်မှုများ တန်းစီထားပါသည်",
+      "analysisComplete": "ခွဲခြမ်းစိတ်ဖြာမှု ပြီးစီးပါပြီ",
+      "syncComplete": "စင့်ခ် ပြီးစီးပါပြီ"
+    }
   },
   "agents": {
     "activeNow": "ယခု လုပ်ဆောင်နေသည်",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ",
-      "couldNotOpenMessage": "GitHub App ပြင်ဆင်မှုကို ကျွန်ုပ်တို့ စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
+      "couldNotOpenMessage": "GitHub App ပြင်ဆင်မှုကို ကျွန်ုပ်တို့ စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
+      "installedTitle": "GitHub App ထည့်သွင်းပြီးပါပြီ",
+      "installedMessage": "သင့် repository များကို ယခု ချိတ်ဆက်ပြီးပါပြီ။",
+      "pendingTitle": "Admin အတည်ပြုချက် စောင့်ဆိုင်းနေသည်",
+      "pendingMessage": "အဖွဲ့အစည်း admin သည် ထည့်သွင်းမှုတောင်းဆိုချက်ကို အတည်ပြုရပါမည်။",
+      "accountMismatchTitle": "အကောင့် မကိုက်ညီပါ",
+      "accountMismatchMessage": "ဤချိတ်ဆက်မှုကို မတူညီသော အကောင့်ဖြင့် ဝင်ရောက်ထားသော Kilo App မှ စတင်ခဲ့သည်။ ထိုအကောင့်ဖြင့် ဝဘ်တွင် ဝင်ရောက်ပါ၊ သို့မဟုတ် အက်ပ်မှ ပြန်လည်စတင်ပါ။",
+      "cannotCompleteTitle": "ထည့်သွင်းမှုကို အပြီးမသတ်နိုင်ပါ",
+      "notAdminMessage": "ထိုအကောင့်၏ GitHub admin သာလျှင် ၎င်းကို ချိတ်ဆက်နိုင်သည်။ Kilo ထည့်သွင်းရန် အဖွဲ့အစည်း admin ကို တောင်းဆိုပါ။",
+      "alreadyClaimedMessage": "ထို GitHub ထည့်သွင်းမှုကို အခြား Kilo အကောင့်တစ်ခုနှင့် ချိတ်ဆက်ပြီးဖြစ်သည်။ ထိုနေရာတွင် ဦးစွာ ချိတ်ဆက်မှုဖြုတ်ပါ။",
+      "didNotCompleteTitle": "ထည့်သွင်းမှု မပြီးစီးပါ",
+      "didNotCompleteMessage": "GitHub App ထည့်သွင်းမှု မပြီးစီးပါ။ အက်ပ်မှ ထပ်စမ်းကြည့်ပါ။"
     },
     "sessionExited": "ဆက်ရှင် ထွက်သွားသည်",
     "remoteSpawnRetryable": "အင်​စတ​န်း​စ သို့ မရောက်​ရှိ​နိုင်​ပါ — ၎င်း ချိတ်​ဆက်​မှု ပြတ်​တောက်​နေ​သည်​ ဖြစ်​နိုင်​သည်​။",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "အီးမေးလ် ပို့ဆောင်မှုမှာ ယာယီ မရရှိနိုင်ပါ။ ကျေးဇူးပြု၍ နောက်မှ ထပ်ကြိုးစားပါ။",
     "admissionRequired": "သင့်စက်ကို အတည်ပြု၍မရပါ။ အခြားစက်တစ်ခုတွင် သို့မဟုတ် ဝဘ်မှတဆင့် ဝင်ရောက်ရန် '$t(login.moreSignInOptions)' ကို သုံးပါ။",
     "default": "တစ်ခုခု မှားသွားသည်။ ကျေးဇူးပြု၍ ထပ်ကြိုးစားပါ။",
-    "retryableAdmission": "ဤစက်ကို အတည်ပြု၍မရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။"
+    "retryableAdmission": "ဤစက်ကို အတည်ပြု၍မရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
+    "startSignInFailed": "ဝင်ရောက်မှုကို စတင်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "couldNotOpenBrowser": "ဘရောက်ဆာ ဖွင့်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "signInTimedOut": "ဝင်ရောက်မှု အချိန်ကုန်သွားသည်။ ထပ်စမ်းကြည့်ပါ။",
+    "signInFailed": "ဝင်ရောက်မှု မအောင်မြင်ပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "networkError": "ကွန်ရက်အမှား။ ထပ်စမ်းကြည့်ပါ။",
+    "accessDeniedByUser": "အသုံးပြုသူက ဝင်ရောက်ခွင့်ကို ငြင်းပယ်ခဲ့သည်",
+    "codeExpired": "ကုဒ် သက်တမ်းကုန်သွားသည်"
   },
   "models": {
     "dataCollected": "စုဆောင်းထားသော အချက်အလက်",
-    "free": "အခမဲ့"
+    "free": "အခမဲ့",
+    "couldNotUpdateFavorites": "အကြိုက်ဆုံးများကို အပ်ဒိတ်လုပ်၍မရပါ"
   }
 }

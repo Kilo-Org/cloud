@@ -22,7 +22,9 @@
     "error": "त्रुटि: {{error}}",
     "couldNotCopyToClipboard": "क्लिपबोर्ड पर कॉपी नहीं हो सका",
     "notNow": "अभी नहीं",
-    "continue": "जारी रखें"
+    "continue": "जारी रखें",
+    "back": "वापस",
+    "somethingWentWrong": "कुछ गड़बड़ हो गई"
   },
   "language": {
     "title": "भाषा",
@@ -246,7 +248,12 @@
       "sizeRejection": "{{filename}} {{limit}} की अटैचमेंट सीमा से अधिक है।",
       "unreadable": "{{filename}} पढ़ नहीं सका।",
       "pastedImage": "चिपकाई गई छवि",
-      "defaultName": "अनुलग्नक"
+      "defaultName": "अनुलग्नक",
+      "classificationDenied": "एक्ज़ीक्यूटेबल फ़ाइलें संलग्न नहीं की जा सकतीं",
+      "classificationEmpty": "फ़ाइल खाली है",
+      "classificationTooLarge": "फ़ाइलें 20 MB या उससे छोटी होनी चाहिए",
+      "classificationUnreadable": "यह फ़ाइल पढ़ी नहीं जा सकी",
+      "announceUploaded": "अटैचमेंट अपलोड हो गया"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "शुरू हो रहा है",
       "stopped": "रुका हुआ",
       "stopping": "रुक रहा है",
-      "unknown": "अज्ञात"
+      "unknown": "अज्ञात",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent सक्षम हो गया, लेकिन प्रारंभिक सिंक कतार में नहीं लग सका। फिर से सिंक करें।",
-    "queuedActionUntracked": "कतार में लगी कार्रवाई अब ट्रैक नहीं की जा सकती। नवीनतम स्थिति देखने के लिए रीफ़्रेश करें।"
+    "queuedActionUntracked": "कतार में लगी कार्रवाई अब ट्रैक नहीं की जा सकती। नवीनतम स्थिति देखने के लिए रीफ़्रेश करें।",
+    "commands": {
+      "findingAlreadyDismissed": "निष्कर्ष पहले ही खारिज किया जा चुका है",
+      "findingDismissed": "निष्कर्ष खारिज किया गया",
+      "noRemediationsQueued": "कोई मौजूदा निष्कर्ष कतार में नहीं लगे",
+      "remediationsQueued": "मौजूदा सुधार कतार में लगाए गए",
+      "analysisComplete": "विश्लेषण पूर्ण",
+      "syncComplete": "सिंक पूर्ण"
+    }
   },
   "agents": {
     "activeNow": "अभी सक्रिय",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "हम GitHub ऐप सेटअप शुरू नहीं कर सके। कृपया फिर से कोशिश करें।",
-      "couldNotOpenTitle": "GitHub नहीं खुल सका"
+      "couldNotOpenTitle": "GitHub नहीं खुल सका",
+      "installedTitle": "GitHub ऐप इंस्टॉल हो गया",
+      "installedMessage": "आपकी रिपॉज़िटरी अब कनेक्ट हैं।",
+      "pendingTitle": "एडमिन अनुमोदन की प्रतीक्षा",
+      "pendingMessage": "संगठन के किसी एडमिन को इंस्टॉल अनुरोध को अनुमोदित करना होगा।",
+      "accountMismatchTitle": "खाता मेल नहीं खाता",
+      "accountMismatchMessage": "यह कनेक्शन Kilo ऐप से किसी अलग खाते में साइन इन करके शुरू किया गया था। उस खाते से वेब पर साइन इन करें, या ऐप से फिर से शुरू करें।",
+      "cannotCompleteTitle": "इंस्टॉल पूरा नहीं किया जा सकता",
+      "notAdminMessage": "केवल उस खाते का GitHub एडमिन ही इसे कनेक्ट कर सकता है। Kilo इंस्टॉल करने के लिए संगठन के एडमिन से कहें।",
+      "alreadyClaimedMessage": "वह GitHub इंस्टॉल पहले से किसी दूसरे Kilo खाते से कनेक्ट है। पहले वहाँ इसे डिस्कनेक्ट करें।",
+      "didNotCompleteTitle": "इंस्टॉल पूरा नहीं हुआ",
+      "didNotCompleteMessage": "GitHub ऐप इंस्टॉल पूरा नहीं हुआ। ऐप से फिर से कोशिश करें।"
     },
     "sessionExited": "सत्र समाप्त हुआ",
     "remoteSpawnRetryable": "इंस्टेंस तक नहीं पहुँचा जा सका — हो सकता है वह डिस्कनेक्ट हो गया हो।",
@@ -2307,7 +2334,24 @@
       "viewTerms": "शर्तें देखें",
       "termsAcceptRequired": "पोस्ट करने के लिए आपको सेवा की शर्तें स्वीकार करनी होंगी।",
       "termsCheckRetryCopy": "सेवा की शर्तें जाँची नहीं जा सकीं। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
-      "termsOutdatedCopy": "सेवा की शर्तें बदल गई हैं। नवीनतम संस्करण स्वीकार करने के लिए यह स्क्रीन फिर से खोलें।"
+      "termsOutdatedCopy": "सेवा की शर्तें बदल गई हैं। नवीनतम संस्करण स्वीकार करने के लिए यह स्क्रीन फिर से खोलें।",
+      "reactions": {
+        "thumbsUp": "अंगूठा ऊपर",
+        "thumbsDown": "अंगूठा नीचे",
+        "laugh": "हँसी",
+        "hooray": "वाह",
+        "confused": "उलझन में",
+        "heart": "दिल",
+        "rocket": "रॉकेट",
+        "eyes": "आँखें"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} पर फ़ाइल टिप्पणी",
+        "fileComment": "फ़ाइल टिप्पणी",
+        "outdatedOnPathLines": "{{path}} {{lines}} पर पुराना",
+        "outdatedOnLines": "{{lines}} पर पुराना",
+        "outdatedOnPath": "{{path}} पर पुराना"
+      }
     },
     "entry": {
       "clearLink": "पुल रिक्वेस्ट लिंक साफ़ करें",
@@ -2464,7 +2508,36 @@
         "closed": "यह पुल रिक्वेस्ट बंद है"
       },
       "updateBranch": "शाखा अपडेट करें",
-      "updateBranchFromBase": "बेस से शाखा अपडेट करें"
+      "updateBranchFromBase": "बेस से शाखा अपडेट करें",
+      "blocked": {
+        "unknownStateTitle": "GitHub ने मर्ज योग्य स्थिति की रिपोर्ट नहीं की है",
+        "unknownStateDetail": "थोड़ी देर में ओवरव्यू रीफ़्रेश करने का प्रयास करें।",
+        "conflictsTitle": "मर्ज टकराव",
+        "conflictsDetail": "मर्ज करने से पहले इस शाखा के मर्ज टकराव हल करें।",
+        "requiredReviewsTitle": "आवश्यक समीक्षाएँ अनुपलब्ध हैं",
+        "requiredReviewsDetail": "आवश्यक समीक्षकों की स्वीकृतियाँ अनुपलब्ध या लंबित हैं।",
+        "failingChecksTitle": "आवश्यक जाँचें विफल हो रही हैं",
+        "failingChecksDetail": "आवश्यक स्थिति जाँचें विफल हो रही हैं।",
+        "unstableTitle": "कुछ जाँचें विफल हो रही हैं",
+        "unstableDetail": "गैर-आवश्यक जाँचें विफल हो रही हैं। वे मर्ज को नहीं रोकेंगी।",
+        "draftTitle": "ड्राफ़्ट पुल रिक्वेस्ट",
+        "draftDetail": "मर्ज करने से पहले पुल रिक्वेस्ट को समीक्षा के लिए तैयार चिह्नित करें।",
+        "behindTitle": "शाखा पुरानी हो गई है",
+        "behindDetailUpdatable": "मर्ज करने से पहले बेस से शाखा अपडेट करें या रीबेस करें।",
+        "behindDetail": "हेड शाखा बेस से पीछे है। मर्ज करने से पहले शाखा को रीबेस करें या अपडेट करें।",
+        "notMergeableTitle": "यह पुल रिक्वेस्ट अभी मर्ज योग्य नहीं है",
+        "notMergeableDetail": "GitHub ने {{state}} मर्ज योग्य स्थिति की रिपोर्ट की।"
+      },
+      "methodLabels": {
+        "merge": "मर्ज कमिट बनाएँ",
+        "squash": "स्क्वैश करके मर्ज करें",
+        "rebase": "रीबेस करके मर्ज करें"
+      },
+      "methodDescriptions": {
+        "merge": "इस शाखा के सभी कमिटों को मर्ज कमिट के साथ बेस शाखा में मिलाएँ।",
+        "squash": "इस शाखा के सभी कमिटों को बेस शाखा पर एक ही कमिट में मिलाएँ।",
+        "rebase": "इस शाखा के सभी कमिटों को मर्ज कमिट के बिना बेस शाखा पर फिर से चलाएँ।"
+      }
     },
     "noDescriptionProvided": "कोई विवरण नहीं दिया गया।",
     "noFilesChanged": "कोई फ़ाइल नहीं बदली",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API सीमा"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है",
-    "linkPasteNotAPullRequest": "यह GitHub पुल रिक्वेस्ट लिंक नहीं है"
+    "linkPasteNotAPullRequest": "यह GitHub पुल रिक्वेस्ट लिंक नहीं है",
+    "announce": {
+      "commentPosted": "टिप्पणी पोस्ट हुई",
+      "reviewSubmitted": "समीक्षा सबमिट हुई",
+      "autoMergeEnabled": "ऑटो-मर्ज सक्षम हुआ"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ईमेल डिलीवरी अस्थायी रूप से अनुपलब्ध है। कृपया बाद में फिर से प्रयास करें।",
     "admissionRequired": "आपके डिवाइस की पुष्टि नहीं की जा सकती। किसी दूसरे डिवाइस पर या वेब के माध्यम से साइन इन करने के लिए '$t(login.moreSignInOptions)' का उपयोग करें।",
     "default": "कुछ गलत हो गया। कृपया फिर से प्रयास करें।",
-    "retryableAdmission": "हम इस डिवाइस की पुष्टि नहीं कर सके। अपना कनेक्शन जाँचें और फिर से प्रयास करें।"
+    "retryableAdmission": "हम इस डिवाइस की पुष्टि नहीं कर सके। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
+    "startSignInFailed": "साइन इन शुरू करना विफल रहा। कृपया फिर से कोशिश करें।",
+    "couldNotOpenBrowser": "ब्राउज़र नहीं खुल सका। कृपया फिर से कोशिश करें।",
+    "signInTimedOut": "साइन-इन का समय समाप्त हो गया। कृपया फिर से कोशिश करें।",
+    "signInFailed": "साइन-इन विफल रहा। कृपया फिर से कोशिश करें।",
+    "networkError": "नेटवर्क त्रुटि। कृपया फिर से कोशिश करें।",
+    "accessDeniedByUser": "उपयोगकर्ता द्वारा पहुँच अस्वीकृत",
+    "codeExpired": "कोड समाप्त हो गया"
   },
   "models": {
     "dataCollected": "एकत्रित डेटा",
-    "free": "निःशुल्क"
+    "free": "निःशुल्क",
+    "couldNotUpdateFavorites": "पसंदीदा अपडेट नहीं हो सके"
   }
 }

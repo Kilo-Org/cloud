@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopioitu leikepöydälle",
     "couldNotCopyToClipboard": "Kopioiminen leikepöydälle epäonnistui",
     "required": "pakollinen",
-    "error": "virhe: {{error}}"
+    "error": "virhe: {{error}}",
+    "back": "Takaisin",
+    "somethingWentWrong": "Jokin meni pieleen"
   },
   "language": {
     "title": "Kieli",
@@ -280,7 +282,36 @@
         "body": "Haaraa ei voitu poistaa: {{reason}}",
         "accessibility": "Yhdistetty. Haaraa ei voitu poistaa: {{reason}}"
       },
-      "loadFailedTitle": "Yhdistämisasetuksia ei voitu ladata"
+      "loadFailedTitle": "Yhdistämisasetuksia ei voitu ladata",
+      "blocked": {
+        "unknownStateTitle": "GitHub ei ole raportoinut yhdistettävyystilaa",
+        "unknownStateDetail": "Yritä päivittää yleiskatsausta hetken kuluttua.",
+        "conflictsTitle": "Yhdistämisristiriidat",
+        "conflictsDetail": "Ratkaise yhdistämisristiriidat tässä haarassa ennen yhdistämistä.",
+        "requiredReviewsTitle": "Vaaditut arvioinnit puuttuvat",
+        "requiredReviewsDetail": "Vaadittujen arvioijien hyväksynnät puuttuvat tai odottavat.",
+        "failingChecksTitle": "Vaaditut tarkistukset epäonnistuvat",
+        "failingChecksDetail": "Vaaditut tilatarkistukset epäonnistuvat.",
+        "unstableTitle": "Jotkin tarkistukset epäonnistuvat",
+        "unstableDetail": "Ei-vaaditut tarkistukset epäonnistuvat. Ne eivät estä yhdistämistä.",
+        "draftTitle": "Luonnos-pull request",
+        "draftDetail": "Merkitse pull request arviointiin valmiiksi ennen yhdistämistä.",
+        "behindTitle": "Haara on vanhentunut",
+        "behindDetailUpdatable": "Päivitä haara pohjahaarasta tai tee rebase ennen yhdistämistä.",
+        "behindDetail": "Head-haara on jäljessä pohjahaarasta. Tee rebase tai päivitä haara ennen yhdistämistä.",
+        "notMergeableTitle": "Tätä pull requestia ei voi vielä yhdistää",
+        "notMergeableDetail": "GitHub raportoi yhdistettävyystilan {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Luo yhdistämiscommit",
+        "squash": "Squash ja yhdistä",
+        "rebase": "Rebase ja yhdistä"
+      },
+      "methodDescriptions": {
+        "merge": "Yhdistä kaikki tämän haaran commitit pohjahaaraan yhdistämiscommitilla.",
+        "squash": "Yhdistä kaikki tämän haaran commitit yhdeksi commitiksi pohjahaarassa.",
+        "rebase": "Toista kaikki tämän haaran commitit pohjahaarassa ilman yhdistämiscommittia."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Keskusteluketju {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} lisää riviä yläpuolella",
       "termsAcceptRequired": "Sinun on hyväksyttävä palvelun ehdot julkaistaksesi.",
       "termsOutdatedCopy": "Palvelun ehdot muuttuivat. Avaa tämä näyttö uudelleen hyväksyäksesi uusimman version.",
-      "termsCheckRetryCopy": "Palvelun ehtoja ei voitu tarkistaa. Tarkista yhteys ja yritä uudelleen."
+      "termsCheckRetryCopy": "Palvelun ehtoja ei voitu tarkistaa. Tarkista yhteys ja yritä uudelleen.",
+      "reactions": {
+        "thumbsUp": "Peukku ylös",
+        "thumbsDown": "Peukku alas",
+        "laugh": "Nauru",
+        "hooray": "Hurraa",
+        "confused": "Hämmentynyt",
+        "heart": "Sydän",
+        "rocket": "Raketti",
+        "eyes": "Silmät"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Tiedostokommentti: {{path}}",
+        "fileComment": "Tiedostokommentti",
+        "outdatedOnPathLines": "Vanhentunut: {{path}} {{lines}}",
+        "outdatedOnLines": "Vanhentunut: {{lines}}",
+        "outdatedOnPath": "Vanhentunut: {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetuksia ei voitu avata",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
@@ -523,7 +571,12 @@
       "truncationBanner": "Näytetään ensimmäiset {{limit}} muutetuista {{total}} tiedostosta — GitHub API:n raja"
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä",
-    "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki"
+    "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki",
+    "announce": {
+      "commentPosted": "Kommentti lähetetty",
+      "reviewSubmitted": "Arviointi lähetetty",
+      "autoMergeEnabled": "Automaattinen yhdistäminen käytössä"
+    }
   },
   "notifications": {
     "title": "Ilmoitukset",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} ylittää {{limit}} liiterajan.",
       "unreadable": "Tiedostoa {{filename}} ei voitu lukea.",
       "pastedImage": "liitetty kuva",
-      "defaultName": "Liite"
+      "defaultName": "Liite",
+      "classificationDenied": "Suoritettavia tiedostoja ei voi liittää",
+      "classificationEmpty": "Tiedosto on tyhjä",
+      "classificationTooLarge": "Tiedostojen on oltava enintään 20 MB",
+      "classificationUnreadable": "Tätä tiedostoa ei voitu lukea",
+      "announceUploaded": "Liite lähetetty"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "KÄYNNISTETÄÄN",
       "stopped": "PYSÄYTETTY",
       "stopping": "PYSÄYTETÄÄN",
-      "unknown": "TUNTEMATON"
+      "unknown": "TUNTEMATON",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Jonossa olevaa toimenpidettä ei voitu enää seurata. Päivitä nähdäksesi uusimman tilan.",
     "initialSyncAdmissionFailed": "Security Agent otettiin käyttöön, mutta alkusynkronointia ei voitu asettaa jonoon. Synkronoi uudelleen.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Havainto on jo hylätty",
+      "findingDismissed": "Havainto hylätty",
+      "noRemediationsQueued": "Ei olemassa olevia havaintoja jonossa",
+      "remediationsQueued": "Olemassa olevat korjaustoimenpiteet jonossa",
+      "analysisComplete": "Analyysi valmis",
+      "syncComplete": "Synkronointi valmis"
+    }
   },
   "agents": {
     "activeNow": "Aktiivinen nyt",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
-      "couldNotOpenMessage": "GitHub App -asennusta ei voitu aloittaa. Yritä uudelleen."
+      "couldNotOpenMessage": "GitHub App -asennusta ei voitu aloittaa. Yritä uudelleen.",
+      "installedTitle": "GitHub App asennettu",
+      "installedMessage": "Arkistosi on nyt yhdistetty.",
+      "pendingTitle": "Odotetaan ylläpitäjän hyväksyntää",
+      "pendingMessage": "Organisaation ylläpitäjän on hyväksyttävä asennuspyyntö.",
+      "accountMismatchTitle": "Tilit eivät täsmää",
+      "accountMismatchMessage": "Tämä yhteys aloitettiin Kilo Appista, joka on kirjautunut eri tilillä. Kirjaudu sisään sillä tilillä verkossa tai aloita uudelleen sovelluksesta.",
+      "cannotCompleteTitle": "Asennusta ei voi suorittaa loppuun",
+      "notAdminMessage": "Vain GitHub-ylläpitäjä voi yhdistää kyseisen tilin. Pyydä organisaation ylläpitäjää asentamaan Kilo.",
+      "alreadyClaimedMessage": "Kyseinen GitHub-asennus on jo yhdistetty toiseen Kilo-tiliin. Katkaise yhteys sieltä ensin.",
+      "didNotCompleteTitle": "Asennus ei valmistunut",
+      "didNotCompleteMessage": "GitHub App -asennusta ei suoritettu loppuun. Yritä uudelleen sovelluksesta."
     },
     "sessionExited": "Istunto päättyi",
     "remoteSpawnRetryable": "Yhteyttä instanssiin ei saatu — se on voinut katketa.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Sähköpostin toimitus ei ole tilapäisesti käytettävissä. Yritä myöhemmin uudelleen.",
     "admissionRequired": "Laitettasi ei voida vahvistaa. Kirjaudu sisään toisella laitteella tai verkossa kohdan '$t(login.moreSignInOptions)' avulla.",
     "default": "Jokin meni pieleen. Yritä uudelleen.",
-    "retryableAdmission": "Laitetta ei voitu vahvistaa. Tarkista yhteys ja yritä uudelleen."
+    "retryableAdmission": "Laitetta ei voitu vahvistaa. Tarkista yhteys ja yritä uudelleen.",
+    "startSignInFailed": "Kirjautumisen aloittaminen epäonnistui. Yritä uudelleen.",
+    "couldNotOpenBrowser": "Selaimen avaaminen epäonnistui. Yritä uudelleen.",
+    "signInTimedOut": "Kirjautuminen aikakatkaistiin. Yritä uudelleen.",
+    "signInFailed": "Kirjautuminen epäonnistui. Yritä uudelleen.",
+    "networkError": "Verkkovirhe. Yritä uudelleen.",
+    "accessDeniedByUser": "Käyttäjä eväsi pääsyn",
+    "codeExpired": "Koodi vanhentui"
   },
   "models": {
     "dataCollected": "Kerätyt tiedot",
-    "free": "Ilmainen"
+    "free": "Ilmainen",
+    "couldNotUpdateFavorites": "Suosikkeja ei voitu päivittää"
   }
 }

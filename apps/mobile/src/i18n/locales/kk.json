@@ -22,7 +22,9 @@
     "copiedToClipboard": "Алмасу буферіне көшірілді",
     "couldNotCopyToClipboard": "Алмасу буферіне көшіру мүмкін болмады",
     "required": "қажет",
-    "error": "қате: {{error}}"
+    "error": "қате: {{error}}",
+    "back": "Артқа",
+    "somethingWentWrong": "Бірдеңе қате кетті"
   },
   "language": {
     "title": "Тіл",
@@ -280,7 +282,36 @@
         "body": "Филиалды жою мүмкін болмады: {{reason}}",
         "accessibility": "Біріктірілді. Филиалды жою мүмкін болмады: {{reason}}"
       },
-      "loadFailedTitle": "Біріктіру опцияларын жүктеу мүмкін болмады"
+      "loadFailedTitle": "Біріктіру опцияларын жүктеу мүмкін болмады",
+      "blocked": {
+        "unknownStateTitle": "GitHub біріктіру мүмкіндігі күйі туралы хабарлаған жоқ",
+        "unknownStateDetail": "Біраздан кейін шолуды жаңартып көріңіз.",
+        "conflictsTitle": "Біріктіру қақтығыстары",
+        "conflictsDetail": "Біріктіру алдында осы филиалдағы біріктіру қақтығыстарын шешіңіз.",
+        "requiredReviewsTitle": "Қажетті рецензиялар жоқ",
+        "requiredReviewsDetail": "Қажетті рецензенттердің мақұлдаулары жоқ немесе күтілуде.",
+        "failingChecksTitle": "Қажетті тексерулер сәтсіз аяқталуда",
+        "failingChecksDetail": "Қажетті күй тексерулері сәтсіз аяқталуда.",
+        "unstableTitle": "Кейбір тексерулер сәтсіз аяқталуда",
+        "unstableDetail": "Міндетті емес тексерулер сәтсіз аяқталуда. Олар біріктіруді бұғаттамайды.",
+        "draftTitle": "Жоба pull request",
+        "draftDetail": "Біріктіру алдында pull request-ті рецензияға дайын деп белгілеңіз.",
+        "behindTitle": "Филиал ескірген",
+        "behindDetailUpdatable": "Біріктіру алдында филиалды базадан жаңартыңыз немесе rebase жасаңыз.",
+        "behindDetail": "Head филиал базадан артта. Біріктіру алдында филиалды rebase жасаңыз немесе жаңартыңыз.",
+        "notMergeableTitle": "Бұл pull request әлі біріктіруге жарамсыз",
+        "notMergeableDetail": "GitHub {{state}} біріктіру мүмкіндігі күйін хабарлады."
+      },
+      "methodLabels": {
+        "merge": "Біріктіру commit-ін жасау",
+        "squash": "Squash және біріктіру",
+        "rebase": "Rebase және біріктіру"
+      },
+      "methodDescriptions": {
+        "merge": "Осы филиалдағы барлық commit-терді біріктіру commit-імен базалық филиалға біріктіріңіз.",
+        "squash": "Осы филиалдағы барлық commit-терді базалық филиалдағы бір commit-ке біріктіріңіз.",
+        "rebase": "Осы филиалдағы барлық commit-терді біріктіру commit-інсіз базалық филиалға қайта ойнатыңыз."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Талқылау тізбегі {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… жоғарыда тағы {{displayCount}} жол",
       "termsAcceptRequired": "Жариялау үшін Қызмет көрсету шарттарын қабылдау керек.",
       "termsOutdatedCopy": "Қызмет көрсету шарттары өзгерді. Соңғы нұсқаны қабылдау үшін осы экранды қайта ашыңыз.",
-      "termsCheckRetryCopy": "Қызмет көрсету шарттарын тексеру мүмкін болмады. Қосылымды тексеріп, қайта көріңіз."
+      "termsCheckRetryCopy": "Қызмет көрсету шарттарын тексеру мүмкін болмады. Қосылымды тексеріп, қайта көріңіз.",
+      "reactions": {
+        "thumbsUp": "Ұнайды",
+        "thumbsDown": "Ұнамайды",
+        "laugh": "Күлкі",
+        "hooray": "Ура",
+        "confused": "Шатасқан",
+        "heart": "Жүрек",
+        "rocket": "Зымыран",
+        "eyes": "Көздер"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} файлына пікір",
+        "fileComment": "Файлға пікір",
+        "outdatedOnPathLines": "{{path}} {{lines}} бойынша ескірген",
+        "outdatedOnLines": "{{lines}} бойынша ескірген",
+        "outdatedOnPath": "{{path}} бойынша ескірген"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub App параметрлерін ашу мүмкін болмады",
     "installKiloGitHubApp": "Kilo GitHub App орнату",
@@ -523,7 +571,12 @@
       "truncationBanner": "Өзгертілген {{total}} файлдың алғашқы {{limit}}-і көрсетілуде — GitHub API шегі"
     },
     "linkPasteClipboardEmpty": "Айырбастау буфері бос",
-    "linkPasteNotAPullRequest": "GitHub pull request сілтемесі емес"
+    "linkPasteNotAPullRequest": "GitHub pull request сілтемесі емес",
+    "announce": {
+      "commentPosted": "Пікір жарияланды",
+      "reviewSubmitted": "Рецензия жіберілді",
+      "autoMergeEnabled": "Авто-біріктіру қосылды"
+    }
   },
   "notifications": {
     "title": "Хабарландырулар",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} тіркеу шегінен асады.",
       "unreadable": "{{filename}} оқу мүмкін болмады.",
       "pastedImage": "қойылған сурет",
-      "defaultName": "Тіркеме"
+      "defaultName": "Тіркеме",
+      "classificationDenied": "Орындалатын файлдарды тіркеу мүмкін емес",
+      "classificationEmpty": "Файл бос",
+      "classificationTooLarge": "Файлдар 20 MB немесе одан аз болуы керек",
+      "classificationUnreadable": "Бұл файлды оқу мүмкін болмады",
+      "announceUploaded": "Тіркеме жүктелді"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ІСКЕ ҚОСЫЛУДА",
       "stopped": "ТОҚТАТЫЛДЫ",
       "stopping": "ТОҚТАТЫЛУДА",
-      "unknown": "БЕЛГІСІЗ"
+      "unknown": "БЕЛГІСІЗ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Кезекке қойылған әрекетті бақылау мүмкін болмады. Соңғы күйді көру үшін жаңартыңыз.",
     "initialSyncAdmissionFailed": "Security Agent қосылды, бірақ бастапқы синхрондауды кезекке қою мүмкін болмады. Қайта синхрондаңыз.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Дерек қазірдің өзінде жойылған",
+      "findingDismissed": "Дерек жойылды",
+      "noRemediationsQueued": "Бар деректер кезекке қойылмады",
+      "remediationsQueued": "Бар түзетулер кезекке қойылды",
+      "analysisComplete": "Талдау аяқталды",
+      "syncComplete": "Синхрондау аяқталды"
+    }
   },
   "agents": {
     "activeNow": "Қазір белсенді",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ашу мүмкін болмады",
-      "couldNotOpenMessage": "GitHub App орнатуды бастау мүмкін болмады. Қайталап көріңіз."
+      "couldNotOpenMessage": "GitHub App орнатуды бастау мүмкін болмады. Қайталап көріңіз.",
+      "installedTitle": "GitHub App орнатылды",
+      "installedMessage": "Репозиторийлеріңіз енді қосылды.",
+      "pendingTitle": "Әкімшінің мақұлдауы күтілуде",
+      "pendingMessage": "Ұйым әкімшісі орнату сұрауын мақұлдауы керек.",
+      "accountMismatchTitle": "Тіркелгі сәйкес келмейді",
+      "accountMismatchMessage": "Бұл қосылым басқа тіркелгімен кірген Kilo App арқылы басталды. Сол тіркелгімен вебке кіріңіз немесе қосымшадан қайта бастаңыз.",
+      "cannotCompleteTitle": "Орнатуды аяқтау мүмкін емес",
+      "notAdminMessage": "Бұл тіркелгіні тек оның GitHub әкімшісі қоса алады. Ұйым әкімшісінен Kilo орнатуды сұраңыз.",
+      "alreadyClaimedMessage": "Бұл GitHub орнатуы басқа Kilo тіркелгісіне қазірдің өзінде қосылған. Алдымен сол жерде ажыратыңыз.",
+      "didNotCompleteTitle": "Орнату аяқталмады",
+      "didNotCompleteMessage": "GitHub App орнатуы аяқталмады. Қосымшадан қайта көріңіз."
     },
     "sessionExited": "Сессия аяқталды",
     "remoteSpawnRetryable": "Инстансқа жете алмадық — ол ажыраған болуы мүмкін.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Электрондық поштаны жеткізу уақытша қолжетімсіз. Кейінірек қайта көріңіз.",
     "admissionRequired": "Құрылғыңызды тексеру мүмкін емес. Басқа құрылғыда немесе веб арқылы кіру үшін «$t(login.moreSignInOptions)» пайдаланыңыз.",
     "default": "Бірдеңе дұрыс болмады. Қайта көріңіз.",
-    "retryableAdmission": "Біз бұл құрылғыны тексере алмадық. Қосылымды тексеріп, қайта көріңіз."
+    "retryableAdmission": "Біз бұл құрылғыны тексере алмадық. Қосылымды тексеріп, қайта көріңіз.",
+    "startSignInFailed": "Кіруді бастау мүмкін болмады. Қайта көріңіз.",
+    "couldNotOpenBrowser": "Браузерді ашу мүмкін болмады. Қайта көріңіз.",
+    "signInTimedOut": "Кіру уақыты аяқталды. Қайта көріңіз.",
+    "signInFailed": "Кіру сәтсіз аяқталды. Қайта көріңіз.",
+    "networkError": "Желі қатесі. Қайта көріңіз.",
+    "accessDeniedByUser": "Қол жеткізуді пайдаланушы қабылдамады",
+    "codeExpired": "Кодтың мерзімі аяқталды"
   },
   "models": {
     "dataCollected": "Жинақталған деректер",
-    "free": "Тегін"
+    "free": "Тегін",
+    "couldNotUpdateFavorites": "Таңдаулыларды жаңарту мүмкін болмады"
   }
 }

@@ -22,7 +22,9 @@
     "copiedToClipboard": "Клипборд руу хуулсан",
     "couldNotCopyToClipboard": "Клипборд руу хуулах боломжгүй",
     "required": "шаардлагатай",
-    "error": "алдаа: {{error}}"
+    "error": "алдаа: {{error}}",
+    "back": "Буцах",
+    "somethingWentWrong": "Ямар нэгэн алдаа гарлаа"
   },
   "language": {
     "title": "Хэл",
@@ -280,7 +282,36 @@
         "body": "Салбарыг устгах боломжгүй: {{reason}}",
         "accessibility": "Нэгтгэсэн. Салбарыг устгах боломжгүй: {{reason}}"
       },
-      "loadFailedTitle": "Нэгтгэх сонголтуудыг ачаалж чадсангүй"
+      "loadFailedTitle": "Нэгтгэх сонголтуудыг ачаалж чадсангүй",
+      "blocked": {
+        "unknownStateTitle": "GitHub нэгтгэх боломжит төлөв мэдээлээгүй байна",
+        "unknownStateDetail": "Хэсэг хугацааны дараа тоймыг сэргээж үзээрэй.",
+        "conflictsTitle": "Нэгтгэх зөрчил",
+        "conflictsDetail": "Нэгтгэхээс өмнө энэ салбарын нэгтгэх зөрчлүүдийг шийдвэрлээрэй.",
+        "requiredReviewsTitle": "Шаардлагатай тоймууд дутуу",
+        "requiredReviewsDetail": "Шаардлагатай шалгагчдын зөвшөөрөл дутуу эсвэл хүлээгдэж байна.",
+        "failingChecksTitle": "Амжилтгүй болсон шаардлагатай шалгалтууд",
+        "failingChecksDetail": "Шаардлагатай статусын шалгалтууд амжилтгүй болж байна.",
+        "unstableTitle": "Зарим шалгалтууд амжилтгүй болж байна",
+        "unstableDetail": "Шаардлагагүй шалгалтууд амжилтгүй болж байна. Тэд нэгтгэлтийг блоклохгүй.",
+        "draftTitle": "Ноорог pull request",
+        "draftDetail": "Нэгтгэхээс өмнө pull request-ыг тоймлоход бэлэн гэж тэмдэглээрэй.",
+        "behindTitle": "Салбар хуучирсан байна",
+        "behindDetailUpdatable": "Нэгтгэхээс өмнө салбарыг сууриас шинэчилж, эсвэл rebase хийнэ үү.",
+        "behindDetail": "Толгой салбар сууриас хоцорсон. Нэгтгэхээс өмнө салбарыг rebase хийж эсвэл шинэчилнэ үү.",
+        "notMergeableTitle": "Энэ pull request хараахан нэгтгэх боломжгүй",
+        "notMergeableDetail": "GitHub нь {{state}} нэгтгэх боломжит төлөв мэдээлсэн."
+      },
+      "methodLabels": {
+        "merge": "Merge commit үүсгэх",
+        "squash": "Squash болон нэгтгэх",
+        "rebase": "Rebase болон нэгтгэх"
+      },
+      "methodDescriptions": {
+        "merge": "Энэ салбарын бүх commit-уудыг merge commit-той суурь салбарт нэгтгээрэй.",
+        "squash": "Энэ салбарын бүх commit-уудыг суурь салбар дээр нэг commit болгон нэгтгээрэй.",
+        "rebase": "Merge commit-гүйгээр энэ салбарын бүх commit-уудыг суурь салбар дээр дахин хэрэгжүүлээрэй."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Хэлэлцүүлгийн thread {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… дээрх {{displayCount}} нэмэлт мөр",
       "termsAcceptRequired": "Нийтлэхийн тулд та Үйлчилгээний нөхцөлийг хүлээн авах ёстой.",
       "termsOutdatedCopy": "Үйлчилгээний нөхцөл өөрчлөгдсөн. Хамгийн сүүлийн хувилбарыг хүлээн авахын тулд энэ дэлгэцийг дахин нээгээрэй.",
-      "termsCheckRetryCopy": "Үйлчилгээний нөхцөлийг шалгаж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
+      "termsCheckRetryCopy": "Үйлчилгээний нөхцөлийг шалгаж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "reactions": {
+        "thumbsUp": "Эрхий хуруу дээш",
+        "thumbsDown": "Эрхий хуруу доош",
+        "laugh": "Инээд",
+        "hooray": "Хурай",
+        "confused": "Эргэлзсэн",
+        "heart": "Зүрх",
+        "rocket": "Пуужин",
+        "eyes": "Нүд"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} дээрх файлын сэтгэгдэл",
+        "fileComment": "Файлын сэтгэгдэл",
+        "outdatedOnPathLines": "{{path}} {{lines}} дээрх хуучирсан",
+        "outdatedOnLines": "{{lines}} дээрх хуучирсан",
+        "outdatedOnPath": "{{path}} дээрх хуучирсан"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub App тохиргоог нээх боломжгүй",
     "installKiloGitHubApp": "Kilo GitHub App суулгах",
@@ -523,7 +571,12 @@
       "truncationBanner": "Өөрчлөгдсөн {{total}} файлаас эхний {{limit}}-ыг харуулж байна — GitHub API хязгаар"
     },
     "linkPasteClipboardEmpty": "Хуулбар самбар хоосон байна",
-    "linkPasteNotAPullRequest": "Энэ нь GitHub pull request холбоос биш"
+    "linkPasteNotAPullRequest": "Энэ нь GitHub pull request холбоос биш",
+    "announce": {
+      "commentPosted": "Сэтгэгдэл нийтлэгдсэн",
+      "reviewSubmitted": "Тойм илгээгдсэн",
+      "autoMergeEnabled": "Авто-нэгтгэл идэвхжсэн"
+    }
   },
   "notifications": {
     "title": "Мэдэгдэлүүд",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} нь {{limit}} хавсралтын хязгаараас хэтэрсэн.",
       "unreadable": "{{filename}}-ыг унших боломжгүй.",
       "pastedImage": "буулгасан зураг",
-      "defaultName": "Хавсралт"
+      "defaultName": "Хавсралт",
+      "classificationDenied": "Гүйцэтгэх файлуудыг хавсаргах боломжгүй",
+      "classificationEmpty": "Файл хоосон байна",
+      "classificationTooLarge": "Файлууд 20 MB буюу түүнээс бага байх ёстой",
+      "classificationUnreadable": "Энэ файлыг уншиж чадсангүй",
+      "announceUploaded": "Хавсралт байршуулагдсан"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ЭХЛҮҮЛЖ БАЙНА",
       "stopped": "ЗОГССОН",
       "stopping": "ЗОГСООЖ БАЙНА",
-      "unknown": "ТОДОРХОЙГҮЙ"
+      "unknown": "ТОДОРХОЙГҮЙ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Дараалалд орсон үйлдлийг цаашид хянах боломжгүй болсон. Хамгийн сүүлийн төлөвийг харахын тулд сэргээнэ үү.",
     "initialSyncAdmissionFailed": "Security Agent идэвхжсэн боловч анхны синкийг дараалалд оруулах боломжгүй байсан. Дахин синк хийгээрэй.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Олдвор аль хэдийн хасагдсан",
+      "findingDismissed": "Олдвор хасагдсан",
+      "noRemediationsQueued": "Дараалалд орсон одоо байгаа олдвор алга",
+      "remediationsQueued": "Одоо байгаа засварууд дараалалд орлоо",
+      "analysisComplete": "Шинжилгээ дууссан",
+      "syncComplete": "Синк дууссан"
+    }
   },
   "agents": {
     "activeNow": "Одоо идэвхтэй",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ыг нээх боломжгүй",
-      "couldNotOpenMessage": "Бид GitHub App тохиргоог эхлүүлж чадсангүй. Дахин оролдоно уу."
+      "couldNotOpenMessage": "Бид GitHub App тохиргоог эхлүүлж чадсангүй. Дахин оролдоно уу.",
+      "installedTitle": "GitHub App суулгагдсан",
+      "installedMessage": "Таны репозиторууд одоо холбогдсон.",
+      "pendingTitle": "Админы зөвшөөрлийг хүлээж байна",
+      "pendingMessage": "Байгууллагын админ суулгах хүсэлтийг зөвшөөрөх ёстой.",
+      "accountMismatchTitle": "Бүртгэлийн тохироогүй байдал",
+      "accountMismatchMessage": "Энэ холболтыг өөр бүртгэлээр нэвтэрсэн Kilo App-ээс эхлүүлсэн. Тэр бүртгэлээр вэбэд нэвтэрч, эсвэл апп-оос дахин эхлүүлнэ үү.",
+      "cannotCompleteTitle": "Суулгалтыг дуусгах боломжгүй",
+      "notAdminMessage": "Зөвхөн тухайн бүртгэлийн GitHub админ холбох боломжтой. Kilo-г суулгахыг байгууллагын админаас хүснэ үү.",
+      "alreadyClaimedMessage": "Энэ GitHub суулгалт аль хэдийн өөр Kilo бүртгэлд холбогдсон. Эхлээд тэнд салгана уу.",
+      "didNotCompleteTitle": "Суулгалт дуусаагүй",
+      "didNotCompleteMessage": "GitHub App суулгалт дуусаагүй. Апп-оос дахин оролдоно уу."
     },
     "sessionExited": "Сесс дууссан",
     "remoteSpawnRetryable": "Инстанц руу холбогдож чадсангүй — салсан байж магадгүй.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Имэйл хүргэлт түр хугацаанд боломжгүй байна. Дараа дахин оролдоно уу.",
     "admissionRequired": "Таны төхөөрөмжийг баталгаажуулж чадахгүй. Өөр төхөөрөмж дээр эсвэл вэбээр нэвтрэхийн тулд '$t(login.moreSignInOptions)'-ыг ашигла.",
     "default": "Ямар нэгэн алдаа гарлаа. Дахин оролдоно уу.",
-    "retryableAdmission": "Энэ төхөөрөмжийг баталгаажуулж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
+    "retryableAdmission": "Энэ төхөөрөмжийг баталгаажуулж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+    "startSignInFailed": "Нэвтрэлтийг эхлүүлж чадсангүй. Дахин оролдоно уу.",
+    "couldNotOpenBrowser": "Хөтөч нээх боломжгүй. Дахин оролдоно уу.",
+    "signInTimedOut": "Нэвтрэлтийн хугацаа дууссан. Дахин оролдоно уу.",
+    "signInFailed": "Нэвтрэлт амжилтгүй болсон. Дахин оролдоно уу.",
+    "networkError": "Сүлжээний алдаа. Дахин оролдоно уу.",
+    "accessDeniedByUser": "Хэрэглэгч хандалтыг зөвшөөрөөгүй",
+    "codeExpired": "Кодын хугацаа дууссан"
   },
   "models": {
     "dataCollected": "Цуглуулсан өгөгдөл",
-    "free": "Үнэгүй"
+    "free": "Үнэгүй",
+    "couldNotUpdateFavorites": "Дуртай зүйлсийг шинэчлэх боломжгүй"
   }
 }

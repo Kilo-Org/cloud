@@ -22,7 +22,9 @@
     "copiedToClipboard": "در کلیپ‌بورد کپی شد",
     "couldNotCopyToClipboard": "کپی در کلیپ‌بورد ممکن نشد",
     "required": "الزامی",
-    "error": "خطا: {{error}}"
+    "error": "خطا: {{error}}",
+    "back": "بازگشت",
+    "somethingWentWrong": "مشکلی پیش آمد"
   },
   "language": {
     "title": "زبان",
@@ -280,7 +282,36 @@
         "body": "حذف شاخه ممکن نشد: {{reason}}",
         "accessibility": "ادغام شد. حذف شاخه ممکن نشد: {{reason}}"
       },
-      "loadFailedTitle": "بارگذاری گزینه‌های ادغام ممکن نشد"
+      "loadFailedTitle": "بارگذاری گزینه‌های ادغام ممکن نشد",
+      "blocked": {
+        "unknownStateTitle": "GitHub وضعیت ادغام‌پذیری را گزارش نکرده است",
+        "unknownStateDetail": "کمی بعد بازخوانی نمای کلی را امتحان کنید.",
+        "conflictsTitle": "تعارض‌های ادغام",
+        "conflictsDetail": "قبل از ادغام، تعارض‌های ادغام را روی این شاخه حل کنید.",
+        "requiredReviewsTitle": "بازبینی‌های لازم موجود نیستند",
+        "requiredReviewsDetail": "تأییدهای بازبین‌های لازم وجود ندارند یا در انتظار هستند.",
+        "failingChecksTitle": "بررسی‌های لازم ناموفق",
+        "failingChecksDetail": "بررسی‌های وضعیت لازم در حال شکست هستند.",
+        "unstableTitle": "برخی بررسی‌ها در حال شکست هستند",
+        "unstableDetail": "بررسی‌های غیرالزامی در حال شکست هستند. آن‌ها مانع ادغام نمی‌شوند.",
+        "draftTitle": "درخواست pull پیش‌نویس",
+        "draftDetail": "قبل از ادغام، درخواست pull را به‌عنوان آمادهٔ بازبینی علامت‌گذاری کنید.",
+        "behindTitle": "شاخه قدیمی است",
+        "behindDetailUpdatable": "قبل از ادغام، شاخه را از پایه به‌روزرسانی کنید یا rebase کنید.",
+        "behindDetail": "شاخهٔ head از پایه عقب است. قبل از ادغام، شاخه را rebase یا به‌روزرسانی کنید.",
+        "notMergeableTitle": "این درخواست pull هنوز قابل ادغام نیست",
+        "notMergeableDetail": "GitHub وضعیت ادغام‌پذیری {{state}} را گزارش کرده است."
+      },
+      "methodLabels": {
+        "merge": "ایجاد یک commit ادغام",
+        "squash": "Squash و ادغام",
+        "rebase": "Rebase و ادغام"
+      },
+      "methodDescriptions": {
+        "merge": "همهٔ commitهای این شاخه را با یک commit ادغام در شاخهٔ پایه ترکیب کنید.",
+        "squash": "همهٔ commitهای این شاخه را در یک commit واحد در شاخهٔ پایه ترکیب کنید.",
+        "rebase": "همهٔ commitهای این شاخه را بدون commit ادغام روی شاخهٔ پایه پخش کنید."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "رشتهٔ بحث {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} خط بیشتر در بالا",
       "termsAcceptRequired": "برای ارسال باید شرایط استفاده را بپذیرید.",
       "termsOutdatedCopy": "شرایط استفاده تغییر کرده است. برای پذیرش آخرین نسخه این صفحه را دوباره باز کنید.",
-      "termsCheckRetryCopy": "بررسی شرایط استفاده ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+      "termsCheckRetryCopy": "بررسی شرایط استفاده ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "reactions": {
+        "thumbsUp": "شست رو به بالا",
+        "thumbsDown": "شست رو به پایین",
+        "laugh": "خنده",
+        "hooray": "هورا",
+        "confused": "سردرگم",
+        "heart": "قلب",
+        "rocket": "موشک",
+        "eyes": "چشم‌ها"
+      },
+      "anchor": {
+        "fileCommentOnPath": "نظر روی فایل: {{path}}",
+        "fileComment": "نظر روی فایل",
+        "outdatedOnPathLines": "قدیمی: {{path}} {{lines}}",
+        "outdatedOnLines": "قدیمی: {{lines}}",
+        "outdatedOnPath": "قدیمی: {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
     "installKiloGitHubApp": "نصب Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "نمایش {{limit}} فایل اول از {{total}} فایل تغییر یافته — سقف API گیتهاب"
     },
     "linkPasteClipboardEmpty": "کلیپبورد خالی است",
-    "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست"
+    "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست",
+    "announce": {
+      "commentPosted": "نظر ارسال شد",
+      "reviewSubmitted": "بازبینی ارسال شد",
+      "autoMergeEnabled": "ادغام خودکار فعال شد"
+    }
   },
   "notifications": {
     "title": "اعلان‌ها",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} از محدودیت پیوست {{limit}} فراتر می‌رود.",
       "unreadable": "خواندن {{filename}} ممکن نشد.",
       "pastedImage": "تصویر جای‌گذاری‌شده",
-      "defaultName": "پیوست"
+      "defaultName": "پیوست",
+      "classificationDenied": "فایل‌های اجرایی قابل پیوست کردن نیستند",
+      "classificationEmpty": "فایل خالی است",
+      "classificationTooLarge": "فایل‌ها باید 20 MB یا کوچک‌تر باشند",
+      "classificationUnreadable": "خواندن این فایل ممکن نشد",
+      "announceUploaded": "پیوست بارگذاری شد"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "در حال شروع",
       "stopped": "متوقف",
       "stopping": "در حال توقف",
-      "unknown": "ناشناخته"
+      "unknown": "ناشناخته",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "یک اقدام در صف دیگر قابل ردیابی نبود. برای دیدن آخرین وضعیت تازهسازی کنید.",
     "initialSyncAdmissionFailed": "Security Agent فعال شد، اما همگامسازی اولیه در صف قرار نگرفت. دوباره همگامسازی کنید.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "یافته قبلاً رد شده است",
+      "findingDismissed": "یافته رد شد",
+      "noRemediationsQueued": "یافته موجودی در صف نیست",
+      "remediationsQueued": "اصلاح‌های موجود در صف قرار گرفتند",
+      "analysisComplete": "تحلیل کامل شد",
+      "syncComplete": "همگام‌سازی کامل شد"
+    }
   },
   "agents": {
     "activeNow": "اکنون فعال",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
-      "couldNotOpenMessage": "شروع راهاندازی GitHub App ممکن نشد. لطفاً دوباره تلاش کنید."
+      "couldNotOpenMessage": "شروع راهاندازی GitHub App ممکن نشد. لطفاً دوباره تلاش کنید.",
+      "installedTitle": "GitHub App نصب شد",
+      "installedMessage": "مخزن‌های شما اکنون متصل شده‌اند.",
+      "pendingTitle": "در انتظار تأیید مدیر",
+      "pendingMessage": "یک مدیر سازمان باید درخواست نصب را تأیید کند.",
+      "accountMismatchTitle": "عدم تطابق حساب",
+      "accountMismatchMessage": "این اتصال از Kilo App که با یک حساب دیگر وارد شده شروع شد. با آن حساب در وب وارد شوید، یا از برنامه دوباره شروع کنید.",
+      "cannotCompleteTitle": "تکمیل نصب ممکن نیست",
+      "notAdminMessage": "فقط یک مدیر GitHub آن حساب می‌تواند آن را متصل کند. از یک مدیر سازمان بخواهید Kilo را نصب کند.",
+      "alreadyClaimedMessage": "آن نصب GitHub قبلاً به حساب Kilo دیگری متصل است. ابتدا آنجا قطعش کنید.",
+      "didNotCompleteTitle": "نصب تکمیل نشد",
+      "didNotCompleteMessage": "نصب GitHub App تکمیل نشد. از برنامه دوباره تلاش کنید."
     },
     "sessionExited": "جلسه خاتمه یافت",
     "remoteSpawnRetryable": "امکان دسترسی به نمونه وجود نداشت — شاید قطع شده باشد.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ارسال ایمیل بهطور موقت در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.",
     "admissionRequired": "دستگاه شما قابل تأیید نیست. از «$t(login.moreSignInOptions)» استفاده کنید تا در دستگاه دیگری یا از طریق وب وارد شوید.",
     "default": "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-    "retryableAdmission": "ما نتوانستیم این دستگاه را تأیید کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+    "retryableAdmission": "ما نتوانستیم این دستگاه را تأیید کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "startSignInFailed": "شروع ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "couldNotOpenBrowser": "باز کردن مرورگر ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "signInTimedOut": "زمان ورود تمام شد. لطفاً دوباره تلاش کنید.",
+    "signInFailed": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
+    "networkError": "خطای شبکه. لطفاً دوباره تلاش کنید.",
+    "accessDeniedByUser": "دسترسی توسط کاربر رد شد",
+    "codeExpired": "کد منقضی شد"
   },
   "models": {
     "dataCollected": "دادههای جمعآوریشده",
-    "free": "رایگان"
+    "free": "رایگان",
+    "couldNotUpdateFavorites": "به‌روزرسانی موردعلاقه‌ها ممکن نشد"
   }
 }

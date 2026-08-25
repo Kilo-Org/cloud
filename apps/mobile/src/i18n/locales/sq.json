@@ -22,7 +22,9 @@
     "copiedToClipboard": "U kopjua në të papritur",
     "couldNotCopyToClipboard": "Nuk u arrit të kopjohej në të papritur",
     "required": "kërkohet",
-    "error": "gabim: {{error}}"
+    "error": "gabim: {{error}}",
+    "back": "Prapa",
+    "somethingWentWrong": "Diçka shkoi keq"
   },
   "language": {
     "title": "Gjuha",
@@ -280,7 +282,36 @@
         "body": "Nuk u arrit të fshihej dega: {{reason}}",
         "accessibility": "U shkri. Nuk u arrit të fshihej dega: {{reason}}"
       },
-      "loadFailedTitle": "Nuk u arrit të ngarkoheshin opsionet e shkrirjes"
+      "loadFailedTitle": "Nuk u arrit të ngarkoheshin opsionet e shkrirjes",
+      "blocked": {
+        "unknownStateTitle": "GitHub nuk raportoi një gjendje shkrirjeje",
+        "unknownStateDetail": "Provo ta rifreskosh përmbledhjen pas një momenti.",
+        "conflictsTitle": "Konflikte shkrirjeje",
+        "conflictsDetail": "Zgjidh konfliktet e shkrirjes në këtë degë përpara shkrirjes.",
+        "requiredReviewsTitle": "Rishikime të kërkuara që mungojnë",
+        "requiredReviewsDetail": "Miratimet nga rishikuesit e kërkuar mungojnë ose janë në pritje.",
+        "failingChecksTitle": "Kontrolle të kërkuara që dështojnë",
+        "failingChecksDetail": "Kontrollet e statusit të kërkuara po dështojnë.",
+        "unstableTitle": "Disa kontrolle po dështojnë",
+        "unstableDetail": "Kontrollet jo të kërkuara po dështojnë. Ato nuk do ta bllokojnë shkrirjen.",
+        "draftTitle": "Kërkesë tërheqjeje draft",
+        "draftDetail": "Shëno kërkesën e tërheqjes si gati për rishikim përpara shkrirjes.",
+        "behindTitle": "Dega është e vjetëruar",
+        "behindDetailUpdatable": "Azhurno degën nga baza, ose bëj rebase, përpara shkrirjes.",
+        "behindDetail": "Dega kryesore mbetet pas bazës. Bëj rebase ose azhurno degën përpara shkrirjes.",
+        "notMergeableTitle": "Kjo kërkesë tërheqjeje ende nuk mund të shkrihet",
+        "notMergeableDetail": "GitHub raportoi një gjendje shkrirjeje {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Krijo një commit shkrirjeje",
+        "squash": "Squash dhe shkrije",
+        "rebase": "Rebase dhe shkrije"
+      },
+      "methodDescriptions": {
+        "merge": "Bashko të gjithë commit-et nga kjo degë në degën bazë me një commit shkrirjeje.",
+        "squash": "Bashko të gjithë commit-et nga kjo degë në një commit të vetëm në degën bazë.",
+        "rebase": "Riprodho të gjithë commit-et nga kjo degë në degën bazë pa një commit shkrirjeje."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Fije diskutimi {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} rreshta të tjerë më sipër",
       "termsAcceptRequired": "Duhet të pranosh Kushtet e Shërbimit për të postuar.",
       "termsOutdatedCopy": "Kushtet e Shërbimit ndryshuan. Hape sërish këtë ekran për të pranuar versionin më të fundit.",
-      "termsCheckRetryCopy": "Nuk u arrit të kontrolloheshin Kushtet e Shërbimit. Kontrollo lidhjen dhe provo përsëri."
+      "termsCheckRetryCopy": "Nuk u arrit të kontrolloheshin Kushtet e Shërbimit. Kontrollo lidhjen dhe provo përsëri.",
+      "reactions": {
+        "thumbsUp": "Gishti lart",
+        "thumbsDown": "Gishti poshtë",
+        "laugh": "E qeshura",
+        "hooray": "Hora",
+        "confused": "I hutuar",
+        "heart": "Zemër",
+        "rocket": "Raketë",
+        "eyes": "Sytë"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Koment skedari te {{path}}",
+        "fileComment": "Koment skedari",
+        "outdatedOnPathLines": "E vjetëruar te {{path}} {{lines}}",
+        "outdatedOnLines": "E vjetëruar te {{lines}}",
+        "outdatedOnPath": "E vjetëruar te {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nuk u arrit të hapeshin cilësimet e Aplikacionit të GitHub",
     "installKiloGitHubApp": "Instalo Aplikacionin Kilo të GitHub",
@@ -523,7 +571,12 @@
       "truncationBanner": "Duke shfaqur {{limit}}-in e parë nga {{total}} skedarë të ndryshuar — kufiri i API-së së GitHub"
     },
     "linkPasteClipboardEmpty": "Kujtesa është bosh",
-    "linkPasteNotAPullRequest": "Nuk është një lidhje e pull request në GitHub"
+    "linkPasteNotAPullRequest": "Nuk është një lidhje e pull request në GitHub",
+    "announce": {
+      "commentPosted": "Komenti u postua",
+      "reviewSubmitted": "Rishikimi u dërgua",
+      "autoMergeEnabled": "Shkrirja automatike u aktivizua"
+    }
   },
   "notifications": {
     "title": "Njoftimet",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} e kalon kufirin e bashkangjitjes prej {{limit}}.",
       "unreadable": "Nuk u arrit të lexohej {{filename}}.",
       "pastedImage": "imazhi i ngjitur",
-      "defaultName": "Bashkangjitje"
+      "defaultName": "Bashkangjitje",
+      "classificationDenied": "Skedarët e ekzekutueshëm nuk mund të bashkangjiten",
+      "classificationEmpty": "Skedari është bosh",
+      "classificationTooLarge": "Skedarët duhet të jenë 20 MB ose më të vegjël",
+      "classificationUnreadable": "Nuk u arrit të lexohej ky skedar",
+      "announceUploaded": "Bashkangjitja u ngarkua"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "DUKE FILLUAR",
       "stopped": "I NDALUAR",
       "stopping": "DUKE NDALUAR",
-      "unknown": "I PANJOHUR"
+      "unknown": "I PANJOHUR",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Një veprim në radhë nuk mund të gjurmohej më. Rifreskoni për të parë gjendjen më të fundit.",
     "initialSyncAdmissionFailed": "Security Agent u aktivizua, por sinkronizimi fillestar nuk u radhit. Sinkronizoni përsëri.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Gjetja tashmë u hodh",
+      "findingDismissed": "Gjetja u hodh",
+      "noRemediationsQueued": "Asnjë gjetje ekzistuese në radhë",
+      "remediationsQueued": "Riparimet ekzistuese në radhë",
+      "analysisComplete": "Analiza e përfunduar",
+      "syncComplete": "Sinkronizimi i përfunduar"
+    }
   },
   "agents": {
     "activeNow": "Aktiv tani",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",
-      "couldNotOpenMessage": "Nuk u fillua konfigurimi i GitHub App. Ju lutemi provoni përsëri."
+      "couldNotOpenMessage": "Nuk u fillua konfigurimi i GitHub App. Ju lutemi provoni përsëri.",
+      "installedTitle": "Aplikacioni GitHub i instaluar",
+      "installedMessage": "Depot e tua tani janë të lidhura.",
+      "pendingTitle": "Në pritje të miratimit të administratorit",
+      "pendingMessage": "Një administrator i organizatës duhet të miratojë kërkesën e instalimit.",
+      "accountMismatchTitle": "Mospërputhje llogarie",
+      "accountMismatchMessage": "Kjo lidhje u nis nga Aplikacioni Kilo i hyrë me një llogari tjetër. Hyn në ueb me atë llogari, ose fillo përsëri nga aplikacioni.",
+      "cannotCompleteTitle": "Instalimi nuk mund të përfundohet",
+      "notAdminMessage": "Vetëm një administrator GitHub i asaj llogarie mund ta lidhë atë. Kërkoji një administratori të organizatës të instalojë Kilo.",
+      "alreadyClaimedMessage": "Ai instalim i GitHub tashmë është i lidhur me një llogari tjetër Kilo. Shkëpute atje më parë.",
+      "didNotCompleteTitle": "Instalimi nuk u përfundua",
+      "didNotCompleteMessage": "Instalimi i Aplikacionit të GitHub nuk u përfundua. Provo përsëri nga aplikacioni."
     },
     "sessionExited": "Sesioni u mbyll",
     "remoteSpawnRetryable": "Nuk mund të arrihej instanca — mund të jetë shkëputur.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Dërgimi i emailit është përkohësisht i padisponueshëm. Ju lutemi provoni përsëri më vonë.",
     "admissionRequired": "Pajisja juaj nuk mund të verifikohet. Përdorni '$t(login.moreSignInOptions)' për t'u identifikuar në një pajisje tjetër ose përmes uebit.",
     "default": "Diçka shkoi keq. Ju lutemi provoni përsëri.",
-    "retryableAdmission": "Nuk mundëm të verifikonim këtë pajisje. Kontrolloni lidhjen tuaj dhe provoni përsëri."
+    "retryableAdmission": "Nuk mundëm të verifikonim këtë pajisje. Kontrolloni lidhjen tuaj dhe provoni përsëri.",
+    "startSignInFailed": "Dështoi fillimi i hyrjes. Provo përsëri.",
+    "couldNotOpenBrowser": "Nuk u arrit të hapej shfletuesi. Provo përsëri.",
+    "signInTimedOut": "Hyrja u ndërpre nga koha. Provo përsëri.",
+    "signInFailed": "Hyrja dështoi. Provo përsëri.",
+    "networkError": "Gabim rrjeti. Provo përsëri.",
+    "accessDeniedByUser": "Qasja u refuzua nga përdoruesi",
+    "codeExpired": "Kodi skadoi"
   },
   "models": {
     "dataCollected": "Të dhënat e mbledhura",
-    "free": "Falas"
+    "free": "Falas",
+    "couldNotUpdateFavorites": "Nuk u arrit të përditësoheshin të preferuarat"
   }
 }

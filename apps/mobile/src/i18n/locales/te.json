@@ -22,7 +22,9 @@
     "copiedToClipboard": "క్లిప్బోర్డ్కు కాపీ చేయబడింది",
     "couldNotCopyToClipboard": "క్లిప్బోర్డ్కు కాపీ చేయలేకపోయింది",
     "required": "అవసరం",
-    "error": "లోపం: {{error}}"
+    "error": "లోపం: {{error}}",
+    "back": "వెనుకకు",
+    "somethingWentWrong": "ఏదో తప్పు జరిగింది"
   },
   "language": {
     "title": "భాష",
@@ -280,7 +282,36 @@
         "body": "బ్రాంచ్ను తొలగించలేకపోయింది: {{reason}}",
         "accessibility": "మెర్జ్ అయింది. బ్రాంచ్ను తొలగించలేకపోయింది: {{reason}}"
       },
-      "loadFailedTitle": "మెర్జ్ ఎంపికలను లోడ్ చేయలేకపోయింది"
+      "loadFailedTitle": "మెర్జ్ ఎంపికలను లోడ్ చేయలేకపోయింది",
+      "blocked": {
+        "unknownStateTitle": "GitHub మెర్జబుల్ స్థితిని నివేదించలేదు",
+        "unknownStateDetail": "కొద్ది సేపట్లో అవలోకనాన్ని రిఫ్రెష్ చేయడానికి ప్రయత్నించండి.",
+        "conflictsTitle": "మెర్జ్ వైరుధ్యాలు",
+        "conflictsDetail": "మెర్జ్ చేయడానికి ముందు ఈ బ్రాంచ్లోని మెర్జ్ వైరుధ్యాలను పరిష్కరించండి.",
+        "requiredReviewsTitle": "అవసరమైన సమీక్షలు లేవు",
+        "requiredReviewsDetail": "అవసరమైన సమీక్షకుల ఆమోదాలు లేవు లేదా పెండింగ్లో ఉన్నాయి.",
+        "failingChecksTitle": "అవసరమైన చెక్లు విఫలమవుతున్నాయి",
+        "failingChecksDetail": "అవసరమైన స్టేటస్ చెక్లు విఫలమవుతున్నాయి.",
+        "unstableTitle": "కొన్ని చెక్లు విఫలమవుతున్నాయి",
+        "unstableDetail": "అవసరం లేని చెక్లు విఫలమవుతున్నాయి. అవి మెర్జ్ను నిరోధించవు.",
+        "draftTitle": "డ్రాఫ్ట్ పుల్ రిక్వెస్ట్",
+        "draftDetail": "మెర్జ్ చేయడానికి ముందు పుల్ రిక్వెస్ట్ను సమీక్షకు సిద్ధంగా గుర్తించండి.",
+        "behindTitle": "బ్రాంచ్ పాతది",
+        "behindDetailUpdatable": "మెర్జ్ చేయడానికి ముందు బేస్ నుండి బ్రాంచ్ను నవీకరించండి, లేదా రీబేస్ చేయండి.",
+        "behindDetail": "హెడ్ బ్రాంచ్ బేస్ కంటే వెనుకబడి ఉంది. మెర్జ్ చేయడానికి ముందు బ్రాంచ్ను రీబేస్ చేయండి లేదా నవీకరించండి.",
+        "notMergeableTitle": "ఈ పుల్ రిక్వెస్ట్ ఇంకా మెర్జ్ చేయబడదు",
+        "notMergeableDetail": "GitHub {{state}} మెర్జబుల్ స్థితిని నివేదించింది."
+      },
+      "methodLabels": {
+        "merge": "మెర్జ్ కమిట్ను సృష్టించండి",
+        "squash": "స్క్వాష్ చేసి మెర్జ్ చేయండి",
+        "rebase": "రీబేస్ చేసి మెర్జ్ చేయండి"
+      },
+      "methodDescriptions": {
+        "merge": "ఈ బ్రాంచ్ నుండి అన్ని కమిట్లను మెర్జ్ కమిట్తో బేస్ బ్రాంచ్లోకి కలపండి.",
+        "squash": "ఈ బ్రాంచ్ నుండి అన్ని కమిట్లను బేస్ బ్రాంచ్లో ఒకే కమిట్గా కలపండి.",
+        "rebase": "మెర్జ్ కమిట్ లేకుండా ఈ బ్రాంచ్ నుండి అన్ని కమిట్లను బేస్ బ్రాంచ్లో మళ్ళీ అమలు చేయండి."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "చర్చా త్రెడ్ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… పైన మరో {{displayCount}} లైన్లు",
       "termsAcceptRequired": "పోస్ట్ చేయడానికి మీరు సేవా నిబంధనలను అంగీకరించాలి.",
       "termsOutdatedCopy": "సేవా నిబంధనలు మారాయి. తాజా వెర్షన్ను అంగీకరించడానికి ఈ స్క్రీన్ను మళ్ళీ తెరవండి.",
-      "termsCheckRetryCopy": "సేవా నిబంధనలను తనిఖీ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి."
+      "termsCheckRetryCopy": "సేవా నిబంధనలను తనిఖీ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
+      "reactions": {
+        "thumbsUp": "బొటనవేలు పైకి",
+        "thumbsDown": "బొటనవేలు క్రిందికి",
+        "laugh": "నవ్వు",
+        "hooray": "హుర్రే",
+        "confused": "అయోమయం",
+        "heart": "హృదయం",
+        "rocket": "రాకెట్",
+        "eyes": "కళ్ళు"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} లో ఫైల్ వ్యాఖ్య",
+        "fileComment": "ఫైల్ వ్యాఖ్య",
+        "outdatedOnPathLines": "{{path}} {{lines}} లో పాతది",
+        "outdatedOnLines": "{{lines}} లో పాతది",
+        "outdatedOnPath": "{{path}} లో పాతది"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్లను తెరవలేకపోయింది",
     "installKiloGitHubApp": "Kilo GitHub యాప్ను ఇన్స్టాల్ చేయండి",
@@ -523,7 +571,12 @@
       "truncationBanner": "మొదటి {{limit}} / {{total}} మార్చబడిన ఫైళ్లు చూపుతోంది — GitHub API పరిమితి"
     },
     "linkPasteClipboardEmpty": "క్లిప్బోర్డ్ ఖాళీగా ఉంది",
-    "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు"
+    "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు",
+    "announce": {
+      "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
+      "reviewSubmitted": "సమీక్ష సమర్పించబడింది",
+      "autoMergeEnabled": "ఆటో-మెర్జ్ ప్రారంభించబడింది"
+    }
   },
   "notifications": {
     "title": "నోటిఫికేషన్లు",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} అటాచ్మెంట్ పరిమితిని మించిపోయింది.",
       "unreadable": "{{filename}}ను చదవలేకపోయింది.",
       "pastedImage": "అతికించిన చిత్రం",
-      "defaultName": "అటాచ్మెంట్"
+      "defaultName": "అటాచ్మెంట్",
+      "classificationDenied": "ఎక్జిక్యూటబుల్ ఫైల్లను అటాచ్ చేయలేరు",
+      "classificationEmpty": "ఫైల్ ఖాళీగా ఉంది",
+      "classificationTooLarge": "ఫైల్లు 20 MB లేదా అంతకంటే చిన్నవిగా ఉండాలి",
+      "classificationUnreadable": "ఈ ఫైల్ను చదవలేకపోయింది",
+      "announceUploaded": "అటాచ్మెంట్ అప్లోడ్ చేయబడింది"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "STARTING",
       "stopped": "STOPPED",
       "stopping": "STOPPING",
-      "unknown": "UNKNOWN"
+      "unknown": "UNKNOWN",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "క్యూలో ఉన్న చర్యను ఇకపై ట్రాక్ చేయలేకపోయింది. తాజా స్థితిని చూడటానికి రిఫ్రెష్ చేయండి.",
     "initialSyncAdmissionFailed": "సెక్యూరిటీ ఏజెంట్ ప్రారంభించబడింది, కానీ ప్రారంభ సింక్ క్యూలో వేయలేకపోయింది. మళ్ళీ సింక్ చేయండి.",
-    "title": "సెక్యూరిటీ ఏజెంట్"
+    "title": "సెక్యూరిటీ ఏజెంట్",
+    "commands": {
+      "findingAlreadyDismissed": "ఫలితం ఇప్పటికే తీసివేయబడింది",
+      "findingDismissed": "ఫలితం తీసివేయబడింది",
+      "noRemediationsQueued": "క్యూలో ఉన్న ఫలితాలు లేవు",
+      "remediationsQueued": "ఇప్పటికే ఉన్న పరిష్కారాలు క్యూలో ఉన్నాయి",
+      "analysisComplete": "విశ్లేషణ పూర్తయింది",
+      "syncComplete": "సింక్ పూర్తయింది"
+    }
   },
   "agents": {
     "activeNow": "ఇప్పుడు చురుకుగా ఉంది",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubను తెరవలేకపోయింది",
-      "couldNotOpenMessage": "మేము GitHub App సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి."
+      "couldNotOpenMessage": "మేము GitHub App సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+      "installedTitle": "GitHub App ఇన్స్టాల్ చేయబడింది",
+      "installedMessage": "మీ రిపోజిటరీలు ఇప్పుడు కనెక్ట్ చేయబడ్డాయి.",
+      "pendingTitle": "అడ్మిన్ ఆమోదం కోసం వేచి ఉంది",
+      "pendingMessage": "ఒక సంస్థ అడ్మిన్ ఇన్స్టాలేషన్ అభ్యర్థనను ఆమోదించాలి.",
+      "accountMismatchTitle": "ఖాతా సరిపోలడం లేదు",
+      "accountMismatchMessage": "ఈ కనెక్షన్ వేరే ఖాతాతో సైన్ ఇన్ అయిన Kilo App నుండి ప్రారంభించబడింది. ఆ ఖాతాతో వెబ్లో సైన్ ఇన్ చేయండి, లేదా యాప్ నుండి మళ్ళీ ప్రారంభించండి.",
+      "cannotCompleteTitle": "ఇన్స్టాలేషన్ను పూర్తి చేయలేము",
+      "notAdminMessage": "ఆ ఖాతా యొక్క GitHub అడ్మిన్ మాత్రమే దాన్ని కనెక్ట్ చేయగలరు. Kiloను ఇన్స్టాల్ చేయమని సంస్థ అడ్మిన్ను అడగండి.",
+      "alreadyClaimedMessage": "ఆ GitHub ఇన్స్టాలేషన్ ఇప్పటికే మరొక Kilo ఖాతాకు కనెక్ట్ అయి ఉంది. అక్కడ దాన్ని ముందుగా డిస్కనెక్ట్ చేయండి.",
+      "didNotCompleteTitle": "ఇన్స్టాలేషన్ పూర్తి కాలేదు",
+      "didNotCompleteMessage": "GitHub App ఇన్స్టాలేషన్ పూర్తి కాలేదు. యాప్ నుండి మళ్ళీ ప్రయత్నించండి."
     },
     "sessionExited": "సెషన్ నిష్క్రమించింది",
     "remoteSpawnRetryable": "ఇన్స్టాన్స్ను చేరుకోలేకపోయాం — అది డిస్కనెక్ట్ అయి ఉండవచ్చు.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ఇమెయిల్ డెలివరీ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి తరువాత మళ్లీ ప్రయత్నించండి.",
     "admissionRequired": "మీ పరికరాన్ని ధృవీకరించలేము. మరొక పరికరంలో లేదా వెబ్ ద్వారా సైన్-ఇన్ చేయడానికి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
     "default": "ఏదో తప్పు జరిగింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
-    "retryableAdmission": "మేము ఈ పరికరాన్ని ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
+    "retryableAdmission": "మేము ఈ పరికరాన్ని ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+    "startSignInFailed": "సైన్ ఇన్ ప్రారంభించడంలో విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "couldNotOpenBrowser": "బ్రౌజర్ను తెరవలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "signInTimedOut": "సైన్ ఇన్ గడువు ముగిసింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "signInFailed": "సైన్ ఇన్ విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "networkError": "నెట్వర్క్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "accessDeniedByUser": "వినియోగదారు ద్వారా యాక్సెస్ నిరాకరించబడింది",
+    "codeExpired": "కోడ్ గడువు ముగిసింది"
   },
   "models": {
     "dataCollected": "సేకరించిన డేటా",
-    "free": "ఉచితం"
+    "free": "ఉచితం",
+    "couldNotUpdateFavorites": "ఫేవరిట్లను నవీకరించలేకపోయింది"
   }
 }

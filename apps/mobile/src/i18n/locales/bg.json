@@ -22,7 +22,9 @@
     "copiedToClipboard": "Копирано в клипборда",
     "couldNotCopyToClipboard": "Не можахме да копираме в клипборда",
     "required": "задължително",
-    "error": "грешка: {{error}}"
+    "error": "грешка: {{error}}",
+    "back": "Назад",
+    "somethingWentWrong": "Нещо се обърка"
   },
   "language": {
     "title": "Език",
@@ -280,7 +282,36 @@
         "body": "Не можахме да изтрием клона: {{reason}}",
         "accessibility": "Обединено. Не можахме да изтрием клона: {{reason}}"
       },
-      "loadFailedTitle": "Не можахме да заредим опциите за обединяване"
+      "loadFailedTitle": "Не можахме да заредим опциите за обединяване",
+      "blocked": {
+        "unknownStateTitle": "GitHub не е докладвал статус на обединяемост",
+        "unknownStateDetail": "Опитай да опресниш обзора след малко.",
+        "conflictsTitle": "Конфликти при обединяване",
+        "conflictsDetail": "Разреши конфликтите при обединяване в този клон, преди да обединиш.",
+        "requiredReviewsTitle": "Липсват задължителни прегледи",
+        "requiredReviewsDetail": "Одобренията от задължителните рецензенти липсват или са в изчакване.",
+        "failingChecksTitle": "Провалени задължителни проверки",
+        "failingChecksDetail": "Задължителните проверки на статуса се провалят.",
+        "unstableTitle": "Някои проверки се провалят",
+        "unstableDetail": "Незадължителните проверки се провалят. Те няма да блокират обединяването.",
+        "draftTitle": "Чернова на pull request",
+        "draftDetail": "Отбележи pull request-а като готов за преглед, преди да обединиш.",
+        "behindTitle": "Клонът е остарял",
+        "behindDetailUpdatable": "Обнови клона от основния или направи rebase преди обединяването.",
+        "behindDetail": "Head клонът изостава от основния. Направи rebase или обнови клона преди обединяването.",
+        "notMergeableTitle": "Този pull request все още не може да се обедини",
+        "notMergeableDetail": "GitHub докладва състояние на обединяемост {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Създай commit при обединяване",
+        "squash": "Squash и обедини",
+        "rebase": "Rebase и обедини"
+      },
+      "methodDescriptions": {
+        "merge": "Комбинирай всички commits от този клон в основния клон с commit при обединяване.",
+        "squash": "Комбинирай всички commits от този клон в един-единствен commit в основния клон.",
+        "rebase": "Повтори всички commits от този клон върху основния клон без commit при обединяване."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Дискусионна нишка {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} още реда по-горе",
       "termsAcceptRequired": "Трябва да приемеш условията за ползване, за да публикуваш.",
       "termsOutdatedCopy": "Условията за ползване се промениха. Отвори отново този екран, за да приемеш най-новата версия.",
-      "termsCheckRetryCopy": "Не можахме да проверим условията за ползване. Провери връзката си и опитай отново."
+      "termsCheckRetryCopy": "Не можахме да проверим условията за ползване. Провери връзката си и опитай отново.",
+      "reactions": {
+        "thumbsUp": "Палец нагоре",
+        "thumbsDown": "Палец надолу",
+        "laugh": "Смях",
+        "hooray": "Ура",
+        "confused": "Объркан",
+        "heart": "Сърце",
+        "rocket": "Ракета",
+        "eyes": "Очи"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Коментар за файла на {{path}}",
+        "fileComment": "Коментар за файла",
+        "outdatedOnPathLines": "Остаряло на {{path}} {{lines}}",
+        "outdatedOnLines": "Остаряло на {{lines}}",
+        "outdatedOnPath": "Остаряло на {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Не можахме да отворим настройките на GitHub App",
     "installKiloGitHubApp": "Инсталирай Kilo GitHub App",
@@ -523,7 +571,12 @@
       "tapToComment": "{{label}}, докосни, за да коментираш"
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен",
-    "linkPasteNotAPullRequest": "Не е връзка към pull request в GitHub"
+    "linkPasteNotAPullRequest": "Не е връзка към pull request в GitHub",
+    "announce": {
+      "commentPosted": "Коментарът е публикуван",
+      "reviewSubmitted": "Прегледът е изпратен",
+      "autoMergeEnabled": "Автоматичното обединяване е активирано"
+    }
   },
   "notifications": {
     "title": "Известия",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} надхвърля лимита за прикачени файлове от {{limit}}.",
       "unreadable": "Не можахме да прочетем {{filename}}.",
       "pastedImage": "поставеното изображение",
-      "defaultName": "Прикачен файл"
+      "defaultName": "Прикачен файл",
+      "classificationDenied": "Изпълними файлове не могат да бъдат прикачвани",
+      "classificationEmpty": "Файлът е празен",
+      "classificationTooLarge": "Файловете трябва да са 20 MB или по-малки",
+      "classificationUnreadable": "Този файл не можа да бъде прочетен",
+      "announceUploaded": "Прикаченият файл е качен"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "СТАРТИРАНЕ",
       "stopped": "СПРЯНА",
       "stopping": "СПИРАНЕ",
-      "unknown": "НЕИЗВЕСТНО"
+      "unknown": "НЕИЗВЕСТНО",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Действие в опашка вече не може да се проследява. Опресни, за да видиш най-новото състояние.",
     "initialSyncAdmissionFailed": "Security Agent беше активиран, но първоначалната синхронизация не можа да бъде поставена в опашка. Синхронизирай отново.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Констатацията вече е отхвърлена",
+      "findingDismissed": "Констатацията е отхвърлена",
+      "noRemediationsQueued": "Няма опашени съществуващи констатации",
+      "remediationsQueued": "Съществуващите корекции са опашени",
+      "analysisComplete": "Анализът е завършен",
+      "syncComplete": "Синхронизацията е завършена"
+    }
   },
   "agents": {
     "activeNow": "Активен сега",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не може да се отвори GitHub",
-      "couldNotOpenMessage": "Не можахме да започнем настройката на GitHub App. Моля, опитай отново."
+      "couldNotOpenMessage": "Не можахме да започнем настройката на GitHub App. Моля, опитай отново.",
+      "installedTitle": "GitHub App е инсталиран",
+      "installedMessage": "Вашите хранилища вече са свързани.",
+      "pendingTitle": "Очаква се одобрение от администратор",
+      "pendingMessage": "Администратор на организацията трябва да одобри заявката за инсталиране.",
+      "accountMismatchTitle": "Несъответствие на акаунта",
+      "accountMismatchMessage": "Тази връзка е започната от Kilo App, влязъл с различен акаунт. Влез в мрежата с този акаунт или започни отново от приложението.",
+      "cannotCompleteTitle": "Инсталирането не може да завърши",
+      "notAdminMessage": "Само GitHub администратор на този акаунт може да го свърже. Помоли администратор на организацията да инсталира Kilo.",
+      "alreadyClaimedMessage": "Това GitHub инсталиране вече е свързано с друг Kilo акаунт. Първо го прекъсни там.",
+      "didNotCompleteTitle": "Инсталирането не е завършено",
+      "didNotCompleteMessage": "Инсталирането на GitHub App не беше завършено. Опитай отново от приложението."
     },
     "sessionExited": "Сесията е затворена",
     "remoteSpawnRetryable": "Не може да се достигне инстанцията — вероятно се е прекъснала връзката.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Доставянето на имейл временно е недостъпно. Моля, опитайте отново по-късно.",
     "admissionRequired": "Устройството ви не може да бъде проверено. Използвайте „$t(login.moreSignInOptions)“, за да влезете на друго устройство или през мрежата.",
     "default": "Нещо се обърка. Моля, опитайте отново.",
-    "retryableAdmission": "Не можахме да проверим това устройство. Проверете връзката си и опитайте отново."
+    "retryableAdmission": "Не можахме да проверим това устройство. Проверете връзката си и опитайте отново.",
+    "startSignInFailed": "Не успяхме да започнем влизането. Моля, опитай отново.",
+    "couldNotOpenBrowser": "Не успяхме да отворим браузъра. Моля, опитай отново.",
+    "signInTimedOut": "Влизането изтече. Моля, опитай отново.",
+    "signInFailed": "Влизането се провали. Моля, опитай отново.",
+    "networkError": "Мрежова грешка. Моля, опитай отново.",
+    "accessDeniedByUser": "Потребителят отказа достъп",
+    "codeExpired": "Кодът изтече"
   },
   "models": {
     "dataCollected": "Събрани данни",
-    "free": "Безплатно"
+    "free": "Безплатно",
+    "couldNotUpdateFavorites": "Не можахме да актуализираме любимите"
   }
 }

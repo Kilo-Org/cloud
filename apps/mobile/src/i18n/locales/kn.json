@@ -22,7 +22,9 @@
     "copiedToClipboard": "ಕ್ಲಿಪ್ಬೋರ್ಡ್‌ಗೆ ನಕಲಿಸಲಾಗಿದೆ",
     "couldNotCopyToClipboard": "ಕ್ಲಿಪ್ಬೋರ್ಡ್‌ಗೆ ನಕಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "required": "ಅಗತ್ಯವಿದೆ",
-    "error": "ದೋಷ: {{error}}"
+    "error": "ದೋಷ: {{error}}",
+    "back": "ಹಿಂದೆ",
+    "somethingWentWrong": "ಏನೋ ತಪ್ಪಾಗಿದೆ"
   },
   "language": {
     "title": "ಭಾಷೆ",
@@ -280,7 +282,36 @@
         "body": "ಶಾಖೆ ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: {{reason}}",
         "accessibility": "ವಿಲೀನಗೊಳಿಸಲಾಗಿದೆ. ಶಾಖೆ ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: {{reason}}"
       },
-      "loadFailedTitle": "ವಿಲೀನ ಆಯ್ಕೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+      "loadFailedTitle": "ವಿಲೀನ ಆಯ್ಕೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "blocked": {
+        "unknownStateTitle": "GitHub ವಿಲೀನಾರ್ಹ ಸ್ಥಿತಿಯನ್ನು ವರದಿ ಮಾಡಿಲ್ಲ",
+        "unknownStateDetail": "ಸ್ವಲ್ಪ ಸಮಯದಲ್ಲಿ ಅವಲೋಕನವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
+        "conflictsTitle": "ವಿಲೀನ ಸಂಘರ್ಷಗಳು",
+        "conflictsDetail": "ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು ಈ ಶಾಖೆಯಲ್ಲಿ ವಿಲೀನ ಸಂಘರ್ಷಗಳನ್ನು ಪರಿಹರಿಸಿ.",
+        "requiredReviewsTitle": "ಅಗತ್ಯ ವಿಮರ್ಶೆಗಳು ಇಲ್ಲ",
+        "requiredReviewsDetail": "ಅಗತ್ಯವಿರುವ ವಿಮರ್ಶಕರ ಅನುಮೋದನೆಗಳು ಇಲ್ಲ ಅಥವಾ ಬಾಕಿ ಇವೆ.",
+        "failingChecksTitle": "ವಿಫಲವಾದ ಅಗತ್ಯ ಪರಿಶೀಲನೆಗಳು",
+        "failingChecksDetail": "ಅಗತ್ಯ ಸ್ಥಿತಿ ಪರಿಶೀಲನೆಗಳು ವಿಫಲಗೊಳ್ಳುತ್ತಿವೆ.",
+        "unstableTitle": "ಕೆಲವು ಪರಿಶೀಲನೆಗಳು ವಿಫಲಗೊಳ್ಳುತ್ತಿವೆ",
+        "unstableDetail": "ಅಗತ್ಯವಲ್ಲದ ಪರಿಶೀಲನೆಗಳು ವಿಫಲಗೊಳ್ಳುತ್ತಿವೆ. ಅವು ವಿಲೀನವನ್ನು ತಡೆಯುವುದಿಲ್ಲ.",
+        "draftTitle": "ಡ್ರಾಫ್ಟ್ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
+        "draftDetail": "ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ವಿಮರ್ಶೆಗೆ ಸಿದ್ಧ ಎಂದು ಗುರುತಿಸಿ.",
+        "behindTitle": "ಶಾಖೆ ಹಳೆಯದಾಗಿದೆ",
+        "behindDetailUpdatable": "ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು ಬೇಸ್‌ನಿಂದ ಶಾಖೆಯನ್ನು ನವೀಕರಿಸಿ, ಅಥವಾ ರೀಬೇಸ್ ಮಾಡಿ.",
+        "behindDetail": "ಹೆಡ್ ಶಾಖೆಯು ಬೇಸ್‌ಗಿಂತ ಹಿಂದಿದೆ. ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು ಶಾಖೆಯನ್ನು ರೀಬೇಸ್ ಅಥವಾ ನವೀಕರಿಸಿ.",
+        "notMergeableTitle": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಇನ್ನೂ ವಿಲೀನಾರ್ಹವಲ್ಲ",
+        "notMergeableDetail": "GitHub {{state}} ವಿಲೀನಾರ್ಹ ಸ್ಥಿತಿಯನ್ನು ವರದಿ ಮಾಡಿದೆ."
+      },
+      "methodLabels": {
+        "merge": "ವಿಲೀನ ಕಮಿಟ್ ರಚಿಸಿ",
+        "squash": "ಸ್ಕ್ವಾಶ್ ಮತ್ತು ವಿಲೀನಗೊಳಿಸಿ",
+        "rebase": "ರೀಬೇಸ್ ಮತ್ತು ವಿಲೀನಗೊಳಿಸಿ"
+      },
+      "methodDescriptions": {
+        "merge": "ಈ ಶಾಖೆಯ ಎಲ್ಲಾ ಕಮಿಟ್‌ಗಳನ್ನು ವಿಲೀನ ಕಮಿಟ್‌ನೊಂದಿಗೆ ಬೇಸ್ ಶಾಖೆಗೆ ಸೇರಿಸಿ.",
+        "squash": "ಈ ಶಾಖೆಯ ಎಲ್ಲಾ ಕಮಿಟ್‌ಗಳನ್ನು ಬೇಸ್ ಶಾಖೆಯ ಮೇಲೆ ಒಂದೇ ಕಮಿಟ್‌ಗೆ ಸೇರಿಸಿ.",
+        "rebase": "ವಿಲೀನ ಕಮಿಟ್ ಇಲ್ಲದೆ ಈ ಶಾಖೆಯ ಎಲ್ಲಾ ಕಮಿಟ್‌ಗಳನ್ನು ಬೇಸ್ ಶಾಖೆಯ ಮೇಲೆ ಮತ್ತೆ ಅನ್ವಯಿಸಿ."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ಚರ್ಚಾ ಥ್ರೆಡ್ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… ಮೇಲೆ {{displayCount}} ಹೆಚ್ಚಿನ ಸಾಲುಗಳು",
       "termsAcceptRequired": "ಪೋಸ್ಟ್ ಮಾಡಲು ನೀವು ಸೇವಾ ನಿಯಮಗಳನ್ನು ಸ್ವೀಕರಿಸಬೇಕು.",
       "termsOutdatedCopy": "ಸೇವಾ ನಿಯಮಗಳು ಬದಲಾಗಿವೆ. ಇತ್ತೀಚಿನ ಆವೃತ್ತಿಯನ್ನು ಸ್ವೀಕರಿಸಲು ಈ ಪರದೆಯನ್ನು ಮತ್ತೆ ತೆರೆಯಿರಿ.",
-      "termsCheckRetryCopy": "ಸೇವಾ ನಿಯಮಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "termsCheckRetryCopy": "ಸೇವಾ ನಿಯಮಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "reactions": {
+        "thumbsUp": "ಹೆಬ್ಬೆರಳು ಮೇಲಕ್ಕೆ",
+        "thumbsDown": "ಹೆಬ್ಬೆರಳು ಕೆಳಕ್ಕೆ",
+        "laugh": "ನಗು",
+        "hooray": "ಹರ್ರೇ",
+        "confused": "ಗೊಂದಲ",
+        "heart": "ಹೃದಯ",
+        "rocket": "ರಾಕೆಟ್",
+        "eyes": "ಕಣ್ಣುಗಳು"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} ನಲ್ಲಿ ಫೈಲ್ ಕಾಮೆಂಟ್",
+        "fileComment": "ಫೈಲ್ ಕಾಮೆಂಟ್",
+        "outdatedOnPathLines": "{{path}} {{lines}} ನಲ್ಲಿ ಹಳೆಯದಾಗಿದೆ",
+        "outdatedOnLines": "{{lines}} ನಲ್ಲಿ ಹಳೆಯದಾಗಿದೆ",
+        "outdatedOnPath": "{{path}} ನಲ್ಲಿ ಹಳೆಯದಾಗಿದೆ"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub App ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "installKiloGitHubApp": "Kilo GitHub App ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
@@ -523,7 +571,12 @@
       "truncationBanner": "ಬದಲಾದ {{total}} ಫೈಲ್ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ತೋರಿಸಲಾಗುತ್ತಿದೆ — GitHub API ಮಿತಿ"
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ",
-    "linkPasteNotAPullRequest": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ"
+    "linkPasteNotAPullRequest": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
+    "announce": {
+      "commentPosted": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ",
+      "reviewSubmitted": "ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಲಾಗಿದೆ",
+      "autoMergeEnabled": "ಸ್ವಯಂ-ವಿಲೀನ ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ"
+    }
   },
   "notifications": {
     "title": "ಅಧಿಸೂಚನೆಗಳು",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} ಲಗತ್ತು ಮಿತಿಯನ್ನು ಮೀರುತ್ತದೆ.",
       "unreadable": "{{filename}} ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "pastedImage": "ಅಂಟಿಸಿದ ಚಿತ್ರ",
-      "defaultName": "ಲಗತ್ತು"
+      "defaultName": "ಲಗತ್ತು",
+      "classificationDenied": "ಎಕ್ಸಿಕ್ಯೂಟಬಲ್ ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ",
+      "classificationEmpty": "ಫೈಲ್ ಖಾಲಿಯಾಗಿದೆ",
+      "classificationTooLarge": "ಫೈಲ್‌ಗಳು 20 MB ಅಥವಾ ಅದಕ್ಕಿಂತ ಚಿಕ್ಕದಾಗಿರಬೇಕು",
+      "classificationUnreadable": "ಈ ಫೈಲ್ ಅನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "announceUploaded": "ಲಗತ್ತು ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗಿದೆ"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
       "stopped": "ನಿಲ್ಲಿಸಲಾಗಿದೆ",
       "stopping": "ನಿಲ್ಲಿಸಲಾಗುತ್ತಿದೆ",
-      "unknown": "ತಿಳಿದಿಲ್ಲ"
+      "unknown": "ತಿಳಿದಿಲ್ಲ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "ಸೇರಿಸಲಾದ ಕ್ರಿಯೆಯನ್ನು ಇನ್ನು ಮುಂದೆ ಟ್ರ್ಯಾಕ್ ಮಾಡಲಾಗಲಿಲ್ಲ. ಇತ್ತೀಚಿನ ಸ್ಥಿತಿಯನ್ನು ನೋಡಲು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
     "initialSyncAdmissionFailed": "Security Agent ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ, ಆದರೆ ಆರಂಭಿಕ ಸಿಂಕ್ ಅನ್ನು ಸೇರಿಸಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಸಿಂಕ್ ಮಾಡಿ.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "ಸಂಶೋಧನೆಯನ್ನು ಈಗಾಗಲೇ ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
+      "findingDismissed": "ಸಂಶೋಧನೆಯನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
+      "noRemediationsQueued": "ಯಾವುದೇ ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸಂಶೋಧನೆಗಳನ್ನು ಸೇರಿಸಿಲ್ಲ",
+      "remediationsQueued": "ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಪರಿಹಾರಗಳನ್ನು ಸೇರಿಸಲಾಗಿದೆ",
+      "analysisComplete": "ವಿಶ್ಲೇಷಣೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "syncComplete": "ಸಿಂಕ್ ಪೂರ್ಣಗೊಂಡಿದೆ"
+    }
   },
   "agents": {
     "activeNow": "ಈಗ ಸಕ್ರಿಯ",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
-      "couldNotOpenMessage": "GitHub App ಸೆಟಪ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "couldNotOpenMessage": "GitHub App ಸೆಟಪ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "installedTitle": "GitHub App ಸ್ಥಾಪಿಸಲಾಗಿದೆ",
+      "installedMessage": "ನಿಮ್ಮ ರೆಪೊಸಿಟರಿಗಳು ಈಗ ಸಂಪರ್ಕಗೊಂಡಿವೆ.",
+      "pendingTitle": "ನಿರ್ವಾಹಕರ ಅನುಮೋದನೆಗಾಗಿ ಕಾಯುತ್ತಿದೆ",
+      "pendingMessage": "ಸ್ಥಾಪನೆ ವಿನಂತಿಯನ್ನು ಸಂಸ್ಥೆಯ ನಿರ್ವಾಹಕರು ಅನುಮೋದಿಸಬೇಕು.",
+      "accountMismatchTitle": "ಖಾತೆ ಹೊಂದಾಣಿಕೆಯಾಗುತ್ತಿಲ್ಲ",
+      "accountMismatchMessage": "ಈ ಸಂಪರ್ಕವನ್ನು ಬೇರೆ ಖಾತೆಯೊಂದಿಗೆ ಸೈನ್ ಇನ್ ಆಗಿದ್ದ Kilo App ನಿಂದ ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ. ಆ ಖಾತೆಯೊಂದಿಗೆ ವೆಬ್‌ನಲ್ಲಿ ಸೈನ್ ಇನ್ ಮಾಡಿ, ಅಥವಾ ಅಪ್ಲಿಕೇಶನ್‌ನಿಂದ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.",
+      "cannotCompleteTitle": "ಸ್ಥಾಪನೆ ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ",
+      "notAdminMessage": "ಆ ಖಾತೆಯ GitHub ನಿರ್ವಾಹಕ ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು. Kilo ಸ್ಥಾಪಿಸಲು ಸಂಸ್ಥೆಯ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
+      "alreadyClaimedMessage": "ಆ GitHub ಸ್ಥಾಪನೆಯು ಈಗಾಗಲೇ ಮತ್ತೊಂದು Kilo ಖಾತೆಗೆ ಸಂಪರ್ಕಗೊಂಡಿದೆ. ಮೊದಲು ಅಲ್ಲಿ ಅದನ್ನು ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ.",
+      "didNotCompleteTitle": "ಸ್ಥಾಪನೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ",
+      "didNotCompleteMessage": "GitHub App ಸ್ಥಾಪನೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ಅಪ್ಲಿಕೇಶನ್‌ನಿಂದ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "sessionExited": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಿದೆ",
     "remoteSpawnRetryable": "ಇನ್ಸ್ಟೆನ್ಸ್ ಅನ್ನು ತಲುಪಲಾಗಲಿಲ್ಲ — ಅದು ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿರಬಹುದು.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ಇಮೇಲ್ ವಿತರಣೆ ತಾತ್ಕಾಲಿಕವಾಗಿ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "admissionRequired": "ನಿಮ್ಮ ಸಾಧನವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಮತ್ತೊಂದು ಸಾಧನದಲ್ಲಿ ಅಥವಾ ವೆಬ್ ಮೂಲಕ ಸೈನ್-ಇನ್ ಮಾಡಲು '$t(login.moreSignInOptions)' ಬಳಸಿ.",
     "default": "ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "retryableAdmission": "ನಾವು ಈ ಸಾಧನವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    "retryableAdmission": "ನಾವು ಈ ಸಾಧನವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "startSignInFailed": "ಸೈನ್ ಇನ್ ಪ್ರಾರಂಭಿಸಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "couldNotOpenBrowser": "ಬ್ರೌಸರ್ ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "signInTimedOut": "ಸೈನ್ ಇನ್ ಅವಧಿ ಮೀರಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "signInFailed": "ಸೈನ್ ಇನ್ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "networkError": "ನೆಟ್‌ವರ್ಕ್ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "accessDeniedByUser": "ಬಳಕೆದಾರರಿಂದ ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ",
+    "codeExpired": "ಕೋಡ್ ಅವಧಿ ಮೀರಿದೆ"
   },
   "models": {
     "dataCollected": "ಸಂಗ್ರಹಿಸಿದ ಡೇಟಾ",
-    "free": "ಉಚಿತ"
+    "free": "ಉಚಿತ",
+    "couldNotUpdateFavorites": "ಮೆಚ್ಚಿನವುಗಳನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
   }
 }

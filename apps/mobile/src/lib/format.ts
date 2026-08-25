@@ -60,8 +60,12 @@ export function formatMoneyFromCents(amount: number, locale: string, currency = 
   }).format(amount / 100);
 }
 
-export function formatDate(date: Date, locale: string): string {
-  return dateTimeFormat(locale, {}).format(date);
+export function formatDate(
+  date: Date,
+  locale: string,
+  options: Intl.DateTimeFormatOptions = {}
+): string {
+  return dateTimeFormat(locale, options).format(date);
 }
 
 export function formatCalendarDate(value: string, locale: string): string {

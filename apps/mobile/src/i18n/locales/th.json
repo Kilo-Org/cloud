@@ -22,7 +22,9 @@
     "copiedToClipboard": "คัดลอกไปยังคลิปบอร์ดแล้ว",
     "couldNotCopyToClipboard": "ไม่สามารถคัดลอกไปยังคลิปบอร์ดได้",
     "required": "จำเป็น",
-    "error": "ข้อผิดพลาด: {{error}}"
+    "error": "ข้อผิดพลาด: {{error}}",
+    "back": "กลับ",
+    "somethingWentWrong": "เกิดข้อผิดพลาดบางอย่าง"
   },
   "language": {
     "title": "ภาษา",
@@ -280,7 +282,36 @@
         "body": "ไม่สามารถลบสาขาได้: {{reason}}",
         "accessibility": "รวมแล้ว ไม่สามารถลบสาขาได้: {{reason}}"
       },
-      "loadFailedTitle": "ไม่สามารถโหลดตัวเลือกการรวมได้"
+      "loadFailedTitle": "ไม่สามารถโหลดตัวเลือกการรวมได้",
+      "blocked": {
+        "unknownStateTitle": "GitHub ยังไม่รายงานสถานะความสามารถในการรวม",
+        "unknownStateDetail": "ลองรีเฟรชภาพรวมอีกครั้งในอีกสักครู่",
+        "conflictsTitle": "ความขัดแย้งในการรวม",
+        "conflictsDetail": "แก้ไขความขัดแย้งในการรวมบนสาขานี้ก่อนรวม",
+        "requiredReviewsTitle": "ไม่มีการรีวิวที่จำเป็น",
+        "requiredReviewsDetail": "การอนุมัติจากผู้รีวิวที่จำเป็นขาดหายหรือรอดำเนินการ",
+        "failingChecksTitle": "การตรวจสอบที่จำเป็นล้มเหลว",
+        "failingChecksDetail": "การตรวจสอบสถานะที่จำเป็นกำลังล้มเหลว",
+        "unstableTitle": "การตรวจสอบบางรายการล้มเหลว",
+        "unstableDetail": "การตรวจสอบที่ไม่จำเป็นกำลังล้มเหลว แต่จะไม่บล็อกการรวม",
+        "draftTitle": "ร่าง pull request",
+        "draftDetail": "ทำเครื่องหมาย pull request ว่าพร้อมรีวิวก่อนรวม",
+        "behindTitle": "สาขาล้าสมัย",
+        "behindDetailUpdatable": "อัปเดตสาขาจาก base หรือ rebase ก่อนรวม",
+        "behindDetail": "สาขา head ตามหลัง base อยู่ ให้ rebase หรืออัปเดตสาขาก่อนรวม",
+        "notMergeableTitle": "pull request นี้ยังไม่สามารถรวมได้",
+        "notMergeableDetail": "GitHub รายงานสถานะความสามารถในการรวม: {{state}}"
+      },
+      "methodLabels": {
+        "merge": "สร้าง merge commit",
+        "squash": "Squash และรวม",
+        "rebase": "Rebase และรวม"
+      },
+      "methodDescriptions": {
+        "merge": "รวม commit ทั้งหมดจากสาขานี้เข้าสู่สาขา base ด้วย merge commit",
+        "squash": "รวม commit ทั้งหมดจากสาขานี้เป็น commit เดียวบนสาขา base",
+        "rebase": "เล่นซ้ำ commit ทั้งหมดจากสาขานี้บนสาขา base โดยไม่มี merge commit"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "เธรดสนทนา {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} บรรทัดเพิ่มเติมด้านบน",
       "termsAcceptRequired": "คุณต้องยอมรับข้อกำหนดในการให้บริการก่อนจึงจะโพสต์ได้",
       "termsOutdatedCopy": "ข้อกำหนดในการให้บริการมีการเปลี่ยนแปลง เปิดหน้าจอนี้อีกครั้งเพื่อยอมรับเวอร์ชันล่าสุด",
-      "termsCheckRetryCopy": "ไม่สามารถตรวจสอบข้อกำหนดในการให้บริการได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง"
+      "termsCheckRetryCopy": "ไม่สามารถตรวจสอบข้อกำหนดในการให้บริการได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+      "reactions": {
+        "thumbsUp": "ยกนิ้วโป้งขึ้น",
+        "thumbsDown": "ยกนิ้วโป้งลง",
+        "laugh": "หัวเราะ",
+        "hooray": "ไชโย",
+        "confused": "สับสน",
+        "heart": "หัวใจ",
+        "rocket": "จรวด",
+        "eyes": "ตา"
+      },
+      "anchor": {
+        "fileCommentOnPath": "ความคิดเห็นบนไฟล์ {{path}}",
+        "fileComment": "ความคิดเห็นบนไฟล์",
+        "outdatedOnPathLines": "ล้าสมัยบน {{path}} {{lines}}",
+        "outdatedOnLines": "ล้าสมัยบน {{lines}}",
+        "outdatedOnPath": "ล้าสมัยบน {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่า GitHub App ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
-    "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์คำขอดึงของ GitHub"
+    "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์คำขอดึงของ GitHub",
+    "announce": {
+      "commentPosted": "โพสต์ความคิดเห็นแล้ว",
+      "reviewSubmitted": "ส่งรีวิวแล้ว",
+      "autoMergeEnabled": "เปิดการรวมอัตโนมัติแล้ว"
+    }
   },
   "notifications": {
     "title": "การแจ้งเตือน",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} เกินขีดจำกัดการแนบ {{limit}}",
       "unreadable": "ไม่สามารถอ่าน {{filename}} ได้",
       "pastedImage": "รูปภาพที่วาง",
-      "defaultName": "ไฟล์แนบ"
+      "defaultName": "ไฟล์แนบ",
+      "classificationDenied": "ไม่สามารถแนบไฟล์ปฏิบัติการได้",
+      "classificationEmpty": "ไฟล์ว่างเปล่า",
+      "classificationTooLarge": "ไฟล์ต้องมีขนาด 20 MB หรือเล็กกว่า",
+      "classificationUnreadable": "ไม่สามารถอ่านไฟล์นี้ได้",
+      "announceUploaded": "อัปโหลดไฟล์แนบแล้ว"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "กำลังเริ่ม",
       "stopped": "หยุดแล้ว",
       "stopping": "กำลังหยุด",
-      "unknown": "ไม่ทราบ"
+      "unknown": "ไม่ทราบ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "ไม่สามารถติดตามการดำเนินการที่จัดคิวได้อีกต่อไป รีเฟรชเพื่อดูสถานะล่าสุด",
     "initialSyncAdmissionFailed": "เปิดใช้งาน Security Agent แล้ว แต่ไม่สามารถจัดคิวการซิงค์ครั้งแรกได้ ซิงค์อีกครั้ง",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "ละเว้น finding ไปแล้ว",
+      "findingDismissed": "ละเว้น finding แล้ว",
+      "noRemediationsQueued": "ไม่มี findings ที่มีอยู่ถูกจัดคิว",
+      "remediationsQueued": "จัดคิวการแก้ไขที่มีอยู่แล้ว",
+      "analysisComplete": "การวิเคราะห์เสร็จสิ้น",
+      "syncComplete": "การซิงค์เสร็จสิ้น"
+    }
   },
   "agents": {
     "activeNow": "กำลังทำงานอยู่",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
-      "couldNotOpenMessage": "เราไม่สามารถเริ่มการตั้งค่า GitHub App ได้ กรุณาลองอีกครั้ง"
+      "couldNotOpenMessage": "เราไม่สามารถเริ่มการตั้งค่า GitHub App ได้ กรุณาลองอีกครั้ง",
+      "installedTitle": "ติดตั้ง GitHub App แล้ว",
+      "installedMessage": "ที่เก็บของคุณเชื่อมต่อแล้ว",
+      "pendingTitle": "รอการอนุมัติจากผู้ดูแลระบบ",
+      "pendingMessage": "ผู้ดูแลระบบขององค์กรต้องอนุมัติคำขอติดตั้ง",
+      "accountMismatchTitle": "บัญชีไม่ตรงกัน",
+      "accountMismatchMessage": "การเชื่อมต่อนี้เริ่มต้นจาก Kilo App ที่ลงชื่อเข้าใช้ด้วยบัญชีอื่น ลงชื่อเข้าเว็บด้วยบัญชีนั้น หรือเริ่มใหม่จากแอป",
+      "cannotCompleteTitle": "ไม่สามารถติดตั้งให้เสร็จสมบูรณ์ได้",
+      "notAdminMessage": "เฉพาะ GitHub admin ของบัญชีนั้นเท่านั้นที่เชื่อมต่อได้ ถามผู้ดูแลระบบขององค์กรให้ติดตั้ง Kilo",
+      "alreadyClaimedMessage": "การติดตั้ง GitHub นั้นเชื่อมต่อกับบัญชี Kilo อื่นแล้ว ตัดการเชื่อมต่อที่นั่นก่อน",
+      "didNotCompleteTitle": "การติดตั้งยังไม่เสร็จสมบูรณ์",
+      "didNotCompleteMessage": "การติดตั้ง GitHub App ยังไม่เสร็จสมบูรณ์ ลองอีกครั้งจากแอป"
     },
     "sessionExited": "ออกจากเซสชันแล้ว",
     "remoteSpawnRetryable": "ไม่สามารถเข้าถึงอินสแตนซ์ได้ — อาจตัดการเชื่อมต่อแล้ว",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "การส่งอีเมลไม่พร้อมใช้งานชั่วคราว โปรดลองอีกครั้งในภายหลัง",
     "admissionRequired": "ไม่สามารถยืนยันอุปกรณ์ของคุณได้ ใช้ '$t(login.moreSignInOptions)' เพื่อเข้าสู่ระบบบนอุปกรณ์อื่นหรือผ่านเว็บ",
     "default": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง",
-    "retryableAdmission": "ไม่สามารถยืนยันอุปกรณ์นี้ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง"
+    "retryableAdmission": "ไม่สามารถยืนยันอุปกรณ์นี้ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+    "startSignInFailed": "เริ่มลงชื่อเข้าไม่สำเร็จ โปรดลองอีกครั้ง",
+    "couldNotOpenBrowser": "ไม่สามารถเปิดเบราว์เซอร์ได้ โปรดลองอีกครั้ง",
+    "signInTimedOut": "หมดเวลาลงชื่อเข้า โปรดลองอีกครั้ง",
+    "signInFailed": "ลงชื่อเข้าไม่สำเร็จ โปรดลองอีกครั้ง",
+    "networkError": "เกิดข้อผิดพลาดของเครือข่าย โปรดลองอีกครั้ง",
+    "accessDeniedByUser": "ผู้ใช้ปฏิเสธการเข้าถึง",
+    "codeExpired": "รหัสหมดอายุแล้ว"
   },
   "models": {
     "dataCollected": "ข้อมูลที่รวบรวม",
-    "free": "ฟรี"
+    "free": "ฟรี",
+    "couldNotUpdateFavorites": "ไม่สามารถอัปเดตรายการโปรดได้"
   }
 }

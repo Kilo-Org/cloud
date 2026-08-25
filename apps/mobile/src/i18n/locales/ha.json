@@ -22,7 +22,9 @@
     "copiedToClipboard": "An kwafi zuwa allo",
     "couldNotCopyToClipboard": "Ba a iya kwafi zuwa allo ba",
     "required": "ana buƙata",
-    "error": "kuskure: {{error}}"
+    "error": "kuskure: {{error}}",
+    "back": "Baya",
+    "somethingWentWrong": "Wani abu ya ɓace"
   },
   "language": {
     "title": "Harshe",
@@ -280,7 +282,36 @@
         "body": "Ba a iya share reshen ba: {{reason}}",
         "accessibility": "An haɗa. Ba a iya share reshen ba: {{reason}}"
       },
-      "loadFailedTitle": "Ba a iya ɗaukar zaɓuɓɓukan haɗawa ba"
+      "loadFailedTitle": "Ba a iya ɗaukar zaɓuɓɓukan haɗawa ba",
+      "blocked": {
+        "unknownStateTitle": "GitHub bai ba da rahoton matsayin haɗawa ba tukuna",
+        "unknownStateDetail": "Gwada sabunta Overview a ɗan lokaci.",
+        "conflictsTitle": "Rikicin haɗawa",
+        "conflictsDetail": "Warware rikicin haɗawa akan wannan reshe kafin haɗawa.",
+        "requiredReviewsTitle": "Bitar da ake buƙata ta ɓace",
+        "requiredReviewsDetail": "Amincewa daga masu bitar da ake buƙata sun ɓace ko suna jira.",
+        "failingChecksTitle": "Bukatun da suka zama dole suna gaza",
+        "failingChecksDetail": "Bukatun matsayi da suka zama dole suna gaza.",
+        "unstableTitle": "Wasu buƙatu suna gaza",
+        "unstableDetail": "Bukatun da ba su zama dole ba suna gaza. Ba za su toshe haɗawar ba.",
+        "draftTitle": "Daftarin buƙatar jan",
+        "draftDetail": "Yi alama buƙatar jan a matsayin tayar don bita kafin haɗawa.",
+        "behindTitle": "Reshe ya tsufa",
+        "behindDetailUpdatable": "Sabunta reshe daga tushe, ko yi rebase, kafin haɗawa.",
+        "behindDetail": "Reshen kai yana baya ga tushe. Yi rebase ko sabunta reshe kafin haɗawa.",
+        "notMergeableTitle": "Ba za a iya haɗa wannan buƙatar jan ba tukuna",
+        "notMergeableDetail": "GitHub ya ba da rahoton matsayin haɗawa {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Ƙirƙiri commit ɗin haɗawa",
+        "squash": "Squash da haɗawa",
+        "rebase": "Rebase da haɗawa"
+      },
+      "methodDescriptions": {
+        "merge": "Haɗa duk commits daga wannan reshe cikin reshen tushe tare da commit ɗin haɗawa.",
+        "squash": "Haɗa duk commits daga wannan reshe cikin commit guda ɗaya akan reshen tushe.",
+        "rebase": "Sake kunna duk commits daga wannan reshe akan reshen tushe ba tare da commit ɗin haɗawa ba."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Zaren tattaunawa {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} ƙarin layuka a sama",
       "termsAcceptRequired": "Dole ka karɓi Sharuɗɗan Amfani don rubutu.",
       "termsOutdatedCopy": "Sharuɗɗan Amfani sun canza. Bude wannan allo don karɓar sabuwar sigar.",
-      "termsCheckRetryCopy": "Ba a iya duba Sharuɗɗan Amfani ba. Duba haɗinka kuma sake gwadawa."
+      "termsCheckRetryCopy": "Ba a iya duba Sharuɗɗan Amfani ba. Duba haɗinka kuma sake gwadawa.",
+      "reactions": {
+        "thumbsUp": "Babban yatsa",
+        "thumbsDown": "Babban yatsa ƙasa",
+        "laugh": "Dariya",
+        "hooray": "Murna",
+        "confused": "Ruɗani",
+        "heart": "Zuciya",
+        "rocket": "Roka",
+        "eyes": "Idanu"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Tsokacin fayil akan {{path}}",
+        "fileComment": "Tsokacin fayil",
+        "outdatedOnPathLines": "Tsoho akan {{path}} {{lines}}",
+        "outdatedOnLines": "Tsoho akan {{lines}}",
+        "outdatedOnPath": "Tsoho akan {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Ba a iya buɗe saitunan GitHub App ba",
     "installKiloGitHubApp": "Shigar da Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Ana nuna farkon {{limit}} na {{total}} fayilolin da aka canza — iyakar GitHub API"
     },
     "linkPasteClipboardEmpty": "Allon kwafi babu kome",
-    "linkPasteNotAPullRequest": "Ba hanyar GitHub pull request ba"
+    "linkPasteNotAPullRequest": "Ba hanyar GitHub pull request ba",
+    "announce": {
+      "commentPosted": "An buga tsokaci",
+      "reviewSubmitted": "An ƙaddamar da bita",
+      "autoMergeEnabled": "An kunna auto-merge"
+    }
   },
   "notifications": {
     "title": "Sanarwa",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} ya wuce iyakar haɗa {{limit}}.",
       "unreadable": "Ba a iya karanta {{filename}} ba.",
       "pastedImage": "hoton da aka manna",
-      "defaultName": "Haɗi"
+      "defaultName": "Haɗi",
+      "classificationDenied": "Ba za a iya haɗa fayilolin da za a aiwatar da su ba",
+      "classificationEmpty": "Fayil ɗin babu kome",
+      "classificationTooLarge": "Fayiloli dole su kasance 20 MB ko ƙasa",
+      "classificationUnreadable": "An kasa karanta wannan fayil",
+      "announceUploaded": "An ɗora abin da aka haɗa"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ANA FARWA",
       "stopped": "YA TSAYA",
       "stopping": "ANA TSAYARWA",
-      "unknown": "BA A SANI BA"
+      "unknown": "BA A SANI BA",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Ba za a iya bin aikin da aka shigar ba. Sabunta domin ganin matsayi na ƙarshe.",
     "initialSyncAdmissionFailed": "An kunna Security Agent, amma ba a iya shigar da daidaitawar farko ba. Sake daidaitawa.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "An riga an watsar da sakamako",
+      "findingDismissed": "An watsar da sakamako",
+      "noRemediationsQueued": "Babu sakamako da ke akwai a jerin",
+      "remediationsQueued": "An jera gyare-gyaren da ke akwai",
+      "analysisComplete": "Nazari ya cika",
+      "syncComplete": "Daidaitawa ta cika"
+    }
   },
   "agents": {
     "activeNow": "Yana aiki a yanzu",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "An kasa buɗe GitHub",
-      "couldNotOpenMessage": "Ba mu iya fara saitin GitHub App ba. Da fatan za a sake gwadawa."
+      "couldNotOpenMessage": "Ba mu iya fara saitin GitHub App ba. Da fatan za a sake gwadawa.",
+      "installedTitle": "An shigar da GitHub App",
+      "installedMessage": "An haɗa ma'ajiyunka yanzu.",
+      "pendingTitle": "Ana jiran amincewar admin",
+      "pendingMessage": "Admin na ƙungiyar dole ya amince da buƙatar shigarwa.",
+      "accountMismatchTitle": "Asusun bai dace ba",
+      "accountMismatchMessage": "An fara wannan haɗin daga Kilo App da aka shiga da wani asusu daban. Shiga gidan yanar gizo da wannan asusun, ko sake farawa daga app ɗin.",
+      "cannotCompleteTitle": "Ba za a iya kammala shigarwa ba",
+      "notAdminMessage": "Admin na GitHub na wannan asusun ne kawai zai iya haɗa shi. Nemi admin na ƙungiyar ya shigar da Kilo.",
+      "alreadyClaimedMessage": "Wannan shigarwar ta GitHub an riga an haɗa ta da wani asusun Kilo. Cire haɗin a can tukuna.",
+      "didNotCompleteTitle": "Shigarwa ba ta cika ba",
+      "didNotCompleteMessage": "Ba a kammala shigarwar GitHub App ba. Sake gwadawa daga app ɗin."
     },
     "sessionExited": "Zaman ya ƙare",
     "remoteSpawnRetryable": "An kasa isa ga instance — yana iya zama an yanke.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Isar da imel ba ta samuwa na ɗan lokaci. Da fatan za a sake gwadawa daga baya.",
     "admissionRequired": "Ba a iya tabbatar da na'urarka ba. Yi amfani da '$t(login.moreSignInOptions)' don shiga a wata na'ura ko ta yanar gizo.",
     "default": "Wani abu ya faru da kuskure. Da fatan za a sake gwadawa.",
-    "retryableAdmission": "Ba mu iya tabbatar da wannan na'ura ba. Duba haɗinka ka sake gwadawa."
+    "retryableAdmission": "Ba mu iya tabbatar da wannan na'ura ba. Duba haɗinka ka sake gwadawa.",
+    "startSignInFailed": "An kasa fara shiga. Don Allah sake gwadawa.",
+    "couldNotOpenBrowser": "An kasa buɗe mai bincike. Don Allah sake gwadawa.",
+    "signInTimedOut": "Lokacin shiga ya ƙare. Don Allah sake gwadawa.",
+    "signInFailed": "Shiga ya gaza. Don Allah sake gwadawa.",
+    "networkError": "Kuskuren hanyar sadarwa. Don Allah sake gwadawa.",
+    "accessDeniedByUser": "Mai amfani ya ƙi samun damar",
+    "codeExpired": "Lambar ta ƙare"
   },
   "models": {
     "dataCollected": "Bayanan da aka tattara",
-    "free": "Kyauta"
+    "free": "Kyauta",
+    "couldNotUpdateFavorites": "Ba a iya sabunta waɗanda ake so ba"
   }
 }

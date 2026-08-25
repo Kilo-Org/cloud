@@ -54,9 +54,16 @@ export function StatusCard({
 }: Readonly<StatusCardProps>) {
   const { t } = useTranslation();
   const memoryLabel = memoryMb
-    ? `${formatNumber(memoryMb / 1024, i18n.language, { maximumFractionDigits: 0 })} GB`
+    ? formatNumber(memoryMb / 1024, i18n.language, {
+        style: 'unit',
+        unit: 'gigabyte',
+        unitDisplay: 'short',
+        maximumFractionDigits: 0,
+      })
     : '—';
-  const cpuLabel = cpus ? `${formatNumber(cpus, i18n.language)} vCPU` : '—';
+  const cpuLabel = cpus
+    ? t('kiloclaw.status.vcpuValue', { value: formatNumber(cpus, i18n.language) })
+    : '—';
   const lastExitLabel = formatLastExit(lastExitCode, lastExitSignal);
   const gatewayLabel = gatewayState ? statusLabel(gatewayState) : '—';
   const uptimeLabel = uptime == null ? '—' : formatDuration(uptime, i18n.language);

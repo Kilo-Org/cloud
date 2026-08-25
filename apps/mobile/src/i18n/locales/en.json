@@ -22,7 +22,9 @@
     "copiedToClipboard": "Copied to clipboard",
     "couldNotCopyToClipboard": "Could not copy to clipboard",
     "required": "required",
-    "error": "error: {{error}}"
+    "error": "error: {{error}}",
+    "back": "Back",
+    "somethingWentWrong": "Something went wrong"
   },
   "language": {
     "title": "Language",
@@ -280,7 +282,36 @@
         "body": "Couldn't delete the branch: {{reason}}",
         "accessibility": "Merged. Couldn't delete the branch: {{reason}}"
       },
-      "loadFailedTitle": "Couldn't load merge options"
+      "loadFailedTitle": "Couldn't load merge options",
+      "blocked": {
+        "unknownStateTitle": "GitHub hasn't reported a mergeable state",
+        "unknownStateDetail": "Try refreshing the overview in a moment.",
+        "conflictsTitle": "Merge conflicts",
+        "conflictsDetail": "Resolve the merge conflicts on this branch before merging.",
+        "requiredReviewsTitle": "Required reviews missing",
+        "requiredReviewsDetail": "Approvals from the required reviewers are missing or pending.",
+        "failingChecksTitle": "Failing required checks",
+        "failingChecksDetail": "Required status checks are failing.",
+        "unstableTitle": "Some checks are failing",
+        "unstableDetail": "Non-required checks are failing. They will not block the merge.",
+        "draftTitle": "Draft pull request",
+        "draftDetail": "Mark the pull request as ready for review before merging.",
+        "behindTitle": "Branch is out of date",
+        "behindDetailUpdatable": "Update the branch from the base, or rebase, before merging.",
+        "behindDetail": "The head branch is behind the base. Rebase or update the branch before merging.",
+        "notMergeableTitle": "This pull request is not mergeable yet",
+        "notMergeableDetail": "GitHub reported a {{state}} mergeable state."
+      },
+      "methodLabels": {
+        "merge": "Create a merge commit",
+        "squash": "Squash and merge",
+        "rebase": "Rebase and merge"
+      },
+      "methodDescriptions": {
+        "merge": "Combine all commits from this branch into the base branch with a merge commit.",
+        "squash": "Combine all commits from this branch into a single commit on the base branch.",
+        "rebase": "Replay all commits from this branch onto the base branch without a merge commit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Discussion thread {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} more lines above",
       "termsAcceptRequired": "You must accept the Terms of Service to post.",
       "termsOutdatedCopy": "The Terms of Service changed. Reopen this screen to accept the latest version.",
-      "termsCheckRetryCopy": "Couldn't check the Terms of Service. Check your connection and try again."
+      "termsCheckRetryCopy": "Couldn't check the Terms of Service. Check your connection and try again.",
+      "reactions": {
+        "thumbsUp": "Thumbs up",
+        "thumbsDown": "Thumbs down",
+        "laugh": "Laugh",
+        "hooray": "Hooray",
+        "confused": "Confused",
+        "heart": "Heart",
+        "rocket": "Rocket",
+        "eyes": "Eyes"
+      },
+      "anchor": {
+        "fileCommentOnPath": "File comment on {{path}}",
+        "fileComment": "File comment",
+        "outdatedOnPathLines": "Outdated on {{path}} {{lines}}",
+        "outdatedOnLines": "Outdated on {{lines}}",
+        "outdatedOnPath": "Outdated on {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link"
+    "linkPasteNotAPullRequest": "Not a GitHub pull request link",
+    "announce": {
+      "commentPosted": "Comment posted",
+      "reviewSubmitted": "Review submitted",
+      "autoMergeEnabled": "Auto-merge enabled"
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} exceeds the {{limit}} attachment limit.",
       "unreadable": "Couldn't read {{filename}}.",
       "pastedImage": "the pasted image",
-      "defaultName": "Attachment"
+      "defaultName": "Attachment",
+      "classificationDenied": "Executable files can't be attached",
+      "classificationEmpty": "File is empty",
+      "classificationTooLarge": "Files must be 20 MB or smaller",
+      "classificationUnreadable": "Couldn't read this file",
+      "announceUploaded": "Attachment uploaded"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "STARTING",
       "stopped": "STOPPED",
       "stopping": "STOPPING",
-      "unknown": "UNKNOWN"
+      "unknown": "UNKNOWN",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "A queued action could no longer be tracked. Refresh to see the latest state.",
     "initialSyncAdmissionFailed": "Security Agent was enabled, but the initial sync could not be queued. Sync again.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Finding already dismissed",
+      "findingDismissed": "Finding dismissed",
+      "noRemediationsQueued": "No existing findings queued",
+      "remediationsQueued": "Existing remediations queued",
+      "analysisComplete": "Analysis complete",
+      "syncComplete": "Sync complete"
+    }
   },
   "agents": {
     "activeNow": "Active now",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
-      "couldNotOpenMessage": "We could not start the GitHub App setup. Please try again."
+      "couldNotOpenMessage": "We could not start the GitHub App setup. Please try again.",
+      "installedTitle": "GitHub App installed",
+      "installedMessage": "Your repositories are now connected.",
+      "pendingTitle": "Awaiting admin approval",
+      "pendingMessage": "An organization admin must approve the installation request.",
+      "accountMismatchTitle": "Account mismatch",
+      "accountMismatchMessage": "This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.",
+      "cannotCompleteTitle": "Cannot complete installation",
+      "notAdminMessage": "Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.",
+      "alreadyClaimedMessage": "That GitHub installation is already connected to another Kilo account. Disconnect it there first.",
+      "didNotCompleteTitle": "Installation did not complete",
+      "didNotCompleteMessage": "The GitHub App installation was not completed. Try again from the app."
     },
     "sessionExited": "Session exited",
     "remoteSpawnRetryable": "Couldn’t reach the instance — it may have disconnected.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
     "admissionRequired": "Your device can't be verified. Use '$t(login.moreSignInOptions)' to sign in on another device or through the web.",
     "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again."
+    "retryableAdmission": "We could not verify this device. Check your connection and try again.",
+    "startSignInFailed": "Failed to start sign in. Please try again.",
+    "couldNotOpenBrowser": "Could not open browser. Please try again.",
+    "signInTimedOut": "Sign-in timed out. Please try again.",
+    "signInFailed": "Sign-in failed. Please try again.",
+    "networkError": "Network error. Please try again.",
+    "accessDeniedByUser": "Access denied by user",
+    "codeExpired": "Code expired"
   },
   "models": {
     "dataCollected": "Data collected",
-    "free": "Free"
+    "free": "Free",
+    "couldNotUpdateFavorites": "Could not update favorites"
   }
 }

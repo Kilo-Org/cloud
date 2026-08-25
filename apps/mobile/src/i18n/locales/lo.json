@@ -22,7 +22,9 @@
     "copiedToClipboard": "ສຳເນົາໄປທີ່ຄລິບບອດແລ້ວ",
     "couldNotCopyToClipboard": "ບໍ່ສາມາດສຳເນົາໄປທີ່ຄລິບບອດ",
     "required": "ຕ້ອງການ",
-    "error": "ຂໍ້ຜິດພາດ: {{error}}"
+    "error": "ຂໍ້ຜິດພາດ: {{error}}",
+    "back": "ກັບຄືນ",
+    "somethingWentWrong": "ມີບາງຢ່າງຜິດພາດ"
   },
   "language": {
     "title": "ພາສາ",
@@ -280,7 +282,36 @@
         "body": "ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}",
         "accessibility": "Merge ແລ້ວ. ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}"
       },
-      "loadFailedTitle": "ບໍ່ສາມາດໂຫຼດຕົວເລືອກ merge ໄດ້"
+      "loadFailedTitle": "ບໍ່ສາມາດໂຫຼດຕົວເລືອກ merge ໄດ້",
+      "blocked": {
+        "unknownStateTitle": "GitHub ຍັງບໍ່ໄດ້ລາຍງານສະຖານະທີ່ສາມາດ merge ໄດ້",
+        "unknownStateDetail": "ລອງໂຫຼດພາບລວມໃໝ່ອີກເທື່ອໜຶ່ງ.",
+        "conflictsTitle": "ຄວາມຂັດແຍ່ງຂອງ merge",
+        "conflictsDetail": "ແກ້ໄຂຄວາມຂັດແຍ່ງຂອງ merge ໃນສາຂານີ້ກ່ອນ merge.",
+        "requiredReviewsTitle": "ຂາດການກວດສອບທີ່ຕ້ອງການ",
+        "requiredReviewsDetail": "ການອະນຸມັດຈາກຜູ້ກວດສອບທີ່ຕ້ອງການຂາດຫາຍໄປ ຫຼື ຍັງລໍຖ້າຢູ່.",
+        "failingChecksTitle": "ການກວດສອບທີ່ຕ້ອງການລົ້ມເຫຼວ",
+        "failingChecksDetail": "ການກວດສອບສະຖານະທີ່ຕ້ອງການກຳລັງລົ້ມເຫຼວ.",
+        "unstableTitle": "ການກວດສອບບາງອັນລົ້ມເຫຼວ",
+        "unstableDetail": "ການກວດສອບທີ່ບໍ່ຈຳເປັນກຳລັງລົ້ມເຫຼວ. ພວກມັນຈະບໍ່ຂັດຂວາງການ merge.",
+        "draftTitle": "pull request ຮ່າງ",
+        "draftDetail": "ໝາຍ pull request ວ່າພ້ອມສຳລັບການກວດສອບກ່ອນ merge.",
+        "behindTitle": "ສາຂາລ້າສະໄໝ",
+        "behindDetailUpdatable": "ອັບເດດສາຂາຈາກ base, ຫຼື rebase, ກ່ອນ merge.",
+        "behindDetail": "ສາຂາຫົວຢູ່ຫຼັງ base. Rebase ຫຼື ອັບເດດສາຂາກ່ອນ merge.",
+        "notMergeableTitle": "pull request ນີ້ຍັງບໍ່ສາມາດ merge ໄດ້",
+        "notMergeableDetail": "GitHub ລາຍງານສະຖານະທີ່ສາມາດ merge ໄດ້: {{state}}."
+      },
+      "methodLabels": {
+        "merge": "ສ້າງ commit ຂອງ merge",
+        "squash": "Squash ແລະ merge",
+        "rebase": "Rebase ແລະ merge"
+      },
+      "methodDescriptions": {
+        "merge": "ລວມ commits ທັງໝົດຈາກສາຂານີ້ເຂົ້າໃນສາຂາ base ດ້ວຍ commit ຂອງ merge.",
+        "squash": "ລວມ commits ທັງໝົດຈາກສາຂານີ້ເຂົ້າເປັນ commit ດຽວໃນສາຂາ base.",
+        "rebase": "ນຳໃຊ້ commits ທັງໝົດຈາກສາຂານີ້ໃສ່ສາຂາ base ໂດຍບໍ່ມີ commit ຂອງ merge."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ກະທູ້ສົນທະນາ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "... {{displayCount}} ແຖວເພີ່ມເຕີມຂ້າງເທິງ",
       "termsAcceptRequired": "ທ່ານຕ້ອງຍອມຮັບຂໍ້ກຳນົດການໃຊ້ງານເພື່ອຈະໂພສໄດ້.",
       "termsOutdatedCopy": "ຂໍ້ກຳນົດການໃຊ້ງານປ່ຽນແປງແລ້ວ. ເປີດໜ້າຈໍນີ້ຄືນເພື່ອຍອມຮັບສະບັບຫຼ້າສຸດ.",
-      "termsCheckRetryCopy": "ບໍ່ສາມາດກວດສອບຂໍ້ກຳນົດການໃຊ້ງານໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ."
+      "termsCheckRetryCopy": "ບໍ່ສາມາດກວດສອບຂໍ້ກຳນົດການໃຊ້ງານໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
+      "reactions": {
+        "thumbsUp": "ຊົມເຊີຍ",
+        "thumbsDown": "ບໍ່ຊົມເຊີຍ",
+        "laugh": "ຫົວ",
+        "hooray": "ດີໃຈ",
+        "confused": "ງົງ",
+        "heart": "ຫົວໃຈ",
+        "rocket": "ຈະຫຼວດ",
+        "eyes": "ຕາ"
+      },
+      "anchor": {
+        "fileCommentOnPath": "ຄຳເຫັນໃສ່ໄຟລ໌ {{path}}",
+        "fileComment": "ຄຳເຫັນໃສ່ໄຟລ໌",
+        "outdatedOnPathLines": "ລ້າສະໄໝໃນ {{path}} {{lines}}",
+        "outdatedOnLines": "ລ້າສະໄໝໃນ {{lines}}",
+        "outdatedOnPath": "ລ້າສະໄໝໃນ {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າ GitHub App ໄດ້",
     "installKiloGitHubApp": "ຕິດຕັ້ງ Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "ກຳລັງສະແດງ {{limit}} ທຳອິດຈາກ {{total}} ໄຟລ໌ທີ່ປ່ຽນແປງ — ຂີດຈຳກັດ GitHub API"
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ",
-    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງ pull request ຂອງ GitHub"
+    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງ pull request ຂອງ GitHub",
+    "announce": {
+      "commentPosted": "ໂພສຄຳເຫັນແລ້ວ",
+      "reviewSubmitted": "ສົ່ງການກວດສອບແລ້ວ",
+      "autoMergeEnabled": "ເປີດ auto-merge ແລ້ວ"
+    }
   },
   "notifications": {
     "title": "ການແຈ້ງເຕືອນ",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} ເກີນຂີດຈຳກັດການແນບ {{limit}}.",
       "unreadable": "ບໍ່ສາມາດອ່ານ {{filename}} ໄດ້.",
       "pastedImage": "ຮູບພາບທີ່ວາງ",
-      "defaultName": "ໄຟລ໌ແນບ"
+      "defaultName": "ໄຟລ໌ແນບ",
+      "classificationDenied": "ບໍ່ສາມາດແນບໄຟລ໌ທີ່ດຳເນີນການໄດ້",
+      "classificationEmpty": "ໄຟລ໌ວ່າງເປົ່າ",
+      "classificationTooLarge": "ໄຟລ໌ຕ້ອງມີຂະໜາດ 20 MB ຫຼື ນ້ອຍກວ່າ",
+      "classificationUnreadable": "ບໍ່ສາມາດອ່ານໄຟລ໌ນີ້ໄດ້",
+      "announceUploaded": "ອັບໂຫຼດໄຟລ໌ແນບແລ້ວ"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "STARTING",
       "stopped": "STOPPED",
       "stopping": "STOPPING",
-      "unknown": "UNKNOWN"
+      "unknown": "UNKNOWN",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "ການກະທຳທີ່ເຂົ້າຄິວບໍ່ສາມາດຕິດຕາມໄດ້ອີກ. ໂຫຼດຄືນເພື່ອເບິ່ງສະຖານະລ່າສຸດ.",
     "initialSyncAdmissionFailed": "Security Agent ຖືກເປີດໃຊ້, ແຕ່ບໍ່ສາມາດເຂົ້າຄິວການຊິ້ງຄັ້ງທຳອິດ. ຊິ້ງອີກເທື່ອ.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "ການກວດພົບຖືກປິດໄປແລ້ວ",
+      "findingDismissed": "ປິດການກວດພົບແລ້ວ",
+      "noRemediationsQueued": "ບໍ່ມີການກວດພົບທີ່ມີຢູ່ໃນຄິວ",
+      "remediationsQueued": "ການແກ້ໄຂທີ່ມີຢູ່ເຂົ້າຄິວແລ້ວ",
+      "analysisComplete": "ການວິເຄາະສຳເລັດ",
+      "syncComplete": "ການຊິ້ງສຳເລັດ"
+    }
   },
   "agents": {
     "activeNow": "ເຄື່ອນໄຫວຕອນນີ້",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "ບໍ່ສາມາດເປີດ GitHub",
-      "couldNotOpenMessage": "ພວກເຮົາບໍ່ສາມາດເລີ່ມການຕັ້ງຄ່າ GitHub App. ກະລຸນາລອງໃໝ່."
+      "couldNotOpenMessage": "ພວກເຮົາບໍ່ສາມາດເລີ່ມການຕັ້ງຄ່າ GitHub App. ກະລຸນາລອງໃໝ່.",
+      "installedTitle": "ຕິດຕັ້ງ GitHub App ແລ້ວ",
+      "installedMessage": "ຣີໂພສິທໍຣີຂອງທ່ານເຊື່ອມຕໍ່ແລ້ວ.",
+      "pendingTitle": "ກຳລັງລໍຖ້າການອະນຸມັດຂອງຜູ້ດູແລ",
+      "pendingMessage": "ຜູ້ດູແລອົງກອນຕ້ອງອະນຸມັດຄຳຂໍການຕິດຕັ້ງ.",
+      "accountMismatchTitle": "ບັນຊີບໍ່ກົງກັນ",
+      "accountMismatchMessage": "ການເຊື່ອມຕໍ່ນີ້ຖືກເລີ່ມຈາກແອັບ Kilo ທີ່ເຂົ້າສູ່ລະບົບດ້ວຍບັນຊີອື່ນ. ເຂົ້າສູ່ລະບົບເວັບດ້ວຍບັນຊີນັ້ນ, ຫຼືເລີ່ມໃໝ່ຈາກແອັບ.",
+      "cannotCompleteTitle": "ບໍ່ສາມາດເຮັດການຕິດຕັ້ງໃຫ້ສຳເລັດ",
+      "notAdminMessage": "ພຽງແຕ່ຜູ້ດູແລ GitHub ຂອງບັນຊີນັ້ນເທົ່ານັ້ນທີ່ສາມາດເຊື່ອມຕໍ່ມັນໄດ້. ຂໍໃຫ້ຜູ້ດູແລອົງກອນຕິດຕັ້ງ Kilo.",
+      "alreadyClaimedMessage": "ການຕິດຕັ້ງ GitHub ນັ້ນເຊື່ອມຕໍ່ກັບບັນຊີ Kilo ອື່ນແລ້ວ. ຕັດການເຊື່ອມຕໍ່ຢູ່ບ່ອນນັ້ນກ່ອນ.",
+      "didNotCompleteTitle": "ການຕິດຕັ້ງບໍ່ສຳເລັດ",
+      "didNotCompleteMessage": "ການຕິດຕັ້ງ GitHub App ຍັງບໍ່ສຳເລັດ. ລອງອີກຄັ້ງຈາກແອັບ."
     },
     "sessionExited": "ເຊດຊັນອອກແລ້ວ",
     "remoteSpawnRetryable": "ບໍ່ສາມາດເຂົ້າເຖິງ instance ໄດ້ — ມັນອາດຈະຕັດການເຊື່ອມຕໍ່.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ການສົ່ງອີເມວບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ. ກະລຸນາລອງໃໝ່ໃນພາຍຫຼັງ.",
     "admissionRequired": "ບໍ່ສາມາດຢືນຢັນອຸປະກອນຂອງທ່ານໄດ້. ໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອເຂົ້າສູ່ລະບົບໃນອຸປະກອນອື່ນ ຫຼື ຜ່ານເວັບ.",
     "default": "ມີບາງຢ່າງຜິດພາດ. ກະລຸນາລອງໃໝ່.",
-    "retryableAdmission": "ພວກເຮົາບໍ່ສາມາດຢືນຢັນອຸປະກອນນີ້ໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງໃໝ່."
+    "retryableAdmission": "ພວກເຮົາບໍ່ສາມາດຢືນຢັນອຸປະກອນນີ້ໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງໃໝ່.",
+    "startSignInFailed": "ການເລີ່ມເຂົ້າສູ່ລະບົບລົ້ມເຫຼວ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "couldNotOpenBrowser": "ບໍ່ສາມາດເປີດບຣາວເຊີໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
+    "signInTimedOut": "ການເຂົ້າສູ່ລະບົບໝົດເວລາ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "signInFailed": "ການເຂົ້າສູ່ລະບົບລົ້ມເຫຼວ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "networkError": "ຂໍ້ຜິດພາດເຄືອຂ່າຍ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "accessDeniedByUser": "ຜູ້ໃຊ້ປະຕິເສດການເຂົ້າເຖິງ",
+    "codeExpired": "ລະຫັດໝົດອາຍຸ"
   },
   "models": {
     "dataCollected": "ຂໍ້ມູນທີ່ເກັບກຳ",
-    "free": "ຟຣີ"
+    "free": "ຟຣີ",
+    "couldNotUpdateFavorites": "ບໍ່ສາມາດອັບເດດລາຍການທີ່ມັກໄດ້"
   }
 }

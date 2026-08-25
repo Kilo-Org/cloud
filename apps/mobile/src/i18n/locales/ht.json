@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopiye nan clipboard la",
     "couldNotCopyToClipboard": "Pa t ka kopiye nan clipboard la",
     "required": "obligatwa",
-    "error": "erè: {{error}}"
+    "error": "erè: {{error}}",
+    "back": "Tounen",
+    "somethingWentWrong": "Yon bagay pa mache"
   },
   "language": {
     "title": "Lang",
@@ -280,7 +282,36 @@
         "body": "Pa t ka efase branch lan: {{reason}}",
         "accessibility": "Fizyonnen. Pa t ka efase branch lan: {{reason}}"
       },
-      "loadFailedTitle": "Pa t ka chaje opsyon fizyon yo"
+      "loadFailedTitle": "Pa t ka chaje opsyon fizyon yo",
+      "blocked": {
+        "unknownStateTitle": "GitHub pa rapòte yon eta fizyonabilite",
+        "unknownStateDetail": "Eseye rafrechi apèsi a apre yon ti moman.",
+        "conflictsTitle": "Konfli fizyon",
+        "conflictsDetail": "Rezoud konfli fizyon yo sou branch sa a anvan ou fizyonnen.",
+        "requiredReviewsTitle": "Revizyon obligatwa manke",
+        "requiredReviewsDetail": "Apwobasyon revizè obligatwa yo manke oswa an patant.",
+        "failingChecksTitle": "Tchèk obligatwa ap echwe",
+        "failingChecksDetail": "Tchèk estati obligatwa yo ap echwe.",
+        "unstableTitle": "Kèk tchèk ap echwe",
+        "unstableDetail": "Tchèk ki pa obligatwa yo ap echwe. Yo pa ap bloke fizyon an.",
+        "draftTitle": "Demand rale brouyon",
+        "draftDetail": "Make demand rale a kòm pare pou revizyon anvan ou fizyonnen.",
+        "behindTitle": "Branch la pa ajou",
+        "behindDetailUpdatable": "Mete ajou branch lan depi baz la, oswa rebase, anvan ou fizyonnen.",
+        "behindDetail": "Branch tèt la dèyè baz la. Rebase oswa mete ajou branch lan anvan ou fizyonnen.",
+        "notMergeableTitle": "Demand rale sa a pa ka fizyonnen ankò",
+        "notMergeableDetail": "GitHub rapòte yon eta fizyonabilite {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Kreye yon komit fizyon",
+        "squash": "Squash epi fizyonnen",
+        "rebase": "Rebase epi fizyonnen"
+      },
+      "methodDescriptions": {
+        "merge": "Konbine tout komit yo sou branch sa a nan branch baz la ak yon komit fizyon.",
+        "squash": "Konbine tout komit yo sou branch sa a nan yon sèl komit sou branch baz la.",
+        "rebase": "Rejoue tout komit yo sou branch sa a sou branch baz la san yon komit fizyon."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Fil diskisyon {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "... {{displayCount}} plis liy pi wo a",
       "termsAcceptRequired": "Ou dwe aksepte Kondisyon Itilizasyon yo pou pòste.",
       "termsOutdatedCopy": "Kondisyon Itilizasyon yo chanje. Relouvri ekran sa a pou aksepte vèsyon ki dènye a.",
-      "termsCheckRetryCopy": "Pa t ka tcheke Kondisyon Itilizasyon yo. Tcheke koneksyon ou e eseye ankò."
+      "termsCheckRetryCopy": "Pa t ka tcheke Kondisyon Itilizasyon yo. Tcheke koneksyon ou e eseye ankò.",
+      "reactions": {
+        "thumbsUp": "Pous leve",
+        "thumbsDown": "Pous desann",
+        "laugh": "Ri",
+        "hooray": "Yoyo",
+        "confused": "Konfizyon",
+        "heart": "Kè",
+        "rocket": "Fizye",
+        "eyes": "Zye"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Kòmantè sou fichye {{path}}",
+        "fileComment": "Kòmantè sou fichye",
+        "outdatedOnPathLines": "Demode sou {{path}} {{lines}}",
+        "outdatedOnLines": "Demode sou {{lines}}",
+        "outdatedOnPath": "Demode sou {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Pa t ka louvri paramèt GitHub App",
     "installKiloGitHubApp": "Enstale Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Ap montre premye {{limit}} sou {{total}} fichye ki chanje — limit API GitHub"
     },
     "linkPasteClipboardEmpty": "Clipboard la vid",
-    "linkPasteNotAPullRequest": "Se pa yon lyen pull request GitHub"
+    "linkPasteNotAPullRequest": "Se pa yon lyen pull request GitHub",
+    "announce": {
+      "commentPosted": "Kòmantè pòste",
+      "reviewSubmitted": "Revizyon soumèt",
+      "autoMergeEnabled": "Auto-fizyon aktive"
+    }
   },
   "notifications": {
     "title": "Notifikasyon",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} depase limit atachman {{limit}} a.",
       "unreadable": "Pa t ka li {{filename}}.",
       "pastedImage": "imaj kole a",
-      "defaultName": "Atachman"
+      "defaultName": "Atachman",
+      "classificationDenied": "Fichye egzekitab pa ka atache",
+      "classificationEmpty": "Fichye a vid",
+      "classificationTooLarge": "Fichye yo dwe 20 MB oswa mwens",
+      "classificationUnreadable": "Pa t ka li fichye sa a",
+      "announceUploaded": "Atachman telechaje"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "AP KÒMANSE",
       "stopped": "SISPANN",
       "stopping": "AP SISPANN",
-      "unknown": "ENKONI"
+      "unknown": "ENKONI",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Yon aksyon an pwosesis pa te kapab swiv ankò. Rafrechi pou wè dènye eta a.",
     "initialSyncAdmissionFailed": "Security Agent te aktive, men premye senkronizasyon an pa t 'kapab mete an pwosesis. Senkronize ankò.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Rezilta deja rejte",
+      "findingDismissed": "Rezilta rejte",
+      "noRemediationsQueued": "Pa gen rezilta ki egziste an pwosesis",
+      "remediationsQueued": "Remedysyon ki egziste yo an pwosesis",
+      "analysisComplete": "Analiz konplete",
+      "syncComplete": "Senkronizasyon konplete"
+    }
   },
   "agents": {
     "activeNow": "Aktif kounye a",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
-      "couldNotOpenMessage": "Nou pa te kapab kòmanse konfigirasyon GitHub App la. Tanpri eseye ankò."
+      "couldNotOpenMessage": "Nou pa te kapab kòmanse konfigirasyon GitHub App la. Tanpri eseye ankò.",
+      "installedTitle": "GitHub App enstale",
+      "installedMessage": "Depo ou yo konekte kounye a.",
+      "pendingTitle": "Ap tann apwobasyon administratè",
+      "pendingMessage": "Yon admin òganizasyon dwe apwouve demann enstalasyon an.",
+      "accountMismatchTitle": "Kont pa matche",
+      "accountMismatchMessage": "Koneksyon sa a te kòmanse nan Kilo App ki konekte ak yon lòt kont. Konekte sou web la ak kont sa a, oswa rekòmanse nan aplikasyon an.",
+      "cannotCompleteTitle": "Pa ka fini enstalasyon an",
+      "notAdminMessage": "Se sèlman yon admin GitHub nan kont sa a ki ka konekte li. Mande yon admin òganizasyon pou enstale Kilo.",
+      "alreadyClaimedMessage": "Enstalasyon GitHub sa a deja konekte ak yon lòt kont Kilo. Dekonekte li la anvan.",
+      "didNotCompleteTitle": "Enstalasyon pa fini",
+      "didNotCompleteMessage": "Enstalasyon GitHub App la pa te fini. Rekòmanse nan aplikasyon an."
     },
     "sessionExited": "Sesyon soti",
     "remoteSpawnRetryable": "Pa t kapab rive jwenn enstans lan — li ka te dekonekte.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Livrezon imèl pa disponib pou kounye a. Tanpri eseye ankò pita.",
     "admissionRequired": "Aparèy ou pa ka verifye. Itilize '$t(login.moreSignInOptions)' pou konekte sou yon lòt aparèy oswa atravè web la.",
     "default": "Yon bagay mal pase. Tanpri eseye ankò.",
-    "retryableAdmission": "Nou pa t kapab verifye aparèy sa a. Tcheke koneksyon ou epi eseye ankò."
+    "retryableAdmission": "Nou pa t kapab verifye aparèy sa a. Tcheke koneksyon ou epi eseye ankò.",
+    "startSignInFailed": "Echwe pou kòmanse koneksyon. Tanpri eseye ankò.",
+    "couldNotOpenBrowser": "Pa t ka louvri navigatè a. Tanpri eseye ankò.",
+    "signInTimedOut": "Koneksyon an ekspire. Tanpri eseye ankò.",
+    "signInFailed": "Koneksyon an echwe. Tanpri eseye ankò.",
+    "networkError": "Erè rezo. Tanpri eseye ankò.",
+    "accessDeniedByUser": "Aksè refize pa itilizatè",
+    "codeExpired": "Kòd la ekspire"
   },
   "models": {
     "dataCollected": "Done kolekte",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Pa t ka mete ajou favori yo"
   }
 }

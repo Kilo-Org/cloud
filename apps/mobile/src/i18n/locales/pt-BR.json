@@ -22,7 +22,9 @@
     "required": "obrigatório",
     "error": "erro: {{error}}",
     "notNow": "Agora não",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "back": "Voltar",
+    "somethingWentWrong": "Algo deu errado"
   },
   "language": {
     "title": "Idioma",
@@ -262,7 +264,12 @@
       "sizeRejection": "{{filename}} excede o limite de anexo de {{limit}}.",
       "unreadable": "Não foi possível ler {{filename}}.",
       "pastedImage": "a imagem colada",
-      "defaultName": "Anexo"
+      "defaultName": "Anexo",
+      "classificationDenied": "Arquivos executáveis não podem ser anexados",
+      "classificationEmpty": "O arquivo está vazio",
+      "classificationTooLarge": "Os arquivos devem ter no máximo 20 MB",
+      "classificationUnreadable": "Não foi possível ler este arquivo",
+      "announceUploaded": "Anexo enviado"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -682,7 +689,8 @@
       "starting": "INICIANDO",
       "stopped": "PARADO",
       "stopping": "PARANDO",
-      "unknown": "DESCONHECIDO"
+      "unknown": "DESCONHECIDO",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1324,7 +1332,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "O Security Agent foi ativado, mas a sincronização inicial não pôde ser colocada na fila. Sincronize novamente.",
-    "queuedActionUntracked": "Uma ação na fila não pôde mais ser rastreada. Atualize para ver o estado mais recente."
+    "queuedActionUntracked": "Uma ação na fila não pôde mais ser rastreada. Atualize para ver o estado mais recente.",
+    "commands": {
+      "findingAlreadyDismissed": "Descoberta já dispensada",
+      "findingDismissed": "Descoberta dispensada",
+      "noRemediationsQueued": "Nenhuma descoberta existente na fila",
+      "remediationsQueued": "Remediações existentes na fila",
+      "analysisComplete": "Análise concluída",
+      "syncComplete": "Sincronização concluída"
+    }
   },
   "agents": {
     "activeNow": "Ativo agora",
@@ -1374,7 +1390,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Não foi possível iniciar a configuração do GitHub App. Tente novamente.",
-      "couldNotOpenTitle": "Não foi possível abrir o GitHub"
+      "couldNotOpenTitle": "Não foi possível abrir o GitHub",
+      "installedTitle": "GitHub App instalado",
+      "installedMessage": "Seus repositórios estão conectados agora.",
+      "pendingTitle": "Aguardando aprovação do administrador",
+      "pendingMessage": "Um administrador da organização deve aprovar a solicitação de instalação.",
+      "accountMismatchTitle": "Conta incompatível",
+      "accountMismatchMessage": "Esta conexão foi iniciada pelo Kilo App conectado a uma conta diferente. Entre na web com essa conta ou comece novamente pelo app.",
+      "cannotCompleteTitle": "Não foi possível concluir a instalação",
+      "notAdminMessage": "Somente um administrador do GitHub dessa conta pode conectá-la. Peça a um administrador da organização para instalar o Kilo.",
+      "alreadyClaimedMessage": "Essa instalação do GitHub já está conectada a outra conta do Kilo. Desconecte-a lá primeiro.",
+      "didNotCompleteTitle": "A instalação não foi concluída",
+      "didNotCompleteMessage": "A instalação do GitHub App não foi concluída. Tente novamente pelo app."
     },
     "sessionExited": "Sessão encerrada",
     "remoteSpawnRetryable": "Não foi possível acessar a instância — ela pode ter se desconectado.",
@@ -2320,7 +2347,24 @@
       "termsCheckRetryCopy": "Não foi possível verificar os Termos de Serviço. Verifique sua conexão e tente novamente.",
       "termsOutdatedCopy": "Os Termos de Serviço mudaram. Reabra esta tela para aceitar a versão mais recente.",
       "comment_many": "{{displayCount}} comentários",
-      "reaction_many": "reações"
+      "reaction_many": "reações",
+      "reactions": {
+        "thumbsUp": "Polegar para cima",
+        "thumbsDown": "Polegar para baixo",
+        "laugh": "Riso",
+        "hooray": "Viva",
+        "confused": "Confuso",
+        "heart": "Coração",
+        "rocket": "Foguete",
+        "eyes": "Olhos"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentário de arquivo em {{path}}",
+        "fileComment": "Comentário de arquivo",
+        "outdatedOnPathLines": "Desatualizado em {{path}} {{lines}}",
+        "outdatedOnLines": "Desatualizado em {{lines}}",
+        "outdatedOnPath": "Desatualizado em {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Limpar link do pull request",
@@ -2479,7 +2523,36 @@
         "closed": "Este pull request está fechado"
       },
       "updateBranch": "Atualizar branch",
-      "updateBranchFromBase": "Atualizar branch a partir do branch base"
+      "updateBranchFromBase": "Atualizar branch a partir do branch base",
+      "blocked": {
+        "unknownStateTitle": "O GitHub não informou um estado de possibilidade de merge",
+        "unknownStateDetail": "Tente atualizar a visão geral em instantes.",
+        "conflictsTitle": "Conflitos de merge",
+        "conflictsDetail": "Resolva os conflitos de merge neste branch antes de fazer o merge.",
+        "requiredReviewsTitle": "Faltam revisões obrigatórias",
+        "requiredReviewsDetail": "As aprovações dos revisores obrigatórios estão faltando ou pendentes.",
+        "failingChecksTitle": "Verificações obrigatórias com falha",
+        "failingChecksDetail": "As verificações de status obrigatórias estão falhando.",
+        "unstableTitle": "Algumas verificações estão falhando",
+        "unstableDetail": "Verificações não obrigatórias estão falhando. Elas não bloquearão o merge.",
+        "draftTitle": "Pull request em rascunho",
+        "draftDetail": "Marque o pull request como pronto para revisão antes de fazer o merge.",
+        "behindTitle": "O branch está desatualizado",
+        "behindDetailUpdatable": "Atualize o branch a partir do branch base, ou faça rebase, antes de fazer o merge.",
+        "behindDetail": "O branch de origem está atrás do branch base. Faça rebase ou atualize o branch antes de fazer o merge.",
+        "notMergeableTitle": "Este pull request ainda não pode ser mesclado",
+        "notMergeableDetail": "O GitHub informou um estado de possibilidade de merge: {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Criar um commit de merge",
+        "squash": "Squash e merge",
+        "rebase": "Rebase e merge"
+      },
+      "methodDescriptions": {
+        "merge": "Combine todos os commits deste branch no branch base com um commit de merge.",
+        "squash": "Combine todos os commits deste branch em um único commit no branch base.",
+        "rebase": "Reproduza todos os commits deste branch no branch base sem um commit de merge."
+      }
     },
     "noDescriptionProvided": "Nenhuma descrição fornecida.",
     "noFilesChanged": "Nenhum arquivo alterado",
@@ -2572,7 +2645,12 @@
       "truncationBanner": "Mostrando os primeiros {{limit}} de {{total}} arquivos alterados — limite da API do GitHub"
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia",
-    "linkPasteNotAPullRequest": "Não é um link de pull request do GitHub"
+    "linkPasteNotAPullRequest": "Não é um link de pull request do GitHub",
+    "announce": {
+      "commentPosted": "Comentário publicado",
+      "reviewSubmitted": "Revisão enviada",
+      "autoMergeEnabled": "Merge automático ativado"
+    }
   },
   "organization": {
     "boundary": {
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "A entrega de e-mail está temporariamente indisponível. Tente novamente mais tarde.",
     "admissionRequired": "Seu dispositivo não pode ser verificado. Use '$t(login.moreSignInOptions)' para entrar em outro dispositivo ou pela web.",
     "default": "Algo deu errado. Tente novamente.",
-    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifique sua conexão e tente novamente."
+    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifique sua conexão e tente novamente.",
+    "startSignInFailed": "Falha ao iniciar a entrada. Tente novamente.",
+    "couldNotOpenBrowser": "Não foi possível abrir o navegador. Tente novamente.",
+    "signInTimedOut": "A entrada expirou. Tente novamente.",
+    "signInFailed": "Falha na entrada. Tente novamente.",
+    "networkError": "Erro de rede. Tente novamente.",
+    "accessDeniedByUser": "Acesso negado pelo usuário",
+    "codeExpired": "Código expirado"
   },
   "models": {
     "dataCollected": "Dados coletados",
-    "free": "Grátis"
+    "free": "Grátis",
+    "couldNotUpdateFavorites": "Não foi possível atualizar os favoritos"
   }
 }

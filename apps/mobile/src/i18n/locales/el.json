@@ -22,7 +22,9 @@
     "copiedToClipboard": "Αντιγράφηκε στο πρόχειρο",
     "couldNotCopyToClipboard": "Δεν ήταν δυνατή η αντιγραφή στο πρόχειρο",
     "required": "απαιτείται",
-    "error": "σφάλμα: {{error}}"
+    "error": "σφάλμα: {{error}}",
+    "back": "Πίσω",
+    "somethingWentWrong": "Κάτι πήγε στραβά"
   },
   "language": {
     "title": "Γλώσσα",
@@ -280,7 +282,36 @@
         "body": "Δεν ήταν δυνατή η διαγραφή του κλάδου: {{reason}}",
         "accessibility": "Συγχωνεύτηκε. Δεν ήταν δυνατή η διαγραφή του κλάδου: {{reason}}"
       },
-      "loadFailedTitle": "Δεν ήταν δυνατή η φόρτωση των επιλογών συγχώνευσης"
+      "loadFailedTitle": "Δεν ήταν δυνατή η φόρτωση των επιλογών συγχώνευσης",
+      "blocked": {
+        "unknownStateTitle": "Το GitHub δεν ανέφερε κατάσταση συγχώνευσης",
+        "unknownStateDetail": "Δοκιμάστε να ανανεώσετε την επισκόπηση σε λίγο.",
+        "conflictsTitle": "Συγκρούσεις συγχώνευσης",
+        "conflictsDetail": "Επιλύστε τις συγκρούσεις συγχώνευσης σε αυτόν τον κλάδο πριν τη συγχώνευση.",
+        "requiredReviewsTitle": "Λείπουν απαιτούμενες αναθεωρήσεις",
+        "requiredReviewsDetail": "Οι εγκρίσεις από τους απαιτούμενους αναθεωρητές λείπουν ή εκκρεμούν.",
+        "failingChecksTitle": "Αποτυγχάνουν απαιτούμενοι έλεγχοι",
+        "failingChecksDetail": "Οι απαιτούμενοι έλεγχοι κατάστασης αποτυγχάνουν.",
+        "unstableTitle": "Αποτυγχάνουν ορισμένοι έλεγχοι",
+        "unstableDetail": "Αποτυγχάνουν μη απαιτούμενοι έλεγχοι. Δεν θα μπλοκάρουν τη συγχώνευση.",
+        "draftTitle": "Πρόχειρο pull request",
+        "draftDetail": "Σημειώστε το pull request ως έτοιμο για αναθεώρηση πριν τη συγχώνευση.",
+        "behindTitle": "Ο κλάδος είναι ξεπερασμένος",
+        "behindDetailUpdatable": "Ενημερώστε τον κλάδο από το βασικό ή κάντε rebase πριν τη συγχώνευση.",
+        "behindDetail": "Ο κλάδος κεφαλής υστερεί σε σχέση με τον βασικό. Κάντε rebase ή ενημερώστε τον κλάδο πριν τη συγχώνευση.",
+        "notMergeableTitle": "Αυτό το pull request δεν μπορεί ακόμα να συγχωνευθεί",
+        "notMergeableDetail": "Το GitHub ανέφερε κατάσταση συγχώνευσης {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Δημιουργία commit συγχώνευσης",
+        "squash": "Squash και συγχώνευση",
+        "rebase": "Rebase και συγχώνευση"
+      },
+      "methodDescriptions": {
+        "merge": "Συνδυάστε όλα τα commits από αυτόν τον κλάδο στον βασικό κλάδο με ένα commit συγχώνευσης.",
+        "squash": "Συνδυάστε όλα τα commits από αυτόν τον κλάδο σε ένα μόνο commit στον βασικό κλάδο.",
+        "rebase": "Αναπαραγάγετε όλα τα commits από αυτόν τον κλάδο στον βασικό κλάδο χωρίς commit συγχώνευσης."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Νήμα συζήτησης {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} επιπλέον γραμμές παραπάνω",
       "termsAcceptRequired": "Πρέπει να αποδεχτείτε τους Όρους χρήσης για να δημοσιεύσετε.",
       "termsOutdatedCopy": "Οι Όροι χρήσης άλλαξαν. Ανοίξτε ξανά αυτή την οθόνη για να αποδεχτείτε την τελευταία έκδοση.",
-      "termsCheckRetryCopy": "Δεν ήταν δυνατός ο έλεγχος των Όρων χρήσης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
+      "termsCheckRetryCopy": "Δεν ήταν δυνατός ο έλεγχος των Όρων χρήσης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+      "reactions": {
+        "thumbsUp": "Μου αρέσει",
+        "thumbsDown": "Δεν μου αρέσει",
+        "laugh": "Γέλιο",
+        "hooray": "Ζήτω",
+        "confused": "Μπερδεμένος",
+        "heart": "Καρδιά",
+        "rocket": "Πύραυλος",
+        "eyes": "Μάτια"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Σχόλιο αρχείου στο {{path}}",
+        "fileComment": "Σχόλιο αρχείου",
+        "outdatedOnPathLines": "Ξεπερασμένο στο {{path}} {{lines}}",
+        "outdatedOnLines": "Ξεπερασμένο στις {{lines}}",
+        "outdatedOnPath": "Ξεπερασμένο στο {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων GitHub App",
     "installKiloGitHubApp": "Εγκατάσταση του Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Εμφάνιση των πρώτων {{limit}} από {{total}} αλλαγμένα αρχεία — όριο API του GitHub"
     },
     "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο",
-    "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub"
+    "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub",
+    "announce": {
+      "commentPosted": "Δημοσιεύτηκε το σχόλιο",
+      "reviewSubmitted": "Υποβλήθηκε η αναθεώρηση",
+      "autoMergeEnabled": "Η αυτόματη συγχώνευση ενεργοποιήθηκε"
+    }
   },
   "notifications": {
     "title": "Ειδοποιήσεις",
@@ -656,7 +709,12 @@
       "sizeRejection": "Το {{filename}} υπερβαίνει το όριο επισύναψης {{limit}}.",
       "unreadable": "Δεν ήταν δυνατή η ανάγνωση του {{filename}}.",
       "pastedImage": "η επικολλημένη εικόνα",
-      "defaultName": "Συνημμένο"
+      "defaultName": "Συνημμένο",
+      "classificationDenied": "Δεν είναι δυνατή η επισύναψη εκτελέσιμων αρχείων",
+      "classificationEmpty": "Το αρχείο είναι κενό",
+      "classificationTooLarge": "Τα αρχεία πρέπει να είναι 20 MB ή μικρότερα",
+      "classificationUnreadable": "Δεν ήταν δυνατή η ανάγνωση αυτού του αρχείου",
+      "announceUploaded": "Το συνημμένο μεταφορτώθηκε"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "ΕΚΚΙΝΗΣΗ",
       "stopped": "ΣΤΑΜΑΤΗΜΕΝΟ",
       "stopping": "ΔΙΑΚΟΠΗ",
-      "unknown": "ΑΓΝΩΣΤΟ"
+      "unknown": "ΑΓΝΩΣΤΟ",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Δεν ήταν πλέον δυνατή η παρακολούθηση μιας ενέργειας σε αναμονή. Ανανεώστε για να δείτε την τελευταία κατάσταση.",
     "initialSyncAdmissionFailed": "Ο Security Agent ενεργοποιήθηκε, αλλά ο αρχικός συγχρονισμός δεν ήταν δυνατό να τεθεί σε αναμονή. Συγχρονίστε ξανά.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Το εύρημα έχει ήδη απορριφθεί",
+      "findingDismissed": "Το εύρημα απορρίφθηκε",
+      "noRemediationsQueued": "Δεν υπάρχουν υπάρχοντα ευρήματα στην ουρά",
+      "remediationsQueued": "Οι υπάρχουσες αποκαταστάσεις μπήκαν στην ουρά",
+      "analysisComplete": "Η ανάλυση ολοκληρώθηκε",
+      "syncComplete": "Ο συγχρονισμός ολοκληρώθηκε"
+    }
   },
   "agents": {
     "activeNow": "Ενεργό τώρα",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
-      "couldNotOpenMessage": "Δεν ήταν δυνατή η έναρξη της ρύθμισης της εφαρμογής GitHub. Δοκιμάστε ξανά."
+      "couldNotOpenMessage": "Δεν ήταν δυνατή η έναρξη της ρύθμισης της εφαρμογής GitHub. Δοκιμάστε ξανά.",
+      "installedTitle": "Το GitHub App εγκαταστάθηκε",
+      "installedMessage": "Τα αποθετήριά σας είναι πλέον συνδεδεμένα.",
+      "pendingTitle": "Εκκρεμεί έγκριση διαχειριστή",
+      "pendingMessage": "Ένας διαχειριστής οργανισμού πρέπει να εγκρίνει το αίτημα εγκατάστασης.",
+      "accountMismatchTitle": "Αναντιστοιχία λογαριασμού",
+      "accountMismatchMessage": "Αυτή η σύνδεση ξεκίνησε από την Kilo App με σύνδεση σε διαφορετικό λογαριασμό. Συνδεθείτε στον ιστό με αυτόν τον λογαριασμό ή ξεκινήστε ξανά από την εφαρμογή.",
+      "cannotCompleteTitle": "Δεν είναι δυνατή η ολοκλήρωση της εγκατάστασης",
+      "notAdminMessage": "Μόνο ένας διαχειριστής GitHub αυτού του λογαριασμού μπορεί να τον συνδέσει. Ζητήστε από έναν διαχειριστή οργανισμού να εγκαταστήσει τον Kilo.",
+      "alreadyClaimedMessage": "Αυτή η εγκατάσταση GitHub είναι ήδη συνδεδεμένη με άλλο λογαριασμό Kilo. Αποσυνδέστε την εκεί πρώτα.",
+      "didNotCompleteTitle": "Η εγκατάσταση δεν ολοκληρώθηκε",
+      "didNotCompleteMessage": "Η εγκατάσταση του GitHub App δεν ολοκληρώθηκε. Δοκιμάστε ξανά από την εφαρμογή."
     },
     "sessionExited": "Η συνεδρία τερματίστηκε",
     "remoteSpawnRetryable": "Δεν ήταν δυνατή η πρόσβαση στην παρουσία — μπορεί να αποσυνδέθηκε.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Η παράδοση email δεν είναι προσωρινά διαθέσιμη. Προσπαθήστε ξανά αργότερα.",
     "admissionRequired": "Η συσκευή σας δεν μπορεί να επαληθευτεί. Χρησιμοποιήστε τις «$t(login.moreSignInOptions)» για να συνδεθείτε από άλλη συσκευή ή μέσω ιστού.",
     "default": "Κάτι πήγε στραβά. Προσπαθήστε ξανά.",
-    "retryableAdmission": "Δεν μπορέσαμε να επαληθεύσουμε αυτή τη συσκευή. Ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά."
+    "retryableAdmission": "Δεν μπορέσαμε να επαληθεύσουμε αυτή τη συσκευή. Ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά.",
+    "startSignInFailed": "Δεν ήταν δυνατή η έναρξη της σύνδεσης. Δοκιμάστε ξανά.",
+    "couldNotOpenBrowser": "Δεν ήταν δυνατό το άνοιγμα του προγράμματος περιήγησης. Δοκιμάστε ξανά.",
+    "signInTimedOut": "Η σύνδεση έληξε. Δοκιμάστε ξανά.",
+    "signInFailed": "Η σύνδεση απέτυχε. Δοκιμάστε ξανά.",
+    "networkError": "Σφάλμα δικτύου. Δοκιμάστε ξανά.",
+    "accessDeniedByUser": "Η πρόσβαση απορρίφθηκε από τον χρήστη",
+    "codeExpired": "Ο κωδικός έληξε"
   },
   "models": {
     "dataCollected": "Δεδομένα που συλλέγονται",
-    "free": "Δωρεάν"
+    "free": "Δωρεάν",
+    "couldNotUpdateFavorites": "Δεν ήταν δυνατή η ενημέρωση των αγαπημένων"
   }
 }

@@ -22,7 +22,9 @@
     "copiedToClipboard": "បានចម្លងទៅក្តារខៀន",
     "couldNotCopyToClipboard": "មិនអាចចម្លងទៅក្តារខៀនបានទេ",
     "required": "ទាមទារ",
-    "error": "កំហុស: {{error}}"
+    "error": "កំហុស: {{error}}",
+    "back": "ត្រឡប់ក្រោយ",
+    "somethingWentWrong": "មានអ្វីមួយខុសប្រក្រតី"
   },
   "language": {
     "title": "ភាសា",
@@ -280,7 +282,36 @@
         "body": "មិនអាចលុបសាខាបានទេ: {{reason}}",
         "accessibility": "បានបញ្ចូល។ មិនអាចលុបសាខាបានទេ: {{reason}}"
       },
-      "loadFailedTitle": "មិនអាចផ្ទុកជម្រើសបញ្ចូលបានទេ"
+      "loadFailedTitle": "មិនអាចផ្ទុកជម្រើសបញ្ចូលបានទេ",
+      "blocked": {
+        "unknownStateTitle": "GitHub មិនទាន់រាយការណ៍ស្ថានភាពលទ្ធភាពបញ្ចូល",
+        "unknownStateDetail": "ព្យាយាមធ្វើឱ្យទិដ្ឋភាពទូទៅស្រស់បន្តិចក្រោយនេះ។",
+        "conflictsTitle": "ជម្លោះបញ្ចូល",
+        "conflictsDetail": "ដោះស្រាយជម្លោះបញ្ចូលនៅលើសាខានេះ មុនពេលបញ្ចូល។",
+        "requiredReviewsTitle": "ការពិនិត្យដែលត្រូវការបានបាត់",
+        "requiredReviewsDetail": "ការយល់ព្រមពីអ្នកពិនិត្យដែលត្រូវការបានបាត់ ឬកំពុងរង់ចាំ។",
+        "failingChecksTitle": "ការត្រួតពិនិត្យដែលត្រូវការកំពុងបរាជ័យ",
+        "failingChecksDetail": "ការត្រួតពិនិត្យស្ថានភាពដែលត្រូវការកំពុងបរាជ័យ។",
+        "unstableTitle": "ការត្រួតពិនិត្យមួយចំនួនកំពុងបរាជ័យ",
+        "unstableDetail": "ការត្រួតពិនិត្យដែលមិនត្រូវការកំពុងបរាជ័យ។ វានឹងមិនរារាំងការបញ្ចូលទេ។",
+        "draftTitle": "សំណើទាញព្រាង",
+        "draftDetail": "សម្គាល់សំណើទាញថារួចរាល់សម្រាប់ការពិនិត្យ មុនពេលបញ្ចូល។",
+        "behindTitle": "សាខាហួសសម័យ",
+        "behindDetailUpdatable": "ធ្វើបច្ចុប្បន្នភាពសាខាពីមូលដ្ឋាន ឬ rebase មុនពេលបញ្ចូល។",
+        "behindDetail": "សាខាក្បាលស្ថិតនៅក្រោយមូលដ្ឋាន។ Rebase ឬធ្វើបច្ចុប្បន្នភាពសាខាមុនពេលបញ្ចូល។",
+        "notMergeableTitle": "សំណើទាញនេះមិនទាន់អាចបញ្ចូលបានទេ",
+        "notMergeableDetail": "GitHub បានរាយការណ៍ស្ថានភាពលទ្ធភាពបញ្ចូល {{state}}។"
+      },
+      "methodLabels": {
+        "merge": "បង្កើត commit បញ្ចូល",
+        "squash": "បញ្ចូលរួម (squash) និងបញ្ចូល",
+        "rebase": "រៀបឡើងវិញ (rebase) និងបញ្ចូល"
+      },
+      "methodDescriptions": {
+        "merge": "បញ្ចូល commit ទាំងអស់ពីសាខានេះទៅក្នុងសាខាមូលដ្ឋាន ជាមួយនឹង commit បញ្ចូលមួយ។",
+        "squash": "បញ្ចូល commit ទាំងអស់ពីសាខានេះទៅជា commit តែមួយនៅលើសាខាមូលដ្ឋាន។",
+        "rebase": "ចាក់ឡើងវិញនូវ commit ទាំងអស់ពីសាខានេះទៅលើសាខាមូលដ្ឋាន ដោយគ្មាន commit បញ្ចូល។"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ខ្សែស្រឡាយពិភាក្សា {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} បន្ទាត់បន្ថែមខាងលើ",
       "termsAcceptRequired": "អ្នកត្រូវតែទទួលយកលក្ខខណ្ឌនៃសេវាកម្ម ដើម្បីប្រកាស។",
       "termsOutdatedCopy": "លក្ខខណ្ឌនៃសេវាកម្មបានប្តូរ។ បើកអេក្រង់នេះម្តងទៀត ដើម្បីទទួលយកកំណែចុងក្រោយ។",
-      "termsCheckRetryCopy": "មិនអាចពិនិត្យលក្ខខណ្ឌនៃសេវាកម្មបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។"
+      "termsCheckRetryCopy": "មិនអាចពិនិត្យលក្ខខណ្ឌនៃសេវាកម្មបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+      "reactions": {
+        "thumbsUp": "មេដៃឡើង",
+        "thumbsDown": "មេដៃចុះ",
+        "laugh": "សើច",
+        "hooray": "ហ៊ឺរ៉ា",
+        "confused": "ច្របូកច្របល់",
+        "heart": "បេះដូង",
+        "rocket": "រ៉ុក្កែត",
+        "eyes": "ភ្នែក"
+      },
+      "anchor": {
+        "fileCommentOnPath": "អត្ថាធិប្បាយឯកសារនៅលើ {{path}}",
+        "fileComment": "អត្ថាធិប្បាយឯកសារ",
+        "outdatedOnPathLines": "ហួសសម័យនៅលើ {{path}} {{lines}}",
+        "outdatedOnLines": "ហួសសម័យនៅលើ {{lines}}",
+        "outdatedOnPath": "ហួសសម័យនៅលើ {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់ GitHub App បានទេ",
     "installKiloGitHubApp": "ដំឡើង Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "កំពុងបង្ហាញ {{limit}} ដំបូងក្នុងចំណោម {{total}} ឯកសារដែលបានផ្លាស់ប្តូរ — ដែនកំណត់ GitHub API"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ",
-    "linkPasteNotAPullRequest": "មិនមែនជាតំណ pull request របស់ GitHub ទេ"
+    "linkPasteNotAPullRequest": "មិនមែនជាតំណ pull request របស់ GitHub ទេ",
+    "announce": {
+      "commentPosted": "បានប្រកាសអត្ថាធិប្បាយ",
+      "reviewSubmitted": "បានដាក់ស្នើការពិនិត្យ",
+      "autoMergeEnabled": "បានបើកការបញ្ចូលដោយស្វ័យប្រវត្តិ"
+    }
   },
   "notifications": {
     "title": "ការជូនដំណឹង",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} លើសពីដែនកំណត់ភ្ជាប់ {{limit}}។",
       "unreadable": "មិនអាចអាន {{filename}} បានទេ។",
       "pastedImage": "រូបភាពដែលបានបិទភ្ជាប់",
-      "defaultName": "ឯកសារភ្ជាប់"
+      "defaultName": "ឯកសារភ្ជាប់",
+      "classificationDenied": "មិនអាចភ្ជាប់ឯកសារដែលអាចប្រតិបត្តិបាន",
+      "classificationEmpty": "ឯកសារទទេ",
+      "classificationTooLarge": "ឯកសារត្រូវតែមាន 20 MB ឬតូចជាង",
+      "classificationUnreadable": "មិនអាចអានឯកសារនេះ",
+      "announceUploaded": "បានផ្ទុកឡើងឯកសារភ្ជាប់"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "កំពុងចាប់ផ្តើម",
       "stopped": "បានបញ្ឈប់",
       "stopping": "កំពុងបញ្ឈប់",
-      "unknown": "មិនស្គាល់"
+      "unknown": "មិនស្គាល់",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "សកម្មភាពដែលបានដាក់ក្នុងជួរលែងអាចតាមដានបានទៀតទេ។ ធ្វើឱ្យថ្មី ដើម្បីមើលស្ថានភាពចុងក្រោយ។",
     "initialSyncAdmissionFailed": "Security Agent ត្រូវបានបើក ប៉ុន្តែការធ្វើសមកាលកម្មដំបូងមិនអាចដាក់ក្នុងជួរបានទេ។ ធ្វើសមកាលកម្មម្តងទៀត។",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "ការរកឃើញត្រូវបានបដិសេធរួចហើយ",
+      "findingDismissed": "បានបដិសេធការរកឃើញ",
+      "noRemediationsQueued": "គ្មានការរកឃើញដែលមានស្រាប់នៅក្នុងជួរទេ",
+      "remediationsQueued": "ការដោះស្រាយដែលមានស្រាប់ត្រូវបានដាក់ក្នុងជួរ",
+      "analysisComplete": "ការវិភាគបានបញ្ចប់",
+      "syncComplete": "ការធ្វើសមកាលកម្មបានបញ្ចប់"
+    }
   },
   "agents": {
     "activeNow": "សកម្មឥឡូវនេះ",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "មិនអាចបើក GitHub",
-      "couldNotOpenMessage": "យើងមិនអាចចាប់ផ្តើមការដំឡើង GitHub App បានទេ។ សូមព្យាយាមម្តងទៀត។"
+      "couldNotOpenMessage": "យើងមិនអាចចាប់ផ្តើមការដំឡើង GitHub App បានទេ។ សូមព្យាយាមម្តងទៀត។",
+      "installedTitle": "បានដំឡើង GitHub App",
+      "installedMessage": "ឃ្លាំងកូដរបស់អ្នកត្រូវបានភ្ជាប់ឥឡូវនេះ។",
+      "pendingTitle": "កំពុងរង់ចាំការយល់ព្រមពីអ្នកគ្រប់គ្រង",
+      "pendingMessage": "អ្នកគ្រប់គ្រងអង្គការត្រូវតែយល់ព្រមលើសំណើដំឡើង។",
+      "accountMismatchTitle": "គណនីមិនត្រូវគ្នា",
+      "accountMismatchMessage": "ការតភ្ជាប់នេះត្រូវបានចាប់ផ្តើមពីកម្មវិធី Kilo ដែលបានចូលជាមួយគណនីផ្សេង។ សូមចូលគេហទំព័រជាមួយគណនីនោះ ឬចាប់ផ្តើមម្តងទៀតពីកម្មវិធី។",
+      "cannotCompleteTitle": "មិនអាចបញ្ចប់ការដំឡើង",
+      "notAdminMessage": "មានតែអ្នកគ្រប់គ្រង GitHub នៃគណនីនោះប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។ សួរអ្នកគ្រប់គ្រងអង្គការដើម្បីដំឡើង Kilo។",
+      "alreadyClaimedMessage": "ការដំឡើង GitHub នោះត្រូវបានភ្ជាប់ទៅគណនី Kilo ផ្សេងរួចហើយ។ សូមផ្តាច់វានៅទីនោះជាមុនសិន។",
+      "didNotCompleteTitle": "ការដំឡើងមិនបានបញ្ចប់",
+      "didNotCompleteMessage": "ការដំឡើង GitHub App មិនបានបញ្ចប់ទេ។ សូមព្យាយាមម្តងទៀតពីកម្មវិធី។"
     },
     "sessionExited": "វគ្គត្រូវបានបញ្ចប់",
     "remoteSpawnRetryable": "មិនអាចទៅដល់ instance បានទេ — វាអាចត្រូវបានផ្ដាច់។",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ការផ្ញើអ៊ីមែលមិនអាចប្រើបានជាបណ្ដោះអាសន្នទេ។ សូមព្យាយាមម្ដងទៀតនៅពេលក្រោយ។",
     "admissionRequired": "ឧបករណ៍របស់អ្នកមិនអាចផ្ទៀងផ្ទាត់បានទេ។ ប្រើ '$t(login.moreSignInOptions)' ដើម្បីចូលនៅលើឧបករណ៍ផ្សេង ឬតាមរយៈបណ្ដាញ។",
     "default": "មានអ្វីមួយខុសប្រក្រតី។ សូមព្យាយាមម្ដងទៀត។",
-    "retryableAdmission": "យើងមិនអាចផ្ទៀងផ្ទាត់ឧបករណ៍នេះបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។"
+    "retryableAdmission": "យើងមិនអាចផ្ទៀងផ្ទាត់ឧបករណ៍នេះបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
+    "startSignInFailed": "មិនអាចចាប់ផ្តើមការចូល។ សូមព្យាយាមម្តងទៀត។",
+    "couldNotOpenBrowser": "មិនអាចបើកកម្មវិធីរុករក។ សូមព្យាយាមម្តងទៀត។",
+    "signInTimedOut": "ការចូលអស់ពេល។ សូមព្យាយាមម្តងទៀត។",
+    "signInFailed": "ការចូលបរាជ័យ។ សូមព្យាយាមម្តងទៀត។",
+    "networkError": "កំហុសបណ្តាញ។ សូមព្យាយាមម្តងទៀត។",
+    "accessDeniedByUser": "ការចូលប្រើត្រូវបានបដិសេធដោយអ្នកប្រើ",
+    "codeExpired": "កូដផុតកំណត់"
   },
   "models": {
     "dataCollected": "ទិន្នន័យដែលប្រមូលបាន",
-    "free": "ឥតគិតថ្លៃ"
+    "free": "ឥតគិតថ្លៃ",
+    "couldNotUpdateFavorites": "មិនអាចធ្វើបច្ចុប្បន្នភាពចំណូលចិត្ត"
   }
 }

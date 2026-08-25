@@ -22,7 +22,9 @@
     "copiedToClipboard": "Voasoratra tamin'ny clipboard",
     "couldNotCopyToClipboard": "Tsy afaka nanoratra tamin'ny clipboard",
     "required": "ilaina",
-    "error": "diso: {{error}}"
+    "error": "diso: {{error}}",
+    "back": "Hiverina",
+    "somethingWentWrong": "Nisy olana"
   },
   "language": {
     "title": "Fiteny",
@@ -280,7 +282,36 @@
         "body": "Tsy afaka namafa ny sampana: {{reason}}",
         "accessibility": "Nampirina. Tsy afaka namafa ny sampana: {{reason}}"
       },
-      "loadFailedTitle": "Tsy afaka namaky ny safidy hampirina"
+      "loadFailedTitle": "Tsy afaka namaky ny safidy hampirina",
+      "blocked": {
+        "unknownStateTitle": "Mbola tsy nambaran'ny GitHub ny fahafaha-mampirina",
+        "unknownStateDetail": "Andramo havaozina ny famintinana rehefa afaka kelikely.",
+        "conflictsTitle": "Fifanoheran'ny fampirina",
+        "conflictsDetail": "Vahao ny fifanoheran'ny fampirina amin'ity sampana ity alohan'ny hampirina.",
+        "requiredReviewsTitle": "Tsy ampy ny fandinihana ilaina",
+        "requiredReviewsDetail": "Tsy ampy na miandry ny fanekena avy amin'ny mpandinika ilaina.",
+        "failingChecksTitle": "Misy fanamarinana ilaina tsy mandalo",
+        "failingChecksDetail": "Tsy mandalo ny fanamarinana sata ilaina.",
+        "unstableTitle": "Misy fanamarinana tsy mandalo",
+        "unstableDetail": "Tsy mandalo ny fanamarinana tsy voatery. Tsy hanakana ny fampirina izy ireo.",
+        "draftTitle": "Draft pull request",
+        "draftDetail": "Mariho ny pull request ho vonona hofandrinihana alohan'ny hampirina.",
+        "behindTitle": "Lany daty ny sampana",
+        "behindDetailUpdatable": "Havaozy avy amin'ny base ny sampana, na ataovy rebase, alohan'ny hampirina.",
+        "behindDetail": "Lavitry ny base ny sampana loha. Ataovy rebase na havaozy ny sampana alohan'ny hampirina.",
+        "notMergeableTitle": "Mbola tsy azo hampirina ity pull request ity",
+        "notMergeableDetail": "Nambaran'ny GitHub ny fahafaha-mampirina {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Mamorona commit hampirina",
+        "squash": "Squash sy hampirina",
+        "rebase": "Rebase sy hampirina"
+      },
+      "methodDescriptions": {
+        "merge": "Ampiraiso ao amin'ny sampana base ny commit rehetra avy amin'ity sampana ity amin'ny alalan'ny commit hampirina.",
+        "squash": "Ampiraiso ho commit tokana ao amin'ny sampana base ny commit rehetra avy amin'ity sampana ity.",
+        "rebase": "Avereno amin'ny sampana base ny commit rehetra avy amin'ity sampana ity tsy misy commit hampirina."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Loha-dresaka {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} andalana fanampiny etsy ambony",
       "termsAcceptRequired": "Tsy maintsy manaiky ny Fepetran'ny fampiasana ianao vao afaka manaparitaka.",
       "termsOutdatedCopy": "Niova ny Fepetran'ny fampiasana. Sokafy indray ity efijery ity mba hanaiky ny kinova farany.",
-      "termsCheckRetryCopy": "Tsy afaka nanamarina ny Fepetran'ny fampiasana. Jereo ny fifandraisanao ary andramana indray."
+      "termsCheckRetryCopy": "Tsy afaka nanamarina ny Fepetran'ny fampiasana. Jereo ny fifandraisanao ary andramana indray.",
+      "reactions": {
+        "thumbsUp": "Ankihibe mitsangana",
+        "thumbsDown": "Ankihibe midina",
+        "laugh": "Hehy",
+        "hooray": "Hoera",
+        "confused": "Misafotofoto",
+        "heart": "Fo",
+        "rocket": "Balafomanga",
+        "eyes": "Masomaso"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Hevitra amin'ny rakitra {{path}}",
+        "fileComment": "Hevitra amin'ny rakitra",
+        "outdatedOnPathLines": "Lany daty amin'ny {{path}} {{lines}}",
+        "outdatedOnLines": "Lany daty amin'ny {{lines}}",
+        "outdatedOnPath": "Lany daty amin'ny {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Tsy afaka nanokatra ny fika GitHub App",
     "installKiloGitHubApp": "Ampetraho ny Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Mampiseho ny {{limit}} voalohany amin'ny {{total}} rakitra novaina — fetran'ny API GitHub"
     },
     "linkPasteClipboardEmpty": "Foana ny tahiry",
-    "linkPasteNotAPullRequest": "Tsy rohy pull request amin'ny GitHub io"
+    "linkPasteNotAPullRequest": "Tsy rohy pull request amin'ny GitHub io",
+    "announce": {
+      "commentPosted": "Navoaka ny hevitra",
+      "reviewSubmitted": "Nalefa ny fandinihana",
+      "autoMergeEnabled": "Alefa ny auto-merge"
+    }
   },
   "notifications": {
     "title": "Fampandrenesana",
@@ -656,7 +709,12 @@
       "sizeRejection": "Mihoatra ny fetran'ny {{limit}} rakitra ny {{filename}}.",
       "unreadable": "Tsy afaka namaky {{filename}}.",
       "pastedImage": "ny sary natsofoka",
-      "defaultName": "Rakitra"
+      "defaultName": "Rakitra",
+      "classificationDenied": "Tsy azo ampiana ny rakitra azo tanterahina",
+      "classificationEmpty": "Foana ny rakitra",
+      "classificationTooLarge": "Tsy maintsy 20 MB na latsaka ny rakitra",
+      "classificationUnreadable": "Tsy afaka namaky ity rakitra ity",
+      "announceUploaded": "Nampiakarina ny rakitra"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "MANOMBOKA",
       "stopped": "NIJANONA",
       "stopping": "MAMPIJANONA",
-      "unknown": "TSY FANTATRA"
+      "unknown": "TSY FANTATRA",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Tsy azo arahi-maso intsony ny hetsika voalahatra. Avereno vaovao raha hahita ny sata farany.",
     "initialSyncAdmissionFailed": "Nahafahana ny Security Agent, saingy tsy afaka nalahatra ny sincro voalohany. Sincro indray.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Efa nesorina ny fikarohana",
+      "findingDismissed": "Nesorina ny fikarohana",
+      "noRemediationsQueued": "Tsy misy fikarohana milahatra",
+      "remediationsQueued": "Milahatra ny fanarenana efa misy",
+      "analysisComplete": "Vita ny famakafakana",
+      "syncComplete": "Vita ny sync"
+    }
   },
   "agents": {
     "activeNow": "Mavitrika izao",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
-      "couldNotOpenMessage": "Tsy afaka nanomboka ny fanamboarana GitHub App izahay. Andramo indray azafady."
+      "couldNotOpenMessage": "Tsy afaka nanomboka ny fanamboarana GitHub App izahay. Andramo indray azafady.",
+      "installedTitle": "Voapetraka ny GitHub App",
+      "installedMessage": "Mifandray amin'izao ny repository-nao.",
+      "pendingTitle": "Miandry ny faneken'ny admin",
+      "pendingMessage": "Tsy maintsy eken'ny admin-n'ny fandaminana ny fangatahana fametrahana.",
+      "accountMismatchTitle": "Tsy mifanaraka ny kaonty",
+      "accountMismatchMessage": "Nanomboka tao amin'ny Kilo App niditra tamin'ny kaonty hafa ity fifandraisana ity. Midira amin'ny tranonkala amin'io kaonty io, na manomboha indray avy amin'ny app.",
+      "cannotCompleteTitle": "Tsy afaka mamita ny fametrahana",
+      "notAdminMessage": "Ny GitHub admin-n'io kaonty io ihany no afaka mampifandray azy. Mangataha amin'ny admin-n'ny fandaminana mba hametraka ny Kilo.",
+      "alreadyClaimedMessage": "Efa mifandray amin'ny Kilo kaonty hafa io fametrahana GitHub io. Esory ao aloha.",
+      "didNotCompleteTitle": "Tsy vita ny fametrahana",
+      "didNotCompleteMessage": "Tsy vita ny fametrahana ny GitHub App. Andramana indray avy amin'ny app."
     },
     "sessionExited": "Nifarana ny sessio",
     "remoteSpawnRetryable": "Tsy tratra ilay fitaovana — mety ho tapaka ny fifandraisana.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Tsy misy vonjimaika ny fandefasana e-mail. Andramo indray azafady.",
     "admissionRequired": "Tsy azo hamaivanina ny fitaovanao. Ampiasao ny '$t(login.moreSignInOptions)' hidirana amin'ny fitaovana hafa na amin'ny tranonkala.",
     "default": "Nisy olana. Andramo indray azafady.",
-    "retryableAdmission": "Tsy afaka nanamarina ity fitaovana ity izahay. Jereo ny fifandraisanao ary andramo indray."
+    "retryableAdmission": "Tsy afaka nanamarina ity fitaovana ity izahay. Jereo ny fifandraisanao ary andramo indray.",
+    "startSignInFailed": "Tsy afaka nanomboka ny fidirana. Andramo indray azafady.",
+    "couldNotOpenBrowser": "Tsy afaka nanokatra ny navigateur. Andramo indray azafady.",
+    "signInTimedOut": "Nifarana ny fotoana fidirana. Andramo indray azafady.",
+    "signInFailed": "Tsy nahomby ny fidirana. Andramo indray azafady.",
+    "networkError": "Hadisoan'ny tambajotra. Andramo indray azafady.",
+    "accessDeniedByUser": "Nolavin'ny mpampiasa ny fidirana",
+    "codeExpired": "Lany daty ny kaody"
   },
   "models": {
     "dataCollected": "Angona voaangona",
-    "free": "Maimaimpoana"
+    "free": "Maimaimpoana",
+    "couldNotUpdateFavorites": "Tsy afaka nanavao ny ankafizina"
   }
 }

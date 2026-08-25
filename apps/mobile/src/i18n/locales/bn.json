@@ -22,7 +22,9 @@
     "copiedToClipboard": "ক্লিপবোর্ডে কপি হয়েছে",
     "couldNotCopyToClipboard": "ক্লিপবোর্ডে কপি করা যায়নি",
     "required": "আবশ্যক",
-    "error": "ত্রুটি: {{error}}"
+    "error": "ত্রুটি: {{error}}",
+    "back": "পেছনে",
+    "somethingWentWrong": "কিছু ভুল হয়েছে"
   },
   "language": {
     "title": "ভাষা",
@@ -280,7 +282,36 @@
         "body": "ব্রাঞ্চ মুছে ফেলা যায়নি: {{reason}}",
         "accessibility": "মার্জ হয়েছে। ব্রাঞ্চ মুছে ফেলা যায়নি: {{reason}}"
       },
-      "loadFailedTitle": "মার্জ বিকল্প লোড করা যায়নি"
+      "loadFailedTitle": "মার্জ বিকল্প লোড করা যায়নি",
+      "blocked": {
+        "unknownStateTitle": "GitHub মার্জযোগ্য অবস্থা রিপোর্ট করেনি",
+        "unknownStateDetail": "কিছুক্ষণ পর ওভারভিউ রিফ্রেশ করার চেষ্টা করুন।",
+        "conflictsTitle": "মার্জ সংঘাত",
+        "conflictsDetail": "মার্জ করার আগে এই ব্রাঞ্চের মার্জ সংঘাতগুলো সমাধান করুন।",
+        "requiredReviewsTitle": "প্রয়োজনীয় রিভিউ অনুপস্থিত",
+        "requiredReviewsDetail": "প্রয়োজনীয় রিভিউয়ারদের অনুমোদন অনুপস্থিত বা মুলতুবি আছে।",
+        "failingChecksTitle": "প্রয়োজনীয় চেক ব্যর্থ হচ্ছে",
+        "failingChecksDetail": "প্রয়োজনীয় স্ট্যাটাস চেকগুলো ব্যর্থ হচ্ছে।",
+        "unstableTitle": "কিছু চেক ব্যর্থ হচ্ছে",
+        "unstableDetail": "অ-প্রয়োজনীয় চেকগুলো ব্যর্থ হচ্ছে। এগুলো মার্জ ব্লক করবে না।",
+        "draftTitle": "খসড়া পুল রিকোয়েস্ট",
+        "draftDetail": "মার্জ করার আগে পুল রিকোয়েস্টটিকে রিভিউয়ের জন্য প্রস্তুত হিসেবে চিহ্নিত করুন।",
+        "behindTitle": "ব্রাঞ্চটি পুরানো",
+        "behindDetailUpdatable": "মার্জ করার আগে বেস থেকে ব্রাঞ্চ আপডেট করুন, অথবা রিবেস করুন।",
+        "behindDetail": "হেড ব্রাঞ্চটি বেসের পিছনে আছে। মার্জ করার আগে রিবেস বা ব্রাঞ্চ আপডেট করুন।",
+        "notMergeableTitle": "এই পুল রিকোয়েস্টটি এখনও মার্জযোগ্য নয়",
+        "notMergeableDetail": "GitHub {{state}} মার্জযোগ্য অবস্থা রিপোর্ট করেছে।"
+      },
+      "methodLabels": {
+        "merge": "একটি মার্জ কমিট তৈরি করুন",
+        "squash": "স্কোয়াশ এবং মার্জ",
+        "rebase": "রিবেস এবং মার্জ"
+      },
+      "methodDescriptions": {
+        "merge": "মার্জ কমিট দিয়ে এই ব্রাঞ্চের সব কমিট বেস ব্রাঞ্চে একত্রিত করুন।",
+        "squash": "এই ব্রাঞ্চের সব কমিট বেস ব্রাঞ্চে একটি একক কমিটে একত্রিত করুন।",
+        "rebase": "মার্জ কমিট ছাড়াই এই ব্রাঞ্চের সব কমিট বেস ব্রাঞ্চে পুনরায় চালান।"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "আলোচনা থ্রেড {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… উপরে আরও {{displayCount}} লাইন",
       "termsAcceptRequired": "পোস্ট করতে আপনাকে অবশ্যই পরিষেবার শর্তাবলী গ্রহণ করতে হবে।",
       "termsOutdatedCopy": "পরিষেবার শর্তাবলী পরিবর্তিত হয়েছে। সর্বশেষ সংস্করণ গ্রহণ করতে এই স্ক্রিনটি আবার খুলুন।",
-      "termsCheckRetryCopy": "পরিষেবার শর্তাবলী পরীক্ষা করা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।"
+      "termsCheckRetryCopy": "পরিষেবার শর্তাবলী পরীক্ষা করা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "reactions": {
+        "thumbsUp": "থাম্বস আপ",
+        "thumbsDown": "থাম্বস ডাউন",
+        "laugh": "হাসি",
+        "hooray": "হুররে",
+        "confused": "বিভ্রান্ত",
+        "heart": "হৃদয়",
+        "rocket": "রকেট",
+        "eyes": "চোখ"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}}-এ ফাইল মন্তব্য",
+        "fileComment": "ফাইল মন্তব্য",
+        "outdatedOnPathLines": "{{path}} {{lines}}-এ পুরানো",
+        "outdatedOnLines": "{{lines}}-এ পুরানো",
+        "outdatedOnPath": "{{path}}-এ পুরানো"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপ সেটিংস খোলা যায়নি",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
@@ -523,7 +571,12 @@
       "tapToComment": "{{label}}, মন্তব্য করতে আলতো চাপুন"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি",
-    "linkPasteNotAPullRequest": "এটি একটি GitHub pull request লিংক নয়"
+    "linkPasteNotAPullRequest": "এটি একটি GitHub pull request লিংক নয়",
+    "announce": {
+      "commentPosted": "মন্তব্য পোস্ট হয়েছে",
+      "reviewSubmitted": "রিভিউ জমা হয়েছে",
+      "autoMergeEnabled": "অটো-মার্জ সক্রিয় হয়েছে"
+    }
   },
   "notifications": {
     "title": "বিজ্ঞপ্তি",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} সংযুক্তি সীমা অতিক্রম করেছে।",
       "unreadable": "{{filename}} পড়া যায়নি।",
       "pastedImage": "পেস্ট করা ছবিটি",
-      "defaultName": "সংযুক্তি"
+      "defaultName": "সংযুক্তি",
+      "classificationDenied": "এক্সিকিউটেবল ফাইল সংযুক্ত করা যাবে না",
+      "classificationEmpty": "ফাইলটি খালি",
+      "classificationTooLarge": "ফাইলের আকার 20 MB বা তার কম হতে হবে",
+      "classificationUnreadable": "এই ফাইলটি পড়া যায়নি",
+      "announceUploaded": "সংযুক্তি আপলোড হয়েছে"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "শুরু হচ্ছে",
       "stopped": "বন্ধ",
       "stopping": "বন্ধ হচ্ছে",
-      "unknown": "অজানা"
+      "unknown": "অজানা",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "একটি সারিবদ্ধ অ্যাকশন আর ট্র্যাক করা যায়নি। সর্বশেষ অবস্থা দেখতে রিফ্রেশ করুন।",
     "initialSyncAdmissionFailed": "সিকিউরিটি এজেন্ট সক্রিয় করা হয়েছিল, কিন্তু প্রাথমিক সিঙ্ক সারিতে রাখা যায়নি। আবার সিঙ্ক করুন।",
-    "title": "সিকিউরিটি এজেন্ট"
+    "title": "সিকিউরিটি এজেন্ট",
+    "commands": {
+      "findingAlreadyDismissed": "ফলাফলটি ইতিমধ্যে খারিজ হয়েছে",
+      "findingDismissed": "ফলাফলটি খারিজ হয়েছে",
+      "noRemediationsQueued": "কোনো বিদ্যমান ফলাফল সারিবদ্ধ নেই",
+      "remediationsQueued": "বিদ্যমান প্রতিকার সারিবদ্ধ হয়েছে",
+      "analysisComplete": "বিশ্লেষণ সম্পূর্ণ",
+      "syncComplete": "সিঙ্ক সম্পূর্ণ"
+    }
   },
   "agents": {
     "activeNow": "এখন সক্রিয়",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
-      "couldNotOpenMessage": "আমরা GitHub অ্যাপ সেটআপ শুরু করতে পারিনি। আবার চেষ্টা করুন।"
+      "couldNotOpenMessage": "আমরা GitHub অ্যাপ সেটআপ শুরু করতে পারিনি। আবার চেষ্টা করুন।",
+      "installedTitle": "GitHub অ্যাপ ইনস্টল হয়েছে",
+      "installedMessage": "আপনার রিপোজিটরিগুলো এখন সংযুক্ত।",
+      "pendingTitle": "অ্যাডমিন অনুমোদনের অপেক্ষায়",
+      "pendingMessage": "ইনস্টলেশন অনুরোধটি অনুমোদন করতে হবে একজন সংস্থা অ্যাডমিনকে।",
+      "accountMismatchTitle": "অ্যাকাউন্ট মেলেনি",
+      "accountMismatchMessage": "এই সংযোগটি অন্য অ্যাকাউন্ট দিয়ে সাইন-ইন করা Kilo অ্যাপ থেকে শুরু হয়েছিল। সেই অ্যাকাউন্ট দিয়ে ওয়েবে সাইন-ইন করুন, অথবা অ্যাপ থেকে আবার শুরু করুন।",
+      "cannotCompleteTitle": "ইনস্টলেশন সম্পূর্ণ করা যাচ্ছে না",
+      "notAdminMessage": "শুধুমাত্র সেই অ্যাকাউন্টের একজন GitHub অ্যাডমিন এটি সংযোগ করতে পারবেন। Kilo ইনস্টল করতে একজন সংস্থা অ্যাডমিনকে বলুন।",
+      "alreadyClaimedMessage": "সেই GitHub ইনস্টলেশনটি ইতিমধ্যে অন্য একটি Kilo অ্যাকাউন্টের সাথে সংযুক্ত। সেখানে প্রথমে এটি সংযোগ বিচ্ছিন্ন করুন।",
+      "didNotCompleteTitle": "ইনস্টলেশন সম্পূর্ণ হয়নি",
+      "didNotCompleteMessage": "GitHub অ্যাপ ইনস্টলেশনটি সম্পূর্ণ হয়নি। অ্যাপ থেকে আবার চেষ্টা করুন।"
     },
     "sessionExited": "সেশন বন্ধ হয়েছে",
     "remoteSpawnRetryable": "ইনস্ট্যান্সে পৌঁছানো যায়নি — এটি সংযোগ বিচ্ছিন্ন হতে পারে।",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ইমেইল ডেলিভারি সাময়িকভাবে অনুপলব্ধ। অনুগ্রহ করে পরে আবার চেষ্টা করুন।",
     "admissionRequired": "আপনার ডিভাইস যাচাই করা যাচ্ছে না। অন্য একটি ডিভাইসে বা ওয়েবে সাইন-ইন করতে '$t(login.moreSignInOptions)' ব্যবহার করুন।",
     "default": "কিছু ভুল হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
-    "retryableAdmission": "আমরা এই ডিভাইসটি যাচাই করতে পারিনি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।"
+    "retryableAdmission": "আমরা এই ডিভাইসটি যাচাই করতে পারিনি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+    "startSignInFailed": "সাইন-ইন শুরু করা যায়নি। আবার চেষ্টা করুন।",
+    "couldNotOpenBrowser": "ব্রাউজার খোলা যায়নি। আবার চেষ্টা করুন।",
+    "signInTimedOut": "সাইন-ইনের সময় শেষ হয়েছে। আবার চেষ্টা করুন।",
+    "signInFailed": "সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+    "networkError": "নেটওয়ার্ক ত্রুটি। আবার চেষ্টা করুন।",
+    "accessDeniedByUser": "ব্যবহারকারী অ্যাক্সেস অস্বীকার করেছেন",
+    "codeExpired": "কোডের মেয়াদ শেষ হয়েছে"
   },
   "models": {
     "dataCollected": "সংগৃহীত ডেটা",
-    "free": "ফ্রি"
+    "free": "ফ্রি",
+    "couldNotUpdateFavorites": "প্রিয় আপডেট করা যায়নি"
   }
 }

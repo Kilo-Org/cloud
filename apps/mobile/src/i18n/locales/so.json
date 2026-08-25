@@ -22,7 +22,9 @@
     "copiedToClipboard": "Waxaa la nuqulay",
     "couldNotCopyToClipboard": "Ma nuqulin karin",
     "required": "loo baahan yahay",
-    "error": "khalad: {{error}}"
+    "error": "khalad: {{error}}",
+    "back": "Dib",
+    "somethingWentWrong": "Waxbaa khaldamay"
   },
   "language": {
     "title": "Luuqad",
@@ -280,7 +282,36 @@
         "body": "Laanta lama tirtiri karin: {{reason}}",
         "accessibility": "Waa la daray. Laanta lama tirtiri karin: {{reason}}"
       },
-      "loadFailedTitle": "Xulashooyinka merge lama soo qaadin karin"
+      "loadFailedTitle": "Xulashooyinka merge lama soo qaadin karin",
+      "blocked": {
+        "unknownStateTitle": "GitHub ma sheegin heer mergeable ah",
+        "unknownStateDetail": "Mar kale day cusboonaysiinta dulmarka dhawaan.",
+        "conflictsTitle": "Isku dhacyada merge",
+        "conflictsDetail": "Xali isku dhacyada merge ee laantan ka hor intaadan ku darin.",
+        "requiredReviewsTitle": "Dib-u-eegisyo loo baahan yahay ayaa maqan",
+        "requiredReviewsDetail": "Oggolaanshaha dib-u-eegayaasha loo baahan yahay waa maqan yihiin ama way sugan yihiin.",
+        "failingChecksTitle": "Baaris loo baahan yahay oo fashilmay",
+        "failingChecksDetail": "Baarista heerka ee loo baahan yahay way fashilmayaan.",
+        "unstableTitle": "Qaar ka mid ah baarista way fashilmayaan",
+        "unstableDetail": "Baarista aan loo baahnayn way fashilmayaan. Ma xirin doonaan merge-ka.",
+        "draftTitle": "Pull request qabyo ah",
+        "draftDetail": "Calaamadee pull request-ka inuu diyaar u yahay dib-u-eegista ka hor intaadan ku darin.",
+        "behindTitle": "Laantu wey duugoobtay",
+        "behindDetailUpdatable": "Ka cusbooneysii laanta saldhigga, ama rebase-ee, ka hor intaadan ku darin.",
+        "behindDetail": "Laanta madaxa waxay ka dambeysaa saldhigga. Rebase-ee ama cusbooneysii laanta ka hor intaadan ku darin.",
+        "notMergeableTitle": "Pull request-kan wali lama dari karo",
+        "notMergeableDetail": "GitHub waxay soo sheegtay heer mergeable ah oo {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Abuur commit merge ah",
+        "squash": "Squash oo ku dar",
+        "rebase": "Rebase oo ku dar"
+      },
+      "methodDescriptions": {
+        "merge": "Isku dar dhammaan commits-ka laantan kuna laanta saldhigga iyadoo la isticmaalayo commit merge ah.",
+        "squash": "Isku dar dhammaan commits-ka laantan hal commit oo keliya oo ku yaal laanta saldhigga.",
+        "rebase": "Dib u ciyaar dhammaan commits-ka laantan ee laanta saldhigga iyadoon la isticmaalin commit merge ah."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Wadashaqeynta doodda {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} xariiq oo dheeri ah korka",
       "termsAcceptRequired": "Waa inaad ogolaataa Shuruudaha Adeegga si aad wax u dajiso.",
       "termsOutdatedCopy": "Shuruudaha Adeeggu way beddelmeen. Dib u fur shaashaddan si aad u oggolaato nuqulka ugu cusub.",
-      "termsCheckRetryCopy": "Shuruudaha Adeegga lama hubin karin. Hubi xiriirkaaga oo mar kale isku day."
+      "termsCheckRetryCopy": "Shuruudaha Adeegga lama hubin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "reactions": {
+        "thumbsUp": "Suul kor",
+        "thumbsDown": "Suul hoos",
+        "laugh": "Qosol",
+        "hooray": "Hooray",
+        "confused": "Jahwareer",
+        "heart": "Qalbi",
+        "rocket": "Raket",
+        "eyes": "Indho"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Faallada faylka ee {{path}}",
+        "fileComment": "Faallada faylka",
+        "outdatedOnPathLines": "Waa duugoobay ee {{path}} {{lines}}",
+        "outdatedOnLines": "Waa duugoobay ee {{lines}}",
+        "outdatedOnPath": "Waa duugoobay ee {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Dejinta GitHub App lama furi karin",
     "installKiloGitHubApp": "Rakib Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub"
     },
     "linkPasteClipboardEmpty": "Qalabka koobigu waa madhan",
-    "linkPasteNotAPullRequest": "Kuma aha xiriiriyaha codsiga jiidista GitHub"
+    "linkPasteNotAPullRequest": "Kuma aha xiriiriyaha codsiga jiidista GitHub",
+    "announce": {
+      "commentPosted": "Faallada waa la dajiyay",
+      "reviewSubmitted": "Dib-u-eegista waa la gudbiyay",
+      "autoMergeEnabled": "Auto-merge waa la furay"
+    }
   },
   "notifications": {
     "title": "Ogaysiisyada",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} waxay ka weyn tahay xadka lifaaqa ee {{limit}}.",
       "unreadable": "{{filename}} lama aqrin karin.",
       "pastedImage": "sawirka la dhajiyay",
-      "defaultName": "Lifaaq"
+      "defaultName": "Lifaaq",
+      "classificationDenied": "Faylasha fulinta ah lama lifaaqi karo",
+      "classificationEmpty": "Faylku waa madhan",
+      "classificationTooLarge": "Faylasha waa inay ahaadaan 20 MB ama ka yar",
+      "classificationUnreadable": "Faylkan lama aqrin karin",
+      "announceUploaded": "Lifaaqda waa la soo geliyay"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "BILAABAYA",
       "stopped": "JOOGSATAY",
       "stopping": "JOOGSINAYA",
-      "unknown": "LAMA YAQANN"
+      "unknown": "LAMA YAQANN",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Tallaabo safan ah ayaan mar dambe la socon karin. Cusboonaysii si aad u aragto heerka ugu dambeeyay.",
     "initialSyncAdmissionFailed": "Security Agent waa la shiday, laakiin isku-xidhka koowaad lama safan karin. Mar kale isku-xidh.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Natiijada horeyba waa la iska tuuray",
+      "findingDismissed": "Natiijada waa la iska tuuray",
+      "noRemediationsQueued": "Ma jiraan natiijooyin jira oo safka ku jira",
+      "remediationsQueued": "Wax ka saarista jirta ayaa safka ku jirta",
+      "analysisComplete": "Falanqaynta waa la dhammeeyay",
+      "syncComplete": "Sync-ka waa la dhammeeyay"
+    }
   },
   "agents": {
     "activeNow": "Hadda firfircoon",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Lama furi karin GitHub",
-      "couldNotOpenMessage": "Lama bilaabi karin dejinta App-ka GitHub. Fadlan mar kale isku day."
+      "couldNotOpenMessage": "Lama bilaabi karin dejinta App-ka GitHub. Fadlan mar kale isku day.",
+      "installedTitle": "GitHub App waa la rakibay",
+      "installedMessage": "Kaydadkaagu hadda waa ku xidhan yihiin.",
+      "pendingTitle": "Sugaya oggolaanshaha maamulka",
+      "pendingMessage": "Maamulaha hay'adda waa inuu oggolaadaa codsiga rakibidda.",
+      "accountMismatchTitle": "Isma qabsasho akoon",
+      "accountMismatchMessage": "Xiriirkan waxaa laga bilaabay Kilo App oo lagu soo galay akoon ka duwan. Ku soo gal web-ka akoonkaas, ama dib uga bilaab app-ka.",
+      "cannotCompleteTitle": "Rakibidda lama dhammayn karo",
+      "notAdminMessage": "Kaliya maamulaha GitHub ee akoonkaas ayaa ku xidhi kara. Weydii maamulaha hay'adda inuu rakibo Kilo.",
+      "alreadyClaimedMessage": "Rakibidda GitHub ee horey ayaa ku xidhan akoon Kilo oo kale. Marka hore halkaas ka gooy.",
+      "didNotCompleteTitle": "Rakibidda lama dhammeeyin",
+      "didNotCompleteMessage": "Rakibidda GitHub App lama dhammeeyin. Mar kale isku day app-ka."
     },
     "sessionExited": "Kalfadhi ayaa ka baxay",
     "remoteSpawnRetryable": "Lama gaadhin kolkuu ahaa — waxaa laga yaabaa inuu ka xidhmo.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Keenista email-ka waxay si kumeel-gaar ah u maqan tahay. Fadlan mar kale isku day.",
     "admissionRequired": "Qalabkaaga lama xaqiijin karo. Isticmaal '$t(login.moreSignInOptions)' si aad u gasho qalab kale ama shabakadda dhexdeeda.",
     "default": "Waxbaa qalday. Fadlan mar kale isku day.",
-    "retryableAdmission": "Kuma awoodin inaan xaqiijino qalabkan. Hubi xiriirkaaga oo mar kale isku day."
+    "retryableAdmission": "Kuma awoodin inaan xaqiijino qalabkan. Hubi xiriirkaaga oo mar kale isku day.",
+    "startSignInFailed": "Soo galista lama bilaabi karin. Fadlan mar kale isku day.",
+    "couldNotOpenBrowser": "Browser-ka lama furi karin. Fadlan mar kale isku day.",
+    "signInTimedOut": "Soo galista waqtigeedii wuu dhacay. Fadlan mar kale isku day.",
+    "signInFailed": "Soo galista way fashilantay. Fadlan mar kale isku day.",
+    "networkError": "Khalad shabakadeed. Fadlan mar kale isku day.",
+    "accessDeniedByUser": "Gelitaanka isticmaaluhu wuu diiday",
+    "codeExpired": "Koodhku wuu dhacay"
   },
   "models": {
     "dataCollected": "Xog la ururiyay",
-    "free": "Bilaash"
+    "free": "Bilaash",
+    "couldNotUpdateFavorites": "Kuwa la jeclaaday lama cusboonaysiin karin"
   }
 }

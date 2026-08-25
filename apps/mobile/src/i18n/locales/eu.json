@@ -22,7 +22,9 @@
     "copiedToClipboard": "Arbelean kopiatuta",
     "couldNotCopyToClipboard": "Ezin izan da arbelean kopiatu",
     "required": "beharrezkoa",
-    "error": "errorea: {{error}}"
+    "error": "errorea: {{error}}",
+    "back": "Atzera",
+    "somethingWentWrong": "Zerbait gaizki joan da"
   },
   "language": {
     "title": "Hizkuntza",
@@ -280,7 +282,36 @@
         "body": "Ezin izan da adarra ezabatu: {{reason}}",
         "accessibility": "Batuta. Ezin izan da adarra ezabatu: {{reason}}"
       },
-      "loadFailedTitle": "Ezin izan dira batze-aukerak kargatu"
+      "loadFailedTitle": "Ezin izan dira batze-aukerak kargatu",
+      "blocked": {
+        "unknownStateTitle": "GitHub-ek ez du batze-egoerarik jakinarazi",
+        "unknownStateDetail": "Saiatu ikuspegi orokorra freskatzen une batean.",
+        "conflictsTitle": "Batze-gatazkak",
+        "conflictsDetail": "Konpondu batze-gatazkak adar honetan batu aurretik.",
+        "requiredReviewsTitle": "Beharrezko berrikuspenak falta dira",
+        "requiredReviewsDetail": "Beharrezko berrikusleen onespenak falta dira edo zain daude.",
+        "failingChecksTitle": "Beharrezko egiaztapenak huts egiten",
+        "failingChecksDetail": "Beharrezko egoera-egiaztapenak huts egiten ari dira.",
+        "unstableTitle": "Egiaztapen batzuk huts egiten ari dira",
+        "unstableDetail": "Beharrezkoak ez diren egiaztapenak huts egiten ari dira. Ez dute batzea blokeatuko.",
+        "draftTitle": "Pull request zirriborroa",
+        "draftDetail": "Markatu pull request-a berrikusketarako prest batu aurretik.",
+        "behindTitle": "Adarra zaharkituta dago",
+        "behindDetailUpdatable": "Eguneratu adarra oinarritik edo berregin rebase-a batu aurretik.",
+        "behindDetail": "Buruko adarra oinarriaren atzean dago. Berregin rebase-a edo eguneratu adarra batu aurretik.",
+        "notMergeableTitle": "Pull request hau oraindik ezin da batu",
+        "notMergeableDetail": "GitHub-ek {{state}} batze-egoera jakinarazi du."
+      },
+      "methodLabels": {
+        "merge": "Sortu batze-commit bat",
+        "squash": "Squash-a eta batu",
+        "rebase": "Rebase-a eta batu"
+      },
+      "methodDescriptions": {
+        "merge": "Konbinatu adar honen commit guztiak oinarrizko adarrean batze-commit batekin.",
+        "squash": "Konbinatu adar honen commit guztiak commit bakarrean oinarrizko adarrean.",
+        "rebase": "Erreproduzitu adar honen commit guztiak oinarrizko adarrean batze-commit gabe."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Eztabaida-haria {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "... {{displayCount}} lerro gehiago goian",
       "termsAcceptRequired": "Zerbitzu-baldintzak onartu behar dituzu argitaratzeko.",
       "termsOutdatedCopy": "Zerbitzu-baldintzak aldatu dira. Ireki pantaila hau berriro azken bertsioa onartzeko.",
-      "termsCheckRetryCopy": "Ezin izan dira Zerbitzu-baldintzak egiaztatu. Egiaztatu konexioa eta saiatu berriro."
+      "termsCheckRetryCopy": "Ezin izan dira Zerbitzu-baldintzak egiaztatu. Egiaztatu konexioa eta saiatu berriro.",
+      "reactions": {
+        "thumbsUp": "Pulgarra gora",
+        "thumbsDown": "Pulgarra behera",
+        "laugh": "Barre",
+        "hooray": "Hurra",
+        "confused": "Nahasia",
+        "heart": "Bihotza",
+        "rocket": "Suziria",
+        "eyes": "Begiak"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Fitxategi-iruzkina: {{path}}",
+        "fileComment": "Fitxategi-iruzkina",
+        "outdatedOnPathLines": "Zaharkitua: {{path}} {{lines}}",
+        "outdatedOnLines": "Zaharkitua: {{lines}}",
+        "outdatedOnPath": "Zaharkitua: {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Ezin izan da GitHub aplikazioaren ezarpena ireki",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
@@ -523,7 +571,12 @@
       "truncationBanner": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten — GitHub API muga"
     },
     "linkPasteClipboardEmpty": "Arbel hutsik dago",
-    "linkPasteNotAPullRequest": "Ez da GitHub-en pull request esteka bat"
+    "linkPasteNotAPullRequest": "Ez da GitHub-en pull request esteka bat",
+    "announce": {
+      "commentPosted": "Iruzkina argitaratuta",
+      "reviewSubmitted": "Berrikuspena bidalita",
+      "autoMergeEnabled": "Auto-batzea gaituta"
+    }
   },
   "notifications": {
     "title": "Jakinarazpenak",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} eranskina-mugaren gainetik dago.",
       "unreadable": "Ezin izan da {{filename}} irakurri.",
       "pastedImage": "itsatsitako irudia",
-      "defaultName": "Eranskina"
+      "defaultName": "Eranskina",
+      "classificationDenied": "Fitxategi exekutagarriak ezin dira erantsi",
+      "classificationEmpty": "Fitxategia hutsik dago",
+      "classificationTooLarge": "Fitxategiak 20 MB edo txikiagoak izan behar dira",
+      "classificationUnreadable": "Ezin izan da fitxategi hau irakurri",
+      "announceUploaded": "Eranskina igo da"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "HASTEN",
       "stopped": "GELDITUTA",
       "stopping": "GELDITZEN",
-      "unknown": "EZEZAGUNA"
+      "unknown": "EZEZAGUNA",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Ilaran jarritako ekintza bat ezin da jada jarraitu. Freskatu azken egoera ikusteko.",
     "initialSyncAdmissionFailed": "Security Agent gaituta, baina hasierako sinkronizazioa ezin da ilaran jarri. Sinkronizatu berriro.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Emaitza jada baztertuta",
+      "findingDismissed": "Emaitza baztertuta",
+      "noRemediationsQueued": "Ez da emaitza existenterik ilaratu",
+      "remediationsQueued": "Lehendik dauden konponketak ilaratu dira",
+      "analysisComplete": "Analisia osatuta",
+      "syncComplete": "Sinkronizazioa osatuta"
+    }
   },
   "agents": {
     "activeNow": "Orain aktibo",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin da GitHub ireki",
-      "couldNotOpenMessage": "Ezin izan dugu GitHub App konfigurazioa hasi. Saiatu berriro."
+      "couldNotOpenMessage": "Ezin izan dugu GitHub App konfigurazioa hasi. Saiatu berriro.",
+      "installedTitle": "GitHub aplikazioa instalatuta",
+      "installedMessage": "Zure biltegiak konektatuta daude orain.",
+      "pendingTitle": "Administratzailearen onarpenaren zain",
+      "pendingMessage": "Erakundeko administratzaile batek onartu behar du instalazio-eskaera.",
+      "accountMismatchTitle": "Kontuen desadostasuna",
+      "accountMismatchMessage": "Konexio hau Kilo aplikazioaren beste kontu batekin hasi zen. Hasi saioa webgunean kontu horrekin, edo hasi berriro aplikaziotik.",
+      "cannotCompleteTitle": "Ezin da instalazioa osatu",
+      "notAdminMessage": "Kontu hori erakundeko GitHub administratzaile batek soilik konekta dezake. Eskatu erakundeko administratzaile bati Kilo instalatzeko.",
+      "alreadyClaimedMessage": "GitHub instalazio hori jada beste Kilo kontu batekin konektatuta dago. Deskonektatu lehenengo han.",
+      "didNotCompleteTitle": "Instalazioa ez da osatu",
+      "didNotCompleteMessage": "GitHub aplikazioaren instalazioa ez da osatu. Saiatu berriro aplikaziotik."
     },
     "sessionExited": "Saioa itxi da",
     "remoteSpawnRetryable": "Ezin izan da instantziara iritsi; baliteke deskonektatuta egotea.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Posta elektronikoaren entrega aldi baterako ez dago erabilgarri. Saiatu berriro geroago.",
     "admissionRequired": "Zure gailua ezin da egiaztatu. Erabili '$t(login.moreSignInOptions)' beste gailu batean edo webgunearen bidez saioa hasteko.",
     "default": "Zerbait gaizki joan da. Saiatu berriro.",
-    "retryableAdmission": "Ezin izan dugu gailu hau egiaztatu. Egiaztatu zure konexioa eta saiatu berriro."
+    "retryableAdmission": "Ezin izan dugu gailu hau egiaztatu. Egiaztatu zure konexioa eta saiatu berriro.",
+    "startSignInFailed": "Ezin da saioa hasi. Saiatu berriro.",
+    "couldNotOpenBrowser": "Ezin da nabigatzailea ireki. Saiatu berriro.",
+    "signInTimedOut": "Saioa iraungi da. Saiatu berriro.",
+    "signInFailed": "Saioa hasteak huts egin du. Saiatu berriro.",
+    "networkError": "Sare-errorea. Saiatu berriro.",
+    "accessDeniedByUser": "Erabiltzaileak sarbidea ukatu du",
+    "codeExpired": "Kodea iraungi da"
   },
   "models": {
     "dataCollected": "Bildutako datuak",
-    "free": "Doan"
+    "free": "Doan",
+    "couldNotUpdateFavorites": "Ezin izan dira gogokoak eguneratu"
   }
 }

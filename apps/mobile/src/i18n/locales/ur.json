@@ -22,7 +22,9 @@
     "copiedToClipboard": "کلپ بورڈ پر کاپی ہو گیا",
     "couldNotCopyToClipboard": "کلپ بورڈ پر کاپی نہیں ہو سکا",
     "required": "مطلوبہ",
-    "error": "خرابی: {{error}}"
+    "error": "خرابی: {{error}}",
+    "back": "واپس",
+    "somethingWentWrong": "کچھ غلط ہو گیا"
   },
   "language": {
     "title": "زبان",
@@ -280,7 +282,36 @@
         "body": "برانچ حذف نہیں ہو سکی: {{reason}}",
         "accessibility": "مرج ہو گیا۔ برانچ حذف نہیں ہو سکی: {{reason}}"
       },
-      "loadFailedTitle": "مرج کے اختیارات لوڈ نہیں ہو سکے"
+      "loadFailedTitle": "مرج کے اختیارات لوڈ نہیں ہو سکے",
+      "blocked": {
+        "unknownStateTitle": "GitHub نے مرجیبلٹی حالت رپورٹ نہیں کی",
+        "unknownStateDetail": "تھوڑی دیر میں جائزہ تازہ کرنے کی کوشش کریں۔",
+        "conflictsTitle": "مرج تنازعات",
+        "conflictsDetail": "مرج کرنے سے پہلے اس برانچ کے مرج تنازعات حل کریں۔",
+        "requiredReviewsTitle": "مطلوبہ جائزے غائب ہیں",
+        "requiredReviewsDetail": "مطلوبہ جائزہ لینے والوں کی منظوریاں غائب یا زیر التوا ہیں۔",
+        "failingChecksTitle": "ناکام مطلوبہ جانچیں",
+        "failingChecksDetail": "مطلوبہ اسٹیٹس جانچیں ناکام ہو رہی ہیں۔",
+        "unstableTitle": "کچھ جانچیں ناکام ہیں",
+        "unstableDetail": "غیر مطلوبہ جانچیں ناکام ہیں۔ وہ مرج کو روکیں گی نہیں۔",
+        "draftTitle": "ڈرافٹ پل ریکویسٹ",
+        "draftDetail": "مرج سے پہلے پل ریکویسٹ کو جائزے کے لیے تیار نشان زد کریں۔",
+        "behindTitle": "برانچ پرانی ہو گئی ہے",
+        "behindDetailUpdatable": "مرج سے پہلے برانچ کو بیس سے اپ ڈیٹ کریں، یا ریبیس کریں۔",
+        "behindDetail": "ہیڈ برانچ بیس سے پیچھے ہے۔ مرج سے پہلے برانچ کو ریبیس کریں یا اپ ڈیٹ کریں۔",
+        "notMergeableTitle": "یہ پل ریکویسٹ ابھی مرج نہیں ہو سکتی",
+        "notMergeableDetail": "GitHub نے {{state}} مرجیبلٹی حالت رپورٹ کی۔"
+      },
+      "methodLabels": {
+        "merge": "مرج کمیٹ بنائیں",
+        "squash": "اسکواش اور مرج کریں",
+        "rebase": "ریبیس اور مرج کریں"
+      },
+      "methodDescriptions": {
+        "merge": "اس برانچ کی تمام کمیٹوں کو ایک مرج کمیٹ کے ساتھ بیس برانچ میں ملا دیتا ہے۔",
+        "squash": "اس برانچ کی تمام کمیٹوں کو بیس برانچ پر ایک ہی کمیٹ میں ملا دیتا ہے۔",
+        "rebase": "اس برانچ کی تمام کمیٹوں کو مرج کمیٹ کے بغیر بیس برانچ پر دوبارہ چلاتا ہے۔"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "تبادلۂ خیال تھریڈ {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "اوپر مزید {{displayCount}} لائنیں...",
       "termsAcceptRequired": "پوسٹ کرنے کے لیے آپ کو خدمت کی شرائط قبول کرنی ہوں گی۔",
       "termsOutdatedCopy": "خدمت کی شرائط تبدیل ہو گئیں۔ تازہ ترین ورژن قبول کرنے کے لیے یہ اسکرین دوبارہ کھولیں۔",
-      "termsCheckRetryCopy": "خدمت کی شرائط چیک نہیں ہو سکیں۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
+      "termsCheckRetryCopy": "خدمت کی شرائط چیک نہیں ہو سکیں۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "reactions": {
+        "thumbsUp": "انگوٹھا اوپر",
+        "thumbsDown": "انگوٹھا نیچے",
+        "laugh": "ہنسی",
+        "hooray": "شاباش",
+        "confused": "الجھا ہوا",
+        "heart": "دل",
+        "rocket": "راکٹ",
+        "eyes": "آنکھیں"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} پر فائل تبصرہ",
+        "fileComment": "فائل تبصرہ",
+        "outdatedOnPathLines": "{{path}} {{lines}} پر پرانا",
+        "outdatedOnLines": "{{lines}} پر پرانا",
+        "outdatedOnPath": "{{path}} پر پرانا"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی سیٹنگز نہیں کھلی سکیں",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -523,7 +571,12 @@
       "truncationBanner": "کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں — GitHub API حد"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے",
-    "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ لنک نہیں ہے"
+    "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ لنک نہیں ہے",
+    "announce": {
+      "commentPosted": "تبصرہ پوسٹ ہو گیا",
+      "reviewSubmitted": "جائزہ جمع ہو گیا",
+      "autoMergeEnabled": "آٹو-مرج فعال ہو گیا"
+    }
   },
   "notifications": {
     "title": "اطلاعیں",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} {{limit}} منسلکہ حد سے بڑھ جاتی ہے۔",
       "unreadable": "{{filename}} پڑھی نہیں جا سکی۔",
       "pastedImage": "چسپاں کردہ تصویر",
-      "defaultName": "منسلکہ"
+      "defaultName": "منسلکہ",
+      "classificationDenied": "ایگزیکیوٹیبل فائلیں منسلک نہیں کی جا سکتیں",
+      "classificationEmpty": "فائل خالی ہے",
+      "classificationTooLarge": "فائلیں 20 MB یا اس سے چھوٹی ہونی چاہئیں",
+      "classificationUnreadable": "یہ فائل پڑھی نہیں جا سکی",
+      "announceUploaded": "منسلکہ اپ لوڈ ہو گیا"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "شروع ہو رہا ہے",
       "stopped": "رکا ہوا",
       "stopping": "روکا جا رہا ہے",
-      "unknown": "نامعلوم"
+      "unknown": "نامعلوم",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo آٹو",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "قطار میں موجود عمل کا مزید سراغ نہیں لگایا جا سکا۔ تازہ ترین حالت دیکھنے کے لیے تازہ کریں۔",
     "initialSyncAdmissionFailed": "سکیورٹی ایجنٹ فعال کیا گیا، لیکن ابتدائی ہم آہنگی قطار میں نہیں لگائی جا سکی۔ دوبارہ ہم آہنگ کریں۔",
-    "title": "سکیورٹی ایجنٹ"
+    "title": "سکیورٹی ایجنٹ",
+    "commands": {
+      "findingAlreadyDismissed": "نتیجہ پہلے ہی خارج کیا جا چکا ہے",
+      "findingDismissed": "نتیجہ خارج کر دیا گیا",
+      "noRemediationsQueued": "کوئی موجودہ نتیجہ قطار میں نہیں",
+      "remediationsQueued": "موجودہ اصلاحات قطار میں شامل کر دی گئیں",
+      "analysisComplete": "تجزیہ مکمل ہو گیا",
+      "syncComplete": "مطابقت مکمل ہو گئی"
+    }
   },
   "agents": {
     "activeNow": "ابھی فعال",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
-      "couldNotOpenMessage": "ہم GitHub App سیٹ اپ شروع نہیں کر سکے۔ براہ کرم دوبارہ کوشش کریں۔"
+      "couldNotOpenMessage": "ہم GitHub App سیٹ اپ شروع نہیں کر سکے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "installedTitle": "GitHub ایپ انسٹال ہو گئی",
+      "installedMessage": "آپ کی ریپوزٹریاں اب منسلک ہیں۔",
+      "pendingTitle": "ایڈمن کی منظوری کا انتظار",
+      "pendingMessage": "تنظیم کے ایڈمن کو انسٹالیشن کی درخواست منظور کرنی ہوگی۔",
+      "accountMismatchTitle": "اکاؤنٹ مماثل نہیں",
+      "accountMismatchMessage": "یہ کنکشن Kilo ایپ سے شروع کیا گیا تھا جو کسی مختلف اکاؤنٹ سے سائن ان تھی۔ اس اکاؤنٹ سے ویب پر سائن ان کریں، یا ایپ سے دوبارہ شروع کریں۔",
+      "cannotCompleteTitle": "انسٹالیشن مکمل نہیں ہو سکتی",
+      "notAdminMessage": "اس اکاؤنٹ کو صرف اس کا GitHub ایڈمن منسلک کر سکتا ہے۔ Kilo انسٹال کرنے کے لیے تنظیم کے ایڈمن سے کہیں۔",
+      "alreadyClaimedMessage": "یہ GitHub انسٹالیشن پہلے سے کسی دوسرے Kilo اکاؤنٹ سے منسلک ہے۔ پہلے وہاں سے منقطع کریں۔",
+      "didNotCompleteTitle": "انسٹالیشن مکمل نہیں ہوئی",
+      "didNotCompleteMessage": "GitHub ایپ کی انسٹالیشن مکمل نہیں ہوئی۔ ایپ سے دوبارہ کوشش کریں۔"
     },
     "sessionExited": "سیشن ختم ہو گیا",
     "remoteSpawnRetryable": "انسٹینس تک رسائی نہیں ہو سکی — شاید یہ منقطع ہو گیا ہے۔",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "ای میل کی ترسیل فی الحال دستیاب نہیں ہے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "admissionRequired": "آپ کے آلے کی تصدیق نہیں ہو سکی۔ دوسرے آلے پر یا ویب کے ذریعے سائن ان کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
     "default": "کچھ غلط ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
-    "retryableAdmission": "ہم اس آلے کی تصدیق نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
+    "retryableAdmission": "ہم اس آلے کی تصدیق نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "startSignInFailed": "سائن ان شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
+    "couldNotOpenBrowser": "براؤزر نہیں کھل سکا۔ براہ کرم دوبارہ کوشش کریں۔",
+    "signInTimedOut": "سائن ان کا وقت ختم ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
+    "signInFailed": "سائن ان ناکام رہا۔ براہ کرم دوبارہ کوشش کریں۔",
+    "networkError": "نیٹ ورک کی خرابی۔ براہ کرم دوبارہ کوشش کریں۔",
+    "accessDeniedByUser": "صارف نے رسائی مسترد کر دی",
+    "codeExpired": "کوڈ کی میعاد ختم ہو گئی"
   },
   "models": {
     "dataCollected": "جمع کردہ ڈیٹا",
-    "free": "مفت"
+    "free": "مفت",
+    "couldNotUpdateFavorites": "پسندیدہ اپ ڈیٹ نہیں ہو سکے"
   }
 }

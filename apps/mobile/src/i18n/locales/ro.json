@@ -22,7 +22,9 @@
     "copiedToClipboard": "Copiat în clipboard",
     "couldNotCopyToClipboard": "Nu s-a putut copia în clipboard",
     "required": "obligatoriu",
-    "error": "eroare: {{error}}"
+    "error": "eroare: {{error}}",
+    "back": "Înapoi",
+    "somethingWentWrong": "Ceva nu a mers bine"
   },
   "language": {
     "title": "Limba",
@@ -282,7 +284,36 @@
         "body": "Ramura nu a putut fi ștearsă: {{reason}}",
         "accessibility": "Fuzionat. Ramura nu a putut fi ștearsă: {{reason}}"
       },
-      "loadFailedTitle": "Nu s-au putut încărca opțiunile de fuziune"
+      "loadFailedTitle": "Nu s-au putut încărca opțiunile de fuziune",
+      "blocked": {
+        "unknownStateTitle": "GitHub nu a raportat o stare de fuzionare",
+        "unknownStateDetail": "Încearcă să reîmprospătezi prezentarea generală peste o clipă.",
+        "conflictsTitle": "Conflicte de fuzionare",
+        "conflictsDetail": "Rezolvă conflictele de fuzionare de pe această ramură înainte de fuzionare.",
+        "requiredReviewsTitle": "Lipsesc revizuirile obligatorii",
+        "requiredReviewsDetail": "Aprobările de la revizorii obligatorii lipsesc sau sunt în așteptare.",
+        "failingChecksTitle": "Verificările obligatorii eșuează",
+        "failingChecksDetail": "Verificările de stare obligatorii eșuează.",
+        "unstableTitle": "Unele verificări eșuează",
+        "unstableDetail": "Verificările neobligatorii eșuează. Nu vor bloca fuzionarea.",
+        "draftTitle": "Pull request în ciornă",
+        "draftDetail": "Marchează pull request-ul ca fiind gata pentru revizuire înainte de fuzionare.",
+        "behindTitle": "Ramura este învechită",
+        "behindDetailUpdatable": "Actualizează ramura de la bază sau fă rebase înainte de fuzionare.",
+        "behindDetail": "Ramura head este în urma bazei. Fă rebase sau actualizează ramura înainte de fuzionare.",
+        "notMergeableTitle": "Acest pull request nu poate fi fuzionat încă",
+        "notMergeableDetail": "GitHub a raportat o stare de fuzionare {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Creează un commit de fuzionare",
+        "squash": "Squash și fuzionează",
+        "rebase": "Rebase și fuzionează"
+      },
+      "methodDescriptions": {
+        "merge": "Combină toate commit-urile din această ramură în ramura de bază cu un commit de fuzionare.",
+        "squash": "Combină toate commit-urile din această ramură într-un singur commit pe ramura de bază.",
+        "rebase": "Reia toate commit-urile din această ramură pe ramura de bază fără un commit de fuzionare."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Fir de discuție {{anchorLabel}}",
@@ -360,7 +391,24 @@
       "termsOutdatedCopy": "Termenii de utilizare s-au schimbat. Redeschide acest ecran pentru a accepta versiunea cea mai recentă.",
       "termsCheckRetryCopy": "Nu s-a putut verifica Termenii de utilizare. Verifică conexiunea și încearcă din nou.",
       "comment_few": "{{displayCount}} comentarii",
-      "reaction_few": "reacții"
+      "reaction_few": "reacții",
+      "reactions": {
+        "thumbsUp": "Deget în sus",
+        "thumbsDown": "Deget în jos",
+        "laugh": "Râs",
+        "hooray": "Ura",
+        "confused": "Confuz",
+        "heart": "Inimă",
+        "rocket": "Rachetă",
+        "eyes": "Ochi"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentariu pe fișier la {{path}}",
+        "fileComment": "Comentariu pe fișier",
+        "outdatedOnPathLines": "Învechit pe {{path}} {{lines}}",
+        "outdatedOnLines": "Învechit pe {{lines}}",
+        "outdatedOnPath": "Învechit pe {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub",
     "installKiloGitHubApp": "Instalează Kilo GitHub App",
@@ -530,7 +578,12 @@
       "truncationBanner": "Se afișează primele {{limit}} din {{total}} fișiere modificate — limita API GitHub"
     },
     "linkPasteClipboardEmpty": "Clipboard-ul este gol",
-    "linkPasteNotAPullRequest": "Nu este un link de pull request GitHub"
+    "linkPasteNotAPullRequest": "Nu este un link de pull request GitHub",
+    "announce": {
+      "commentPosted": "Comentariu publicat",
+      "reviewSubmitted": "Revizuire trimisă",
+      "autoMergeEnabled": "Fuziunea automată activată"
+    }
   },
   "notifications": {
     "title": "Notificări",
@@ -663,7 +716,12 @@
       "sizeRejection": "{{filename}} depășește limita de atașare de {{limit}}.",
       "unreadable": "Nu s-a putut citi {{filename}}.",
       "pastedImage": "imaginea lipită",
-      "defaultName": "Atașament"
+      "defaultName": "Atașament",
+      "classificationDenied": "Fișierele executabile nu pot fi atașate",
+      "classificationEmpty": "Fișierul este gol",
+      "classificationTooLarge": "Fișierele trebuie să aibă 20 MB sau mai puțin",
+      "classificationUnreadable": "Nu s-a putut citi acest fișier",
+      "announceUploaded": "Atașament încărcat"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1037,7 +1095,8 @@
       "starting": "SE PORNEȘTE",
       "stopped": "OPRIT",
       "stopping": "SE OPRESTE",
-      "unknown": "NECUNOSCUT"
+      "unknown": "NECUNOSCUT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1725,7 +1784,15 @@
     },
     "queuedActionUntracked": "O acțiune pusă în coadă nu a mai putut fi urmărită. Reîmprospătează pentru a vedea cea mai recentă stare.",
     "initialSyncAdmissionFailed": "Security Agent a fost activat, dar sincronizarea inițială nu a putut fi pusă în coadă. Sincronizează din nou.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Constatarea a fost deja respinsă",
+      "findingDismissed": "Constatare respinsă",
+      "noRemediationsQueued": "Nicio constatare existentă pusă în coadă",
+      "remediationsQueued": "Remedierile existente au fost puse în coadă",
+      "analysisComplete": "Analiză finalizată",
+      "syncComplete": "Sincronizare finalizată"
+    }
   },
   "agents": {
     "activeNow": "Activ acum",
@@ -1775,7 +1842,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
-      "couldNotOpenMessage": "Nu am putut începe configurarea GitHub App. Încearcă din nou."
+      "couldNotOpenMessage": "Nu am putut începe configurarea GitHub App. Încearcă din nou.",
+      "installedTitle": "GitHub App instalată",
+      "installedMessage": "Depozitele tale sunt acum conectate.",
+      "pendingTitle": "În așteptarea aprobării administratorului",
+      "pendingMessage": "Un administrator al organizației trebuie să aprobe cererea de instalare.",
+      "accountMismatchTitle": "Neconcordanță de cont",
+      "accountMismatchMessage": "Această conexiune a fost pornită din aplicația Kilo, autentificat cu un alt cont. Autentifică-te pe web cu acel cont sau pornește din nou din aplicație.",
+      "cannotCompleteTitle": "Instalarea nu poate fi finalizată",
+      "notAdminMessage": "Doar un administrator GitHub al acelui cont o poate conecta. Cere unui administrator al organizației să instaleze Kilo.",
+      "alreadyClaimedMessage": "Acea instalare GitHub este deja conectată la un alt cont Kilo. Deconecteaz-o mai întâi acolo.",
+      "didNotCompleteTitle": "Instalarea nu s-a finalizat",
+      "didNotCompleteMessage": "Instalarea GitHub App nu a fost finalizată. Încearcă din nou din aplicație."
     },
     "sessionExited": "Sesiunea a fost închisă",
     "remoteSpawnRetryable": "Nu s-a putut ajunge la instanță — este posibil să se fi deconectat.",
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "Livrarea emailului este temporar indisponibilă. Încearcă din nou mai târziu.",
     "admissionRequired": "Dispozitivul tău nu poate fi verificat. Folosește „$t(login.moreSignInOptions)” pentru a te autentifica pe alt dispozitiv sau prin web.",
     "default": "Ceva nu a mers bine. Încearcă din nou.",
-    "retryableAdmission": "Nu am putut verifica acest dispozitiv. Verifică conexiunea și încearcă din nou."
+    "retryableAdmission": "Nu am putut verifica acest dispozitiv. Verifică conexiunea și încearcă din nou.",
+    "startSignInFailed": "Nu s-a putut începe autentificarea. Încearcă din nou.",
+    "couldNotOpenBrowser": "Nu s-a putut deschide browserul. Încearcă din nou.",
+    "signInTimedOut": "Autentificarea a expirat. Încearcă din nou.",
+    "signInFailed": "Autentificarea a eșuat. Încearcă din nou.",
+    "networkError": "Eroare de rețea. Încearcă din nou.",
+    "accessDeniedByUser": "Acces refuzat de utilizator",
+    "codeExpired": "Cod expirat"
   },
   "models": {
     "dataCollected": "Date colectate",
-    "free": "Gratuit"
+    "free": "Gratuit",
+    "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele"
   }
 }

@@ -22,6 +22,7 @@
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { i18n } from '@/i18n';
 import { parseTimestamp } from '@/lib/utils';
 
 // GitHub's 8 review-comment reaction content values. The trpc DTO
@@ -98,17 +99,23 @@ export function selectThreadAnchorLabel(thread: ReviewThread): string {
     // No complete original anchor — fall back to a path-only outdated label
     // (never render a dangling "L").
     if (originalLine === null) {
-      return path ? `Outdated on ${path}${side}` : `Outdated${side}`;
+      return path
+        ? i18n.t('prReview.discussion.anchor.outdatedOnPath', { path }) + side
+        : i18n.t('prReview.discussion.outdated') + side;
     }
     const original =
       thread.originalStartLine && thread.originalStartLine !== originalLine
         ? `L${thread.originalStartLine}–L${originalLine}`
         : `L${originalLine}`;
-    return path ? `Outdated on ${path} ${original}${side}` : `Outdated on ${original}${side}`;
+    return path
+      ? i18n.t('prReview.discussion.anchor.outdatedOnPathLines', { path, lines: original }) + side
+      : i18n.t('prReview.discussion.anchor.outdatedOnLines', { lines: original }) + side;
   }
   // File-level (subjectType FILE or no line) — only show path.
   if (thread.subjectType === 'FILE' || thread.line === null) {
-    return path ? `File comment on ${path}` : 'File comment';
+    return path
+      ? i18n.t('prReview.discussion.anchor.fileCommentOnPath', { path })
+      : i18n.t('prReview.discussion.anchor.fileComment');
   }
   // Active line / range.
   const line =

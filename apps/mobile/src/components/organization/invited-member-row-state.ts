@@ -87,7 +87,7 @@ export function useResendInvite(organizationId: string) {
       });
     },
     onError: (error: { message: string }) => {
-      announcingToast.error(error.message || 'Something went wrong');
+      announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
     },
   });
 }

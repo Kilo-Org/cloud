@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopeeriti lõikelauale",
     "couldNotCopyToClipboard": "Ei õnnestunud lõikelauale kopeerida",
     "required": "nõutav",
-    "error": "viga: {{error}}"
+    "error": "viga: {{error}}",
+    "back": "Tagasi",
+    "somethingWentWrong": "Midagi läks valesti"
   },
   "language": {
     "title": "Keel",
@@ -280,7 +282,36 @@
         "body": "Haru kustutamine ebaõnnestus: {{reason}}",
         "accessibility": "Ühendatud. Haru kustutamine ebaõnnestus: {{reason}}"
       },
-      "loadFailedTitle": "Ühendamisvalikute laadimine ebaõnnestus"
+      "loadFailedTitle": "Ühendamisvalikute laadimine ebaõnnestus",
+      "blocked": {
+        "unknownStateTitle": "GitHub ei ole teatanud ühendatavuse olekut",
+        "unknownStateDetail": "Proovi mõne hetke pärast ülevaadet värskendada.",
+        "conflictsTitle": "Ühendamiskonfliktid",
+        "conflictsDetail": "Lahenda enne ühendamist selle haru ühendamiskonfliktid.",
+        "requiredReviewsTitle": "Nõutud ülevaated puuduvad",
+        "requiredReviewsDetail": "Nõutud ülevaatajate kinnitused puuduvad või on ootel.",
+        "failingChecksTitle": "Nõutud kontrollid ebaõnnestuvad",
+        "failingChecksDetail": "Nõutud olekukontrollid ebaõnnestuvad.",
+        "unstableTitle": "Mõned kontrollid ebaõnnestuvad",
+        "unstableDetail": "Mittenõutud kontrollid ebaõnnestuvad. Need ei blokeeri ühendamist.",
+        "draftTitle": "Mustand-pull request",
+        "draftDetail": "Märgi pull request enne ühendamist ülevaateks valmis.",
+        "behindTitle": "Haru on vananenud",
+        "behindDetailUpdatable": "Uuenda enne ühendamist haru alusest või tee rebase.",
+        "behindDetail": "Päiseharu on alusest maas. Tee enne ühendamist rebase või uuenda haru.",
+        "notMergeableTitle": "Seda pull request'i ei saa veel ühendada",
+        "notMergeableDetail": "GitHub teatas ühendatavuse olekust {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Loo ühendamise commit",
+        "squash": "Squash ja ühenda",
+        "rebase": "Rebase ja ühenda"
+      },
+      "methodDescriptions": {
+        "merge": "Kombineeri kõik selle haru commit'id alusharu ühendamise commit'iga.",
+        "squash": "Kombineeri kõik selle haru commit'id alusharu üheks commit'iks.",
+        "rebase": "Kanna kõik selle haru commit'id alusharule ümber ilma ühendamise commit'ita."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Arutelulõim {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "... veel {{displayCount}} rida ülal",
       "termsAcceptRequired": "Postitamiseks pead nõustuma teenusetingimustega.",
       "termsOutdatedCopy": "Teenusetingimused muutusid. Uusima versiooniga nõustumiseks ava see ekraan uuesti.",
-      "termsCheckRetryCopy": "Teenusetingimuste kontrollimine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
+      "termsCheckRetryCopy": "Teenusetingimuste kontrollimine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
+      "reactions": {
+        "thumbsUp": "Pöial üles",
+        "thumbsDown": "Pöial alla",
+        "laugh": "Naer",
+        "hooray": "Hurraa",
+        "confused": "Segadus",
+        "heart": "Süda",
+        "rocket": "Rakett",
+        "eyes": "Silmad"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Faili kommentaar: {{path}}",
+        "fileComment": "Faili kommentaar",
+        "outdatedOnPathLines": "Aegunud: {{path}} {{lines}}",
+        "outdatedOnLines": "Aegunud: {{lines}}",
+        "outdatedOnPath": "Aegunud: {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "GitHub'i rakenduse seadete avamine ebaõnnestus",
     "installKiloGitHubApp": "Installi Kilo GitHub'i rakendus",
@@ -523,7 +571,12 @@
       "truncationBanner": "Kuvatakse esimesed {{limit}} muudetud faili kokku {{total}}-st — GitHubi API piirang"
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi",
-    "linkPasteNotAPullRequest": "Pole GitHub pull requesti link"
+    "linkPasteNotAPullRequest": "Pole GitHub pull requesti link",
+    "announce": {
+      "commentPosted": "Kommentaar on postitatud",
+      "reviewSubmitted": "Ülevaade on esitatud",
+      "autoMergeEnabled": "Automaatne ühendamine on lubatud"
+    }
   },
   "notifications": {
     "title": "Teavitused",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} ületab {{limit}} manuse piirangu.",
       "unreadable": "Faili {{filename}} lugemine ebaõnnestus.",
       "pastedImage": "kleebitud pilt",
-      "defaultName": "Manus"
+      "defaultName": "Manus",
+      "classificationDenied": "Käivitatavaid faile ei saa lisada",
+      "classificationEmpty": "Fail on tühi",
+      "classificationTooLarge": "Failid peavad olema 20 MB või väiksemad",
+      "classificationUnreadable": "Seda faili ei õnnestunud lugeda",
+      "announceUploaded": "Manus on üles laaditud"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "KÄIVITAMINE",
       "stopped": "PEATATUD",
       "stopping": "PEATAMINE",
-      "unknown": "TEADMATA"
+      "unknown": "TEADMATA",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Järjekorras olevat tegevust ei õnnestunud enam jälgida. Värskenda, et näha uusimat olekut.",
     "initialSyncAdmissionFailed": "Security Agent oli lubatud, kuid esialgset sünkroonimist ei õnnestunud järjekorda panna. Sünkrooni uuesti.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Leid on juba kõrvale jäetud",
+      "findingDismissed": "Leid jäeti kõrvale",
+      "noRemediationsQueued": "Ühtegi olemasolevat leidu pole järjekorras",
+      "remediationsQueued": "Olemasolevad parandused pandi järjekorda",
+      "analysisComplete": "Analüüs on lõppenud",
+      "syncComplete": "Sünkroonimine on lõppenud"
+    }
   },
   "agents": {
     "activeNow": "Aktiivne praegu",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'i avamine ebaõnnestus",
-      "couldNotOpenMessage": "GitHub App'i seadistuse käivitamine ebaõnnestus. Proovi uuesti."
+      "couldNotOpenMessage": "GitHub App'i seadistuse käivitamine ebaõnnestus. Proovi uuesti.",
+      "installedTitle": "GitHub App on installitud",
+      "installedMessage": "Sinu hoidlad on nüüd ühendatud.",
+      "pendingTitle": "Oodatakse administraatori kinnitust",
+      "pendingMessage": "Organisatsiooni administraator peab installimistaotluse kinnitama.",
+      "accountMismatchTitle": "Kontod ei klapi",
+      "accountMismatchMessage": "Selle ühenduse alustas Kilo rakendus, mis on sisse logitud teise kontoga. Logi sisse selle kontoga veebis või alusta rakendusest uuesti.",
+      "cannotCompleteTitle": "Installimist ei saa lõpule viia",
+      "notAdminMessage": "Selle konto saab ühendada ainult selle GitHub'i administraator. Palu organisatsiooni administraatoril Kilo installida.",
+      "alreadyClaimedMessage": "See GitHub'i installimine on juba teise Kilo kontoga ühendatud. Eemalda see seal esimesena.",
+      "didNotCompleteTitle": "Installimine ei lõppenud",
+      "didNotCompleteMessage": "GitHub App'i installimine ei lõppenud. Proovi rakendusest uuesti."
     },
     "sessionExited": "Seanss lõpetatud",
     "remoteSpawnRetryable": "Ei õnnestunud instantsini jõuda — see võis ühenduse katkestada.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-kirja kohaletoimetamine pole hetkel saadaval. Proovi hiljem uuesti.",
     "admissionRequired": "Sinu seadet ei saa kontrollida. Kasuta valikut „$t(login.moreSignInOptions)\", et sisse logida mõnel teisel seadmel või veebi kaudu.",
     "default": "Midagi läks valesti. Proovi uuesti.",
-    "retryableAdmission": "Me ei saanud seda seadet kontrollida. Kontrolli ühendust ja proovi uuesti."
+    "retryableAdmission": "Me ei saanud seda seadet kontrollida. Kontrolli ühendust ja proovi uuesti.",
+    "startSignInFailed": "Sisselogimise alustamine ebaõnnestus. Proovi uuesti.",
+    "couldNotOpenBrowser": "Brauseri avamine ebaõnnestus. Proovi uuesti.",
+    "signInTimedOut": "Sisselogimine aegus. Proovi uuesti.",
+    "signInFailed": "Sisselogimine ebaõnnestus. Proovi uuesti.",
+    "networkError": "Võrguviga. Proovi uuesti.",
+    "accessDeniedByUser": "Kasutaja keelas juurdepääsu",
+    "codeExpired": "Kood on aegunud"
   },
   "models": {
     "dataCollected": "Kogutud andmed",
-    "free": "Tasuta"
+    "free": "Tasuta",
+    "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus"
   }
 }

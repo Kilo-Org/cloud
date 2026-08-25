@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopieret til udklipsholder",
     "couldNotCopyToClipboard": "Kunne ikke kopiere til udklipsholder",
     "required": "påkrævet",
-    "error": "fejl: {{error}}"
+    "error": "fejl: {{error}}",
+    "back": "Tilbage",
+    "somethingWentWrong": "Noget gik galt"
   },
   "language": {
     "title": "Sprog",
@@ -280,7 +282,36 @@
         "body": "Kunne ikke slette grenen: {{reason}}",
         "accessibility": "Flettet. Kunne ikke slette grenen: {{reason}}"
       },
-      "loadFailedTitle": "Kunne ikke indlæse fletmuligheder"
+      "loadFailedTitle": "Kunne ikke indlæse fletmuligheder",
+      "blocked": {
+        "unknownStateTitle": "GitHub har ikke rapporteret en flettemulighed-status",
+        "unknownStateDetail": "Prøv at opdatere oversigten om et øjeblik.",
+        "conflictsTitle": "Flettekonflikter",
+        "conflictsDetail": "Løs flettekonflikterne på denne gren, før du fletter.",
+        "requiredReviewsTitle": "Nødvendige anmeldelser mangler",
+        "requiredReviewsDetail": "Godkendelser fra de nødvendige anmeldere mangler eller er under behandling.",
+        "failingChecksTitle": "Nødvendige kontroller fejler",
+        "failingChecksDetail": "Nødvendige statuskontroller fejler.",
+        "unstableTitle": "Nogle kontroller fejler",
+        "unstableDetail": "Ikke-nødvendige kontroller fejler. De blokerer ikke fletningen.",
+        "draftTitle": "Udkast pull request",
+        "draftDetail": "Markér pull request'en som klar til gennemgang, før du fletter.",
+        "behindTitle": "Grenen er forældet",
+        "behindDetailUpdatable": "Opdater grenen fra basen, eller foretag et rebase, før du fletter.",
+        "behindDetail": "Hovedgrenen er bagud i forhold til basen. Foretag et rebase eller opdater grenen, før du fletter.",
+        "notMergeableTitle": "Denne pull request kan ikke flettes endnu",
+        "notMergeableDetail": "GitHub rapporterede en {{state}} flettemulighed-status."
+      },
+      "methodLabels": {
+        "merge": "Opret en flette-commit",
+        "squash": "Squash og flet",
+        "rebase": "Rebase og flet"
+      },
+      "methodDescriptions": {
+        "merge": "Saml alle commits fra denne gren i basegrenen med en flette-commit.",
+        "squash": "Saml alle commits fra denne gren i en enkelt commit på basegrenen.",
+        "rebase": "Afspil alle commits fra denne gren oven på basegrenen uden en flette-commit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Diskussionstråd {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} flere linjer ovenfor",
       "termsAcceptRequired": "Du skal acceptere tjenestevilkårene for at skrive.",
       "termsOutdatedCopy": "Tjenestevilkårene ændrede sig. Åbn denne skærm igen for at acceptere den nyeste version.",
-      "termsCheckRetryCopy": "Kunne ikke kontrollere tjenestevilkårene. Tjek din forbindelse og prøv igen."
+      "termsCheckRetryCopy": "Kunne ikke kontrollere tjenestevilkårene. Tjek din forbindelse og prøv igen.",
+      "reactions": {
+        "thumbsUp": "Tommel op",
+        "thumbsDown": "Tommel ned",
+        "laugh": "Griner",
+        "hooray": "Hurra",
+        "confused": "Forvirret",
+        "heart": "Hjerte",
+        "rocket": "Raket",
+        "eyes": "Øjne"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Filkommentar på {{path}}",
+        "fileComment": "Filkommentar",
+        "outdatedOnPathLines": "Forældet på {{path}} {{lines}}",
+        "outdatedOnLines": "Forældet på {{lines}}",
+        "outdatedOnPath": "Forældet på {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åbne GitHub-appindstillinger",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -523,7 +571,12 @@
       "truncationBanner": "Viser de første {{limit}} af {{total}} ændrede filer — GitHub API-grænse"
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom",
-    "linkPasteNotAPullRequest": "Ikke et GitHub pull request-link"
+    "linkPasteNotAPullRequest": "Ikke et GitHub pull request-link",
+    "announce": {
+      "commentPosted": "Kommentar sendt",
+      "reviewSubmitted": "Anmeldelse indsendt",
+      "autoMergeEnabled": "Automatisk fletning aktiveret"
+    }
   },
   "notifications": {
     "title": "Meddelelser",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} overstiger grænsen på {{limit}} for vedhæftninger.",
       "unreadable": "Kunne ikke læse {{filename}}.",
       "pastedImage": "det indsatte billede",
-      "defaultName": "Vedhæftning"
+      "defaultName": "Vedhæftning",
+      "classificationDenied": "Eksekverbare filer kan ikke vedhæftes",
+      "classificationEmpty": "Filen er tom",
+      "classificationTooLarge": "Filer skal være på 20 MB eller mindre",
+      "classificationUnreadable": "Kunne ikke læse denne fil",
+      "announceUploaded": "Vedhæftning uploadet"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "STARTER",
       "stopped": "STOPPET",
       "stopping": "STOPPER",
-      "unknown": "UKENDT"
+      "unknown": "UKENDT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "En handling i kø kunne ikke længere spores. Opdater for at se den nyeste tilstand.",
     "initialSyncAdmissionFailed": "Security Agent blev aktiveret, men den indledende synkronisering kunne ikke sættes i kø. Synkronisér igen.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Funden er allerede afvist",
+      "findingDismissed": "Fund afvist",
+      "noRemediationsQueued": "Ingen eksisterende fund i kø",
+      "remediationsQueued": "Eksisterende afhjælpninger sat i kø",
+      "analysisComplete": "Analyse fuldført",
+      "syncComplete": "Synkronisering fuldført"
+    }
   },
   "agents": {
     "activeNow": "Aktiv nu",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
-      "couldNotOpenMessage": "Vi kunne ikke starte GitHub App-opsætningen. Prøv igen."
+      "couldNotOpenMessage": "Vi kunne ikke starte GitHub App-opsætningen. Prøv igen.",
+      "installedTitle": "GitHub App installeret",
+      "installedMessage": "Dine repositories er nu forbundet.",
+      "pendingTitle": "Afventer admin-godkendelse",
+      "pendingMessage": "En organisationsadministrator skal godkende installationsanmodningen.",
+      "accountMismatchTitle": "Kontoerne matcher ikke",
+      "accountMismatchMessage": "Denne forbindelse blev startet fra Kilo App logget ind med en anden konto. Log ind på nettet med den konto, eller start igen fra appen.",
+      "cannotCompleteTitle": "Kan ikke fuldføre installation",
+      "notAdminMessage": "Kun en GitHub-administrator for den konto kan forbinde den. Bed en organisationsadministrator om at installere Kilo.",
+      "alreadyClaimedMessage": "Den GitHub-installation er allerede forbundet til en anden Kilo-konto. Afbryd forbindelsen der først.",
+      "didNotCompleteTitle": "Installationen blev ikke fuldført",
+      "didNotCompleteMessage": "Installationen af GitHub App blev ikke fuldført. Prøv igen fra appen."
     },
     "sessionExited": "Sessionen blev afsluttet",
     "remoteSpawnRetryable": "Kunne ikke nå instansen — den er måske blevet afbrudt.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "E-maillevering er midlertidigt utilgængelig. Prøv venligst igen senere.",
     "admissionRequired": "Din enhed kan ikke verificeres. Brug '$t(login.moreSignInOptions)' for at logge ind på en anden enhed eller via nettet.",
     "default": "Der gik noget galt. Prøv venligst igen.",
-    "retryableAdmission": "Vi kunne ikke verificere denne enhed. Kontrollér din forbindelse, og prøv igen."
+    "retryableAdmission": "Vi kunne ikke verificere denne enhed. Kontrollér din forbindelse, og prøv igen.",
+    "startSignInFailed": "Kunne ikke starte login. Prøv igen.",
+    "couldNotOpenBrowser": "Kunne ikke åbne browseren. Prøv igen.",
+    "signInTimedOut": "Login overskred tidsgrænsen. Prøv igen.",
+    "signInFailed": "Login mislykkedes. Prøv igen.",
+    "networkError": "Netværksfejl. Prøv igen.",
+    "accessDeniedByUser": "Adgang afvist af bruger",
+    "codeExpired": "Koden er udløbet"
   },
   "models": {
     "dataCollected": "Indsamlede data",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Kunne ikke opdatere favoritter"
   }
 }

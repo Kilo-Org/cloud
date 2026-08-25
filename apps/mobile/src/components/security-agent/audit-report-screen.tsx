@@ -15,7 +15,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatDate, formatNumber } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
-import { capitalize, parseTimestamp } from '@/lib/utils';
+import { parseTimestamp } from '@/lib/utils';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
@@ -23,6 +23,18 @@ type SecurityAgentAuditReport = Extract<AuditReportResponse, { status: 'ok' }>['
 type SecurityFindingAuditSection = SecurityAgentAuditReport['findings'][number];
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
+
+// Literal keys, never a template: the catalog check scans the source for the
+// keys a lookup passes on, and a computed key is invisible to it.
+const SEVERITY_LABEL_KEYS = {
+  critical: 'securityAgent.sla.critical',
+  high: 'securityAgent.sla.high',
+  medium: 'securityAgent.sla.medium',
+  low: 'securityAgent.sla.low',
+  // A finding whose severity the scanner never reported. The SLA policy has no
+  // row for it, so reuse the finding-details word.
+  unknown: 'securityAgent.findingDetails.unknown',
+} as const;
 
 // Personal and org procedures resolve to nominally distinct tRPC option
 // types even when structurally identical, so we always call both hooks (one
@@ -55,9 +67,15 @@ function AuditReportSkeleton() {
 
 function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
-  const start = formatDate(parseTimestamp(report.period.start), i18n.language);
-  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language);
-  const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language);
+  const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
+    timeZone: 'UTC',
+  });
+  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
+    timeZone: 'UTC',
+  });
+  const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language, {
+    timeZone: 'UTC',
+  });
 
   return (
     <View className="gap-1">
@@ -102,7 +120,7 @@ function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }
         {SEVERITY_ORDER.map(severity => (
           <SummaryCount
             key={severity}
-            label={capitalize(severity)}
+            label={t(SEVERITY_LABEL_KEYS[severity])}
             value={report.summary.bySeverity[severity]}
           />
         ))}
@@ -114,7 +132,7 @@ function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }
 function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSection }>) {
   const { t } = useTranslation();
   const meta = [
-    capitalize(finding.severity),
+    t(SEVERITY_LABEL_KEYS[finding.severity]),
     finding.repository ?? t('securityAgent.auditReport.repositoryNotRecorded'),
   ].join(' · ');
 
@@ -141,8 +159,12 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
 function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
-    const start = formatDate(parseTimestamp(report.period.start), i18n.language);
-    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language);
+    const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
+      timeZone: 'UTC',
+    });
+    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
+      timeZone: 'UTC',
+    });
     return (
       <EmptyState
         icon={FileText}

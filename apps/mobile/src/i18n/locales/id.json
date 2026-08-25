@@ -22,7 +22,9 @@
     "required": "wajib diisi",
     "error": "kesalahan: {{error}}",
     "notNow": "Nanti saja",
-    "continue": "Lanjutkan"
+    "continue": "Lanjutkan",
+    "back": "Kembali",
+    "somethingWentWrong": "Terjadi kesalahan"
   },
   "language": {
     "title": "Bahasa",
@@ -276,7 +278,12 @@
       "sizeRejection": "{{filename}} melebihi batas lampiran {{limit}}.",
       "unreadable": "Tidak dapat membaca {{filename}}.",
       "pastedImage": "gambar yang ditempel",
-      "defaultName": "Lampiran"
+      "defaultName": "Lampiran",
+      "classificationDenied": "File yang dapat dieksekusi tidak dapat dilampirkan",
+      "classificationEmpty": "File kosong",
+      "classificationTooLarge": "File harus berukuran 20 MB atau lebih kecil",
+      "classificationUnreadable": "Tidak dapat membaca file ini",
+      "announceUploaded": "Lampiran diunggah"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -694,7 +701,8 @@
       "starting": "MEMULAI",
       "stopped": "BERHENTI",
       "stopping": "MENGHENTIKAN",
-      "unknown": "TIDAK DIKETAHUI"
+      "unknown": "TIDAK DIKETAHUI",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1334,7 +1342,15 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent telah diaktifkan, tetapi sinkronisasi awal tidak dapat diantrekan. Sinkronkan lagi.",
-    "queuedActionUntracked": "Tindakan yang diantrekan tidak dapat dilacak lagi. Muat ulang untuk melihat status terbaru."
+    "queuedActionUntracked": "Tindakan yang diantrekan tidak dapat dilacak lagi. Muat ulang untuk melihat status terbaru.",
+    "commands": {
+      "findingAlreadyDismissed": "Temuan sudah diabaikan",
+      "findingDismissed": "Temuan diabaikan",
+      "noRemediationsQueued": "Tidak ada temuan yang ada diantrekan",
+      "remediationsQueued": "Remediasi yang ada diantrekan",
+      "analysisComplete": "Analisis selesai",
+      "syncComplete": "Sinkronisasi selesai"
+    }
   },
   "agents": {
     "activeNow": "Aktif sekarang",
@@ -1382,7 +1398,18 @@
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
-      "couldNotOpenTitle": "Tidak dapat membuka GitHub"
+      "couldNotOpenTitle": "Tidak dapat membuka GitHub",
+      "installedTitle": "Aplikasi GitHub terpasang",
+      "installedMessage": "Repositori Anda kini terhubung.",
+      "pendingTitle": "Menunggu persetujuan admin",
+      "pendingMessage": "Admin organisasi harus menyetujui permintaan pemasangan.",
+      "accountMismatchTitle": "Akun tidak cocok",
+      "accountMismatchMessage": "Koneksi ini dimulai dari Aplikasi Kilo yang masuk sebagai akun berbeda. Masuk ke web dengan akun tersebut, atau mulai lagi dari aplikasi.",
+      "cannotCompleteTitle": "Tidak dapat menyelesaikan pemasangan",
+      "notAdminMessage": "Hanya admin GitHub dari akun tersebut yang dapat menghubungkannya. Minta admin organisasi untuk memasang Kilo.",
+      "alreadyClaimedMessage": "Pemasangan GitHub tersebut sudah terhubung ke akun Kilo lain. Putuskan koneksinya di sana terlebih dahulu.",
+      "didNotCompleteTitle": "Pemasangan tidak selesai",
+      "didNotCompleteMessage": "Pemasangan Aplikasi GitHub tidak selesai. Coba lagi dari aplikasi."
     },
     "sessionExited": "Sesi berakhir",
     "remoteSpawnRetryable": "Tidak dapat menjangkau instance — mungkin telah terputus.",
@@ -2307,7 +2334,24 @@
       "viewTerms": "Lihat ketentuan",
       "termsAcceptRequired": "Anda harus menerima Ketentuan Layanan untuk mengirim.",
       "termsCheckRetryCopy": "Tidak dapat memeriksa Ketentuan Layanan. Periksa koneksi Anda dan coba lagi.",
-      "termsOutdatedCopy": "Ketentuan Layanan berubah. Buka ulang layar ini untuk menerima versi terbaru."
+      "termsOutdatedCopy": "Ketentuan Layanan berubah. Buka ulang layar ini untuk menerima versi terbaru.",
+      "reactions": {
+        "thumbsUp": "Jempol ke atas",
+        "thumbsDown": "Jempol ke bawah",
+        "laugh": "Tertawa",
+        "hooray": "Hore",
+        "confused": "Bingung",
+        "heart": "Hati",
+        "rocket": "Roket",
+        "eyes": "Mata"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komentar file di {{path}}",
+        "fileComment": "Komentar file",
+        "outdatedOnPathLines": "Kedaluwarsa di {{path}} {{lines}}",
+        "outdatedOnLines": "Kedaluwarsa di {{lines}}",
+        "outdatedOnPath": "Kedaluwarsa di {{path}}"
+      }
     },
     "entry": {
       "clearLink": "Hapus tautan pull request",
@@ -2464,7 +2508,36 @@
         "closed": "Pull request ini ditutup"
       },
       "updateBranch": "Perbarui cabang",
-      "updateBranchFromBase": "Perbarui cabang dari dasar"
+      "updateBranchFromBase": "Perbarui cabang dari dasar",
+      "blocked": {
+        "unknownStateTitle": "GitHub belum melaporkan status kemampuan gabung",
+        "unknownStateDetail": "Coba segarkan ringkasan sebentar lagi.",
+        "conflictsTitle": "Konflik penggabungan",
+        "conflictsDetail": "Selesaikan konflik penggabungan di cabang ini sebelum menggabungkan.",
+        "requiredReviewsTitle": "Tinjauan yang diperlukan belum ada",
+        "requiredReviewsDetail": "Persetujuan dari peninjau yang diperlukan belum ada atau masih tertunda.",
+        "failingChecksTitle": "Pemeriksaan wajib gagal",
+        "failingChecksDetail": "Pemeriksaan status wajib gagal.",
+        "unstableTitle": "Beberapa pemeriksaan gagal",
+        "unstableDetail": "Pemeriksaan yang tidak wajib gagal. Ini tidak akan memblokir penggabungan.",
+        "draftTitle": "Draf pull request",
+        "draftDetail": "Tandai pull request sebagai siap ditinjau sebelum menggabungkan.",
+        "behindTitle": "Cabang sudah usang",
+        "behindDetailUpdatable": "Perbarui cabang dari dasar, atau rebase, sebelum menggabungkan.",
+        "behindDetail": "Cabang kepala tertinggal di belakang dasar. Rebase atau perbarui cabang sebelum menggabungkan.",
+        "notMergeableTitle": "Pull request ini belum dapat digabungkan",
+        "notMergeableDetail": "GitHub melaporkan status kemampuan gabung {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Buat commit gabung",
+        "squash": "Squash dan gabungkan",
+        "rebase": "Rebase dan gabungkan"
+      },
+      "methodDescriptions": {
+        "merge": "Gabungkan semua commit dari cabang ini ke cabang dasar dengan commit gabung.",
+        "squash": "Gabungkan semua commit dari cabang ini menjadi satu commit di cabang dasar.",
+        "rebase": "Putar ulang semua commit dari cabang ini ke cabang dasar tanpa commit gabung."
+      }
     },
     "noDescriptionProvided": "Tidak ada deskripsi yang diberikan.",
     "noFilesChanged": "Tidak ada file yang berubah",
@@ -2554,7 +2627,12 @@
       "truncationBanner": "Menampilkan {{limit}} file pertama dari {{total}} file yang diubah — batas API GitHub"
     },
     "linkPasteClipboardEmpty": "Clipboard kosong",
-    "linkPasteNotAPullRequest": "Bukan tautan pull request GitHub"
+    "linkPasteNotAPullRequest": "Bukan tautan pull request GitHub",
+    "announce": {
+      "commentPosted": "Komentar terkirim",
+      "reviewSubmitted": "Tinjauan terkirim",
+      "autoMergeEnabled": "Gabung otomatis diaktifkan"
+    }
   },
   "organization": {
     "boundary": {
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Pengiriman email untuk sementara tidak tersedia. Silakan coba lagi nanti.",
     "admissionRequired": "Perangkat Anda tidak dapat diverifikasi. Gunakan '$t(login.moreSignInOptions)' untuk masuk di perangkat lain atau melalui web.",
     "default": "Terjadi kesalahan. Silakan coba lagi.",
-    "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksi Anda dan coba lagi."
+    "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksi Anda dan coba lagi.",
+    "startSignInFailed": "Gagal memulai proses masuk. Silakan coba lagi.",
+    "couldNotOpenBrowser": "Tidak dapat membuka browser. Silakan coba lagi.",
+    "signInTimedOut": "Proses masuk habis waktu. Silakan coba lagi.",
+    "signInFailed": "Gagal masuk. Silakan coba lagi.",
+    "networkError": "Kesalahan jaringan. Silakan coba lagi.",
+    "accessDeniedByUser": "Akses ditolak oleh pengguna",
+    "codeExpired": "Kode kedaluwarsa"
   },
   "models": {
     "dataCollected": "Data yang dikumpulkan",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Tidak dapat memperbarui favorit"
   }
 }

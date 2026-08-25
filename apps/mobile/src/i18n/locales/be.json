@@ -22,7 +22,9 @@
     "copiedToClipboard": "Скапіравана ў буфер абмену",
     "couldNotCopyToClipboard": "Не атрымалася скапіраваць у буфер абмену",
     "required": "абавязкова",
-    "error": "памылка: {{error}}"
+    "error": "памылка: {{error}}",
+    "back": "Назад",
+    "somethingWentWrong": "Нешта пайшло не так"
   },
   "language": {
     "title": "Мова",
@@ -284,7 +286,36 @@
         "body": "Не атрымалася выдаліць галіну: {{reason}}",
         "accessibility": "Зліта. Не атрымалася выдаліць галіну: {{reason}}"
       },
-      "loadFailedTitle": "Не атрымалася загрузіць варыянты зліцця"
+      "loadFailedTitle": "Не атрымалася загрузіць варыянты зліцця",
+      "blocked": {
+        "unknownStateTitle": "GitHub не паведаміў пра стан злівальнасці",
+        "unknownStateDetail": "Паспрабуйце абнавіць агляд праз хвіліну.",
+        "conflictsTitle": "Канфлікты зліцця",
+        "conflictsDetail": "Вырашыце канфлікты зліцця на гэтай галіне перад зліццём.",
+        "requiredReviewsTitle": "Няма абавязковых рэцэнзій",
+        "requiredReviewsDetail": "Ухвалы ад абавязковых рэцэнзентаў адсутнічаюць або чакаюць.",
+        "failingChecksTitle": "Абавязковыя праверкі не праходзяць",
+        "failingChecksDetail": "Абавязковыя статусныя праверкі не праходзяць.",
+        "unstableTitle": "Некаторыя праверкі не праходзяць",
+        "unstableDetail": "Неабавязковыя праверкі не праходзяць. Яны не заблакуюць зліццё.",
+        "draftTitle": "Чарнавік pull request",
+        "draftDetail": "Пазначце pull request як гатовы да рэцэнзіі перад зліццём.",
+        "behindTitle": "Галіна састарэла",
+        "behindDetailUpdatable": "Абнавіце галіну з базавай або зрабіце rebase перад зліццём.",
+        "behindDetail": "Галіна head адстае ад базавай. Зрабіце rebase або абнавіце галіну перад зліццём.",
+        "notMergeableTitle": "Гэты pull request пакуль немагчыма зліць",
+        "notMergeableDetail": "GitHub паведаміў пра стан злівальнасці {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Стварыць каміт зліцця",
+        "squash": "Squash і зліць",
+        "rebase": "Rebase і зліць"
+      },
+      "methodDescriptions": {
+        "merge": "Аб'яднайце ўсе каміты з гэтай галіны ў базавую галіну з камітам зліцця.",
+        "squash": "Аб'яднайце ўсе каміты з гэтай галіны ў адзін каміт на базавай галіне.",
+        "rebase": "Паўторыце ўсе каміты з гэтай галіны на базавай галіне без каміта зліцця."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Галінка абмеркавання {{anchorLabel}}",
@@ -364,7 +395,24 @@
       "comment_few": "{{displayCount}} каментары",
       "comment_many": "{{displayCount}} каментароў",
       "reaction_few": "рэакцыі",
-      "reaction_many": "рэакцый"
+      "reaction_many": "рэакцый",
+      "reactions": {
+        "thumbsUp": "Вялікі палец уверх",
+        "thumbsDown": "Вялікі палец уніз",
+        "laugh": "Смех",
+        "hooray": "Ура",
+        "confused": "Збянтэжаны",
+        "heart": "Сэрца",
+        "rocket": "Ракета",
+        "eyes": "Вочы"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Каментар да файла на {{path}}",
+        "fileComment": "Каментар да файла",
+        "outdatedOnPathLines": "Састарэла на {{path}} {{lines}}",
+        "outdatedOnLines": "Састарэла на {{lines}}",
+        "outdatedOnPath": "Састарэла на {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады GitHub App",
     "installKiloGitHubApp": "Усталяваць Kilo GitHub App",
@@ -537,7 +585,12 @@
       "tapToComment": "{{label}}, дакраніцеся, каб пакінуць каментар"
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты",
-    "linkPasteNotAPullRequest": "Гэта не спасылка на pull request GitHub"
+    "linkPasteNotAPullRequest": "Гэта не спасылка на pull request GitHub",
+    "announce": {
+      "commentPosted": "Каментар апублікаваны",
+      "reviewSubmitted": "Рэцэнзія адпраўлена",
+      "autoMergeEnabled": "Аўтазліццё ўключана"
+    }
   },
   "notifications": {
     "title": "Апавяшчэнні",
@@ -670,7 +723,12 @@
       "sizeRejection": "{{filename}} перавышае ліміт далучэння {{limit}}.",
       "unreadable": "Не атрымалася прачытаць {{filename}}.",
       "pastedImage": "устаўленая выява",
-      "defaultName": "Далучэнне"
+      "defaultName": "Далучэнне",
+      "classificationDenied": "Выканальныя файлы нельга далучыць",
+      "classificationEmpty": "Файл пусты",
+      "classificationTooLarge": "Файлы павінны быць 20 MB або менш",
+      "classificationUnreadable": "Не атрымалася прачытаць гэты файл",
+      "announceUploaded": "Далучэнне загружана"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1045,7 +1103,8 @@
       "starting": "ЗАПУСК",
       "stopped": "СПЫНЕНЫ",
       "stopping": "СПЫНЕННЕ",
-      "unknown": "НЕВЯДОМА"
+      "unknown": "НЕВЯДОМА",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1736,7 +1795,15 @@
     },
     "queuedActionUntracked": "Пастаўленae ў чаргу дзеянне больш не адсочваецца. Абнавіце, каб убачыць бягучы стан.",
     "initialSyncAdmissionFailed": "Security Agent быў уключаны, але першая сінхранізацыя не змагла быць пастаўлена ў чаргу. Сінхранізуйце зноў.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Знаходка ўжо адхілена",
+      "findingDismissed": "Знаходка адхілена",
+      "noRemediationsQueued": "Няма існуючых знаходак у чарзе",
+      "remediationsQueued": "Існуючыя ліквідацыі пастаўлены ў чаргу",
+      "analysisComplete": "Аналіз завершаны",
+      "syncComplete": "Сінхранізацыя завершана"
+    }
   },
   "agents": {
     "activeNow": "Актыўны зараз",
@@ -1788,7 +1855,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
-      "couldNotOpenMessage": "Не атрымалася пачаць наладу GitHub App. Паспрабуйце зноў."
+      "couldNotOpenMessage": "Не атрымалася пачаць наладу GitHub App. Паспрабуйце зноў.",
+      "installedTitle": "GitHub App усталяваны",
+      "installedMessage": "Вашы рэпазіторыі цяпер падключаны.",
+      "pendingTitle": "Чакаецца зацвярджэнне адміністратара",
+      "pendingMessage": "Адміністратар арганізацыі павінен ухваліць запыт на ўсталяванне.",
+      "accountMismatchTitle": "Нясупадзенне ўліковага запісу",
+      "accountMismatchMessage": "Гэтае падключэнне было пачата з Kilo App, увайшоўшы пад іншым уліковым запісам. Увайдзіце ў вэб-версію пад гэтым запісам або пачніце зноў з дадатку.",
+      "cannotCompleteTitle": "Немагчыма завяршыць усталяванне",
+      "notAdminMessage": "Толькі GitHub-адміністратар гэтага ўліковага запісу можа падключыць яго. Папрасіце адміністратара арганізацыі ўсталяваць Kilo.",
+      "alreadyClaimedMessage": "Гэта ўсталяванне GitHub ужо падключана да іншага ўліковага запісу Kilo. Спачатку адключыце яго там.",
+      "didNotCompleteTitle": "Усталяванне не завершана",
+      "didNotCompleteMessage": "Усталяванне GitHub App не было завершана. Паспрабуйце яшчэ раз з дадатку."
     },
     "sessionExited": "Сеанс завершаны",
     "remoteSpawnRetryable": "Не ўдалося злучыцца з інстансам — магчыма, ён адключыўся.",
@@ -2755,10 +2833,18 @@
     "emailDeliveryFailed": "Дастаўка электроннай пошты часова недаступная. Паспрабуйце пазней.",
     "admissionRequired": "Ваша прылада не можа быць праверана. Скарыстайцеся пунктам «$t(login.moreSignInOptions)», каб увайсці на іншай прыладзе або праз вэб.",
     "default": "Нешта пайшло не так. Паспрабуйце яшчэ раз.",
-    "retryableAdmission": "Не ўдалося правесці праверку гэтай прылады. Праверце злучэнне і паспрабуйце яшчэ раз."
+    "retryableAdmission": "Не ўдалося правесці праверку гэтай прылады. Праверце злучэнне і паспрабуйце яшчэ раз.",
+    "startSignInFailed": "Не атрымалася пачаць уваход. Паспрабуйце яшчэ раз.",
+    "couldNotOpenBrowser": "Не атрымалася адкрыць браўзер. Паспрабуйце яшчэ раз.",
+    "signInTimedOut": "Час уваходу скончыўся. Паспрабуйце яшчэ раз.",
+    "signInFailed": "Уваход не атрымаўся. Паспрабуйце яшчэ раз.",
+    "networkError": "Памылка сеткі. Паспрабуйце яшчэ раз.",
+    "accessDeniedByUser": "Карыстальнік адхіліў доступ",
+    "codeExpired": "Тэрмін дзеяння кода скончыўся"
   },
   "models": {
     "dataCollected": "Сабраныя даныя",
-    "free": "Бясплатна"
+    "free": "Бясплатна",
+    "couldNotUpdateFavorites": "Не атрымалася абнавіць выбранае"
   }
 }

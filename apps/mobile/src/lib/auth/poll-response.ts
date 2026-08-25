@@ -1,6 +1,8 @@
 // Pure classification of a device-auth poll response's HTTP status. Kept
 // free of any react-native/expo imports so it can be unit tested directly.
 
+import { i18n } from '@/i18n';
+
 type PollOutcome =
   | { readonly status: 'approved' }
   | { readonly status: 'pending' }
@@ -17,10 +19,10 @@ export function classifyPollResponse(httpStatus: number): PollOutcome {
     return { status: 'pending' };
   }
   if (httpStatus === 403) {
-    return { status: 'denied', message: 'Access denied by user' };
+    return { status: 'denied', message: i18n.t('authErrors.accessDeniedByUser') };
   }
   if (httpStatus === 410) {
-    return { status: 'expired', message: 'Code expired' };
+    return { status: 'expired', message: i18n.t('authErrors.codeExpired') };
   }
   // 429/5xx are transient (rate limiting or a flaky server) — keep polling.
   if (httpStatus === 429 || httpStatus >= 500) {

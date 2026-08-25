@@ -22,7 +22,9 @@
     "copiedToClipboard": "Cóipeáladh go dtí an gearrthaisce",
     "couldNotCopyToClipboard": "Níorbh fhéidir cóipeáil go dtí an gearrthaisce",
     "required": "riachtanach",
-    "error": "earráid: {{error}}"
+    "error": "earráid: {{error}}",
+    "back": "Ar ais",
+    "somethingWentWrong": "Chuaigh rud éigin mícheart"
   },
   "language": {
     "title": "Teanga",
@@ -286,7 +288,36 @@
         "body": "Níorbh fhéidir an brainse a scriosadh: {{reason}}",
         "accessibility": "Cumascaithe. Níorbh fhéidir an brainse a scriosadh: {{reason}}"
       },
-      "loadFailedTitle": "Níorbh fhéidir roghanna cumasc a lódáil"
+      "loadFailedTitle": "Níorbh fhéidir roghanna cumasc a lódáil",
+      "blocked": {
+        "unknownStateTitle": "Níor thuairiscigh GitHub staid chumascach",
+        "unknownStateDetail": "Bain triail as an forléargas a athnuachan i gceann tamaill.",
+        "conflictsTitle": "Coinbhleachtaí cumasc",
+        "conflictsDetail": "Réitigh na coinbhleachtaí cumasc ar an mbrainse seo sula gcumascfaidh tú.",
+        "requiredReviewsTitle": "Athbhreithnithe riachtanacha ar iarraidh",
+        "requiredReviewsDetail": "Tá formheasanna ó na hathbhreithneoirí riachtanacha ar iarraidh nó ar feitheamh.",
+        "failingChecksTitle": "Seiceálacha riachtanacha ag teipeadh",
+        "failingChecksDetail": "Tá seiceálacha stádais riachtanacha ag teipeadh.",
+        "unstableTitle": "Tá roinnt seiceálacha ag teipeadh",
+        "unstableDetail": "Tá seiceálacha neamhriachtanacha ag teipeadh. Ní chuirfidh siad bac ar an gcumasc.",
+        "draftTitle": "Dréacht-iarratas tarraingthe",
+        "draftDetail": "Marcáil an t-iarratas tarraingthe mar réidh le hathbhreithniú sula gcumascfaidh tú.",
+        "behindTitle": "Tá an brainse as dáta",
+        "behindDetailUpdatable": "Nuashonraigh an brainse ón mbun, nó déan rebase, sula gcumascfaidh tú.",
+        "behindDetail": "Tá an brainse ceann taobh thiar den bhun. Déan rebase nó nuashonraigh an brainse sula gcumascfaidh tú.",
+        "notMergeableTitle": "Ní féidir an t-iarratas tarraingthe seo a chumasc go fóill",
+        "notMergeableDetail": "Thuairiscigh GitHub staid chumascach {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Cruthaigh tiomantas cumasc",
+        "squash": "Squash agus cumasc",
+        "rebase": "Rebase agus cumasc"
+      },
+      "methodDescriptions": {
+        "merge": "Comhcheangail gach tiomantas ón mbrainse seo isteach sa bhunbrainse le tiomantas cumasc.",
+        "squash": "Comhcheangail gach tiomantas ón mbrainse seo in aon tiomantas amháin ar an mbunbrainse.",
+        "rebase": "Athsheinn gach tiomantas ón mbrainse seo ar an mbunbrainse gan tiomantas cumasc."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Snáithe plé {{anchorLabel}}",
@@ -368,7 +399,24 @@
       "comment_many": "{{displayCount}} trácht",
       "reaction_two": "imoibriúchán",
       "reaction_few": "imoibriúchán",
-      "reaction_many": "imoibriúcháin"
+      "reaction_many": "imoibriúcháin",
+      "reactions": {
+        "thumbsUp": "Ordóg suas",
+        "thumbsDown": "Ordóg síos",
+        "laugh": "Gáire",
+        "hooray": "Húrá",
+        "confused": "Trína chéile",
+        "heart": "Croí",
+        "rocket": "Roicéad",
+        "eyes": "Súile"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Trácht comhaid ar {{path}}",
+        "fileComment": "Trácht comhaid",
+        "outdatedOnPathLines": "Seanchaithe ar {{path}} {{lines}}",
+        "outdatedOnLines": "Seanchaithe ar {{lines}}",
+        "outdatedOnPath": "Seanchaithe ar {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe Aip GitHub a oscailt",
     "installKiloGitHubApp": "Suiteáil Aip GitHub Kilo",
@@ -544,7 +592,12 @@
       "truncationBanner": "Ag taispeáint an chéad {{limit}} de na {{total}} chomhad athraithe — teorainn API GitHub"
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh",
-    "linkPasteNotAPullRequest": "Ní nasc pull request GitHub é seo"
+    "linkPasteNotAPullRequest": "Ní nasc pull request GitHub é seo",
+    "announce": {
+      "commentPosted": "Trácht foilsithe",
+      "reviewSubmitted": "Athbhreithniú curtha isteach",
+      "autoMergeEnabled": "Uath-chumasc cumasaithe"
+    }
   },
   "notifications": {
     "title": "Fógraí",
@@ -677,7 +730,12 @@
       "sizeRejection": "Is mó {{filename}} ná an teorainn cheangail {{limit}}.",
       "unreadable": "Níorbh fhéidir {{filename}} a léamh.",
       "pastedImage": "an íomhá ghreamaithe",
-      "defaultName": "Ceangaltán"
+      "defaultName": "Ceangaltán",
+      "classificationDenied": "Ní féidir comhaid inrite a cheangal",
+      "classificationEmpty": "Tá an comhad folamh",
+      "classificationTooLarge": "Caithfidh comhaid a bheith 20 MB nó níos lú",
+      "classificationUnreadable": "Níorbh fhéidir an comhad seo a léamh",
+      "announceUploaded": "Uaslódáladh an ceangaltán"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1053,7 +1111,8 @@
       "starting": "AG TOSÚ",
       "stopped": "STOPT",
       "stopping": "AG STOPADH",
-      "unknown": "ANAITHNID"
+      "unknown": "ANAITHNID",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1747,7 +1806,15 @@
     },
     "queuedActionUntracked": "Níorbh fhéidir gníomh i scuaine a rianú a thuilleadh. Athnuaigh chun an staid is déanaí a fheiceáil.",
     "initialSyncAdmissionFailed": "Cumasaíodh Security Agent, ach níorbh fhéidir an chéad shioncrónú a chur i scuaine. Sioncrónaigh arís.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Fionnachtain díbithe cheana",
+      "findingDismissed": "Fionnachtain díbithe",
+      "noRemediationsQueued": "Níl aon fhionnachtain atá ann cheana sa scuaine",
+      "remediationsQueued": "Feabhsuithe atá ann cheana i scuaine",
+      "analysisComplete": "Anailís críochnaithe",
+      "syncComplete": "Sioncrónú críochnaithe"
+    }
   },
   "agents": {
     "activeNow": "Gníomhach anois",
@@ -1801,7 +1868,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
-      "couldNotOpenMessage": "Níorbh fhéidir linn socrú GitHub App a thosú. Bain triail as arís le do thoil."
+      "couldNotOpenMessage": "Níorbh fhéidir linn socrú GitHub App a thosú. Bain triail as arís le do thoil.",
+      "installedTitle": "Aip GitHub suiteáilte",
+      "installedMessage": "Tá do stórtha ceangailte anois.",
+      "pendingTitle": "Ag fanacht le ceadú an riarthóra",
+      "pendingMessage": "Caithfidh riarthóir eagraíochta an t-iarratas suiteála a cheadú.",
+      "accountMismatchTitle": "Neamhréir chuntais",
+      "accountMismatchMessage": "Cuireadh an nasc seo ar bun ón Kilo App agus tú sínithe isteach le cuntas eile. Sínigh isteach ar an ngréasán leis an gcuntas sin, nó tosaigh arís ón aip.",
+      "cannotCompleteTitle": "Ní féidir an tsuiteáil a chríochnú",
+      "notAdminMessage": "Ní féidir ach le riarthóir GitHub den chuntas sin é a nascadh. Iarr ar riarthóir eagraíochta Kilo a shuiteáil.",
+      "alreadyClaimedMessage": "Tá an tsuiteáil GitHub sin ceangailte cheana le cuntas Kilo eile. Dícheangail é ansin ar dtús.",
+      "didNotCompleteTitle": "Níor críochnaíodh an tsuiteáil",
+      "didNotCompleteMessage": "Níor críochnaíodh suiteáil na hAipe GitHub. Bain triail as arís ón aip."
     },
     "sessionExited": "D'fhág an seisiún",
     "remoteSpawnRetryable": "Níorbh fhéidir an t-instance a bhaint amach — seans gur dícheanglaíodh é.",
@@ -2774,10 +2852,18 @@
     "emailDeliveryFailed": "Níl seachadadh ríomhphoist ar fáil go sealadach. Bain triail as arís níos déanaí le do thoil.",
     "admissionRequired": "Ní féidir do ghléas a fhíorú. Úsáid '$t(login.moreSignInOptions)' chun sínithe isteach ar ghléas eile nó tríd an ngréasán.",
     "default": "Chuaigh rud éigin mícheart. Bain triail as arís le do thoil.",
-    "retryableAdmission": "Níorbh fhéidir linn an gléas seo a fhíorú. Seiceáil do cheangal agus bain triail as arís."
+    "retryableAdmission": "Níorbh fhéidir linn an gléas seo a fhíorú. Seiceáil do cheangal agus bain triail as arís.",
+    "startSignInFailed": "Theip ar an síniú isteach a thosú. Bain triail as arís le do thoil.",
+    "couldNotOpenBrowser": "Níorbh fhéidir an brabhsálaí a oscailt. Bain triail as arís le do thoil.",
+    "signInTimedOut": "Chuaigh an síniú isteach thar am. Bain triail as arís le do thoil.",
+    "signInFailed": "Theip ar an síniú isteach. Bain triail as arís le do thoil.",
+    "networkError": "Earráid líonra. Bain triail as arís le do thoil.",
+    "accessDeniedByUser": "Rochtain diúltaithe ag an úsáideoir",
+    "codeExpired": "Cód imithe in éag"
   },
   "models": {
     "dataCollected": "Sonraí bailithe",
-    "free": "Saor in aisce"
+    "free": "Saor in aisce",
+    "couldNotUpdateFavorites": "Níorbh fhéidir na cinn is fearr leat a nuashonrú"
   }
 }

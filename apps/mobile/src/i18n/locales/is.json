@@ -22,7 +22,9 @@
     "copiedToClipboard": "Afritað á klippiborð",
     "couldNotCopyToClipboard": "Ekki tókst að afrita á klippiborð",
     "required": "áskilið",
-    "error": "villa: {{error}}"
+    "error": "villa: {{error}}",
+    "back": "Til baka",
+    "somethingWentWrong": "Eitthvað fór úrskeiðis"
   },
   "language": {
     "title": "Tungumál",
@@ -280,7 +282,36 @@
         "body": "Gat ekki eytt greininni: {{reason}}",
         "accessibility": "Sameinað. Gat ekki eytt greininni: {{reason}}"
       },
-      "loadFailedTitle": "Gat ekki hlaðið sameiningarvalkostum"
+      "loadFailedTitle": "Gat ekki hlaðið sameiningarvalkostum",
+      "blocked": {
+        "unknownStateTitle": "GitHub hefur ekki tilkynnt sameiningarstöðu",
+        "unknownStateDetail": "Reyndu að endurnýja yfirlitið eftir augnablik.",
+        "conflictsTitle": "Sameiningarátök",
+        "conflictsDetail": "Leystu sameiningarátökin á þessari grein áður en þú sameinar.",
+        "requiredReviewsTitle": "Nauðsynlegar úttektir vantar",
+        "requiredReviewsDetail": "Samþykki frá nauðsynlegum rýnendum vantar eða bíður.",
+        "failingChecksTitle": "Nauðsynlegar athuganir mistakast",
+        "failingChecksDetail": "Nauðsynlegar stöðuathuganir mistakast.",
+        "unstableTitle": "Sumar athuganir mistakast",
+        "unstableDetail": "Athuganir sem ekki eru nauðsynlegar mistakast. Þær loka ekki á sameininguna.",
+        "draftTitle": "Pull request í drögum",
+        "draftDetail": "Merktu pull request sem tilbúinn til úttektar áður en þú sameinar.",
+        "behindTitle": "Grein er úrelt",
+        "behindDetailUpdatable": "Uppfærðu greinina frá grunngrein, eða endurstilltu, áður en þú sameinar.",
+        "behindDetail": "Hausgreinin er á eftir grunngreininni. Endurstilltu eða uppfærðu greinina áður en þú sameinar.",
+        "notMergeableTitle": "Ekki er enn hægt að sameina þennan pull request",
+        "notMergeableDetail": "GitHub tilkynnti {{state}} sameiningarstöðu."
+      },
+      "methodLabels": {
+        "merge": "Búa til sameiningarcommit",
+        "squash": "Samþjappa og sameina",
+        "rebase": "Endurstilla og sameina"
+      },
+      "methodDescriptions": {
+        "merge": "Sameinaðu alla commits frá þessari grein inn í grunngreinina með sameiningarcommit.",
+        "squash": "Sameinaðu alla commits frá þessari grein í einn commit á grunngreininni.",
+        "rebase": "Spilaðu alla commits frá þessari grein inn á grunngreinina án sameiningarcommit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Umræðuþráður {{anchorLabel}}",
@@ -356,7 +387,24 @@
       "moreLinesAbove": "… {{displayCount}} fleiri línur að ofan",
       "termsAcceptRequired": "Þú verður að samþykkja þjónustuskilmálana til að birta.",
       "termsOutdatedCopy": "Þjónustuskilmálarnir breyttust. Opnaðu þennan skjá aftur til að samþykkja nýjustu útgáfuna.",
-      "termsCheckRetryCopy": "Gat ekki athugað þjónustuskilmálana. Athugaðu tenginguna og reyndu aftur."
+      "termsCheckRetryCopy": "Gat ekki athugað þjónustuskilmálana. Athugaðu tenginguna og reyndu aftur.",
+      "reactions": {
+        "thumbsUp": "Þumall upp",
+        "thumbsDown": "Þumall niður",
+        "laugh": "Hlátur",
+        "hooray": "Húrra",
+        "confused": "Ruglaður",
+        "heart": "Hjarta",
+        "rocket": "Eldflaug",
+        "eyes": "Augu"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Skráarathugasemd á {{path}}",
+        "fileComment": "Skráarathugasemd",
+        "outdatedOnPathLines": "Úrelt á {{path}} {{lines}}",
+        "outdatedOnLines": "Úrelt á {{lines}}",
+        "outdatedOnPath": "Úrelt á {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Gat ekki opnað stillingar GitHub App",
     "installKiloGitHubApp": "Settu upp Kilo GitHub App",
@@ -523,7 +571,12 @@
       "truncationBanner": "Sýni fyrstu {{limit}} af {{total}} breyttum skrám — GitHub API takmörk"
     },
     "linkPasteClipboardEmpty": "Klippiborð er tómt",
-    "linkPasteNotAPullRequest": "Ekki GitHub pull request hlekkur"
+    "linkPasteNotAPullRequest": "Ekki GitHub pull request hlekkur",
+    "announce": {
+      "commentPosted": "Athugasemd birt",
+      "reviewSubmitted": "Úttekt send",
+      "autoMergeEnabled": "Sjálfvirk sameining virkjuð"
+    }
   },
   "notifications": {
     "title": "Tilkynningar",
@@ -656,7 +709,12 @@
       "sizeRejection": "{{filename}} er yfir {{limit}} viðhengismörkunum.",
       "unreadable": "Gat ekki lesið {{filename}}.",
       "pastedImage": "límaða myndin",
-      "defaultName": "Viðhengi"
+      "defaultName": "Viðhengi",
+      "classificationDenied": "Ekki er hægt að hengja keyranlegar skrár",
+      "classificationEmpty": "Skráin er tóm",
+      "classificationTooLarge": "Skrár verða að vera 20 MB eða minni",
+      "classificationUnreadable": "Gat ekki lesið þessa skrá",
+      "announceUploaded": "Viðhengi hlaðið upp"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1029,7 +1087,8 @@
       "starting": "RÆSI",
       "stopped": "STÖÐVUÐ",
       "stopping": "STÖÐVA",
-      "unknown": "ÓÞEKKT"
+      "unknown": "ÓÞEKKT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1714,7 +1773,15 @@
     },
     "queuedActionUntracked": "Ekki var lengur hægt að fylgjast með aðgerð í biðröð. Endurnýjaðu til að sjá nýjustu stöðu.",
     "initialSyncAdmissionFailed": "Security Agent var virkjaður, en ekki tókst að setja upphafssamstillingu í biðröð. Samstillaðu aftur.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Atviki þegar hafnað",
+      "findingDismissed": "Atviki hafnað",
+      "noRemediationsQueued": "Engin núverandi atvik sett í biðröð",
+      "remediationsQueued": "Núverandi úrbætur settar í biðröð",
+      "analysisComplete": "Greining lokið",
+      "syncComplete": "Samstilling lokið"
+    }
   },
   "agents": {
     "activeNow": "Virkur núna",
@@ -1762,7 +1829,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
-      "couldNotOpenMessage": "Okkur tókst ekki að hefja uppsetningu GitHub Apps. Reyndu aftur."
+      "couldNotOpenMessage": "Okkur tókst ekki að hefja uppsetningu GitHub Apps. Reyndu aftur.",
+      "installedTitle": "GitHub App uppsett",
+      "installedMessage": "Geymslurnar þínar eru nú tengdar.",
+      "pendingTitle": "Bíður samþykkis stjórnanda",
+      "pendingMessage": "Stjórnandi stofnunarinnar verður að samþykkja uppsetningarbeiðnina.",
+      "accountMismatchTitle": "Reikningur passar ekki",
+      "accountMismatchMessage": "Þessi tenging var hafin í Kilo App með innskráningu á annan reikning. Skráðu þig inn á vefnum með þeim reikningi, eða byrjaðu aftur í appinu.",
+      "cannotCompleteTitle": "Ekki er hægt að ljúka uppsetningu",
+      "notAdminMessage": "Aðeins GitHub stjórnandi þess reiknings getur tengt hann. Biddu stjórnanda stofnunarinnar að setja upp Kilo.",
+      "alreadyClaimedMessage": "Sú GitHub uppsetning er þegar tengd öðrum Kilo reikningi. Aftengdu hana þar fyrst.",
+      "didNotCompleteTitle": "Uppsetningu var ekki lokið",
+      "didNotCompleteMessage": "Ekki var lokið við uppsetningu GitHub App. Reyndu aftur í appinu."
     },
     "sessionExited": "Lota hætt",
     "remoteSpawnRetryable": "Náði ekki til eintaksins — það gæti hafa tengst af.",
@@ -2717,10 +2795,18 @@
     "emailDeliveryFailed": "Afhending tölvupósts er tímabundið ófáanleg. Reyndu aftur síðar.",
     "admissionRequired": "Ekki er hægt að staðfesta tækið þitt. Notaðu '$t(login.moreSignInOptions)' til að skrá þig inn á öðru tæki eða í gegnum vefinn.",
     "default": "Eitthvað fór úrskeiðis. Reyndu aftur.",
-    "retryableAdmission": "Við gátum ekki staðfest þetta tæki. Athugaðu tenginguna og reyndu aftur."
+    "retryableAdmission": "Við gátum ekki staðfest þetta tæki. Athugaðu tenginguna og reyndu aftur.",
+    "startSignInFailed": "Mistókst að hefja innskráningu. Reyndu aftur.",
+    "couldNotOpenBrowser": "Gat ekki opnað vafra. Reyndu aftur.",
+    "signInTimedOut": "Innskráning rann út á tíma. Reyndu aftur.",
+    "signInFailed": "Innskráning mistókst. Reyndu aftur.",
+    "networkError": "Netvilla. Reyndu aftur.",
+    "accessDeniedByUser": "Notandi hafnaði aðgangi",
+    "codeExpired": "Kóði er útrunninn"
   },
   "models": {
     "dataCollected": "Upplýsingar safnaðar",
-    "free": "Ókeypis"
+    "free": "Ókeypis",
+    "couldNotUpdateFavorites": "Gat ekki uppfært uppáhald"
   }
 }

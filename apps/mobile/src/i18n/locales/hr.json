@@ -22,7 +22,9 @@
     "copiedToClipboard": "Kopirano u međuspremnik",
     "couldNotCopyToClipboard": "Nije moguće kopirati u međuspremnik",
     "required": "obavezno",
-    "error": "greška: {{error}}"
+    "error": "greška: {{error}}",
+    "back": "Natrag",
+    "somethingWentWrong": "Nešto je pošlo po zlu"
   },
   "language": {
     "title": "Jezik",
@@ -282,7 +284,36 @@
         "body": "Nije moguće obrisati granu: {{reason}}",
         "accessibility": "Spojeno. Nije moguće obrisati granu: {{reason}}"
       },
-      "loadFailedTitle": "Nije moguće učitati opcije spajanja"
+      "loadFailedTitle": "Nije moguće učitati opcije spajanja",
+      "blocked": {
+        "unknownStateTitle": "GitHub nije prijavio mogućnost spajanja",
+        "unknownStateDetail": "Pokušajte osvježiti pregled za trenutak.",
+        "conflictsTitle": "Konflikti spajanja",
+        "conflictsDetail": "Riješite konflikte spajanja na ovoj grani prije spajanja.",
+        "requiredReviewsTitle": "Nedostaju potrebne recenzije",
+        "requiredReviewsDetail": "Odobrenja potrebnih recenzenata nedostaju ili su na čekanju.",
+        "failingChecksTitle": "Neuspješne potrebne provjere",
+        "failingChecksDetail": "Potrebne provjere statusa ne uspijevaju.",
+        "unstableTitle": "Neke provjere ne uspijevaju",
+        "unstableDetail": "Neobavezne provjere ne uspijevaju. One neće blokirati spajanje.",
+        "draftTitle": "Skica pull requesta",
+        "draftDetail": "Označite pull request kao spreman za recenziju prije spajanja.",
+        "behindTitle": "Grana je zastarjela",
+        "behindDetailUpdatable": "Ažurirajte granu s osnovne ili je rebase-ajte prije spajanja.",
+        "behindDetail": "Glavna grana zaostaje za osnovnom. Rebase-ajte ili ažurirajte granu prije spajanja.",
+        "notMergeableTitle": "Ovaj pull request još nije moguće spojiti",
+        "notMergeableDetail": "GitHub je prijavio stanje spajanja {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Stvori merge commit",
+        "squash": "Squash i spoji",
+        "rebase": "Rebase i spoji"
+      },
+      "methodDescriptions": {
+        "merge": "Kombiniraj sve commitove s ove grane u osnovnu granu uz merge commit.",
+        "squash": "Kombiniraj sve commitove s ove grane u jedan commit na osnovnoj grani.",
+        "rebase": "Ponovno primijeni sve commitove s ove grane na osnovnu granu bez merge commita."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Nit rasprave {{anchorLabel}}",
@@ -360,7 +391,24 @@
       "termsOutdatedCopy": "Uvjeti korištenja su se promijenili. Ponovno otvorite ovaj zaslon za prihvaćanje najnovije verzije.",
       "termsCheckRetryCopy": "Nije moguće provjeriti Uvjete korištenja. Provjerite svoju vezu i pokušajte ponovno.",
       "comment_few": "{{displayCount}} komentara",
-      "reaction_few": "reakcije"
+      "reaction_few": "reakcije",
+      "reactions": {
+        "thumbsUp": "Palac gore",
+        "thumbsDown": "Palac dolje",
+        "laugh": "Smijeh",
+        "hooray": "Ura",
+        "confused": "Zbunjeno",
+        "heart": "Srce",
+        "rocket": "Raketa",
+        "eyes": "Oči"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komentar na datoteci {{path}}",
+        "fileComment": "Komentar na datoteci",
+        "outdatedOnPathLines": "Zastarjelo na {{path}} {{lines}}",
+        "outdatedOnLines": "Zastarjelo na {{lines}}",
+        "outdatedOnPath": "Zastarjelo na {{path}}"
+      }
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti postavke GitHub aplikacije",
     "installKiloGitHubApp": "Instaliraj Kilo GitHub aplikaciju",
@@ -530,7 +578,12 @@
       "truncationBanner": "Prikazujem prvih {{limit}} od {{total}} promijenjenih datoteka — ograničenje GitHub API-ja"
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan",
-    "linkPasteNotAPullRequest": "Nije poveznica na GitHub pull request"
+    "linkPasteNotAPullRequest": "Nije poveznica na GitHub pull request",
+    "announce": {
+      "commentPosted": "Komentar objavljen",
+      "reviewSubmitted": "Recenzija poslana",
+      "autoMergeEnabled": "Automatsko spajanje omogućeno"
+    }
   },
   "notifications": {
     "title": "Obavijesti",
@@ -663,7 +716,12 @@
       "sizeRejection": "{{filename}} premašuje ograničenje privitka od {{limit}}.",
       "unreadable": "Nije moguće pročitati {{filename}}.",
       "pastedImage": "zalijepljena slika",
-      "defaultName": "Privitak"
+      "defaultName": "Privitak",
+      "classificationDenied": "Izvršne datoteke se ne mogu priložiti",
+      "classificationEmpty": "Datoteka je prazna",
+      "classificationTooLarge": "Datoteke moraju biti veličine 20 MB ili manje",
+      "classificationUnreadable": "Nije moguće pročitati ovu datoteku",
+      "announceUploaded": "Privitak učitan"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1037,7 +1095,8 @@
       "starting": "POKRETANJE",
       "stopped": "ZAUSTAVLJENO",
       "stopping": "ZAUSTAVLJANJE",
-      "unknown": "NEPOZNATO"
+      "unknown": "NEPOZNATO",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1725,7 +1784,15 @@
     },
     "queuedActionUntracked": "Radnju u redu čekanja više nije moguće pratiti. Osvježite za prikaz najnovijeg stanja.",
     "initialSyncAdmissionFailed": "Security Agent je omogućen, ali početnu sinkronizaciju nije bilo moguće staviti u red. Sinkronizirajte ponovno.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Nalaz je već odbačen",
+      "findingDismissed": "Nalaz odbačen",
+      "noRemediationsQueued": "Nema postojećih nalaza u redu čekanja",
+      "remediationsQueued": "Postojeće sanacije u redu čekanja",
+      "analysisComplete": "Analiza dovršena",
+      "syncComplete": "Sinkronizacija dovršena"
+    }
   },
   "agents": {
     "activeNow": "Aktivno sada",
@@ -1775,7 +1842,18 @@
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
-      "couldNotOpenMessage": "Nismo mogli započeti postavljanje GitHub aplikacije. Pokušajte ponovno."
+      "couldNotOpenMessage": "Nismo mogli započeti postavljanje GitHub aplikacije. Pokušajte ponovno.",
+      "installedTitle": "GitHub aplikacija instalirana",
+      "installedMessage": "Vaši repozitoriji su sada povezani.",
+      "pendingTitle": "Čeka se odobrenje administratora",
+      "pendingMessage": "Administrator organizacije mora odobriti zahtjev za instalaciju.",
+      "accountMismatchTitle": "Nepodudaranje računa",
+      "accountMismatchMessage": "Ova veza je pokrenuta iz Kilo aplikacije prijavljene s drugim računom. Prijavite se na web s tim računom ili pokrenite ponovno iz aplikacije.",
+      "cannotCompleteTitle": "Nije moguće dovršiti instalaciju",
+      "notAdminMessage": "Samo GitHub administrator tog računa može ga povezati. Zamolite administratora organizacije da instalira Kilo.",
+      "alreadyClaimedMessage": "Ta GitHub instalacija je već povezana s drugim Kilo računom. Prvo je odspojite tamo.",
+      "didNotCompleteTitle": "Instalacija nije dovršena",
+      "didNotCompleteMessage": "Instalacija GitHub aplikacije nije dovršena. Pokušajte ponovno iz aplikacije."
     },
     "sessionExited": "Sesija je završena",
     "remoteSpawnRetryable": "Nije moguće doći do instance — možda se prekinula veza.",
@@ -2736,10 +2814,18 @@
     "emailDeliveryFailed": "Dostava e-pošte trenutno nije dostupna. Pokušajte ponovno kasnije.",
     "admissionRequired": "Vaš se uređaj ne može verificirati. Upotrijebite '$t(login.moreSignInOptions)' za prijavu na drugom uređaju ili putem weba.",
     "default": "Nešto je pošlo po zlu. Pokušajte ponovno.",
-    "retryableAdmission": "Nismo mogli verificirati ovaj uređaj. Provjerite svoju vezu i pokušajte ponovno."
+    "retryableAdmission": "Nismo mogli verificirati ovaj uređaj. Provjerite svoju vezu i pokušajte ponovno.",
+    "startSignInFailed": "Nije moguće pokrenuti prijavu. Pokušajte ponovno.",
+    "couldNotOpenBrowser": "Nije moguće otvoriti preglednik. Pokušajte ponovno.",
+    "signInTimedOut": "Prijava je istekla. Pokušajte ponovno.",
+    "signInFailed": "Prijava nije uspjela. Pokušajte ponovno.",
+    "networkError": "Greška mreže. Pokušajte ponovno.",
+    "accessDeniedByUser": "Pristup je odbio korisnik",
+    "codeExpired": "Kôd je istekao"
   },
   "models": {
     "dataCollected": "Prikupljeni podaci",
-    "free": "Besplatno"
+    "free": "Besplatno",
+    "couldNotUpdateFavorites": "Nije moguće ažurirati favorite"
   }
 }

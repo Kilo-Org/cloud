@@ -1,5 +1,6 @@
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   isLatestMutationGeneration,
@@ -13,7 +14,7 @@ import {
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 const onMutationError = (error: { message: string }) => {
-  announcingToast.error(error.message || 'Something went wrong');
+  announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
 };
 
 // Distributive helpers: `OrgWithMembers` is a union of the admin and member

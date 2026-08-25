@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetVoiceInputLanguageTagCacheForTests,
   pickSupportedVoiceInputLanguageTag,
-  resolveVoiceInputLanguageTag,
   resolveVoiceInputStartLanguageTag,
 } from './voice-input-language';
 
@@ -27,30 +26,6 @@ vi.mock('expo-speech-recognition', () => ({
     getSupportedLocales: getSupportedLocalesMock,
   },
 }));
-
-describe('resolveVoiceInputLanguageTag', () => {
-  it('falls back to en-US when the locales array is empty', () => {
-    expect(resolveVoiceInputLanguageTag([])).toBe('en-US');
-  });
-
-  it('falls back to en-US when the first locale has no languageTag', () => {
-    expect(resolveVoiceInputLanguageTag([{}])).toBe('en-US');
-  });
-
-  it('falls back to en-US when the first locale languageTag is empty', () => {
-    expect(resolveVoiceInputLanguageTag([{ languageTag: '' }])).toBe('en-US');
-  });
-
-  it('returns the first locale languageTag when it is populated', () => {
-    expect(resolveVoiceInputLanguageTag([{ languageTag: 'nl-NL' }])).toBe('nl-NL');
-  });
-
-  it('ignores later locales', () => {
-    expect(resolveVoiceInputLanguageTag([{ languageTag: 'fr-FR' }, { languageTag: 'de-DE' }])).toBe(
-      'fr-FR'
-    );
-  });
-});
 
 describe('pickSupportedVoiceInputLanguageTag', () => {
   it('returns the supported spelling on exact match (device en_US → supported en-US)', () => {
@@ -97,6 +72,24 @@ describe('pickSupportedVoiceInputLanguageTag', () => {
     expect(pickSupportedVoiceInputLanguageTag(['zh-Hant-TW'], ['zh-CN', 'zh-Hant'])).toBe(
       'zh-Hant'
     );
+  });
+
+  it('keeps the Traditional script when the device names a Traditional region', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hant', 'zh-TW'], ['zh-CN', 'zh-TW'])).toBe(
+      'zh-TW'
+    );
+  });
+
+  it('maps a Simplified script tag onto the Simplified region', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hans'], ['zh-TW', 'zh-CN'])).toBe('zh-CN');
+  });
+
+  it('maps the HK region to Traditional Chinese', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-HK'], ['zh-CN', 'zh-TW'])).toBe('zh-TW');
+  });
+
+  it('keeps the old behavior for a non-Chinese tag', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['de-AT'], ['de-DE', 'de-CH'])).toBe('de-DE');
   });
 });
 

@@ -1576,6 +1576,13 @@
       "when": 1787673476900,
       "tag": "0224_retire_kiloclaw_referral_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 225,
+      "version": "7",
+      "when": 1787677353599,
+      "tag": "0225_rare_captain_britain",
+      "breakpoints": true
     }
   ]
 }

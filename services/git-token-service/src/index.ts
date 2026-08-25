@@ -92,6 +92,7 @@ export type GetTokenForRepoParams = {
   githubRepo: string;
   userId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
 };
 
 export type GetTokenForRepoSuccess = {
@@ -109,7 +110,8 @@ export type GetTokenForRepoFailure = {
     | 'invalid_repo_format'
     | 'no_installation_found'
     | 'repository_not_installed'
-    | 'invalid_org_id';
+    | 'invalid_org_id'
+    | 'integration_mismatch';
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
@@ -179,6 +181,7 @@ export type RedeemGitHubSessionCapabilityFailureReason =
   | 'repository_mismatch'
   | 'invalid_upstream_request'
   | 'source_unavailable'
+  | 'integration_mismatch'
   | 'identity_mismatch';
 export type RedeemGitHubSessionCapabilityResult =
   | RedeemGitHubSessionCapabilitySuccess
@@ -779,6 +782,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         case 'invalid_repo_format':
         case 'no_installation_found':
         case 'invalid_org_id':
+        case 'integration_mismatch':
           return { success: false, reason: installation.reason };
       }
     }
@@ -820,6 +824,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         case 'no_installation_found':
         case 'repository_not_installed':
         case 'invalid_org_id':
+        case 'integration_mismatch':
           return { success: false, reason: installation.reason };
       }
     }
@@ -887,6 +892,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
           ? { outboundContainerId: params.outboundContainerId }
           : {}),
         ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+        ...(params.expectedIntegrationId !== undefined
+          ? { integrationId: params.expectedIntegrationId }
+          : {}),
         ...repository,
         source: auth.source,
         identity: this.getSessionIdentity(auth),
@@ -934,6 +942,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const authParams = {
       userId: claims.userId,
       ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
+      ...(claims.integrationId !== undefined
+        ? { expectedIntegrationId: claims.integrationId }
+        : {}),
       githubRepo: `${claims.owner}/${claims.repo}`,
     };
     let auth: GetCloudAgentAuthForRepoResult | null;
@@ -945,6 +956,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       } catch {
         return { success: false, reason: 'source_unavailable' };
       }
+    }
+    if (auth && !auth.success && auth.reason === 'integration_mismatch') {
+      return { success: false, reason: 'integration_mismatch' };
     }
     if (!auth || !auth.success || auth.source !== claims.source) {
       return { success: false, reason: 'source_unavailable' };
@@ -983,9 +997,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
   private async redeemPinnedUserAuthorization(
     params: GetTokenForRepoParams
-  ): Promise<GetCloudAgentAuthForRepoSuccess | null> {
+  ): Promise<GetCloudAgentAuthForRepoResult | null> {
     const installation =
       await this.installationLookupService.findManagedInstallationForRepo(params);
+    if (!installation.success && installation.reason === 'integration_mismatch') {
+      return { success: false, reason: 'integration_mismatch' };
+    }
     if (!installation.success || installation.githubAppType === 'lite') return null;
     if (
       installation.permissions?.contents !== 'write' ||

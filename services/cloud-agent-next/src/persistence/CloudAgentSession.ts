@@ -245,6 +245,7 @@ type GroupedRegisterSessionInput = {
     | {
         type: 'github';
         repo: string;
+        githubIntegrationId?: string;
         branch?: string;
       }
     | {
@@ -296,6 +297,9 @@ function repositoryMetadataFromRegistrationInput(
       return {
         type: 'github',
         repo: repository.repo,
+        ...(repository.githubIntegrationId
+          ? { githubIntegrationId: repository.githubIntegrationId }
+          : {}),
         upstreamBranch: repository.branch,
       };
     case 'gitlab':
@@ -379,6 +383,7 @@ function isSameRegistrationRepository(
       return (
         stored.type === 'github' &&
         stored.repo === submitted.repo &&
+        stored.githubIntegrationId === submitted.githubIntegrationId &&
         stored.upstreamBranch === submitted.branch
       );
     case 'gitlab':

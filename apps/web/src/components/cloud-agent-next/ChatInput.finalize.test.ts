@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { UseCloudAgentAttachmentUploadReturn } from '@/hooks/useCloudAgentAttachmentUpload';
 import type { ChatInput as ChatInputComponent } from './ChatInput';
 
@@ -85,7 +86,7 @@ function installLinkedomDom(): {
 
   return {
     container: container as unknown as HTMLElement,
-    window,
+    window: window as unknown as Window,
     cleanup: () => {
       Object.assign(globalThis, previous);
     },
@@ -101,7 +102,7 @@ function buildMockUpload(
     removeAttachment: jest.fn(),
     clearAttachments: jest.fn(),
     hasUploadingAttachments: false,
-    getAttachmentsData: jest.fn(),
+    getAttachmentsData: jest.fn<() => CloudAgentAttachments | undefined>(),
     finalizeAttachments: jest.fn(async () => undefined),
     isDragging: false,
     dragHandlers: {
@@ -150,7 +151,7 @@ function setTextareaValue(rootContainer: HTMLElement, value: string) {
 // Runtime modules are loaded after the jest.mock registrations above so the
 // presentational children and the upload hook are stubbed before ChatInput's
 // own import graph resolves.
-let ChatInput: ChatInputComponent;
+let ChatInput: typeof ChatInputComponent;
 let toastError: jest.Mock;
 let mockedUseCloudAgentAttachmentUpload: jest.Mock<
   (options: unknown) => UseCloudAgentAttachmentUploadReturn

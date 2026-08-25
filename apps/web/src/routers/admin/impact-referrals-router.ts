@@ -26,7 +26,7 @@ const ReferralProductSchema = z.enum([
 
 const ReferralInvestigationInputSchema = z.object({
   search: z.string().trim().min(1),
-  product: ReferralProductSchema.default(ImpactReferralProduct.KiloClaw),
+  product: ReferralProductSchema.default(ImpactReferralProduct.KiloPass),
 });
 
 const NullableString = z.string().nullable();
@@ -616,7 +616,7 @@ async function investigateReferrer(
   };
 }
 
-export const adminKiloclawReferralsRouter = createTRPCRouter({
+export const adminImpactReferralsRouter = createTRPCRouter({
   investigateReferrer: adminProcedure
     .input(ReferralInvestigationInputSchema)
     .output(ReferralInvestigationOutputSchema)

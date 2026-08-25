@@ -134,9 +134,11 @@ type InvestigationResult = {
   }>;
 };
 
+// KiloClaw referrals are retired. The option stays so support can still read the
+// retained historical records; no new KiloClaw referral state is ever produced.
 const PRODUCT_OPTIONS: Array<{ value: ReferralProduct; label: string }> = [
-  { value: 'kiloclaw', label: 'KiloClaw' },
   { value: 'kilo_pass', label: 'Kilo Pass' },
+  { value: 'kiloclaw', label: 'KiloClaw (retired)' },
 ];
 
 type ResultsProps = {
@@ -167,7 +169,7 @@ function formatRewardValue(row: {
   return '—';
 }
 
-export function KiloclawReferralsInvestigationResults({ result }: ResultsProps) {
+export function ImpactReferralsInvestigationResults({ result }: ResultsProps) {
   return (
     <div className="space-y-4">
       <Card>
@@ -377,14 +379,14 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function KiloclawReferralsInvestigation() {
+export function ImpactReferralsInvestigation() {
   const trpc = useTRPC();
   const [search, setSearch] = useState('');
-  const [product, setProduct] = useState<ReferralProduct>('kiloclaw');
+  const [product, setProduct] = useState<ReferralProduct>('kilo_pass');
   const [submittedSearch, setSubmittedSearch] = useState<string | null>(null);
-  const [submittedProduct, setSubmittedProduct] = useState<ReferralProduct>('kiloclaw');
+  const [submittedProduct, setSubmittedProduct] = useState<ReferralProduct>('kilo_pass');
   const query = useQuery(
-    trpc.admin.kiloclawReferrals.investigateReferrer.queryOptions(
+    trpc.admin.impactReferrals.investigateReferrer.queryOptions(
       { search: submittedSearch ?? '', product: submittedProduct },
       { enabled: submittedSearch !== null }
     )
@@ -456,7 +458,7 @@ export function KiloclawReferralsInvestigation() {
           </CardContent>
         </Card>
       ) : null}
-      {query.data ? <KiloclawReferralsInvestigationResults result={query.data} /> : null}
+      {query.data ? <ImpactReferralsInvestigationResults result={query.data} /> : null}
     </div>
   );
 }

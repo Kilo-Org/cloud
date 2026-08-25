@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getNotificationPermissionStatus,
@@ -60,7 +62,16 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
           return;
         }
         if (token) {
-          await registerTokenMutateAsync({ token, platform: getPlatform() });
+          await registerTokenMutateAsync({
+            token,
+            platform: getPlatform(),
+            // Both fields are read per token when a push is sent: a null
+            // locale sends English copy, and a null app_version drops the
+            // Android channel id. Omitting them here writes nulls over the
+            // values an earlier registration stored.
+            appVersion: Application.nativeApplicationVersion ?? undefined,
+            locale: getResolvedLanguage(),
+          });
           if (isCancelled()) {
             return;
           }

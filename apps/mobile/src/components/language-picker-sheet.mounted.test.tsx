@@ -14,6 +14,20 @@ const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+const keyboard = vi.hoisted(() => {
+  const listeners = new Map<string, (event?: { endCoordinates: { height: number } }) => void>();
+  return {
+    listeners,
+    addListener: vi.fn(
+      (event: string, listener: (event?: { endCoordinates: { height: number } }) => void) => {
+        listeners.set(event, listener);
+        return { remove: vi.fn(() => listeners.delete(event)) };
+      }
+    ),
+  };
+});
 const i18nManager = vi.hoisted(() => ({
   allowRTL: vi.fn(),
   isRTL: false,
@@ -45,8 +59,11 @@ const flatListMock = vi.hoisted(
 );
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   FlatList: flatListMock,
+  Keyboard: keyboard,
   Modal: 'Modal',
+  Platform: platform,
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -61,13 +78,15 @@ vi.mock('react-native-reanimated', () => ({
   SlideOutDown: { duration: vi.fn() },
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => insets,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@rn-primitives/portal', () => ({ Portal: 'Portal' }));
 vi.mock('expo', () => ({ reloadAppAsync }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6b7280' }),
@@ -169,6 +188,10 @@ describe('LanguagePickerSheet apply', () => {
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
     writeLanguageReturnTarget.mockReset();
+    platform.OS = 'android';
+    insets.bottom = 0;
+    keyboard.listeners.clear();
+    keyboard.addListener.mockClear();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
     vi.mocked(toast.error).mockClear();
@@ -176,6 +199,81 @@ describe('LanguagePickerSheet apply', () => {
 
   afterEach(async () => {
     await i18n.changeLanguage('en');
+  });
+
+  it('keeps the Android sheet above the keyboard and navigation inset', async () => {
+    insets.bottom = 24;
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const overlay = findByType(renderer.root, 'View').find(
+      node => node.props.className === 'flex-1 justify-end bg-black/40'
+    );
+    if (!overlay) {
+      throw new Error('keyboard-aware sheet overlay not found');
+    }
+
+    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 0 }]);
+    expect(keyboard.addListener).toHaveBeenCalledWith('keyboardDidShow', expect.any(Function));
+
+    act(() => {
+      keyboard.listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 240 } });
+    });
+    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 264 }]);
+
+    act(() => {
+      keyboard.listeners.get('keyboardDidHide')?.();
+    });
+    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 0 }]);
+
+    renderer.unmount();
+  });
+
+  it('keeps the iOS sheet above the keyboard without adding its safe-area inset', async () => {
+    platform.OS = 'ios';
+    insets.bottom = 24;
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const overlay = findByType(renderer.root, 'View').find(
+      node => node.props.className === 'flex-1 justify-end bg-black/40'
+    );
+    if (!overlay) {
+      throw new Error('keyboard-aware sheet overlay not found');
+    }
+
+    expect(keyboard.addListener).toHaveBeenCalledWith('keyboardWillShow', expect.any(Function));
+
+    act(() => {
+      keyboard.listeners.get('keyboardWillShow')?.({ endCoordinates: { height: 240 } });
+    });
+    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 240 }]);
+
+    renderer.unmount();
+  });
+
+  it('shows the standard empty state when the search matches no languages', async () => {
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('zzzzzz');
+    });
+
+    const emptyState = findByType(renderer.root, 'EmptyState')[0];
+    expect(emptyState?.props).toMatchObject({
+      icon: 'SearchX',
+      placement: 'top',
+      title: 'No languages match',
+      description: 'Try a different search term.',
+    });
+    expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('');
+    });
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+
+    renderer.unmount();
   });
 
   it('applies an LTR language in place without reloading the app', async () => {

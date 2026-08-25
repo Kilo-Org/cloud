@@ -424,6 +424,9 @@ function RootLayoutNav() {
   // without reading stale state or adding the id to effect deps.
   const pendingShareIdRef = useRef(pendingShareId);
   pendingShareIdRef.current = pendingShareId;
+  // Bumped by the ingest arm and the gate consume so the cold-start restore can
+  // detect any live arm/consume during its async reads and skip the fill.
+  const pendingShareIdEpochRef = useRef(0);
 
   // Cold-start share restore. Order matters: payloads first, then the
   // navigation queue (deliveries point at restored payloads), then the pending
@@ -433,23 +436,24 @@ function RootLayoutNav() {
     let cancelled = false;
 
     async function restoreShare() {
+      const startEpoch = pendingShareIdEpochRef.current;
       if (!userId) {
         return;
       }
       await restoreSharePayloads(userId);
-      if (cancelled) {
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;
       }
       await restoreShareNavigation(userId);
       // `cancelled` is set by the cleanup below; the previous check narrows the
       // fall-through path, but the variable is genuinely mutable.
       // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
-      if (cancelled) {
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;
       }
       const pendingId = await loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
       // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
-      if (cancelled) {
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;
       }
       if (
@@ -607,6 +611,7 @@ function RootLayoutNav() {
         if (superseded !== null) {
           clearSharePayload(superseded);
         }
+        pendingShareIdEpochRef.current += 1;
         setPendingShareId(shareId);
         // Persist the pending id so a process death before the gate opens still
         // restores it; skipped while the account has not resolved (signed out).
@@ -774,6 +779,7 @@ function RootLayoutNav() {
     } else {
       router.push(navigation.href as Href);
     }
+    pendingShareIdEpochRef.current += 1;
     setPendingShareId(null);
   }, [pendingShareId, isShellReady, onGateRoute, router]);
 

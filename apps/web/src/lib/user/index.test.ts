@@ -128,6 +128,7 @@ import {
   user_terms_acceptances,
   user_deletion_requests,
   user_deletion_steps,
+  cloud_agent_pending_uploads,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
@@ -254,6 +255,7 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
+    await db.delete(cloud_agent_pending_uploads);
     await db.delete(coding_plan_availability_intents);
     await db.delete(coding_plan_subscriptions);
     await db.delete(byok_api_keys);
@@ -962,6 +964,56 @@ describe('User', () => {
             inArray(analytics_event_outbox.id, [userOutbox.id, fallbackOutbox.id, otherOutbox.id])
           )
       ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
+    });
+
+    it('deletes the user\'s cloud agent pending-upload rows and leaves other users\' rows', async () => {
+      const user = await insertTestUser({ google_user_email: 'pending-upload-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [userPending] = await db
+        .insert(cloud_agent_pending_uploads)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          object_key: `${user.id}/cloud-agent/msg-1/att-1.bin`,
+          message_uuid: '11111111-1111-4111-8111-111111111111',
+          attachment_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          byte_size: 42,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .returning();
+      const [otherPending] = await db
+        .insert(cloud_agent_pending_uploads)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: otherUser.id,
+          object_key: `${otherUser.id}/cloud-agent/msg-1/att-1.bin`,
+          message_uuid: '22222222-2222-4222-8222-222222222222',
+          attachment_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          byte_size: 42,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .returning();
+      if (!userPending || !otherPending) {
+        throw new Error('Failed to seed pending upload rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, userPending.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
+      ).toHaveLength(1);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {

@@ -184,7 +184,7 @@ export function ChatInput({
       if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
 
       const attachmentsData = attachmentsEnabled
-        ? attachmentUpload.getAttachmentsData()
+        ? await attachmentUpload.finalizeAttachments()
         : undefined;
       const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
       const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);

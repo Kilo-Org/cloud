@@ -97,6 +97,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/reap-abandoned-cloud-agent-uploads",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/usage-partition-maintenance",
       "schedule": "0 0 1 * *"
     },

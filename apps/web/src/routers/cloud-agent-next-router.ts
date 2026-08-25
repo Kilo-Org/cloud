@@ -39,12 +39,14 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
+  cloudAgentLinkPendingUploadsSchema,
 } from './cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl,
   generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
+import { linkPendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -378,6 +380,19 @@ export const cloudAgentNextRouter = createTRPCRouter({
         messageUuid: input.messageUuid,
         filename: input.filename,
       });
+    }),
+
+  /**
+   * Finalize send-time attachment ledger rows: flip the caller's pending
+   * uploads for a message to 'linked'. Personal scope; the R2 key prefix is
+   * the caller's own user id.
+   */
+  linkPendingUploads: baseProcedure
+    .input(cloudAgentLinkPendingUploadsSchema)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
+      return { success: true };
     }),
 
   /**

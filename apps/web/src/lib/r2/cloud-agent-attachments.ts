@@ -12,6 +12,7 @@ import {
 } from '@/lib/cloud-agent/constants';
 import { cloudAgentRelaxedAttachmentFilenameSchema } from '@/routers/cloud-agent-next-schemas';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
+import { admitPendingUpload } from '@/lib/r2/cloud-agent-pending-uploads';
 
 type Service = 'app-builder' | 'cloud-agent';
 
@@ -122,6 +123,18 @@ export async function generateCloudAgentAttachmentUploadUrl({
       })()
     : CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION[contentType as CloudAgentAttachmentAllowedType];
   const key = `${userId}/cloud-agent/${messageUuid}/${attachmentId}.${suffix}`;
+
+  // Admit into the pending-upload ledger before signing. Compatibility: old
+  // clients presigned with no ledger; remove this admit call only when every
+  // uploader has moved onto send-time finalization.
+  await admitPendingUpload({
+    kiloUserId: userId,
+    messageUuid,
+    attachmentId,
+    objectKey: key,
+    byteSize: contentLength,
+  });
+
   const command = new PutObjectCommand({
     Bucket: r2CloudAgentAttachmentsBucketName,
     Key: key,

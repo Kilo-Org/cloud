@@ -58,6 +58,7 @@ import {
   slack_bot_requests,
   bot_requests,
   cloud_agent_code_reviews,
+  cloud_agent_pending_uploads,
   code_review_feedback_events,
   code_review_memory_proposals,
   kiloclaw_instances,
@@ -1397,6 +1398,9 @@ export async function anonymizeCloudUserData(
   await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
   await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
   await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
+  await tx
+    .delete(cloud_agent_pending_uploads)
+    .where(eq(cloud_agent_pending_uploads.kilo_user_id, userId));
   await tx
     .delete(cloud_agent_code_reviews)
     .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));

@@ -5963,6 +5963,42 @@ export const cloud_agent_sessions = pgTable(
 export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
 export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
 
+/**
+ * Pending-upload ledger for cloud agent attachments. A presign admits a row in
+ * status 'pending'; send-time finalization flips the matching rows to 'linked'
+ * in one transaction; a cron reaper deletes the R2 objects behind abandoned
+ * 'pending' rows whose lease has expired and records them as 'reaped'.
+ * kilo_user_id is text() because user IDs are not always UUIDs (OAuth users).
+ */
+export const cloud_agent_pending_uploads = pgTable(
+  'cloud_agent_pending_uploads',
+  {
+    id: text().primaryKey().notNull(),
+    kilo_user_id: text().notNull(),
+    object_key: text().notNull().unique(),
+    message_uuid: text().notNull(),
+    attachment_id: text().notNull(),
+    byte_size: integer().notNull(),
+    status: text().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    index('IDX_cloud_agent_pending_uploads_user_message_status').on(
+      table.kilo_user_id,
+      table.message_uuid,
+      table.status
+    ),
+    check(
+      'cloud_agent_pending_uploads_status_check',
+      sql`${table.status} IN ('pending', 'linked', 'reaped')`
+    ),
+  ]
+);
+
+export type CloudAgentPendingUpload = typeof cloud_agent_pending_uploads.$inferSelect;
+export type NewCloudAgentPendingUpload = typeof cloud_agent_pending_uploads.$inferInsert;
+
 export type CloudAgentSessionRunStatus =
   | 'queued'
   | 'accepted'

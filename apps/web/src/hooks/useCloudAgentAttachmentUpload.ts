@@ -69,6 +69,7 @@ export type UseCloudAgentAttachmentUploadReturn = {
   clearAttachments: () => void;
   hasUploadingAttachments: boolean;
   getAttachmentsData: () => CloudAgentAttachments | undefined;
+  finalizeAttachments: () => Promise<CloudAgentAttachments | undefined>;
   isDragging: boolean;
   dragHandlers: {
     onDragEnter: (event: React.DragEvent) => void;
@@ -193,6 +194,12 @@ export function useCloudAgentAttachmentUpload(
   );
   const { mutateAsync: orgMutateAsync } = useMutation(
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
+  );
+  const { mutateAsync: personalLinkMutateAsync } = useMutation(
+    trpc.cloudAgentNext.linkPendingUploads.mutationOptions()
+  );
+  const { mutateAsync: orgLinkMutateAsync } = useMutation(
+    trpc.organizations.cloudAgentNext.linkPendingUploads.mutationOptions()
   );
 
   const getPresignedUrl = useCallback(
@@ -422,6 +429,31 @@ export function useCloudAgentAttachmentUpload(
     [messageUuid]
   );
 
+  /**
+   * Flip the completed uploads' pending-ledger rows to 'linked' just before
+   * the caller submits the message, then return the attachment payload. Without
+   * this the admitted rows stay 'pending' and the cron reaper deletes objects
+   * the user did send.
+   */
+  const finalizeAttachments = useCallback(async (): Promise<CloudAgentAttachments | undefined> => {
+    const completeKeys = attachmentsRef.current
+      .filter(
+        (attachment): attachment is CloudAgentAttachmentFile & { r2Key: string } =>
+          attachment.status === 'complete' && Boolean(attachment.r2Key)
+      )
+      .map(attachment => attachment.r2Key);
+
+    if (completeKeys.length > 0) {
+      if (organizationId) {
+        await orgLinkMutateAsync({ messageUuid, objectKeys: completeKeys, organizationId });
+      } else {
+        await personalLinkMutateAsync({ messageUuid, objectKeys: completeKeys });
+      }
+    }
+
+    return getAttachmentsData();
+  }, [getAttachmentsData, messageUuid, orgLinkMutateAsync, organizationId, personalLinkMutateAsync]);
+
   const handleDragEnter = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -458,6 +490,7 @@ export function useCloudAgentAttachmentUpload(
       ['processing', 'pending', 'uploading'].includes(attachment.status)
     ),
     getAttachmentsData,
+    finalizeAttachments,
     isDragging,
     dragHandlers: {
       onDragEnter: handleDragEnter,

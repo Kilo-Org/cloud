@@ -1865,6 +1865,18 @@
       "updating": "جارٍ التحديث، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "طلب سحب"
+    },
+    "markdownImage": {
+      "load": "تحميل",
+      "loadWithHost": "تحميل {{host}}",
+      "httpsOnly": "صور HTTPS فقط"
+    },
+    "markdownLink": {
+      "invalidLink": "لا يمكن فتح هذا الرابط.",
+      "hostConfirmTitle": "فتح رابط خارجي؟",
+      "hostConfirmMessage": "يفتح هذا الرابط {{host}} في متصفحك.",
+      "open": "فتح",
+      "trustThisHost": "الثقة بهذا المضيف"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "البيانات التي تم جمعها",
     "free": "مجاني"
+  },
+  "trustedHosts": {
+    "title": "المضيفون الموثوقون",
+    "subtitle": "مضيفون تثق بهم لفتحها دون سؤال",
+    "emptyTitle": "لا توجد مضيفون موثوقون",
+    "emptyDescription": "عندما تثق بمضيف رابط، يُفتح دون سؤال مرة أخرى.",
+    "revoke": "إبطال {{host}}",
+    "backToPreferences": "العودة إلى التفضيلات"
   }
 }

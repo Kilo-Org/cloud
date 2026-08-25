@@ -87,7 +87,10 @@ describe('confirmAndOpenMarkdownLink', () => {
     const buttons = (alert.mock.calls[0] as AlertCall)[2];
     buttons[1]?.onPress?.();
 
-    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/path', { label: 'link' });
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/path', {
+      label: 'link',
+      retryOnError: true,
+    });
     expect(trustHost).not.toHaveBeenCalled();
     expect(isTrustedHost('example.com')).toBe(false);
   });
@@ -99,7 +102,10 @@ describe('confirmAndOpenMarkdownLink', () => {
     buttons[2]?.onPress?.();
 
     expect(trustHost).toHaveBeenCalledWith('example.com');
-    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/path', { label: 'link' });
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/path', {
+      label: 'link',
+      retryOnError: true,
+    });
   });
 
   it('skips the Alert and opens directly once the host is trusted', () => {
@@ -112,7 +118,10 @@ describe('confirmAndOpenMarkdownLink', () => {
     confirmAndOpenMarkdownLink('https://example.com/path', { label: 'link' });
 
     expect(alert).not.toHaveBeenCalled();
-    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/path', { label: 'link' });
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/path', {
+      label: 'link',
+      retryOnError: true,
+    });
   });
 
   it('still shows the Alert while the store has not loaded', () => {

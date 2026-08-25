@@ -2237,6 +2237,18 @@
       "updating": "Ina-update, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "I-load",
+      "loadWithHost": "I-load {{host}}",
+      "httpsOnly": "HTTPS na mga larawan lang"
+    },
+    "markdownLink": {
+      "invalidLink": "Hindi mabubuksan ang link na ito.",
+      "hostConfirmTitle": "Buksan ang panlabas na link?",
+      "hostConfirmMessage": "Bubuksan ng link na ito ang {{host}} sa iyong browser.",
+      "open": "Buksan",
+      "trustThisHost": "Pagkatiwalaan ang host na ito"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Kinokolektang data",
     "free": "Libre"
+  },
+  "trustedHosts": {
+    "title": "Mga pinagkakatiwalaang host",
+    "subtitle": "Mga host na pinagkakatiwalaan mong buksan nang hindi nagtatanong",
+    "emptyTitle": "Walang pinagkakatiwalaang host",
+    "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
+    "revoke": "Bawiin ang {{host}}",
+    "backToPreferences": "Bumalik sa mga kagustuhan"
   }
 }

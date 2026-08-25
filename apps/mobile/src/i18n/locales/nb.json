@@ -2237,6 +2237,18 @@
       "updating": "Oppdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Last inn",
+      "loadWithHost": "Last inn {{host}}",
+      "httpsOnly": "Kun HTTPS-bilder"
+    },
+    "markdownLink": {
+      "invalidLink": "Denne lenken kan ikke åpnes.",
+      "hostConfirmTitle": "Åpne ekstern lenke?",
+      "hostConfirmMessage": "Denne lenken åpner {{host}} i nettleseren din.",
+      "open": "Åpne",
+      "trustThisHost": "Stol på denne verten"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Data samlet inn",
     "free": "Gratis"
+  },
+  "trustedHosts": {
+    "title": "Stolte verter",
+    "subtitle": "Verter du stoler på å åpne uten å spørre",
+    "emptyTitle": "Ingen stolte verter",
+    "emptyDescription": "Når du stoler på en lenkes vert, åpnes den uten å spørre igjen.",
+    "revoke": "Fjern {{host}}",
+    "backToPreferences": "Tilbake til innstillinger"
   }
 }

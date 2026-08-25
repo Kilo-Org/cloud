@@ -2237,6 +2237,18 @@
       "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ਪੁਲ ਰਿਕਵਸਟ"
+    },
+    "markdownImage": {
+      "load": "ਲੋਡ ਕਰੋ",
+      "loadWithHost": "ਲੋਡ ਕਰੋ {{host}}",
+      "httpsOnly": "ਸਿਰਫ HTTPS ਚਿੱਤਰ"
+    },
+    "markdownLink": {
+      "invalidLink": "ਇਹ ਲਿੰਕ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਦਾ।",
+      "hostConfirmTitle": "ਬਾਹਰੀ ਲਿੰਕ ਖੋਲ੍ਹਣਾ ਹੈ?",
+      "hostConfirmMessage": "ਇਹ ਲਿੰਕ {{host}} ਨੂੰ ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਖੋਲ੍ਹਦਾ ਹੈ।",
+      "open": "ਖੋਲ੍ਹੋ",
+      "trustThisHost": "ਇਸ ਹੋਸਟ 'ਤੇ ਭਰੋਸਾ ਕਰੋ"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "ਇਕੱਠਾ ਕੀਤਾ ਗਿਆ ਡੇਟਾ",
     "free": "ਮੁਫਤ"
+  },
+  "trustedHosts": {
+    "title": "ਭਰੋਸੇਯੋਗ ਹੋਸਟ",
+    "subtitle": "ਜਿਹੜੇ ਹੋਸਟਾਂ 'ਤੇ ਤੁਸੀਂ ਪੁੱਛੇ ਬਿਨਾਂ ਖੋਲ੍ਹਣ ਲਈ ਭਰੋਸਾ ਕਰਦੇ ਹੋ",
+    "emptyTitle": "ਕੋਈ ਭਰੋਸੇਯੋਗ ਹੋਸਟ ਨਹੀਂ",
+    "emptyDescription": "ਜਦੋਂ ਤੁਸੀਂ ਕਿਸੇ ਲਿੰਕ ਦੇ ਹੋਸਟ 'ਤੇ ਭਰੋਸਾ ਕਰਦੇ ਹੋ, ਇਹ ਦੁਬਾਰਾ ਪੁੱਛੇ ਬਿਨਾਂ ਖੁੱਲ੍ਹਦਾ ਹੈ।",
+    "revoke": "{{host}} ਨੂੰ ਹਟਾਓ",
+    "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
   }
 }

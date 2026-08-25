@@ -2237,6 +2237,18 @@
       "updating": "புதுப்பிக்கிறது, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "இழு கோரிக்கை"
+    },
+    "markdownImage": {
+      "load": "ஏற்று",
+      "loadWithHost": "ஏற்று {{host}}",
+      "httpsOnly": "HTTPS படங்கள் மட்டுமே"
+    },
+    "markdownLink": {
+      "invalidLink": "இந்த இணைப்பைத் திறக்க முடியாது.",
+      "hostConfirmTitle": "வெளிப்புற இணைப்பைத் திறக்கவா?",
+      "hostConfirmMessage": "இந்த இணைப்பு உங்கள் உலாவியில் {{host}} ஐத் திறக்கும்.",
+      "open": "திறக்கவும்",
+      "trustThisHost": "இந்த ஹோஸ்டை நம்பு"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "சேகரிக்கப்பட்ட தரவு",
     "free": "இலவசம்"
+  },
+  "trustedHosts": {
+    "title": "நம்பப்படும் ஹோஸ்ட்கள்",
+    "subtitle": "கேட்காமல் திறக்க நீங்கள் நம்பும் ஹோஸ்ட்கள்",
+    "emptyTitle": "நம்பப்படும் ஹோஸ்ட்கள் இல்லை",
+    "emptyDescription": "ஒரு இணைப்பின் ஹோஸ்டை நீங்கள் நம்பும்போது, அது மீண்டும் கேட்காமல் திறக்கும்.",
+    "revoke": "{{host}} ஐ திரும்பப் பெறு",
+    "backToPreferences": "விருப்பங்களுக்குத் திரும்பு"
   }
 }

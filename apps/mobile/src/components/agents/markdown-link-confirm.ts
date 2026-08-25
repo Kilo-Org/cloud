@@ -45,7 +45,7 @@ export function confirmAndOpenMarkdownLink(href: string, { label }: { label?: st
   // Never skip confirm before the trusted-host store has loaded: an untrusted
   // default must still show the Alert.
   if (getTrustedHostsHasLoaded() && isTrustedHost(host)) {
-    void openExternalUrl(href, { label });
+    void openExternalUrl(href, { label, retryOnError: true });
     return;
   }
 
@@ -57,14 +57,14 @@ export function confirmAndOpenMarkdownLink(href: string, { label }: { label?: st
       {
         text: i18n.t('agentChat.markdownLink.open'),
         onPress: () => {
-          void openExternalUrl(href, { label });
+          void openExternalUrl(href, { label, retryOnError: true });
         },
       },
       {
         text: i18n.t('agentChat.markdownLink.trustThisHost'),
         onPress: () => {
           trustHost(host);
-          void openExternalUrl(href, { label });
+          void openExternalUrl(href, { label, retryOnError: true });
         },
       },
     ]

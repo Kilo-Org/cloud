@@ -1865,6 +1865,18 @@
       "updating": "正在更新，{{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "拉取請求"
+    },
+    "markdownImage": {
+      "load": "載入",
+      "loadWithHost": "載入 {{host}}",
+      "httpsOnly": "僅限 HTTPS 圖片"
+    },
+    "markdownLink": {
+      "invalidLink": "此連結無法開啟。",
+      "hostConfirmTitle": "開啟外部連結？",
+      "hostConfirmMessage": "此連結會在瀏覽器中開啟 {{host}}。",
+      "open": "開啟",
+      "trustThisHost": "信任此主機"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "收集的資料",
     "free": "免費"
+  },
+  "trustedHosts": {
+    "title": "信任的主機",
+    "subtitle": "您信任且開啟時不需詢問的主機",
+    "emptyTitle": "沒有信任的主機",
+    "emptyDescription": "當您信任連結的主機時，它會直接開啟，不再詢問。",
+    "revoke": "撤銷 {{host}}",
+    "backToPreferences": "返回偏好設定"
   }
 }

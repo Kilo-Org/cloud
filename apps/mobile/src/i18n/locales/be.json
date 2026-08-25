@@ -2237,6 +2237,18 @@
       "updating": "Абнаўленне, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Загрузіць",
+      "loadWithHost": "Загрузіць {{host}}",
+      "httpsOnly": "Толькі HTTPS-выявы"
+    },
+    "markdownLink": {
+      "invalidLink": "Гэтую спасылку нельга адкрыць.",
+      "hostConfirmTitle": "Адкрыць вонкавую спасылку?",
+      "hostConfirmMessage": "Гэтая спасылка адкрые {{host}} у вашым браўзеры.",
+      "open": "Адкрыць",
+      "trustThisHost": "Давяраць гэтаму хосту"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Сабраныя даныя",
     "free": "Бясплатна"
+  },
+  "trustedHosts": {
+    "title": "Давераныя хасты",
+    "subtitle": "Хасты, якім вы давяраеце адкрываць без запыту",
+    "emptyTitle": "Няма давераных хастаў",
+    "emptyDescription": "Калі вы даверыцеся хосту спасылкі, яна адкрыецца без наступных запытаў.",
+    "revoke": "Адабраць {{host}}",
+    "backToPreferences": "Назад да наладаў"
   }
 }

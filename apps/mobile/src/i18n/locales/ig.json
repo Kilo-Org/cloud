@@ -2237,6 +2237,18 @@
       "updating": "Na-emelite, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "arịrịọ ndọrọ"
+    },
+    "markdownImage": {
+      "load": "Bupụta",
+      "loadWithHost": "Bupụta {{host}}",
+      "httpsOnly": "Onyonyo HTTPS naanị"
+    },
+    "markdownLink": {
+      "invalidLink": "Enweghị ike imeghe njikọ a.",
+      "hostConfirmTitle": "Meghe njikọ mpụga?",
+      "hostConfirmMessage": "Njikọ a na-emeghe {{host}} na ihe nchọgharị gị.",
+      "open": "Meghe",
+      "trustThisHost": "Tụkwasị obi n'onye nlekọta a"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Data anakọtara",
     "free": "N'efu"
+  },
+  "trustedHosts": {
+    "title": "Ndị nlekọta a tụkwasịrị obi",
+    "subtitle": "Ndị nlekọta ị tụkwasịrị obi imeghe na-enweghị ịjụ",
+    "emptyTitle": "Enweghị ndị nlekọta a tụkwasịrị obi",
+    "emptyDescription": "Mgbe ị tụkwasịrị obi n'onye nlekọta njikọ, ọ na-emeghe na-enweghị ịjụ ọzọ.",
+    "revoke": "Weghachite {{host}}",
+    "backToPreferences": "Laghachi na mmasị"
   }
 }

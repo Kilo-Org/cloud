@@ -2237,6 +2237,18 @@
       "updating": "Թարմացվում է, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Բեռնել",
+      "loadWithHost": "Բեռնել {{host}}",
+      "httpsOnly": "Միայն HTTPS պատկերներ"
+    },
+    "markdownLink": {
+      "invalidLink": "Այս հղումը հնարավոր չէ բացել։",
+      "hostConfirmTitle": "Բացել արտաքին հղումը։",
+      "hostConfirmMessage": "Այս հղումը ձեր զննարկչում բացում է {{host}}։",
+      "open": "Բացել",
+      "trustThisHost": "Վստահել այս հոսթին"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Հավաքագրված տվյալներ",
     "free": "Անվճար"
+  },
+  "trustedHosts": {
+    "title": "Վստահելի հոսթեր",
+    "subtitle": "Հոսթեր, որոնք բացվում են առանց հարցնելու",
+    "emptyTitle": "Վստահելի հոսթեր չկան",
+    "emptyDescription": "Երբ վստահում եք հղման հոսթին, այն բացվում է առանց կրկին հարցնելու։",
+    "revoke": "Հեռացնել {{host}}",
+    "backToPreferences": "Վերադառնալ կարգավորումներ"
   }
 }

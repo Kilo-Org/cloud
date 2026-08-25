@@ -1,4 +1,21 @@
-import { SHARE_PAYLOAD_MAX_ENTRIES, type ShareId } from '@/lib/share-payload';
+import {
+  getSharePersistUserId,
+  SHARE_PAYLOAD_MAX_ENTRIES,
+  type ShareId,
+} from '@/lib/share-payload';
+import type * as DraftsModule from '@/lib/persist/drafts';
+
+// Durable persistence of the pending navigation queue (DEC-01 drafts). Loaded
+// lazily via dynamic import so unit tests that only touch the in-memory queue
+// do not load encrypted-kv (expo-sqlite/drizzle) at import time.
+
+let draftsPromise: Promise<typeof DraftsModule> | null = null;
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function getDrafts(): Promise<typeof DraftsModule> {
+  draftsPromise ??= import('@/lib/persist/drafts');
+  return draftsPromise;
+}
 
 export type PendingShareNavigation = { href: string; shareId: ShareId | null };
 
@@ -16,17 +33,60 @@ export function shareDeliveryShareId(
 /** FIFO of committed share destinations waiting for gate dismiss + delivery. */
 const pendingQueue: PendingShareNavigation[] = [];
 
+/** Persists the current queue (debounced + flushed, no-op while signed out). */
+export async function persistShareNavigationNow(): Promise<void> {
+  const userId = getSharePersistUserId();
+  if (!userId) {
+    return;
+  }
+  const { saveDraft, flushDraft, SHARE_NAV_DRAFT_KEY } = await getDrafts();
+  saveDraft(
+    userId,
+    SHARE_NAV_DRAFT_KEY,
+    pendingQueue.map(entry => ({ href: entry.href, shareId: entry.shareId }))
+  );
+  await flushDraft(userId, SHARE_NAV_DRAFT_KEY);
+}
+
 export function setPendingShareNavigation(next: PendingShareNavigation): void {
   pendingQueue.push(next);
   // Store evicts oldest beyond the same cap; keep navigation queue in lockstep.
   while (pendingQueue.length > SHARE_PAYLOAD_MAX_ENTRIES) {
     pendingQueue.shift();
   }
+  void persistShareNavigationNow();
 }
 
 /** Read-and-remove the oldest pending navigation, or null when empty. */
 export function takePendingShareNavigation(): PendingShareNavigation | null {
-  return pendingQueue.shift() ?? null;
+  const next = pendingQueue.shift() ?? null;
+  void persistShareNavigationNow();
+  return next;
+}
+
+/**
+ * Restores the pending navigation queue from the durable draft for `userId`.
+ * Call only after payloads have been restored, so a restored delivery can
+ * point at a payload that is already in the in-memory map. Fills only an empty
+ * queue: a navigation committed in this process wins over a stale or empty
+ * draft. No-op while signed out, or when no draft exists.
+ */
+export async function restoreShareNavigation(userId: string): Promise<void> {
+  if (!userId) {
+    return;
+  }
+  const { loadDraft, SHARE_NAV_DRAFT_KEY, isShareNavigationDraft } = await getDrafts();
+  const draft = await loadDraft(userId, SHARE_NAV_DRAFT_KEY, isShareNavigationDraft);
+  if (pendingQueue.length > 0) {
+    return;
+  }
+  if (!draft) {
+    return;
+  }
+  pendingQueue.length = 0;
+  for (const entry of draft) {
+    pendingQueue.push({ href: entry.href, shareId: entry.shareId });
+  }
 }
 
 /**

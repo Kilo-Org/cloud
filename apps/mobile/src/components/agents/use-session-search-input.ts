@@ -5,8 +5,35 @@ import { selectAwaitingCommit } from '@/components/agents/session-list-search-bu
 import {
   createDefaultSearchTimer,
   createSessionSearchController,
+  resolveSearchRestoreDecision,
   type SessionSearchController,
 } from '@/components/agents/session-search-state';
+import type * as DraftsModule from '@/lib/persist/drafts';
+
+// Durable draft persistence is loaded lazily via dynamic import so pure unit
+// tests that import this hook never load encrypted-kv (expo-sqlite/drizzle).
+
+let draftsPromise: Promise<typeof DraftsModule> | null = null;
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function getDrafts(): Promise<typeof DraftsModule> {
+  draftsPromise ??= import('@/lib/persist/drafts');
+  return draftsPromise;
+}
+
+/** TextInput remount key while the durable draft is still loading / empty. */
+export const SESSION_SEARCH_DEFAULT_INPUT_KEY = 'session-search-empty';
+/** TextInput remount key applied once to render a restored non-empty draft. */
+export const SESSION_SEARCH_RESTORED_INPUT_KEY = 'session-search-restored';
+
+export type UseSessionSearchInputParams = {
+  /** Signed-in user id; persistence is skipped when empty. */
+  userId: string | undefined;
+  /** Durable draft value once loaded (null while not yet restored). */
+  restoredQuery: string | null;
+  /** True once the durable draft load has settled (identity or entity). */
+  restoreSettled: boolean;
+};
 
 type UseSessionSearchInputResult = {
   /** Committed (debounced) search query that drives the list body. */
@@ -17,6 +44,10 @@ type UseSessionSearchInputResult = {
   hasText: boolean;
   /** True while typed text is ahead of the committed (debounced) query. */
   awaitingCommit: boolean;
+  /** TextInput remount key; changes once to render a restored draft. */
+  searchInputKey: string;
+  /** Initial content for the TextInput, set only on the restore remount. */
+  searchDefaultValue: string | undefined;
   /** Call on every `onChangeText` from the search TextInput. */
   handleSearchInputChange: (text: string) => void;
   /** In-field X: imperatively clear the typed text, blur, and drop the query. */
@@ -29,11 +60,16 @@ type UseSessionSearchInputResult = {
 
 /**
  * Encapsulates the Agents search input's debounced commit, uncontrolled
- * TextInput ref, and the two clear paths (search-only vs. broad). Keeps the
- * screen focused on layout/query consumption while preserving the exact 300ms
- * debounce and dispose-on-unmount behavior.
+ * TextInput ref, durable draft persistence, and the two clear paths
+ * (search-only vs. broad). Keeps the screen focused on layout/query
+ * consumption while preserving the exact 300ms debounce, dispose-on-unmount
+ * behavior, and the restored-draft remount contract.
  */
-export function useSessionSearchInput(): UseSessionSearchInputResult {
+export function useSessionSearchInput({
+  userId,
+  restoredQuery,
+  restoreSettled,
+}: UseSessionSearchInputParams): UseSessionSearchInputResult {
   const [searchQuery, setSearchQuery] = useState('');
   // Stale-closure guard: the ref is read by handleSearchInputChange so
   // selectAwaitingCommit always sees the latest committed query without
@@ -68,6 +104,28 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
   });
   const searchController = searchControllerRef.current;
 
+  // Restore remount state: starts empty; flips to a restore key exactly once
+  // when a non-empty durable draft settles and the user has not typed.
+  const [searchInputKey, setSearchInputKey] = useState(SESSION_SEARCH_DEFAULT_INPUT_KEY);
+  const [searchDefaultValue, setSearchDefaultValue] = useState<string | undefined>(undefined);
+
+  // Persist the visible typed string (durable, flushed). Skipped while the
+  // account has not resolved (DEC-01 account scope).
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+
+  const saveSearchDraft = useCallback((text: string) => {
+    const uid = userIdRef.current;
+    if (!uid) {
+      return;
+    }
+    void (async () => {
+      const { saveDraft, flushDraft, SESSION_SEARCH_DRAFT_KEY } = await getDrafts();
+      saveDraft(uid, SESSION_SEARCH_DRAFT_KEY, text);
+      void flushDraft(uid, SESSION_SEARCH_DRAFT_KEY);
+    })();
+  }, []);
+
   const handleSearchChange = useCallback(
     (text: string) => {
       searchController.scheduleSearch(text);
@@ -82,7 +140,8 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     searchController.clearSearchOnly();
     lastTypedRef.current = '';
     setAwaitingCommit(false);
-  }, [searchController]);
+    saveSearchDraft('');
+  }, [searchController, saveSearchDraft]);
 
   // The search TextInput lives above the pinned "Active now" tray (so it's
   // always visible) but must stay uncontrolled — see iOS TextInput rules.
@@ -95,6 +154,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
       setHasText(hasTextNow);
       lastTypedRef.current = text;
       handleSearchChange(text);
+      saveSearchDraft(text);
 
       // Only trigger a render when awaitingCommit transitions.
       // The functional updater returns prev when it already equals
@@ -108,7 +168,7 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
       });
       setAwaitingCommit(prev => (prev === shouldAwait ? prev : shouldAwait));
     },
-    [handleSearchChange]
+    [handleSearchChange, saveSearchDraft]
   );
 
   // In-field X: imperatively clear what's visibly typed + dismiss the
@@ -129,7 +189,31 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     setHasText(false);
     lastTypedRef.current = '';
     setAwaitingCommit(false);
-  }, []);
+    saveSearchDraft('');
+  }, [saveSearchDraft]);
+
+  // Seed the input once the durable draft settles and the user has not typed.
+  // An empty persisted value (including '' persisted by a clear) seeds empty,
+  // so a previously committed non-empty query is never reloaded. A non-empty
+  // restored value also flips the remount key so the uncontrolled input shows
+  // the restored text; the key never changes on later commits.
+  useEffect(() => {
+    const decision = resolveSearchRestoreDecision({
+      settled: restoreSettled,
+      hasTyped: lastTypedRef.current !== '',
+      restoredQuery,
+    });
+    if (!decision.shouldSeed) {
+      return;
+    }
+    lastTypedRef.current = decision.query;
+    setHasText(decision.hasText);
+    setSearchQuery(decision.query);
+    if (decision.shouldRemount) {
+      setSearchInputKey(SESSION_SEARCH_RESTORED_INPUT_KEY);
+      setSearchDefaultValue(decision.query);
+    }
+  }, [restoreSettled, restoredQuery]);
 
   useEffect(
     () => () => {
@@ -143,6 +227,8 @@ export function useSessionSearchInput(): UseSessionSearchInputResult {
     searchInputRef,
     hasText,
     awaitingCommit,
+    searchInputKey,
+    searchDefaultValue,
     handleSearchInputChange,
     handleClearSearchInput,
     clearSearchInput,

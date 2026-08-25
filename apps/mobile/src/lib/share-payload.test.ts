@@ -1,18 +1,32 @@
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
+/* eslint-disable max-lines -- cohesive suite: pure helpers + store + durable persistence + normalize */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetSharePayloadStoreForTests,
+  __setCheckFileExistsForTests,
   __setDeleteCachedFileForTests,
   clearSharePayload,
   composeShareText,
   discardUnstoredSharePayload,
   normalizeShareIntent,
   peekSharePayload,
+  persistSharePayloadsNow,
   putSharePayload,
+  restoreSharePayloads,
+  setSharePersistUserId,
   SHARE_PAYLOAD_MAX_ENTRIES,
   SHARE_TEXT_MAX_CHARS,
   takeSharePayload,
 } from './share-payload';
+import {
+  flushDraft,
+  isStringDraft,
+  loadDraft,
+  PENDING_SHARE_ID_DRAFT_KEY,
+  saveDraft,
+  SHARE_PAYLOADS_DRAFT_KEY,
+} from '@/lib/persist/drafts';
 
 vi.mock('expo-crypto', () => {
   let n = 0;
@@ -32,7 +46,43 @@ vi.mock('expo-file-system/legacy', () => ({
   deleteAsync: vi.fn(async () => {
     await Promise.resolve();
   }),
+  getInfoAsync: vi.fn(async () => ({ exists: true, isDirectory: false })),
 }));
+
+// The drafts module (lazy-required by share-payload) imports the native
+// encrypted-kv chain; the fake below mirrors the real upsert/list semantics
+// (same harness as drafts.test.ts).
+const kvStore = vi.hoisted(
+  () => new Map<string, { scope: string; k: string; v: string; updatedAt: number }>()
+);
+const kvMock = vi.hoisted(() => ({
+  getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
+  removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
+  listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
+}));
+
+vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
+}));
+
+function storageKey(scope: string, k: string): string {
+  return `${scope}\u0000${k}`;
+}
+
+let nextUpdatedAt = 1;
+
+/** Drains pending microtasks and macrotasks so fire-and-forget async clears settle. */
+async function drainAsync(): Promise<void> {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
 
 async function withDeleteTracking(run: (deleted: string[]) => Promise<void>): Promise<void> {
   const deleted: string[] = [];
@@ -268,6 +318,220 @@ describe('share payload store', () => {
       });
       await Promise.resolve();
       expect(deleted).toEqual([]);
+    });
+  });
+});
+
+describe('share payload durable persistence', () => {
+  beforeEach(() => {
+    __resetSharePayloadStoreForTests();
+    vi.clearAllMocks();
+    kvStore.clear();
+    nextUpdatedAt = 1;
+    kvMock.getItem.mockImplementation(
+      async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
+    );
+    kvMock.setItem.mockImplementation(async (scope, k, v) => {
+      kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
+      nextUpdatedAt += 1;
+    });
+    kvMock.removeItem.mockImplementation(async (scope, k) => {
+      kvStore.delete(storageKey(scope, k));
+    });
+    kvMock.listEntries.mockImplementation(async scope =>
+      [...kvStore.values()]
+        .filter(entry => entry.scope === scope)
+        .toSorted((a, b) => a.updatedAt - b.updatedAt)
+        .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
+    );
+  });
+
+  it('put then restore fills peek', async () => {
+    setSharePersistUserId('u1');
+    const id = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+    __resetSharePayloadStoreForTests();
+    // simulate process death (clears memory)
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(id)?.text).toBe('hello');
+  });
+
+  it('take then restore returns null', async () => {
+    setSharePersistUserId('u1');
+    const id = putSharePayload({ text: 'consumed', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+    expect(takeSharePayload(id)?.text).toBe('consumed');
+    await persistSharePayloadsNow();
+    __resetSharePayloadStoreForTests();
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(id)).toBeNull();
+  });
+
+  it('clear then restore returns null', async () => {
+    setSharePersistUserId('u1');
+    const id = putSharePayload({ text: 'abandoned', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+    clearSharePayload(id);
+    await persistSharePayloadsNow();
+    __resetSharePayloadStoreForTests();
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(id)).toBeNull();
+  });
+
+  it('evict beyond cap then restore lacks the oldest id', async () => {
+    setSharePersistUserId('u1');
+    const ids: string[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES + 2; i += 1) {
+      ids.push(putSharePayload({ text: `t-${i}`, files: [], failedFiles: [] }));
+    }
+    await persistSharePayloadsNow();
+    __resetSharePayloadStoreForTests();
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(ids[0] ?? '')).toBeNull();
+    expect(peekSharePayload(ids[1] ?? '')).toBeNull();
+    expect(peekSharePayload(ids.at(-1) ?? '')?.text).toBe(`t-${SHARE_PAYLOAD_MAX_ENTRIES + 1}`);
+  });
+
+  it('moves a restored file whose uri is missing into failedFiles', async () => {
+    setSharePersistUserId('u1');
+    const id = putSharePayload({
+      text: 'with-files',
+      files: [
+        { name: 'present.jpg', uri: 'file:///cache/present.jpg' },
+        { name: 'gone.png', uri: 'file:///cache/gone.png' },
+      ],
+      failedFiles: [],
+    });
+    await persistSharePayloadsNow();
+    __resetSharePayloadStoreForTests();
+    __setCheckFileExistsForTests(async uri => uri.includes('present'));
+    await restoreSharePayloads('u1');
+    const restored = peekSharePayload(id);
+    expect(restored?.files.map(file => file.name)).toEqual(['present.jpg']);
+    expect(restored?.failedFiles).toEqual(['gone.png']);
+  });
+
+  it('skips persistence while userId is empty', async () => {
+    const id = putSharePayload({ text: 'signed-out', files: [], failedFiles: [] });
+    expect(peekSharePayload(id)?.text).toBe('signed-out');
+    await persistSharePayloadsNow();
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+    __resetSharePayloadStoreForTests();
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(id)).toBeNull();
+  });
+
+  it('a put landing during the restore read wins over the draft', async () => {
+    setSharePersistUserId('u1');
+    saveDraft('u1', SHARE_PAYLOADS_DRAFT_KEY, {
+      order: ['draft-id'],
+      entries: { 'draft-id': { text: 'draft-text', files: [], failedFiles: [] } },
+    });
+    await flushDraft('u1', SHARE_PAYLOADS_DRAFT_KEY);
+
+    // Simulate process death: wipe the in-memory store, keep the draft.
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
+
+    // Start the restore; it suspends on the async draft read, so a put made
+    // synchronously here runs during the read and must survive the fill.
+    const restore = restoreSharePayloads('u1');
+    const liveId = putSharePayload({ text: 'live', files: [], failedFiles: [] });
+
+    await restore;
+
+    expect(peekSharePayload(liveId)?.text).toBe('live');
+  });
+
+  it('restore of a truthy empty post-take draft does not clobber a live in-process payload', async () => {
+    // u1 took their only share; the take persisted a truthy empty draft.
+    setSharePersistUserId('u1');
+    saveDraft('u1', SHARE_PAYLOADS_DRAFT_KEY, { order: [], entries: {} });
+    await flushDraft('u1', SHARE_PAYLOADS_DRAFT_KEY);
+
+    // Sign out; a signed-out share lands in memory only (persist no-ops).
+    setSharePersistUserId(null);
+    const liveId = putSharePayload({ text: 'live', files: [], failedFiles: [] });
+
+    // Same-process login restores u1's empty draft.
+    setSharePersistUserId('u1');
+    await restoreSharePayloads('u1');
+
+    expect(peekSharePayload(liveId)?.text).toBe('live');
+  });
+
+  it('restore for a different user does not eject a live payload', async () => {
+    setSharePersistUserId('userA');
+    const liveId = putSharePayload({ text: 'live-a', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    saveDraft('userB', SHARE_PAYLOADS_DRAFT_KEY, {
+      order: ['draft-b'],
+      entries: { 'draft-b': { text: 'draft-b-text', files: [], failedFiles: [] } },
+    });
+    await flushDraft('userB', SHARE_PAYLOADS_DRAFT_KEY);
+
+    await restoreSharePayloads('userB');
+
+    expect(peekSharePayload(liveId)?.text).toBe('live-a');
+  });
+
+  it('clearing one share never drops a different share pending id', async () => {
+    setSharePersistUserId('u1');
+    const a = putSharePayload({ text: 'a', files: [], failedFiles: [] });
+    const b = putSharePayload({ text: 'b', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    // Persist the still-live share B as the pending id.
+    saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, b);
+    await flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
+
+    clearSharePayload(a);
+    await drainAsync();
+    expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(b);
+
+    clearSharePayload(b);
+    await vi.waitFor(async () => {
+      expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBeNull();
+    });
+  });
+
+  it('taking one share never drops a different share pending id', async () => {
+    setSharePersistUserId('u1');
+    const a = putSharePayload({ text: 'a', files: [], failedFiles: [] });
+    const b = putSharePayload({ text: 'b', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, b);
+    await flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
+
+    expect(takeSharePayload(a)?.text).toBe('a');
+    await drainAsync();
+    expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(b);
+
+    expect(takeSharePayload(b)?.text).toBe('b');
+    await vi.waitFor(async () => {
+      expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBeNull();
+    });
+  });
+
+  it('clearing a superseded id cannot delete a newer pending id that is not yet flushed', async () => {
+    setSharePersistUserId('u1');
+    const a = putSharePayload({ text: 'a', files: [], failedFiles: [] });
+    const b = putSharePayload({ text: 'b', files: [], failedFiles: [] });
+
+    // a is the durable pending id; b is then saved but left unflushed so the
+    // clear and the newer write overlap (the ordering the prior fix missed).
+    saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, a);
+    await flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
+    saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, b);
+
+    // Clearing the superseded a while b's write is still in flight leaves b.
+    clearSharePayload(a);
+    void flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
+
+    await vi.waitFor(async () => {
+      expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(b);
     });
   });
 });

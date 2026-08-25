@@ -95,10 +95,21 @@ import {
   clearSharePayload,
   discardUnstoredSharePayload,
   normalizeShareIntent,
+  peekSharePayload,
   putSharePayload,
+  restoreSharePayloads,
+  setSharePersistUserId,
   type ShareId,
   type SharePayload,
 } from '@/lib/share-payload';
+import { restoreShareNavigation } from '@/lib/share-navigation';
+import {
+  flushDraft,
+  isStringDraft,
+  loadDraft,
+  PENDING_SHARE_ID_DRAFT_KEY,
+  saveDraft,
+} from '@/lib/persist/drafts';
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
@@ -284,6 +295,13 @@ function RootLayoutNav() {
     void restorePersistedPendingDeepLink();
   }, []);
 
+  // Scope share persistence to the current account (DEC-01): null while signed
+  // out, so a share captured signed out never persists (in-memory only, and a
+  // same-process login can still open the gate).
+  useEffect(() => {
+    setSharePersistUserId(userId ?? null);
+  }, [userId]);
+
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
@@ -406,6 +424,51 @@ function RootLayoutNav() {
   // without reading stale state or adding the id to effect deps.
   const pendingShareIdRef = useRef(pendingShareId);
   pendingShareIdRef.current = pendingShareId;
+
+  // Cold-start share restore. Order matters: payloads first, then the
+  // navigation queue (deliveries point at restored payloads), then the pending
+  // id — and only when its payload still exists. A restored id with an empty
+  // map is the existing stale-share empty path, so it must not re-arm the gate.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreShare() {
+      if (!userId) {
+        return;
+      }
+      await restoreSharePayloads(userId);
+      if (cancelled) {
+        return;
+      }
+      await restoreShareNavigation(userId);
+      // `cancelled` is set by the cleanup below; the previous check narrows the
+      // fall-through path, but the variable is genuinely mutable.
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled) {
+        return;
+      }
+      const pendingId = await loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled) {
+        return;
+      }
+      if (
+        pendingId !== null &&
+        peekSharePayload(pendingId) !== null &&
+        pendingShareIdRef.current === null
+      ) {
+        // Fill only an empty slot: a live ingest that armed a newer pending id
+        // during this restore must win, so never overwrite a non-null slot.
+        setPendingShareId(pendingId);
+      }
+    }
+
+    void restoreShare();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
   const isShellReady = isShellReadyForShare({
@@ -545,6 +608,12 @@ function RootLayoutNav() {
           clearSharePayload(superseded);
         }
         setPendingShareId(shareId);
+        // Persist the pending id so a process death before the gate opens still
+        // restores it; skipped while the account has not resolved (signed out).
+        if (userId) {
+          saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, shareId);
+          void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+        }
       } catch (error) {
         if (cancelled) {
           return;
@@ -562,7 +631,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [hasShareIntent, shareIntent]);
+  }, [hasShareIntent, shareIntent, userId]);
 
   useEffect(() => {
     const decision = resolveBootstrapDecision({

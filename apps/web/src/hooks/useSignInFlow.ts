@@ -135,6 +135,7 @@ export function useSignInFlow({
   // Initialize email from hint or params
   useEffect(() => {
     if (storybookInitialState) return;
+    if (isInviteCleared) return;
 
     if (tier === 'returning' && hint?.lastEmail && emailState !== hint.lastEmail) {
       setEmailState(hint.lastEmail);
@@ -144,7 +145,7 @@ export function useSignInFlow({
       // Prefill from query params (e.g., redirect with error)
       setEmailState(params.email);
     }
-  }, [tier, hint?.lastEmail, params.email, storybookInitialState]);
+  }, [tier, hint?.lastEmail, params.email, storybookInitialState, isInviteCleared]);
 
   const [error, setError] = useState(initialError || '');
   const [showTurnstile, setShowTurnstile] = useState(storybookInitialState?.showTurnstile ?? false);
@@ -361,6 +362,7 @@ export function useSignInFlow({
       !initialError &&
       !isSignUp &&
       !isInviteCleared &&
+      flowState === 'landing' &&
       tier !== 'invite'
     ) {
       const prefilledEmail = params.email;
@@ -376,6 +378,7 @@ export function useSignInFlow({
     initialError,
     isSignUp,
     isInviteCleared,
+    flowState,
     tier,
     createTurnstileWidgetAttempt,
   ]);
@@ -820,6 +823,7 @@ export function useSignInFlow({
     retireTurnstileWidget();
     clearPendingSso();
     setIsInviteCleared(true);
+    setEmailState('');
     // Clear invite params by navigating without them
     const newParams = new URLSearchParams(params);
     newParams.delete('email');
@@ -830,7 +834,6 @@ export function useSignInFlow({
       '',
       query ? `${window.location.pathname}?${query}` : window.location.pathname
     );
-    setEmailState('');
     setFlowState('landing');
     setShowEmailInput(true);
   }, [clearPendingSso, params, retireTurnstileWidget]);

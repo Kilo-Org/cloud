@@ -19,16 +19,18 @@ jest.mock('@/components/auth/sign-in/EmailInputForm', () => ({
 jest.mock('@/hooks/useSignInFlow', () => ({
   useSignInFlow: ({
     searchParams,
+    error,
     isSignUp,
     ssoMode,
   }: {
     searchParams: Record<string, string>;
+    error?: string;
     isSignUp?: boolean;
     ssoMode?: boolean;
   }) => ({
     isHintLoaded: true,
-    emailValidation: { isValid: true, error: null },
-    error: '',
+    emailValidation: { isValid: !error, error: null },
+    error: error ?? '',
     showTurnstile: false,
     flowState: 'landing',
     tier: ssoMode ? 'new' : searchParams.org && searchParams.email ? 'invite' : 'new',
@@ -60,6 +62,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
 
 const { SignInForm } = require('./SignInForm') as {
   SignInForm: (props: {
+    error?: string;
     isSignUp?: boolean;
     ssoMode?: boolean;
     title?: string;
@@ -130,5 +133,17 @@ describe('SignInForm Enterprise SSO navigation', () => {
     expect(html).toContain('Continue to Single Sign-On');
     expect(html).not.toContain('Security Verification');
     expect(html.match(/Install Kilo Code/g)).toHaveLength(1);
+  });
+
+  it('renders callback errors globally when the empty email is invalid', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: {},
+        error: 'LINKING-FAILED',
+      })
+    );
+
+    expect(html).toContain('data-error-notification');
+    expect(html).toContain('Account Linking Failed');
   });
 });

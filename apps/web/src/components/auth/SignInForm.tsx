@@ -65,7 +65,7 @@ export function SignInForm({
 
   // Syntax errors belong to the email field. Discovery and provider errors need
   // one global live region rather than being announced twice.
-  const fieldError = !flow.emailValidation.isValid ? flow.error : undefined;
+  const fieldError = flow.emailValidation.error ?? undefined;
   const errorNotification =
     flow.error && !fieldError ? <AuthErrorNotification error={flow.error} /> : null;
 

@@ -4,17 +4,19 @@ import { createRequire } from 'node:module';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { SignInFlowProps, SignInFlowReturn } from './useSignInFlow';
+import type { SignInHint } from './useSignInHint';
 
 const mockSignIn = jest.fn<() => Promise<void>>();
-const mockSaveHint = jest.fn();
+const mockSaveHint = jest.fn<(hint: SignInHint) => void>();
 const mockClearHint = jest.fn();
 const mockSendMagicLink =
   jest.fn<(email: string, callbackUrl?: string) => Promise<{ success: true }>>();
+let mockHint: SignInHint | null = null;
 
 jest.mock('next-auth/react', () => ({ signIn: mockSignIn }));
 jest.mock('@/hooks/useSignInHint', () => ({
   useSignInHint: () => ({
-    hint: null,
+    hint: mockHint,
     isLoaded: true,
     saveHint: mockSaveHint,
     clearHint: mockClearHint,
@@ -108,6 +110,7 @@ function FlowProbe({ props = { searchParams: {} } }: { props?: SignInFlowProps }
     createElement('output', { id: 'state' }, flow.flowState),
     createElement('output', { id: 'tier' }, flow.tier),
     createElement('output', { id: 'email-input' }, String(flow.showEmailInput)),
+    createElement('output', { id: 'email' }, flow.email),
     createElement('output', { id: 'turnstile' }, String(flow.showTurnstile)),
     createElement('output', { id: 'verifying' }, String(flow.isVerifying)),
     createElement('output', { id: 'delivering' }, String(flow.isDeliveringMagicLink)),
@@ -193,6 +196,7 @@ describe('useSignInFlow discovery cancellation', () => {
   beforeEach(() => {
     mockSignIn.mockReset();
     mockSignIn.mockResolvedValue(undefined);
+    mockHint = null;
     mockSaveHint.mockReset();
     mockClearHint.mockReset();
     mockSendMagicLink.mockReset();
@@ -448,6 +452,27 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('does not reopen Turnstile after prefilled email discovery succeeds', async () => {
+    mockSaveHint.mockImplementation(hint => {
+      mockHint = hint;
+    });
+    fetchMock
+      .mockResolvedValueOnce(response({ success: true }))
+      .mockResolvedValueOnce(response({ kind: 'existing', providers: ['email'] }));
+    mounted = mountFlow({ searchParams: { email: 'returning@example.com' } });
+
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('true');
+    await act(async () => {
+      button(mounted!.container, 'first').click();
+      await flushAsyncWork();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(mockSendMagicLink).toHaveBeenCalledTimes(1);
+    expect(mounted.container.querySelector('#state')?.textContent).toBe('magic-link-sent');
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
+  });
+
   it('holds the automatic email flow pending through delivery and recovers after failure', async () => {
     const delivery = deferred<{ success: true }>();
     fetchMock
@@ -556,6 +581,7 @@ describe('useSignInFlow discovery cancellation', () => {
 
     expect(mounted.container.querySelector('#tier')?.textContent).toBe('new');
     expect(mounted.container.querySelector('#email-input')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#email')?.textContent).toBe('');
     expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
     expect(fetchMock).not.toHaveBeenCalled();
   });

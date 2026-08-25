@@ -9,9 +9,8 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 
 import {
   AgentSessionsSection,
-  hasDisplayableAgentSessions,
+  HOME_LIVE_SLOT_MIN_CLASS,
 } from '@/components/home/agent-sessions-section';
-import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';
@@ -20,6 +19,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useOrganization } from '@/lib/organization-context';
+import { cn } from '@/lib/utils';
 
 export function HomeScreen() {
   const queryClient = useQueryClient();
@@ -29,11 +29,8 @@ export function HomeScreen() {
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
 
   const {
-    storedSessions,
-    activeSessions,
     isLoading: sessionsLoading,
     storedIsError,
-    storedIsSuccess,
     activeIsError,
     refetch: refetchSessions,
   } = useAgentSessions({
@@ -42,11 +39,6 @@ export function HomeScreen() {
   });
 
   const isLoading = sessionsLoading || !orgLoaded;
-
-  // Match what the Home Agent-sessions section actually renders (cloud-agent
-  // stored + any active), so a CLI-only account shows the first-use promo
-  // instead of an empty section + orphaned "New coding task" button.
-  const hasAnySession = hasDisplayableAgentSessions(storedSessions, activeSessions);
   const headerTitle = buildTimedGreeting();
 
   const handleRefresh = useCallback(() => {
@@ -75,27 +67,24 @@ export function HomeScreen() {
                 <Skeleton className="h-3 w-28 rounded" />
               </View>
               <View className="gap-2 px-4">
-                <Skeleton className="h-[72px] w-full rounded-2xl" />
-                <Skeleton className="h-[72px] w-full rounded-2xl" />
+                <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
+                <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
+                <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
               </View>
             </Animated.View>
           ) : (
             <Animated.View entering={FadeIn.duration(200)} className="gap-2">
-              {renderSessionsOrPromo({
-                hasAnySession,
+              {renderSessionsOrError({
                 organizationId,
-                sessionsError: storedIsError,
-                sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
+                storedIsError,
                 activeIsError,
                 handleRetrySessions: () => void refetchSessions(),
                 t,
               })}
 
-              {hasAnySession ? (
-                <View className="pt-4">
-                  <NewTaskButton organizationId={organizationId} />
-                </View>
-              ) : null}
+              <View className="pt-4">
+                <NewTaskButton organizationId={organizationId} />
+              </View>
 
               <ProductChoices organizationId={organizationId} />
             </Animated.View>
@@ -106,23 +95,18 @@ export function HomeScreen() {
   );
 }
 
-function renderSessionsOrPromo(params: {
-  hasAnySession: boolean;
+function renderSessionsOrError(params: {
   organizationId: string | null;
-  sessionsError: boolean;
-  sessionsLoadedEmpty: boolean;
+  storedIsError: boolean;
   activeIsError: boolean;
   handleRetrySessions: () => void;
   t: TFunction;
 }) {
-  // Stale stored history always wins over an error (e.g. a live-poll blip
-  // on the active-sessions query) — never blank out sessions we already
-  // have. The first-use promo only appears after a confirmed empty
-  // response, never merely because the fetch hasn't succeeded yet.
-  if (params.hasAnySession) {
-    return <AgentSessionsSection organizationId={params.organizationId} />;
-  }
-  if (params.sessionsError) {
+  // A stored-list failure blocks all sessions, so it wins. A cold active poll
+  // failure is retryable but still hides the section until it recovers.
+  // Otherwise Home always renders the section, whose placeholders cover the
+  // empty Live-now state.
+  if (params.storedIsError) {
     return (
       <QueryError
         placement="top"
@@ -131,8 +115,6 @@ function renderSessionsOrPromo(params: {
       />
     );
   }
-  // Cold active-only failure: the stored query succeeded empty but the active
-  // poll failed before any data loaded. Retryable, so never claim first-use.
   if (params.activeIsError) {
     return (
       <QueryError
@@ -142,8 +124,5 @@ function renderSessionsOrPromo(params: {
       />
     );
   }
-  if (params.sessionsLoadedEmpty) {
-    return <AgentsPromoCard organizationId={params.organizationId} />;
-  }
-  return null;
+  return <AgentSessionsSection organizationId={params.organizationId} />;
 }

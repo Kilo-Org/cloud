@@ -1,19 +1,23 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { StoredSessionRow } from '@/components/agents/session-row';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { SectionHeader } from '@/components/home/section-header';
-import { Text } from '@/components/ui/text';
+import { Plus } from '@/components/ui/icons';
 import {
   type ActiveSession,
   type StoredSession,
   useAgentSessions,
 } from '@/lib/hooks/use-agent-sessions';
-import { parseTimestamp } from '@/lib/utils';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn, parseTimestamp } from '@/lib/utils';
+
+export const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
 
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
@@ -28,9 +32,13 @@ type Row =
       key: string;
       kind: 'stored';
       session: StoredSession;
+    }
+  | {
+      key: string;
+      kind: 'placeholder';
     };
 
-function buildRows(params: {
+export function buildRows(params: {
   activeSessions: ActiveSession[];
   storedSessions: StoredSession[];
   activeSessionIds: Set<string>;
@@ -51,7 +59,6 @@ function buildRows(params: {
     CLOUD_AGENT_PLATFORMS.has(s.created_on_platform)
   );
   const live = cloudAgentStored.filter(s => activeSessionIds.has(s.session_id));
-  const offline = cloudAgentStored.filter(s => !activeSessionIds.has(s.session_id));
 
   const sortByUpdated = (a: StoredSession, b: StoredSession) =>
     parseTimestamp(b.status_updated_at ?? b.updated_at).getTime() -
@@ -68,33 +75,13 @@ function buildRows(params: {
     }
   }
 
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread already prevents mutation of the source
-  for (const session of [...offline].sort(sortByUpdated)) {
-    if (rows.length >= MAX_ROWS) {
-      break;
-    }
-    if (!seenSessionIds.has(session.session_id)) {
-      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session });
-      seenSessionIds.add(session.session_id);
-    }
+  // Fill the remaining slots with empty placeholders so Home always renders
+  // exactly three Live now slots.
+  while (rows.length < MAX_ROWS) {
+    rows.push({ key: `placeholder:${rows.length}`, kind: 'placeholder' });
   }
 
   return rows;
-}
-
-// Whether the Home "Agent sessions" section has anything to render — mirrors
-// buildRows' inclusion rule (any active session, or a cloud-agent stored
-// session; stored CLI/other-platform sessions live on the Agents tab, not
-// Home). The Home screen gates its section/promo/new-task button on this so a
-// CLI-only account shows the first-use promo instead of an empty section.
-export function hasDisplayableAgentSessions(
-  storedSessions: StoredSession[],
-  activeSessions: ActiveSession[]
-): boolean {
-  return (
-    activeSessions.length > 0 ||
-    storedSessions.some(s => CLOUD_AGENT_PLATFORMS.has(s.created_on_platform))
-  );
 }
 
 type AgentSessionsSectionProps = {
@@ -104,16 +91,12 @@ type AgentSessionsSectionProps = {
 export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
+  const { activeSessions, storedSessions, activeSessionIds } = useAgentSessions({
     organizationId,
   });
   const navigateToSession = useAgentSessionNavigator();
 
   const rows = buildRows({ activeSessions, storedSessions, activeSessionIds });
-
-  if (rows.length === 0) {
-    return null;
-  }
 
   return (
     <View>
@@ -124,19 +107,20 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
           router.push('/(app)/(tabs)/(2_agents)' as Href);
         }}
       />
-      {activeIsError ? (
-        <Text variant="muted" className="mx-4 mb-2 text-xs">
-          {t('home.showingSavedSessions')}
-        </Text>
-      ) : null}
       <View className="mx-4 gap-2">
         {rows.map(row => {
+          if (row.kind === 'placeholder') {
+            return <LiveNowPlaceholder key={row.key} organizationId={organizationId} />;
+          }
           if (row.kind === 'active') {
             const { session } = row;
             return (
               <View
                 key={row.key}
-                className="overflow-hidden rounded-2xl border border-border bg-card"
+                className={cn(
+                  'overflow-hidden rounded-2xl border border-border bg-card',
+                  HOME_LIVE_SLOT_MIN_CLASS
+                )}
               >
                 <RemoteSessionRow
                   session={session}
@@ -153,7 +137,10 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
           return (
             <View
               key={row.key}
-              className="overflow-hidden rounded-2xl border border-border bg-card"
+              className={cn(
+                'overflow-hidden rounded-2xl border border-border bg-card',
+                HOME_LIVE_SLOT_MIN_CLASS
+              )}
             >
               <StoredSessionRow
                 session={session}
@@ -168,6 +155,32 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function LiveNowPlaceholder({ organizationId }: Readonly<{ organizationId: string | null }>) {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+
+  return (
+    <View
+      className={cn(
+        'overflow-hidden rounded-2xl border border-dashed border-border bg-card',
+        HOME_LIVE_SLOT_MIN_CLASS
+      )}
+    >
+      <Pressable
+        onPress={() => {
+          router.push(getNewAgentSessionPath(organizationId) as Href);
+        }}
+        className="flex-1 items-center justify-center py-[13px] pl-[18px] pr-3 active:opacity-70"
+        accessibilityRole="button"
+        accessibilityLabel={t('home.startNewAgentSession')}
+      >
+        <Plus size={18} color={colors.mutedForeground} />
+      </Pressable>
     </View>
   );
 }

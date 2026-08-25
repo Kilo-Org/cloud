@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasDisplayableAgentSessions } from '@/components/home/agent-sessions-section';
+import { buildRows } from '@/components/home/agent-sessions-section';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 
 vi.mock('expo-router', () => ({
@@ -24,8 +24,8 @@ vi.mock('@/components/agents/session-row', () => ({
   StoredSessionRow: () => null,
 }));
 
-vi.mock('@/components/ui/text', () => ({
-  Text: () => null,
+vi.mock('@/components/ui/icons', () => ({
+  Plus: () => null,
 }));
 
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
@@ -68,27 +68,54 @@ function makeStored(over: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
-describe('hasDisplayableAgentSessions', () => {
-  it('returns true when there is at least one active session', () => {
-    expect(hasDisplayableAgentSessions([], [makeActive()])).toBe(true);
+describe('buildRows', () => {
+  it('yields three placeholders when there are no live sessions', () => {
+    const rows = buildRows({
+      activeSessions: [],
+      storedSessions: [],
+      activeSessionIds: new Set(),
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows.every(row => row.kind === 'placeholder')).toBe(true);
+    expect(rows.map(row => row.key)).toEqual(['placeholder:0', 'placeholder:1', 'placeholder:2']);
   });
 
-  it('returns true when a cloud-agent stored session exists', () => {
-    expect(
-      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent' })], [])
-    ).toBe(true);
-    expect(
-      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent-web' })], [])
-    ).toBe(true);
+  it('yields one live row and two placeholders for one active session', () => {
+    const active = makeActive();
+    const rows = buildRows({
+      activeSessions: [active],
+      storedSessions: [],
+      activeSessionIds: new Set([active.id]),
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows.filter(row => row.kind === 'active')).toHaveLength(1);
+    expect(rows.filter(row => row.kind === 'placeholder')).toHaveLength(2);
   });
 
-  it('returns false when only non-cloud-agent stored sessions exist', () => {
-    expect(hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cli' })], [])).toBe(
-      false
-    );
+  it('yields three live rows and zero placeholders for three active sessions', () => {
+    const activeSessions = [
+      makeActive({ id: 'a1' }),
+      makeActive({ id: 'a2' }),
+      makeActive({ id: 'a3' }),
+    ];
+    const rows = buildRows({
+      activeSessions,
+      storedSessions: [],
+      activeSessionIds: new Set(['a1', 'a2', 'a3']),
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows.filter(row => row.kind === 'active')).toHaveLength(3);
+    expect(rows.filter(row => row.kind === 'placeholder')).toHaveLength(0);
   });
 
-  it('returns false when both arrays are empty', () => {
-    expect(hasDisplayableAgentSessions([], [])).toBe(false);
+  it('does not occupy a slot with an offline stored session', () => {
+    const offline = makeStored({ session_id: 'off1', created_on_platform: 'cloud-agent' });
+    const rows = buildRows({
+      activeSessions: [],
+      storedSessions: [offline],
+      activeSessionIds: new Set(),
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows.every(row => row.kind === 'placeholder')).toBe(true);
   });
 });

@@ -15,9 +15,16 @@ import {
   getSelectedChatLinkAction,
   performChatLinkAction,
 } from './chat-link-actions';
+import { formatLinkHost } from './markdown-link-confirm';
 import { MarkdownText, type MarkdownTextProps } from './markdown-text';
 
 type ChatMarkdownTextProps = Omit<MarkdownTextProps, 'onLongPressLink' | 'onPressLink'>;
+
+/** Sheet message: host then full href, so the host is visible above the URL. */
+function sheetMessage(href: string): string {
+  const host = formatLinkHost(href);
+  return host ? `${host}\n${href}` : href;
+}
 
 function buildPrReviewHref(href: string): Href | null {
   const parsed = parseGitHubPrUrl(href);
@@ -56,7 +63,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
           title: t('agentChat.chatLink.prLinkActions'),
-          message: href,
+          message: sheetMessage(href),
           containerStyle: { paddingBottom: bottom },
         },
         index => {
@@ -92,7 +99,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
           title: t('agentChat.chatLink.linkActions'),
-          message: href,
+          message: sheetMessage(href),
           containerStyle: { paddingBottom: bottom },
         },
         index => {

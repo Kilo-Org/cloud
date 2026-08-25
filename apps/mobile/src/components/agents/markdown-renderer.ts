@@ -18,12 +18,11 @@ import {
 } from 'react-native';
 import { Renderer } from 'react-native-marked';
 
-import { openExternalUrl } from '@/lib/external-link';
-
 import { CodeBlock } from './code-block';
 import { normalizeFenceLanguage } from './code-block-model';
 import { isSupportedScheme, parseHtmlImages } from './markdown-html-image';
 import { MarkdownImage } from './markdown-image';
+import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import {
   getLinkAccessibilityActions,
   getLinkAccessibilityHint,
@@ -243,7 +242,13 @@ export class MarkdownRenderer extends Renderer {
   ): ReactNode {
     const interactionProps = this.linkInteractionProps(children, href, title);
     if (Array.isArray(children) && children.length > 0 && containsMarkdownImage(children)) {
-      return createElement(Pressable, { ...interactionProps, key: this.getKey() }, children);
+      // The image owns the default action, so the Pressable keeps long-press,
+      // the link role, and the showLinkActions action but no onPress.
+      return createElement(
+        Pressable,
+        { ...interactionProps, onPress: undefined, key: this.getKey() },
+        children
+      );
     }
     return createElement(
       Text,
@@ -270,13 +275,18 @@ export class MarkdownRenderer extends Renderer {
           this.onLongPressLink?.(href);
         }
       },
-      onLongPress: getLinkLongPressHandler(this.onLongPressLink, href),
+      onLongPress:
+        this.onLongPressLink !== undefined
+          ? getLinkLongPressHandler(this.onLongPressLink, href)
+          : () => {
+              confirmAndOpenMarkdownLink(href, { label: accessibilityLabel });
+            },
       onPress: () => {
         const handled = this.onPressLink?.(href);
         if (handled) {
           return;
         }
-        void openExternalUrl(href, { label: accessibilityLabel });
+        confirmAndOpenMarkdownLink(href, { label: accessibilityLabel });
       },
     };
   }

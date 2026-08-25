@@ -1980,6 +1980,10 @@
       "openAsText": "Open as text",
       "openInExternalApp": "Open in external app"
     },
+    "markdownImage": {
+      "load": "Load",
+      "httpsOnly": "HTTPS images only"
+    },
     "preparation": {
       "exitCode": "Exit code: {{code}}",
       "earlierOutputOmitted": "Earlier output omitted",
@@ -2175,6 +2179,13 @@
       "opensInBrowser": "Opens in browser",
       "showLinkActions": "Show link actions"
     },
+    "markdownLink": {
+      "invalidLink": "This link can't be opened.",
+      "hostConfirmTitle": "Open external link?",
+      "hostConfirmMessage": "This link opens {{host}} in your browser.",
+      "open": "Open",
+      "trustThisHost": "Trust this host"
+    },
     "compaction": {
       "contextCompacted": "Context compacted"
     },
@@ -2272,6 +2283,14 @@
     "signOutThisSessionMessage": "{{device}} will be signed out. It can keep API access for up to an hour.",
     "signOutConfirm": "Sign out",
     "signOutMessage": "You will need to sign in again to access your workspace."
+  },
+  "trustedHosts": {
+    "title": "Trusted hosts",
+    "subtitle": "Hosts you trust to open without asking",
+    "emptyTitle": "No trusted hosts",
+    "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "revoke": "Revoke {{host}}",
+    "backToPreferences": "Back to preferences"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Could not open the app store.",

@@ -14,6 +14,7 @@ import {
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
 import { useHoistedOperationKey } from '@/lib/operation-key';
+import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
   remoteSpawnNonRetryableToast,
   remoteSpawnRetryableToast,
@@ -158,6 +159,10 @@ export function useRemoteSpawnDispatch({
     ) => Promise<CreateSessionOutcome>;
   } = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
+  // `true` while `onStart`'s async head refetches the instance list and
+  // resolves the live instance (a rebooted host's new connectionId). Surfaced
+  // so the route keeps the Start button disabled during that window.
+  const [isResolvingInstance, setIsResolvingInstance] = useState(false);
   // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
   // the key and the relay dedupes the retry.
   const { getKey, rotateKey } = useHoistedOperationKey();
@@ -193,7 +198,6 @@ export function useRemoteSpawnDispatch({
     if (runOnInstance === null) {
       return;
     }
-    const selectedConnectionId = runOnInstance.connectionId;
     const fields = spawnFieldsRef.current;
     // Press-time snapshot. Read once, here, before any await.
     const submitPayload = getSubmitPayloadRef.current?.() ?? null;
@@ -214,76 +218,114 @@ export function useRemoteSpawnDispatch({
       selection: fields.selection,
       organizationId: fields.organizationId,
     });
-    const operationKey = getKey(
-      JSON.stringify({
-        connectionId: selectedConnectionId,
-        mode: fields.mode,
-        selection: fields.selection,
-        organizationId: fields.organizationId,
-      })
-    );
     void (async () => {
-      const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, { operationKey });
-      if (outcome.status === 'ready') {
-        // The spawn settled; the next submit is a fresh intent.
-        rotateKey();
-        const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
-        if (submitPayload === null) {
-          router.replace(spawnedPath);
+      setIsResolvingInstance(true);
+      try {
+        // Refetch the live instance list so a rebooted host's new
+        // connectionId replaces the stale selection before spawn.
+        let freshList = instanceList;
+        try {
+          const result = await refetchInstances();
+          freshList = result.data?.instances ?? instanceList;
+        } catch {
+          // Refetch failed; continue with the last-known list.
+        }
+        const live = resolveLiveInstance(runOnInstance, freshList);
+        if (live === null) {
+          // No live row matches the selection (neither the connectionId nor
+          // the name + projectName pair). Surface the retryable copy and let
+          // the next Start tap re-resolve against a refreshed list.
+          toast.error(remoteSpawnRetryableToast());
+          onSpawnFailedRef.current?.();
           return;
         }
-        const shareId = putSharePayload(submitPayload);
-        router.replace(
-          appendShareParams(spawnedPath as string, shareId, {
-            autoSend: true,
+        const selectedConnectionId = live.connectionId;
+        // A rebooted host advertises the same name + projectName on a new
+        // connectionId. Remap the selection to the live row so the spawn and
+        // a later refetch agree. The unchanged-id case keeps the same id and
+        // the same hoisted operation key.
+        if (live.connectionId !== runOnInstance.connectionId) {
+          setRunOnInstance(live);
+        }
+        const operationKey = getKey(
+          JSON.stringify({
+            connectionId: selectedConnectionId,
             mode: fields.mode,
-          }) as Href
+            selection: fields.selection,
+            organizationId: fields.organizationId,
+          })
         );
-        return;
-      }
-      // Not ready: the spawn settled without navigating. Re-arm the caller's
-      // abandon guard so a later back/swipe still confirms.
-      onSpawnFailedRef.current?.();
-      if (outcome.status === 'nonRetryable') {
-        // A typed non-retryable rejection ends the intent.
-        rotateKey();
-        toast.error(remoteSpawnNonRetryableToast());
-        return;
-      }
-      // outcome.status === 'retryable': refetch the instance list and
-      // re-evaluate whether the previously-selected instance is still
-      // present.
-      toast.error(remoteSpawnRetryableToast());
-      let refetchedInstances: InstancePickerInstance[] = instanceList;
-      try {
-        const result = await refetchInstances();
-        refetchedInstances = result.data?.instances ?? instanceList;
-      } catch {
-        // Refetch failed; fall through with the last-known list. The
-        // mapping helper treats an empty list as "disconnected", which
-        // is the right conservative default for a network blip.
-      }
-      const action = resolveRemoteSubmitOutcome({
-        outcome,
-        refetchedInstances,
-        selectedConnectionId,
-      });
-      if (action.kind !== 'retryable') {
-        // Defensive: outcome.status === 'retryable' must produce a
-        // retryable action. If this ever changes we'll want to know.
-        return;
-      }
-      // kilocode_change - only apply the reset if the selection this
-      // dispatch was FOR is still the CURRENT one (read from the ref, not
-      // the closure-captured `runOnInstance` — see the ref's comment
-      // above). Without this check, a stale tail's reset could clobber a
-      // newer, unrelated selection the user already made.
-      if (
-        action.shouldResetSelectionToCloudAgent &&
-        runOnInstanceRef.current?.connectionId === selectedConnectionId
-      ) {
-        setRunOnInstance(null);
-        setShowInstanceDisconnectedNote(action.showInstanceDisconnectedNote);
+        const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, {
+          operationKey,
+        });
+        if (outcome.status === 'ready') {
+          // The spawn settled; the next submit is a fresh intent.
+          rotateKey();
+          const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
+          if (submitPayload === null) {
+            router.replace(spawnedPath);
+            return;
+          }
+          const shareId = putSharePayload(submitPayload);
+          router.replace(
+            appendShareParams(spawnedPath as string, shareId, {
+              autoSend: true,
+              mode: fields.mode,
+            }) as Href
+          );
+          return;
+        }
+        // Not ready: the spawn settled without navigating. Re-arm the caller's
+        // abandon guard so a later back/swipe still confirms.
+        onSpawnFailedRef.current?.();
+        if (outcome.status === 'nonRetryable') {
+          // A typed non-retryable rejection ends the intent.
+          rotateKey();
+          toast.error(remoteSpawnNonRetryableToast());
+          return;
+        }
+        // outcome.status === 'retryable': refetch the instance list and
+        // re-evaluate whether the previously-selected instance is still
+        // present.
+        toast.error(remoteSpawnRetryableToast());
+        // Seed from the fresh pre-spawn list, not the press-time
+        // `instanceList`: if the spawn remapped the selection to a live
+        // connectionId above, the press-time list still holds the stale id. A
+        // post-spawn refetch throw would then make the live id look missing
+        // and reset the selection to Cloud Agent even though the host is live.
+        let refetchedInstances: InstancePickerInstance[] = freshList;
+        try {
+          const result = await refetchInstances();
+          refetchedInstances = result.data?.instances ?? freshList;
+        } catch {
+          // Refetch failed; fall through with the fresh pre-spawn list. The
+          // mapping helper treats an empty list as "disconnected", which
+          // is the right conservative default for a network blip.
+        }
+        const action = resolveRemoteSubmitOutcome({
+          outcome,
+          refetchedInstances,
+          selectedConnectionId,
+        });
+        if (action.kind !== 'retryable') {
+          // Defensive: outcome.status === 'retryable' must produce a
+          // retryable action. If this ever changes we'll want to know.
+          return;
+        }
+        // kilocode_change - only apply the reset if the selection this
+        // dispatch was FOR is still the CURRENT one (read from the ref, not
+        // the closure-captured `runOnInstance` — see the ref's comment
+        // above). Without this check, a stale tail's reset could clobber a
+        // newer, unrelated selection the user already made.
+        if (
+          action.shouldResetSelectionToCloudAgent &&
+          runOnInstanceRef.current?.connectionId === selectedConnectionId
+        ) {
+          setRunOnInstance(null);
+          setShowInstanceDisconnectedNote(action.showInstanceDisconnectedNote);
+        }
+      } finally {
+        setIsResolvingInstance(false);
       }
     })();
   }, [
@@ -309,7 +351,7 @@ export function useRemoteSpawnDispatch({
   );
 
   return {
-    isSpawningRemote: remoteSpawn.status.status === 'inFlight',
+    isSpawningRemote: remoteSpawn.status.status === 'inFlight' || isResolvingInstance,
     showInstanceDisconnectedNote,
     onStart,
     onChangeRunOnInstance,

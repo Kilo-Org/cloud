@@ -575,6 +575,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     instance: Instance | undefined
   ): void {
     const { connectionId } = attachment;
+    // Legacy CLIs omit `instance` entirely; only close a stale same-host
+    // socket when the heartbeat actually carries an instance identity.
+    if (instance) {
+      this.closeStaleSocketsForInstance(instance.name, instance.projectName, connectionId);
+    }
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
@@ -2023,6 +2028,38 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
     return false;
+  }
+
+  // Old form: one live CLI socket per connectionId, including a rebooted host's stale socket. Remove when every CLI advertises a stable host id.
+  private closeStaleSocketsForInstance(
+    name: string,
+    projectName: string,
+    keepConnectionId: string
+  ): void {
+    if (!name || !projectName) return;
+
+    for (const ws of this.ctx.getWebSockets('cli')) {
+      const att = ws.deserializeAttachment() as WSAttachment | null;
+      if (att?.role !== 'cli' || att.connectionId === keepConnectionId) continue;
+      if (att.instance?.name !== name || att.instance?.projectName !== projectName) continue;
+
+      console.log('Closing stale CLI socket for same-host reconnect', {
+        connectionId: att.connectionId,
+        name,
+        projectName,
+      });
+      this.ctx.waitUntil(
+        this.failPendingCommandsForSocket(ws, false).catch((error: unknown) => {
+          console.error('Failed to persist terminal commands for stale socket', {
+            connectionId: att.connectionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+      );
+      // Preserve session ownership — the rebooting host's replacement socket
+      // re-claims the same sessions in its first heartbeat.
+      ws.close(1000, 'replaced by same-host reconnect');
+    }
   }
 
   private replaceWebSocket(connectionId: string): void {

@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- spawn-input, navigation, and admission suites share the hook harness. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
+import { type KiloSessionId, type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
@@ -9,17 +9,21 @@ import {
   peekSharePayload,
   type SharePayload,
 } from '@/lib/share-payload';
-import { buildCreateRemoteSessionInput } from '@/lib/hooks/remote-instance-spawn-classifier';
+import {
+  buildCreateRemoteSessionInput,
+  type CreateSessionOutcome,
+} from '@/lib/hooks/remote-instance-spawn-classifier';
 import { REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST } from '@/lib/remote-spawn-admission';
+import { remoteSpawnRetryableToast } from '@/lib/remote-submit-outcome';
 
 import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
-  vi.fn(async () => {
+  vi.fn(async (): Promise<CreateSessionOutcome> => {
     await Promise.resolve();
     return {
       status: 'ready' as const,
-      sessionID: 'ses_12345678901234567890123456',
+      sessionID: 'ses_12345678901234567890123456' as KiloSessionId,
     };
   })
 );
@@ -125,7 +129,11 @@ function runHook(args: {
   selection?: ModelSelection;
   getSubmitPayload?: () => SharePayload | null;
   onSpawnAdmitted?: () => void;
+  onSpawnFailed?: () => void;
   runOnInstance?: InstancePickerInstance | null;
+  setRunOnInstance?: (next: InstancePickerInstance | null) => void;
+  refetchInstances?: () => Promise<{ data: { instances: InstancePickerInstance[] } | undefined }>;
+  instanceList?: InstancePickerInstance[];
 }) {
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
@@ -170,30 +178,50 @@ function runHook(args: {
     },
   };
 
-  const previousDispatcher =
-    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
-  hookIndex = 0;
-  refIndex = 0;
-  reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
-  try {
-    const mountDispatch = useRemoteSpawnDispatch;
-    return mountDispatch({
-      organizationId: args.organizationId,
-      mode: args.mode,
-      selection: args.selection,
-      runOnInstance: args.runOnInstance === undefined ? INSTANCE : args.runOnInstance,
-      // eslint-disable-next-line no-empty-function -- no-op setter for harness
-      setRunOnInstance: (_next: InstancePickerInstance | null) => {},
-      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
-      refetchInstances: () => Promise.resolve({ data: { instances: [INSTANCE] } }),
-      instanceList: [INSTANCE],
-      getSubmitPayload: args.getSubmitPayload,
-      onSpawnAdmitted: args.onSpawnAdmitted,
-    });
-  } finally {
-    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
-      previousDispatcher;
-  }
+  // `runOnInstance` is parent state in the real route: `setRunOnInstance`
+  // re-renders the hook with the new value so the `runOnInstanceRef` effect
+  // sees it. Mirror that here; otherwise the async tail's remap would leave
+  // the ref on the stale press-time id and the reset guard (which reads the
+  // ref) could never be exercised by a remap test.
+  let currentRunOnInstance: InstancePickerInstance | null =
+    args.runOnInstance === undefined ? INSTANCE : args.runOnInstance;
+
+  const render = () => {
+    hookIndex = 0;
+    refIndex = 0;
+    const previousDispatcher =
+      reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
+    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
+    try {
+      const mountDispatch = useRemoteSpawnDispatch;
+      return mountDispatch({
+        organizationId: args.organizationId,
+        mode: args.mode,
+        selection: args.selection,
+        runOnInstance: currentRunOnInstance,
+        setRunOnInstance: next => {
+          args.setRunOnInstance?.(next);
+          if (next !== currentRunOnInstance) {
+            currentRunOnInstance = next;
+            render();
+          }
+        },
+        refetchInstances:
+          args.refetchInstances ??
+          // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+          (() => Promise.resolve({ data: { instances: [INSTANCE] } })),
+        instanceList: args.instanceList ?? [INSTANCE],
+        getSubmitPayload: args.getSubmitPayload,
+        onSpawnAdmitted: args.onSpawnAdmitted,
+        onSpawnFailed: args.onSpawnFailed,
+      });
+    } finally {
+      reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
+        previousDispatcher;
+    }
+  };
+
+  return render();
 }
 
 describe('useRemoteSpawnDispatch spawn input chain', () => {
@@ -426,5 +454,133 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     onStart();
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRemoteSpawnDispatch live-instance remap', () => {
+  const LIVE_INSTANCE: InstancePickerInstance = {
+    connectionId: 'conn-live',
+    name: 'laptop',
+    projectName: 'kilo',
+  };
+
+  beforeEach(() => {
+    spawnMock.mockClear();
+    useRemoteInstanceSpawnMock.mockClear();
+    routerReplace.mockClear();
+    toastErrorMock.mockClear();
+    __resetSharePayloadStoreForTests();
+  });
+
+  it('spawns with the same connectionId when the refetched list still has it', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: [INSTANCE] } }),
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
+    ]);
+  });
+
+  it('remaps to the live connectionId when the id changed but name + project match', async () => {
+    const setRunOnInstanceMock = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      setRunOnInstance: next => {
+        setRunOnInstanceMock(next);
+      },
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: [LIVE_INSTANCE] } }),
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-live',
+      { orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
+    ]);
+    expect(setRunOnInstanceMock).toHaveBeenCalledWith(LIVE_INSTANCE);
+  });
+
+  it('falls back to the last-known instanceList when the refetch throws', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.reject(new Error('network down')),
+      instanceList: [INSTANCE],
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      { orgId: 'org-xyz' },
+      { operationKey: expect.any(String) },
+    ]);
+  });
+
+  it('keeps the live selection when a remap is followed by a failing post-spawn refetch', async () => {
+    const setRunOnInstanceMock = vi.fn();
+    // First (pre-spawn) refetch resolves the live row so the id remaps; the
+    // second (post-spawn) refetch fails.
+    const refetchInstancesMock = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { instances: [LIVE_INSTANCE] } })
+      .mockRejectedValueOnce(new Error('network down'));
+    spawnMock.mockResolvedValueOnce({
+      status: 'retryable',
+      reason: 'transport failure',
+      cause: new Error('socket gone'),
+    });
+
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      setRunOnInstance: next => {
+        setRunOnInstanceMock(next);
+      },
+      refetchInstances: refetchInstancesMock,
+      instanceList: [INSTANCE],
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(refetchInstancesMock).toHaveBeenCalledTimes(2);
+    });
+    // Flush the rejected-refetch continuation (outcome classification and the
+    // reset guard) before asserting the selection did not move to null.
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    // The remap applied the live row...
+    expect(setRunOnInstanceMock).toHaveBeenCalledWith(LIVE_INSTANCE);
+    // ...and the failing refetch must not reset the selection to Cloud Agent.
+    expect(setRunOnInstanceMock).toHaveBeenCalledTimes(1);
+    expect(setRunOnInstanceMock).not.toHaveBeenCalledWith(null);
+  });
+
+  it('toasts the retryable copy and calls onSpawnFailed when no live instance resolves', async () => {
+    const onSpawnFailedMock = vi.fn();
+    const setRunOnInstanceMock = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      setRunOnInstance: next => {
+        setRunOnInstanceMock(next);
+      },
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: [] } }),
+      onSpawnFailed: () => {
+        onSpawnFailedMock();
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(onSpawnFailedMock).toHaveBeenCalledTimes(1);
+    });
+    expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnRetryableToast());
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(setRunOnInstanceMock).not.toHaveBeenCalled();
   });
 });

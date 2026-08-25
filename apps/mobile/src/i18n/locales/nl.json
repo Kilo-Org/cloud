@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass is een maandelijks abonnement dat automatisch wordt verlengd. De betaling wordt bij bevestiging van de aankoop in rekening gebracht op je Apple ID. Abonnementen worden elke maand automatisch verlengd voor de weergegeven prijs, tenzij je ten minste 24 uur voor het einde van de huidige periode opzegt. Beheer of annuleer op elk moment in de accountinstellingen van de App Store.",
     "legalPrivacyPolicy": "Privacybeleid",
     "legalTermsOfUse": "Gebruiksvoorwaarden (EULA)",
-    "purchaseNotLinked": "Deze App Store-aankoop is niet gekoppeld aan je Kilo-account. Controleer of je bent aangemeld met het Apple ID waarmee de aankoop is gedaan, en probeer het opnieuw.",
     "purchaseDifferentAccount": "Deze App Store-aankoop is niet gekoppeld aan je Kilo-account. Meld je aan met het Apple-account dat voor de aankoop is gebruikt, en probeer het opnieuw.",
     "restoreFailed": "Aankopen herstellen mislukt. Probeer het opnieuw.",
     "purchaseFailed": "Aankoop voltooien mislukt.",
-    "purchaseStartFailed": "App Store-aankoop starten mislukt."
+    "purchaseStartFailed": "App Store-aankoop starten mislukt.",
+    "purchaseOwnedByAnotherAccount": "De Kilo Pass op dit Apple-account hoort bij een ander Kilo-account."
   },
   "consent": {
     "kilo": "Kilo",

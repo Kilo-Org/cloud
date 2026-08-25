@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass เป็นการสมัครสมาชิกรายเดือนที่ต่ออายุอัตโนมัติ ค่าธรรมเนียมจะถูกเรียกเก็บจาก Apple ID ของคุณเมื่อยืนยันการซื้อ การสมัครสมาชิกจะต่ออายุอัตโนมัติทุกเดือนในราคาที่แสดง เว้นแต่จะยกเลิกอย่างน้อย 24 ชั่วโมงก่อนสิ้นสุดรอบปัจจุบัน จัดการหรือยกเลิกได้ทุกเมื่อในการตั้งค่าบัญชี App Store",
     "legalPrivacyPolicy": "นโยบายความเป็นส่วนตัว",
     "legalTermsOfUse": "ข้อกำหนดการใช้งาน (EULA)",
-    "purchaseNotLinked": "การซื้อใน App Store นี้ไม่ได้เชื่อมโยงกับบัญชี Kilo ของคุณ ตรวจสอบว่าคุณลงชื่อเข้าด้วย Apple ID ที่ใช้ซื้อ แล้วลองอีกครั้ง",
     "purchaseDifferentAccount": "การซื้อใน App Store นี้ไม่ได้เชื่อมโยงกับบัญชี Kilo ของคุณ ลงชื่อเข้า Apple Account ที่ใช้สำหรับการซื้อ แล้วลองอีกครั้ง",
     "restoreFailed": "คืนค่าการซื้อไม่สำเร็จ ลองอีกครั้ง",
     "purchaseFailed": "ทำการซื้อไม่สำเร็จ",
-    "purchaseStartFailed": "เริ่มการซื้อใน App Store ไม่สำเร็จ"
+    "purchaseStartFailed": "เริ่มการซื้อใน App Store ไม่สำเร็จ",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass ใน Apple Account นี้เป็นของบัญชี Kilo อื่น"
   },
   "consent": {
     "kilo": "Kilo",

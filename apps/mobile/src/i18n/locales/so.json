@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass waa diiwaangelin bil-ah oo is-keeneysa si toos ah. Lacagta waxaa laga qaadaa Apple ID-gaaga markaad xaqiijiso iibsashada. Diiwaangelintu waxay si toos ah u cusbooneysa bil kasta qiimaha la muujiyey ilaa aadan baajin ugu yaraan 24 saacadood ka hor dhamaadka xilli-gii xaafada. Ku maareyso ama baaji wakhti kasta ee goobaha xisaabta App Store.",
     "legalPrivacyPolicy": "Siyaasadda Asturnaanta",
     "legalTermsOfUse": "Shuruudaha Isticmaalka (EULA)",
-    "purchaseNotLinked": "Iibsashadan App Store kuma xirna akoontigaaga Kilo. Hubi inaad ku soo gashay Apple ID-ga iibsashada sameeyay, ka dibna mar kale isku day.",
     "purchaseDifferentAccount": "Iibsashadan App Store kuma xirna akoontigaaga Kilo. Ku soo gal Apple Account-ka loo adeegsaday iibsashada, ka dibna mar kale isku day.",
     "restoreFailed": "Soo celinta iibsashada way fashilantay. Mar kale isku day.",
     "purchaseFailed": "Iibsashada lama dhammayn karin.",
-    "purchaseStartFailed": "Bilowga iibsashada App Store waa fashilmay."
+    "purchaseStartFailed": "Bilowga iibsashada App Store waa fashilmay.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass-ka ku yaal Xisaabtan Apple-ka ah waxaa leh koonto Kilo oo kale."
   },
   "consent": {
     "kilo": "Kilo",

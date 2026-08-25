@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass একটি স্বয়ংক্রিয়-নবায়নযোগ্য মাসিক সাবস্ক্রিপশন। কেনার নিশ্চিতকরণে আপনার Apple ID থেকে পেমেন্ট নেওয়া হয়। সাবস্ক্রিপশন বর্তমান সময়সীমা শেষ হওয়ার কমপক্ষে 24 ঘণ্টা আগে বাতিল না করা হলে প্রতি মাসে দেখানো দামে স্বয়ংক্রিয়ভাবে নবায়ন হয়। আপনার App Store অ্যাকাউন্ট সেটিংসে যেকোনো সময় পরিচালনা বা বাতিল করুন।",
     "legalPrivacyPolicy": "গোপনীয়তা নীতি",
     "legalTermsOfUse": "ব্যবহারের শর্তাবলী (EULA)",
-    "purchaseNotLinked": "এই App Store ক্রয়টি আপনার Kilo অ্যাকাউন্টের সাথে লিঙ্ক করা নেই। নিশ্চিত করুন যে আপনি যে Apple ID দিয়ে ক্রয়টি করেছেন সেটিতে সাইন ইন করেছেন, তারপর আবার চেষ্টা করুন।",
     "purchaseDifferentAccount": "এই App Store ক্রয়টি আপনার Kilo অ্যাকাউন্টের সাথে লিঙ্ক করা নেই। ক্রয়ের জন্য ব্যবহৃত Apple Account-এ সাইন ইন করুন, তারপর আবার চেষ্টা করুন।",
     "restoreFailed": "ক্রয় পুনরুদ্ধার করা যায়নি। আবার চেষ্টা করুন।",
     "purchaseFailed": "ক্রয় সম্পূর্ণ করা যায়নি।",
-    "purchaseStartFailed": "App Store ক্রয় শুরু করা যায়নি।"
+    "purchaseStartFailed": "App Store ক্রয় শুরু করা যায়নি।",
+    "purchaseOwnedByAnotherAccount": "এই Apple Account-এ Kilo Pass একটি ভিন্ন Kilo অ্যাকাউন্টের।"
   },
   "consent": {
     "kilo": "Kilo",

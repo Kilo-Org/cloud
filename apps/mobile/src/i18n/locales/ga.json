@@ -2766,11 +2766,11 @@
     "legalDisclosure": "Is síntiús míosúil uath-fhionnuaire é Kilo Pass. Gearrtar an táille ar do Apple ID ag deimhniú an cheannaigh. Déanann síntiúis athnuachan go huathoibríoch gach mí ar an bpraghas a thaispeántar mura gcuirtear ceal orthu 24 uair an chloig ar a laghad roimh dheireadh na tréimhse reatha. Bainistigh nó cuir ceal orthu am ar bith i do shocruithe cuntais App Store.",
     "legalPrivacyPolicy": "Beartas Príobháideachta",
     "legalTermsOfUse": "Téarmaí Úsáide (EULA)",
-    "purchaseNotLinked": "Níl an ceannach App Store seo nasctha le do chuntas Kilo. Déan cinnte go bhfuil tú sínithe isteach leis an Apple ID a rinne an ceannach, ansin bain triail as arís.",
     "purchaseDifferentAccount": "Níl an ceannach App Store seo nasctha le do chuntas Kilo. Sínigh isteach leis an Apple Account a úsáideadh don cheannach, ansin bain triail as arís.",
     "restoreFailed": "Theip ar na ceannacháin a chur ar ais. Bain triail as arís.",
     "purchaseFailed": "Theip ar an gceannach a chríochnú.",
-    "purchaseStartFailed": "Theip ar cheannach App Store a thosú."
+    "purchaseStartFailed": "Theip ar cheannach App Store a thosú.",
+    "purchaseOwnedByAnotherAccount": "Baineann an Kilo Pass ar an Apple Account seo le cuntas Kilo éagsúil."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2280,11 +2280,11 @@
     "legalDisclosure": "O Kilo Pass é uma assinatura mensal com renovação automática. O pagamento é cobrado na sua Apple ID na confirmação da compra. As assinaturas são renovadas automaticamente todos os meses pelo preço exibido, a menos que sejam canceladas pelo menos 24 horas antes do fim do período atual. Gerencie ou cancele a qualquer momento nas configurações da sua conta na App Store.",
     "legalPrivacyPolicy": "Política de Privacidade",
     "legalTermsOfUse": "Termos de Uso (EULA)",
-    "purchaseNotLinked": "Esta compra da App Store não está vinculada à sua conta Kilo. Verifique se você está conectado ao Apple ID que fez a compra e tente novamente.",
     "purchaseDifferentAccount": "Esta compra da App Store não está vinculada à sua conta Kilo. Entre na Apple Account usada na compra e tente novamente.",
     "restoreFailed": "Falha ao restaurar as compras. Tente novamente.",
     "purchaseFailed": "Falha ao concluir a compra.",
-    "purchaseStartFailed": "Falha ao iniciar a compra na App Store."
+    "purchaseStartFailed": "Falha ao iniciar a compra na App Store.",
+    "purchaseOwnedByAnotherAccount": "O Kilo Pass desta Conta Apple pertence a uma conta Kilo diferente."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass hilero automatikoki berritzen den harpidetza da. Erosketa baieztatzen denean, ordainketa zure Apple ID-ra kobratzen da. Harpidetzak automatikoki berritzen dira hilero agertzen den prezioan, uneko aldia amaitu baino 24 ordu lehenago gutxienez ezeztatu ezean. Kudeatu edo ezeztatu edonoiz zure App Store kontuaren ezarpenetan.",
     "legalPrivacyPolicy": "Pribatutasun-politika",
     "legalTermsOfUse": "Erabilera-baldintzak (EULA)",
-    "purchaseNotLinked": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Ziurtatu erosketaren jabe den Apple IDrekin saioa hasi duzula, eta saiatu berriro.",
     "purchaseDifferentAccount": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Hasi saioa erosketarako erabilitako Apple kontuarekin, eta saiatu berriro.",
     "restoreFailed": "Ezin dira erosketa berreskuratu. Saiatu berriro.",
     "purchaseFailed": "Ezin izan da erosketa amaitu.",
-    "purchaseStartFailed": "Ezin izan da App Store-ko erosketa hasi."
+    "purchaseStartFailed": "Ezin izan da App Store-ko erosketa hasi.",
+    "purchaseOwnedByAnotherAccount": "Apple kontu honetako Kilo Pass beste Kilo kontu bati dagokio."
   },
   "consent": {
     "kilo": "Kilo",

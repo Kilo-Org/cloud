@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass is 'n outomaties-hernubare maandelikse intekening. Betaling word by bevestiging van aankoop van jou Apple ID gehef. Intekeninge hernu elke maand outomaties teen die prys wat vertoon word, tensy dit minstens 24 uur voor die einde van die huidige tydperk gekanselleer word. Bestuur of kanselleer enige tyd in jou App Store-rekeninginstellings.",
     "legalPrivacyPolicy": "Privaatheidsbeleid",
     "legalTermsOfUse": "Gebruiksvoorwaardes (EULA)",
-    "purchaseNotLinked": "Hierdie App Store-aankoop is nie aan jou Kilo-rekening gekoppel nie. Maak seker jy is aangemeld by die Apple ID wat die aankoop gemaak het, en probeer dan weer.",
     "purchaseDifferentAccount": "Hierdie App Store-aankoop is nie aan jou Kilo-rekening gekoppel nie. Teken in by die Apple-rekening wat vir die aankoop gebruik is, en probeer dan weer.",
     "restoreFailed": "Kon nie aankope herstel nie. Probeer weer.",
     "purchaseFailed": "Kon nie aankoop voltooi nie.",
-    "purchaseStartFailed": "Kon nie App Store-aankoop begin nie."
+    "purchaseStartFailed": "Kon nie App Store-aankoop begin nie.",
+    "purchaseOwnedByAnotherAccount": "Die Kilo Pass op hierdie Apple-rekening behoort aan 'n ander Kilo-rekening."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass 是自動續訂的每月訂閱。款項會在購買確認時從您的 Apple ID 扣款。除非在目前週期結束前至少 24 小時取消，否則訂閱會以顯示的價格每月自動續訂。您可以隨時在 App Store 帳戶設定中管理或取消。",
     "legalPrivacyPolicy": "隱私權政策",
     "legalTermsOfUse": "使用條款 (EULA)",
-    "purchaseNotLinked": "此 App Store 購買未連結至您的 Kilo 帳戶。請確認您已登入進行購買的 Apple ID，然後再試一次。",
     "purchaseDifferentAccount": "此 App Store 購買未連結至您的 Kilo 帳戶。請登入用於購買的 Apple 帳戶，然後再試一次。",
     "restoreFailed": "恢復購買失敗。請再試一次。",
     "purchaseFailed": "無法完成購買。",
-    "purchaseStartFailed": "無法開始 App Store 購買。"
+    "purchaseStartFailed": "無法開始 App Store 購買。",
+    "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的 Kilo Pass 屬於另一個 Kilo 帳戶。"
   },
   "consent": {
     "kilo": "Kilo",

@@ -2293,11 +2293,11 @@
     "legalDisclosure": "Kilo Pass to automatycznie odnawiana subskrypcja miesięczna. Płatność jest pobierana z Twojego Apple ID przy potwierdzeniu zakupu. Subskrypcja odnawia się automatycznie co miesiąc po podanej cenie, chyba że anulujesz ją co najmniej 24 godziny przed końcem bieżącego okresu. Zarządzaj nią lub anuluj ją w dowolnym momencie w ustawieniach konta App Store.",
     "legalPrivacyPolicy": "Polityka prywatności",
     "legalTermsOfUse": "Warunki korzystania (EULA)",
-    "purchaseNotLinked": "Ten zakup w App Store nie jest powiązany z Twoim kontem Kilo. Upewnij się, że jesteś zalogowany na Apple ID, na którym dokonano zakupu, a następnie spróbuj ponownie.",
     "purchaseDifferentAccount": "Ten zakup w App Store nie jest powiązany z Twoim kontem Kilo. Zaloguj się na konto Apple użyte do zakupu, a następnie spróbuj ponownie.",
     "restoreFailed": "Nie udało się przywrócić zakupów. Spróbuj ponownie.",
     "purchaseFailed": "Nie udało się dokończyć zakupu.",
-    "purchaseStartFailed": "Nie udało się rozpocząć zakupu w App Store."
+    "purchaseStartFailed": "Nie udało się rozpocząć zakupu w App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tym koncie Apple należy do innego konta Kilo."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2726,11 +2726,11 @@
     "legalDisclosure": "Kilo Pass je pretplata na mesec dana koja se automatski obnavlja. Plaćanje se naplaćuje sa vašeg Apple ID-ja pri potvrdi kupovine. Pretplate se automatski obnavljaju svakog meseca po prikazanoj ceni, osim ako ih ne otkažete najmanje 24 sata pre kraja tekućeg perioda. Upravljajte ili otkažite u svakom trenutku u podešavanjima naloga u App Store-u.",
     "legalPrivacyPolicy": "Politika privatnosti",
     "legalTermsOfUse": "Uslovi korišćenja (EULA)",
-    "purchaseNotLinked": "Ova kupovina u App Store-u nije povezana sa vašim Kilo nalogom. Uverite se da ste prijavljeni na Apple ID kojim je kupovina izvršena, pa pokušajte ponovo.",
     "purchaseDifferentAccount": "Ova kupovina u App Store-u nije povezana sa vašim Kilo nalogom. Prijavite se na Apple nalog korišćen za kupovinu, pa pokušajte ponovo.",
     "restoreFailed": "Vraćanje kupovina nije uspelo. Pokušajte ponovo.",
     "purchaseFailed": "Kupovina nije mogla biti dovršena.",
-    "purchaseStartFailed": "Započinjanje kupovine u App Store-u nije uspelo."
+    "purchaseStartFailed": "Započinjanje kupovine u App Store-u nije uspelo.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na ovom Apple nalogu pripada drugom Kilo nalogu."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass-ը ավտոմատ թարմացվող ամսական բաժանորդագրություն է: Վճարումը գանձվում է ձեր Apple ID-ից գնումը հաստատելիս: Բաժանորդագրությունը թարմացվում է ամեն ամիս նշված գնով, եթե չեղարկեք ընթացիկ ժամանակաշրջանի ավարտից առնվազն 24 ժամ առաջ: Կառավարեք կամ չեղարկեք ցանկացած պահի ձեր App Store հաշվի կարգավորումներում:",
     "legalPrivacyPolicy": "Գաղտնիության քաղաքականություն",
     "legalTermsOfUse": "Օգտագործման պայմաններ (EULA)",
-    "purchaseNotLinked": "Այս App Store գնումը կապված չէ ձեր Kilo հաշվի հետ: Համոզվեք, որ մուտք եք գործել այն Apple ID-ով, որով կատարվել է գնումը, ապա կրկին փորձեք:",
     "purchaseDifferentAccount": "Այս App Store գնումը կապված չէ ձեր Kilo հաշվի հետ: Մուտք գործեք գնման համար օգտագործված Apple Account-ով, ապա կրկին փորձեք:",
     "restoreFailed": "Չհաջողվեց վերականգնել գնումները: Կրկին փորձեք:",
     "purchaseFailed": "Չհաջողվեց ավարտել գնումը:",
-    "purchaseStartFailed": "Չհաջողվեց սկսել App Store գնումը:"
+    "purchaseStartFailed": "Չհաջողվեց սկսել App Store գնումը:",
+    "purchaseOwnedByAnotherAccount": "Այս Apple Account-ի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին:"
   },
   "consent": {
     "kilo": "Kilo",

@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass bụ ndenye aha kwa ọnwa nke na-emegharị onwe ya. A na-ana ụgwọ na Apple ID gị mgbe ị kwadoro ịzụta. Ndenye aha na-emegharị kwa ọnwa na ọnụahịa egosiri belụsọ na ị kagburu ya ọ dịkarịa ala awa 24 tupu njedebe nke oge ugbu a. Jikwaa ma ọ bụ kagbuo ya mgbe ọ bụla na ntọala akaụntụ App Store gị.",
     "legalPrivacyPolicy": "Amụma Nzuzo",
     "legalTermsOfUse": "Ụkpụrụ Ojiji (EULA)",
-    "purchaseNotLinked": "Ịzụrụ App Store a ejikọghị na akaụntụ Kilo gị. Gbaa mbọ hụ na ị banyere na Apple ID nke zụrụ ya, wee nwaa ọzọ.",
     "purchaseDifferentAccount": "Ịzụrụ App Store a ejikọghị na akaụntụ Kilo gị. Banye na Akaụntụ Apple e ji zụọ ya, wee nwaa ọzọ.",
     "restoreFailed": "Ịweghachite azụrụ dara. Nwaa ọzọ.",
     "purchaseFailed": "Ịmecha azụrụ dara.",
-    "purchaseStartFailed": "Ịmalite azụrụ App Store dara."
+    "purchaseStartFailed": "Ịmalite azụrụ App Store dara.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na Akaụntụ Apple a bụ nke akaụntụ Kilo ọzọ."
   },
   "consent": {
     "kilo": "Kilo",

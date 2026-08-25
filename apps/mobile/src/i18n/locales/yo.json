@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass jẹ́ ìfọwọ́sílẹ̀ oṣooṣu tó máa ń tún ara rẹ̀ ṣe ní àìdáni. Wọ́n máa ń gba owó sí Apple ID rẹ ní ìfìdírí ìrà. Àwọn ìfọwọ́sílẹ̀ máa ń tún ara wọn ṣe lọ́ṣọ̀ọ̀so ní iye tí a fi hàn, àyàfi bí a kò bá fagilé rẹ̀ ni ó kéré tán wákàtí 24 kí ìgbà tí ó ń lọ kí ó parí. Ṣàkóso tàbí fagilé rẹ̀ nígbàkúgbà nínú àwọn ètò àkọọ́lẹ̀ App Store rẹ.",
     "legalPrivacyPolicy": "Ìlànà Àṣírí",
     "legalTermsOfUse": "Àwọn Ìlànà Ìlò (EULA)",
-    "purchaseNotLinked": "Rírà App Store yìí kò ní ìsopọ̀ sí àkọọ́lẹ̀ Kilo rẹ. Ríi dájú pé o wọlé sí Apple ID tó ṣe rírà náà, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
     "purchaseDifferentAccount": "Rírà App Store yìí kò ní ìsopọ̀ sí àkọọ́lẹ̀ Kilo rẹ. Wọlé sí Apple Account tí a lò fún rírà náà, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
     "restoreFailed": "Kùnà láti mú àwọn rírà padà. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "purchaseFailed": "Kùnà láti parí rírà.",
-    "purchaseStartFailed": "Kùnà láti bẹ̀rẹ̀ rírà App Store."
+    "purchaseStartFailed": "Kùnà láti bẹ̀rẹ̀ rírà App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass lori Apple Account yii jẹ ti Kilo akọọlẹ miiran."
   },
   "consent": {
     "kilo": "Kilo",

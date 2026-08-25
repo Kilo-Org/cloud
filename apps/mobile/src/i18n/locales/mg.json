@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass dia famandrihana isam-bolana azo havaozina ho azy. Alaina amin'ny Apple ID anao ny fandoavam-bola rehefa hamafisina ny fividianana. Havaozina ho azy ny famandrihana isam-bolana amin'ny vidiny aseho raha tsy foanana 24 ora farafahakeliny alohan'ny fiafaran'ny fe-potoana ankehitriny. Tantano na foano isaky ny te ianao amin'ny fikandrana kaonty App Store anao.",
     "legalPrivacyPolicy": "Politika momba ny fiainana manokana",
     "legalTermsOfUse": "Fepetran'ny fampiasana (EULA)",
-    "purchaseNotLinked": "Tsy mifandray amin'ny kaonty Kilo anao ity fividianana App Store ity. Ataovy azo antoka fa niditra tamin'ny Apple ID nanao ny fividianana ianao, ary andramana indray.",
     "purchaseDifferentAccount": "Tsy mifandray amin'ny kaonty Kilo anao ity fividianana App Store ity. Midira amin'ny Apple Account nampiasaina tamin'ny fividianana, ary andramana indray.",
     "restoreFailed": "Tsy nahomby ny famerenana ny fividianana. Andramana indray.",
     "purchaseFailed": "Tsy nahomby ny famitana ny fividianana.",
-    "purchaseStartFailed": "Tsy nahomby ny fanombohana ny fividianana App Store."
+    "purchaseStartFailed": "Tsy nahomby ny fanombohana ny fividianana App Store.",
+    "purchaseOwnedByAnotherAccount": "Ny Kilo Pass amin'ity Apple Account ity dia an'ny kaonty Kilo hafa."
   },
   "consent": {
     "kilo": "Kilo",

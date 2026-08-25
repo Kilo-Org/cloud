@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass خودکار تجدید کے ساتھ ماہانہ سبسکرپشن ہے۔ ادائیگی خریداری کی تصدیق پر آپ کے Apple ID سے لی جاتی ہے۔ سبسکرپشنز ہر ماہ دکھائی گئی قیمت پر خود بخود تجدید ہوتی ہیں جب تک کہ موجودہ مدت ختم ہونے سے کم از کم 24 گھنٹے پہلے منسوخ نہ کی جائیں۔ اپنی App Store اکاؤنٹ کی ترتیبات میں کسی بھی وقت منظم یا منسوخ کریں۔",
     "legalPrivacyPolicy": "رازداری کی پالیسی",
     "legalTermsOfUse": "استعمال کی شرائط (EULA)",
-    "purchaseNotLinked": "یہ App Store خریداری آپ کے Kilo اکاؤنٹ سے منسلک نہیں ہے۔ اس بات کو یقینی بنائیں کہ آپ اس Apple ID سے سائن ان ہیں جس نے خریداری کی تھی، پھر دوبارہ کوشش کریں۔",
     "purchaseDifferentAccount": "یہ App Store خریداری آپ کے Kilo اکاؤنٹ سے منسلک نہیں ہے۔ خریداری کے لیے استعمال شدہ Apple اکاؤنٹ میں سائن ان کریں، پھر دوبارہ کوشش کریں۔",
     "restoreFailed": "خریداریاں بحال نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
     "purchaseFailed": "خریداری مکمل نہیں ہو سکی۔",
-    "purchaseStartFailed": "App Store خریداری شروع نہیں ہو سکی۔"
+    "purchaseStartFailed": "App Store خریداری شروع نہیں ہو سکی۔",
+    "purchaseOwnedByAnotherAccount": "اس Apple اکاؤنٹ پر Kilo Pass کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتا ہے۔"
   },
   "consent": {
     "kilo": "Kilo",

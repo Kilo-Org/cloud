@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass は自動更新の月額サブスクリプションです。購入の確認時に、お支払いは Apple ID に請求されます。サブスクリプションは、現在の期間終了の 24 時間前までに解約しない限り、表示された価格で毎月自動更新されます。App Store のアカウント設定でいつでも管理または解約できます。",
     "legalPrivacyPolicy": "プライバシーポリシー",
     "legalTermsOfUse": "利用規約 (EULA)",
-    "purchaseNotLinked": "このApp Store購入はKiloアカウントにリンクされていません。購入に使用したApple IDでサインインしていることを確認してから、もう一度お試しください。",
     "purchaseDifferentAccount": "このApp Store購入はKiloアカウントにリンクされていません。購入に使用したApple Accountにサインインして、もう一度お試しください。",
     "restoreFailed": "購入の復元に失敗しました。もう一度お試しください。",
     "purchaseFailed": "購入を完了できませんでした。",
-    "purchaseStartFailed": "App Storeでの購入を開始できませんでした。"
+    "purchaseStartFailed": "App Storeでの購入を開始できませんでした。",
+    "purchaseOwnedByAnotherAccount": "このAppleアカウントのKilo Passは別のKiloアカウントに属しています。"
   },
   "consent": {
     "kilo": "Kilo",

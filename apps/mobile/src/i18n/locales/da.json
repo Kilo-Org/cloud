@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass er et automatisk fornyeligt månedligt abonnement. Betaling opkræves på din Apple ID ved bekræftelse af købet. Abonnementer fornyes automatisk hver måned til den viste pris, medmindre de annulleres mindst 24 timer før udløbet af den aktuelle periode. Administrér eller annullér når som helst i dine App Store-kontoindstillinger.",
     "legalPrivacyPolicy": "Fortrolighedspolitik",
     "legalTermsOfUse": "Vilkår for brug (EULA)",
-    "purchaseNotLinked": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Sørg for, at du er logget ind på den Apple ID, der foretog købet, og prøv igen.",
     "purchaseDifferentAccount": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Log ind på den Apple-konto, der blev brugt til købet, og prøv igen.",
     "restoreFailed": "Kunne ikke gendanne køb. Prøv igen.",
     "purchaseFailed": "Kunne ikke fuldføre købet.",
-    "purchaseStartFailed": "Kunne ikke starte App Store-købet."
+    "purchaseStartFailed": "Kunne ikke starte App Store-købet.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-konto tilhører en anden Kilo-konto."
   },
   "consent": {
     "kilo": "Kilo",

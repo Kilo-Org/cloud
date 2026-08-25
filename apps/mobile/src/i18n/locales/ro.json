@@ -2726,11 +2726,11 @@
     "legalDisclosure": "Kilo Pass este un abonament lunar cu reînnoire automată. Plata este încasată de pe Apple ID la confirmarea achiziției. Abonamentele se reînnoiesc automat în fiecare lună la prețul afișat, dacă nu sunt anulate cu cel puțin 24 de ore înainte de sfârșitul perioadei curente. Gestionează sau anulează oricând în setările contului tău App Store.",
     "legalPrivacyPolicy": "Politica de confidențialitate",
     "legalTermsOfUse": "Termeni și condiții (EULA)",
-    "purchaseNotLinked": "Această achiziție din App Store nu este legată de contul tău Kilo. Asigură-te că ești autentificat în Apple ID-ul care a făcut achiziția, apoi încearcă din nou.",
     "purchaseDifferentAccount": "Această achiziție din App Store nu este legată de contul tău Kilo. Autentifică-te în Apple Account-ul folosit pentru achiziție, apoi încearcă din nou.",
     "restoreFailed": "Restaurarea achizițiilor a eșuat. Încearcă din nou.",
     "purchaseFailed": "Finalizarea achiziției a eșuat.",
-    "purchaseStartFailed": "Nu s-a putut începe achiziția din App Store."
+    "purchaseStartFailed": "Nu s-a putut începe achiziția din App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass de pe acest Apple Account aparține unui alt cont Kilo."
   },
   "consent": {
     "kilo": "Kilo",

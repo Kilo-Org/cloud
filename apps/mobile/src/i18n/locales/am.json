@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass በራስ-ሰር የሚታደስ ወርሃዊ ምዝገባ ነው። ክፍያው ግዢውን ሲያረጋግጡ በApple ID ዎ ላይ ይጠየቃል። ምዝገባዎች ከወቅቱ ጊዜ ማብቂያ ቢያንስ 24 ሰዓታት በፊት ካልተሰረዙ በስተቀር በየወሩ በተጠቀሰው ዋጋ በራስ-ሰር ይታደሳሉ። በApp Store መለያ ቅንብሮችዎ ውስጥ በማንኛውም ጊዜ ያስተዳድሩ ወይም ይሰርዙ።",
     "legalPrivacyPolicy": "የግላዊነት ፖሊሲ",
     "legalTermsOfUse": "የአጠቃቀም ውሎች (EULA)",
-    "purchaseNotLinked": "ይህ የApp Store ግዢ ከKilo መለያዎ ጋር አልተገናኘም። ግዢውን ባደረገው Apple ID መግባትዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
     "purchaseDifferentAccount": "ይህ የApp Store ግዢ ከKilo መለያዎ ጋር አልተገናኘም። ለግዢው ወደተጠቀመው የApple መለያ ይግቡ፣ ከዚያ እንደገና ይሞክሩ።",
     "restoreFailed": "ግዢዎችን መመለስ አልተሳካም። እንደገና ይሞክሩ።",
     "purchaseFailed": "ግዢውን ማጠናቀቅ አልተሳካም።",
-    "purchaseStartFailed": "የApp Store ግዢን መጀመር አልተሳካም።"
+    "purchaseStartFailed": "የApp Store ግዢን መጀመር አልተሳካም።",
+    "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው Kilo Pass የሌላ የKilo መለያ ነው።"
   },
   "consent": {
     "kilo": "Kilo",

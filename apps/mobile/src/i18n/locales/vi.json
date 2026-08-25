@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass là gói đăng ký hàng tháng tự gia hạn. Khoản thanh toán được tính vào Apple ID của bạn khi xác nhận mua. Gói đăng ký tự động gia hạn mỗi tháng theo giá đã hiển thị trừ khi bạn hủy ít nhất 24 giờ trước khi kết thúc kỳ hiện tại. Quản lý hoặc hủy bất kỳ lúc nào trong cài đặt tài khoản App Store.",
     "legalPrivacyPolicy": "Chính sách quyền riêng tư",
     "legalTermsOfUse": "Điều khoản sử dụng (EULA)",
-    "purchaseNotLinked": "Giao dịch mua App Store này chưa được liên kết với tài khoản Kilo của bạn. Hãy đảm bảo bạn đã đăng nhập bằng Apple ID đã thực hiện giao dịch mua, sau đó thử lại.",
     "purchaseDifferentAccount": "Giao dịch mua App Store này chưa được liên kết với tài khoản Kilo của bạn. Hãy đăng nhập bằng Tài khoản Apple đã dùng cho giao dịch mua, sau đó thử lại.",
     "restoreFailed": "Không thể khôi phục giao dịch mua. Thử lại.",
     "purchaseFailed": "Không thể hoàn tất giao dịch mua.",
-    "purchaseStartFailed": "Không thể bắt đầu giao dịch mua trên App Store."
+    "purchaseStartFailed": "Không thể bắt đầu giao dịch mua trên App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass trên Tài khoản Apple này thuộc về một tài khoản Kilo khác."
   },
   "consent": {
     "kilo": "Kilo",

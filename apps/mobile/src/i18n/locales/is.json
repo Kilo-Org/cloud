@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass er sjálfvirkt endurnýjanleg mánaðaráskrift. Greiðsla er innheimt á Apple ID þinn við staðfestingu kaupa. Áskriftir endurnýjast sjálfkrafa mánaðarlega á sýnandi verði nema sagt sé upp að minnsta kosti 24 klukkustundum fyrir lok gildistímabilsins. Hafa umsjón með eða hætta við hvenær sem er í stillingum App Store reikningsins þíns.",
     "legalPrivacyPolicy": "Persónuverndarstefna",
     "legalTermsOfUse": "Notendaskilmálar (EULA)",
-    "purchaseNotLinked": "Þessi App Store-kaup eru ekki tengd Kilo-reikningnum þínum. Gakktu úr skugga um að þú sért skráð(ur) inn á Apple ID-ið sem gerði kaupin, og reyndu svo aftur.",
     "purchaseDifferentAccount": "Þessi App Store-kaup eru ekki tengd Kilo-reikningnum þínum. Skráðu þig inn á Apple-reikninginn sem notaður var við kaupin, og reyndu svo aftur.",
     "restoreFailed": "Mistókst að endurheimta kaup. Reyndu aftur.",
     "purchaseFailed": "Mistókst að ljúka kaupum.",
-    "purchaseStartFailed": "Mistókst að hefja App Store-kaup."
+    "purchaseStartFailed": "Mistókst að hefja App Store-kaup.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass á þessum Apple-reikningi tilheyrir öðrum Kilo-reikningi."
   },
   "consent": {
     "kilo": "Kilo",

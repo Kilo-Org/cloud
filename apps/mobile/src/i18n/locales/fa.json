@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass یک اشتراک ماهانه با تمدید خودکار است. پرداخت در تأیید خرید از Apple ID شما کسر میشود. اشتراکها هر ماه بهصورت خودکار با قیمت نشاندادهشده تمدید میشوند، مگر اینکه حداقل ۲۴ ساعت قبل از پایان دوره فعلی لغو شوند. هر زمان میتوانید در تنظیمات حساب App Store خود آن را مدیریت یا لغو کنید.",
     "legalPrivacyPolicy": "خطمشی حریم خصوصی",
     "legalTermsOfUse": "شرایط استفاده (EULA)",
-    "purchaseNotLinked": "این خرید App Store به حساب Kilo شما متصل نیست. مطمئن شوید با Apple ID چی که خرید با آن انجام شده وارد شده‌اید، سپس دوباره تلاش کنید.",
     "purchaseDifferentAccount": "این خرید App Store به حساب Kilo شما متصل نیست. با Apple Account مورد استفاده برای خرید وارد شوید، سپس دوباره تلاش کنید.",
     "restoreFailed": "بازیابی خریدها ممکن نشد. دوباره تلاش کنید.",
     "purchaseFailed": "تکمیل خرید ممکن نشد.",
-    "purchaseStartFailed": "شروع خرید App Store ممکن نشد."
+    "purchaseStartFailed": "شروع خرید App Store ممکن نشد.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass روی این Apple Account متعلق به یک حساب Kilo دیگر است."
   },
   "consent": {
     "kilo": "Kilo",

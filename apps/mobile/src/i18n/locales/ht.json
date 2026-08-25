@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass se yon abònman chak mwa ki renouvle otomatikman. Peman an chaje sou Apple ID ou lè acha a konfime. Abònman yo renouvle otomatikman chak mwa nan pri ki montre a sòf si yo anile omwen 24 èdtan anvan fen peryòd aktyèl la. Jere oswa anile nenpòt lè nan paramèt kont App Store ou.",
     "legalPrivacyPolicy": "Règleman sou Vi prive",
     "legalTermsOfUse": "Kondisyon Itilizasyon (EULA)",
-    "purchaseNotLinked": "Acha App Store sa a pa lye ak kont Kilo ou. Asire w ou konekte ak Apple ID ki te fè acha a, epi eseye ankò.",
     "purchaseDifferentAccount": "Acha App Store sa a pa lye ak kont Kilo ou. Konekte ak Apple Account yo te itilize pou acha a, epi eseye ankò.",
     "restoreFailed": "Echwe pou retabli acha yo. Eseye ankò.",
     "purchaseFailed": "Echwe pou fini acha a.",
-    "purchaseStartFailed": "Echwe pou kòmanse acha App Store."
+    "purchaseStartFailed": "Echwe pou kòmanse acha App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass la sou Kont Apple sa a fè pati yon lòt kont Kilo."
   },
   "consent": {
     "kilo": "Kilo",

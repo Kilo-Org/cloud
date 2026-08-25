@@ -2746,11 +2746,11 @@
     "legalDisclosure": "Kilo Pass je samodejno obnovljiva mesečna naročnina. Plačilo se bremeni vaš Apple ID ob potrditvi nakupa. Naročnine se samodejno obnovijo vsak mesec po prikazani ceni, razen če jih prekličete vsaj 24 ur pred koncem trenutnega obdobja. Upravljajte ali prekličite kadar koli v nastavitvah računa v App Store.",
     "legalPrivacyPolicy": "Politika zasebnosti",
     "legalTermsOfUse": "Pogoji uporabe (EULA)",
-    "purchaseNotLinked": "Ta nakup v App Store ni povezan z vašim Kilo računom. Prepričajte se, da ste prijavljeni v Apple ID, s katerim je bil nakup opravljen, nato poskusite znova.",
     "purchaseDifferentAccount": "Ta nakup v App Store ni povezan z vašim Kilo računom. Prijavite se v Apple račun, s katerim je bil nakup opravljen, nato poskusite znova.",
     "restoreFailed": "Obnovitev nakupov ni uspela. Poskusite znova.",
     "purchaseFailed": "Nakupa ni bilo mogoče dokončati.",
-    "purchaseStartFailed": "Nakupa v App Store ni bilo mogoče začeti."
+    "purchaseStartFailed": "Nakupa v App Store ni bilo mogoče začeti.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tem Apple računu pripada drugemu Kilo računu."
   },
   "consent": {
     "kilo": "Kilo",

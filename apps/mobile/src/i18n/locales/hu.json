@@ -2706,11 +2706,11 @@
     "legalDisclosure": "A Kilo Pass automatikusan megújuló havi előfizetés. A fizetés az Apple ID-hoz kerül felszámításra a vásárlás megerősítésekor. Az előfizetés minden hónapban automatikusan megújul a megjelenített áron, hacsak nem mondja le legalább 24 órával az aktuális időszak vége előtt. Kezelje vagy mondja le bármikor az App Store fiókbeállításaiban.",
     "legalPrivacyPolicy": "Adatvédelmi irányelvek",
     "legalTermsOfUse": "Felhasználási feltételek (EULA)",
-    "purchaseNotLinked": "Ez az App Store-vásárlás nincs hozzárendelve a Kilo-fiókjához. Győződjön meg róla, hogy azzal az Apple ID-val van bejelentkezve, amellyel a vásárlás történt, majd próbálja újra.",
     "purchaseDifferentAccount": "Ez az App Store-vásárlás nincs hozzárendelve a Kilo-fiókjához. Jelentkezzen be a vásárláshoz használt Apple-fiókkal, majd próbálja újra.",
     "restoreFailed": "Nem sikerült visszaállítani a vásárlásokat. Próbálja újra.",
     "purchaseFailed": "Nem sikerült befejezni a vásárlást.",
-    "purchaseStartFailed": "Nem sikerült elindítani az App Store-vásárlást."
+    "purchaseStartFailed": "Nem sikerült elindítani az App Store-vásárlást.",
+    "purchaseOwnedByAnotherAccount": "Az ezen Apple-fiókon lévő Kilo Pass egy másik Kilo-fiókhoz tartozik."
   },
   "consent": {
     "kilo": "Kilo",

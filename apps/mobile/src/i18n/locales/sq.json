@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass është një abonim mujor me rinovim automatik. Pagesa i ngarkohet Apple ID-së suaj në konfirmim të blerjes. Abonimet rinovohen automatikisht çdo muaj me çmimin e treguar, përveç nëse anulohen të paktën 24 orë para përfundimit të periudhës aktuale. Menaxhojeni ose anuloni në çdo kohë te cilësimet e llogarisë suaj në App Store.",
     "legalPrivacyPolicy": "Politika e privatësisë",
     "legalTermsOfUse": "Kushtet e përdorimit (EULA)",
-    "purchaseNotLinked": "Kjo blerje në App Store nuk është e lidhur me llogarinë tuaj Kilo. Sigurohuni që jeni regjistruar me Apple ID që bëri blerjen, pastaj provoni përsëri.",
     "purchaseDifferentAccount": "Kjo blerje në App Store nuk është e lidhur me llogarinë tuaj Kilo. Hyni me Apple Account të përdorur për blerjen, pastaj provoni përsëri.",
     "restoreFailed": "Rivendosja e blerjeve dështoi. Provo përsëri.",
     "purchaseFailed": "Nuk u arrit të përfundohej blerja.",
-    "purchaseStartFailed": "Nuk u arrit të fillohej blerja në App Store."
+    "purchaseStartFailed": "Nuk u arrit të fillohej blerja në App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass në këtë Apple Account i përket një llogarie tjetër Kilo."
   },
   "consent": {
     "kilo": "Kilo",

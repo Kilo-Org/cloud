@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass avtomatik yenilənən aylıq abunədir. Ödəniş alışın təsdiqində Apple ID-nizdən çıxılır. Abunəliklər cari dövrün sonuna ən azı 24 saat qalmış ləğv edilmədiyi halda hər ay göstərilən qiymətlə avtomatik yenilənir. İstənilən vaxt App Store hesabınızın parametrlərində idarə edin və ya ləğv edin.",
     "legalPrivacyPolicy": "Məxfilik Siyasəti",
     "legalTermsOfUse": "İstifadə Şərtləri (EULA)",
-    "purchaseNotLinked": "Bu App Store alışı Kilo hesabınıza bağlı deyil. Alışı edən Apple ID ilə daxil olduğunuza əmin olun, sonra yenidən cəhd edin.",
     "purchaseDifferentAccount": "Bu App Store alışı Kilo hesabınıza bağlı deyil. Alış üçün istifadə edilmiş Apple Hesabına daxil olun, sonra yenidən cəhd edin.",
     "restoreFailed": "Alışlar bərpa edilə bilmədi. Yenidən cəhd edin.",
     "purchaseFailed": "Alış tamamlana bilmədi.",
-    "purchaseStartFailed": "App Store alışı başladıla bilmədi."
+    "purchaseStartFailed": "App Store alışı başladıla bilmədi.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Hesabındakı Kilo Pass başqa Kilo hesabına aiddir."
   },
   "consent": {
     "kilo": "Kilo",

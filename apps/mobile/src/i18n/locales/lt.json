@@ -2746,11 +2746,11 @@
     "legalDisclosure": "„Kilo Pass“ yra automatiškai atnaujinama mėnesinė prenumerata. Mokėjimas nuskaitomas iš jūsų „Apple ID“ patvirtinus pirkimą. Prenumeratos atnaujinamos automatiškai kiekvieną mėnesį nurodyta kaina, nebent atšauksite ne vėliau kaip likus 24 valandoms iki einamojo laikotarpio pabaigos. Tvarkykite arba atšaukite bet kada „App Store“ paskyros nustatymuose.",
     "legalPrivacyPolicy": "Privatumo politika",
     "legalTermsOfUse": "Naudojimo sąlygos (EULA)",
-    "purchaseNotLinked": "Šis App Store pirkinys nesusietas su jūsų Kilo paskyra. Įsitikinkite, kad prisijungę prie Apple ID, kuriuo atliktas pirkinys, tada bandykite dar kartą.",
     "purchaseDifferentAccount": "Šis App Store pirkinys nesusietas su jūsų Kilo paskyra. Prisijunkite prie Apple paskyros, naudotos pirkinį atlikti, tada bandykite dar kartą.",
     "restoreFailed": "Nepavyko atkurti pirkinių. Bandykite dar kartą.",
     "purchaseFailed": "Nepavyko užbaigti pirkinio.",
-    "purchaseStartFailed": "Nepavyko pradėti App Store pirkinio."
+    "purchaseStartFailed": "Nepavyko pradėti App Store pirkinio.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass šioje Apple paskyroje priklauso kitai Kilo paskyrai."
   },
   "consent": {
     "kilo": "Kilo",

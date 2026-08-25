@@ -2706,11 +2706,11 @@
     "legalDisclosure": "I-Kilo Pass iwukubhalisela kwanyanga ngalinye okuzivuselelayo ngokuzenzakalelayo. Inkokhelo ikhokhiswa ku-Apple ID yakho lapho kuqinisekiswa ukuthenga. Ukubhalisela kuzivuselela ngokuzenzakalelayo nyanga zonke ngentengo ebonisiwe ngaphandle uma kukhanselwe okungenani amahora angu-24 ngaphambi kokuphela kwesikhathi samanje. Lawula noma ukhansela noma nini kuzilungiselelo zekhawunti yakho ye-App Store.",
     "legalPrivacyPolicy": "Inqubomgomo Yobumfihlo",
     "legalTermsOfUse": "Imigomo Yokusetshenziswa (EULA)",
-    "purchaseNotLinked": "Lokhu kuthengwa kwe-App Store akuxhunyiwe ku-akhawunti yakho ye-Kilo. Qinisekisa ukuthi ungenile nge-Apple ID eyenza lokhu kuthenga, bese uzama futhi.",
     "purchaseDifferentAccount": "Lokhu kuthengwa kwe-App Store akuxhunyiwe ku-akhawunti yakho ye-Kilo. Ngena nge-Apple Account esetshenziselwe ukuthenga, bese uzama futhi.",
     "restoreFailed": "Kwehlulekile ukubuyisela okuthengiwe. Zama futhi.",
     "purchaseFailed": "Kwehlulekile ukuqeda ukuthenga.",
-    "purchaseStartFailed": "Kwehlulekile ukuqala ukuthenga kwe-App Store."
+    "purchaseStartFailed": "Kwehlulekile ukuqala ukuthenga kwe-App Store.",
+    "purchaseOwnedByAnotherAccount": "I-Kilo Pass kule Apple Account ingeyenye i-akhawunti ye-Kilo."
   },
   "consent": {
     "kilo": "I-Kilo",

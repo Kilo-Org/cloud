@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass ເປັນການສະໝັກສະມາຊິກລາຍເດືອນທີ່ຕໍ່ອັດຕະໂນມັດ. ການຊຳລະຈະຖືກຄິດຄ່າຈາກ Apple ID ຂອງທ່ານເມື່ອຢືນຢັນການຊື້. ການສະໝັກຈະຕໍ່ອັດຕະໂນມັດທຸກເດືອນໃນລາຄາທີ່ສະແດງ ເວັ້ນເສຍແຕ່ຍົກເລີກຢ່າງໜ້ອຍ 24 ຊົ່ວໂມງກ່ອນສິ້ນສຸດໄລຍະປັດຈຸບັນ. ຈັດການ ຫຼື ຍົກເລີກໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າບັນຊີ App Store.",
     "legalPrivacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ",
     "legalTermsOfUse": "ຂໍ້ກຳນົດການນຳໃຊ້ (EULA)",
-    "purchaseNotLinked": "ການຊື້ App Store ນີ້ບໍ່ໄດ້ເຊື່ອມໂຍງກັບບັນຊີ Kilo ຂອງທ່ານ. ໃຫ້ແນ່ໃຈວ່າທ່ານເຂົ້າສູ່ລະບົບ Apple ID ທີ່ເຮັດການຊື້, ແລ້ວລອງອີກຄັ້ງ.",
     "purchaseDifferentAccount": "ການຊື້ App Store ນີ້ບໍ່ໄດ້ເຊື່ອມໂຍງກັບບັນຊີ Kilo ຂອງທ່ານ. ເຂົ້າສູ່ລະບົບ Apple Account ທີ່ໃຊ້ສຳລັບການຊື້, ແລ້ວລອງອີກຄັ້ງ.",
     "restoreFailed": "ການກູ້ຄືນການຊື້ລົ້ມເຫລວ. ລອງອີກຄັ້ງ.",
     "purchaseFailed": "ການເຮັດການຊື້ໃຫ້ສຳເລັດລົ້ມເຫລວ.",
-    "purchaseStartFailed": "ການເລີ່ມການຊື້ App Store ລົ້ມເຫລວ."
+    "purchaseStartFailed": "ການເລີ່ມການຊື້ App Store ລົ້ມເຫລວ.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass ໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ."
   },
   "consent": {
     "kilo": "Kilo",

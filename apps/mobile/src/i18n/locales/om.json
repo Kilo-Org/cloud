@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass ji'aan haaromsu subscription dha. Kaffaltiin Apple ID kee irratti yeroo bitachuu mirkaneeffamu ni itti baafama. Subscription'n ji'a ji'aan gatii mul'atuun ni haaroma, yoo yeroo dhumaa dura sa'aatii 24 dura hin haaromsine malee. Yeroo kamillee App Store account keessaa bulchi ykn haqi.",
     "legalPrivacyPolicy": "Imaammata Iccitii",
     "legalTermsOfUse": "Caaccuu Itti Fayyadamaa (EULA)",
-    "purchaseNotLinked": "Bittaan App Store kana herrega Kilo kee waliin hin walqabamne. Apple ID bittaa kana hojjetu waliin seenuu mirkaneeffadhu, ergasii ammas yaali.",
     "purchaseDifferentAccount": "Bittaan App Store kana herrega Kilo kee waliin hin walqabamne. Apple Account bittaa kanaaf fayyadame waliin seenii, ergasii ammas yaali.",
     "restoreFailed": "Bittaa deebisuu dadhabe. Irra deebi'ii yaali.",
     "purchaseFailed": "Bittaa xumuruu dadhabe.",
-    "purchaseStartFailed": "Bittaa App Store jalqabuu dadhabe."
+    "purchaseStartFailed": "Bittaa App Store jalqabuu dadhabe.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass akkaawuntii Apple kana irratti jiru akkaawuntii Kilo adda biraa keessaa."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass adalah langganan bulanan yang dapat diperbarui otomatis. Pembayaran dibebankan ke Apple ID Anda saat konfirmasi pembelian. Langganan diperbarui otomatis setiap bulan dengan harga yang ditampilkan kecuali dibatalkan minimal 24 jam sebelum akhir periode berjalan. Kelola atau batalkan kapan saja di pengaturan akun App Store Anda.",
     "legalPrivacyPolicy": "Kebijakan Privasi",
     "legalTermsOfUse": "Ketentuan Penggunaan (EULA)",
-    "purchaseNotLinked": "Pembelian App Store ini tidak tertaut ke akun Kilo Anda. Pastikan Anda masuk dengan Apple ID yang melakukan pembelian, lalu coba lagi.",
     "purchaseDifferentAccount": "Pembelian App Store ini tidak tertaut ke akun Kilo Anda. Masuk dengan Akun Apple yang digunakan untuk pembelian, lalu coba lagi.",
     "restoreFailed": "Gagal memulihkan pembelian. Coba lagi.",
     "purchaseFailed": "Gagal menyelesaikan pembelian.",
-    "purchaseStartFailed": "Gagal memulai pembelian App Store."
+    "purchaseStartFailed": "Gagal memulai pembelian App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass di Akun Apple ini milik akun Kilo yang berbeda."
   },
   "consent": {
     "kilo": "Kilo",

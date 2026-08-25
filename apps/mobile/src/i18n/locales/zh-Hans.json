@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass 是可自动续订的月度订阅。付款在购买确认时从您的 Apple ID 扣费。订阅每月按所示价格自动续订，除非在当前周期结束前至少 24 小时取消。可随时在您的 App Store 账户设置中管理或取消。",
     "legalPrivacyPolicy": "隐私政策",
     "legalTermsOfUse": "使用条款（EULA）",
-    "purchaseNotLinked": "此 App Store 购买尚未关联到您的 Kilo 账户。请确认您已登录用于购买此项目的 Apple ID，然后重试。",
     "purchaseDifferentAccount": "此 App Store 购买尚未关联到您的 Kilo 账户。请登录购买时使用的 Apple 账户，然后重试。",
     "restoreFailed": "恢复购买失败。请重试。",
     "purchaseFailed": "完成购买失败。",
-    "purchaseStartFailed": "启动 App Store 购买失败。"
+    "purchaseStartFailed": "启动 App Store 购买失败。",
+    "purchaseOwnedByAnotherAccount": "此 Apple 账户上的 Kilo Pass 属于另一个 Kilo 账户。"
   },
   "consent": {
     "kilo": "Kilo",

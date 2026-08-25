@@ -2280,11 +2280,11 @@
     "legalDisclosure": "Kilo Pass הוא מנוי חודשי שמתחדש אוטומטית. התשלום נגבה מחשבון Apple שלך בעת אישור הרכישה. המנוי מתחדש אוטומטית בכל חודש במחיר המוצג, אלא אם תבטל לפחות 24 שעות לפני סוף התקופה הנוכחית. נהל או בטל בכל עת בהגדרות חשבון App Store שלך.",
     "legalPrivacyPolicy": "מדיניות פרטיות",
     "legalTermsOfUse": "תנאי שימוש (EULA)",
-    "purchaseNotLinked": "רכישה זו ב-App Store אינה מקושרת לחשבון Kilo שלך. ודא שאתה מחובר ל-Apple ID שביצע את הרכישה, ולאחר מכן נסה שוב.",
     "purchaseDifferentAccount": "רכישה זו ב-App Store אינה מקושרת לחשבון Kilo שלך. היכנס לחשבון Apple שבו נעשה שימוש לרכישה, ולאחר מכן נסה שוב.",
     "restoreFailed": "שחזור הרכישות נכשל. נסה שוב.",
     "purchaseFailed": "השלמת הרכישה נכשלה.",
-    "purchaseStartFailed": "התחלת הרכישה ב-App Store נכשלה."
+    "purchaseStartFailed": "התחלת הרכישה ב-App Store נכשלה.",
+    "purchaseOwnedByAnotherAccount": "ה-Kilo Pass בחשבון Apple הזה שייך לחשבון Kilo אחר."
   },
   "consent": {
     "kilo": "Kilo",

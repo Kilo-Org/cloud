@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass એ આપમેળે રિન્યુ થતું માસિક સબ્સ્ક્રિપ્શન છે. ખરીદીની પુષ્ટિ પર તમારા Apple ID પર ચુકવણી કરવામાં આવે છે. જ્યાં સુધી વર્તમાન સમયગાળાના અંતના 24 કલાક પહેલાં રદ ન કરવામાં આવે ત્યાં સુધી સબ્સ્ક્રિપ્શન દર મહિને દર્શાવેલ કિંમતે આપમેળે રિન્યુ થાય છે. તમારી App Store એકાઉન્ટ સેટિંગ્સમાં ગમે ત્યારે મેનેજ કરો અથવા રદ કરો.",
     "legalPrivacyPolicy": "ગોપનીયતા નીતિ",
     "legalTermsOfUse": "ઉપયોગની શરતો (EULA)",
-    "purchaseNotLinked": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે લિંક થયેલી નથી. ખાતરી કરો કે તમે ખરીદી કરનાર Apple ID પર સાઇન ઇન છો, પછી ફરી પ્રયત્ન કરો.",
     "purchaseDifferentAccount": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે લિંક થયેલી નથી. ખરીદી માટે વપરાયેલા Apple એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયત્ન કરો.",
     "restoreFailed": "ખરીદીઓ પુનઃસ્થાપિત કરવામાં નિષ્ફળ. ફરી પ્રયત્ન કરો.",
     "purchaseFailed": "ખરીદી પૂર્ણ કરવામાં નિષ્ફળ.",
-    "purchaseStartFailed": "App Store ખરીદી શરૂ કરવામાં નિષ્ફળ."
+    "purchaseStartFailed": "App Store ખરીદી શરૂ કરવામાં નિષ્ફળ.",
+    "purchaseOwnedByAnotherAccount": "આ Apple ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે."
   },
   "consent": {
     "kilo": "Kilo",

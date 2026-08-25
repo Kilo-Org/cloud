@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass یو خودکار تازه کېدونکی میاشتنی ګډون دی. پیسې ستاسو Apple ID ته د پیرود د تایید په وخت کې اخیستل کیږي. ګډونونه هر میاشت په ښودل شوي نرخ باندې په اتوماتیک ډول نوي کیږي، پرته له دې چې د اوسنۍ مودې له پای ته رسېدو ۲۴ ساعته مخکې لغوه شي. هر وخت د خپل App Store حساب تنظیماتو کې اداره یا لغوه کړئ.",
     "legalPrivacyPolicy": "د محرمیت پالیسي",
     "legalTermsOfUse": "د استعمال شرایط (EULA)",
-    "purchaseNotLinked": "دا د App Store پیرود ستاسو د Kilo حساب سره تړلی نه دی. ډاډ ترلاسه کړئ چې تاسو په هغه Apple ID کې ننوتلي یاست چې پیرود یې کړی، بیا هڅه وکړئ.",
     "purchaseDifferentAccount": "دا د App Store پیرود ستاسو د Kilo حساب سره تړلی نه دی. د پیرود لپاره کارول شوي Apple Account ته ننوځئ، بیا هڅه وکړئ.",
     "restoreFailed": "پیرودونه بیرته راوړل ناکام شول. بیا هڅه وکړئ.",
     "purchaseFailed": "پیرود بشپړول ناکام شول.",
-    "purchaseStartFailed": "د App Store پیرود پیل کول ناکام شول."
+    "purchaseStartFailed": "د App Store پیرود پیل کول ناکام شول.",
+    "purchaseOwnedByAnotherAccount": "دا Apple Account باندې Kilo Pass د بل Kilo حساب پورې اړه لري."
   },
   "consent": {
     "kilo": "Kilo",

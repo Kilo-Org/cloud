@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass avtomatik yangilanadigan oylik obuna hisoblanadi. To‘lov xaridni tasdiqlashda Apple ID hisobingizdan undiriladi. Obunalar har oy ko‘rsatilgan narxda avtomatik yangilanadi, agar joriy davr tugashidan kamida 24 soat oldin bekor qilinmasa. Istiagan paytda App Store hisob sozlamalaringizda boshqaring yoki bekor qiling.",
     "legalPrivacyPolicy": "Maxfiylik siyosati",
     "legalTermsOfUse": "Foydalanish shartlari (EULA)",
-    "purchaseNotLinked": "Bu App Store xaridi Kilo hisobingizga bog'lanmagan. Xaridni amalga oshirgan Apple ID bilan tizimga kirganingizga ishonch hosil qiling va qayta urinib ko'ring.",
     "purchaseDifferentAccount": "Bu App Store xaridi Kilo hisobingizga bog'lanmagan. Xarid uchun ishlatilgan Apple hisobiga kiring va qayta urinib ko'ring.",
     "restoreFailed": "Xaridlarni tiklab bo'lmadi. Qayta urinib ko'ring.",
     "purchaseFailed": "Xaridni yakunlab bo'lmadi.",
-    "purchaseStartFailed": "App Store xaridini boshlab bo'lmadi."
+    "purchaseStartFailed": "App Store xaridini boshlab bo'lmadi.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli."
   },
   "consent": {
     "kilo": "Kilo",

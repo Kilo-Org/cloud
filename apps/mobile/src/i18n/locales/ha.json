@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass biyan kuɗi ne na wata-wata wanda ke sabunta kansa. Ana cajin biyan kuɗi ga Apple ID ɗinka a lokacin tabbatar da siyayya. Biyan kuɗi yana sabuntawa kowace wata a farashin da aka nuna sai dai idan an soke shi aƙalla sa'o'i 24 kafin ƙarshen lokaci na yanzu. Sarrafa ko soke a kowane lokaci a saitunan asusunka na App Store.",
     "legalPrivacyPolicy": "Manufofin Sirri",
     "legalTermsOfUse": "Sharuɗɗan Amfani (EULA)",
-    "purchaseNotLinked": "Wannan sayayyar App Store ba a haɗa ta da asusunka na Kilo ba. Tabbatar an shiga da Apple ID ɗin da ya yi sayayyar, sannan sake gwadawa.",
     "purchaseDifferentAccount": "Wannan sayayyar App Store ba a haɗa ta da asusunka na Kilo ba. Shiga da Apple Account ɗin da aka yi amfani da shi don sayayyar, sannan sake gwadawa.",
     "restoreFailed": "An kasa maido da sayayya. Sake gwadawa.",
     "purchaseFailed": "An kasa kammala sayayya.",
-    "purchaseStartFailed": "An kasa fara sayayyar App Store."
+    "purchaseStartFailed": "An kasa fara sayayyar App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass akan wannan Apple Account na wani asusun Kilo ne daban."
   },
   "consent": {
     "kilo": "Kilo",

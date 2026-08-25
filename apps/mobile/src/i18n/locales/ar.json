@@ -2319,11 +2319,11 @@
     "legalDisclosure": "Kilo Pass اشتراك شهري متجدد تلقائيًا. يتم خصم الدفعة من Apple ID الخاص بك عند تأكيد الشراء. تتجدد الاشتراكات تلقائيًا كل شهر بالسعر المعروض ما لم يتم الإلغاء قبل 24 ساعة على الأقل من نهاية الفترة الحالية. يمكنك الإدارة أو الإلغاء في أي وقت من إعدادات حسابك في App Store.",
     "legalPrivacyPolicy": "سياسة الخصوصية",
     "legalTermsOfUse": "شروط الاستخدام (EULA)",
-    "purchaseNotLinked": "عملية الشراء هذه من App Store غير مرتبطة بحساب Kilo الخاص بك. تأكد من تسجيل الدخول إلى Apple ID الذي أجرى عملية الشراء، ثم حاول مرة أخرى.",
     "purchaseDifferentAccount": "عملية الشراء هذه من App Store غير مرتبطة بحساب Kilo الخاص بك. سجّل الدخول إلى حساب Apple المستخدم للشراء، ثم حاول مرة أخرى.",
     "restoreFailed": "فشل استعادة المشتريات. حاول مرة أخرى.",
     "purchaseFailed": "فشل إكمال عملية الشراء.",
-    "purchaseStartFailed": "فشل بدء عملية شراء من App Store."
+    "purchaseStartFailed": "فشل بدء عملية شراء من App Store.",
+    "purchaseOwnedByAnotherAccount": "ينتمي Kilo Pass على حساب Apple هذا إلى حساب Kilo مختلف."
   },
   "consent": {
     "kilo": "Kilo",

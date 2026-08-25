@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass ni usajili wa kila mwezi unaofanywa upya kiotomatiki. Malipo yanakatwa kwenye Apple ID yako unapothibitisha ununuzi. Usajili unafanywa upya kiotomatiki kila mwezi kwa bei inayoonyeshwa isipokuwa umeghairi angalau saa 24 kabla ya mwisho wa kipindi cha sasa. Simamia au ghairi wakati wowote katika mipangilio ya akaunti yako ya App Store.",
     "legalPrivacyPolicy": "Sera ya Faragha",
     "legalTermsOfUse": "Masharti ya Matumizi (EULA)",
-    "purchaseNotLinked": "Ununuzi huu wa App Store haujaunganishwa na akaunti yako ya Kilo. Hakikisha umeingia na Apple ID iliyofanya ununuzi, kisha ujaribu tena.",
     "purchaseDifferentAccount": "Ununuzi huu wa App Store haujaunganishwa na akaunti yako ya Kilo. Ingia na Akaunti ya Apple iliyotumika kwa ununuzi, kisha ujaribu tena.",
     "restoreFailed": "Imeshindwa kurejesha ununuzi. Jaribu tena.",
     "purchaseFailed": "Imeshindwa kukamilisha ununuzi.",
-    "purchaseStartFailed": "Imeshindwa kuanza ununuzi wa App Store."
+    "purchaseStartFailed": "Imeshindwa kuanza ununuzi wa App Store.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass kwenye Akaunti hii ya Apple ni ya akaunti nyingine ya Kilo."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Ang Kilo Pass ay isang auto-renewable na buwanang subscription. Babayaran ang bayad sa iyong Apple ID kapag nakumpirma ang pagbili. Awtomatikong nire-renew ang mga subscription bawat buwan sa ipinapakitang presyo maliban kung kinansela nang hindi bababa sa 24 na oras bago matapos ang kasalukuyang panahon. Pamahalaan o kanselahin anumang oras sa iyong mga setting ng App Store account.",
     "legalPrivacyPolicy": "Patakaran sa Privacy",
     "legalTermsOfUse": "Mga Tuntunin ng Paggamit (EULA)",
-    "purchaseNotLinked": "Hindi naka-link ang pagbiling ito sa App Store sa iyong Kilo account. Siguraduhing naka-sign in ka sa Apple ID na bumili, pagkatapos subukan muli.",
     "purchaseDifferentAccount": "Hindi naka-link ang pagbiling ito sa App Store sa iyong Kilo account. Mag-sign in sa Apple Account na ginamit sa pagbili, pagkatapos subukan muli.",
     "restoreFailed": "Nabigong i-restore ang mga pagbili. Subukan muli.",
     "purchaseFailed": "Nabigong kumpletuhin ang pagbili.",
-    "purchaseStartFailed": "Nabigong simulan ang pagbili sa App Store."
+    "purchaseStartFailed": "Nabigong simulan ang pagbili sa App Store.",
+    "purchaseOwnedByAnotherAccount": "Ang Kilo Pass sa Apple Account na ito ay kabilang sa ibang Kilo account."
   },
   "consent": {
     "kilo": "Kilo",

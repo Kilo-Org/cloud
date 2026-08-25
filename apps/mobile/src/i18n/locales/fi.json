@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass on automaattisesti uusiutuva kuukausitilaus. Maksu veloitetaan Apple ID:stäsi oston vahvistuksen yhteydessä. Tilaus uusiutuu automaattisesti joka kuukausi näytettyyn hintaan, ellei sitä peruuteta vähintään 24 tuntia ennen nykyisen jakson päättymistä. Hallinnoi tai peruuta milloin tahansa App Store -tilin asetuksissa.",
     "legalPrivacyPolicy": "Tietosuojakäytäntö",
     "legalTermsOfUse": "Käyttöehdot (EULA)",
-    "purchaseNotLinked": "Tämä App Store -osto ei ole liitetty Kilo-tiliisi. Varmista, että olet kirjautunut Apple ID:llä, jolla osto tehtiin, ja yritä uudelleen.",
     "purchaseDifferentAccount": "Tämä App Store -osto ei ole liitetty Kilo-tiliisi. Kirjaudu ostokseen käytetyllä Apple-tilillä ja yritä uudelleen.",
     "restoreFailed": "Ostosten palauttaminen epäonnistui. Yritä uudelleen.",
     "purchaseFailed": "Oston viimeistely epäonnistui.",
-    "purchaseStartFailed": "App Store -oston aloittaminen epäonnistui."
+    "purchaseStartFailed": "App Store -oston aloittaminen epäonnistui.",
+    "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin Kilo Pass kuuluu eri Kilo-tilille."
   },
   "consent": {
     "kilo": "Kilo",

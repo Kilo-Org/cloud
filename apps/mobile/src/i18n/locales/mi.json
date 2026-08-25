@@ -2706,11 +2706,11 @@
     "legalDisclosure": "He ohinga ā-marama e hoko aunoatia ana a Kilo Pass. Ka utua te utu ki tō Apple ID i te whakaaetanga o te hoko. Ka whakahoutia aunoatia ngā ohinga ia marama ki te utu e whakaaturia ana ki te kore e whakakorengia kia 24 hāora i mua i te mutunga o te wā o nāianei. Whakahaerehia, whakakorea rānei i ngā wā katoa i roto i tō tautuhinga pūkete App Store.",
     "legalPrivacyPolicy": "Kaupapahere Tūmataiti",
     "legalTermsOfUse": "Tikanga Whakamahi (EULA)",
-    "purchaseNotLinked": "Kāore tēnei hokonga App Store i hono ki tō pūkete Kilo. Tirohia kua takiuru koe ki te Apple ID nāna te hokonga, kātahi ka whakamātau anō.",
     "purchaseDifferentAccount": "Kāore tēnei hokonga App Store i hono ki tō pūkete Kilo. Takiuru ki te Pūkete Apple i whakamahia mō te hokonga, kātahi ka whakamātau anō.",
     "restoreFailed": "I rahua te whakaora i ngā hokonga. Whakamātau anō.",
     "purchaseFailed": "I rahua te whakaoti i te hokonga.",
-    "purchaseStartFailed": "I rahua te tīmata i te hokonga App Store."
+    "purchaseStartFailed": "I rahua te tīmata i te hokonga App Store.",
+    "purchaseOwnedByAnotherAccount": "Ko te Kilo Pass o tēnei Pūkete Apple nō tētahi atu pūkete Kilo."
   },
   "consent": {
     "kilo": "Kilo",

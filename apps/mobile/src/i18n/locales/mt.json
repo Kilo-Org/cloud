@@ -2766,11 +2766,11 @@
     "legalDisclosure": "Kilo Pass huwa abbonament mensili li jiġġedded awtomatikament. Il-ħlas jitħallas mill-Apple ID tiegħek fil-konferma tax-xiri. L-abbonamenti jiġġeddu awtomatikament kull xahar bil-prezz muri sakemm ma jitħassrux mill-inqas 24 siegħa qabel it-tmiem tal-perjodu attwali. Immaniġġja jew ikkanċella fi kwalunkwe ħin fis-settings tal-kont tal-App Store tiegħek.",
     "legalPrivacyPolicy": "Politika tal-Privatezza",
     "legalTermsOfUse": "Termini tal-Użu (EULA)",
-    "purchaseNotLinked": "Dan ix-xiri mill-App Store mhuwiex marbut mal-kont ta' Kilo tiegħek. Kun żgur li inti idħolt fl-Apple ID li għamel ix-xiri, imbagħad erġa' pprova.",
     "purchaseDifferentAccount": "Dan ix-xiri mill-App Store mhuwiex marbut mal-kont ta' Kilo tiegħek. Idħol fil-kont tal-Apple użat għax-xiri, imbagħad erġa' pprova.",
     "restoreFailed": "Ma setgħux jiġu restawrati x-xirjiet. Erġa' pprova.",
     "purchaseFailed": "Ma setax jitlesta x-xiri.",
-    "purchaseStartFailed": "Ma setax jibda x-xiri mill-App Store."
+    "purchaseStartFailed": "Ma setax jibda x-xiri mill-App Store.",
+    "purchaseOwnedByAnotherAccount": "Il-Kilo Pass fuq dan l-Apple Account jappartjeni għal kont ieħor ta' Kilo."
   },
   "consent": {
     "kilo": "Kilo",

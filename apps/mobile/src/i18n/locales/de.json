@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass ist ein automatisch verlängerbares Monatsabonnement. Die Zahlung wird bei Kaufbestätigung deiner Apple-ID belastet. Abonnements verlängern sich automatisch jeden Monat zum angezeigten Preis, sofern sie nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums gekündigt werden. Jederzeit in deinen App-Store-Kontoeinstellungen verwalten oder kündigen.",
     "legalPrivacyPolicy": "Datenschutzrichtlinie",
     "legalTermsOfUse": "Nutzungsbedingungen (EULA)",
-    "purchaseNotLinked": "Dieser App-Store-Kauf ist nicht mit deinem Kilo-Konto verknüpft. Stelle sicher, dass du mit der Apple-ID angemeldet bist, mit der der Kauf getätigt wurde, und versuche es erneut.",
     "purchaseDifferentAccount": "Dieser App-Store-Kauf ist nicht mit deinem Kilo-Konto verknüpft. Melde dich mit dem Apple-Konto an, mit dem der Kauf getätigt wurde, und versuche es erneut.",
     "restoreFailed": "Käufe konnten nicht wiederhergestellt werden. Versuche es erneut.",
     "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden.",
-    "purchaseStartFailed": "Der App-Store-Kauf konnte nicht gestartet werden."
+    "purchaseStartFailed": "Der App-Store-Kauf konnte nicht gestartet werden.",
+    "purchaseOwnedByAnotherAccount": "Der Kilo Pass auf diesem Apple-Konto gehört zu einem anderen Kilo-Konto."
   },
   "consent": {
     "kilo": "Kilo",

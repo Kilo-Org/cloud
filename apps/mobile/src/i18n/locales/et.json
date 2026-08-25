@@ -2706,11 +2706,11 @@
     "legalDisclosure": "Kilo Pass on automaatselt uuenev igakuine tellimus. Makse võetakse sinu Apple ID-lt ostu kinnitamisel. Tellimus uueneb iga kuu automaatselt näidatud hinnaga, kui sa seda ei tühista vähemalt 24 tundi enne jooksva perioodi lõppu. Halda või tühista tellimust igal ajal oma App Store konto seadetes.",
     "legalPrivacyPolicy": "Privaatsuspoliitika",
     "legalTermsOfUse": "Kasutustingimused (EULA)",
-    "purchaseNotLinked": "See App Store'i ost pole sinu Kilo kontoga seotud. Veendu, et oled sisse logitud selle Apple ID-ga, millega ost tehti, ja proovi uuesti.",
     "purchaseDifferentAccount": "See App Store'i ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Apple kontoga ja proovi uuesti.",
     "restoreFailed": "Ostude taastamine ebaõnnestus. Proovi uuesti.",
     "purchaseFailed": "Ostu lõpetamine ebaõnnestus.",
-    "purchaseStartFailed": "App Store'i ostu alustamine ebaõnnestus."
+    "purchaseStartFailed": "App Store'i ostu alustamine ebaõnnestus.",
+    "purchaseOwnedByAnotherAccount": "Selle Apple kontoga seotud Kilo Pass kuulub teisele Kilo kontole."
   },
   "consent": {
     "kilo": "Kilo",

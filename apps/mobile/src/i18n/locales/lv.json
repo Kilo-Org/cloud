@@ -2726,11 +2726,11 @@
     "legalDisclosure": "Kilo Pass ir automātiski atjaunojams mēneša abonements. Maksājums tiek iekasēts no jūsu Apple ID pirkuma apstiprināšanas brīdī. Abonements katru mēnesi atjaunojas automātiski par norādīto cenu, ja vien tas netiek atcelts vismaz 24 stundas pirms pašreizējā perioda beigām. Pārvaldiet vai atceliet to jebkurā laikā sava App Store konta iestatījumos.",
     "legalPrivacyPolicy": "Privātuma politika",
     "legalTermsOfUse": "Lietošanas noteikumi (EULA)",
-    "purchaseNotLinked": "Šis App Store pirkums nav saistīts ar jūsu Kilo kontu. Pārliecinieties, ka esat pierakstījies ar Apple ID, kas veica pirkumu, un mēģiniet vēlreiz.",
     "purchaseDifferentAccount": "Šis App Store pirkums nav saistīts ar jūsu Kilo kontu. Pierakstieties ar Apple kontu, kas tika izmantots pirkumam, un mēģiniet vēlreiz.",
     "restoreFailed": "Neizdevās atjaunot pirkumus. Mēģiniet vēlreiz.",
     "purchaseFailed": "Neizdevās pabeigt pirkumu.",
-    "purchaseStartFailed": "Neizdevās sākt App Store pirkumu."
+    "purchaseStartFailed": "Neizdevās sākt App Store pirkumu.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass šajā Apple kontā pieder citam Kilo kontam."
   },
   "consent": {
     "kilo": "Kilo",

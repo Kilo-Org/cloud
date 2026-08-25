@@ -2786,11 +2786,11 @@
     "legalDisclosure": "Tanysgrifiad misol sy'n adnewyddu'n awtomatig yw Kilo Pass. Codir y taliad i'ch Apple ID ar gadarnhad o'r pryniant. Mae tanysgrifiadau'n adnewyddu'n awtomatig bob mis am y pris a ddangosir oni bai eich bod yn canslo o leiaf 24 awr cyn diwedd y cyfnod cyfredol. Rheolwch neu ganslwch unrhyw bryd yng ngosodiadau cyfrif eich App Store.",
     "legalPrivacyPolicy": "Polisi Preifatrwydd",
     "legalTermsOfUse": "Telerau Defnyddio (EULA)",
-    "purchaseNotLinked": "Nid yw'r pryniant App Store hwn wedi'i gysylltu â'ch cyfrif Kilo. Sicrhewch eich bod wedi mewngofnodi i'r Apple ID a wnaeth y pryniant, yna rhowch gynnig arall arni.",
     "purchaseDifferentAccount": "Nid yw'r pryniant App Store hwn wedi'i gysylltu â'ch cyfrif Kilo. Mewngofnodwch i'r Apple Account a ddefnyddiwyd ar gyfer y pryniant, yna rhowch gynnig arall arni.",
     "restoreFailed": "Methodd adfer pryniannau. Rhowch gynnig arall arni.",
     "purchaseFailed": "Methodd cwblhau'r pryniant.",
-    "purchaseStartFailed": "Methodd cychwyn pryniant App Store."
+    "purchaseStartFailed": "Methodd cychwyn pryniant App Store.",
+    "purchaseOwnedByAnotherAccount": "Mae'r Kilo Pass ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol."
   },
   "consent": {
     "kilo": "Kilo",

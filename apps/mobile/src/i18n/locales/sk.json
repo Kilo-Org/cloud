@@ -2746,11 +2746,11 @@
     "legalDisclosure": "Kilo Pass je mesačné predplatné s automatickým obnovením. Platba sa účtuje na vaše Apple ID pri potvrdení nákupu. Predplatné sa automaticky obnovuje každý mesiac za zobrazenú cenu, pokiaľ ho nezrušíte najmenej 24 hodín pred koncom aktuálneho obdobia. Spravujte alebo zrušte ho kedykoľvek v nastaveniach svojho účtu App Store.",
     "legalPrivacyPolicy": "Zásady ochrany osobných údajov",
     "legalTermsOfUse": "Podmienky používania (EULA)",
-    "purchaseNotLinked": "Tento nákup v App Store nie je prepojený s vaším účtom Kilo. Uistite sa, že ste prihlásení do Apple ID, cez ktoré bol nákup uskutočnený, a skúste to znova.",
     "purchaseDifferentAccount": "Tento nákup v App Store nie je prepojený s vaším účtom Kilo. Prihláste sa do Apple Account použitého na nákup a skúste to znova.",
     "restoreFailed": "Obnovenie nákupov zlyhalo. Skúste to znova.",
     "purchaseFailed": "Nákup sa nepodarilo dokončiť.",
-    "purchaseStartFailed": "Nákup v App Store sa nepodarilo spustiť."
+    "purchaseStartFailed": "Nákup v App Store sa nepodarilo spustiť.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tomto Apple Account patrí inému účtu Kilo."
   },
   "consent": {
     "kilo": "Kilo",

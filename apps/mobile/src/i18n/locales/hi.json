@@ -2267,11 +2267,11 @@
     "legalDisclosure": "Kilo Pass एक स्वतः-नवीकरणीय मासिक सदस्यता है। खरीद की पुष्टि पर भुगतान आपके Apple ID से लिया जाता है। सदस्यताएँ हर महीने दिखाई गई कीमत पर स्वतः नवीकरण होती हैं, जब तक कि वर्तमान अवधि समाप्त होने से कम से कम 24 घंटे पहले रद्द न की जाएँ। इन्हें कभी भी अपनी App Store खाता सेटिंग्स में प्रबंधित या रद्द करें।",
     "legalPrivacyPolicy": "गोपनीयता नीति",
     "legalTermsOfUse": "उपयोग की शर्तें (EULA)",
-    "purchaseNotLinked": "यह App Store खरीदारी आपके Kilo खाते से लिंक नहीं है। सुनिश्चित करें कि आप उस Apple ID में साइन इन हैं जिसने खरीदारी की है, फिर फिर से प्रयास करें।",
     "purchaseDifferentAccount": "यह App Store खरीदारी आपके Kilo खाते से लिंक नहीं है। खरीदारी के लिए उपयोग किए गए Apple खाते में साइन इन करें, फिर फिर से प्रयास करें।",
     "restoreFailed": "खरीदारी पुनर्स्थापित करने में विफल। फिर से प्रयास करें।",
     "purchaseFailed": "खरीदारी पूरी करने में विफल।",
-    "purchaseStartFailed": "App Store खरीदारी शुरू करने में विफल।"
+    "purchaseStartFailed": "App Store खरीदारी शुरू करने में विफल।",
+    "purchaseOwnedByAnotherAccount": "इस Apple खाते का Kilo Pass किसी दूसरे Kilo खाते से संबंधित है।"
   },
   "consent": {
     "kilo": "Kilo",

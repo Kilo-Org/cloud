@@ -81,6 +81,15 @@ async function deleteLeafSession(
   userId: string,
   sessionId: string
 ): Promise<LeafDeleteResult> {
+  // Compatibility: the old path DELETEd first. Keep the null-first order so
+  // share URLs die even if the later DELETE fails.
+  await db
+    .update(cli_sessions_v2)
+    .set({ public_id: null })
+    .where(
+      and(eq(cli_sessions_v2.kilo_user_id, userId), eq(cli_sessions_v2.session_id, sessionId))
+    );
+
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}`;
   const result = await deletionFetch(context, url, {
     method: 'DELETE',

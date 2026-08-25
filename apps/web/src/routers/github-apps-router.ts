@@ -58,7 +58,7 @@ export const githubAppsRouter = createTRPCRouter({
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
 
       return {
-        canAdd: integrations.length === 0 || ctx.user.is_admin,
+        canAdd: true,
         installations: integrations.map(integration => {
           const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
           const status: 'connected' | 'pending' | 'suspended' | 'needs_attention' =
@@ -153,15 +153,6 @@ export const githubAppsRouter = createTRPCRouter({
         'billing_manager',
         'member',
       ]);
-      if (owner.type === 'org') {
-        const integrations = await githubAppsService.listIntegrations(owner);
-        if (integrations.length > 0 && !ctx.user.is_admin) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Only Kilo administrators can add another GitHub organization',
-          });
-        }
-      }
       const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
 
       const token = await createInstallState({

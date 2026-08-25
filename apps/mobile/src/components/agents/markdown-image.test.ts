@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- cohesive suite: inert-until-load, proxy/viewer routing, and chip/link a11y share one tree-walk harness */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/agents/markdown-renderer.test.ts) */
 import '@/i18n';
 import { createElement } from 'react';
@@ -104,6 +105,16 @@ describe('MarkdownImage inert-until-load', () => {
       (loadButton.props.onPress as () => void)();
     });
     expect(ofType(renderer.root, 'Image')).toHaveLength(1);
+
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    const previewSource = image.props.source as { uri: string; headers?: Record<string, string> };
+    expect(previewSource.uri).toBe(
+      'https://api.test/api/media/proxy?url=https%3A%2F%2Fexample.com%2Fa.png'
+    );
+    expect(previewSource.headers).toEqual({ Authorization: 'Bearer test-token' });
 
     await unmount(renderer);
   });
@@ -262,6 +273,16 @@ describe('MarkdownImage inert-until-load', () => {
     });
     expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(1);
 
+    const viewer = ofType(renderer.root, 'ImageViewerModal')[0];
+    if (!viewer) {
+      throw new Error('viewer not found');
+    }
+    expect(viewer.props.uri).toBe(
+      'https://api.test/api/media/proxy?url=https%3A%2F%2Fexample.com%2Fa.png'
+    );
+    expect(viewer.props.uri).not.toContain('example.com/a.png');
+    expect(viewer.props.headers).toEqual({ Authorization: 'Bearer test-token' });
+
     await act(async () => {
       await Promise.resolve();
       renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));
@@ -299,6 +320,68 @@ describe('MarkdownImage inert-until-load', () => {
       throw new Error('load button not found');
     }
     expect(load.props.accessibilityActions).toBeUndefined();
+
+    await unmount(renderer);
+  });
+
+  it('exposes showLinkActions on the blocked chip when a callback is supplied', async () => {
+    const onShow = vi.fn<() => void>();
+    const renderer = await mount('http://insecure.com/a.png', '', onShow);
+    const chip = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.accessibilityLabel === 'insecure.com · HTTPS images only'
+    );
+    expect(chip.props.accessibilityActions).toEqual([
+      { name: 'showLinkActions', label: 'Show link actions' },
+    ]);
+    await act(async () => {
+      await Promise.resolve();
+      (chip.props.onAccessibilityAction as (event: unknown) => void)({
+        nativeEvent: { actionName: 'showLinkActions' },
+      });
+    });
+    expect(onShow).toHaveBeenCalledTimes(1);
+
+    await unmount(renderer);
+  });
+
+  it('exposes showLinkActions on the retry chip when a callback is supplied', async () => {
+    confirmMarkdownImage('https://example.com/a.png');
+    const onShow = vi.fn<() => void>();
+    const renderer = await mount('https://example.com/a.png', 'shot', onShow);
+
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    const retryButtons = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === 'Image unavailable, retry loading'
+    );
+    expect(retryButtons).toHaveLength(1);
+    const retryButton = retryButtons[0];
+    if (!retryButton) {
+      throw new Error('retry button not found');
+    }
+    expect(retryButton.props.accessibilityActions).toEqual([
+      { name: 'showLinkActions', label: 'Show link actions' },
+    ]);
+    await act(async () => {
+      await Promise.resolve();
+      (retryButton.props.onAccessibilityAction as (event: unknown) => void)({
+        nativeEvent: { actionName: 'showLinkActions' },
+      });
+    });
+    expect(onShow).toHaveBeenCalledTimes(1);
 
     await unmount(renderer);
   });

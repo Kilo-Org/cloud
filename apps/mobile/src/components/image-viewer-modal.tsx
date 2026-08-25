@@ -16,6 +16,8 @@ import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 type ImageViewerModalProps = {
   visible: boolean;
   uri: string | null;
+  /** Auth headers forwarded to the Image source (media proxy). */
+  headers?: Record<string, string>;
   /** Header a11y labels; kilo-chat passes the filename. */
   filename: string;
   /** Omit to hide the share action entirely. */
@@ -29,6 +31,7 @@ type ImageViewerModalProps = {
 export function ImageViewerModal({
   visible,
   uri,
+  headers,
   filename,
   sharing = false,
   shareError = null,
@@ -166,7 +169,7 @@ export function ImageViewerModal({
               <GestureDetector gesture={zoomGesture}>
                 <Animated.View className="h-full w-full" style={imageStyle}>
                   <Image
-                    source={{ uri }}
+                    source={{ uri, headers }}
                     cachePolicy="memory"
                     className="h-full w-full"
                     contentFit="contain"

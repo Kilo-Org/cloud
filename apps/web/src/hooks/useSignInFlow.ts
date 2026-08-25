@@ -348,7 +348,12 @@ export function useSignInFlow({
     return { isValid: true, error: null };
   }, [email, isSignUp, pendingSignIn]);
 
-  // Auto-trigger Turnstile when email is prefilled from query params
+  // Query-email verification is a one-shot action for each distinct address in
+  // this mounted flow. In particular, returning from provider selection must
+  // leave the prefilled address editable rather than reopening Turnstile.
+  const autoVerifiedQueryEmailsRef = useRef(new Set<string>());
+
+  // Auto-trigger Turnstile when email is prefilled from query params.
   // Note: This shows Turnstile but doesn't automatically perform lookup.
   // The lookup happens after user completes Turnstile verification in handleTurnstileSuccess.
   useEffect(() => {
@@ -356,17 +361,20 @@ export function useSignInFlow({
     // Explicit sign-up is provider-first, and invite URLs own their SSO CTA.
     // DIFFERENT-OAUTH recovery still pre-fills and displays the normal email
     // form through showEmailInput; it must not silently resume discovery.
+    const prefilledEmail = params.email;
     if (
-      params.email &&
+      prefilledEmail &&
       !storybookInitialState &&
       !initialError &&
       !isSignUp &&
       !isInviteCleared &&
       flowState === 'landing' &&
-      tier !== 'invite'
+      tier !== 'invite' &&
+      !autoVerifiedQueryEmailsRef.current.has(prefilledEmail)
     ) {
-      const prefilledEmail = params.email;
       if (emailSchema.safeParse({ email: prefilledEmail }).success) {
+        autoVerifiedQueryEmailsRef.current.add(prefilledEmail);
+        setEmailState(prefilledEmail);
         createTurnstileWidgetAttempt();
         setShowTurnstile(true);
         setTurnstileError(false);

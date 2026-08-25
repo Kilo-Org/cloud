@@ -164,7 +164,12 @@ function FlowProbe({ props = { searchParams: {} } }: { props?: SignInFlowProps }
   );
 }
 
-type MountedFlow = { container: HTMLElement; root: Root; cleanup: () => void };
+type MountedFlow = {
+  container: HTMLElement;
+  root: Root;
+  render: (props: SignInFlowProps) => void;
+  cleanup: () => void;
+};
 
 function mountFlow(props?: SignInFlowProps): MountedFlow {
   const dom = installDom();
@@ -176,6 +181,9 @@ function mountFlow(props?: SignInFlowProps): MountedFlow {
   return {
     container: dom.container,
     root,
+    render: nextProps => {
+      act(() => root.render(createElement(FlowProbe, { props: nextProps })));
+    },
     cleanup: () => {
       act(() => root.unmount());
       dom.cleanup();
@@ -471,6 +479,59 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(mockSendMagicLink).toHaveBeenCalledTimes(1);
     expect(mounted.container.querySelector('#state')?.textContent).toBe('magic-link-sent');
     expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
+  });
+
+  it('auto-opens Turnstile once for a valid prefilled email', () => {
+    mounted = mountFlow({ searchParams: { email: 'returning@example.com' } });
+    const initialAttempt = mounted.container.querySelector('#attempt')?.textContent;
+
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('true');
+    expect(initialAttempt).toBe('1');
+
+    mounted.render({ searchParams: { email: 'returning@example.com' } });
+
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#attempt')?.textContent).toBe(initialAttempt);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not reopen Turnstile or refetch after Back from prefilled multi-provider discovery', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response({ success: true }))
+      .mockResolvedValueOnce(response({ kind: 'existing', providers: ['google', 'github'] }));
+    mounted = mountFlow({ searchParams: { email: 'returning@example.com' } });
+
+    await act(async () => {
+      button(mounted!.container, 'first').click();
+      await flushAsyncWork();
+    });
+    expect(mounted.container.querySelector('#state')?.textContent).toBe('provider-select');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    act(() => button(mounted!.container, 'back').click());
+
+    expect(mounted.container.querySelector('#state')?.textContent).toBe('landing');
+    expect(mounted.container.querySelector('#email-input')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('false');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('auto-opens once for a genuinely changed prefilled query email', () => {
+    mounted = mountFlow({ searchParams: { email: 'first@example.com' } });
+
+    expect(mounted.container.querySelector('#email')?.textContent).toBe('first@example.com');
+    expect(mounted.container.querySelector('#attempt')?.textContent).toBe('1');
+
+    mounted.render({ searchParams: { email: 'second@example.com' } });
+
+    expect(mounted.container.querySelector('#email')?.textContent).toBe('second@example.com');
+    expect(mounted.container.querySelector('#turnstile')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#attempt')?.textContent).toBe('2');
+
+    mounted.render({ searchParams: { email: 'second@example.com' } });
+
+    expect(mounted.container.querySelector('#attempt')?.textContent).toBe('2');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('holds the automatic email flow pending through delivery and recovers after failure', async () => {

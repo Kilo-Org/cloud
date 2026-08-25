@@ -74,6 +74,8 @@ export function AgentSessionListScreen() {
     activeSessions,
     activeIsError,
     isLoading,
+    storedIsFetching,
+    storedLoadedPageCount,
     paging,
     refetch,
     handleRetry,
@@ -237,7 +239,7 @@ export function AgentSessionListScreen() {
           sections={sections}
           hasAnySessions={hasAnySessions}
           hasPinnedActive={hasPinnedActive}
-          isLoading={isLoading || !ready}
+          isLoading={isLoading || !ready || (storedIsFetching && storedLoadedPageCount === 0)}
           isError={contentIsError}
           activeIsError={activeIsError}
           hasStoredSessions={storedSessions.length > 0}

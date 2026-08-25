@@ -10,7 +10,11 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
 }
 
-export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<typeof View>) {
+export function AppAwareKeyboardPaddingView({
+  style,
+  keyboardOffset = 0,
+  ...props
+}: ComponentProps<typeof View> & { keyboardOffset?: number }) {
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
@@ -55,5 +59,7 @@ export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<
     };
   }, []);
 
-  return <View {...props} style={[style, { paddingBottom: keyboardPadding }]} />;
+  const resolvedKeyboardPadding = keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
+
+  return <View {...props} style={[style, { paddingBottom: resolvedKeyboardPadding }]} />;
 }

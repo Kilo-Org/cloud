@@ -227,21 +227,6 @@ export function LoginScreen() {
         // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard padding
         style={{ paddingBottom: androidKeyboardPad }}
       >
-        <Pressable
-          onPress={() => {
-            setLanguagePickerOpen(true);
-          }}
-          disabled={globeDisabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.language')}
-          accessibilityState={{ disabled: globeDisabled }}
-          className="absolute z-10 h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
-          // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
-          style={{ top: insets.top + 8, ...globeTrailing }}
-        >
-          <Globe size={22} color={colors.foreground} />
-        </Pressable>
         <ScrollView
           className="flex-1 bg-background"
           contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
@@ -365,6 +350,21 @@ export function LoginScreen() {
             )}
           </View>
         </ScrollView>
+        <Pressable
+          onPress={() => {
+            setLanguagePickerOpen(true);
+          }}
+          disabled={globeDisabled}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.language')}
+          accessibilityState={{ disabled: globeDisabled }}
+          className="absolute h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+          // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
+          style={{ top: insets.top + 8, ...globeTrailing }}
+        >
+          <Globe size={22} color={colors.foreground} />
+        </Pressable>
       </View>
       <LanguagePickerSheet
         visible={languagePickerOpen}

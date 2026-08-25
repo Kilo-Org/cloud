@@ -130,13 +130,17 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const deadline = getSecurityDeadlinePresentation(finding);
   const deadlineCopy = getDeadlineCopy(deadline.state);
   const supersedingFindingId = getSupersedingFindingId(finding);
-  const severityKey =
-    lookup(SEVERITY_KEYS, finding.severity) ?? 'securityAgent.findingDetails.unknown';
-  const dismissedOrUnknownKey =
+  // A code the app does not know yet reads as the raw code, the same way
+  // packages/app-shared renders it for web. A word like "Unknown" would hide
+  // which value the backend actually sent.
+  const severityKey = lookup(SEVERITY_KEYS, finding.severity);
+  const severityLabel = severityKey ? t(severityKey) : finding.severity;
+  const knownStatusKey =
     finding.status === 'ignored'
       ? FINDING_STATUS_KEYS.dismissed
-      : (lookup(FINDING_STATUS_KEYS, finding.status) ?? 'securityAgent.findingDetails.unknown');
-  const statusKey = supersedingFindingId ? FINDING_STATUS_KEYS.superseded : dismissedOrUnknownKey;
+      : lookup(FINDING_STATUS_KEYS, finding.status);
+  const statusKey = supersedingFindingId ? FINDING_STATUS_KEYS.superseded : knownStatusKey;
+  const statusLabel = statusKey ? t(statusKey) : finding.status;
   const advisoryUrl = finding.dependabot_html_url;
 
   return (
@@ -147,10 +151,10 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[severity.tone])}>
-            {t('securityAgent.findingDetails.severityLabel', { severity: t(severityKey) })}
+            {t('securityAgent.findingDetails.severityLabel', { severity: severityLabel })}
           </Text>
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
-            {t(statusKey)}
+            {statusLabel}
           </Text>
           <FindingStatusBadge
             icon={deadline.icon}

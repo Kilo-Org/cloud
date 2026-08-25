@@ -55,6 +55,10 @@ RUN GLAB_VERSION="1.93.0" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb
 
+COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
+	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
+
 # Install pnpm and kilocode 
 RUN npm install -g pnpm @kilocode/cli@${KILOCODE_CLI_VERSION}
 

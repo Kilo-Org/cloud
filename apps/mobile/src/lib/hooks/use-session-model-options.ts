@@ -9,6 +9,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { sortRemoteModelCatalogProviders } from '@kilocode/cloud-agent-sdk/remote-model-order';
 
+import { i18n } from '@/i18n';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 
 type SessionModelSource =
@@ -115,7 +116,7 @@ function buildUnavailableRemoteOptions(input: BuildSessionModelOptionsInput): Se
     ? createUnavailableOption(currentSelection.model)
     : ({
         id: 'remote-session-model',
-        name: 'Session model',
+        name: i18n.t('agentChat.modelSelector.sessionModel'),
         displayId: '',
         variants: [],
         isPreferred: false,

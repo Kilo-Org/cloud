@@ -5,6 +5,7 @@ import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatDuration } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { computeStatus } from './compute-status';
 
@@ -56,7 +57,7 @@ export function WorkingIndicator({ messages, isStreaming }: Readonly<WorkingIndi
     }
   }
 
-  const time = formatElapsed(elapsed);
+  const time = formatDuration(elapsed, i18n.language);
 
   return (
     <Animated.View
@@ -70,13 +71,4 @@ export function WorkingIndicator({ messages, isStreaming }: Readonly<WorkingIndi
       </Text>
     </Animated.View>
   );
-}
-
-function formatElapsed(seconds: number): string {
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}m ${s}s`;
 }

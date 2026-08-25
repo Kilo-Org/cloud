@@ -45,6 +45,10 @@ RUN GLAB_VERSION="1.93.0" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb
 
+COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
+	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
+
 # Generate locales to suppress setlocale warnings
 RUN apt-get update && apt-get install -y --no-install-recommends locales && \
 	   sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \

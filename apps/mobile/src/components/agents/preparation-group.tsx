@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type TFunction } from 'i18next';
-import { AlertCircle, Check, ChevronRight, Terminal } from '@/components/ui/icons';
+import { AlertCircle, Check, ChevronDown, Terminal } from '@/components/ui/icons';
 import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { MonoScrollBlock } from './mono-scroll-block';
@@ -29,11 +32,11 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         accessibilityState={{ expanded }}
         className="flex-row items-center gap-2 px-3 py-3 active:bg-secondary"
       >
-        <ChevronRight
-          size={16}
-          color={colors.mutedForeground}
-          style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
-        />
+        {expanded ? (
+          <ChevronDown size={16} color={colors.mutedForeground} />
+        ) : (
+          <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+        )}
         <AttemptIcon status={attempt.status} />
         <Text className="text-sm font-medium">{title}</Text>
       </Pressable>
@@ -80,11 +83,14 @@ function setupCommandLabel(step: PreparationStepSnapshot, t: TFunction): string 
   }
   if (step.commandCount) {
     return t('agentChat.preparation.setupCommandOf', {
-      index: step.commandIndex + 1,
+      index: formatNumber(step.commandIndex + 1, i18n.language),
       count: step.commandCount,
+      displayCount: formatNumber(step.commandCount, i18n.language),
     });
   }
-  return t('agentChat.preparation.setupCommand', { index: step.commandIndex + 1 });
+  return t('agentChat.preparation.setupCommand', {
+    index: formatNumber(step.commandIndex + 1, i18n.language),
+  });
 }
 
 function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
@@ -102,6 +108,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
     step.exitCode,
   ].some(value => value !== undefined && value !== '');
   const label = setupCommandLabel(step, t) ?? step.label;
+  const DetailsIcon = expanded ? ChevronDown : DirectionalChevronRight;
   return (
     <View className="overflow-hidden rounded border border-border">
       <Pressable
@@ -115,11 +122,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
         className="flex-row items-center gap-2 px-2 py-2.5 active:bg-secondary"
       >
         {hasDetails ? (
-          <ChevronRight
-            size={14}
-            color={colors.mutedForeground}
-            style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
-          />
+          <DetailsIcon size={14} color={colors.mutedForeground} />
         ) : (
           <View className="w-3.5" />
         )}

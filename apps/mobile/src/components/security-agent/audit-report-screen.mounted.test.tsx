@@ -42,6 +42,7 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
 }));
 vi.mock('@/lib/format', () => ({
   formatDate: String,
+  formatNumber: String,
 }));
 vi.mock('@/lib/utils', () => ({
   capitalize: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),

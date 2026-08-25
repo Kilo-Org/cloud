@@ -115,7 +115,7 @@ export default function RepoPickerScreen() {
           <Pressable
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
             onPress={() => {
-              handleSelect(repo.fullName);
+              handleSelect(`${repo.platform}:${repo.fullName}`);
             }}
             accessibilityRole="button"
             accessibilityLabel={repo.fullName}
@@ -128,7 +128,7 @@ export default function RepoPickerScreen() {
             <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
               {repo.fullName}
             </Text>
-            {bridge.currentValue === repo.fullName ? (
+            {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
               <Check size={18} color={colors.primary} />
             ) : null}
           </Pressable>

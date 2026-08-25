@@ -5,7 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
-import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
+import {
+  type NewSessionRepository,
+  type RepositoryGroup,
+  type RepositoryPlatform,
+} from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
@@ -58,12 +62,12 @@ type NewSessionConfigureFormProps = {
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
   // Repository (Cloud Agent only).
-  view: RepositorySectionView;
+  groups: RepositoryGroup[];
   isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
-  onOpenGitHubIntegration: () => void;
+  onConnectProvider: (platform: RepositoryPlatform) => void;
   onRefreshRepos: () => void;
-  repositories: { fullName: string; isPrivate: boolean }[];
+  repositories: NewSessionRepository[];
   selectedRepo: string;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
@@ -115,10 +119,10 @@ export function NewSessionConfigureForm({
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
-  view,
+  groups,
   isRetrying,
   onChangeRepo,
-  onOpenGitHubIntegration,
+  onConnectProvider,
   onRefreshRepos,
   repositories,
   selectedRepo,
@@ -261,10 +265,10 @@ export function NewSessionConfigureForm({
       {!isRemote ? (
         <NewSessionRepositorySection
           disabled={isCreating}
-          view={view}
+          groups={groups}
           isRetrying={isRetrying}
           onChange={onChangeRepo}
-          onOpenGitHubIntegration={onOpenGitHubIntegration}
+          onConnect={onConnectProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
           value={selectedRepo}

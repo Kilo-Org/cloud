@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
@@ -27,7 +28,7 @@ type UseNewSessionCreatorInput = {
   organizationId?: string;
   /** Invoked on the success path before navigation; failures never fire it. */
   onCreated?: () => void;
-  selectedRepo: string;
+  selectedRepository: NewSessionRepository | null;
   setIsCreating: (value: boolean) => void;
   variant: string;
   /** Commit and push the agent's changes (true) or leave them uncommitted (false). */
@@ -42,7 +43,10 @@ type PrepareSessionInput = {
   mode: AgentMode;
   model: string;
   variant: string | undefined;
-  githubRepo: string;
+  /** Exactly one repository field is set, matching the selected row's platform. */
+  githubRepo?: string;
+  gitlabProject?: string;
+  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   autoCommit: boolean;
   autoInitiate: boolean;
   operationKey: string;
@@ -68,7 +72,7 @@ export function useNewSessionCreator({
   model,
   organizationId,
   onCreated,
-  selectedRepo,
+  selectedRepository,
   setIsCreating,
   variant,
   autoCommit,
@@ -132,7 +136,9 @@ export function useNewSessionCreator({
       mode,
       model,
       variant: variant || undefined,
-      repo: selectedRepo,
+      repo: selectedRepository
+        ? `${selectedRepository.platform}/${selectedRepository.fullName}`
+        : '',
       autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
@@ -159,11 +165,11 @@ export function useNewSessionCreator({
         mode,
         model,
         variant: variant || undefined,
-        githubRepo: selectedRepo,
         autoCommit,
         autoInitiate: true,
         operationKey,
       };
+      setRepositoryField(baseInput, selectedRepository);
       if (profileId) {
         baseInput.profileId = profileId;
       }
@@ -239,7 +245,7 @@ export function useNewSessionCreator({
       setIsCreating(false);
     }
   }, [
-    selectedRepo,
+    selectedRepository,
     model,
     mode,
     variant,
@@ -261,4 +267,34 @@ export function useNewSessionCreator({
   ]);
 
   return { createSessionFromDraft, promptRef };
+}
+
+/**
+ * Write exactly one repository field into the create body, matching the
+ * selected row's platform. Bitbucket requires workspace + run ids, so it
+ * contributes nothing when those are missing (which cannot happen for a row
+ * that came from `listBitbucketRepositories`).
+ */
+function setRepositoryField(
+  input: PrepareSessionInput,
+  repository: NewSessionRepository | null
+): void {
+  if (!repository) {
+    return;
+  }
+  if (repository.platform === 'github') {
+    input.githubRepo = repository.fullName;
+    return;
+  }
+  if (repository.platform === 'gitlab') {
+    input.gitlabProject = repository.fullName;
+    return;
+  }
+  if (repository.workspaceUuid && repository.repositoryUuid) {
+    input.bitbucketRepo = {
+      fullName: repository.fullName,
+      workspaceUuid: repository.workspaceUuid,
+      repositoryUuid: repository.repositoryUuid,
+    };
+  }
 }

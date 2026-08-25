@@ -1268,6 +1268,7 @@
       "gitlabAccount": "GitLab account",
       "connectGitLab": "Connect GitLab",
       "gitlabError": "Could not open GitLab setup. Please try again.",
+      "bitbucketError": "Could not open Bitbucket setup. Please try again.",
       "description": "Connect the Kilo {{label}} to review pull requests automatically."
     },
     "overview": {

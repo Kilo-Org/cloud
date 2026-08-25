@@ -6,6 +6,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type NewSessionRepository } from './new-session-repository-state';
 import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
@@ -156,7 +157,7 @@ function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
     mode: 'code' as AgentMode,
     model: 'anthropic/claude-sonnet-4',
     organizationId: undefined,
-    selectedRepo: '',
+    selectedRepository: null,
     setIsCreating: vi.fn(() => undefined),
     variant: 'medium',
     autoCommit: false,
@@ -277,7 +278,7 @@ function runCreator(args: {
   model?: string;
   variant?: string;
   organizationId?: string;
-  selectedRepo?: string;
+  selectedRepository?: NewSessionRepository | null;
   autoCommit?: boolean;
   profileId?: string | null;
 }): CreatorResult {
@@ -317,7 +318,11 @@ function runCreator(args: {
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',
       organizationId: args.organizationId,
-      selectedRepo: args.selectedRepo ?? 'owner/repo',
+      selectedRepository: args.selectedRepository ?? {
+        platform: 'github' as const,
+        fullName: 'owner/repo',
+        isPrivate: false,
+      },
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
@@ -684,6 +689,66 @@ describe('useNewSessionCreator autoCommit', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: true });
+  });
+});
+
+describe('useNewSessionCreator repository platform payload', () => {
+  it('sends only githubRepo for a GitHub row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ githubRepo: 'owner/repo' });
+    expect(payload).not.toHaveProperty('gitlabProject');
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+  });
+
+  it('sends only gitlabProject for a GitLab row and never githubRepo', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'group/project', isPrivate: true },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ gitlabProject: 'group/project' });
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+  });
+
+  it('sends only bitbucketRepo with workspace and repository uuids for a Bitbucket row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      organizationId: 'org-1',
+      selectedRepository: {
+        platform: 'bitbucket',
+        fullName: 'workspace/repo',
+        isPrivate: true,
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      bitbucketRepo: {
+        fullName: 'workspace/repo',
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('gitlabProject');
   });
 });
 

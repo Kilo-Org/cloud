@@ -38,8 +38,11 @@ export function RepoSelector({
   const { t } = useTranslation();
   const effectivelyDisabled = disabled || isLoading || repositories.length === 0;
 
+  // The selection value is `platform:fullName`; display only the fullName.
+  const displayValue = value.includes(':') ? value.slice(value.indexOf(':') + 1) : value;
   const label =
-    value || (isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title'));
+    displayValue ||
+    (isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title'));
 
   function handlePress() {
     if (effectivelyDisabled) {

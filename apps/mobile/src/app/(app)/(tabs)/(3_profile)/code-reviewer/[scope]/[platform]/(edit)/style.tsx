@@ -11,10 +11,10 @@ export default function ReviewStyleRoute() {
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
   const labels = {
-    strict: 'codeReviewer.reviewStyle.strict',
-    balanced: 'codeReviewer.reviewStyle.balanced',
-    lenient: 'codeReviewer.reviewStyle.lenient',
-    roast: 'codeReviewer.reviewStyle.roast',
+    strict: t('codeReviewer.reviewStyle.strict'),
+    balanced: t('codeReviewer.reviewStyle.balanced'),
+    lenient: t('codeReviewer.reviewStyle.lenient'),
+    roast: t('codeReviewer.reviewStyle.roast'),
   } as const;
   const descriptions = {
     strict: t('codeReviewer.style.strict'),

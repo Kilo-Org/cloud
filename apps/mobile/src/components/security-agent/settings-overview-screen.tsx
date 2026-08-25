@@ -152,7 +152,8 @@ export function SettingsOverviewScreen({
     data.newFindingNotificationsEnabled,
     data.slaNotificationsEnabled,
   ].filter(Boolean).length;
-  const analysisModeLabel = lookup(ANALYSIS_MODE_KEYS, data.analysisMode) ?? data.analysisMode;
+  const analysisModeKey = lookup(ANALYSIS_MODE_KEYS, data.analysisMode);
+  const analysisModeLabel = analysisModeKey ? t(analysisModeKey) : data.analysisMode;
 
   const handleToggle = (value: boolean) => {
     void Haptics.selectionAsync();

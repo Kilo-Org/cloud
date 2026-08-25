@@ -267,9 +267,11 @@ export function FindingRemediationPanel({
     remediationSummary?.status ?? null,
     summaryStatusOptions
   );
-  const statusLabel =
-    getRemediationStatusKey(remediationSummary?.status ?? null, summaryStatusOptions) ??
-    presentation.label;
+  const statusKey = getRemediationStatusKey(
+    remediationSummary?.status ?? null,
+    summaryStatusOptions
+  );
+  const statusLabel = statusKey ? t(statusKey) : presentation.label;
   const blockerKey = !remediationCapability.canStart
     ? getRemediationUnavailableKey(remediationCapability.startReason)
     : null;
@@ -428,9 +430,13 @@ export function FindingRemediationPanel({
                 attempt.status,
                 attemptStatusOptions
               );
-              const attemptStatusLabel =
-                getRemediationStatusKey(attempt.status, attemptStatusOptions) ??
-                attemptPresentation.label;
+              const attemptStatusKey = getRemediationStatusKey(
+                attempt.status,
+                attemptStatusOptions
+              );
+              const attemptStatusLabel = attemptStatusKey
+                ? t(attemptStatusKey)
+                : attemptPresentation.label;
               const originKey = lookup(REMEDIATION_ORIGIN_KEYS, attempt.origin);
               const validation =
                 attempt.validationEvidence?.map((record, index) =>

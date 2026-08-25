@@ -62,7 +62,8 @@ function getDismissalReasonLabel(reason: string | null): string {
   if (!reason) {
     return i18n.t('securityAgent.findingDetails.reasonAfterReview');
   }
-  return lookup(DISMISSAL_REASON_KEYS, reason) ?? reason.replaceAll('_', ' ');
+  const key = lookup(DISMISSAL_REASON_KEYS, reason);
+  return key ? i18n.t(key) : reason.replaceAll('_', ' ');
 }
 
 function getFindingSourceLabel(source: string): string {

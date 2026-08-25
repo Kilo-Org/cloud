@@ -497,7 +497,7 @@ describe('sales demo router', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.organization_id, firstOrgId));
     const total = txns.reduce((acc, tx) => acc + Number(tx.amount_microdollars), 0);
-    expect(total).toBe(after.settings.sales_demo_seeded_microdollars + 25_030_000);
+    expect(total).toBe(Number(after.microdollars_used) + 25_030_000);
 
     const ledger = await db
       .select()

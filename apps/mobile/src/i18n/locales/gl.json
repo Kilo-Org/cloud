@@ -2287,7 +2287,6 @@
     "couldNotLoadActiveSessions": "Non se puideron cargar as sesións activas",
     "agentSessions": "Sesións de axente",
     "noLiveSessions": "Nothing running right now",
-    "startNewAgentSession": "Iniciar unha nova sesión de Kilo Agent",
     "newCodingTask": "Nova tarefa de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",

@@ -2287,7 +2287,6 @@
     "couldNotLoadActiveSessions": "Det gick inte att läsa in aktiva sessioner",
     "agentSessions": "Agentsessioner",
     "noLiveSessions": "Nothing running right now",
-    "startNewAgentSession": "Starta en ny Kilo Agent-session",
     "newCodingTask": "Ny kodningsuppgift",
     "explore": "Utforska",
     "seeAll": "Visa alla",

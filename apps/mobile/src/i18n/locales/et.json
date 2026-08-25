@@ -2287,7 +2287,6 @@
     "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Agendi seansid",
     "noLiveSessions": "Nothing running right now",
-    "startNewAgentSession": "Alusta uut Kilo Agent seanssi",
     "newCodingTask": "Uus kodeerimisülesanne",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",

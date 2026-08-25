@@ -2287,7 +2287,6 @@
     "couldNotLoadActiveSessions": "Couldn't load active sessions",
     "agentSessions": "Live now",
     "noLiveSessions": "Nothing running right now",
-    "startNewAgentSession": "Start a new Kilo Agent session",
     "newCodingTask": "New coding task",
     "explore": "Explore",
     "seeAll": "See all",

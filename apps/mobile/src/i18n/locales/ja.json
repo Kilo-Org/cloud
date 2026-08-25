@@ -1915,7 +1915,6 @@
     "couldNotLoadActiveSessions": "アクティブなセッションを読み込めませんでした",
     "agentSessions": "エージェントセッション",
     "noLiveSessions": "Nothing running right now",
-    "startNewAgentSession": "新しいKiloエージェントセッションを開始",
     "newCodingTask": "新しいコーディングタスク",
     "explore": "探索",
     "seeAll": "すべて表示",

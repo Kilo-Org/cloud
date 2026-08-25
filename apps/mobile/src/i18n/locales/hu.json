@@ -2287,7 +2287,6 @@
     "couldNotLoadActiveSessions": "Az aktív munkameneteket nem sikerült betölteni",
     "agentSessions": "Ügynök munkamenetek",
     "noLiveSessions": "Nothing running right now",
-    "startNewAgentSession": "Új Kilo Agent munkamenet indítása",
     "newCodingTask": "Új kódolási feladat",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",

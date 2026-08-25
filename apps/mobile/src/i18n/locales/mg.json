@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Bonus top-up ekipa 2025",
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny credits"
-      }
+      },
+      "loadMore": "Havao bebe kokoa",
+      "loadMoreFailed": "Tsy afaka ny havaozina bebe kokoa.",
+      "truncated": "Misy ny fiasana crédit taloha kokoa."
     },
     "inviteMember": {
       "emailError": "Ampidiro adiresy email sahaza",
@@ -2971,7 +2974,10 @@
         "draft": "Draft",
         "uncollectible": "Tsy azo angonina",
         "unknown": "Tsy fantatra"
-      }
+      },
+      "loadMore": "Havao bebe kokoa",
+      "loadMoreFailed": "Tsy afaka ny havaozina bebe kokoa.",
+      "truncated": "Misy ny faktiora taloha kokoa."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "بۆنەی زیادکردنی تیم 2025",
         "accounting_adjustment": "ڕێکخستنی هەژماری",
         "credits_expired": "بەسەرچوونی کرێدت"
-      }
+      },
+      "loadMore": "بارکردنی زیاتر",
+      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت.",
+      "truncated": "چالاکی بەرایی کۆنیتر بەردەستە."
     },
     "inviteMember": {
       "emailError": "ناونیشانی ئیمەیڵی دروست بنووسە",
@@ -2971,7 +2974,10 @@
         "draft": "ڕەشنووس",
         "uncollectible": "نەکۆڵکراو",
         "unknown": "نەزانراو"
-      }
+      },
+      "loadMore": "بارکردنی زیاتر",
+      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت.",
+      "truncated": "فاکتورە کۆنەکان بەردەستن."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

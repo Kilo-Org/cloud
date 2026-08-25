@@ -2984,7 +2984,10 @@
         "team-topup-bonus-2025": "Ekipni bonus za polnjenje 2025",
         "accounting_adjustment": "Računovodska prilagoditev",
         "credits_expired": "Potečeni krediti"
-      }
+      },
+      "loadMore": "Naloži več",
+      "loadMoreFailed": "Ni bilo mogoče naložiti več.",
+      "truncated": "Starejša dejavnost kredita je na voljo."
     },
     "inviteMember": {
       "emailError": "Vnesi veljaven e-poštni naslov",
@@ -3011,7 +3014,10 @@
         "draft": "Osnutek",
         "uncollectible": "Neizterljivo",
         "unknown": "Neznano"
-      }
+      },
+      "loadMore": "Naloži več",
+      "loadMoreFailed": "Ni bilo mogoče naložiti več.",
+      "truncated": "Starejši računi so na voljo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ime@podjetje.com",

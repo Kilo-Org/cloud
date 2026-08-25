@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlar muddati tugadi"
-      }
+      },
+      "loadMore": "Ko'proq yuklash",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi.",
+      "truncated": "Eski kredit faoliyati mavjud."
     },
     "inviteMember": {
       "emailError": "To'g'ri email manzil kiriting",
@@ -2971,7 +2974,10 @@
         "draft": "Qoralama",
         "uncollectible": "Undirib bo'lmaydigan",
         "unknown": "Noma'lum"
-      }
+      },
+      "loadMore": "Ko'proq yuklash",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi.",
+      "truncated": "Eski hisob-fakturalar mavjud."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -2984,7 +2984,10 @@
         "team-topup-bonus-2025": "Bonus za doplnění týmu 2025",
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
-      }
+      },
+      "loadMore": "Načíst více",
+      "loadMoreFailed": "Nepodařilo se načíst další.",
+      "truncated": "Starší aktivita kreditů je k dispozici."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu",
@@ -3011,7 +3014,10 @@
         "draft": "Koncept",
         "uncollectible": "Nedobytné",
         "unknown": "Neznámé"
-      }
+      },
+      "loadMore": "Načíst více",
+      "loadMoreFailed": "Nepodařilo se načíst další.",
+      "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

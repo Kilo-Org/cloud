@@ -3004,7 +3004,10 @@
         "team-topup-bonus-2025": "Bónas forlíonta foirne 2025",
         "accounting_adjustment": "Coigeartú cuntasaíochta",
         "credits_expired": "Creidmheasanna imithe in éag"
-      }
+      },
+      "loadMore": "Lódáil tuilleadh",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
+      "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
     "inviteMember": {
       "emailError": "Iontráil seoladh ríomhphoist bailí",
@@ -3031,7 +3034,10 @@
         "draft": "Dréacht",
         "uncollectible": "Dobhailithe",
         "unknown": "Anaithnid"
-      }
+      },
+      "loadMore": "Lódáil tuilleadh",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
+      "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

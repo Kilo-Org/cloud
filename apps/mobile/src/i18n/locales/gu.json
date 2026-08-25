@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "ટીમ ટોપઅપ બોનસ 2025",
         "accounting_adjustment": "એકાઉન્ટિંગ ગોઠવણ",
         "credits_expired": "ક્રેડિટ સમાપ્ત થઈ"
-      }
+      },
+      "loadMore": "વધુ લોડ કરો",
+      "loadMoreFailed": "વધુ લોડ કરી શકાયું નથી.",
+      "truncated": "જૂની ક્રેડિટ પ્રવૃત્તિ ઉપલબ્ધ છે."
     },
     "inviteMember": {
       "emailError": "માન્ય ઇમેઇલ સરનામું દાખલ કરો",
@@ -2971,7 +2974,10 @@
         "draft": "ડ્રાફ્ટ",
         "uncollectible": "વસૂલ કરી ન શકાય તેવું",
         "unknown": "અજ્ઞાત"
-      }
+      },
+      "loadMore": "વધુ લોડ કરો",
+      "loadMoreFailed": "વધુ લોડ કરી શકાયું નથી.",
+      "truncated": "જૂના ઇન્વૉઇસ ઉપલબ્ધ છે."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

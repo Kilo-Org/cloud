@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "குழு டாப்-அப் போனஸ் 2025",
         "accounting_adjustment": "கணக்கியல் சரிசெய்தல்",
         "credits_expired": "கிரெடிட்கள் காலாவதியானது"
-      }
+      },
+      "loadMore": "மேலும் ஏற்றவும்",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
+      "truncated": "பழைய கிரெடிட் செயல்பாடு கிடைக்கிறது."
     },
     "inviteMember": {
       "emailError": "செல்லுபடியாகும் மின்னஞ்சல் முகவரியை உள்ளிடவும்",
@@ -2971,7 +2974,10 @@
         "draft": "வரைவு",
         "uncollectible": "வசூலிக்க முடியாதது",
         "unknown": "தெரியாதது"
-      }
+      },
+      "loadMore": "மேலும் ஏற்றவும்",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
+      "truncated": "பழைய விலைப்பட்டியல்கள் கிடைக்கின்றன."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

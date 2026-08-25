@@ -2964,7 +2964,10 @@
         "team-topup-bonus-2025": "Komandas papildinājuma bonuss 2025",
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredīti beigušies"
-      }
+      },
+      "loadMore": "Ielādēt vairāk",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
+      "truncated": "Ir pieejama vecāka kredīta aktivitāte."
     },
     "inviteMember": {
       "emailError": "Ievadi derīgu e-pasta adresi",
@@ -2991,7 +2994,10 @@
         "draft": "Melnraksts",
         "uncollectible": "Nepiedzenams",
         "unknown": "Nezināms"
-      }
+      },
+      "loadMore": "Ielādēt vairāk",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
+      "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

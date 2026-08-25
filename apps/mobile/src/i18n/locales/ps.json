@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "د ټیم ټاپ اپ بونس 2025",
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "کریډیټونه منقضي شوي"
-      }
+      },
+      "loadMore": "نور مه پورته کړئ",
+      "loadMoreFailed": "نور پورته کېدل ناشوني شول.",
+      "truncated": "پخوانۍ کریډیټي کړنې شته دي."
     },
     "inviteMember": {
       "emailError": "یو سم بریښنالیک آدرس دننه کړئ",
@@ -2971,7 +2974,10 @@
         "draft": "مسوده",
         "uncollectible": "نه راټولېدونکی",
         "unknown": "نامعلوم"
-      }
+      },
+      "loadMore": "نور مه پورته کړئ",
+      "loadMoreFailed": "نور پورته کېدل ناشوني شول.",
+      "truncated": "پخوانۍ رسیدونه شته دي."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

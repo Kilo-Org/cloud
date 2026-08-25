@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Regnskabsmæssig justering",
         "credits_expired": "Udløbne kreditter"
-      }
+      },
+      "loadMore": "Indlæs mere",
+      "loadMoreFailed": "Det lykkedes ikke at indlæse mere.",
+      "truncated": "Ældre kreditaktivitet er tilgængelig."
     },
     "inviteMember": {
       "emailError": "Angiv en gyldig e-mailadresse",
@@ -2971,7 +2974,10 @@
         "draft": "Kladde",
         "uncollectible": "Uinddrivelig",
         "unknown": "Ukendt"
-      }
+      },
+      "loadMore": "Indlæs mere",
+      "loadMoreFailed": "Det lykkedes ikke at indlæse mere.",
+      "truncated": "Ældre fakturaer er tilgængelige."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "navn@virksomhed.dk",

@@ -2970,7 +2970,10 @@
         "team-topup-bonus-2025": "Бонус за пополнение баланса команды 2025",
         "accounting_adjustment": "Бухгалтерская корректировка",
         "credits_expired": "Кредиты истекли"
-      }
+      },
+      "loadMore": "Загрузить ещё",
+      "loadMoreFailed": "Не удалось загрузить.",
+      "truncated": "Доступна более ранняя активность по кредитам."
     },
     "hub": {
       "balance": "Баланс",
@@ -3006,7 +3009,10 @@
         "draft": "Черновик",
         "uncollectible": "Не подлежит взысканию",
         "unknown": "Неизвестно"
-      }
+      },
+      "loadMore": "Загрузить ещё",
+      "loadMoreFailed": "Не удалось загрузить.",
+      "truncated": "Доступны более ранние счета."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

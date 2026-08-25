@@ -2964,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
-      }
+      },
+      "loadMore": "Carrega'n més",
+      "loadMoreFailed": "No s'ha pogut carregar més.",
+      "truncated": "Hi ha activitat de crèdit més antiga disponible."
     },
     "inviteMember": {
       "emailError": "Introduïu una adreça de correu vàlida",
@@ -2991,7 +2994,10 @@
         "draft": "Esborrany",
         "uncollectible": "No cobrable",
         "unknown": "Desconegut"
-      }
+      },
+      "loadMore": "Carrega'n més",
+      "loadMoreFailed": "No s'ha pogut carregar més.",
+      "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

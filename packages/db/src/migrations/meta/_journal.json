@@ -1583,6 +1583,13 @@
       "when": 1787677353599,
       "tag": "0225_rare_captain_britain",
       "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1787683856423,
+      "tag": "0226_aromatic_paper_doll",
+      "breakpoints": true
     }
   ]
 }

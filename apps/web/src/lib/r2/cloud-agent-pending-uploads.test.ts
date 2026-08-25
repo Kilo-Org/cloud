@@ -282,4 +282,30 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(sentCommands.map(command => command.name)).toEqual(['DeleteObjectCommand']);
     expect(sentCommands.map(command => command.input.Key)).toEqual([releasedKey]);
   });
+
+  it('leaves the row pending for the reaper when the R2 delete fails', async () => {
+    mockSend.mockRejectedValue(new Error('r2 down'));
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const rowId = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: future,
+    });
+
+    await expect(
+      releasePendingUploads(kiloUserId, [buildObjectKey(kiloUserId, messageUuid, attachment)])
+    ).rejects.toThrow('r2 down');
+
+    const rows = await db
+      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
+    expect(rows.map(row => row.id)).toEqual([rowId]);
+    expect(rows[0].status).toBe('pending');
+  });
 });

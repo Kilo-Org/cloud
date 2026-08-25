@@ -279,9 +279,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
         // Compatibility: the server links authoritatively so any client whose
         // send goes through sendMessage keeps its objects (mobile, old tabs).
-        // The web client's own finalizeAttachments link is redundant but
-        // harmless (idempotent). Only ATTACHMENT rows are admitted (images are
-        // never admitted; only generateCloudAgentAttachmentUploadUrl admits).
+        // The client does not link pre-send, so a failed or abandoned send
+        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
+        // admitted (images are never admitted; only
+        // generateCloudAgentAttachmentUploadUrl admits).
         if (attachments && attachments.files.length > 0) {
           await linkPendingUploads(
             ctx.user.id,

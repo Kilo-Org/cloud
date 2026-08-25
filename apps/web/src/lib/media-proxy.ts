@@ -109,13 +109,13 @@ function baseContentType(header: string | null): string {
  * accumulated bytes exceed `maxBytes`, cancelling the stream so an oversized
  * upstream body is never buffered in full.
  */
-async function readCappedBody(response: Response, maxBytes: number): Promise<Uint8Array> {
+async function readCappedBody(response: Response, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
   if (!response.body) {
     return new Uint8Array(0);
   }
 
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
   let total = 0;
 
   try {

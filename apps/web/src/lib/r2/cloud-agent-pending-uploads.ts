@@ -106,8 +106,10 @@ export type ReapAbandonedUploadsSummary = {
  * caller abandons the files before sending (e.g. removes them from the
  * composer). Only the caller's own 'pending' rows are released; 'linked' rows
  * (already sent) and other users' rows stay untouched. The R2 objects behind
- * the rows it actually releases are deleted too, so an abandoned upload is
- * never left unreaped.
+ * the rows are deleted BEFORE the rows, so a failed R2 delete leaves the row
+ * 'pending' for the reaper instead of orphaning the object; deleting the rows
+ * after a successful object delete can only leave a 'pending' row whose
+ * already-absent object a later reap no-ops on.
  */
 export async function releasePendingUploads(
   kiloUserId: string,
@@ -115,18 +117,18 @@ export async function releasePendingUploads(
 ): Promise<void> {
   if (objectKeys.length === 0) return;
 
-  const released = await db
-    .delete(cloud_agent_pending_uploads)
+  const pendingRows = await db
+    .select({ object_key: cloud_agent_pending_uploads.object_key })
+    .from(cloud_agent_pending_uploads)
     .where(
       and(
         eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
         eq(cloud_agent_pending_uploads.status, 'pending'),
         inArray(cloud_agent_pending_uploads.object_key, objectKeys)
       )
-    )
-    .returning({ object_key: cloud_agent_pending_uploads.object_key });
+    );
 
-  for (const row of released) {
+  for (const row of pendingRows) {
     await r2Client.send(
       new DeleteObjectCommand({
         Bucket: r2CloudAgentAttachmentsBucketName,
@@ -134,6 +136,16 @@ export async function releasePendingUploads(
       })
     );
   }
+
+  await db
+    .delete(cloud_agent_pending_uploads)
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        eq(cloud_agent_pending_uploads.status, 'pending'),
+        inArray(cloud_agent_pending_uploads.object_key, objectKeys)
+      )
+    );
 }
 
 /**

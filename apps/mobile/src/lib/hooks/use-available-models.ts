@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import * as z from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
@@ -101,6 +102,33 @@ export function thinkingEffortLabel(variant: string): string {
 
 const MODEL_REQUEST_TIMEOUT_MS = 15_000;
 
+/**
+ * Wire contract for the openrouter / org models endpoints. The response is a
+ * `data` array of model descriptors matching the `ModelResponse` fields.
+ */
+export const OpenRouterModelsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      isFree: z.boolean().optional(),
+      mayTrainOnYourPrompts: z.boolean().optional(),
+      hasUserByokAvailable: z.boolean().optional(),
+      context_length: z.number().nullable().optional(),
+      preferredIndex: z.number().optional(),
+      pricing: z
+        .object({ prompt: z.string().optional(), completion: z.string().optional() })
+        .optional(),
+      opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
+    })
+  ),
+});
+
+/**
+ * Wire contract for the organization defaults endpoint.
+ */
+export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.string() });
+
 async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
   const token = await getAuthTokenForRequest();
   const url = organizationId
@@ -123,7 +151,7 @@ async function fetchModels(organizationId: string | undefined): Promise<ModelRes
       throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
     }
 
-    const data: ModelResponse = await response.json();
+    const data = OpenRouterModelsResponseSchema.parse(await response.json());
     return data;
   } catch (error) {
     if (controller.signal.aborted) {
@@ -149,7 +177,7 @@ async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel:
   if (!response.ok) {
     throw new Error(`Failed to fetch org defaults: ${response.status} ${response.statusText}`);
   }
-  return (await response.json()) as { defaultModel: string };
+  return OrganizationDefaultsResponseSchema.parse(await response.json());
 }
 
 // ── Hooks ────────────────────────────────────────────────────────────

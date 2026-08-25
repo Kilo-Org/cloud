@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -93,10 +95,10 @@ export function PartRenderer({
   // If OpenCode ever ships diff text on the part, render it through `DiffLine`.
   if (isPatchPart(part)) {
     const fileCount = part.files.length;
-    const summary =
-      fileCount === 1
-        ? t('agentChat.partRenderer.updatedFile', { count: fileCount })
-        : t('agentChat.partRenderer.updatedFiles', { count: fileCount });
+    const summary = t('agentChat.partRenderer.updatedFileCount', {
+      count: fileCount,
+      displayCount: formatNumber(fileCount, i18n.language),
+    });
     return (
       <MessageErrorBoundary>
         <View className="my-1 gap-1">

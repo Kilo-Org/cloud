@@ -1573,8 +1573,36 @@
     {
       "idx": 224,
       "version": "7",
-      "when": 1787633900214,
-      "tag": "0224_blushing_ego",
+      "when": 1787673476900,
+      "tag": "0224_retire_kiloclaw_referral_rewards",
+      "breakpoints": true
+    },
+    {
+      "idx": 225,
+      "version": "7",
+      "when": 1787677353599,
+      "tag": "0225_rare_captain_britain",
+      "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1787683856423,
+      "tag": "0226_aromatic_paper_doll",
+      "breakpoints": true
+    },
+    {
+      "idx": 227,
+      "version": "7",
+      "when": 1787685886103,
+      "tag": "0227_exotic_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1787689696640,
+      "tag": "0228_fast_frightful_four",
       "breakpoints": true
     }
   ]

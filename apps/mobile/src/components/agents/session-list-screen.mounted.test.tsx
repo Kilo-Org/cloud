@@ -31,6 +31,12 @@ const focusCallback = vi.hoisted(() => ({
 }));
 const refetchSpy = vi.hoisted(() => vi.fn());
 const invalidateQueries = vi.hoisted(() => vi.fn());
+const sessionListState = vi.hoisted(() => ({
+  storedSessions: [] as { session_id: string; organization_id: string | null }[],
+  activeSessions: [] as { id: string }[],
+  storedIsFetching: false,
+  storedLoadedPageCount: 1,
+}));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -99,10 +105,12 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 }));
 vi.mock('@/components/agents/use-agent-session-list-data', () => ({
   useAgentSessionListData: () => ({
-    storedSessions: [],
-    activeSessions: [],
+    storedSessions: sessionListState.storedSessions,
+    activeSessions: sessionListState.activeSessions,
     activeIsError: false,
     isLoading: false,
+    storedIsFetching: sessionListState.storedIsFetching,
+    storedLoadedPageCount: sessionListState.storedLoadedPageCount,
     paging: {},
     refetch: refetchSpy,
     handleRetry: vi.fn(),
@@ -156,6 +164,10 @@ describe('AgentSessionListScreen foreground refresh', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     focusState.current = true;
     focusCallback.current = undefined;
+    sessionListState.storedSessions = [];
+    sessionListState.activeSessions = [];
+    sessionListState.storedIsFetching = false;
+    sessionListState.storedLoadedPageCount = 1;
     refetchSpy.mockClear();
     invalidateQueries.mockClear();
   });
@@ -169,6 +181,34 @@ describe('AgentSessionListScreen foreground refresh', () => {
     mountedRenderers.length = 0;
     appState.listeners.clear();
     vi.restoreAllMocks();
+  });
+
+  it('keeps the history loading while a cleared session cache refills', async () => {
+    sessionListState.activeSessions = [{ id: 'active-session' }];
+    sessionListState.storedIsFetching = true;
+    sessionListState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+    const content = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'AgentSessionListContent'
+    );
+
+    expect(content.props.hasAnySessions).toBe(true);
+    expect(content.props.isLoading).toBe(true);
+  });
+
+  it('keeps a confirmed empty session result visible during a background refetch', async () => {
+    sessionListState.activeSessions = [{ id: 'active-session' }];
+    sessionListState.storedIsFetching = true;
+    sessionListState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+    const content = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'AgentSessionListContent'
+    );
+
+    expect(content.props.hasAnySessions).toBe(true);
+    expect(content.props.isLoading).toBe(false);
   });
 
   it('refetches and invalidates the active-sessions tray on foreground while focused', async () => {

@@ -2,6 +2,7 @@ import { allow_fake_login } from '@/lib/constants';
 import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
+import React from 'react';
 
 export default async function SignInPage({
   searchParams,
@@ -20,7 +21,7 @@ export default async function SignInPage({
           error={error}
           isSignUp={isSignUp}
           allowFakeLogin={allow_fake_login}
-          title={ssoMode ? 'Enterprise SSO' : isSignUp ? 'Create your account' : 'Welcome back'}
+          title={ssoMode ? 'Enterprise SSO' : isSignUp ? 'Create your account' : 'Welcome.'}
           subtitle={
             ssoMode
               ? "Enter your work email address to sign in with your organization's Single Sign-On"

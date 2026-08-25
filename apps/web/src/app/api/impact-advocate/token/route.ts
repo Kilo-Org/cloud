@@ -30,10 +30,11 @@ async function ensureInternalReferralCode(userId: string): Promise<void> {
     .onConflictDoNothing({ target: [referral_codes.kilo_user_id] });
 }
 
+// Kilo Pass is the only live Advocate referral program; `kiloclaw` is rejected
+// rather than silently served a Kilo Pass token.
 function parseRequestedProduct(request: NextRequest): ImpactReferralProduct | null {
   const product = request.nextUrl.searchParams.get('product')?.trim();
-  if (!product) return ImpactReferralProduct.KiloClaw;
-  if (product === ImpactReferralProduct.KiloClaw) return ImpactReferralProduct.KiloClaw;
+  if (!product) return ImpactReferralProduct.KiloPass;
   if (product === ImpactReferralProduct.KiloPass) return ImpactReferralProduct.KiloPass;
   return null;
 }

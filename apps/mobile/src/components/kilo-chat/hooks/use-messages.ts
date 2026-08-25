@@ -1,4 +1,4 @@
-import { formatKiloChatError, type KiloChatClient } from '@kilocode/kilo-chat';
+import { type KiloChatClient } from '@kilocode/kilo-chat';
 import {
   useMessageCacheUpdater,
   useMessages,
@@ -7,6 +7,8 @@ import {
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+
+import { formatMobileKiloChatError } from '../kilo-chat-error';
 
 export { useMessages, useMessageCacheUpdater };
 
@@ -17,7 +19,7 @@ export function useSendMessage(
 ) {
   return useSharedSendMessage(client, conversationId, currentUserId, {
     onError: err => {
-      toast.error(formatKiloChatError(err, i18n.t('chat.messageActions.sendFailed')));
+      toast.error(formatMobileKiloChatError(err, i18n.t('chat.messageActions.sendFailed')));
     },
   });
 }

@@ -26,7 +26,7 @@ import { i18n } from '@/i18n';
 import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -114,8 +114,11 @@ export function OrganizationHubScreen() {
             // purchased capacity and can legitimately be zero.
             value={
               org.requireSeats
-                ? `${org.seatCount.used} / ${org.seatCount.total}`
-                : String(org.seatCount.used)
+                ? `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
+                    org.seatCount.total,
+                    i18n.language
+                  )}`
+                : formatNumber(org.seatCount.used, i18n.language)
             }
             last
           />

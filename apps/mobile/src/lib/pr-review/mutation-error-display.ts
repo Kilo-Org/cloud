@@ -9,12 +9,11 @@
 // have committed, so the user must verify the PR instead of being shown the
 // generic retryable copy.
 
+import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
-  PR_OPERATION_AMBIGUOUS_MESSAGE,
-  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
 type MutationErrorDisplaySurface = 'composer' | 'submit';
@@ -25,14 +24,6 @@ type MutationErrorDisplay = {
   kind: MutationErrorDisplayKind;
   message: string;
 };
-
-const COMPOSER_BAD_REQUEST =
-  "This comment can't be posted. The selected line may have changed, or the PR may have been updated.";
-const SUBMIT_BAD_REQUEST =
-  "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.";
-const COMPOSER_RETRYABLE_FALLBACK = 'Could not post comment.';
-const SUBMIT_RETRYABLE = 'Could not submit review. Check your connection and try again.';
-const RECONNECT_MESSAGE = 'GitHub connection expired.';
 
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
@@ -48,13 +39,13 @@ export function mutationErrorDisplay(
   // The ambiguous outcome is NOT the generic retryable copy: the effect may
   // have committed, so the user must verify the PR. Verbatim on both surfaces.
   if (isPrOperationAmbiguous(rawError)) {
-    return { kind: 'retryable', message: PR_OPERATION_AMBIGUOUS_MESSAGE };
+    return { kind: 'retryable', message: i18n.t('prReview.operation.ambiguous') };
   }
   // The persistence-failure marker is retry-BLOCKING: the row never became
   // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
   // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
-    return { kind: 'bad-request', message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE };
+    return { kind: 'bad-request', message: i18n.t('prReview.operation.persistenceFailed') };
   }
   if (classification.kind === 'forbidden') {
     return { kind: 'forbidden', message: classification.message };
@@ -62,19 +53,22 @@ export function mutationErrorDisplay(
   if (classification.kind === 'bad-request') {
     return {
       kind: 'bad-request',
-      message: surface === 'composer' ? COMPOSER_BAD_REQUEST : SUBMIT_BAD_REQUEST,
+      message:
+        surface === 'composer'
+          ? i18n.t('prReview.mutationError.commentNotPosted')
+          : i18n.t('prReview.mutationError.reviewNotSubmitted'),
     };
   }
   if (classification.kind === 'reconnect') {
-    return { kind: 'reconnect', message: RECONNECT_MESSAGE };
+    return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
   }
   if (surface === 'submit') {
-    return { kind: 'retryable', message: SUBMIT_RETRYABLE };
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
   const message =
     rawError instanceof Error && rawError.message.length > 0
       ? rawError.message
-      : COMPOSER_RETRYABLE_FALLBACK;
+      : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }
 

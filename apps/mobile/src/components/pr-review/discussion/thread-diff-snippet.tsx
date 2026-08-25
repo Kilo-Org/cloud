@@ -7,6 +7,8 @@ import { View } from 'react-native';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { type ThreadDiffSnippet as ThreadDiffSnippetData } from '@/lib/pr-review/discussion/thread-diff-snippet';
 
 type ThreadDiffSnippetProps = {
@@ -24,7 +26,10 @@ export function ThreadDiffSnippet({ snippet }: Readonly<ThreadDiffSnippetProps>)
       {truncatedCount > 0 ? (
         <View className="border-b border-hair-soft px-3 py-1">
           <Text className="text-xs text-muted-foreground">
-            {t('prReview.discussion.moreLinesAbove', { count: truncatedCount })}
+            {t('prReview.discussion.moreLinesAbove', {
+              count: truncatedCount,
+              displayCount: formatNumber(truncatedCount, i18n.language),
+            })}
           </Text>
         </View>
       ) : null}

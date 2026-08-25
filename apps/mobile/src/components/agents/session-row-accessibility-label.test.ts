@@ -104,7 +104,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: null,
         })
-      ).toBe('Fix login bug, needs input, CLI');
+      ).toBe('Fix login bug, needs input, and CLI');
     });
 
     it('includes meta when the caller passes it (caller is responsible for omitting)', () => {
@@ -120,7 +120,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'VSCODE',
           meta: '5 minutes ago',
         })
-      ).toBe('Fix login bug, needs input, VSCODE, 5 minutes ago');
+      ).toBe('Fix login bug, needs input, VSCODE, and 5 minutes ago');
     });
   });
 
@@ -134,7 +134,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: '5 minutes ago',
         })
-      ).toBe('Fix login bug, CLI, 5 minutes ago');
+      ).toBe('Fix login bug, CLI, and 5 minutes ago');
     });
 
     it('produces "title, badge, meta" with "just now"', () => {
@@ -145,7 +145,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLOUD AGENT',
           meta: 'just now',
         })
-      ).toBe('New session, CLOUD AGENT, just now');
+      ).toBe('New session, CLOUD AGENT, and just now');
     });
 
     it('produces "title, badge, meta" with a days-ago spoken form', () => {
@@ -156,7 +156,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'SLACK',
           meta: '3 days ago',
         })
-      ).toBe('Old session, SLACK, 3 days ago');
+      ).toBe('Old session, SLACK, and 3 days ago');
     });
   });
 
@@ -171,7 +171,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: null,
         })
-      ).toBe('Live session, needs input, CLI');
+      ).toBe('Live session, needs input, and CLI');
     });
 
     it('works with the LIVE fallback badge', () => {
@@ -182,7 +182,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'LIVE',
           meta: null,
         })
-      ).toBe('Live session, needs input, LIVE');
+      ).toBe('Live session, needs input, and LIVE');
     });
   });
 
@@ -196,7 +196,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: '2 hours ago',
         })
-      ).toBe('Live session, CLI, 2 hours ago');
+      ).toBe('Live session, CLI, and 2 hours ago');
     });
   });
 
@@ -210,7 +210,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'LIVE',
           meta: null,
         })
-      ).toBe('Live session, LIVE');
+      ).toBe('Live session and LIVE');
     });
   });
 
@@ -223,7 +223,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'B',
           meta: 'C',
         })
-      ).toBe('A, needs input, B, C');
+      ).toBe('A, needs input, B, and C');
     });
 
     it('preserves fixed order with needsInput false and no meta', () => {
@@ -234,7 +234,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'B',
           meta: null,
         })
-      ).toBe('A, B');
+      ).toBe('A and B');
     });
 
     it('preserves fixed order with title and meta only (no badge, no needsInput)', () => {
@@ -247,7 +247,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: '',
           meta: '1 day ago',
         })
-      ).toBe('Orphan, 1 day ago');
+      ).toBe('Orphan and 1 day ago');
     });
   });
 
@@ -263,7 +263,7 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '9 hours ago',
           platform: 'cloud-agent',
         })
-      ).toBe('X, CLOUD, 9 hours ago, from CLOUD AGENT');
+      ).toBe('X, CLOUD, 9 hours ago, and from CLOUD AGENT');
     });
 
     it('platform-badged row without repo: caller omits platform (label unchanged)', () => {
@@ -276,7 +276,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLI',
           meta: 'cost 1 dollar 10 cents, 8 hours ago',
         })
-      ).toBe('X, CLI, cost 1 dollar 10 cents, 8 hours ago');
+      ).toBe('X, CLI, and cost 1 dollar 10 cents, 8 hours ago');
     });
 
     it('needs-input row: no platform segment', () => {
@@ -287,7 +287,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'CLOUD',
           meta: null,
         })
-      ).toBe('X, needs input, CLOUD');
+      ).toBe('X, needs input, and CLOUD');
     });
 
     it('unmapped / absent platform: no segment appended', () => {
@@ -299,7 +299,7 @@ describe('sessionRowAccessibilityLabel', () => {
           badge: 'GASTOWN',
           meta: '1 hour ago',
         })
-      ).toBe('X, GASTOWN, 1 hour ago');
+      ).toBe('X, GASTOWN, and 1 hour ago');
       // Direct call with null/undefined also appends nothing.
       expect(
         sessionRowAccessibilityLabel({
@@ -309,7 +309,7 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '1 hour ago',
           platform: null,
         })
-      ).toBe('X, GASTOWN, 1 hour ago');
+      ).toBe('X, GASTOWN, and 1 hour ago');
       expect(
         sessionRowAccessibilityLabel({
           title: 'X',
@@ -318,7 +318,7 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '1 hour ago',
           platform: undefined,
         })
-      ).toBe('X, GASTOWN, 1 hour ago');
+      ).toBe('X, GASTOWN, and 1 hour ago');
     });
   });
 
@@ -333,7 +333,7 @@ describe('sessionRowAccessibilityLabel', () => {
           needsInput: false,
           badge: 'CLI',
         })
-      ).toBe('Fix login bug, CLI');
+      ).toBe('Fix login bug and CLI');
     });
   });
 });

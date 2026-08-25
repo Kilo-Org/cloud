@@ -1860,51 +1860,92 @@ export async function findUserIdByAuthProvider(
  * Returns all providers the user has linked, categorized by type.
  * Used for provider selection UI when user has multiple sign-in options.
  *
- * @param email - Any email linked to the user's account
- * @returns Object with user's providers and SSO info, or null if no account exists
+ * Resolves both exact linked-provider email and normalized primary-email
+ * candidates. This keeps discovery aligned with magic-link sign-in without
+ * letting either lookup source silently take precedence over the other.
+ *
+ * @param email - Any email linked to the user's account or normalized primary email.
+ *
+ * Discovery must distinguish an unknown email from conflicting identities so
+ * callers can fail closed rather than treating an ambiguous account as new.
  */
-export async function getAllUserProviders(email: string): Promise<{
+type UserProviderInfo = {
   kiloUserId: string;
   providers: AuthProviderId[];
   primaryEmail: string;
   workosHostedDomain?: string;
-} | null> {
+};
+
+export type UserProviderLookupResult =
+  | { kind: 'found'; user: UserProviderInfo }
+  | { kind: 'not_found' }
+  | { kind: 'ambiguous' };
+
+export async function getAllUserProviders(email: string): Promise<UserProviderLookupResult> {
   const lowerEmail = email.toLowerCase().trim();
 
-  // Get all auth providers that share the same kilo_user_id as any provider with this email.
-  // This uses a correlated subquery to find the user ID and get all their providers in a single query.
+  // A submitted email only determines discovery options; provider callbacks
+  // and magic-link verification remain the authentication authority.
+  const linkedProviders = await db
+    .selectDistinct({ kilo_user_id: user_auth_provider.kilo_user_id })
+    .from(user_auth_provider)
+    .where(eq(sql`lower(${user_auth_provider.email})`, lowerEmail))
+    .limit(2);
+  // Keep the legacy null-column fallback used by findUserByNormalizedEmail,
+  // but always resolve it alongside the exact linked-provider source. Looking
+  // at two candidates from each source is enough to identify ambiguity.
+  const normalizedUsers = await db.query.kilocode_users.findMany({
+    where: or(
+      eq(kilocode_users.normalized_email, normalizeEmail(email)),
+      and(
+        isNull(kilocode_users.normalized_email),
+        sql`lower(${kilocode_users.google_user_email}) = lower(${email.trim()})`
+      )
+    ),
+    limit: 2,
+  });
+  const candidateUserIds = new Set([
+    ...linkedProviders.map(provider => provider.kilo_user_id),
+    ...normalizedUsers.map(user => user.id),
+  ]);
+  if (candidateUserIds.size > 1) {
+    return { kind: 'ambiguous' };
+  }
+  const candidateUserId = candidateUserIds.values().next().value;
+  if (!candidateUserId) {
+    return { kind: 'not_found' };
+  }
+
+  const user = normalizedUsers.find(normalizedUser => normalizedUser.id === candidateUserId);
+  if (user) {
+    return getUserProviderInfo(user);
+  }
+
+  const linkedUser = await findUserById(candidateUserId);
+  if (!linkedUser) return { kind: 'not_found' };
+
+  return getUserProviderInfo(linkedUser);
+}
+
+async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult> {
+  // The matched account, rather than the submitted address, is authoritative
+  // for its supported methods and primary-domain SSO enforcement.
   const providers = await db
     .select()
     .from(user_auth_provider)
-    .where(
-      eq(
-        user_auth_provider.kilo_user_id,
-        db
-          .select({ id: user_auth_provider.kilo_user_id })
-          .from(user_auth_provider)
-          .where(eq(user_auth_provider.email, lowerEmail))
-          .limit(1)
-      )
-    )
+    .where(eq(user_auth_provider.kilo_user_id, user.id))
     .orderBy(user_auth_provider.created_at);
-
-  if (providers.length === 0) {
-    return null;
-  }
-
-  const kiloUserId = providers[0].kilo_user_id;
-  const user = await findUserById(kiloUserId);
-  if (!user) {
-    return null;
-  }
 
   const workosProvider = providers.find(p => p.provider === 'workos');
 
   return {
-    kiloUserId,
-    providers: providers.map(p => p.provider),
-    primaryEmail: user.google_user_email,
-    workosHostedDomain: workosProvider?.hosted_domain ?? undefined,
+    kind: 'found',
+    user: {
+      kiloUserId: user.id,
+      providers: providers.map(p => p.provider),
+      primaryEmail: user.google_user_email,
+      workosHostedDomain: workosProvider?.hosted_domain ?? undefined,
+    },
   };
 }
 

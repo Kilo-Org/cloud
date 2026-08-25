@@ -15,6 +15,8 @@ type OptionListProps<T extends string, TSaveResult> = {
   /** Must resolve/reject once the save actually completes — the screen
    * navigates back only on confirmed success. */
   onSelect: (value: T) => Promise<TSaveResult>;
+  /** Optional per-option row label; defaults to the raw option value. */
+  labels?: Readonly<Record<T, string>>;
   /** Optional per-option caption below the label. */
   descriptions?: Readonly<Record<T, string>>;
   /** Disables every row, e.g. while the config backing `selected` is still loading. */
@@ -27,6 +29,7 @@ export function OptionList<T extends string, TSaveResult>({
   options,
   selected,
   onSelect,
+  labels,
   descriptions,
   disabled,
 }: Readonly<OptionListProps<T, TSaveResult>>) {
@@ -56,7 +59,7 @@ export function OptionList<T extends string, TSaveResult>({
           {options.map(option => (
             <View key={option} className="relative">
               <ChoiceRow
-                label={option}
+                label={labels?.[option] ?? option}
                 description={descriptions?.[option]}
                 selected={selected === option}
                 disabled={Boolean(disabled) || pending !== null}

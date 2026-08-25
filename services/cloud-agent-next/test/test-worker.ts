@@ -20,6 +20,9 @@ import type {
   SendCloudAgentSessionNotificationResult,
 } from '../src/notifications-binding.js';
 import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
+import { getSandboxControlStub, isSandboxControlId } from '../src/sandbox-control/stub';
+import { resolveSessionStub } from '../src/sandbox-session/session-stub';
+import type { Env } from '../src/types';
 
 type RecordedPushCall = SendCloudAgentSessionNotificationParams;
 
@@ -64,11 +67,15 @@ export class CloudAgentSession extends RealCloudAgentSession {
 }
 
 export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+export { SandboxControl } from '../src/persistence/SandboxControl.js';
+export { SandboxSession } from '../src/sandbox-session/SandboxSession.js';
 
 type TestEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
+  SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
+  SANDBOX_SESSION: Env['SANDBOX_SESSION'];
 };
 
 function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
@@ -83,6 +90,18 @@ export default {
   async fetch(request: Request, env: TestEnv): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith('/sandbox-control/')) {
+      const upgradeHeader = request.headers.get('Upgrade');
+      if (upgradeHeader?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control/'.length));
+      if (!sandboxId || sandboxId.includes('/') || !isSandboxControlId(sandboxId)) {
+        return new Response('Invalid sandboxId', { status: 400 });
+      }
+      return getSandboxControlStub(env, sandboxId).fetch(request);
+    }
+
     if (url.pathname === '/stream') {
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader !== 'websocket') {
@@ -96,10 +115,7 @@ export default {
         return new Response('Missing sessionId parameter', { status: 400 });
       }
 
-      const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-      const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-      return stub.fetch(request);
+      return resolveSessionStub(env, userId, sessionId).fetch(request);
     }
 
     if (url.pathname === '/test/notification-jobs/fail-next' && request.method === 'POST') {

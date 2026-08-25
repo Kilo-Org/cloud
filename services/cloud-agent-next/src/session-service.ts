@@ -57,6 +57,7 @@ import {
   requiresContainmentSandbox,
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
+import { resolveSessionStub } from './sandbox-session/session-stub.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
@@ -1066,10 +1067,8 @@ export async function fetchSessionMetadata(
   userId: string,
   sessionId: string
 ): Promise<CloudAgentSessionState | null> {
-  const doKey = `${userId}:${sessionId}`;
-
   const metadata = await withDORetry(
-    () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
+    () => resolveSessionStub(env, userId, sessionId),
     stub => stub.getMetadata(),
     'getMetadata'
   );
@@ -1093,12 +1092,7 @@ export async function fetchSessionMetadata(
   }
 }
 
-/**
- * Generate a unique session ID with the agent_ prefix.
- */
-export function generateSessionId(): SessionId {
-  return `agent_${crypto.randomUUID()}`;
-}
+export { generateSessionId } from './session-plane.js';
 
 function githubRepository(metadata: CloudAgentSessionState) {
   return metadata.repository?.type === 'github' ? metadata.repository : undefined;

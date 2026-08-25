@@ -295,6 +295,34 @@ describe('restoreSession', () => {
     }
   });
 
+  it('returns 404 when session-ingest returns a valid empty session export', async () => {
+    mockFetchOk(JSON.stringify({ info: {}, messages: [], sessionDiff: [] }));
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'snapshot not found (empty export)',
+      code: 404,
+      step: 'download',
+    });
+  });
+
+  it('does not treat an empty export with an extra error field as a missing snapshot', async () => {
+    mockFetchOk(
+      JSON.stringify({ info: {}, messages: [], sessionDiff: [], detail: 'upstream error' })
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('snapshot missing info.id');
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+  });
+
   it('returns download error when the snapshot metadata is not JSON', async () => {
     mockFetchOk('not valid JSON {{{');
 

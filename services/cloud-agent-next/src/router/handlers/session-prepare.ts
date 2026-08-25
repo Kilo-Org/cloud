@@ -27,6 +27,7 @@ import {
 } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { logger, withLogTags } from '../../logger.js';
+import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -425,10 +426,7 @@ const updateSessionHandler = internalApiProtectedProcedure
       });
       logger.info('Updating session');
 
-      const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-        `${ctx.userId}:${input.cloudAgentSessionId}`
-      );
-      const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
+      const stub = resolveSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
 
       const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 

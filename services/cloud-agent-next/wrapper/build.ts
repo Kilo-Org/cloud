@@ -27,6 +27,16 @@ await Bun.build({
   minify: true,
 });
 
+await Bun.build({
+  entrypoints: ['./src/control/main.ts'],
+  outdir: './dist',
+  naming: 'control-wrapper.js',
+  target: 'bun',
+  minify: true,
+});
+
 await chmod('./dist/bb', 0o755);
 
-console.log('Build complete: dist/wrapper.js, dist/restore-session.js, dist/bb');
+console.log(
+  'Build complete: dist/wrapper.js, dist/restore-session.js, dist/bb, dist/control-wrapper.js'
+);

@@ -963,6 +963,72 @@ describe('pending session messages', () => {
     expect(result.failedEventCount).toBe(1);
   });
 
+  it('terminalizes persisted Vercel delivery immediately when runtime delivery is disabled', async () => {
+    const userId = 'user_pending_vercel_disabled';
+    const sessionId = 'agent_pending_vercel_disabled';
+    const messageId = 'msg_018f1e2d3c4bVercelDisabled';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const volatileEvents: Array<{ streamEventType: string; payload: string }> = [];
+      (instance as any).broadcastVolatileEvent = (event: {
+        streamEventType: string;
+        payload: string;
+      }) => {
+        volatileEvents.push(event);
+      };
+      const registration = await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'disabled provider delivery',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: 'ses_vercel_disabled_delivery',
+          kilocodeToken: 'token-vercel-disabled',
+        }),
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'vercel' },
+      });
+      expect(registration.success).toBe(true);
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({ userId, prompt: 'disabled provider delivery', messageId })
+      );
+      expect(admission.success).toBe(true);
+
+      await instance.alarm();
+      const firstState = await getSessionMessageState(instance.ctx.storage, messageId);
+      const firstPending = await listPendingSessionMessages(instance.ctx.storage);
+      await instance.alarm();
+      const eventQueries = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
+      );
+      const failedEvents = eventQueries.findByFilters({ eventTypes: ['cloud.message.failed'] });
+      const sentEvents = eventQueries.findByFilters({ eventTypes: ['cloud.message.sent'] });
+      return { firstState, firstPending, failedEvents, sentEvents, volatileEvents };
+    });
+
+    expect(result.firstPending).toHaveLength(0);
+    expect(result.firstState).toMatchObject({
+      status: 'failed',
+      attempts: 1,
+      completionSource: 'delivery_failure',
+      error: 'Sandbox runtime delivery is unavailable for this session',
+    });
+    expect(result.failedEvents).toHaveLength(1);
+    expect(result.sentEvents).toHaveLength(0);
+    expect(result.volatileEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          streamEventType: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+        }),
+      ])
+    );
+  });
+
   it('exhausts failed flush retries, emits cloud.message.failed, and removes the pending message', async () => {
     const userId = 'user_pending_flush_exhaust';
     const sessionId = 'agent_pending_flush_exhaust';

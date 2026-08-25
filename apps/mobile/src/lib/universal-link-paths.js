@@ -19,4 +19,6 @@ export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/organizations/.*/security-agent/findings',
   '/organizations/.*/code-reviews',
   '/organizations/.*/code-reviews/.*',
+  '/organizations/.*/overview',
+  '/pr-review/.*/.*/.*',
 ];

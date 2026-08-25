@@ -11,7 +11,7 @@ import {
 
 const WEB = 'https://app.kilo.ai';
 
-/** Expected targets for the 14 table rows (concrete ids where wildcards). */
+/** Expected targets for the 16 table rows (concrete ids where wildcards). */
 const ROW_CASES = [
   {
     path: '/home',
@@ -69,11 +69,19 @@ const ROW_CASES = [
     path: '/organizations/org_123/code-reviews/rev_9',
     app: '/(app)/(tabs)/(3_profile)/code-reviewer/org_123/reviews/rev_9',
   },
+  {
+    path: '/organizations/org_123/overview',
+    app: '/(app)/(tabs)/(3_profile)/organization/org_123',
+  },
+  {
+    path: '/pr-review/acme/api/42',
+    app: '/(app)/pr-review/acme/api/42',
+  },
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 14 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(14);
+  it('has exactly 16 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(16);
   });
 });
 
@@ -286,8 +294,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 16 entries (14 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(16);
+  it('returns 18 entries (16 rows + 2 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(18);
   });
 
   it('every entry has a "/" key', () => {
@@ -324,7 +332,7 @@ describe('aasaComponents', () => {
 });
 
 describe('androidPathPatterns', () => {
-  it('deep-equals the expected 14-string list', () => {
+  it('deep-equals the expected 16-string list', () => {
     expect(androidPathPatterns()).toEqual([
       '/home',
       '/profile',
@@ -340,6 +348,8 @@ describe('androidPathPatterns', () => {
       '/organizations/.*/security-agent/findings',
       '/organizations/.*/code-reviews',
       '/organizations/.*/code-reviews/.*',
+      '/organizations/.*/overview',
+      '/pr-review/.*/.*/.*',
     ]);
   });
 });

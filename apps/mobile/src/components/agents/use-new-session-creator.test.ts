@@ -752,6 +752,26 @@ describe('useNewSessionCreator repository platform payload', () => {
   });
 });
 
+describe('useNewSessionCreator intentFingerprint repo field', () => {
+  // The deployed app persisted safe-retry rows with the bare `fullName` in the
+  // fingerprint's `repo` field. A regression to `${platform}/${fullName}` would
+  // make `getStoredOperationKey` mint a fresh key on relaunch and bypass the
+  // operation-key dedupe (duplicate sessions, orphaned outbox rows).
+  it('fingerprints the bare fullName so persisted safe-retry rows keep matching', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'group/project', isPrivate: true },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const fingerprint = outboxMock.getStoredOperationKey.mock.calls[0]?.[0] ?? '';
+    const parsed = JSON.parse(fingerprint) as { repo: string };
+    expect(parsed.repo).toBe('group/project');
+  });
+});
+
 describe('useNewSessionCreator mutation outbox (P1-E-40c)', () => {
   beforeEach(() => {
     prepareSessionMutate.mockReset();

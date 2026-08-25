@@ -5,7 +5,9 @@ import {
   permissionAskId,
   sessionEventIdentity,
   unfilteredKiloEvents,
+  updateSessionSnapshots,
 } from './feed';
+import type { HandlerSessionSnapshot } from './sandbox-control-handlers';
 import {
   rememberAttachedRoot,
   rememberChildSession,
@@ -49,6 +51,100 @@ describe('eventKiloSessionId', () => {
     expect(eventKiloSessionId({ info: { sessionID: 'info-session' } })).toBe('info-session');
     expect(eventKiloSessionId({ info: { id: 'info-id' } })).toBe('info-id');
     expect(eventKiloSessionId({ part: { sessionID: 'part-session' } })).toBe('part-session');
+  });
+});
+
+describe('session status snapshots', () => {
+  it('reflects root busy and idle transitions in the existing snapshot array', () => {
+    rememberAttachedRoot('root', '/ws');
+    const sessions: HandlerSessionSnapshot[] = [];
+
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'root', status: { type: 'busy' } } },
+      sessions
+    );
+
+    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'root', status: { type: 'idle' } } },
+      sessions
+    );
+
+    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'idle', idleForMs: 0 }]);
+  });
+
+  it.each(['retry', 'offline'])('treats root %s status as active', status => {
+    rememberAttachedRoot('root', '/ws');
+    const sessions: HandlerSessionSnapshot[] = [];
+
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'root', status: { type: status } } },
+      sessions
+    );
+
+    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+  });
+
+  it('does not let child idle status override an active root', () => {
+    rememberAttachedRoot('root', '/ws');
+    rememberChildSession({ childId: 'child', parentId: 'root', directory: '/ws' });
+    const sessions: HandlerSessionSnapshot[] = [];
+
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'root', status: { type: 'busy' } } },
+      sessions
+    );
+    updateSessionSnapshots(
+      {
+        type: 'session.status',
+        directory: '/ws',
+        properties: { sessionID: 'child', status: { type: 'idle' } },
+      },
+      sessions
+    );
+
+    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+  });
+
+  it('ignores malformed, unknown, unattached, and unrelated events', () => {
+    rememberAttachedRoot('root', '/ws');
+    const sessions: HandlerSessionSnapshot[] = [
+      { kiloSessionId: 'root', state: 'active', idleForMs: 0 },
+    ];
+
+    for (const event of [
+      { type: 'session.status', properties: { sessionID: 'root' } },
+      { type: 'session.status', properties: { sessionID: 'root', status: null } },
+      { type: 'session.status', properties: { sessionID: 'root', status: { type: 'unknown' } } },
+      { type: 'session.status', properties: { status: { type: 'idle' } } },
+      { type: 'session.status', properties: { sessionID: 'other', status: { type: 'idle' } } },
+      { type: 'session.idle', properties: { sessionID: 'root', status: { type: 'idle' } } },
+    ]) {
+      updateSessionSnapshots(event, sessions);
+    }
+
+    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+  });
+
+  it('tracks attached roots independently', () => {
+    rememberAttachedRoot('root-a', '/a');
+    rememberAttachedRoot('root-b', '/b');
+    const sessions: HandlerSessionSnapshot[] = [];
+
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'root-a', status: { type: 'busy' } } },
+      sessions
+    );
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'root-b', status: { type: 'idle' } } },
+      sessions
+    );
+
+    expect(sessions).toEqual([
+      { kiloSessionId: 'root-a', state: 'active', idleForMs: 0 },
+      { kiloSessionId: 'root-b', state: 'idle', idleForMs: 0 },
+    ]);
   });
 });
 

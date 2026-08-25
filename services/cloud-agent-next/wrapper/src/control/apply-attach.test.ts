@@ -77,6 +77,101 @@ describe('applySessionAttach', () => {
     expect(gitCalls).toEqual([]);
   });
 
+  it('checks out the requested branch when the directory already has git metadata', async () => {
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const result = await applySessionAttach(
+      session,
+      { branch: 'feature/retry', git: { url: 'https://github.com/acme/demo.git' } },
+      {
+        kiloClient: fakeKilo(),
+        ...noFs,
+        mkdir: async () => undefined,
+        hasGit: async () => true,
+        runGit: async (args, cwd) => {
+          gitCalls.push({ args, cwd });
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      }
+    );
+
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([{ args: ['checkout', '-B', 'feature/retry'], cwd: '/workspace/a' }]);
+  });
+
+  it('retries branch checkout after cloning succeeds but the initial checkout fails', async () => {
+    const gitCalls: string[][] = [];
+    const setupCalls: string[] = [];
+    const events: PreparingEventDataV2[] = [];
+    let gitExists = false;
+    let bootstrapComplete = false;
+    let markerWrites = 0;
+    let checkoutAttempts = 0;
+    const payload = {
+      branch: 'feature/retry',
+      git: { url: 'https://github.com/acme/demo.git' },
+      setupCommands: ['pnpm install'],
+      preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
+    };
+    const deps = {
+      kiloClient: fakeKilo(),
+      mkdir: async () => undefined,
+      hasGit: async () => gitExists,
+      hasBootstrapMarker: async () => bootstrapComplete,
+      writeBootstrapMarker: async () => {
+        markerWrites += 1;
+        bootstrapComplete = true;
+      },
+      runGit: async (args: string[]) => {
+        gitCalls.push(args);
+        if (args[0] === 'clone') {
+          gitExists = true;
+          return { stdout: '', stderr: '', exitCode: 0 };
+        }
+        checkoutAttempts += 1;
+        return {
+          stdout: '',
+          stderr: checkoutAttempts === 1 ? 'checkout failed' : '',
+          exitCode: checkoutAttempts === 1 ? 1 : 0,
+        };
+      },
+      runSetup: async (command: string) => {
+        setupCalls.push(command);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      emitPreparing: (event: PreparingEventDataV2) => {
+        events.push(event);
+      },
+    };
+
+    const failed = await applySessionAttach(session, payload, deps);
+
+    expect(failed).toEqual({
+      ok: false,
+      error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+    });
+    expect(gitExists).toBe(true);
+    expect(setupCalls).toEqual([]);
+    expect(markerWrites).toBe(0);
+
+    const retried = await applySessionAttach(session, payload, deps);
+
+    expect(retried).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      ['clone', 'https://github.com/acme/demo.git', '/workspace/a'],
+      ['checkout', '-B', 'feature/retry'],
+      ['checkout', '-B', 'feature/retry'],
+    ]);
+    expect(setupCalls).toEqual(['pnpm install']);
+    expect(markerWrites).toBe(1);
+    expect(events.filter(event => event.step === 'cloning').map(event => event.action)).toEqual([
+      'step_started',
+      'step_progress',
+      'step_failed',
+      'step_started',
+      'step_completed',
+    ]);
+  });
+
   it('skips clone and setup when the bootstrap marker is present', async () => {
     const gitCalls: string[][] = [];
     const setupCalls: string[] = [];

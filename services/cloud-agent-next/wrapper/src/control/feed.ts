@@ -1,3 +1,4 @@
+import type { HandlerSessionSnapshot } from './sandbox-control-handlers';
 import { directoryForSession, rootForSession } from './session-directories';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,6 +43,31 @@ export function sessionEventIdentity(input: {
     ...(input.sessionId ? { kiloSessionId: input.sessionId } : {}),
     ...(root ? { rootKiloSessionId: root } : {}),
   };
+}
+
+export function updateSessionSnapshots(
+  event: { type: string; properties: Record<string, unknown>; directory?: string },
+  sessions: HandlerSessionSnapshot[]
+): void {
+  if (event.type !== 'session.status') return;
+  const kiloSessionId = eventKiloSessionId(event.properties);
+  if (!kiloSessionId || rootForSession(kiloSessionId, event.directory) !== kiloSessionId) return;
+  const status = event.properties.status;
+  if (!isRecord(status)) return;
+  const state =
+    status.type === 'idle'
+      ? 'idle'
+      : status.type === 'busy' || status.type === 'retry' || status.type === 'offline'
+        ? 'active'
+        : undefined;
+  if (!state) return;
+  const existing = sessions.find(session => session.kiloSessionId === kiloSessionId);
+  if (existing) {
+    existing.state = state;
+    existing.idleForMs = 0;
+    return;
+  }
+  sessions.push({ kiloSessionId, state, idleForMs: 0 });
 }
 
 export function permissionAskId(event: {

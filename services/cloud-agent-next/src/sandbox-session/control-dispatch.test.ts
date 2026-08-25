@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { controlDispatchDisposition } from './control-dispatch.js';
+import { controlDispatchDisposition, observeControlAfterStopping } from './control-dispatch.js';
 
 describe('controlDispatchDisposition', () => {
   it('fails a queued turn when the physical sandbox is failed', () => {
@@ -29,5 +29,67 @@ describe('controlDispatchDisposition', () => {
     expect(controlDispatchDisposition({ connection: 'connected', physical: 'creating' })).toBe(
       'wait'
     );
+  });
+
+  it('never sends to a stopping sandbox even when its connection is still ready', () => {
+    expect(controlDispatchDisposition({ connection: 'ready', physical: 'stopping' })).toBe('wait');
+    expect(controlDispatchDisposition({ connection: 'disconnected', physical: 'stopping' })).toBe(
+      'wait'
+    );
+  });
+});
+
+describe('observeControlAfterStopping', () => {
+  it('polls until the stopping sandbox becomes stopped', async () => {
+    let now = 0;
+    let observations = 0;
+
+    const status = await observeControlAfterStopping(
+      { connection: 'ready', physical: 'stopping' },
+      async () => {
+        observations += 1;
+        return {
+          connection: 'disconnected',
+          physical: observations === 1 ? 'stopping' : 'stopped',
+        };
+      },
+      {
+        retryMs: 5_000,
+        deadline: 120_000,
+        now: () => now,
+        sleep: async milliseconds => {
+          now += milliseconds;
+        },
+      }
+    );
+
+    expect(status).toEqual({ connection: 'disconnected', physical: 'stopped' });
+    expect(observations).toBe(2);
+    expect(now).toBe(10_000);
+  });
+
+  it('stops observing when the bounded startup deadline expires', async () => {
+    let now = 0;
+    let observations = 0;
+
+    const status = await observeControlAfterStopping(
+      { connection: 'ready', physical: 'stopping' },
+      async () => {
+        observations += 1;
+        return { connection: 'ready', physical: 'stopping' };
+      },
+      {
+        retryMs: 5_000,
+        deadline: 12_000,
+        now: () => now,
+        sleep: async milliseconds => {
+          now += milliseconds;
+        },
+      }
+    );
+
+    expect(status).toBeUndefined();
+    expect(observations).toBe(3);
+    expect(now).toBe(12_000);
   });
 });

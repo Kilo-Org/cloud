@@ -7,13 +7,18 @@ import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { createWrapperKiloClient } from '../kilo-api.js';
 import { logToFile } from '../utils.js';
 import { maybeStartSandboxControlClient } from './sandbox-control-runtime';
-import { buildHeartbeatPayload, handleControlRequest } from './sandbox-control-handlers';
+import {
+  buildHeartbeatPayload,
+  handleControlRequest,
+  type HandlerSessionSnapshot,
+} from './sandbox-control-handlers';
 import {
   childFromSessionCreated,
   eventKiloSessionId,
   permissionAskId,
   sessionEventIdentity,
   unfilteredKiloEvents,
+  updateSessionSnapshots,
 } from './feed';
 import { rememberChildSession } from './session-directories';
 
@@ -46,11 +51,7 @@ async function main(): Promise<void> {
   const kiloClient = createWrapperKiloClient(result.client, result.server.url, '/');
   logToFile(`kilo server started at ${result.server.url}`);
 
-  const sessions: Array<{
-    kiloSessionId: string;
-    state: 'idle' | 'active' | 'finalizing';
-    idleForMs: number;
-  }> = [];
+  const sessions: HandlerSessionSnapshot[] = [];
 
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   control = maybeStartSandboxControlClient(process.env, logToFile, {
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
           const child = childFromSessionCreated(event.properties);
           if (child) rememberChildSession(child);
         }
+        updateSessionSnapshots(event, sessions);
         const kiloSessionId = eventKiloSessionId(event.properties);
         const identity = sessionEventIdentity({
           sessionId: kiloSessionId,

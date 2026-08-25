@@ -6,6 +6,7 @@ export type SessionMessageRecord = {
   messageId: string;
   state: SessionMessageState;
   acceptedAt?: number;
+  lastActivityAt?: number;
   prompt?: string;
   failedReason?: string;
   attachFailures?: number;
@@ -149,7 +150,19 @@ export function acceptQueuedMessage(
 ): SessionMessageRecord[] | undefined {
   if (nextQueuedMessageId(messages) !== messageId) return undefined;
   return messages.map(message =>
-    message.messageId === messageId ? { ...message, state: 'accepted', acceptedAt } : message
+    message.messageId === messageId
+      ? { ...message, state: 'accepted', acceptedAt, lastActivityAt: acceptedAt }
+      : message
+  );
+}
+
+export function recordAcceptedMessageActivity(
+  messages: readonly SessionMessageRecord[],
+  lastActivityAt: number
+): SessionMessageRecord[] | undefined {
+  if (!hasAcceptedMessage(messages)) return undefined;
+  return messages.map(message =>
+    message.state === 'accepted' ? { ...message, lastActivityAt } : message
   );
 }
 

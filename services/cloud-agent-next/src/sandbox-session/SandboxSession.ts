@@ -45,6 +45,7 @@ import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
   controlDispatchDisposition,
   failureReasonFromControlStatus,
+  observeControlAfterStopping,
   safeErrorFromQueueReason,
 } from './control-dispatch.js';
 import { acceptedAlarmDecision } from './accepted-overdue.js';
@@ -62,6 +63,7 @@ import {
   isAttachExhausted,
   isPromptExhausted,
   nextQueuedMessageId,
+  recordAcceptedMessageActivity,
   streamCloudStatus,
   streamQueuedSnapshots,
   terminalizeAcceptedMessages,
@@ -147,6 +149,11 @@ export class SandboxSession extends DurableObject<Env> {
       eventQueries: this.eventQueries,
       broadcast: event => this.broadcastStoredEvent(event),
     });
+    const terminal = userTurnTerminalState(input.payload.type);
+    if (!terminal) {
+      const activeMessages = recordAcceptedMessageActivity(await this.loadMessages(), Date.now());
+      if (activeMessages) await this.saveMessages(activeMessages);
+    }
     const ingestItems = controlEventToIngestItems(input.payload.type, input.payload.properties);
     const eventKiloSessionId = ingestKiloSessionId(input.payload.type, input.payload.properties);
     const rootKiloSessionId = metadata.auth.kiloSessionId;
@@ -184,7 +191,6 @@ export class SandboxSession extends DurableObject<Env> {
         );
       }
     }
-    const terminal = userTurnTerminalState(input.payload.type);
     if (terminal) {
       const before = await this.loadMessages();
       if (hasAcceptedMessage(before)) {
@@ -482,7 +488,7 @@ export class SandboxSession extends DurableObject<Env> {
       message => message.state === 'accepted' && message.acceptedAt !== undefined
     );
     if (accepted?.acceptedAt !== undefined) {
-      const decision = acceptedAlarmDecision(accepted.acceptedAt, now);
+      const decision = acceptedAlarmDecision(accepted.acceptedAt, now, accepted.lastActivityAt);
       if (decision.action === 'fail') {
         await this.failWaitingMessages('accepted_overdue');
         return;
@@ -556,15 +562,34 @@ export class SandboxSession extends DurableObject<Env> {
         kiloSessionId,
         directory: this.directory(metadata),
       };
-      const before = await control.getStatus();
-      const provision = provisionPreparingStep(before.physical, allowCreate);
-      if (provision) recorder.onProgress(provision.step, provision.message);
-      const status = await control.ensureReady({
-        ownerId: metadata.identity.userId,
-        provider: getSandboxProvider(metadata),
-        allowCreate,
-        ...(metadata.auth.kilocodeToken ? { kiloToken: metadata.auth.kilocodeToken } : {}),
-      });
+      let before = await control.getStatus();
+      const stoppingDeadline = Date.now() + DEADLINE_MS.startup;
+      let status: Awaited<ReturnType<typeof control.getStatus>>;
+      while (true) {
+        if (allowCreate && before.physical === 'stopping') {
+          const observed = await observeControlAfterStopping(before, () => control.getStatus(), {
+            retryMs: QUEUE_RETRY_MS,
+            deadline: stoppingDeadline,
+          });
+          if (!observed) {
+            recorder.finalize({ status: 'failed', safeError: 'Environment failed' });
+            await this.failWaitingMessages('environment_failed');
+            return;
+          }
+          if (nextQueuedMessageId(await this.loadMessages()) !== messageId) return;
+          before = observed;
+        }
+        const provision = provisionPreparingStep(before.physical, allowCreate);
+        if (provision) recorder.onProgress(provision.step, provision.message);
+        status = await control.ensureReady({
+          ownerId: metadata.identity.userId,
+          provider: getSandboxProvider(metadata),
+          allowCreate,
+          ...(metadata.auth.kilocodeToken ? { kiloToken: metadata.auth.kilocodeToken } : {}),
+        });
+        if (!allowCreate || status.physical !== 'stopping') break;
+        before = status;
+      }
       const boot = bootPreparingStep(status.physical, status.connection);
       if (boot) recorder.onProgress(boot.step, boot.message);
       const disposition = controlDispatchDisposition(status);

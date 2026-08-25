@@ -7,6 +7,7 @@ import {
   hasAcceptedMessage,
   hasInterruptibleWork,
   nextQueuedMessageId,
+  recordAcceptedMessageActivity,
   streamCloudStatus,
   streamQueuedSnapshots,
   terminalizeAcceptedMessages,
@@ -128,7 +129,12 @@ describe('acceptQueuedMessage', () => {
       ['a', 'accepted'],
       ['b', 'queued'],
     ]);
-    expect(accepted?.find(message => message.messageId === 'a')?.acceptedAt).toBe(10);
+    expect(accepted?.find(message => message.messageId === 'a')).toEqual({
+      messageId: 'a',
+      state: 'accepted',
+      acceptedAt: 10,
+      lastActivityAt: 10,
+    });
   });
 
   it('does not resurrect a cancelled message after interrupt', () => {
@@ -140,6 +146,35 @@ describe('acceptQueuedMessage', () => {
   it('does not accept while another message is accepted', () => {
     expect(
       acceptQueuedMessage([msg('a', 'accepted'), msg('b', 'queued')], 'b', 10)
+    ).toBeUndefined();
+  });
+});
+
+const nonterminalSessionEventTypes = ['session.event', 'message.part.delta', 'session.idle'];
+
+describe('recordAcceptedMessageActivity', () => {
+  it.each(nonterminalSessionEventTypes)(
+    'keeps the accepted turn active when a %s event arrives',
+    eventType => {
+      expect(userTurnTerminalState(eventType)).toBeUndefined();
+
+      const messages: SessionMessageRecord[] = [
+        { messageId: 'a', state: 'accepted', acceptedAt: 10, lastActivityAt: 20 },
+        { messageId: 'b', state: 'queued' },
+        { messageId: 'c', state: 'completed' },
+      ];
+
+      expect(recordAcceptedMessageActivity(messages, 30)).toEqual([
+        { messageId: 'a', state: 'accepted', acceptedAt: 10, lastActivityAt: 30 },
+        { messageId: 'b', state: 'queued' },
+        { messageId: 'c', state: 'completed' },
+      ]);
+    }
+  );
+
+  it('does not update messages when no turn is accepted', () => {
+    expect(
+      recordAcceptedMessageActivity([msg('a', 'queued'), msg('b', 'completed')], 30)
     ).toBeUndefined();
   });
 });

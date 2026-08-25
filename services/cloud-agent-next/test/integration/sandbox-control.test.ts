@@ -1,9 +1,10 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
+import { loadDeadlines } from '../../src/sandbox-control/durable-state.js';
 import {
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
@@ -303,6 +304,91 @@ describe('SandboxControl durable remainder', () => {
         physical: 'stopping',
       });
     });
+  });
+
+  it('arms idle stop on ready, cancels it for active work, and rearms it when work becomes idle', async () => {
+    const sandboxId = 'sbx_control_heartbeat_idle_stop';
+    const credential = generateSandboxCredential();
+    const stub = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(stub, async instance => {
+      await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
+      await instance.initializeOwner('owner_1');
+      await instance.attachSession({
+        sessionId: 'ses_1',
+        kiloSessionId: 'kilo_1',
+        directory: '/workspace/a',
+        ownerId: 'owner_1',
+      });
+    });
+
+    const response = await SELF.fetch(`http://worker.test/sandbox-control/${sandboxId}`, {
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${credential}`,
+      },
+    });
+    if (response.status !== 101 || !response.webSocket) {
+      throw new Error(`Unexpected sandbox control upgrade: ${response.status}`);
+    }
+    const ws = response.webSocket;
+    ws.accept();
+    await completeHello(ws, 'hello-heartbeat-idle-stop');
+
+    ws.send(
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    await vi.waitFor(async () => {
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect((await loadDeadlines(state.storage)).idleStop).toEqual(expect.any(Number));
+      });
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.heartbeat',
+        payload: {
+          state: 'active',
+          pendingMessages: 0,
+          kilo: { ready: true },
+          sessions: [{ kiloSessionId: 'kilo_1', state: 'active', idleForMs: 0 }],
+        },
+      })
+    );
+    await vi.waitFor(async () => {
+      await runInDurableObject(stub, async (instance, state) => {
+        expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+        expect(await instance.listRoutes()).toEqual([
+          expect.objectContaining({ kiloSessionId: 'kilo_1', lastState: 'active' }),
+        ]);
+      });
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.heartbeat',
+        payload: {
+          state: 'idle',
+          pendingMessages: 0,
+          kilo: { ready: true },
+          sessions: [{ kiloSessionId: 'kilo_1', state: 'idle', idleForMs: 0 }],
+        },
+      })
+    );
+    await vi.waitFor(async () => {
+      await runInDurableObject(stub, async (instance, state) => {
+        expect((await loadDeadlines(state.storage)).idleStop).toEqual(expect.any(Number));
+        expect(await instance.listRoutes()).toEqual([
+          expect.objectContaining({ kiloSessionId: 'kilo_1', lastState: 'idle' }),
+        ]);
+      });
+    });
+    ws.close();
   });
 
   it('clears the transition log when the sandbox record is erased', async () => {

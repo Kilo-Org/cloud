@@ -189,24 +189,33 @@ export async function applySessionAttach(
   if (!alreadyBootstrapped && needsWorkspace) {
     try {
       await mkdir(directory);
-      if (attach.git && !(await hasGit(directory))) {
-        const cloneStepId = 'phase:cloning';
-        progress.start('cloning', cloneStepId, 'Cloning repository…');
-        progress.progress('cloning', cloneStepId, 'Cloning repository…');
-        const cloneUrl = authenticatedGitUrl(attach.git.url, attach.git.token, attach.git.platform);
-        const cloned = await runGit(['clone', cloneUrl, directory]);
-        if (cloned.exitCode !== 0) {
-          progress.fail('cloning', cloneStepId, 'git clone failed');
-          return fail('not_ready', 'git clone failed', true);
-        }
-        if (attach.branch) {
-          const checked = await runGit(['checkout', '-B', attach.branch], directory);
-          if (checked.exitCode !== 0) {
-            progress.fail('cloning', cloneStepId, 'git checkout failed');
-            return fail('not_ready', 'git checkout failed', true);
+      if (attach.git) {
+        const needsClone = !(await hasGit(directory));
+        if (needsClone || attach.branch) {
+          const cloneStepId = 'phase:cloning';
+          progress.start('cloning', cloneStepId, 'Cloning repository…');
+          if (needsClone) {
+            progress.progress('cloning', cloneStepId, 'Cloning repository…');
+            const cloneUrl = authenticatedGitUrl(
+              attach.git.url,
+              attach.git.token,
+              attach.git.platform
+            );
+            const cloned = await runGit(['clone', cloneUrl, directory]);
+            if (cloned.exitCode !== 0) {
+              progress.fail('cloning', cloneStepId, 'git clone failed');
+              return fail('not_ready', 'git clone failed', true);
+            }
           }
+          if (attach.branch) {
+            const checked = await runGit(['checkout', '-B', attach.branch], directory);
+            if (checked.exitCode !== 0) {
+              progress.fail('cloning', cloneStepId, 'git checkout failed');
+              return fail('not_ready', 'git checkout failed', true);
+            }
+          }
+          progress.complete('cloning', cloneStepId);
         }
-        progress.complete('cloning', cloneStepId);
       }
       if (setupCommands.length > 0) {
         for (const [index, command] of setupCommands.entries()) {

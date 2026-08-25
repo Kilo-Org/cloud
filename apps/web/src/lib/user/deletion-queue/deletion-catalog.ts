@@ -204,6 +204,15 @@ export function validateMaterializedStepKeys(
     seen.add(stepKey);
     catalogEntryFor(version, stepKey);
   }
+
+  for (const { stepKey } of catalogForVersion(version)) {
+    if (seen.has(stepKey) || (version === 2 && stepKey === UserDeletionStepKey.CompletionEmail)) {
+      continue;
+    }
+    throw new Error(
+      `User deletion queue integrity error: missing required step ${stepKey} for catalog version ${version}`
+    );
+  }
 }
 
 export function teardownStepKeys(

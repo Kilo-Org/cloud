@@ -104,3 +104,43 @@ describe('deletion catalog v2', () => {
     );
   });
 });
+
+describe('materialized deletion catalog validation', () => {
+  it.each([1, 2])('accepts complete catalog version %i requests', version => {
+    const stepKeys = catalogForVersion(version).map(entry => entry.stepKey);
+
+    expect(() => validateMaterializedStepKeys(version, stepKeys)).not.toThrow();
+  });
+
+  it('accepts legacy v2 requests missing only the completion email task', () => {
+    const stepKeys = catalogForVersion(2)
+      .map(entry => entry.stepKey)
+      .filter(stepKey => stepKey !== UserDeletionStepKey.CompletionEmail);
+
+    expect(() => validateMaterializedStepKeys(2, stepKeys)).not.toThrow();
+  });
+
+  it.each([
+    UserDeletionStepKey.PylonReply,
+    UserDeletionStepKey.PylonFinalize,
+    UserDeletionStepKey.CsaSupportDb,
+  ])('rejects v2 requests missing the required %s task', missingStepKey => {
+    const stepKeys = catalogForVersion(2)
+      .map(entry => entry.stepKey)
+      .filter(stepKey => stepKey !== missingStepKey);
+
+    expect(() => validateMaterializedStepKeys(2, stepKeys)).toThrow(
+      `missing required step ${missingStepKey}`
+    );
+  });
+
+  it('rejects v1 requests missing a required task', () => {
+    const stepKeys = catalogForVersion(1)
+      .map(entry => entry.stepKey)
+      .filter(stepKey => stepKey !== UserDeletionStepKey.Anonymize);
+
+    expect(() => validateMaterializedStepKeys(1, stepKeys)).toThrow(
+      `missing required step ${UserDeletionStepKey.Anonymize}`
+    );
+  });
+});

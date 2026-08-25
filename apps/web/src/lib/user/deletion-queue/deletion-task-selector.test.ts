@@ -45,6 +45,23 @@ describe('deletion task selector catalog compatibility', () => {
     const contact = await selectNextTaskForRequest({ requestId, remainingMs: 60_000 });
     expect(contact?.step.step_key).toBe(UserDeletionStepKey.PylonContact);
   });
+
+  it('does not select dependent work when a required finalization task is missing', async () => {
+    const requestId = await createV2Request();
+    await markAllTasksSucceeded(requestId, [UserDeletionStepKey.PylonContact]);
+    await db
+      .delete(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.PylonFinalize)
+        )
+      );
+
+    await expect(selectNextTaskForRequest({ requestId, remainingMs: 60_000 })).rejects.toThrow(
+      `missing required step ${UserDeletionStepKey.PylonFinalize}`
+    );
+  });
 });
 
 async function createV2Request(): Promise<string> {

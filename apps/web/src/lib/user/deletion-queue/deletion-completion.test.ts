@@ -116,6 +116,32 @@ describe('deletion completion gates', () => {
     expect(request?.target_email).toBeNull();
   });
 
+  it('does not scrub or complete a request missing a required finalization task', async () => {
+    const requestId = await enqueueEmailOnly();
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2).map(entry => entry.stepKey),
+      { status: UserDeletionStepStatus.Succeeded }
+    );
+    await db
+      .delete(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.CsaSupportDb)
+        )
+      );
+
+    await expect(advanceDeletionGates(requestId)).rejects.toThrow(
+      `missing required step ${UserDeletionStepKey.CsaSupportDb}`
+    );
+
+    const request = await loadRequest(requestId);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Finalizing);
+    expect(request?.target_email).toBeTruthy();
+  });
+
   it('recovers a stuck finalizing request via the unclaimable sweep', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);

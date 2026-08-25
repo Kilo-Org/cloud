@@ -31,6 +31,7 @@ const store = createSecureStorePreference<string[]>({
   defaultValue: [],
   parse: parseTrustedHosts,
   serialize: value => JSON.stringify(value),
+  mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
 });
 
 // Warm the store as soon as any trust-aware module is imported, so a host

@@ -83,6 +83,12 @@ vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+vi.mock('@/lib/feedback', () => ({
+  maybeAskAfterSuccessfulOutcome: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
 
 const ITEM_FRESH_A: PendingReviewItem = {
   id: 'fresh-a',

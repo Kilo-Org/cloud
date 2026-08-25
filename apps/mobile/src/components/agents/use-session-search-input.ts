@@ -22,9 +22,9 @@ function getDrafts(): Promise<typeof DraftsModule> {
 }
 
 /** TextInput remount key while the durable draft is still loading / empty. */
-export const SESSION_SEARCH_DEFAULT_INPUT_KEY = 'session-search-empty';
+const SESSION_SEARCH_DEFAULT_INPUT_KEY = 'session-search-empty';
 /** TextInput remount key applied once to render a restored non-empty draft. */
-export const SESSION_SEARCH_RESTORED_INPUT_KEY = 'session-search-restored';
+const SESSION_SEARCH_RESTORED_INPUT_KEY = 'session-search-restored';
 
 export type UseSessionSearchInputParams = {
   /** Signed-in user id; persistence is skipped when empty. */

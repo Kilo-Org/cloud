@@ -334,7 +334,7 @@ export function composeSessionProvenanceSubtitle(params: {
  * Normalize a search needle the same way the server does: trim, lowercase,
  * then strip one leading `#` so `"#42"` and `"42"` are equivalent needles.
  */
-export function normalizeSessionSearchNeedle(raw: string): string {
+function normalizeSessionSearchNeedle(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
   return trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
 }

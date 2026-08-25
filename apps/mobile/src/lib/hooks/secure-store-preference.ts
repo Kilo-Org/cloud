@@ -15,13 +15,23 @@ export function createSecureStorePreference<T>(options: {
   defaultValue: T;
   parse: (raw: string | null) => T;
   serialize: (value: T) => string;
+  /**
+   * Reconciles a pending in-memory write with the disk value that arrives
+   * after it. Only runs when a set()/clear() happened before the initial
+   * load resolved; `disk` is the parsed persisted value and `pending` is the
+   * in-memory value at load time.
+   */
+  mergeOnLoad?: (disk: T, pending: T) => T;
 }) {
-  const { key, defaultValue, parse, serialize } = options;
+  const { key, defaultValue, parse, serialize, mergeOnLoad } = options;
   let value = defaultValue;
   let hasLoaded = false;
   // A set() or clear() before the initial load resolves must win over the
   // disk value.
   let dirty = false;
+  // A clear() before the initial load resolves must still win over the disk
+  // value even when mergeOnLoad is set.
+  let cleared = false;
   let loadStarted = false;
   const listeners = new Set<() => void>();
 
@@ -36,6 +46,12 @@ export function createSecureStorePreference<T>(options: {
       const raw = await SecureStore.getItemAsync(key);
       if (!dirty) {
         value = parse(raw);
+      } else if (mergeOnLoad && !cleared) {
+        value = mergeOnLoad(parse(raw), value);
+        // The pending write raced the disk read and already persisted only
+        // the partial value; persist the merged value so the persisted list
+        // is not overwritten.
+        void persist(value);
       }
     } catch (error) {
       // Keep the default on read failure — this runs on mount, before the
@@ -92,6 +108,7 @@ export function createSecureStorePreference<T>(options: {
     set: (next: T) => {
       value = next;
       dirty = true;
+      cleared = false;
       hasLoaded = true;
       emit();
       void persist(next);
@@ -122,6 +139,9 @@ export function createSecureStorePreference<T>(options: {
       // Keep dirty set so an in-flight initial read does not restore the old
       // value after sign-out.
       dirty = true;
+      // A clear before the initial load resolves must still win, even with
+      // mergeOnLoad set.
+      cleared = true;
       emit();
       void remove();
     },

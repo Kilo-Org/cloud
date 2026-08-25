@@ -614,6 +614,11 @@ const PROGRESS_GROUPS = [
     stepKeys: [UserDeletionStepKey.PylonFinalize],
   },
   {
+    label: 'Completion email',
+    hint: 'After the account is fully deleted',
+    stepKeys: [UserDeletionStepKey.CompletionEmail],
+  },
+  {
     label: 'Pylon delete',
     hint: 'After the ticket is tagged and closed',
     stepKeys: [UserDeletionStepKey.PylonContact],

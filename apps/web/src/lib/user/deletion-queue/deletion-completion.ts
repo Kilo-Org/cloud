@@ -9,8 +9,8 @@ import {
 import { db } from '@/lib/drizzle';
 import {
   catalogEntryFor,
-  catalogForVersion,
   preReplyStepKeys,
+  validateMaterializedStepKeys,
 } from '@/lib/user/deletion-queue/deletion-catalog';
 import { USER_DELETION_STOP_STARTING_RESERVE_MS } from '@/lib/user/deletion-queue/deletion-constants';
 import {
@@ -89,7 +89,7 @@ export async function tryCompleteRequest(requestId: string): Promise<boolean> {
       .where(eq(user_deletion_steps.request_id, requestId))
       .for('update');
 
-    const required = catalogForVersion(request.catalog_version).map(entry => entry.stepKey);
+    const required = steps.map(step => step.step_key);
     if (!catalogTasksReady(request.catalog_version, steps, required)) {
       return false;
     }
@@ -117,9 +117,10 @@ function catalogTasksReady(
   steps: (typeof user_deletion_steps.$inferSelect)[],
   requiredKeys: readonly UserDeletionStepKey[]
 ): boolean {
-  if (new Set(steps.map(step => step.step_key)).size !== steps.length) {
-    return false;
-  }
+  validateMaterializedStepKeys(
+    catalogVersion,
+    steps.map(step => step.step_key)
+  );
   for (const key of requiredKeys) {
     const matches = steps.filter(step => step.step_key === key);
     if (matches.length !== 1) return false;

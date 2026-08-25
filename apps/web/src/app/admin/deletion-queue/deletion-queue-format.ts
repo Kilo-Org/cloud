@@ -62,6 +62,10 @@ const STEP_LABELS: Record<string, { label: string; description: string }> = {
     label: 'Pylon finalize',
     description: 'Tag delete-complete and close the ticket',
   },
+  completion_email: {
+    label: 'Completion email',
+    description: 'Notify the customer after account deletion',
+  },
   pylon_contact: {
     label: 'Pylon delete',
     description: 'Delete the Pylon contact',

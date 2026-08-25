@@ -63,6 +63,59 @@ describe('deletion completion gates', () => {
     expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
   });
 
+  it('does not scrub or complete a new v2 request while completion email is pending', async () => {
+    const requestId = await enqueueEmailOnly();
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2)
+        .map(entry => entry.stepKey)
+        .filter(key => key !== UserDeletionStepKey.CompletionEmail),
+      { status: UserDeletionStepStatus.NotApplicable }
+    );
+
+    await advanceDeletionGates(requestId);
+
+    const blocked = await loadRequest(requestId);
+    expect(blocked?.status).toBe(UserDeletionRequestStatus.Finalizing);
+    expect(blocked?.target_email).toBeTruthy();
+
+    await setStepsStatus(requestId, [UserDeletionStepKey.CompletionEmail], {
+      status: UserDeletionStepStatus.NotApplicable,
+    });
+    await advanceDeletionGates(requestId);
+
+    const completed = await loadRequest(requestId);
+    expect(completed?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(completed?.target_email).toBeNull();
+  });
+
+  it('completes a pre-deployment v2 request without a completion email row', async () => {
+    const requestId = await enqueueEmailOnly();
+    await db
+      .delete(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.CompletionEmail)
+        )
+      );
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2)
+        .map(entry => entry.stepKey)
+        .filter(key => key !== UserDeletionStepKey.CompletionEmail),
+      { status: UserDeletionStepStatus.Succeeded }
+    );
+
+    await advanceDeletionGates(requestId);
+
+    const request = await loadRequest(requestId);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.target_email).toBeNull();
+  });
+
   it('recovers a stuck finalizing request via the unclaimable sweep', async () => {
     const requestId = await enqueueEmailOnly();
     await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);

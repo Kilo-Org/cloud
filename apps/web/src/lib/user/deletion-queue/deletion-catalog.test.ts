@@ -6,6 +6,7 @@ import {
   teardownStepKeys,
   USER_DELETION_CATALOG_V1,
   USER_DELETION_CATALOG_V2,
+  validateMaterializedStepKeys,
 } from '@/lib/user/deletion-queue/deletion-catalog';
 
 describe('deletion catalog v1', () => {
@@ -36,8 +37,8 @@ describe('deletion catalog v1', () => {
 });
 
 describe('deletion catalog v2', () => {
-  it('includes PostHog, Substack, Pylon finalize, and CSA support DB', () => {
-    expect(USER_DELETION_CATALOG_V2).toHaveLength(12);
+  it('includes the completion email between Pylon finalize and contact cleanup', () => {
+    expect(USER_DELETION_CATALOG_V2).toHaveLength(13);
     expect(catalogForVersion(2).map(entry => entry.stepKey)).toEqual([
       UserDeletionStepKey.KiloclawDestroy,
       UserDeletionStepKey.Customerio,
@@ -49,6 +50,7 @@ describe('deletion catalog v2', () => {
       UserDeletionStepKey.Anonymize,
       UserDeletionStepKey.PylonReply,
       UserDeletionStepKey.PylonFinalize,
+      UserDeletionStepKey.CompletionEmail,
       UserDeletionStepKey.PylonContact,
       UserDeletionStepKey.CsaSupportDb,
     ]);
@@ -68,13 +70,37 @@ describe('deletion catalog v2', () => {
     ]);
     expect(catalogEntryFor(2, UserDeletionStepKey.PylonContact).dependsOn).toEqual([
       UserDeletionStepKey.PylonFinalize,
+      UserDeletionStepKey.CompletionEmail,
     ]);
     expect(catalogEntryFor(2, UserDeletionStepKey.CsaSupportDb).dependsOn).toEqual([
       UserDeletionStepKey.PylonContact,
     ]);
   });
 
+  it('does not select completion email before teardown and anonymize', () => {
+    expect(catalogEntryFor(2, UserDeletionStepKey.CompletionEmail).dependsOn).toEqual([
+      ...teardownStepKeys(2),
+      UserDeletionStepKey.Anonymize,
+    ]);
+    expect(catalogEntryFor(2, UserDeletionStepKey.CompletionEmail)).toMatchObject({
+      phase: 'finalize',
+      allowsManualVerification: true,
+    });
+  });
+
   it('rejects an unknown catalog version', () => {
     expect(() => catalogForVersion(3)).toThrow(/Unsupported/);
+  });
+
+  it('rejects duplicate and unknown materialized task keys', () => {
+    expect(() =>
+      validateMaterializedStepKeys(2, [
+        UserDeletionStepKey.Anonymize,
+        UserDeletionStepKey.Anonymize,
+      ])
+    ).toThrow(/duplicate step/);
+    expect(() => validateMaterializedStepKeys(2, ['retired_step' as UserDeletionStepKey])).toThrow(
+      /Unknown user deletion step/
+    );
   });
 });

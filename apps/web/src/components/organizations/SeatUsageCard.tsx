@@ -42,6 +42,16 @@ export function SeatUsageCard({ organizationId }: Props) {
     return null;
   }
 
+  if (!org) {
+    return null;
+  }
+
+  // Once the org is loaded, hide Seat Usage for demo orgs and
+  // suppressed-trial orgs before any Seat Usage loading or error UI.
+  if (org.settings.suppress_trial_messaging || org.settings.is_sales_demo) {
+    return null;
+  }
+
   if (error || orgError || status === 'error') {
     return (
       <ErrorCard
@@ -54,16 +64,6 @@ export function SeatUsageCard({ organizationId }: Props) {
         }}
       />
     );
-  }
-
-  if (!org) {
-    return null;
-  }
-
-  // Once the org is loaded, hide Seat Usage for demo orgs and
-  // suppressed-trial orgs before any Seat Usage loading UI.
-  if (org.settings.suppress_trial_messaging || org.settings.is_sales_demo) {
-    return null;
   }
 
   if (isLoading || status === 'loading') {

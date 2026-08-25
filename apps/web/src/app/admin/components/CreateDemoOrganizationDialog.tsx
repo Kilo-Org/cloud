@@ -81,7 +81,9 @@ export function CreateDemoOrganizationDialog({
 
   const handleBlur = () => {
     const trimmed = email.trim();
-    if (trimmed && !isAllowedSalesDemoEmail(trimmed)) {
+    if (!trimmed || isAllowedSalesDemoEmail(trimmed)) {
+      setFieldError(null);
+    } else {
       setFieldError(
         'Only emails ending in @kilocode.ai or @anaconda.com can own a sales demo organization.'
       );
@@ -144,7 +146,7 @@ export function CreateDemoOrganizationDialog({
               </div>
             )}
             {conflictLink && (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground" role="alert">
                 This user already owns a demo organization:{' '}
                 <Link
                   href={`/admin/organizations/${encodeURIComponent(conflictLink.organizationId)}`}

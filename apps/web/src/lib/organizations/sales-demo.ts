@@ -5,6 +5,7 @@ import {
   exa_usage_log,
   kilocode_users,
   microdollar_usage,
+  organization_invitations,
   organization_memberships,
   organizations,
   type Organization,
@@ -200,6 +201,7 @@ export async function restoreSalesDemoOrganization(args: {
     .select()
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .for('update')
     .limit(1);
 
   if (!org || org.settings.is_sales_demo !== true) {
@@ -216,6 +218,9 @@ export async function restoreSalesDemoOrganization(args: {
   await txn
     .delete(credit_transactions)
     .where(eq(credit_transactions.organization_id, organizationId));
+  await txn
+    .delete(organization_invitations)
+    .where(eq(organization_invitations.organization_id, organizationId));
 
   const now = new Date();
   const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
@@ -226,6 +231,7 @@ export async function restoreSalesDemoOrganization(args: {
       total_microdollars_acquired: 0,
       microdollars_used: 0,
       microdollars_balance: 0,
+      auto_top_up_enabled: false,
       plan: 'enterprise',
       require_seats: false,
       free_trial_end_at: oneYearFromNow.toISOString(),

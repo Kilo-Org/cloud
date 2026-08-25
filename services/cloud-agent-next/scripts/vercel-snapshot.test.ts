@@ -61,7 +61,7 @@ describe('Vercel snapshot operator pure logic', () => {
         '',
       ].join('\n')
     );
-    const env: NodeJS.ProcessEnv = {};
+    const env: Record<string, string | undefined> = {};
     applyDevVarsFallback(env, vars);
     expect(env).toEqual({
       VERCEL_TOKEN: 'token-from-file',
@@ -82,7 +82,7 @@ describe('Vercel snapshot operator pure logic', () => {
   });
 
   it('does not overwrite an already-exported VERCEL_TOKEN', () => {
-    const env: NodeJS.ProcessEnv = { VERCEL_TOKEN: 'exported-token' };
+    const env: Record<string, string | undefined> = { VERCEL_TOKEN: 'exported-token' };
     applyDevVarsFallback(env, parseDevVars('VERCEL_TOKEN=file-token\n'));
     expect(env.VERCEL_TOKEN).toBe('exported-token');
   });

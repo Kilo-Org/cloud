@@ -170,7 +170,7 @@ export function parseDevVars(content: string): Map<string, string> {
 }
 
 export function applyDevVarsFallback(
-  env: NodeJS.ProcessEnv,
+  env: Record<string, string | undefined>,
   vars: Map<string, string>,
   keys: readonly string[] = DEV_VARS_FALLBACK_KEYS
 ): void {

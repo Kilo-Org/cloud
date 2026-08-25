@@ -1266,7 +1266,9 @@ export const organizationAdminRouter = createTRPCRouter({
             WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
           )`
         );
-        statusConditions.push(sql`NOT (${organizations.settings}->>'is_sales_demo' = 'true')`);
+        statusConditions.push(
+          sql`${organizations.settings}->>'is_sales_demo' IS DISTINCT FROM 'true'`
+        );
       }
       // mode === 'all': no subscription filter
 

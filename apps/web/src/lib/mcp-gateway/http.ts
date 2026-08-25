@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { GatewayError } from '@kilocode/mcp-gateway';
+import { extractBearerToken as extractBearerTokenFromHeader } from '@kilocode/worker-utils/extract-bearer-token';
 
 export function gatewayErrorResponse(error: unknown) {
   if (error instanceof GatewayError) {
@@ -16,8 +17,5 @@ export function gatewayErrorResponse(error: unknown) {
 }
 
 export function extractBearerToken(headers: Headers): string | null {
-  const authorization = headers.get('authorization');
-  if (!authorization?.toLowerCase().startsWith('bearer ')) return null;
-  const token = authorization.slice(7).trim();
-  return token.length > 0 ? token : null;
+  return extractBearerTokenFromHeader(headers.get('authorization'));
 }

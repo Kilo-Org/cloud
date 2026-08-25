@@ -1,5 +1,5 @@
 import { lookup } from 'dns/promises';
-import ipaddr from 'ipaddr.js';
+import { isIpAddress, isPublicIp } from '@kilocode/mcp-gateway';
 import { isIP } from 'net';
 
 /** Maximum redirect hops followed before the request is rejected. */
@@ -31,19 +31,19 @@ function stripIpv6Brackets(hostname: string): string {
 }
 
 /**
- * Rejects any address that ipaddr.js does not classify as a public unicast
- * destination. This excludes loopback, private, link-local, unique-local IPv6,
- * unspecified, multicast, reserved/test ranges, and broadcast addresses.
+ * Rejects any address that `isPublicIp` does not classify as public. This
+ * excludes loopback, private, link-local, unique-local IPv6, unspecified,
+ * multicast, reserved/test ranges, and broadcast addresses.
  */
 function assertPublicAddress(address: string): void {
   const normalized = stripIpv6Brackets(address.toLowerCase());
   if (normalized.includes('%')) {
     throw new MediaProxyError('Media URL host must not include a zone id.');
   }
-  if (!ipaddr.isValid(normalized)) {
+  if (!isIpAddress(normalized)) {
     throw new MediaProxyError('Media URL host resolves to an invalid address.');
   }
-  if (ipaddr.process(normalized).range() !== 'unicast') {
+  if (!isPublicIp(normalized)) {
     throw new MediaProxyError('Media URL host resolves to a non-public address.');
   }
 }

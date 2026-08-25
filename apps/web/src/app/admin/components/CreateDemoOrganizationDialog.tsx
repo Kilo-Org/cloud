@@ -113,10 +113,19 @@ export function CreateDemoOrganizationDialog({
     onOpenChange(false);
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setEmail('');
+      setFieldError(null);
+      setConflictLink(null);
+    }
+    onOpenChange(nextOpen);
+  };
+
   const isPending = createDemoOrganizationMutation.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create Demo Organization</DialogTitle>
@@ -135,7 +144,7 @@ export function CreateDemoOrganizationDialog({
                 onChange={e => setEmail(e.target.value)}
                 onBlur={handleBlur}
                 className="col-span-3"
-                placeholder="owner@kilocode.ai"
+                placeholder="owner@example.com"
                 aria-invalid={fieldError ? true : undefined}
                 aria-describedby={fieldError ? 'sales-demo-email-error' : undefined}
               />

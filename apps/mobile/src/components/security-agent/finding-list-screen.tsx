@@ -27,6 +27,7 @@ import {
   useSecurityAnalysisCapacity,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -67,6 +68,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const query = useMemo(() => toSecurityFindingQuery(filters), [filters]);
   const findings = useSecurityFindings(scope, query);
   const capacity = useSecurityAnalysisCapacity(scope);
+  useRouteForegroundRefresh([[['securityAgent']]]);
 
   const slaEnabled = config.data?.slaEnabled ?? true;
   const hasAnalysisCapacity =

@@ -18,7 +18,11 @@ import { ProductChoices } from '@/components/home/product-choices';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import {
+  type ActiveSession,
+  type StoredSession,
+  useAgentSessions,
+} from '@/lib/hooks/use-agent-sessions';
 import { useOrganization } from '@/lib/organization-context';
 
 export function HomeScreen() {
@@ -31,6 +35,7 @@ export function HomeScreen() {
   const {
     storedSessions,
     activeSessions,
+    activeSessionIds,
     isLoading: sessionsLoading,
     storedIsError,
     storedIsSuccess,
@@ -84,6 +89,9 @@ export function HomeScreen() {
               {renderSessionsOrPromo({
                 hasAnySession,
                 organizationId,
+                activeSessions,
+                storedSessions,
+                activeSessionIds,
                 sessionsError: storedIsError,
                 sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
                 activeIsError,
@@ -109,6 +117,9 @@ export function HomeScreen() {
 function renderSessionsOrPromo(params: {
   hasAnySession: boolean;
   organizationId: string | null;
+  activeSessions: ActiveSession[];
+  storedSessions: StoredSession[];
+  activeSessionIds: Set<string>;
   sessionsError: boolean;
   sessionsLoadedEmpty: boolean;
   activeIsError: boolean;
@@ -120,7 +131,14 @@ function renderSessionsOrPromo(params: {
   // have. The first-use promo only appears after a confirmed empty
   // response, never merely because the fetch hasn't succeeded yet.
   if (params.hasAnySession) {
-    return <AgentSessionsSection organizationId={params.organizationId} />;
+    return (
+      <AgentSessionsSection
+        activeSessions={params.activeSessions}
+        storedSessions={params.storedSessions}
+        activeSessionIds={params.activeSessionIds}
+        activeIsError={params.activeIsError}
+      />
+    );
   }
   if (params.sessionsError) {
     return (

@@ -8,11 +8,7 @@ import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { SectionHeader } from '@/components/home/section-header';
 import { Text } from '@/components/ui/text';
-import {
-  type ActiveSession,
-  type StoredSession,
-  useAgentSessions,
-} from '@/lib/hooks/use-agent-sessions';
+import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp } from '@/lib/utils';
 
 const MAX_ROWS = 3;
@@ -98,15 +94,20 @@ export function hasDisplayableAgentSessions(
 }
 
 type AgentSessionsSectionProps = {
-  organizationId: string | null;
+  activeSessions: ActiveSession[];
+  storedSessions: StoredSession[];
+  activeSessionIds: Set<string>;
+  activeIsError: boolean;
 };
 
-export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
+export function AgentSessionsSection({
+  activeSessions,
+  storedSessions,
+  activeSessionIds,
+  activeIsError,
+}: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
-    organizationId,
-  });
   const navigateToSession = useAgentSessionNavigator();
 
   const rows = buildRows({ activeSessions, storedSessions, activeSessionIds });

@@ -28,15 +28,6 @@ vi.mock('@/components/ui/text', () => ({
   Text: () => null,
 }));
 
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
-    activeSessions: [],
-    storedSessions: [],
-    activeSessionIds: new Set(),
-    activeIsError: false,
-  }),
-}));
-
 function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
   return {
     id: 'a1',

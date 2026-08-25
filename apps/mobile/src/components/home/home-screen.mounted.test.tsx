@@ -57,9 +57,10 @@ vi.mock('@/components/ui/skeleton', () => ({
 }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useAgentSessions: () => ({
-    activeSessions: [],
-    isLoading: sessionsLoading.value,
     storedSessions: [{}],
+    activeSessions: [],
+    activeSessionIds: new Set(),
+    isLoading: sessionsLoading.value,
     storedIsError: storedIsError.value,
     storedIsSuccess: storedIsSuccess.value,
     activeIsError: activeIsError.value,

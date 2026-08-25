@@ -24,7 +24,7 @@ type TimezoneSelectorProps = {
 /** Get a stable list of IANA timezones. */
 function getTimezones(): string[] {
   try {
-    return Intl.supportedValuesOf('timeZone');
+    return ['UTC', ...Intl.supportedValuesOf('timeZone')];
   } catch {
     // Fallback for older runtimes
     return [
